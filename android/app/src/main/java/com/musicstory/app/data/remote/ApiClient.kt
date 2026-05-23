@@ -1,8 +1,11 @@
 package com.musicstory.app.data.remote
 
+import com.musicstory.app.BuildConfig
 import com.musicstory.app.data.local.SettingsDataStore
+import com.musicstory.app.util.StoryLog
 import com.musicstory.app.data.model.StoryRequest
 import com.musicstory.app.data.model.StoryResponse
+import kotlinx.coroutines.runBlocking
 import okhttp3.Interceptor
 import okhttp3.OkHttpClient
 import okhttp3.logging.HttpLoggingInterceptor
@@ -10,13 +13,21 @@ import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
 import java.util.concurrent.TimeUnit
 
-object ApiClient {
+class ApiClient(
+    private val authManager: BackendAuthManager,
+) {
 
-    private val loggingInterceptor = HttpLoggingInterceptor().apply {
-        level = HttpLoggingInterceptor.Level.BASIC
+    private val loggingInterceptor = HttpLoggingInterceptor { message ->
+        StoryLog.d(message)
+    }.apply {
+        level = if (BuildConfig.DEBUG) {
+            HttpLoggingInterceptor.Level.BASIC
+        } else {
+            HttpLoggingInterceptor.Level.NONE
+        }
     }
 
-    private val okHttpClient: OkHttpClient = OkHttpClient.Builder()
+    private val baseOkHttpClient: OkHttpClient = OkHttpClient.Builder()
         .connectTimeout(15, TimeUnit.SECONDS)
         .readTimeout(50, TimeUnit.SECONDS)
         .writeTimeout(15, TimeUnit.SECONDS)
@@ -27,38 +38,33 @@ object ApiClient {
     private var cachedBaseUrl: String? = null
 
     @Volatile
-    private var cachedSecret: String? = null
-
-    @Volatile
     private var cachedApi: StoryApi? = null
 
-    fun getApi(baseUrl: String, proxySecret: String = ""): StoryApi {
+    suspend fun fetchFullStory(baseUrl: String, request: StoryRequest): StoryResponse {
+        val api = getApi(baseUrl)
+        return try {
+            api.fetchFullStory(request)
+        } catch (first: Exception) {
+            StoryLog.w("Story fetch retry after: ${first.message}")
+            authManager.invalidateToken()
+            getApi(baseUrl).fetchFullStory(request)
+        }
+    }
+
+    fun getApi(baseUrl: String): StoryApi {
         val normalized = normalizeBaseUrl(baseUrl)
-        val secret = proxySecret.trim()
         val current = cachedApi
-        if (current != null && cachedBaseUrl == normalized && cachedSecret == secret) {
+        if (current != null && cachedBaseUrl == normalized) {
             return current
         }
         return synchronized(this) {
             val again = cachedApi
-            if (again != null && cachedBaseUrl == normalized && cachedSecret == secret) {
+            if (again != null && cachedBaseUrl == normalized) {
                 again
             } else {
-                val client = if (secret.isEmpty()) {
-                    okHttpClient
-                } else {
-                    okHttpClient.newBuilder()
-                        .addInterceptor(
-                            Interceptor { chain ->
-                                chain.proceed(
-                                    chain.request().newBuilder()
-                                        .header("X-Music-Story-Secret", secret)
-                                        .build(),
-                                )
-                            },
-                        )
-                        .build()
-                }
+                val client = baseOkHttpClient.newBuilder()
+                    .addInterceptor(createAuthInterceptor(normalized))
+                    .build()
                 Retrofit.Builder()
                     .baseUrl(normalized)
                     .client(client)
@@ -68,7 +74,6 @@ object ApiClient {
                     .also {
                         cachedApi = it
                         cachedBaseUrl = normalized
-                        cachedSecret = secret
                     }
             }
         }
@@ -78,7 +83,36 @@ object ApiClient {
         synchronized(this) {
             cachedApi = null
             cachedBaseUrl = null
-            cachedSecret = null
+        }
+    }
+
+    private fun createAuthInterceptor(baseUrl: String): Interceptor {
+        return Interceptor { chain ->
+            val token = runBlocking { authManager.getAccessToken(baseUrl) }
+            val original = chain.request()
+            val request = if (!token.isNullOrBlank()) {
+                original.newBuilder()
+                    .header("Authorization", "Bearer $token")
+                    .build()
+            } else {
+                original
+            }
+
+            val response = chain.proceed(request)
+            if (response.code == 401) {
+                response.close()
+                val refreshed = runBlocking {
+                    authManager.invalidateToken()
+                    authManager.getAccessToken(baseUrl, forceRefresh = true)
+                }
+                if (!refreshed.isNullOrBlank()) {
+                    val retry = original.newBuilder()
+                        .header("Authorization", "Bearer $refreshed")
+                        .build()
+                    return@Interceptor chain.proceed(retry)
+                }
+            }
+            response
         }
     }
 
@@ -97,5 +131,7 @@ object ApiClient {
         return if (trimmed.endsWith("/")) trimmed else "$trimmed/"
     }
 
-    fun defaultApi(): StoryApi = getApi(SettingsDataStore.DEFAULT_BACKEND_URL)
+    companion object {
+        fun defaultBaseUrl(): String = SettingsDataStore.DEFAULT_BACKEND_URL
+    }
 }

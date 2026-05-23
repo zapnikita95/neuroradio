@@ -25,6 +25,15 @@ export function pickAngle(previousCount: number): string {
   return STORY_ANGLES[previousCount % STORY_ANGLES.length];
 }
 
+function personaForYear(
+  year: number,
+  role: string,
+  speech: string,
+  era: string,
+): StoryPersona {
+  return { roleTitle: role, speechStyle: speech, eraHint: era };
+}
+
 export function personaForTrack(
   year: number | undefined,
   genre: string | undefined,
@@ -34,33 +43,45 @@ export function personaForTrack(
   const a = artist.toLowerCase();
   const y = year ?? guessDecadeYear(artist);
 
+  if (a.includes('elvis')) {
+    return personaForYear(
+      y,
+      `фанат rock'n'roll и soul ${y}-х, коллекционирует синглы Elvis`,
+      'речь 50–70-х: «слушай», «вот что», уважение к King, без сленга другой эпохи',
+      'Телевизионные шоу, RCA Studio, Las Vegas, реакция зала',
+    );
+  }
+
   if (
     g.includes('jazz') ||
     g.includes('swing') ||
     g.includes('bebop') ||
     (y >= 1935 && y <= 1965 && (g.includes('blues') || !g))
   ) {
-    return {
-      roleTitle: `чернокожий или белый джазмен из ${y}-х, одержимый swing и bebop`,
-      speechStyle: 'хриплый смех, «братуха», виски, дым, пот, аплодисменты, уважение к мастерам',
-      eraHint: `Америка ${y}-х, джем-сейшены, винил, расовые барьеры, живое радио`,
-    };
+    return personaForYear(
+      y,
+      `джазмен ${y}-х, одержим swing и bebop`,
+      'лексика 40–60-х: «cat», «man», «dig this», джем-сейшены',
+      `Америка ${y}-х, винил, расовые барьеры, живое радио`,
+    );
   }
 
   if (g.includes('blues') || g.includes('soul')) {
-    return {
-      roleTitle: `блюзмен или soulmate-фанат ${y}-х`,
-      speechStyle: 'грубоватая нежность, исповедь, «слушай, сынок», гитарные струны и ночь',
-      eraHint: 'юг США или городской клуб, боль и гордость в одной песне',
-    };
+    return personaForYear(
+      y,
+      `блюзовый меломан ${y}-х`,
+      'лексика soul/blues: «слушай», «child», исповедь, ночной клуб',
+      'юг США или городской клуб',
+    );
   }
 
   if (g.includes('rock') || g.includes('metal') || g.includes('punk')) {
-    return {
-      roleTitle: `рок-фанат эпохи ${y}-х, который был на каждом концерте`,
-      speechStyle: 'дерзость, энергия, «чувак», громкость как религия',
-      eraHint: 'гаражи, фестивали, бунт против скучных правил',
-    };
+    return personaForYear(
+      y,
+      `рок-фанат ${y}-х`,
+      'лексика rock: «вот что», «слушай сюда», концертный зал',
+      'гаражи, фестивали, бунт против скучных правил',
+    );
   }
 
   if (
@@ -69,78 +90,91 @@ export function personaForTrack(
     g.includes('techno') ||
     g.includes('dance')
   ) {
-    return {
-      roleTitle: `клубный одержимый ${y}-х, знает каждый break и sample`,
-      speechStyle: 'неон, бас в груди, ночь без сна, insider-лексика',
-      eraHint: 'warehouse, диджейские стыки, новая музыка из старых пластинок',
-    };
+    return personaForYear(
+      y,
+      `клубный меломан ${y}-х`,
+      'лексика dance: break, sample, бас, warehouse',
+      'warehouse, диджейские стыки',
+    );
   }
 
   if (g.includes('hip hop') || g.includes('rap')) {
-    return {
-      roleTitle: `фанат хип-хопа ${y}-х с улицы и блокнотом цитат`,
-      speechStyle: 'ритм речи, уличная честность, уважение к flow',
-      eraHint: 'битбокс, блок-вечеринки, слова как оружие и щит',
-    };
+    return personaForYear(
+      y,
+      `фанат хип-хопа ${y}-х`,
+      'лексика rap: flow, block party, уличная честность',
+      'битбокс, блок-вечеринки',
+    );
   }
 
   if (g.includes('pop') || a.includes('beatles') || a.includes('abba')) {
-    return {
-      roleTitle: `обожатель поп-культуры ${y}-х, знает каждый хит по мему`,
-      speechStyle: 'лёгкий юмор, ностальгия, «ты представляешь?»',
-      eraHint: 'телевидение, магнитофоны, первые кассеты',
-    };
+    return personaForYear(
+      y,
+      `обожатель поп-культуры ${y}-х`,
+      'лексика pop: «ты представляешь?», радио и TV',
+      'телевидение, магнитофоны, кассеты',
+    );
   }
 
   if (y < 1970) {
-    return {
-      roleTitle: `современник ${y}-х, фанат ${artist}`,
-      speechStyle: 'тепло, уважение к старой школе, винил и радио',
-      eraHint: 'мир до streaming, музыка как событие',
-    };
+    return personaForYear(
+      y,
+      `современник ${y}-х, фанат ${artist}`,
+      `лексика ${y}-х: винил, радио`,
+      'мир до streaming',
+    );
   }
 
   if (y < 1990) {
-    return {
-      roleTitle: `меломан ${y}-х, коллекционер пластинок ${artist}`,
-      speechStyle: 'живой, ироничный, «слушай сюда»',
-      eraHint: 'кассеты, Walkman, первые MTV-образы',
-    };
+    return personaForYear(
+      y,
+      `меломан ${y}-х, коллекционер ${artist}`,
+      'лексика 80-х: кассеты, Walkman, MTV',
+      'кассеты, Walkman, MTV',
+    );
   }
 
-  return {
-    roleTitle: `современный фанат ${artist}, копает глубже Spotify`,
-    speechStyle: 'увлечённый, открывает скрытое в знакомом',
-    eraHint: 'интернет, но душа всё ещё ищет настоящее',
-  };
+  if (y < 2005) {
+    return personaForYear(
+      y,
+      `фанат ${artist} нулевых`,
+      'лексика 2000-х: ремиксы, CD, «короче»',
+      'интернет-форумы, ремиксы',
+    );
+  }
+
+  return personaForYear(
+    y,
+    `фанат ${artist}`,
+    'современная речь, уважение к эпохе трека',
+    'архивы, ремастеры',
+  );
 }
 
 export function buildSystemPrompt(persona: StoryPersona): string {
-  return `Ты говоришь ОТ ПЕРВОГО ЛИЦА — не рассказчик приложения, не радиоведущий.
+  return `Ты говоришь ОТ ПЕРВОГО ЛИЦА — не ведущий приложения, не диджей радио.
 
 ТВОЯ РОЛЬ: ${persona.roleTitle}
-ТВОЙ ГОЛОС: ${persona.speechStyle}
-ЭПОХА: ${persona.eraHint}
+ЛЕКСИКА ЭПОХИ (строго): ${persona.speechStyle}
+КОНТЕКСТ: ${persona.eraHint}
 
-Ты — современник года выхода трека И фанат именно этого жанра и этого исполнителя.
-Раскрой интересное, скрытое, неочевидное — то, что не скажут в сухой статье.
-Можно слегка драматизировать настроение эпохи, но не выдумывай проверяемые биографические факты.
-
-Стиль (как в разговоре джазмена 50-х с другом у бара):
-- «братуха», «слушай», «чувак» — уместно, не в каждой фразе
-- живо, с юмором или goosebumps — что подходит треку
-- один сильный инсайт, не три слабых
+Ты — современник года выхода трека И фанат этого жанра и исполнителя.
+Один конкретный факт, курьёз или закулисье — не общие слова про «душу» и «магию музыки».
 
 ЗАПРЕЩЕНО:
+- «братуха», «братан», «чувак» — если это не лексика указанной эпохи
 - «Music Story», «сейчас в эфире», «на волнах», «добро пожаловать»
-- реклама, Wikipedia-сухость, канцелярит
-- ремарки в скобках — только текст для озвучки
-- повторять факты из списка «УЖЕ РАССКАЗАНО»
+- вода: «вкладывает душу», «магия музыки», «врубай громче», «не пожалеешь»
+- Wikipedia-сухость, реклама, ремарки в скобках
+- повторять факты из «УЖЕ РАССКАЗАНО»
+
+НУЖНО:
+- 55–65 слов (~30 сек), короткие фразы
+- лексика только из эпохи трека
+- один сильный инсайт или прикол
 
 Формат — строго JSON:
-{"script":"...", "word_count": число, "voiceId": "marina | filipp | jane | alena | omazh"}
-
-script: 55–65 слов (~30 секунд). Короткие фразы. Артист и трек — естественно.`;
+{"script":"...", "word_count": число, "voiceId": "marina | filipp | jane | alena | omazh"}`;
 }
 
 export function buildStoryUserPrompt(params: {
@@ -162,23 +196,19 @@ export function buildStoryUserPrompt(params: {
   if (params.genre) lines.push(`Жанр: ${params.genre}`);
 
   lines.push('');
-  lines.push(`УГОЛ ЭТОГО РАССКАЗА: ${params.angle}`);
-  lines.push(`Говори как ${persona.roleTitle}.`);
+  lines.push(`УГОЛ: ${params.angle}`);
+  lines.push(`Говори как ${persona.roleTitle}, лексика: ${persona.speechStyle}`);
   lines.push('');
 
   const prev = params.previousScripts?.filter(Boolean) ?? [];
   if (prev.length > 0) {
-    lines.push(
-      'УЖЕ РАССКАЗАНО этому слушателю про этот трек — НЕ ПОВТОРЯЙ ни факты, ни формулировки, ни угол:',
-    );
+    lines.push('УЖЕ РАССКАЗАНО — другой факт и другой заход:');
     prev.slice(0, 5).forEach((s, i) => {
       const snippet = s.length > 200 ? `${s.slice(0, 200)}…` : s;
       lines.push(`${i + 1}. ${snippet}`);
     });
-    lines.push('');
-    lines.push('Придумай СОВЕРШЕННО ДРУГОЙ факт и другой заход.');
   } else {
-    lines.push('Это первый рассказ про этот трек для слушателя — удиви сильным заходом.');
+    lines.push('Первый рассказ про этот трек — сразу с сильного факта.');
   }
 
   lines.push('');

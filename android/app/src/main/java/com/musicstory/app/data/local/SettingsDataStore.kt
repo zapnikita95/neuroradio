@@ -6,11 +6,13 @@ import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.intPreferencesKey
+import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.core.stringSetPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import com.musicstory.app.domain.TriggerMode
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 
 private val Context.settingsDataStore: DataStore<Preferences> by preferencesDataStore(
@@ -28,11 +30,7 @@ class SettingsDataStore(private val context: Context) {
     }
 
     val backendUrl: Flow<String> = context.settingsDataStore.data.map { prefs ->
-        prefs[KEY_BACKEND_URL] ?: DEFAULT_BACKEND_URL
-    }
-
-    val backendSecret: Flow<String> = context.settingsDataStore.data.map { prefs ->
-        prefs[KEY_BACKEND_SECRET] ?: ""
+        prefs[KEY_BACKEND_URL].orEmpty().trim().ifBlank { DEFAULT_BACKEND_URL }
     }
 
     val triggerMode: Flow<TriggerMode> = context.settingsDataStore.data.map { prefs ->
@@ -71,8 +69,31 @@ class SettingsDataStore(private val context: Context) {
         context.settingsDataStore.edit { it[KEY_BACKEND_URL] = url.trimEnd('/') }
     }
 
-    suspend fun setBackendSecret(secret: String) {
-        context.settingsDataStore.edit { it[KEY_BACKEND_SECRET] = secret.trim() }
+    suspend fun readAuthState(): AuthState {
+        val prefs = context.settingsDataStore.data.first()
+        return AuthState(
+            installId = prefs[KEY_AUTH_INSTALL_ID].orEmpty(),
+            accessToken = prefs[KEY_AUTH_ACCESS_TOKEN].orEmpty(),
+            expiresAtMs = prefs[KEY_AUTH_EXPIRES_AT] ?: 0L,
+        )
+    }
+
+    suspend fun saveInstallId(installId: String) {
+        context.settingsDataStore.edit { it[KEY_AUTH_INSTALL_ID] = installId }
+    }
+
+    suspend fun saveAuthToken(token: String, expiresAtMs: Long) {
+        context.settingsDataStore.edit {
+            it[KEY_AUTH_ACCESS_TOKEN] = token
+            it[KEY_AUTH_EXPIRES_AT] = expiresAtMs
+        }
+    }
+
+    suspend fun clearAuthToken() {
+        context.settingsDataStore.edit {
+            it.remove(KEY_AUTH_ACCESS_TOKEN)
+            it.remove(KEY_AUTH_EXPIRES_AT)
+        }
     }
 
     suspend fun setTriggerMode(mode: TriggerMode) {
@@ -106,7 +127,7 @@ class SettingsDataStore(private val context: Context) {
     }
 
     companion object {
-        const val DEFAULT_BACKEND_URL = ""
+        const val DEFAULT_BACKEND_URL = "https://music-story-production.up.railway.app"
         const val DEFAULT_EVERY_N_TRACKS = 10
         const val DEFAULT_SAME_TRACK_STORY_EVERY_N = 3
         const val DEFAULT_AUTO_INTERCEPT = true
@@ -114,7 +135,9 @@ class SettingsDataStore(private val context: Context) {
         private val KEY_AUTO_INTERCEPT = booleanPreferencesKey("auto_intercept")
         private val KEY_EVERY_N_TRACKS = intPreferencesKey("every_n_tracks")
         private val KEY_BACKEND_URL = stringPreferencesKey("backend_url")
-        private val KEY_BACKEND_SECRET = stringPreferencesKey("backend_secret")
+        private val KEY_AUTH_INSTALL_ID = stringPreferencesKey("auth_install_id")
+        private val KEY_AUTH_ACCESS_TOKEN = stringPreferencesKey("auth_access_token")
+        private val KEY_AUTH_EXPIRES_AT = longPreferencesKey("auth_expires_at")
         private val KEY_TRIGGER_MODE = stringPreferencesKey("trigger_mode")
         private val KEY_SPECIFIC_ARTISTS = stringSetPreferencesKey("specific_artists")
         private val KEY_SPECIFIC_GENRES = stringSetPreferencesKey("specific_genres")
@@ -123,3 +146,9 @@ class SettingsDataStore(private val context: Context) {
         private val KEY_SAME_TRACK_STORY_EVERY_N = intPreferencesKey("same_track_story_every_n")
     }
 }
+
+data class AuthState(
+    val installId: String,
+    val accessToken: String,
+    val expiresAtMs: Long,
+)

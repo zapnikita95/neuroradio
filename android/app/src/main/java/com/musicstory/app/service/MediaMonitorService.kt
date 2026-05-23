@@ -5,7 +5,10 @@ import android.app.PendingIntent
 import android.app.Service
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
+import android.os.Build
 import android.os.IBinder
+import androidx.core.content.ContextCompat
 import androidx.core.app.NotificationCompat
 import com.musicstory.app.MainActivity
 import com.musicstory.app.MusicStoryApp
@@ -35,7 +38,12 @@ class MediaMonitorService : Service() {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        startForeground(NOTIFICATION_ID, buildNotification(null))
+        try {
+            startForeground(NOTIFICATION_ID, buildNotification(null))
+        } catch (e: SecurityException) {
+            stopSelf()
+            return START_NOT_STICKY
+        }
         return START_STICKY
     }
 
@@ -118,8 +126,21 @@ class MediaMonitorService : Service() {
         const val NOTIFICATION_ID = 1001
 
         fun start(context: Context) {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                val granted = ContextCompat.checkSelfPermission(
+                    context,
+                    android.Manifest.permission.POST_NOTIFICATIONS,
+                ) == PackageManager.PERMISSION_GRANTED
+                if (!granted) return
+            }
             val intent = Intent(context, MediaMonitorService::class.java)
-            context.startForegroundService(intent)
+            try {
+                context.startForegroundService(intent)
+            } catch (_: IllegalStateException) {
+                // Background start restriction — skip until next foreground
+            } catch (_: SecurityException) {
+                // Missing FGS / notification permission
+            }
         }
 
         fun stop(context: Context) {

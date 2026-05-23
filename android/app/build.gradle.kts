@@ -13,8 +13,8 @@ android {
         applicationId = "com.musicstory.app"
         minSdk = 26
         targetSdk = 35
-        versionCode = 1
-        versionName = "1.0"
+        versionCode = 8
+        versionName = "1.0.7"
 
         buildConfigField("String", "VERSION_NAME", "\"$versionName\"")
         buildConfigField("int", "VERSION_CODE", "$versionCode")
@@ -44,6 +44,26 @@ android {
     buildFeatures {
         compose = true
         buildConfig = true
+    }
+}
+
+afterEvaluate {
+    val projectRoot = rootProject.rootDir.parentFile
+
+    fun exportApk(variantFolder: String, apkFileName: String, destFileName: String) {
+        val apk = layout.buildDirectory.file("outputs/apk/$variantFolder/$apkFileName").get().asFile
+        if (!apk.exists()) return
+        val dest = projectRoot.resolve(destFileName)
+        apk.copyTo(dest, overwrite = true)
+        logger.lifecycle("APK → ${dest.absolutePath}")
+    }
+
+    tasks.matching { it.name == "assembleDebug" }.configureEach {
+        doLast { exportApk("debug", "app-debug.apk", "MusicStory.apk") }
+    }
+
+    tasks.matching { it.name == "assembleRelease" }.configureEach {
+        doLast { exportApk("release", "app-release.apk", "MusicStory-release.apk") }
     }
 }
 

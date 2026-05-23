@@ -1,37 +1,30 @@
 import { Router, Request, Response } from 'express';
 import { v4 as uuidv4 } from 'uuid';
-import { requireProxySecret } from '../middleware/proxy-auth.js';
+import { requireAppAuth } from '../middleware/app-auth.js';
+import { validateStoryFullBody } from '../middleware/validate-story.js';
+import { safeErrorMessage } from '../middleware/security-headers.js';
 import { enrichTrackMetadata } from '../services/musicbrainz.js';
 import { generateStoryScript, hasGroqApiKey } from '../services/groq.js';
 import { synthesizeSpeech, hasYandexCredentials } from '../services/yandex-tts.js';
 import { voiceForYear } from '../services/voices.js';
 import { buildDemoStory, isDemoMode } from '../services/demo.js';
+import { signAudioAccess } from '../services/audio-token.js';
 
 const router = Router();
 
-router.use(requireProxySecret);
+router.use(requireAppAuth);
 
 interface StoryFullBody {
-  artist?: string;
-  title?: string;
+  artist: string;
+  title: string;
   previous_scripts?: string[];
 }
 
-router.post('/full', async (req: Request, res: Response) => {
+router.post('/full', validateStoryFullBody, async (req: Request, res: Response) => {
   const { artist, title, previous_scripts: previousScriptsRaw } = req.body as StoryFullBody;
 
-  if (!artist?.trim() || !title?.trim()) {
-    res.status(400).json({
-      error: 'Missing required fields: artist, title',
-    });
-    return;
-  }
-
-  const cleanArtist = artist.trim();
-  const cleanTitle = title.trim();
-
   try {
-    const metadata = await enrichTrackMetadata(cleanArtist, cleanTitle);
+    const metadata = await enrichTrackMetadata(artist, title);
     const voiceId = voiceForYear(metadata.year);
     const demo = isDemoMode();
 
@@ -80,7 +73,7 @@ router.post('/full', async (req: Request, res: Response) => {
     if (!demo && hasYandexCredentials()) {
       const id = uuidv4();
       const audio = await synthesizeSpeech(story.script, story.voiceId, `${id}.ogg`);
-      response.audioUrl = audio.audioUrl;
+      response.audioUrl = signAudioAccess(audio.fileName) ?? audio.audioUrl;
       response.audioFile = audio.fileName;
     } else {
       response.audioUrl = null;
@@ -95,7 +88,7 @@ router.post('/full', async (req: Request, res: Response) => {
     console.error('POST /v1/story/full failed:', err);
     res.status(500).json({
       error: 'Story generation failed',
-      message: err instanceof Error ? err.message : 'Unknown error',
+      message: safeErrorMessage(err),
     });
   }
 });

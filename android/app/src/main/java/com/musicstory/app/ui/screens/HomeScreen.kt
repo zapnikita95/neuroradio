@@ -22,10 +22,16 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
+import android.Manifest
+import android.content.pm.PackageManager
+import android.os.Build
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.core.content.ContextCompat
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
@@ -65,16 +71,33 @@ fun HomeScreen(
     val uiState by app.storyOrchestrator.uiState.collectAsState()
     val hasAccess = app.mediaControllerManager.hasNotificationAccess()
     val isPlaying = app.mediaControllerManager.isPlaying.collectAsState().value
-    val groqConfigured by app.settingsDataStore.groqApiKey.collectAsState(initial = "")
-    val backendConfigured by app.settingsDataStore.backendUrl.collectAsState(initial = "")
 
-    LaunchedEffect(hasAccess) {
+    val notificationPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission(),
+    ) { _ ->
         if (hasAccess) {
             MediaMonitorService.start(context)
             app.storyOrchestrator.setServiceRunning(true)
-        } else {
-            app.storyOrchestrator.setServiceRunning(false)
         }
+    }
+
+    LaunchedEffect(hasAccess) {
+        if (!hasAccess) {
+            app.storyOrchestrator.setServiceRunning(false)
+            return@LaunchedEffect
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            val granted = ContextCompat.checkSelfPermission(
+                context,
+                Manifest.permission.POST_NOTIFICATIONS,
+            ) == PackageManager.PERMISSION_GRANTED
+            if (!granted) {
+                notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                return@LaunchedEffect
+            }
+        }
+        MediaMonitorService.start(context)
+        app.storyOrchestrator.setServiceRunning(true)
     }
 
     MusicStoryBackground(modifier = modifier) {
@@ -146,16 +169,6 @@ fun HomeScreen(
                     errorMessage = uiState.errorMessage,
                 )
 
-                if (groqConfigured.isBlank() && backendConfigured.isBlank()) {
-                    GlassCard(accentBorder = true) {
-                        Text(
-                            text = context.getString(R.string.home_groq_banner),
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = GoldBright,
-                        )
-                    }
-                }
-
                 uiState.lastStory?.let { story ->
                     StoryPreviewCard(
                         artist = story.artist,
@@ -164,6 +177,7 @@ fun HomeScreen(
                         year = story.year,
                         genre = story.genre,
                         isAi = !story.demo,
+                        fetchNote = uiState.fetchNote,
                     )
                 }
 
@@ -307,6 +321,7 @@ private fun StoryPreviewCard(
     year: Int?,
     genre: String?,
     isAi: Boolean,
+    fetchNote: String? = null,
 ) {
     val context = LocalContext.current
     GlassCard(accentBorder = true) {
@@ -331,6 +346,14 @@ private fun StoryPreviewCard(
         val meta = listOfNotNull(year?.toString(), genre).joinToString(" · ")
         if (meta.isNotBlank()) {
             Text(text = meta, style = MaterialTheme.typography.labelMedium)
+        }
+        if (!fetchNote.isNullOrBlank()) {
+            Spacer(modifier = Modifier.height(6.dp))
+            Text(
+                text = fetchNote,
+                style = MaterialTheme.typography.bodySmall,
+                color = MutedLavender,
+            )
         }
         Spacer(modifier = Modifier.height(12.dp))
         Text(

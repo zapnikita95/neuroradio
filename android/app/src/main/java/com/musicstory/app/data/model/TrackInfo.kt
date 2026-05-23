@@ -10,5 +10,13 @@ data class TrackInfo(
     val displayKey: String
         get() = "${artist.lowercase()}|${title.lowercase()}"
 
-    fun isValid(): Boolean = artist.isNotBlank() && title.isNotBlank()
+    fun isValid(): Boolean =
+        artist.isNotBlank() &&
+            title.isNotBlank() &&
+            artist.length <= MAX_FIELD_LEN &&
+            title.length <= MAX_FIELD_LEN
+
+    companion object {
+        private const val MAX_FIELD_LEN = 200
+    }
 }

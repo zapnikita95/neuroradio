@@ -1,0 +1,15 @@
+---
+description: APK build output location for Music Story
+alwaysApply: true
+---
+
+# APK всегда в корне проекта
+
+После любой сборки Android APK должен лежать в **верхней папке репозитория** (`Music story/`), не в `android/app/build/...`.
+
+- Debug: `MusicStory.apk` (корень проекта)
+- Release: `MusicStory-release.apk` (корень проекта)
+
+Gradle уже копирует автоматически в `android/app/build.gradle.kts` (`assembleDebug` / `assembleRelease`).
+
+При ручной сборке или если копирование не сработало — скопируй APK в корень сам. Пользователю указывай только путь **`MusicStory.apk`** в корне проекта.

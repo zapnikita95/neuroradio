@@ -21,72 +21,72 @@ data class StoryPersona(
             val y = year ?: guessDecadeYear(artist)
 
             return when {
+                a.contains("elvis") ->
+                    personaForYear(y, "фанат rock'n'roll и soul $y-х, коллекционирует синглы Elvis",
+                        "речь 50–70-х: «слушай», «вот что», уважение к King, без сленга другой эпохи",
+                        "Телевизионные шоу, RCA Studio, Las Vegas, реакция зала важнее чартов")
+
                 g.contains("jazz") || g.contains("swing") || g.contains("bebop") ||
                     (y in 1935..1965 && (g.contains("blues") || g.isBlank())) ->
-                    StoryPersona(
-                        roleTitle = "чернокожий или белый джазмен из ${y}-х, одержимый swing и bebop",
-                        speechStyle = "хриплый смех, «братуха», виски, дым, пот, аплодисменты, уважение к мастерам",
-                        eraHint = "Америка ${y}-х, джем-сейшены, винил, расовые барьеры, живое радио",
-                    )
+                    personaForYear(y, "джазмен $y-х, одержим swing и bebop",
+                        "лексика 40–60-х: «cat», «man», «dig this», дым, джем-сейшены, уважение к мастерам",
+                        "Америка $y-х, джем-сейшены, винил, расовые барьеры, живое радио")
 
                 g.contains("blues") || g.contains("soul") ->
-                    StoryPersona(
-                        roleTitle = "блюзмен или soulmate-фанат ${y}-х",
-                        speechStyle = "грубоватая нежность, исповедь, «слушай, сынок», гитарные струны и ночь",
-                        eraHint = "юг США или городской клуб, боль и гордость в одной песне",
-                    )
+                    personaForYear(y, "блюзовый меломан $y-х",
+                        "лексика soul/blues: «слушай», «child», исповедь, гитара, ночной клуб",
+                        "юг США или городской клуб, боль и гордость в одной песне")
 
-                g.contains("rock") || g.contains("metal") || g.contains("punk") ->
-                    StoryPersona(
-                        roleTitle = "рок-фанат эпохи ${y}-х, который был на каждом концерте",
-                        speechStyle = "дерзость, энергия, «чувак», громкость как религия",
-                        eraHint = "гаражи, фестивали, бунт против скучных правил",
-                    )
+                g.contains("rock") || g.contains("metal") || g.contains("punk") ||
+                    g.contains("rock'n") ->
+                    personaForYear(y, "рок-фанат $y-х",
+                        "лексика rock $y-х: «вот что», «слушай сюда», громкость, бунт, концертный зал",
+                        "гаражи, фестивали, бунт против скучных правил")
 
                 g.contains("electronic") || g.contains("house") || g.contains("techno") ||
                     g.contains("dance") ->
-                    StoryPersona(
-                        roleTitle = "клубный одержимый ${y}-х, знает каждый break и sample",
-                        speechStyle = "неон, бас в груди, ночь без сна, insider-лексика",
-                        eraHint = "warehouse, диджейские стыки, новая музыка из старых пластинок",
-                    )
+                    personaForYear(y, "клубный меломан $y-х",
+                        "лексика dance/electronic: break, sample, бас, warehouse, ночь без сна",
+                        "warehouse, диджейские стыки, новая музыка из старых пластинок")
 
                 g.contains("hip hop") || g.contains("rap") ->
-                    StoryPersona(
-                        roleTitle = "фанат хип-хопа ${y}-х с улицы и блокнотом цитат",
-                        speechStyle = "ритм речи, уличная честность, уважение к flow",
-                        eraHint = "битбокс, блок-вечеринки, слова как оружие и щит",
-                    )
+                    personaForYear(y, "фанат хип-хопа $y-х",
+                        "лексика rap $y-х: flow, block party, уличная честность, уважение к MC",
+                        "битбокс, блок-вечеринки, слова как оружие и щит")
 
                 g.contains("pop") || a.contains("beatles") || a.contains("abba") ->
-                    StoryPersona(
-                        roleTitle = "обожатель поп-культуры ${y}-х, знает каждый хит по мему",
-                        speechStyle = "лёгкий юмор, ностальгия, «ты представляешь?»",
-                        eraHint = "телевидение, магнитофоны, первые кассеты",
-                    )
+                    personaForYear(y, "обожатель поп-культуры $y-х",
+                        "лексика pop $y-х: «ты представляешь?», лёгкий юмор, радио и TV",
+                        "телевидение, магнитофоны, первые кассеты")
 
                 y < 1970 ->
-                    StoryPersona(
-                        roleTitle = "современник ${y}-х, фанат $artist",
-                        speechStyle = "тепло, уважение к старой школе, винил и радио",
-                        eraHint = "мир до streaming, музыка как событие",
-                    )
+                    personaForYear(y, "современник $y-х, фанат $artist",
+                        "лексика $y-х: винил, радио, уважение к старой школе",
+                        "мир до streaming, музыка как событие")
 
                 y < 1990 ->
-                    StoryPersona(
-                        roleTitle = "меломан ${y}-х, коллекционер пластинок $artist",
-                        speechStyle = "живой, ироничный, «слушай сюда»",
-                        eraHint = "кассеты, Walkman, первые MTV-образы",
-                    )
+                    personaForYear(y, "меломан $y-х, коллекционер $artist",
+                        "лексика $y-х: кассеты, Walkman, MTV, «слушай сюда»",
+                        "кассеты, Walkman, первые MTV-образы")
+
+                y < 2005 ->
+                    personaForYear(y, "фанат $artist нулевых",
+                        "лексика 2000-х: ремиксы, файлообмен, CD-rip, «короче»",
+                        "интернет-форумы, ремиксы, первые mp3")
 
                 else ->
-                    StoryPersona(
-                        roleTitle = "современный фанат $artist, копает глубже Spotify",
-                        speechStyle = "увлечённый, открывает скрытое в знакомом",
-                        eraHint = "интернет, но душа всё ещё ищет настоящее",
-                    )
+                    personaForYear(y, "фанат $artist, копает глубже стриминга",
+                        "современная речь, но уважение к эпохе трека — без чужого сленга",
+                        "архивы, ремастеры, редкие live")
             }
         }
+
+        private fun personaForYear(
+            year: Int,
+            role: String,
+            speech: String,
+            era: String,
+        ) = StoryPersona(roleTitle = role, speechStyle = speech, eraHint = era)
 
         fun pickAngle(previousCount: Int): StoryAngle {
             return StoryAngle.entries[previousCount % StoryAngle.entries.size]

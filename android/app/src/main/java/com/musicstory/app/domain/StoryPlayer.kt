@@ -129,8 +129,10 @@ class StoryPlayer(context: Context) {
         _currentScript.value = response.script
 
         if (!audioUrl.isNullOrBlank()) {
+            com.musicstory.app.util.StoryLog.i("Playing Yandex/server audio: $audioUrl")
             playWithExoPlayer(audioUrl)
         } else {
+            com.musicstory.app.util.StoryLog.i("Playing Android TTS (${response.script.length} chars)")
             playWithTts(response.script)
         }
     }

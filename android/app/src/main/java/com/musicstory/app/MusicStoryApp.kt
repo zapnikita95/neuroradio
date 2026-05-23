@@ -6,16 +6,37 @@ import android.app.NotificationManager
 import android.os.Build
 import com.musicstory.app.data.local.AppDatabase
 import com.musicstory.app.data.local.SettingsDataStore
+import com.musicstory.app.data.remote.ApiClient
+import com.musicstory.app.data.remote.BackendAuthManager
+import com.musicstory.app.data.remote.GroqStoryClient
 import com.musicstory.app.data.repository.ScrobbleRepository
 import com.musicstory.app.data.repository.StoryRepository
 import com.musicstory.app.domain.StoryOrchestrator
 import com.musicstory.app.domain.StoryPlayer
 import com.musicstory.app.domain.TriggerEngine
 import com.musicstory.app.media.MediaControllerManager
+import androidx.work.Constraints
+import androidx.work.ExistingPeriodicWorkPolicy
+import androidx.work.NetworkType
+import androidx.work.PeriodicWorkRequestBuilder
+import androidx.work.WorkManager
+import com.musicstory.app.worker.AuthRefreshWorker
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
+import java.util.concurrent.TimeUnit
 
 class MusicStoryApp : Application() {
 
     lateinit var settingsDataStore: SettingsDataStore
+        private set
+
+    lateinit var backendAuthManager: BackendAuthManager
+        private set
+
+    lateinit var apiClient: ApiClient
         private set
 
     lateinit var scrobbleRepository: ScrobbleRepository
@@ -36,6 +57,8 @@ class MusicStoryApp : Application() {
     lateinit var storyOrchestrator: StoryOrchestrator
         private set
 
+    private val appScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+
     override fun onCreate() {
         super.onCreate()
         instance = this
@@ -44,11 +67,15 @@ class MusicStoryApp : Application() {
 
         val database = AppDatabase.getInstance(this)
         settingsDataStore = SettingsDataStore(this)
+        backendAuthManager = BackendAuthManager(this, settingsDataStore)
+        apiClient = ApiClient(backendAuthManager)
         scrobbleRepository = ScrobbleRepository(database.scrobbleDao())
         storyRepository = StoryRepository(
             storyDao = database.storyDao(),
             storyHistoryDao = database.storyHistoryDao(),
             settingsDataStore = settingsDataStore,
+            apiClient = apiClient,
+            groqStoryClient = GroqStoryClient(),
         )
         mediaControllerManager = MediaControllerManager(this)
         storyPlayer = StoryPlayer(this)
@@ -60,6 +87,29 @@ class MusicStoryApp : Application() {
             mediaControllerManager = mediaControllerManager,
             storyPlayer = storyPlayer,
             triggerEngine = triggerEngine,
+        )
+        scheduleBackgroundAuthRefresh()
+        prefetchBackendAuth()
+    }
+
+    private fun prefetchBackendAuth() {
+        appScope.launch {
+            val backendUrl = settingsDataStore.backendUrl.first()
+            backendAuthManager.warmUp(backendUrl)
+        }
+    }
+
+    private fun scheduleBackgroundAuthRefresh() {
+        val constraints = Constraints.Builder()
+            .setRequiredNetworkType(NetworkType.CONNECTED)
+            .build()
+        val request = PeriodicWorkRequestBuilder<AuthRefreshWorker>(3, TimeUnit.DAYS)
+            .setConstraints(constraints)
+            .build()
+        WorkManager.getInstance(this).enqueueUniquePeriodicWork(
+            AUTH_REFRESH_WORK,
+            ExistingPeriodicWorkPolicy.KEEP,
+            request,
         )
     }
 
@@ -83,6 +133,7 @@ class MusicStoryApp : Application() {
 
     companion object {
         const val CHANNEL_MONITOR = "monitor"
+        private const val AUTH_REFRESH_WORK = "backend_auth_refresh"
 
         @Volatile
         private var instance: MusicStoryApp? = null

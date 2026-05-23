@@ -45,7 +45,6 @@ import androidx.compose.ui.unit.dp
 import com.musicstory.app.MusicStoryApp
 import com.musicstory.app.R
 import com.musicstory.app.data.local.SettingsDataStore
-import com.musicstory.app.data.remote.ApiClient
 import com.musicstory.app.domain.TriggerMode
 import com.musicstory.app.ui.components.GlassCard
 import com.musicstory.app.ui.components.MusicStoryBackground
@@ -77,7 +76,6 @@ fun SettingsScreen(
     val autoIntercept by settings.autoIntercept.collectAsState(initial = SettingsDataStore.DEFAULT_AUTO_INTERCEPT)
     val everyN by settings.everyNTracks.collectAsState(initial = SettingsDataStore.DEFAULT_EVERY_N_TRACKS)
     val backendUrl by settings.backendUrl.collectAsState(initial = SettingsDataStore.DEFAULT_BACKEND_URL)
-    val backendSecret by settings.backendSecret.collectAsState(initial = "")
     val groqApiKey by settings.groqApiKey.collectAsState(initial = "")
     val sameTrackEveryN by settings.sameTrackStoryEveryN.collectAsState(
         initial = SettingsDataStore.DEFAULT_SAME_TRACK_STORY_EVERY_N,
@@ -85,7 +83,6 @@ fun SettingsScreen(
     val triggerMode by settings.triggerMode.collectAsState(initial = TriggerMode.EVERY_N_TRACKS)
 
     var urlInput by remember(backendUrl) { mutableStateOf(backendUrl) }
-    var secretInput by remember(backendSecret) { mutableStateOf(backendSecret) }
     var groqInput by remember(groqApiKey) { mutableStateOf(groqApiKey) }
     var nInput by remember(everyN) { mutableStateOf(everyN.toString()) }
     var sameTrackInput by remember(sameTrackEveryN) { mutableStateOf(sameTrackEveryN.toString()) }
@@ -234,19 +231,19 @@ fun SettingsScreen(
                         shape = RoundedCornerShape(14.dp),
                     )
                     Spacer(modifier = Modifier.height(12.dp))
-                    OutlinedTextField(
-                        value = secretInput,
-                        onValueChange = { secretInput = it },
-                        label = { Text(context.getString(R.string.settings_backend_secret)) },
-                        supportingText = { Text(context.getString(R.string.settings_backend_secret_hint), color = MutedLavender) },
-                        modifier = Modifier.fillMaxWidth(),
-                        singleLine = true,
-                        colors = fieldColors,
-                        shape = RoundedCornerShape(14.dp),
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
                     Text(text = context.getString(R.string.settings_backend_hint), style = MaterialTheme.typography.bodySmall)
+                    Text(text = context.getString(R.string.settings_backend_auth_hint), style = MaterialTheme.typography.bodySmall, color = MutedLavender)
                     Text(text = context.getString(R.string.settings_offline_hint), style = MaterialTheme.typography.bodySmall)
+                }
+
+                GlassCard {
+                    SectionLabel(text = "Отладка")
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = context.getString(R.string.settings_debug_logs_hint),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MutedLavender,
+                    )
                 }
 
                 PrimaryStoryButton(
@@ -256,9 +253,9 @@ fun SettingsScreen(
                             nInput.toIntOrNull()?.let { settings.setEveryNTracks(it) }
                             sameTrackInput.toIntOrNull()?.let { settings.setSameTrackStoryEveryN(it) }
                             settings.setBackendUrl(urlInput)
-                            settings.setBackendSecret(secretInput)
                             settings.setGroqApiKey(groqInput)
-                            ApiClient.invalidateCache()
+                            app.backendAuthManager.invalidateToken()
+                            app.apiClient.invalidateCache()
                             app.triggerEngine.resetCounter()
                         }
                     },

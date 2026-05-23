@@ -2,25 +2,49 @@ import { StoryScript } from './groq.js';
 import { personaForTrack } from './prompts.js';
 import { voiceForYear, YandexVoiceId } from './voices.js';
 
-const LOCAL_ANGLES = [
-  (artist: string, title: string, year: number, persona: ReturnType<typeof personaForTrack>) =>
-    `Слушай, братуха… «${title}» от ${artist} — это ${year}-й, и тут есть секрет: на записи слышно не только ноты — слышно, как ${persona.roleTitle.split(',')[0]} вкладывает душу. Микрофон ловит вздох между тактами — и вот этот вздох стоит слушать снова. Врубай громче.`,
+function artistFact(artist: string, title: string, year: number): string | null {
+  const a = artist.toLowerCase();
+  const t = title.toLowerCase();
+  if (a.includes('elvis') && (t.includes('jxl') || t.includes('little less'))) {
+    return (
+      'В 2002 JXL вытащил из архива RCA demo 1968 года, наложил breakbeat — ' +
+      'и Elvis снова в чартах через четверть века. Без ремикса многие не знали оригинал.'
+    );
+  }
+  if (a.includes('elvis')) {
+    return (
+      `Elvis в ${year}-м ломал формат: «${title}» записывали как шоу для TV, не как сессию — ` +
+      'реакция зала важнее чартов.'
+    );
+  }
+  return null;
+}
 
-  (artist: string, title: string, year: number, persona: ReturnType<typeof personaForTrack>) =>
-    `О-о-о, ${year} год… «${title}», ${artist}. Представь: ${persona.eraHint}. Люди ещё не листают ленту — они живут в моменте, и эта пластинка как газета того дня. Слушай не фоном — слушай как современник.`,
+function buildAngleScript(
+  artist: string,
+  title: string,
+  year: number,
+  angleIndex: number,
+  persona: ReturnType<typeof personaForTrack>,
+): string {
+  const custom = artistFact(artist, title, year);
+  const opener = persona.speechStyle.includes('rock')
+    ? 'Вот что,'
+    : persona.speechStyle.includes('джаз') || persona.speechStyle.includes('jazz')
+      ? 'Dig this,'
+      : 'Слушай,';
+  if (custom) return `${opener} ${custom}`;
 
-  (artist: string, title: string, year: number, persona: ReturnType<typeof personaForTrack>) =>
-    `Братуха, я фанат ${artist} с тех пор, как впервые услышал «${title}». Это ${year}, ${persona.speechStyle.slice(0, 60)}… Каждый раз ловлю новую деталь — фразу, паузу, огонь. Вот ради таких моментов и копаешь музыку до дна.`,
-
-  (artist: string, title: string, year: number, persona: ReturnType<typeof personaForTrack>) =>
-    `Чувак, «${title}» — это не студийная картинка, это зал ${year} года. ${artist} выходит — и воздух меняется. Даже на записи чувствуешь, как пол под ногами дрожит. Закрой глаза — ты в первом ряду.`,
-
-  (artist: string, title: string, year: number, persona: ReturnType<typeof personaForTrack>) =>
-    `Слушай внимательно: «${title}» от ${artist} — ${year}. С первого раза кажется простым, а на самом деле там второй слой — настроение эпохи, которое ${persona.roleTitle} понимает без слов. Музыка говорит то, что люди боялись сказать вслух.`,
-
-  (artist: string, title: string, year: number, persona: ReturnType<typeof personaForTrack>) =>
-    `Братуха, на сцене ${year} года шептались: ${artist} с «${title}» — это не просто хит, это разговор всей тусовки. ${persona.eraHint}. Кто-то спорил до драки, кто-то плакал от красоты. А мы просто включаем — и снова там, где всё начиналось.`,
-];
+  const templates = [
+    `В ${year} году при записи «${title}» оставили дубль с ошибкой — тот срыв стал фирменным моментом.`,
+    `${year}-й: ${persona.eraHint}. «${title}» от ${artist} — не фон, а газета улицы.`,
+    `Я собираю всё на ${artist}. «${title}» (${year}) каждый раз даёт новую деталь в live-версии.`,
+    `На шоу ${year} года ${artist} вышел с «${title}» — зал замолчал на первой ноте, потом взорвался.`,
+    `«${title}» звучит просто, но ${persona.roleTitle.split(',')[0]} слышит второй слой настроения ${year}-го.`,
+    `В ${year}-м шептались: ${artist} и «${title}» — спор в кулуарах, не просто сингл.`,
+  ];
+  return `${opener} ${templates[angleIndex % templates.length]}`;
+}
 
 function isTooSimilar(candidate: string, previous: string[]): boolean {
   const c = candidate.toLowerCase();
@@ -38,14 +62,18 @@ export function buildDemoStory(
   previousScripts: string[] = [],
 ): StoryScript {
   const voiceId: YandexVoiceId = voiceForYear(year);
-  const eraYear = year ?? 1958;
+  const eraYear = year ?? 1968;
   const persona = personaForTrack(year, genre, artist);
   let angleIndex = previousScripts.length;
 
-  for (let attempt = 0; attempt < LOCAL_ANGLES.length; attempt++) {
-    const idx = (angleIndex + attempt) % LOCAL_ANGLES.length;
-    const script = LOCAL_ANGLES[idx](artist, title, eraYear, persona);
-
+  for (let attempt = 0; attempt < 6; attempt++) {
+    const script = buildAngleScript(
+      artist,
+      title,
+      eraYear,
+      angleIndex + attempt,
+      persona,
+    );
     if (!isTooSimilar(script, previousScripts)) {
       return {
         script,
@@ -55,7 +83,7 @@ export function buildDemoStory(
     }
   }
 
-  const fallback = LOCAL_ANGLES[0](artist, title, eraYear, persona);
+  const fallback = buildAngleScript(artist, title, eraYear, 0, persona);
   return {
     script: fallback,
     word_count: fallback.trim().split(/\s+/).filter(Boolean).length,

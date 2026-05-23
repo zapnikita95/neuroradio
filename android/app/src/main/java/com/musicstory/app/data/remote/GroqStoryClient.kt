@@ -6,8 +6,6 @@ import com.musicstory.app.data.model.StoryResponse
 import com.musicstory.app.domain.StoryAngle
 import com.musicstory.app.domain.StoryPersona
 import com.musicstory.app.domain.StoryPrompts
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -24,11 +22,7 @@ class GroqStoryClient(
     private val gson: Gson = Gson(),
 ) {
 
-    /**
-     * @param backendProxyUrl Railway/backend base URL — Groq вызывается через сервер (обход геоблока)
-     * @param backendProxySecret optional PROXY_SECRET from server env
-     * @param apiKey direct Groq key — только если прокси не используется
-     */
+    /** Direct Groq only — backend proxy removed for security (no open LLM relay). */
     suspend fun generateStory(
         artist: String,
         title: String,
@@ -37,9 +31,10 @@ class GroqStoryClient(
         previousScripts: List<String> = emptyList(),
         angle: StoryAngle = StoryPersona.pickAngle(previousScripts.size),
         apiKey: String? = null,
-        backendProxyUrl: String? = null,
-        backendProxySecret: String? = null,
-    ): StoryResponse? = withContext(Dispatchers.IO) {
+    ): StoryResponse? {
+        val key = apiKey?.trim().orEmpty()
+        if (key.isEmpty()) return null
+
         val persona = StoryPersona.forTrack(year, genre, artist)
         val system = StoryPrompts.systemPrompt(persona)
         val user = StoryPrompts.userMessage(artist, title, year, genre, angle, previousScripts)
@@ -58,32 +53,29 @@ class GroqStoryClient(
             )
         }
 
-        val proxyBase = backendProxyUrl?.trim()?.trimEnd('/')
-        val useProxy = !proxyBase.isNullOrBlank()
-
-        val requestBuilder = Request.Builder()
+        val request = Request.Builder()
+            .url("https://api.groq.com/openai/v1/chat/completions")
             .header("Content-Type", "application/json")
+            .header("Authorization", "Bearer $key")
             .post(body.toString().toRequestBody("application/json".toMediaType()))
+            .build()
 
-        if (useProxy) {
-            requestBuilder.url("$proxyBase/v1/groq/chat/completions")
-            backendProxySecret?.trim()?.takeIf { it.isNotEmpty() }?.let { secret ->
-                requestBuilder.header("X-Music-Story-Secret", secret)
-            }
-        } else {
-            val key = apiKey?.trim().orEmpty()
-            if (key.isEmpty()) return@withContext null
-            requestBuilder
-                .url("https://api.groq.com/openai/v1/chat/completions")
-                .header("Authorization", "Bearer $key")
-        }
+        val response = client.newCall(request).execute()
+        if (!response.isSuccessful) return null
 
-        val response = client.newCall(requestBuilder.build()).execute()
-        if (!response.isSuccessful) return@withContext null
+        return parseGroqResponse(response.body?.string(), artist, title, year, genre)
+    }
 
-        val payload = gson.fromJson(response.body?.string(), GroqChatResponse::class.java)
-        val content = payload.choices?.firstOrNull()?.message?.content ?: return@withContext null
-        parseStoryJson(content, artist, title, year, genre)
+    private fun parseGroqResponse(
+        rawBody: String?,
+        artist: String,
+        title: String,
+        year: Int?,
+        genre: String?,
+    ): StoryResponse? {
+        val payload = gson.fromJson(rawBody, GroqChatResponse::class.java)
+        val content = payload.choices?.firstOrNull()?.message?.content ?: return null
+        return parseStoryJson(content, artist, title, year, genre)
     }
 
     private fun parseStoryJson(
