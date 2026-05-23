@@ -2,6 +2,7 @@ import fetch from 'node-fetch';
 
 const MUSICBRAINZ_BASE = 'https://musicbrainz.org/ws/2';
 const USER_AGENT = 'MusicStoryBFF/1.0 (contact@example.com)';
+const MAX_RETRIES = 3;
 
 export interface TrackMetadata {
   artist: string;
@@ -69,6 +70,47 @@ function pickCountry(recording: MusicBrainzRecording): string | undefined {
   return undefined;
 }
 
+function isRetryableNetworkError(err: unknown): boolean {
+  if (!(err instanceof Error)) return false;
+  const msg = `${err.message} ${(err as NodeJS.ErrnoException).code ?? ''}`.toLowerCase();
+  return msg.includes('econnreset') ||
+    msg.includes('etimedout') ||
+    msg.includes('socket') ||
+    msg.includes('network');
+}
+
+async function fetchRecordingSearch(artist: string, title: string): Promise<MusicBrainzRecording | null> {
+  const query = encodeURIComponent(`artist:"${artist}" AND recording:"${title}"`);
+  const url = `${MUSICBRAINZ_BASE}/recording?query=${query}&fmt=json&limit=5&inc=artist-credits`;
+
+  let lastError: unknown;
+  for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
+    try {
+      const response = await fetch(url, {
+        headers: { 'User-Agent': USER_AGENT },
+        signal: AbortSignal.timeout(8000),
+      });
+
+      if (!response.ok) {
+        console.warn(`MusicBrainz HTTP ${response.status} for ${artist} — ${title}`);
+        return null;
+      }
+
+      const data = (await response.json()) as MusicBrainzSearchResponse;
+      return data.recordings?.[0] ?? null;
+    } catch (err) {
+      lastError = err;
+      if (attempt < MAX_RETRIES - 1 && isRetryableNetworkError(err)) {
+        await new Promise((resolve) => setTimeout(resolve, 400 * (attempt + 1)));
+        continue;
+      }
+      throw err;
+    }
+  }
+
+  throw lastError ?? new Error('MusicBrainz lookup failed');
+}
+
 /**
  * Enriches artist/title with year and genre via MusicBrainz recording search.
  * Returns input fields unchanged when lookup fails.
@@ -80,25 +122,8 @@ export async function enrichTrackMetadata(
   const base: TrackMetadata = { artist, title };
 
   try {
-    const query = encodeURIComponent(`artist:"${artist}" AND recording:"${title}"`);
-    const url = `${MUSICBRAINZ_BASE}/recording?query=${query}&fmt=json&limit=5&inc=artist-credits`;
-
-    const response = await fetch(url, {
-      headers: { 'User-Agent': USER_AGENT },
-      signal: AbortSignal.timeout(8000),
-    });
-
-    if (!response.ok) {
-      console.warn(`MusicBrainz HTTP ${response.status} for ${artist} — ${title}`);
-      return base;
-    }
-
-    const data = (await response.json()) as MusicBrainzSearchResponse;
-    const recording = data.recordings?.[0];
-
-    if (!recording) {
-      return base;
-    }
+    const recording = await fetchRecordingSearch(artist, title);
+    if (!recording) return base;
 
     return {
       artist,

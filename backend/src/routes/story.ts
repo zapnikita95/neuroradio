@@ -133,13 +133,16 @@ router.post('/full', validateStoryFullBody, async (req: Request, res: Response) 
   } catch (err) {
     console.error('POST /v1/story/full failed:', err);
     const rawMessage = err instanceof Error ? err.message : String(err);
+    const isRateLimit = /429|rate_limit|tokens per day/i.test(rawMessage);
     const groqUnavailable = /groq|403 forbidden|could not produce a usable story/i.test(rawMessage);
     res.status(groqUnavailable ? 503 : 500).json({
       error: groqUnavailable ? 'Story generation unavailable' : 'Story generation failed',
-      code: groqUnavailable ? 'GROQ_FAILED' : 'STORY_FAILED',
-      message: groqUnavailable
-        ? 'Groq не ответил — обнови GROQ_API_KEY на сервере или добавь свой ключ в настройках приложения.'
-        : safeErrorMessage(err),
+      code: isRateLimit ? 'GROQ_RATE_LIMIT' : groqUnavailable ? 'GROQ_FAILED' : 'STORY_FAILED',
+      message: isRateLimit
+        ? 'Лимит Groq на сервере исчерпан. Если в настройках есть свой Groq-ключ — приложение попробует с телефона.'
+        : groqUnavailable
+          ? 'Groq не ответил. Добавь свой Groq-ключ в настройках или попробуй через минуту.'
+          : safeErrorMessage(err),
     });
   }
 });

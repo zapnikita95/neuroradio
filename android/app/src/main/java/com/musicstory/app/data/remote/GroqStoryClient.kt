@@ -52,11 +52,12 @@ class GroqStoryClient(
         )
 
         var lastError: IOException? = null
-        for (model in StoryPrompts.GROQ_MODELS) {
+        for (attempt in 0 until MAX_ATTEMPTS) {
+            val relaxed = attempt == MAX_ATTEMPTS - 1
             try {
-                return@withContext requestStory(
+                val story = requestStory(
                     apiKey = key,
-                    model = model,
+                    model = StoryPrompts.GROQ_MODEL_PRIMARY,
                     system = system,
                     user = user,
                     storyLength = storyLength,
@@ -64,17 +65,17 @@ class GroqStoryClient(
                     title = title,
                     year = year,
                     genre = genre,
+                    relaxedQuality = relaxed,
                 )
+                if (story != null) return@withContext story
+                StoryLog.w("Direct Groq attempt ${attempt + 1}: quality rejected")
             } catch (e: IOException) {
                 lastError = e
-                if (isRateLimitError(e) && model != StoryPrompts.GROQ_MODELS.last()) {
-                    StoryLog.w("Groq model $model rate-limited, trying fallback")
-                    continue
-                }
-                throw e
+                if (isRateLimitError(e)) throw e
+                StoryLog.w("Direct Groq attempt ${attempt + 1} failed: ${e.message}")
             }
         }
-        throw lastError ?: IOException("Groq не ответил")
+        throw lastError ?: IOException("Groq не смог собрать историю после $MAX_ATTEMPTS попыток")
     }
 
     private fun requestStory(
@@ -87,6 +88,7 @@ class GroqStoryClient(
         title: String,
         year: Int?,
         genre: String?,
+        relaxedQuality: Boolean,
     ): StoryResponse? {
         val body = JSONObject().apply {
             put("model", model)
@@ -120,8 +122,14 @@ class GroqStoryClient(
                     },
                 )
             }
-            return parseGroqResponse(response.body?.string(), artist, title, year, genre)
-                ?: throw IOException("Groq ответил, но текст истории не разобрался")
+            return parseGroqResponse(
+                response.body?.string(),
+                artist,
+                title,
+                year,
+                genre,
+                relaxedQuality,
+            )
         }
     }
 
@@ -136,10 +144,11 @@ class GroqStoryClient(
         title: String,
         year: Int?,
         genre: String?,
+        relaxedQuality: Boolean,
     ): StoryResponse? {
         val payload = gson.fromJson(rawBody, GroqChatResponse::class.java)
         val content = payload.choices?.firstOrNull()?.message?.content ?: return null
-        return parseStoryJson(content, artist, title, year, genre)
+        return parseStoryJson(content, artist, title, year, genre, relaxedQuality)
     }
 
     private fun parseStoryJson(
@@ -148,6 +157,7 @@ class GroqStoryClient(
         title: String,
         year: Int?,
         genre: String?,
+        relaxedQuality: Boolean,
     ): StoryResponse? {
         val jsonStart = raw.indexOf('{')
         val jsonEnd = raw.lastIndexOf('}')
@@ -156,7 +166,9 @@ class GroqStoryClient(
         return try {
             val obj = JSONObject(raw.substring(jsonStart, jsonEnd + 1))
             val script = obj.getString("script").trim()
-            if (script.isBlank() || StoryScriptQuality.isTemplateLike(script)) return null
+            if (script.isBlank()) return null
+            if (StoryScriptQuality.hasBannedPattern(script)) return null
+            if (!relaxedQuality && StoryScriptQuality.isTemplateLike(script, artist, title)) return null
             StoryResponse(
                 artist = artist,
                 title = title,
@@ -182,4 +194,8 @@ class GroqStoryClient(
         val content: String? = null,
         @SerializedName("role") val role: String? = null,
     )
+
+    companion object {
+        private const val MAX_ATTEMPTS = 3
+    }
 }

@@ -1,13 +1,12 @@
 /**
  * Russian stress for Yandex SpeechKit: put + immediately BEFORE the stressed vowel.
- * @see https://yandex.ru/dev/dialogs/alice/doc/ru/speech-tuning.html
- *
- * Groq must NOT emit + marks — server applies this dictionary after generation.
+ * Only words Yandex often misreads — do not mark common vocabulary.
  */
+
+import { normalizeRussianYo } from './russian-yo.js';
 
 /** lowercase word → word with + before stressed vowel */
 export const RUSSIAN_STRESS: Record<string, string> = {
-  // studio / concert / tech
   атлас: 'атл+ас',
   атласе: 'атл+асе',
   барабан: 'бараб+ан',
@@ -26,6 +25,7 @@ export const RUSSIAN_STRESS: Record<string, string> = {
   концерт: 'конц+ерт',
   концерта: 'конц+ерта',
   концерте: 'конц+ерте',
+  курьёз: 'курь+ёз',
   микрофон: 'микроф+он',
   микрофона: 'микроф+она',
   микрофоном: 'микроф+оном',
@@ -35,6 +35,15 @@ export const RUSSIAN_STRESS: Record<string, string> = {
   мониторах: 'монит+орах',
   мониторов: 'монит+оров',
   мониторы: 'монит+оры',
+  продюсер: 'прод+юсер',
+  продюсеры: 'прод+юсеры',
+  радиола: 'ради+ола',
+  радиолы: 'ради+олы',
+  раздевалке: 'раздев+алке',
+  свист: 'св+ист',
+  свиста: 'св+иста',
+  сингл: 'с+ингл',
+  сингла: 'с+ингла',
   студии: 'ст+удии',
   студий: 'ст+удий',
   студию: 'ст+удию',
@@ -43,78 +52,12 @@ export const RUSSIAN_STRESS: Record<string, string> = {
   звукорежиссёр: 'звукорежисс+ёр',
   звукорежиссёра: 'звукорежисс+ёра',
   звукорежиссёры: 'звукорежисс+ёры',
-
-  // story vocabulary
-  берет: 'бер+ет',
-  бизнес: 'б+изнес',
-  было: 'б+ыло',
-  важный: 'в+ажный',
-  гарлем: 'Г+арлем',
-  голос: 'г+олос',
-  дух: 'д+ух',
-  зал: 'з+ал',
-  зала: 'з+ала',
-  замке: 'з+амке',
-  замок: 'з+амок',
-  кричал: 'кр+ичал',
   краснели: 'красн+ели',
-  курьёз: 'курь+ёз',
-  музыканты: 'музык+анты',
-  начала: 'нач+ала',
-  ноте: 'н+оте',
-  ноту: 'н+оту',
-  одержим: 'од+ержим',
-  одержимый: 'од+ержимый',
-  па: 'п+а',
-  плащ: 'пл+ащ',
-  плащом: 'пл+ащом',
-  продюсер: 'прод+юсер',
-  продюсеры: 'прод+юсеры',
-  радиола: 'ради+ола',
-  радиолы: 'ради+олы',
-  раздевалке: 'раздев+алке',
-  реакция: 'ре+акция',
-  реакцию: 'ре+акцию',
-  ритуал: 'риту+ал',
-  свист: 'св+ист',
-  свиста: 'св+иста',
-  сезон: 'сез+он',
-  сезона: 'сез+она',
-  сингл: 'с+ингл',
-  сингла: 'с+ингла',
-  соседи: 'сос+еди',
-  тогда: 'тогд+а',
-  удар: 'уд+ар',
-  фирменным: 'ф+ирменным',
-  фраза: 'фр+аза',
-  фразу: 'фр+азу',
-  хит: 'х+ит',
   эфир: 'эф+ир',
   эфире: 'эф+ире',
-  эпоха: 'эп+оха',
-  эпохе: 'эп+охе',
 };
 
-/** Words that must never keep model-provided + marks (always re-stress from dictionary). */
-export const FORCE_RESTRESS = new Set([
-  'инженер',
-  'инженера',
-  'инженером',
-  'инженеры',
-  'звукорежиссёр',
-  'звукорежиссёра',
-  'звукорежиссёры',
-  'версии',
-  'версию',
-  'атлас',
-  'атласе',
-  'монитор',
-  'монитора',
-  'мониторами',
-  'мониторах',
-  'мониторов',
-  'мониторы',
-]);
+export const FORCE_RESTRESS = new Set(Object.keys(RUSSIAN_STRESS));
 
 export function stripStressMarks(word: string): string {
   return word.replace(/\+/g, '');
@@ -135,9 +78,13 @@ export function applyStressToWord(word: string): string {
 }
 
 export function applyRussianStress(text: string): string {
-  return text.replace(/[а-яёА-ЯЁ][а-яёА-ЯЁ+\-]*/g, (word) => applyStressToWord(word));
+  const normalized = normalizeRussianYo(text);
+  return normalized.replace(/[а-яёА-ЯЁ][а-яёА-ЯЁ+\-]*/g, (word) => applyStressToWord(word));
 }
 
 export function listStressEntries(): Array<{ word: string; marked: string }> {
   return Object.entries(RUSSIAN_STRESS).map(([word, marked]) => ({ word, marked }));
 }
+
+/** @deprecated use RUSSIAN_STRESS */
+export const STRESS_OVERRIDES = RUSSIAN_STRESS;

@@ -77,7 +77,9 @@ class StoryRepository(
 
         if (!forceRefresh && previousScripts.isEmpty()) {
             val cached = storyDao.getByTrackKey(trackKey)
-            if (cached != null && !cached.demo && !isCacheExpired(cached) && !StoryScriptQuality.isTemplateLike(cached.script)) {
+            if (cached != null && !cached.demo && !isCacheExpired(cached) &&
+                !StoryScriptQuality.isTemplateLike(cached.script, cached.artist, cached.title)
+            ) {
                 StoryLog.i("Story from cache")
                 return Result.success(cached.toResponse())
             }
@@ -218,7 +220,7 @@ class StoryRepository(
             }
             when {
                 groqStory == null -> StoryAttemptResult.Failed("Groq не вернул текст истории")
-                StoryScriptQuality.isTemplateLike(groqStory.script) -> {
+                StoryScriptQuality.isTemplateLike(groqStory.script, track.artist, track.title) -> {
                     StoryLog.w("Direct Groq returned template-like story — rejected")
                     StoryAttemptResult.TemplateRejected
                 }
@@ -273,7 +275,7 @@ class StoryRepository(
                     StoryLog.w("Backend returned template/demo story — rejected")
                     StoryAttemptResult.TemplateRejected
                 }
-                StoryScriptQuality.isTemplateLike(response.script) -> {
+                StoryScriptQuality.isTemplateLike(response.script, track.artist, track.title) -> {
                     StoryLog.w("Backend returned template-like story — rejected")
                     StoryAttemptResult.TemplateRejected
                 }

@@ -19,10 +19,8 @@ import {
 } from './story-length.js';
 
 const GROQ_API_URL = 'https://api.groq.com/openai/v1/chat/completions';
-const GROQ_MODEL_PRIMARY = 'llama-3.1-8b-instant';
-const GROQ_MODEL_FALLBACK = 'llama-3.3-70b-versatile';
-const GROQ_MODELS = [GROQ_MODEL_PRIMARY, GROQ_MODEL_FALLBACK];
-const MAX_ATTEMPTS = 2;
+const GROQ_MODEL = 'llama-3.1-8b-instant';
+const MAX_ATTEMPTS = 3;
 
 export interface StoryScript {
   script: string;
@@ -70,47 +68,36 @@ async function callGroq(
   const apiKey = process.env.GROQ_API_KEY;
   if (!apiKey) throw new Error('GROQ_API_KEY is not configured');
 
-  let lastError: Error | null = null;
+  const response = await fetch(GROQ_API_URL, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      model: GROQ_MODEL,
+      temperature: 0.72,
+      max_tokens: maxTokens,
+      response_format: { type: 'json_object' },
+      messages: [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: userPrompt },
+      ],
+    }),
+    signal: AbortSignal.timeout(45000),
+  });
 
-  for (const model of GROQ_MODELS) {
-    const response = await fetch(GROQ_API_URL, {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model,
-        temperature: 0.72,
-        max_tokens: maxTokens,
-        response_format: { type: 'json_object' },
-        messages: [
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content: userPrompt },
-        ],
-      }),
-      signal: AbortSignal.timeout(45000),
-    });
-
-    if (response.ok) {
-      const data = (await response.json()) as {
-        choices?: Array<{ message?: { content?: string } }>;
-      };
-      const content = data.choices?.[0]?.message?.content;
-      if (!content) throw new Error('Groq returned empty content');
-      return content;
-    }
-
+  if (!response.ok) {
     const body = await response.text();
-    lastError = new Error(`Groq API error ${response.status}: ${body}`);
-    if (response.status === 429 && model !== GROQ_MODELS[GROQ_MODELS.length - 1]) {
-      console.warn(`Groq model ${model} rate-limited, trying fallback`);
-      continue;
-    }
-    throw lastError;
+    throw new Error(`Groq API error ${response.status}: ${body}`);
   }
 
-  throw lastError ?? new Error('Groq request failed');
+  const data = (await response.json()) as {
+    choices?: Array<{ message?: { content?: string } }>;
+  };
+  const content = data.choices?.[0]?.message?.content;
+  if (!content) throw new Error('Groq returned empty content');
+  return content;
 }
 
 function finalizeStory(
@@ -177,6 +164,7 @@ export async function generateStoryScript(
       storyLength,
       input.artist,
       input.title,
+      { strictLength: attempt === MAX_ATTEMPTS - 1 ? false : true, skipWatery: attempt === MAX_ATTEMPTS - 1 },
     );
     if (quality.ok) {
       return finalizeStory(story, { ...input, voiceId }, storyLength);
@@ -188,6 +176,7 @@ export async function generateStoryScript(
       storyLength,
       input.artist,
       input.title,
+      { strictLength: attempt === MAX_ATTEMPTS - 1 ? false : true, skipWatery: attempt === MAX_ATTEMPTS - 1 },
     );
     if (sanitizedQuality.ok) {
       console.warn(`Story sanitized after attempt ${attempt + 1}: ${quality.reason}`);

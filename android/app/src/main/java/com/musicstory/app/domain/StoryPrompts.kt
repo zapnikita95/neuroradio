@@ -3,8 +3,7 @@ package com.musicstory.app.domain
 object StoryPrompts {
 
     const val GROQ_MODEL_PRIMARY = "llama-3.1-8b-instant"
-    const val GROQ_MODEL_FALLBACK = "llama-3.3-70b-versatile"
-    val GROQ_MODELS = listOf(GROQ_MODEL_PRIMARY, GROQ_MODEL_FALLBACK)
+    val GROQ_MODELS = listOf(GROQ_MODEL_PRIMARY)
 
     /** @deprecated use GROQ_MODEL_PRIMARY */
     const val GROQ_MODEL = GROQ_MODEL_PRIMARY

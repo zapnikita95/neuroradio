@@ -127,15 +127,44 @@ export function sanitizeScriptForTts(script: string, artist: string, title: stri
   return result;
 }
 
+function normalizeForMatch(text: string): string {
+  return text.toLowerCase().replace(/[^\p{L}\p{N}\s]/gu, ' ').replace(/\s+/g, ' ').trim();
+}
+
+function significantTokens(raw: string): string[] {
+  return normalizeForMatch(raw)
+    .split(' ')
+    .filter((part) => part.length >= 3);
+}
+
+/** Story mentions artist, title, or a concrete music detail — enough to pass quality gate. */
+export function hasConcreteFact(script: string, artist = '', title = ''): boolean {
+  const trimmed = script.trim();
+  if (/«[^»]{2,}»/.test(trimmed)) return true;
+
+  const scriptNorm = normalizeForMatch(trimmed);
+  for (const token of significantTokens(artist)) {
+    if (scriptNorm.includes(token)) return true;
+  }
+  for (const token of significantTokens(title)) {
+    if (token.length >= 4 && scriptNorm.includes(token)) return true;
+  }
+
+  const concreteSignals =
+    /\b(сэмпл|sample|перезапис|дубль|лейбл|продюсер|радио|телевиз|клип|чарт|billboard|гитар|барабан|клавиш|оркестр|сакс|труб|скрипк|микрофон|пластинк|кассет|vinyl|prado|pérez|перес|кавер|cover|remix|plagiar|запрет|скандал|плагиат|первый раз|в эфир|на сцене|в раздевалке|backstage|soundcheck|сведени|master|микш|репетиц|фестив|Apollo|Abbey|Columbia|EMI|MTV|Grammy|песн|трек|альбом|сингл|куплет|мелоди|исполн|запис|верси|оркестр|джаз|свинг|рок|блюз|саксоф|фортеп|ударн|вокал|хор|дириж|композ|arrang|оригинал|перевод|эфир|премьер|релиз|дебют|soundtrack|сцен|зал|студи|концерт|пластин|винил|кассет|радиол|припев|бридж|solo|соло)\b/i;
+  return concreteSignals.test(trimmed);
+}
+
 export function validateStoryScript(
   script: string,
   lengthId: StoryLengthId = DEFAULT_STORY_LENGTH,
   artist = '',
   title = '',
-  options: { strictLength?: boolean } = {},
+  options: { strictLength?: boolean; skipWatery?: boolean } = {},
 ): { ok: true } | { ok: false; reason: string } {
   const limits = getStoryLengthPreset(lengthId);
   const strictLength = options.strictLength ?? true;
+  const skipWatery = options.skipWatery ?? false;
   const trimmed = script.trim();
   if (!trimmed) return { ok: false, reason: 'empty script' };
 
@@ -154,9 +183,11 @@ export function validateStoryScript(
     return { ok: false, reason: `forbidden numbers: ${numberIssue}` };
   }
 
-  const waterIssue = findWateryContent(trimmed);
-  if (waterIssue) {
-    return { ok: false, reason: waterIssue };
+  if (!skipWatery) {
+    const waterIssue = findWateryContent(trimmed, artist, title);
+    if (waterIssue) {
+      return { ok: false, reason: waterIssue };
+    }
   }
 
   const words = countWords(trimmed);
@@ -173,22 +204,7 @@ export function validateStoryScript(
 }
 
 /** Reject generic filler without concrete detail. */
-export function findWateryContent(script: string): string | null {
-  const genericOpeners = [
-    /^«?\s*я (?:сидел|вспоминаю) (?:в )?студии/i,
-    /^«?\s*сквозь миганье лампочек/i,
-  ];
-  for (const pattern of genericOpeners) {
-    if (pattern.test(script)) {
-      return 'generic studio opener — start with a concrete fact';
-    }
-  }
-
-  const concreteSignals =
-    /\b(сэмпл|sample|перезапис|дубль|лейбл|продюсер|радио|телевиз|клип|чарт|billboard|гитар|барабан|клавиш|оркестр|сакс|труб|скрипк|микрофон|пластинк|кассет|vinyl|prado|pérez|перес|перез|кавер|cover|remix|plagiar|запрет|скандал|штраф|плагиат|первый раз|в эфир|на сцене|в раздевалке|backstage|soundcheck|монтаж|монтажн|сведени|master|микш|репетиц|фestival|фестив|Apollo|Монтр|Abbey|Sun Records|Columbia|EMI|Def Jam|Яндекс|Spotify|MTV|Grammy|«[^»]{3,}»)\b/i;
-  if (!concreteSignals.test(script)) {
-    return 'no concrete fact — need sample, place, person, instrument, label, or scandal detail';
-  }
-
-  return null;
+export function findWateryContent(script: string, artist = '', title = ''): string | null {
+  if (hasConcreteFact(script, artist, title)) return null;
+  return 'no concrete fact — mention artist, title, instrument, label, or recording detail';
 }
