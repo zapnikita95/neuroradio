@@ -138,7 +138,6 @@ export async function generateStoryScript(
   const voiceId = input.voiceId ?? voiceForYear(input.year, input.genre);
 
   let retryReason: string | undefined;
-  let lastParsed: StoryScript | null = null;
 
   for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
     const userPrompt = buildStoryUserPrompt({
@@ -159,7 +158,6 @@ export async function generateStoryScript(
 
     story.voiceId = voiceId;
     story.word_count = countWords(story.script);
-    lastParsed = story;
 
     const quality = validateStoryScript(
       story.script,
@@ -187,22 +185,7 @@ export async function generateStoryScript(
     console.warn(`Story quality reject (attempt ${attempt + 1}): ${retryReason}`);
   }
 
-  if (lastParsed) {
-    const fallback = finalizeStory(lastParsed, { ...input, voiceId }, storyLength);
-    const relaxed = validateStoryScript(
-      fallback.script,
-      storyLength,
-      input.artist,
-      input.title,
-      { strictLength: false },
-    );
-    if (relaxed.ok || countWords(fallback.script) >= 30) {
-      console.warn(`Story returned after sanitize fallback: ${retryReason ?? 'quality retries exhausted'}`);
-      return fallback;
-    }
-  }
-
   throw new Error(
-    `Groq could not produce a usable story after ${MAX_ATTEMPTS} attempts`,
+    `Groq could not produce a usable story after ${MAX_ATTEMPTS} attempts${retryReason ? `: ${retryReason}` : ''}`,
   );
 }

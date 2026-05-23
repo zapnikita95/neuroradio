@@ -7,7 +7,6 @@ import { enrichTrackMetadata } from '../services/musicbrainz.js';
 import { generateStoryScript, hasGroqApiKey } from '../services/groq.js';
 import { synthesizeSpeech, hasYandexCredentials } from '../services/yandex-tts.js';
 import { resolveVoiceForStory } from '../services/voices.js';
-import { buildDemoStory, isDemoMode } from '../services/demo.js';
 import { signAudioAccess } from '../services/audio-token.js';
 import { isUnlimitedInstall } from '../config/security.js';
 import { attachStoryQuotaHeaders, getDailyStoryQuota } from '../middleware/rate-limit.js';
@@ -46,6 +45,15 @@ router.get('/quota', (req: Request, res: Response) => {
 });
 
 router.post('/full', validateStoryFullBody, async (req: Request, res: Response) => {
+  if (!hasGroqApiKey()) {
+    res.status(503).json({
+      error: 'Story generation unavailable',
+      code: 'GROQ_NOT_CONFIGURED',
+      message: 'Groq не настроен на сервере. Добавь GROQ_API_KEY или свой ключ в настройках приложения.',
+    });
+    return;
+  }
+
   const {
     artist,
     title,
@@ -60,37 +68,22 @@ router.post('/full', validateStoryFullBody, async (req: Request, res: Response) 
   try {
     const metadata = await enrichTrackMetadata(artist, title);
     const voiceId = resolveVoiceForStory(ttsVoice, metadata.year, metadata.genre);
-    const demo = isDemoMode();
 
     const previousScripts = Array.isArray(previousScriptsRaw)
       ? previousScriptsRaw.filter((s): s is string => typeof s === 'string' && s.trim().length > 0)
       : [];
 
-    let story;
-
-    if (demo) {
-      story = buildDemoStory(
-        metadata.artist,
-        metadata.title,
-        metadata.year,
-        metadata.genre,
-        previousScripts,
-        storyNarrator,
-        metadata.countryCode,
-      );
-    } else {
-      story = await generateStoryScript({
-        artist: metadata.artist,
-        title: metadata.title,
-        year: metadata.year,
-        genre: metadata.genre,
-        countryCode: metadata.countryCode,
-        voiceId,
-        storyLength,
-        storyNarrator,
-        previousScripts,
-      });
-    }
+    const story = await generateStoryScript({
+      artist: metadata.artist,
+      title: metadata.title,
+      year: metadata.year,
+      genre: metadata.genre,
+      countryCode: metadata.countryCode,
+      voiceId,
+      storyLength,
+      storyNarrator,
+      previousScripts,
+    });
 
     const response: Record<string, unknown> = {
       artist: metadata.artist,
@@ -102,16 +95,16 @@ router.post('/full', validateStoryFullBody, async (req: Request, res: Response) 
       script: story.script,
       word_count: story.word_count,
       voiceId: story.voiceId,
-      demo,
+      demo: false,
       quota: getDailyStoryQuota(req.installId ?? 'unknown'),
       sources: {
         musicbrainz: Boolean(metadata.year || metadata.genre || metadata.mbid),
-        groq: !demo && hasGroqApiKey(),
-        yandexTts: !demo && hasYandexCredentials(),
+        groq: true,
+        yandexTts: hasYandexCredentials(),
       },
     };
 
-    if (!demo && hasYandexCredentials()) {
+    if (hasYandexCredentials()) {
       const id = uuidv4();
       const audio = await synthesizeSpeech(story.script, story.voiceId, `${id}.ogg`, {
         speed: ttsSpeed,
@@ -124,9 +117,7 @@ router.post('/full', validateStoryFullBody, async (req: Request, res: Response) 
     } else {
       response.audioUrl = null;
       response.audioFile = null;
-      response.ttsHint = hasYandexCredentials()
-        ? null
-        : 'Нет Yandex TTS — телефон озвучит текст через системный Android TTS';
+      response.ttsHint = 'Нет Yandex TTS — телефон озвучит текст через системный Android TTS';
     }
 
     const installId = req.installId ?? 'unknown';
@@ -135,9 +126,7 @@ router.post('/full', validateStoryFullBody, async (req: Request, res: Response) 
   } catch (err) {
     console.error('POST /v1/story/full failed:', err);
     const rawMessage = err instanceof Error ? err.message : String(err);
-    const groqUnavailable =
-      !isDemoMode() &&
-      (/groq|403 forbidden|could not produce a usable story/i.test(rawMessage));
+    const groqUnavailable = /groq|403 forbidden|could not produce a usable story/i.test(rawMessage);
     res.status(groqUnavailable ? 503 : 500).json({
       error: groqUnavailable ? 'Story generation unavailable' : 'Story generation failed',
       code: groqUnavailable ? 'GROQ_FAILED' : 'STORY_FAILED',

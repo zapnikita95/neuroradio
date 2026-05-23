@@ -70,7 +70,7 @@ class StoryRepository(
 
         if (!forceRefresh && previousScripts.isEmpty()) {
             val cached = storyDao.getByTrackKey(trackKey)
-            if (cached != null && !isCacheExpired(cached) && !isStaleRadioScript(cached.script)) {
+            if (cached != null && !cached.demo && !isCacheExpired(cached) && !isStaleRadioScript(cached.script)) {
                 StoryLog.i("Story from cache")
                 return Result.success(cached.toResponse())
             }
@@ -119,15 +119,17 @@ class StoryRepository(
                         ),
                     )
                 }
-                if (response.script.isNotBlank() && !isDuplicateScript(response.script, previousScripts)) {
+                if (response.demo) {
+                    StoryLog.w("Backend returned template/demo story — rejected")
+                } else if (response.script.isNotBlank() && !isDuplicateScript(response.script, previousScripts)) {
                     response.quota?.let { quota ->
                         _dailyQuota.value = quota
                     }
-                    StoryLog.i("Backend OK: audio=${response.audioUrl != null}, demo=${response.demo}, quota=${response.quota?.remaining}/${response.quota?.limit}")
+                    StoryLog.i("Backend OK: audio=${response.audioUrl != null}, quota=${response.quota?.remaining}/${response.quota?.limit}")
                     persistStory(trackKey, track, response, angle.labelRu)
                     return Result.success(response)
                 }
-                StoryLog.w("Backend response rejected: empty or duplicate")
+                StoryLog.w("Backend response rejected: empty, duplicate, or template")
             } catch (e: Exception) {
                 if (e is HttpException && e.code() == 429) {
                     rateLimitHit = true
@@ -311,7 +313,7 @@ class StoryRepository(
     }
 
     private fun isCacheExpired(cached: CachedStory): Boolean {
-        val maxAgeMs = if (cached.demo) 60 * 60 * 1000L else 24 * 60 * 60 * 1000L
+        val maxAgeMs = 24 * 60 * 60 * 1000L
         return System.currentTimeMillis() - cached.fetchedAt > maxAgeMs
     }
 
@@ -322,7 +324,9 @@ class StoryRepository(
             lower.contains("на волнах") ||
             lower.contains("добро пожаловать") ||
             lower.contains("братуха") ||
-            lower.contains("врубай громче")
+            lower.contains("врубай громче") ||
+            lower.contains("стоял у радиолы") ||
+            lower.contains("фанат ") && lower.contains(" настояли")
     }
 
     private fun CachedStory.toResponse(): StoryResponse = StoryResponse(
