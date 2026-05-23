@@ -131,16 +131,16 @@ router.post('/full', validateStoryFullBody, async (req: Request, res: Response) 
     res.json(response);
   } catch (err) {
     console.error('POST /v1/story/full failed:', err);
-    const message = safeErrorMessage(err);
+    const rawMessage = err instanceof Error ? err.message : String(err);
     const groqUnavailable =
       !isDemoMode() &&
-      (message.includes('Groq') || message.includes('GROQ') || message.includes('403'));
+      (/groq|403 forbidden|could not produce a usable story/i.test(rawMessage));
     res.status(groqUnavailable ? 503 : 500).json({
       error: groqUnavailable ? 'Story generation unavailable' : 'Story generation failed',
       code: groqUnavailable ? 'GROQ_FAILED' : 'STORY_FAILED',
       message: groqUnavailable
         ? 'Groq не ответил — обнови GROQ_API_KEY на сервере или добавь свой ключ в настройках приложения.'
-        : message,
+        : safeErrorMessage(err),
     });
   }
 });
