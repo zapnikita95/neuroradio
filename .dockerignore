@@ -1,0 +1,13 @@
+android/
+assets/
+docs/
+scripts/
+.cursor/
+.git/
+**/.env
+**/.env.*
+!**/.env.example
+**/node_modules/
+*.apk
+*.aab
+README.md

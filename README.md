@@ -84,7 +84,7 @@ Music story/
 ## GitHub и Railway
 
 - **Репозиторий:** https://github.com/zapnikita95/music-story
-- **Деплой бэкенда:** Railway → Deploy from GitHub → root directory **`backend`**
+- **Деплой бэкенда:** Railway → GitHub repo `music-story` → сборка через корневой **`Dockerfile`** (Root Directory = пусто)
 - **Секреты:** только в Railway Variables и локальном `backend/.env` — **не коммитить** (см. `.gitignore`)
 
 Подробно: [backend/RAILWAY.md](backend/RAILWAY.md)
