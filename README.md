@@ -1,6 +1,8 @@
 # Music Story
 
-Android-приложение «нейрорадио» для стриминговых плееров: определяет текущий трек через MediaSession, запрашивает короткую (~30 сек) русскую справку у бэкенда и озвучивает её, затем возобновляет музыку.
+«Нейрорадио» для стриминговых плееров: определяет текущий трек, запрашивает короткую (~30 сек) русскую справку у бэкенда и озвучивает её.
+
+**Платформы:** Android (Kotlin) · iOS (SwiftUI, iOS 17+) · **Windows Desktop** (Tauri виджет)
 
 ## Быстрый старт
 
@@ -29,6 +31,40 @@ APK автоматически копируется в корень: **`MusicSto
 
 **Требования:** JDK 17, Android SDK (API 35), Gradle wrapper в `android/`.
 
+### iOS (SwiftUI)
+
+Сборка **только на macOS** (Xcode). Проект уже в репозитории — XcodeGen не нужен.
+
+```bash
+git clone https://github.com/zapnikita95/music-story.git
+cd music-story/ios
+open MusicStory.xcodeproj
+```
+
+В Xcode: **Signing & Capabilities** → Team → **Run** (⌘R).
+
+Подробная инструкция: [ios/README.md](ios/README.md) · [PLAN-06](docs/PLAN-06-ios.md)
+
+### Windows Desktop (виджет)
+
+Круглый always-on-top виджет: Spotify / Яндекс / браузер через Windows SMTC.
+
+```bash
+cd desktop
+npm install
+npm run tauri build
+```
+
+Exe: `desktop/src-tauri/target/release/music-story-desktop.exe`
+
+Подробнее: [desktop/README.md](desktop/README.md)
+
+| iOS | Android |
+|-----|---------|
+| Spotify App Remote + Apple Music (авто) | MediaSession (авто) |
+| ShazamKit / ручной ввод (Яндекс и др.) | NotificationListener |
+| Локальное уведомление + виджет | Persistent notification |
+
 ### Бэкенд (BFF)
 
 ```bash
@@ -56,6 +92,8 @@ npm run dev
 ```
 Music story/
 ├── android/              # Kotlin + Jetpack Compose
+├── desktop/              # Tauri 2 + React (Windows виджет)
+├── ios/                  # SwiftUI (iOS 17+)
 ├── backend/              # Node.js Express BFF
 ├── docs/                 # Подробная документация и планы подсистем
 ├── .env.example          # Шаблон секретов бэкенда
@@ -79,6 +117,7 @@ Music story/
 - [PLAN-03: AI prompts](docs/PLAN-03-ai-prompts.md)
 - [PLAN-04: Triggers & scrobbling](docs/PLAN-04-triggers-scrobbling.md)
 - [PLAN-05: Testing & release](docs/PLAN-05-testing-release.md)
+- [PLAN-06: iOS](docs/PLAN-06-ios.md)
 - [Backend README](backend/README.md)
 
 ## GitHub и Railway
@@ -100,6 +139,9 @@ Music story/
 | `GROQ_API_KEY` | Генерация текста (Groq) + автоматический JWT для APK |
 | `AUTH_JWT_SECRET` | *(опционально)* свой JWT-секрет; иначе выводится из `GROQ_API_KEY` |
 | `ALLOWED_CERT_SHA256` | *(опционально)* release fingerprint для Play Store |
+| `ALLOWED_IOS_TEAM_ID` | *(опционально)* Apple Team ID для iOS-приложения |
+| `DESKTOP_AUTH_SECRET` | *(опционально)* секрет для desktop-клиента (`client_type: desktop`) |
+| `ALLOW_DESKTOP_AUTH` | *(dev)* `true` — desktop-токены без секрета |
 | `YANDEX_API_KEY` | Yandex SpeechKit |
 | `YANDEX_FOLDER_ID` | Каталог Yandex Cloud |
 

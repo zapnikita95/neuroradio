@@ -1,0 +1,37 @@
+# iOS build (requires macOS + Xcode)
+
+name: iOS Build
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'ios/**'
+      - '.github/workflows/ios-build.yml'
+
+jobs:
+  build:
+    runs-on: macos-14
+    defaults:
+      run:
+        working-directory: ios
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Ensure Xcode project exists
+        run: |
+          if [ ! -d MusicStory.xcodeproj ]; then
+            brew install xcodegen
+            xcodegen generate
+          fi
+
+      - name: Build for iOS Simulator
+        run: |
+          xcodebuild \
+            -project MusicStory.xcodeproj \
+            -scheme MusicStory \
+            -destination 'platform=iOS Simulator,name=iPhone 16,OS=latest' \
+            -configuration Debug \
+            CODE_SIGNING_ALLOWED=NO \
+            build

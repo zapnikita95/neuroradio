@@ -1,0 +1,553 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 56;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		B1000001 /* MusicStoryApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1000001 /* MusicStoryApp.swift */; };
+		B1000002 /* AppContainer.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1000002 /* AppContainer.swift */; };
+		B1000003 /* TrackInfo.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1000003 /* TrackInfo.swift */; };
+		B1000004 /* AppleMusicNowPlaying.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1000004 /* AppleMusicNowPlaying.swift */; };
+		B1000005 /* SpotifyAppRemoteManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1000005 /* SpotifyAppRemoteManager.swift */; };
+		B1000006 /* ShazamTrackRecognizer.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1000006 /* ShazamTrackRecognizer.swift */; };
+		B1000007 /* NowPlayingCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1000007 /* NowPlayingCoordinator.swift */; };
+		B1000008 /* Models.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1000008 /* Models.swift */; };
+		B1000009 /* SettingsStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1000009 /* SettingsStore.swift */; };
+		B100000A /* BackendClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = F100000A /* BackendClient.swift */; };
+		B100000B /* StoryHistoryStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = F100000B /* StoryHistoryStore.swift */; };
+		B100000C /* StoryRepository.swift in Sources */ = {isa = PBXBuildFile; fileRef = F100000C /* StoryRepository.swift */; };
+		B100000D /* TriggerEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = F100000D /* TriggerEngine.swift */; };
+		B100000E /* StoryPlayer.swift in Sources */ = {isa = PBXBuildFile; fileRef = F100000E /* StoryPlayer.swift */; };
+		B100000F /* StoryOrchestrator.swift in Sources */ = {isa = PBXBuildFile; fileRef = F100000F /* StoryOrchestrator.swift */; };
+		B1000010 /* NotificationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1000010 /* NotificationService.swift */; };
+		B1000011 /* Theme.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1000011 /* Theme.swift */; };
+		B1000012 /* OnboardingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1000012 /* OnboardingView.swift */; };
+		B1000013 /* HomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1000013 /* HomeView.swift */; };
+		B1000014 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1000014 /* SettingsView.swift */; };
+		B1000015 /* HistoryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1000015 /* HistoryView.swift */; };
+		B1000016 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = F1000016 /* Assets.xcassets */; };
+		B1000017 /* TellStoryWidget.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1000017 /* TellStoryWidget.swift */; };
+		B1000018 /* MusicStoryWidgetExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = P1000002 /* MusicStoryWidgetExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		B1000019 /* WidgetKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = F1000019 /* WidgetKit.framework */; };
+		B100001A /* SwiftUI.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = F100001A /* SwiftUI.framework */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		C1000001 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = P1000001 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = T1000002;
+			remoteInfo = MusicStoryWidgetExtension;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		E1000001 /* Embed Foundation Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				B1000018 /* MusicStoryWidgetExtension.appex in Embed Foundation Extensions */,
+			);
+			name = "Embed Foundation Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
+
+/* Begin PBXFileReference section */
+		F1000001 /* MusicStoryApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MusicStoryApp.swift; sourceTree = "<group>"; };
+		F1000002 /* AppContainer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppContainer.swift; sourceTree = "<group>"; };
+		F1000003 /* TrackInfo.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrackInfo.swift; sourceTree = "<group>"; };
+		F1000004 /* AppleMusicNowPlaying.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppleMusicNowPlaying.swift; sourceTree = "<group>"; };
+		F1000005 /* SpotifyAppRemoteManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpotifyAppRemoteManager.swift; sourceTree = "<group>"; };
+		F1000006 /* ShazamTrackRecognizer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShazamTrackRecognizer.swift; sourceTree = "<group>"; };
+		F1000007 /* NowPlayingCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NowPlayingCoordinator.swift; sourceTree = "<group>"; };
+		F1000008 /* Models.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Models.swift; sourceTree = "<group>"; };
+		F1000009 /* SettingsStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsStore.swift; sourceTree = "<group>"; };
+		F100000A /* BackendClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackendClient.swift; sourceTree = "<group>"; };
+		F100000B /* StoryHistoryStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StoryHistoryStore.swift; sourceTree = "<group>"; };
+		F100000C /* StoryRepository.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StoryRepository.swift; sourceTree = "<group>"; };
+		F100000D /* TriggerEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TriggerEngine.swift; sourceTree = "<group>"; };
+		F100000E /* StoryPlayer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StoryPlayer.swift; sourceTree = "<group>"; };
+		F100000F /* StoryOrchestrator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StoryOrchestrator.swift; sourceTree = "<group>"; };
+		F1000010 /* NotificationService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationService.swift; sourceTree = "<group>"; };
+		F1000011 /* Theme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Theme.swift; sourceTree = "<group>"; };
+		F1000012 /* OnboardingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingView.swift; sourceTree = "<group>"; };
+		F1000013 /* HomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeView.swift; sourceTree = "<group>"; };
+		F1000014 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
+		F1000015 /* HistoryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HistoryView.swift; sourceTree = "<group>"; };
+		F1000016 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		F1000017 /* TellStoryWidget.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TellStoryWidget.swift; sourceTree = "<group>"; };
+		F1000018 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		F100001B /* WidgetInfo.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		F1000019 /* WidgetKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = WidgetKit.framework; path = System/Library/Frameworks/WidgetKit.framework; sourceTree = SDKROOT; };
+		F100001A /* SwiftUI.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = SwiftUI.framework; path = System/Library/Frameworks/SwiftUI.framework; sourceTree = SDKROOT; };
+		P1000002 /* MusicStoryWidgetExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = MusicStoryWidgetExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		P1000003 /* MusicStory.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = MusicStory.app; sourceTree = BUILT_PRODUCTS_DIR; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		X1000001 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		X1000002 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				B1000019 /* WidgetKit.framework in Frameworks */,
+				B100001A /* SwiftUI.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		G1000001 = {
+			isa = PBXGroup;
+			children = (
+				G1000002 /* MusicStory */,
+				G1000003 /* MusicStoryWidget */,
+				G1000004 /* Frameworks */,
+				G1000005 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		G1000002 /* MusicStory */ = {
+			isa = PBXGroup;
+			children = (
+				G1000006 /* App */,
+				G1000007 /* Media */,
+				G1000008 /* Data */,
+				G1000009 /* Domain */,
+				G100000A /* Notifications */,
+				G100000B /* UI */,
+				F1000016 /* Assets.xcassets */,
+				F1000018 /* Info.plist */,
+			);
+			path = MusicStory;
+			sourceTree = "<group>";
+		};
+		G1000003 /* MusicStoryWidget */ = {
+			isa = PBXGroup;
+			children = (
+				F1000017 /* TellStoryWidget.swift */,
+				F100001B /* WidgetInfo.plist */,
+			);
+			path = MusicStoryWidget;
+			sourceTree = "<group>";
+		};
+		G1000004 /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+				F1000019 /* WidgetKit.framework */,
+				F100001A /* SwiftUI.framework */,
+			);
+			name = Frameworks;
+			sourceTree = "<group>";
+		};
+		G1000005 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				P1000003 /* MusicStory.app */,
+				P1000002 /* MusicStoryWidgetExtension.appex */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		G1000006 /* App */ = {
+			isa = PBXGroup;
+			children = (
+				F1000001 /* MusicStoryApp.swift */,
+				F1000002 /* AppContainer.swift */,
+			);
+			path = App;
+			sourceTree = "<group>";
+		};
+		G1000007 /* Media */ = {
+			isa = PBXGroup;
+			children = (
+				F1000003 /* TrackInfo.swift */,
+				F1000004 /* AppleMusicNowPlaying.swift */,
+				F1000005 /* SpotifyAppRemoteManager.swift */,
+				F1000006 /* ShazamTrackRecognizer.swift */,
+				F1000007 /* NowPlayingCoordinator.swift */,
+			);
+			path = Media;
+			sourceTree = "<group>";
+		};
+		G1000008 /* Data */ = {
+			isa = PBXGroup;
+			children = (
+				F1000008 /* Models.swift */,
+				F1000009 /* SettingsStore.swift */,
+				F100000A /* BackendClient.swift */,
+				F100000B /* StoryHistoryStore.swift */,
+				F100000C /* StoryRepository.swift */,
+			);
+			path = Data;
+			sourceTree = "<group>";
+		};
+		G1000009 /* Domain */ = {
+			isa = PBXGroup;
+			children = (
+				F100000D /* TriggerEngine.swift */,
+				F100000E /* StoryPlayer.swift */,
+				F100000F /* StoryOrchestrator.swift */,
+			);
+			path = Domain;
+			sourceTree = "<group>";
+		};
+		G100000A /* Notifications */ = {
+			isa = PBXGroup;
+			children = (
+				F1000010 /* NotificationService.swift */,
+			);
+			path = Notifications;
+			sourceTree = "<group>";
+		};
+		G100000B /* UI */ = {
+			isa = PBXGroup;
+			children = (
+				F1000011 /* Theme.swift */,
+				F1000012 /* OnboardingView.swift */,
+				F1000013 /* HomeView.swift */,
+				F1000014 /* SettingsView.swift */,
+				F1000015 /* HistoryView.swift */,
+			);
+			path = UI;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		T1000001 /* MusicStory */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = L1000003 /* Build configuration list for PBXNativeTarget "MusicStory" */;
+			buildPhases = (
+				S1000001 /* Sources */,
+				X1000001 /* Frameworks */,
+				R1000001 /* Resources */,
+				E1000001 /* Embed Foundation Extensions */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				D1000001 /* PBXTargetDependency */,
+			);
+			name = MusicStory;
+			productName = MusicStory;
+			productReference = P1000003 /* MusicStory.app */;
+			productType = "com.apple.product-type.application";
+		};
+		T1000002 /* MusicStoryWidgetExtension */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = L1000004 /* Build configuration list for PBXNativeTarget "MusicStoryWidgetExtension" */;
+			buildPhases = (
+				S1000002 /* Sources */,
+				X1000002 /* Frameworks */,
+				R1000002 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = MusicStoryWidgetExtension;
+			productName = MusicStoryWidgetExtension;
+			productReference = P1000002 /* MusicStoryWidgetExtension.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		P1000001 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = 1;
+				LastSwiftUpdateCheck = 1500;
+				LastUpgradeCheck = 1500;
+				TargetAttributes = {
+					T1000001 = {
+						CreatedOnToolsVersion = 15.0;
+					};
+					T1000002 = {
+						CreatedOnToolsVersion = 15.0;
+					};
+				};
+			};
+			buildConfigurationList = L1000001 /* Build configuration list for PBXProject "MusicStory" */;
+			compatibilityVersion = "Xcode 14.0";
+			developmentRegion = ru;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				en,
+				ru,
+				Base,
+			);
+			mainGroup = G1000001;
+			productRefGroup = G1000005 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				T1000001 /* MusicStory */,
+				T1000002 /* MusicStoryWidgetExtension */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		R1000001 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				B1000016 /* Assets.xcassets in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		R1000002 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		S1000001 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				B1000001 /* MusicStoryApp.swift in Sources */,
+				B1000002 /* AppContainer.swift in Sources */,
+				B1000003 /* TrackInfo.swift in Sources */,
+				B1000004 /* AppleMusicNowPlaying.swift in Sources */,
+				B1000005 /* SpotifyAppRemoteManager.swift in Sources */,
+				B1000006 /* ShazamTrackRecognizer.swift in Sources */,
+				B1000007 /* NowPlayingCoordinator.swift in Sources */,
+				B1000008 /* Models.swift in Sources */,
+				B1000009 /* SettingsStore.swift in Sources */,
+				B100000A /* BackendClient.swift in Sources */,
+				B100000B /* StoryHistoryStore.swift in Sources */,
+				B100000C /* StoryRepository.swift in Sources */,
+				B100000D /* TriggerEngine.swift in Sources */,
+				B100000E /* StoryPlayer.swift in Sources */,
+				B100000F /* StoryOrchestrator.swift in Sources */,
+				B1000010 /* NotificationService.swift in Sources */,
+				B1000011 /* Theme.swift in Sources */,
+				B1000012 /* OnboardingView.swift in Sources */,
+				B1000013 /* HomeView.swift in Sources */,
+				B1000014 /* SettingsView.swift in Sources */,
+				B1000015 /* HistoryView.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		S1000002 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				B1000017 /* TellStoryWidget.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		D1000001 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = T1000002 /* MusicStoryWidgetExtension */;
+			targetProxy = C1000001 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
+/* Begin XCBuildConfiguration section */
+		C2000001 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"DEBUG=1",
+					"$(inherited)",
+				);
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				ONLY_ACTIVE_ARCH = YES;
+				SDKROOT = iphoneos;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 5.9;
+			};
+			name = Debug;
+		};
+		C2000002 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				GCC_OPTIMIZATION_LEVEL = s;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				SDKROOT = iphoneos;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_VERSION = 5.9;
+				VALIDATE_PRODUCT = YES;
+			};
+			name = Release;
+		};
+		C2000003 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = "";
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = MusicStory/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = "Music Story";
+				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations = UIInterfaceOrientationPortrait;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.musicstory.app;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		C2000004 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = "";
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = MusicStory/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = "Music Story";
+				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations = UIInterfaceOrientationPortrait;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.musicstory.app;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+		C2000005 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = "";
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = MusicStoryWidget/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = "Music Story Widget";
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.musicstory.app.widget;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.9;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		C2000006 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = "";
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = MusicStoryWidget/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = "Music Story Widget";
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.musicstory.app.widget;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.9;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		L1000001 /* Build configuration list for PBXProject "MusicStory" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				C2000001 /* Debug */,
+				C2000002 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		L1000003 /* Build configuration list for PBXNativeTarget "MusicStory" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				C2000003 /* Debug */,
+				C2000004 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		L1000004 /* Build configuration list for PBXNativeTarget "MusicStoryWidgetExtension" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				C2000005 /* Debug */,
+				C2000006 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = P1000001 /* Project object */;
+}

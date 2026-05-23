@@ -50,6 +50,12 @@ export function verifyJwt(token: string, secret: string): JwtPayload | null {
     const now = Math.floor(Date.now() / 1000);
     if (typeof payload.exp !== 'number' || payload.exp < now) return null;
     if (typeof payload.sub !== 'string' || payload.sub.trim().length === 0) return null;
+
+    if (payload.client === DESKTOP_CLIENT_ID) {
+      if (!isDesktopAuthEnabled()) return null;
+      return payload;
+    }
+
     if (payload.pkg && payload.pkg !== getAllowedPackageName()) return null;
     if (payload.cert) {
       const allowed = getAllowedCertFingerprints();
@@ -80,10 +86,31 @@ export function getAllowedPackageName(): string {
   return process.env.ALLOWED_PACKAGE_NAME?.trim() || 'com.musicstory.app';
 }
 
+export function getAllowedIosTeamIds(): Set<string> {
+  const allowed = new Set<string>();
+  const raw = process.env.ALLOWED_IOS_TEAM_ID?.trim();
+  if (raw) {
+    for (const part of raw.split(',')) {
+      const id = part.trim().toUpperCase();
+      if (id.length >= 6) allowed.add(id);
+    }
+  }
+  return allowed;
+}
+
+/** SHA256("ios:{bundleId}:{teamId}") — attestation sent by iOS app as cert_sha256. */
+export function iosAttestationHash(bundleId: string, teamId: string): string {
+  return crypto
+    .createHash('sha256')
+    .update(`ios:${bundleId}:${teamId}`)
+    .digest('hex');
+}
+
 export function getAllowedCertFingerprints(): Set<string> {
   const allowed = new Set<string>();
   if (SECURITY.allowDebugCert) {
     allowed.add(normalizeCertSha256(DEBUG_CERT_SHA256));
+    allowed.add(normalizeCertSha256(iosAttestationHash('com.musicstory.app', 'DEVELOPMENT')));
   }
 
   const raw = process.env.ALLOWED_CERT_SHA256?.trim();
@@ -92,6 +119,11 @@ export function getAllowedCertFingerprints(): Set<string> {
       const normalized = normalizeCertSha256(part);
       if (normalized.length === 64) allowed.add(normalized);
     }
+  }
+
+  const bundleId = getAllowedPackageName();
+  for (const teamId of getAllowedIosTeamIds()) {
+    allowed.add(normalizeCertSha256(iosAttestationHash(bundleId, teamId)));
   }
   return allowed;
 }
@@ -109,4 +141,27 @@ export function getTokenTtlSeconds(): number {
 
 export function isAppAuthEnabled(): boolean {
   return Boolean(getAuthJwtSecret());
+}
+
+export const DESKTOP_CLIENT_ID = 'desktop';
+
+/** Shared secret for desktop app token exchange (DESKTOP_AUTH_SECRET env). */
+export function getDesktopAuthSecret(): string | null {
+  const secret = process.env.DESKTOP_AUTH_SECRET?.trim();
+  if (!secret || secret.length < 16) return null;
+  return secret;
+}
+
+export function isDesktopAuthEnabled(): boolean {
+  if (getDesktopAuthSecret()) return true;
+  return process.env.ALLOW_DESKTOP_AUTH?.trim().toLowerCase() === 'true';
+}
+
+export function verifyDesktopAuthSecret(provided: string): boolean {
+  const expected = getDesktopAuthSecret();
+  if (!expected) return process.env.ALLOW_DESKTOP_AUTH?.trim().toLowerCase() === 'true';
+  const a = Buffer.from(provided.trim(), 'utf8');
+  const b = Buffer.from(expected, 'utf8');
+  if (a.length !== b.length) return false;
+  return crypto.timingSafeEqual(a, b);
 }

@@ -34,3 +34,9 @@ Thumbs.db
 
 # Logs
 *.log
+
+# Xcode / iOS build artifacts
+ios/build/
+ios/DerivedData/
+*.xcuserstate
+xcuserdata/

@@ -1,0 +1,116 @@
+import Foundation
+import Combine
+
+@MainActor
+final class NowPlayingCoordinator: ObservableObject {
+    @Published private(set) var currentTrack: TrackInfo?
+    @Published private(set) var isPlaying = false
+    @Published private(set) var activeSource: TrackSource?
+
+    let spotify = SpotifyAppRemoteManager()
+    let appleMusic = AppleMusicNowPlaying()
+    let shazam = ShazamTrackRecognizer()
+
+    private var cancellables = Set<AnyCancellable>()
+    private var lastPublishedKey: String?
+    var onTrackChanged: ((TrackInfo) -> Void)?
+
+    func start(settings: SettingsStore) {
+        spotify.configure(
+            clientId: settings.spotifyClientId,
+            redirectURI: settings.spotifyRedirectURI
+        )
+        spotify.start()
+        appleMusic.start()
+
+        spotify.$currentTrack
+            .combineLatest(spotify.$isPlaying, appleMusic.$currentTrack, appleMusic.$isPlaying)
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] spotifyTrack, spotifyPlaying, appleTrack, applePlaying in
+                self?.merge(spotifyTrack: spotifyTrack, spotifyPlaying: spotifyPlaying, appleTrack: appleTrack, applePlaying: applePlaying)
+            }
+            .store(in: &cancellables)
+    }
+
+    func pauseMusic() {
+        switch activeSource {
+        case .spotify:
+            spotify.pauseMusic()
+        case .appleMusic:
+            appleMusic.pauseMusic()
+        default:
+            break
+        }
+    }
+
+    func resumeMusic() {
+        switch activeSource {
+        case .spotify:
+            spotify.resumeMusic()
+        case .appleMusic:
+            appleMusic.resumeMusic()
+        default:
+            break
+        }
+    }
+
+    func canControlPlayback(for source: TrackSource?) -> Bool {
+        switch source {
+        case .spotify:
+            return spotify.canControlPlayback
+        case .appleMusic:
+            return appleMusic.canControlPlayback
+        default:
+            return false
+        }
+    }
+
+    func setManualTrack(_ track: TrackInfo) {
+        publish(track: track)
+    }
+
+    func recognizeWithShazam() async throws -> TrackInfo {
+        let track = try await shazam.recognizeOnce()
+        publish(track: track)
+        return track
+    }
+
+    private func merge(
+        spotifyTrack: TrackInfo?,
+        spotifyPlaying: Bool,
+        appleTrack: TrackInfo?,
+        applePlaying: Bool
+    ) {
+        if let spotifyTrack, spotifyPlaying || spotifyTrack.isValid() {
+            publish(track: spotifyTrack, isPlaying: spotifyPlaying)
+            return
+        }
+        if let appleTrack, applePlaying || appleTrack.isValid() {
+            publish(track: appleTrack, isPlaying: applePlaying)
+            return
+        }
+        if let spotifyTrack, spotifyTrack.isValid() {
+            publish(track: spotifyTrack, isPlaying: spotifyPlaying)
+            return
+        }
+        if let appleTrack, appleTrack.isValid() {
+            publish(track: appleTrack, isPlaying: applePlaying)
+            return
+        }
+        currentTrack = nil
+        isPlaying = false
+        activeSource = nil
+    }
+
+    private func publish(track: TrackInfo, isPlaying: Bool? = nil) {
+        let playing = isPlaying ?? (track.source == .spotify ? spotify.isPlaying : appleMusic.isPlaying)
+        currentTrack = track
+        self.isPlaying = playing
+        activeSource = track.source
+
+        let key = track.displayKey
+        guard key != lastPublishedKey else { return }
+        lastPublishedKey = key
+        onTrackChanged?(track)
+    }
+}
