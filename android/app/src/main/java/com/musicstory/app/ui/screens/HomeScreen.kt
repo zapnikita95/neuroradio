@@ -45,6 +45,7 @@ import com.musicstory.app.R
 import com.musicstory.app.domain.OrchestratorMode
 import com.musicstory.app.domain.OrchestratorState
 import com.musicstory.app.service.MediaMonitorService
+import com.musicstory.app.ui.components.GenerationStoryPreview
 import com.musicstory.app.ui.components.LivePulseDot
 import com.musicstory.app.ui.components.MusicStoryBackground
 import com.musicstory.app.ui.components.PrimaryStoryButton
@@ -226,6 +227,11 @@ fun HomeScreen(
                     .padding(bottom = 28.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
+                GenerationStoryPreview(
+                    preview = uiState.generationPreview,
+                    modifier = Modifier.padding(bottom = 4.dp),
+                )
+
                 if (!hasAccess) {
                     SecondaryStoryButton(
                         text = context.getString(R.string.action_grant_access),

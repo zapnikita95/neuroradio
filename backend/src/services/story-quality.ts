@@ -44,6 +44,13 @@ export const BANNED_SCRIPT_PATTERNS: RegExp[] = [
   /подсказывает\s+[A-Z]/i,
   /подсказывает\s+«?[A-Za-z]/i,
   /(?:^|[.!?…]\s*)я (?:сидел|вспоминаю) (?:в )?студии[,]?\s+где/i,
+  /^я помню/i,
+  /^я (?:был|была) в клубе/i,
+  /^я (?:помню|был|была), когда впервые/i,
+  /^на сцене артист начинает/i,
+  /я помню студию/i,
+  /мы были в клубе/i,
+  /я стоял у мониторов/i,
 ];
 
 const ENGLISH_LEAK_PATTERN =
@@ -155,16 +162,35 @@ export function hasConcreteFact(script: string, artist = '', title = ''): boolea
   return concreteSignals.test(trimmed);
 }
 
+function significantWords(text: string): string[] {
+  return normalizeForMatch(text)
+    .split(' ')
+    .filter((word) => word.length >= 5);
+}
+
+/** Script must reflect at least one reference fact (Wikipedia anchor). */
+export function anchorsReferenceFact(script: string, referenceFacts: string[]): boolean {
+  if (referenceFacts.length === 0) return true;
+  const scriptWords = new Set(significantWords(script));
+  return referenceFacts.some((fact) => {
+    const factWords = significantWords(fact);
+    if (factWords.length === 0) return false;
+    const hits = factWords.filter((word) => scriptWords.has(word)).length;
+    return hits >= Math.min(2, factWords.length);
+  });
+}
+
 export function validateStoryScript(
   script: string,
   lengthId: StoryLengthId = DEFAULT_STORY_LENGTH,
   artist = '',
   title = '',
-  options: { strictLength?: boolean; skipWatery?: boolean } = {},
+  options: { strictLength?: boolean; skipWatery?: boolean; referenceFacts?: string[] } = {},
 ): { ok: true } | { ok: false; reason: string } {
   const limits = getStoryLengthPreset(lengthId);
   const strictLength = options.strictLength ?? true;
   const skipWatery = options.skipWatery ?? false;
+  const referenceFacts = options.referenceFacts ?? [];
   const trimmed = script.trim();
   if (!trimmed) return { ok: false, reason: 'empty script' };
 
@@ -188,6 +214,10 @@ export function validateStoryScript(
     if (waterIssue) {
       return { ok: false, reason: waterIssue };
     }
+  }
+
+  if (referenceFacts.length > 0 && !anchorsReferenceFact(trimmed, referenceFacts)) {
+    return { ok: false, reason: 'story ignores Wikipedia reference facts' };
   }
 
   const words = countWords(trimmed);

@@ -125,6 +125,7 @@ export async function generateStoryScript(
   const storyLength = input.storyLength ?? DEFAULT_STORY_LENGTH;
   const lengthPreset = getStoryLengthPreset(storyLength);
   const angle = pickAngle(previousScripts.length);
+  const referenceFacts = input.referenceFacts ?? [];
   const narratorId = resolveStoryNarrator(input.storyNarrator);
   const persona = buildPersonaForNarrator(
     narratorId,
@@ -164,7 +165,11 @@ export async function generateStoryScript(
       storyLength,
       input.artist,
       input.title,
-      { strictLength: attempt === MAX_ATTEMPTS - 1 ? false : true, skipWatery: attempt === MAX_ATTEMPTS - 1 },
+      {
+        strictLength: attempt === MAX_ATTEMPTS - 1 ? false : true,
+        skipWatery: attempt === MAX_ATTEMPTS - 1,
+        referenceFacts,
+      },
     );
     if (quality.ok) {
       return finalizeStory(story, { ...input, voiceId }, storyLength);
@@ -176,7 +181,11 @@ export async function generateStoryScript(
       storyLength,
       input.artist,
       input.title,
-      { strictLength: attempt === MAX_ATTEMPTS - 1 ? false : true, skipWatery: attempt === MAX_ATTEMPTS - 1 },
+      {
+        strictLength: attempt === MAX_ATTEMPTS - 1 ? false : true,
+        skipWatery: attempt === MAX_ATTEMPTS - 1,
+        referenceFacts,
+      },
     );
     if (sanitizedQuality.ok) {
       console.warn(`Story sanitized after attempt ${attempt + 1}: ${quality.reason}`);

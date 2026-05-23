@@ -21,17 +21,50 @@ export interface StoryPersona {
   formatRules?: string;
 }
 
-export const STORY_ANGLES = [
-  'конкретная сцена записи или студийный курьёз',
-  'где ты был, когда впервые услышал этот трек',
-  'живое выступление — что видел своими глазами',
-  'закулисье: кто спорил, что ломалось, что удивило',
-  'деталь, которую фанаты замечают не с первого раза',
-  'история из тусовки жанра в тот сезон',
+export const STORY_ANGLE_PRESETS = [
+  {
+    id: 'studio',
+    labelRu: 'Студия и запись',
+    wrapHint:
+      'Возьми факт про запись, продюсера, дубль или инструмент — подай как закулисную деталь со студии.',
+  },
+  {
+    id: 'release',
+    labelRu: 'Релиз и эфир',
+    wrapHint:
+      'Возьми факт про выход сингла, радио, чарт, лейбл или клип — подай как эфирную или релизную историю.',
+  },
+  {
+    id: 'live',
+    labelRu: 'Концерт и сцена',
+    wrapHint:
+      'Возьми факт про живое выступление, тур, площадку или реакцию зала — подай как сцену концерта.',
+  },
+  {
+    id: 'production',
+    labelRu: 'Продакшн и аранжировка',
+    wrapHint:
+      'Возьми факт про аранжировку, сэмпл, кавер, инструмент или сведение — подай как техническую находку.',
+  },
+  {
+    id: 'fan_detail',
+    labelRu: 'Деталь для фанатов',
+    wrapHint:
+      'Возьми малоизвестный факт — подай как секрет для внимательных слушателей, без выдуманной биографии.',
+  },
+  {
+    id: 'context',
+    labelRu: 'Эпоха и контекст',
+    wrapHint:
+      'Возьми факт про происхождение трека, жанр или культурный контекст — подай как картину того времени.',
+  },
 ] as const;
 
-export function pickAngle(previousCount: number): string {
-  return STORY_ANGLES[previousCount % STORY_ANGLES.length];
+/** @deprecated use STORY_ANGLE_PRESETS */
+export const STORY_ANGLES = STORY_ANGLE_PRESETS.map((a) => a.labelRu);
+
+export function pickAngle(previousCount: number): (typeof STORY_ANGLE_PRESETS)[number] {
+  return STORY_ANGLE_PRESETS[previousCount % STORY_ANGLE_PRESETS.length];
 }
 
 function personaForYear(role: string, speech: string, era: string): StoryPersona {
@@ -145,13 +178,18 @@ export function buildSystemPrompt(persona: StoryPersona, length: StoryLengthPres
 
   const formatBlock = persona.formatRules
     ? persona.formatRules
-    : 'Начинай СРАЗУ со сцены. НЕ обращайся к слушателю как ведущий — ты делишься воспоминанием.';
+    : 'Начни с факта. Подача — от лица персонажа, но факт должен быть настоящим (из ОПОРНЫЕ ФАКТЫ).';
 
   const focusBlock = persona.contentFocus
     ? `ФОКУС СОДЕРЖАНИЯ: ${persona.contentFocus}`
-    : 'Один запоминающийся факт — не «зал сходит с ума», не «артист в огне»';
+    : 'Один проверяемый факт из ОПОРНЫЕ ФАКТЫ — не выдуманное «я помню»';
 
   return `Ты пишешь текст для ОЗВУЧКИ — живой человек рассказывает историю.
+
+ГЛАВНОЕ ПРАВИЛО:
+- Сначала ФАКТ (из блока ОПОРНЫЕ ФАКТЫ в запросе). Потом — подача в амплуа.
+- НЕ выдумывай личные воспоминания, которых нет в фактах: «я помню студию», «я был в клубе», «мы сидели и слушали».
+- Угол истории = только СТИЛЬ подачи факта, не повод для fiction.
 
 КТО ТЫ: ${persona.roleTitle}
 КОНТЕКСТ ЭПОХИ: ${persona.eraHint}
@@ -188,10 +226,11 @@ ${focusBlock}
 - вода: «вкладывает душу», «магия музыки», «зал сходит с ума», «влияет на рок/музыку», «легендарная», «уникальный пример», «суть в том что», «понял что музыка», «соединяет всех»
 - фразы «он подсказывает [имя артиста]» — имя сцены не объект глагола; говори «артист», «он», «Jay», или ««Screamin' Jay Hawkins»»
 - выдуманные вечера «сидели в студии и слушали треки» без конкретного факта
+- выдуманные воспоминания: «я помню», «я был в клубе», «когда впервые услышал», «на сцене артист начинает петь» — если этого нет в ОПОРНЫЕ ФАКТЫ
 
 ОБЯЗАТЕЛЬНО:
-- один конкретный факт из блока ОПОРНЫЕ ФАКТЫ (если есть) — sample, кавер, скандал, инструмент, лейбл, место записи
-- первое предложение — уже факт или действие, не «я сидел в студии»
+- центральный факт из ОПОРНЫЕ ФАКТЫ — его суть должна быть узнаваема в тексте
+- первое предложение — уже факт (кто, что, где записал/выпустил/сэмплировал), не «я помню»
 - имя артиста — только как сценическое имя в «кавычках», дальше «он/она/артист»
 
 JSON: {"script":"...", "word_count": число, "voiceId": "alena | filipp | ermil | jane | omazh | zahar | marina | dasha | julia | kirill | masha | alexander | lera"}`;
@@ -203,7 +242,7 @@ export function buildStoryUserPrompt(params: {
   genre?: string;
   countryCode?: string;
   voiceId: string;
-  angle: string;
+  angle: string | { labelRu: string; wrapHint: string };
   storyLength: StoryLengthId;
   storyNarrator?: StoryNarratorId;
   previousScripts?: string[];
@@ -238,7 +277,10 @@ export function buildStoryUserPrompt(params: {
   lines.push(`Эпоха и контекст: ${locale.sceneHintRu}`);
   lines.push(`ЛОКАЛЬ: ${locale.localeRulesRu}`);
   lines.push('');
-  lines.push(`УГОЛ ИСТОРИИ: ${params.angle}`);
+  const angleLabel = typeof params.angle === 'string' ? params.angle : params.angle.labelRu;
+  const angleWrap = typeof params.angle === 'string' ? params.angle : params.angle.wrapHint;
+  lines.push(`СТИЛЬ ПОДАЧИ: ${angleLabel}`);
+  lines.push(`Как подать факт: ${angleWrap}`);
   lines.push(`Ты — ${persona.roleTitle}. Говоришь так: ${persona.speechStyle}`);
   if (narratorId !== 'auto') {
     const preset = getNarratorPreset(narratorId);
@@ -252,8 +294,14 @@ export function buildStoryUserPrompt(params: {
   const facts = params.referenceFacts?.filter(Boolean) ?? [];
   if (facts.length > 0) {
     lines.push('');
-    lines.push('ОПОРНЫЕ ФАКТЫ (выбери один, встрой в сцену — не пересказывай списком, не выдумывай):');
+    lines.push('ОПОРНЫЕ ФАКТЫ (из Wikipedia — выбери ОДИН, это ядро истории; не выдумывай противоречащее):');
     facts.forEach((fact, i) => lines.push(`${i + 1}. ${fact}`));
+    lines.push('Факт нельзя заменить вымышленным «я помню» или «я был в клубе».');
+  } else {
+    lines.push('');
+    lines.push(
+      'ОПОРНЫЕ ФАКТЫ: не найдены в Wikipedia. Не выдумывай личные воспоминания. Только общеизвестное об артисте/треке, без fiction.',
+    );
   }
 
   if (params.retryReason) {

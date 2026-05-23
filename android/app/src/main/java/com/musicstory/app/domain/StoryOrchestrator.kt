@@ -10,6 +10,7 @@ import com.musicstory.app.media.MediaControllerManager
 import com.musicstory.app.util.StoryLog
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -42,6 +43,14 @@ data class OrchestratorUiState(
     val errorMessage: String? = null,
     val tracksUntilNext: Int? = null,
     val isServiceRunning: Boolean = false,
+    val generationPreview: GenerationPreviewState = GenerationPreviewState(),
+)
+
+data class GenerationPreviewState(
+    val words: List<String> = emptyList(),
+    val visibleWordCount: Int = 0,
+    val alpha: Float = 1f,
+    val isActive: Boolean = false,
 )
 
 class StoryOrchestrator(
@@ -74,6 +83,9 @@ class StoryOrchestrator(
     private val _uiState = MutableStateFlow(OrchestratorUiState())
     val uiState: StateFlow<OrchestratorUiState> = _uiState.asStateFlow()
 
+    private val _generationPreview = MutableStateFlow(GenerationPreviewState())
+    private var previewJob: Job? = null
+
     private fun publishUiState() {
         _uiState.value = OrchestratorUiState(
             mode = _mode.value,
@@ -82,6 +94,7 @@ class StoryOrchestrator(
             errorMessage = _errorMessage.value,
             tracksUntilNext = _tracksUntilNext.value,
             isServiceRunning = _serviceRunning.value,
+            generationPreview = _generationPreview.value,
         )
     }
 
@@ -165,6 +178,7 @@ class StoryOrchestrator(
     private suspend fun playStoryForTrack(track: TrackInfo, manual: Boolean) {
         storyMutex.withLock {
             val session = ++playbackSession
+            cancelGenerationPreview()
             _state.value = OrchestratorState.FETCHING_STORY
             _errorMessage.value = null
             publishUiState()
@@ -176,6 +190,8 @@ class StoryOrchestrator(
             val ttsSpeed = settingsDataStore.ttsSpeed.first().androidRate
             result.fold(
                 onSuccess = { response ->
+                    startGenerationPreview(response.script, session)
+
                     if (!manual) {
                         val elapsed = SystemClock.elapsedRealtime() - fetchStartedAt
                         val remaining = AUTO_MIN_MUSIC_MS - elapsed
@@ -226,6 +242,7 @@ class StoryOrchestrator(
                     schedulePlaybackWatchdog(session, musicPausedForStory)
                 },
                 onFailure = { error ->
+                    cancelGenerationPreview()
                     _errorMessage.value = error.message ?: "Не удалось получить историю"
                     _state.value = OrchestratorState.ERROR
                     publishUiState()
@@ -261,6 +278,7 @@ class StoryOrchestrator(
 
     fun stopStory() {
         playbackSession++
+        cancelGenerationPreview()
         storyPlayer.stop()
         mediaControllerManager.resumeMusic()
         _state.value = OrchestratorState.LISTENING
@@ -276,6 +294,7 @@ class StoryOrchestrator(
     }
 
     private fun clearTransientState() {
+        cancelGenerationPreview()
         _errorMessage.value = null
         if (_state.value == OrchestratorState.ERROR ||
             _state.value == OrchestratorState.PLAYING_STORY ||
@@ -297,10 +316,66 @@ class StoryOrchestrator(
         )
     }
 
+    private fun cancelGenerationPreview() {
+        previewJob?.cancel()
+        previewJob = null
+        _generationPreview.value = GenerationPreviewState()
+    }
+
+    private fun startGenerationPreview(script: String, session: Int) {
+        val words = script.trim().split(Regex("\\s+")).filter { it.isNotEmpty() }
+        if (words.isEmpty()) return
+
+        previewJob?.cancel()
+        previewJob = scope.launch {
+            _generationPreview.value = GenerationPreviewState(
+                words = words,
+                visibleWordCount = 0,
+                alpha = 1f,
+                isActive = true,
+            )
+            publishUiState()
+
+            val wordDelayMs = wordRevealDelayMs(words.size)
+            for (index in 1..words.size) {
+                if (session != playbackSession) return@launch
+                _generationPreview.value = _generationPreview.value.copy(visibleWordCount = index)
+                publishUiState()
+                if (index < words.size) {
+                    delay(wordDelayMs)
+                }
+            }
+
+            delay(PREVIEW_HOLD_MS)
+
+            val fadeSteps = 12
+            repeat(fadeSteps) { step ->
+                if (session != playbackSession) return@launch
+                val alpha = 1f - ((step + 1).toFloat() / fadeSteps.toFloat())
+                _generationPreview.value = _generationPreview.value.copy(alpha = alpha)
+                publishUiState()
+                delay(PREVIEW_FADE_STEP_MS)
+            }
+
+            if (session == playbackSession) {
+                _generationPreview.value = GenerationPreviewState()
+                publishUiState()
+            }
+        }
+    }
+
+    private fun wordRevealDelayMs(wordCount: Int): Long {
+        if (wordCount <= 1) return 0L
+        return (PREVIEW_REVEAL_MAX_MS / wordCount).coerceIn(40L, 160L)
+    }
+
     companion object {
         /** Auto mode: let the track play at least this long before pausing for the story. */
         private const val AUTO_MIN_MUSIC_MS = 8_000L
         private const val PLAYBACK_START_TIMEOUT_MS = 25_000L
+        private const val PREVIEW_REVEAL_MAX_MS = 7_000L
+        private const val PREVIEW_HOLD_MS = 7_000L
+        private const val PREVIEW_FADE_STEP_MS = 70L
     }
 }
 

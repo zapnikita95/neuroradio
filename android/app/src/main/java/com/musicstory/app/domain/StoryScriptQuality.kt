@@ -21,6 +21,11 @@ object StoryScriptQuality {
         Regex("""танцевали на стульях""", RegexOption.IGNORE_CASE),
         Regex("""характерный.*рифф""", RegexOption.IGNORE_CASE),
         Regex("""подсказывает\s+[A-Za-z«]""", RegexOption.IGNORE_CASE),
+        Regex("""^я помню""", RegexOption.IGNORE_CASE),
+        Regex("""^я (?:был|была) в клубе""", RegexOption.IGNORE_CASE),
+        Regex("""^я (?:помню|был|была), когда впервые""", RegexOption.IGNORE_CASE),
+        Regex("""^на сцене артист начинает""", RegexOption.IGNORE_CASE),
+        Regex("""я помню студию""", RegexOption.IGNORE_CASE),
     )
 
     private val concreteFactPattern = Regex(
