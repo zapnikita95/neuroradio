@@ -8,7 +8,17 @@
 
     <string name="home_title">Радио-истории</string>
     <string name="settings_title">Настройки</string>
-    <string name="history_title">История рассказов</string>
+    <string name="history_title">История</string>
+    <string name="history_tab_stories">Рассказы</string>
+    <string name="history_tab_listening">Прослушивания</string>
+    <string name="listening_empty">Пока нет прослушиваний. Включи музыку в Spotify или Яндекс Музыке — треки появятся здесь.</string>
+    <string name="listening_story_badge">Была история</string>
+    <string name="settings_pick_artists">Артисты из прослушанного</string>
+    <string name="settings_pick_genres">Жанры из прослушанного</string>
+    <string name="settings_pick_empty_artists">Слушай музыку — артисты появятся в списке</string>
+    <string name="settings_pick_empty_genres">Жанры подтянутся после нескольких треков (MusicBrainz)</string>
+    <string name="settings_pick_selected_count">Выбрано: %1$d</string>
+    <string name="listening_play_count">×%1$d</string>
     <string name="nav_history">История</string>
     <string name="nav_settings">Настройки</string>
 

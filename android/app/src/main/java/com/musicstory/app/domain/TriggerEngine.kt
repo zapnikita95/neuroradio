@@ -67,10 +67,16 @@ class TriggerEngine {
                 }
             }
             TriggerMode.SPECIFIC_ARTISTS ->
-                settings.specificArtists.any { trackArtist.contains(it, ignoreCase = true) }
+                settings.specificArtists.any { selected ->
+                    trackArtist.equals(selected, ignoreCase = true) ||
+                        trackArtist.contains(selected, ignoreCase = true)
+                }
             TriggerMode.SPECIFIC_GENRES -> {
                 val genre = trackGenre ?: return false
-                settings.specificGenres.any { genre.contains(it, ignoreCase = true) }
+                settings.specificGenres.any { selected ->
+                    genre.equals(selected, ignoreCase = true) ||
+                        genre.contains(selected, ignoreCase = true)
+                }
             }
         }
 

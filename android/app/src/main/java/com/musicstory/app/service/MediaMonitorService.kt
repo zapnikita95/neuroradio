@@ -74,7 +74,9 @@ class MediaMonitorService : Service() {
     }
 
     private suspend fun onNewTrack(app: MusicStoryApp, track: TrackInfo) {
-        if (app.scrobbleRepository.wasRecentlyScrobbled(track)) return
+        if (!app.scrobbleRepository.wasRecentlyScrobbled(track)) {
+            app.scrobbleRepository.scrobbleTrack(track)
+        }
         app.storyOrchestrator.onTrackChanged(track)
     }
 

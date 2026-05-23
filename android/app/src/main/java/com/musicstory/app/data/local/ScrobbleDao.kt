@@ -2,13 +2,13 @@ package com.musicstory.app.data.local
 
 import androidx.room.Dao
 import androidx.room.Insert
-import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface ScrobbleDao {
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
+
+    @Insert
     suspend fun insert(entry: ScrobbleEntry): Long
 
     @Query("SELECT * FROM scrobble_entries ORDER BY scrobbledAt DESC")
@@ -31,6 +31,44 @@ interface ScrobbleDao {
         """,
     )
     suspend fun findLatest(artist: String, title: String): ScrobbleEntry?
+
+    @Query(
+        """
+        SELECT genre FROM scrobble_entries
+        WHERE artist = :artist AND genre IS NOT NULL AND TRIM(genre) != ''
+        ORDER BY scrobbledAt DESC LIMIT 1
+        """,
+    )
+    suspend fun findLatestGenreForArtist(artist: String): String?
+
+    @Query("UPDATE scrobble_entries SET genre = :genre WHERE id = :id")
+    suspend fun updateGenre(id: Long, genre: String)
+
+    @Query("UPDATE scrobble_entries SET storyTriggered = 1 WHERE id = :id")
+    suspend fun markStoryTriggered(id: Long)
+
+    @Query(
+        """
+        SELECT artist, COUNT(*) AS playCount, MAX(scrobbledAt) AS lastPlayedAt
+        FROM scrobble_entries
+        GROUP BY artist
+        ORDER BY lastPlayedAt DESC
+        LIMIT :limit
+        """,
+    )
+    fun observeTopArtists(limit: Int): Flow<List<ScrobbleArtistStat>>
+
+    @Query(
+        """
+        SELECT genre, COUNT(*) AS playCount, MAX(scrobbledAt) AS lastPlayedAt
+        FROM scrobble_entries
+        WHERE genre IS NOT NULL AND TRIM(genre) != ''
+        GROUP BY genre
+        ORDER BY lastPlayedAt DESC
+        LIMIT :limit
+        """,
+    )
+    fun observeTopGenres(limit: Int): Flow<List<ScrobbleGenreStat>>
 
     @Query("DELETE FROM scrobble_entries")
     suspend fun deleteAll()

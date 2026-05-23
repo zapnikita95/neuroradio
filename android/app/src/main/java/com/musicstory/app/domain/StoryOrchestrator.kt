@@ -140,16 +140,19 @@ class StoryOrchestrator(
         if (!track.isValid()) return
 
         val settings = loadTriggerSettings()
+        val trackGenre = scrobbleRepository.lookupGenre(track.artist, track.title)
         val shouldTrigger = _mode.value == OrchestratorMode.AUTO &&
             triggerEngine.onTrackPlayed(
                 settings = settings,
                 trackKey = track.displayKey,
                 trackArtist = track.artist,
-                trackGenre = null,
+                trackGenre = trackGenre,
             )
 
         _tracksUntilNext.value = triggerEngine.tracksUntilNext(settings)
-        scrobbleRepository.recordTrack(track, storyTriggered = shouldTrigger)
+        if (shouldTrigger) {
+            scrobbleRepository.markStoryTriggered(track)
+        }
 
         if (shouldTrigger) {
             playStoryForTrack(track, manual = false)
@@ -238,7 +241,7 @@ class StoryOrchestrator(
                             publishUiState()
                         },
                     )
-                    scrobbleRepository.recordTrack(track, storyTriggered = true)
+                    scrobbleRepository.markStoryTriggered(track)
                     schedulePlaybackWatchdog(session, musicPausedForStory)
                 },
                 onFailure = { error ->

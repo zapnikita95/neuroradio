@@ -9,6 +9,7 @@ data class ScrobbleEntry(
     val artist: String,
     val title: String,
     val album: String? = null,
+    val genre: String? = null,
     val packageName: String? = null,
     val scrobbledAt: Long = System.currentTimeMillis(),
     val storyTriggered: Boolean = false,

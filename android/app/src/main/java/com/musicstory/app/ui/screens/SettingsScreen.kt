@@ -66,6 +66,7 @@ import com.musicstory.app.ui.components.GlassCard
 import com.musicstory.app.ui.components.MusicStoryBackground
 import com.musicstory.app.ui.components.PrimaryStoryButton
 import com.musicstory.app.ui.components.SecondaryStoryButton
+import com.musicstory.app.ui.components.ScrobblePickList
 import com.musicstory.app.ui.components.SectionLabel
 import com.musicstory.app.ui.theme.CreamText
 import com.musicstory.app.ui.theme.DeepVoid
@@ -97,6 +98,10 @@ fun SettingsScreen(
         initial = SettingsDataStore.DEFAULT_SAME_TRACK_STORY_EVERY_N,
     )
     val triggerMode by settings.triggerMode.collectAsState(initial = TriggerMode.EVERY_N_TRACKS)
+    val specificArtists by settings.specificArtists.collectAsState(initial = emptySet())
+    val specificGenres by settings.specificGenres.collectAsState(initial = emptySet())
+    val scrobbledArtists by app.scrobbleRepository.topArtists().collectAsState(initial = emptyList())
+    val scrobbledGenres by app.scrobbleRepository.topGenres().collectAsState(initial = emptyList())
     val dailyQuota by app.storyRepository.dailyQuota.collectAsState(initial = null)
     val storyLength by settings.storyLength.collectAsState(initial = StoryLength.SEC_30)
     val storyNarrator by settings.storyNarrator.collectAsState(initial = StoryNarrator.AUTO)
@@ -170,7 +175,14 @@ fun SettingsScreen(
 
                 CollapsibleSettingsSection(
                     title = context.getString(R.string.settings_trigger_mode),
-                    summary = triggerModeLabel(context, triggerMode),
+                    summary = buildTriggerSummary(
+                        context = context,
+                        triggerMode = triggerMode,
+                        specificArtists = specificArtists,
+                        specificGenres = specificGenres,
+                    ),
+                    initiallyExpanded = triggerMode == TriggerMode.SPECIFIC_ARTISTS ||
+                        triggerMode == TriggerMode.SPECIFIC_GENRES,
                 ) {
                     TriggerMode.entries.forEach { mode ->
                         Row(
@@ -199,6 +211,62 @@ fun SettingsScreen(
                             singleLine = true,
                             colors = fieldColors,
                             shape = RoundedCornerShape(14.dp),
+                        )
+                    }
+                    if (triggerMode == TriggerMode.SPECIFIC_ARTISTS) {
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Text(
+                            text = context.getString(R.string.settings_pick_artists),
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MutedLavender,
+                        )
+                        ScrobblePickList(
+                            items = scrobbledArtists.map { it.artist },
+                            selected = specificArtists,
+                            emptyHint = context.getString(R.string.settings_pick_empty_artists),
+                            onToggle = { artist ->
+                                scope.launch {
+                                    val current = settings.specificArtists.first()
+                                    val next = if (current.any { it.equals(artist, ignoreCase = true) }) {
+                                        current.filterNot { it.equals(artist, ignoreCase = true) }.toSet()
+                                    } else {
+                                        current + artist
+                                    }
+                                    settings.setSpecificArtists(next)
+                                }
+                            },
+                            subtitleFor = { artist ->
+                                val stat = scrobbledArtists.find { it.artist == artist }
+                                stat?.let { context.getString(R.string.listening_play_count, it.playCount) }
+                            },
+                        )
+                    }
+                    if (triggerMode == TriggerMode.SPECIFIC_GENRES) {
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Text(
+                            text = context.getString(R.string.settings_pick_genres),
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MutedLavender,
+                        )
+                        ScrobblePickList(
+                            items = scrobbledGenres.map { it.genre },
+                            selected = specificGenres,
+                            emptyHint = context.getString(R.string.settings_pick_empty_genres),
+                            onToggle = { genre ->
+                                scope.launch {
+                                    val current = settings.specificGenres.first()
+                                    val next = if (current.any { it.equals(genre, ignoreCase = true) }) {
+                                        current.filterNot { it.equals(genre, ignoreCase = true) }.toSet()
+                                    } else {
+                                        current + genre
+                                    }
+                                    settings.setSpecificGenres(next)
+                                }
+                            },
+                            subtitleFor = { genre ->
+                                val stat = scrobbledGenres.find { it.genre == genre }
+                                stat?.let { context.getString(R.string.listening_play_count, it.playCount) }
+                            },
                         )
                     }
                 }
@@ -566,5 +634,25 @@ private fun triggerModeLabel(context: android.content.Context, mode: TriggerMode
         TriggerMode.SPECIFIC_GENRES -> context.getString(R.string.trigger_genres)
         TriggerMode.ALWAYS -> context.getString(R.string.trigger_always)
         TriggerMode.NEVER -> context.getString(R.string.trigger_never)
+    }
+}
+
+private fun buildTriggerSummary(
+    context: android.content.Context,
+    triggerMode: TriggerMode,
+    specificArtists: Set<String>,
+    specificGenres: Set<String>,
+): String {
+    val base = triggerModeLabel(context, triggerMode)
+    return when (triggerMode) {
+        TriggerMode.SPECIFIC_ARTISTS -> {
+            if (specificArtists.isEmpty()) base
+            else "$base · ${context.getString(R.string.settings_pick_selected_count, specificArtists.size)}"
+        }
+        TriggerMode.SPECIFIC_GENRES -> {
+            if (specificGenres.isEmpty()) base
+            else "$base · ${context.getString(R.string.settings_pick_selected_count, specificGenres.size)}"
+        }
+        else -> base
     }
 }
