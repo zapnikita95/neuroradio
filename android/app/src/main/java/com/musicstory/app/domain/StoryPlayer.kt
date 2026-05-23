@@ -193,6 +193,7 @@ class StoryPlayer(context: Context) {
 
     private fun playWithTts(script: String, speechRate: Float) {
         _state.value = StoryPlaybackState.PREPARING
+        val segments = TtsScriptSegmenter.split(script)
         val startSpeaking = {
             val engine = tts
             if (engine == null || !ttsReady) {
@@ -202,6 +203,13 @@ class StoryPlayer(context: Context) {
                 invokeError()
             } else {
                 engine.setSpeechRate(speechRate)
+                if (segments.isEmpty()) {
+                    StoryLog.e("Android TTS: empty script")
+                    _state.value = StoryPlaybackState.ERROR
+                    abandonAudioFocus()
+                    invokeError()
+                } else {
+                var segmentIndex = 0
                 engine.setOnUtteranceProgressListener(
                     object : UtteranceProgressListener() {
                         override fun onStart(utteranceId: String?) {
@@ -213,43 +221,28 @@ class StoryPlayer(context: Context) {
 
                         override fun onDone(utteranceId: String?) {
                             mainHandler.post {
-                                _state.value = StoryPlaybackState.COMPLETED
-                                abandonAudioFocus()
-                                invokeFinished()
+                                segmentIndex++
+                                if (segmentIndex >= segments.size) {
+                                    _state.value = StoryPlaybackState.COMPLETED
+                                    abandonAudioFocus()
+                                    invokeFinished()
+                                } else {
+                                    speakSegment(engine, segments[segmentIndex], segmentIndex, speechRate)
+                                }
                             }
                         }
 
                         @Deprecated("Deprecated in Java")
                         override fun onError(utteranceId: String?) {
-                            mainHandler.post {
-                                StoryLog.e("Android TTS speak error")
-                                _state.value = StoryPlaybackState.ERROR
-                                abandonAudioFocus()
-                                invokeError()
-                            }
+                            mainHandler.post { handleTtsError(engine, segments, segmentIndex, speechRate) }
                         }
 
                         override fun onError(utteranceId: String?, errorCode: Int) {
-                            mainHandler.post {
-                                StoryLog.e("Android TTS speak error: code=$errorCode")
-                                _state.value = StoryPlaybackState.ERROR
-                                abandonAudioFocus()
-                                invokeError()
-                            }
+                            mainHandler.post { handleTtsError(engine, segments, segmentIndex, speechRate) }
                         }
                     },
                 )
-                val params = Bundle().apply {
-                    putString(TextToSpeech.Engine.KEY_PARAM_UTTERANCE_ID, UTTERANCE_ID)
-                    putFloat(TextToSpeech.Engine.KEY_PARAM_VOLUME, 1.0f)
-                    putInt(TextToSpeech.Engine.KEY_PARAM_STREAM, AudioManager.STREAM_MUSIC)
-                }
-                val result = engine.speak(script, TextToSpeech.QUEUE_FLUSH, params, UTTERANCE_ID)
-                if (result == TextToSpeech.ERROR) {
-                    StoryLog.e("Android TTS speak returned ERROR")
-                    _state.value = StoryPlaybackState.ERROR
-                    abandonAudioFocus()
-                    invokeError()
+                speakSegment(engine, segments[0], 0, speechRate)
                 }
             }
         }
@@ -259,6 +252,61 @@ class StoryPlayer(context: Context) {
         } else {
             ensureTtsInitialized(startSpeaking)
         }
+    }
+
+    private fun speakSegment(
+        engine: TextToSpeech,
+        segment: TtsScriptSegmenter.Segment,
+        index: Int,
+        speechRate: Float,
+    ) {
+        val locale = TtsScriptSegmenter.localeFor(segment.lang)
+        val langResult = engine.setLanguage(locale)
+        if (langResult == TextToSpeech.LANG_MISSING_DATA || langResult == TextToSpeech.LANG_NOT_SUPPORTED) {
+            StoryLog.w("TTS locale missing for $locale, falling back to ru-RU")
+            engine.language = Locale("ru", "RU")
+        }
+        engine.setSpeechRate(if (segment.lang == TtsScriptSegmenter.Lang.EN) speechRate * 0.98f else speechRate)
+
+        val utteranceId = "${UTTERANCE_ID}_$index"
+        val params = Bundle().apply {
+            putString(TextToSpeech.Engine.KEY_PARAM_UTTERANCE_ID, utteranceId)
+            putFloat(TextToSpeech.Engine.KEY_PARAM_VOLUME, 1.0f)
+            putInt(TextToSpeech.Engine.KEY_PARAM_STREAM, AudioManager.STREAM_MUSIC)
+        }
+        val queueMode = if (index == 0) TextToSpeech.QUEUE_FLUSH else TextToSpeech.QUEUE_ADD
+        val result = engine.speak(segment.text, queueMode, params, utteranceId)
+        if (result == TextToSpeech.ERROR) {
+            StoryLog.e("Android TTS speak returned ERROR for segment $index (${segment.lang})")
+            _state.value = StoryPlaybackState.ERROR
+            abandonAudioFocus()
+            invokeError()
+        } else {
+            StoryLog.d("TTS segment $index ${segment.lang}: ${segment.text.take(40)}")
+        }
+    }
+
+    private fun handleTtsError(
+        engine: TextToSpeech,
+        segments: List<TtsScriptSegmenter.Segment>,
+        failedIndex: Int,
+        speechRate: Float,
+    ) {
+        val failed = segments.getOrNull(failedIndex)
+        if (failed?.lang == TtsScriptSegmenter.Lang.EN) {
+            StoryLog.w("English TTS failed, retry segment as Russian")
+            speakSegment(
+                engine,
+                TtsScriptSegmenter.Segment(failed.text, TtsScriptSegmenter.Lang.RU),
+                failedIndex,
+                speechRate,
+            )
+            return
+        }
+        StoryLog.e("Android TTS speak error on segment $failedIndex")
+        _state.value = StoryPlaybackState.ERROR
+        abandonAudioFocus()
+        invokeError()
     }
 
     private fun requestAudioFocus(): Boolean {

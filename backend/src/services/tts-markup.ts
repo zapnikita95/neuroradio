@@ -5,10 +5,10 @@
  */
 
 import { sanitizeScriptForTts } from './story-quality.js';
+import { englishWordToPhonemes, wrapLatinWord, VALID_PHONEME } from './english-phonemes.js';
 
-/** Valid Russian TTS phonemes (IPA subset from Yandex docs) */
-const VALID_PHONEME =
-  /^(?:bʲ|b|dʲ|d|fʲ|f|gʲ|g|j|kʲ|k|lʲ|l|mʲ|m|nʲ|n|pʲ|p|rʲ|r|sʲ|s|ʂ|tʲ|t|t͡s|t͡ɕ|vʲ|v|xʲ|x|zʲ|z|ʐ|ɕː|ə|a|ʌ|ɛ|i|ɪ|ɨ|ɔ|u|ʊ)$/;
+/** Valid Russian TTS phonemes — re-export for tests */
+export { VALID_PHONEME };
 
 /** Words that TTS often mis-stresses in our stories → Yandex + markup */
 const STRESS_OVERRIDES: Record<string, string> = {
@@ -90,52 +90,7 @@ const STRESS_OVERRIDES: Record<string, string> = {
   эпохе: 'эп+охе',
 };
 
-const LATIN_DIGRAPH: Array<[RegExp, string]> = [
-  [/sch/gi, 'ʂ'],
-  [/sh/gi, 'ʂ'],
-  [/ch/gi, 't͡ɕ'],
-  [/zh/gi, 'ʐ'],
-  [/th/gi, 't'],
-  [/ph/gi, 'f'],
-  [/ck/gi, 'k'],
-  [/qu/gi, 'k v'],
-  [/x/gi, 'k s'],
-];
-
-const LATIN_CHAR: Record<string, string> = {
-  a: 'a',
-  b: 'b',
-  c: 'k',
-  d: 'd',
-  e: 'ɛ',
-  f: 'f',
-  g: 'g',
-  h: 'x',
-  i: 'i',
-  j: 'dʲ',
-  k: 'k',
-  l: 'l',
-  m: 'm',
-  n: 'n',
-  o: 'o',
-  p: 'p',
-  q: 'k',
-  r: 'r',
-  s: 's',
-  t: 't',
-  u: 'u',
-  v: 'v',
-  w: 'v',
-  y: 'j',
-  z: 'z',
-  á: 'a',
-  é: 'ɛ',
-  í: 'i',
-  ó: 'o',
-  ú: 'u',
-  ñ: 'nʲ',
-  ç: 's',
-};
+const LATIN_TOKEN = /\b[A-Za-z][A-Za-z0-9'’\-]*\b|\b\d+[A-Za-z]+\b|\b[A-Za-z]+\d+\b/g;
 
 export interface TtsMarkupOptions {
   artist?: string;
@@ -162,69 +117,8 @@ function applyStressDictionary(word: string): string {
   return override;
 }
 
-function latinWordToPhonemes(word: string): string | null {
-  if (!word || !/[a-z\u00C0-\u024F]/i.test(word)) return null;
-
-  let src = word.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-  for (const [pattern, replacement] of LATIN_DIGRAPH) {
-    src = src.replace(pattern, ` ${replacement} `);
-  }
-
-  const phonemes: string[] = [];
-  for (const ch of src.toLowerCase()) {
-    if (ch === ' ' || ch === '-' || ch === "'") continue;
-    if (/[0-9]/.test(ch)) {
-      phonemes.push(ch);
-      continue;
-    }
-    const mapped = LATIN_CHAR[ch];
-    if (mapped) {
-      for (const p of mapped.split(/\s+/)) {
-        if (p) phonemes.push(p);
-      }
-    }
-  }
-
-  if (phonemes.length === 0) return null;
-  return phonemes.filter((p) => VALID_PHONEME.test(p) || /^\d+$/.test(p)).join(' ');
-}
-
-function wrapLatinToken(token: string): string {
-  if (!/[a-z\u00C0-\u024F]/i.test(token)) return token;
-  if (token.includes('[[') || token.includes('+')) return token;
-
-  const phonemes = latinWordToPhonemes(token);
-  if (!phonemes) return token;
-  return `[[${phonemes}]]`;
-}
-
-function processLatinSegments(text: string): string {
-  return text.replace(/[«"]([^«»"]*?[a-zA-Z][^«»"]*)[»"]/g, (full, inner: string) => {
-    const quoteOpen = full[0];
-    const quoteClose = full[full.length - 1];
-    const processed = inner
-      .split(/(\s+)/)
-      .map((chunk) => (/\s+/.test(chunk) ? chunk : wrapLatinToken(chunk)))
-      .join('');
-    return `${quoteOpen}${processed}${quoteClose}`;
-  });
-}
-
-function processBareLatinNames(text: string, artist?: string, title?: string): string {
-  let result = text;
-  const words = [
-    ...(artist?.split(/\s+/) ?? []),
-    ...(title?.split(/\s+/) ?? []),
-  ].filter((w) => w.length >= 2 && /[a-z]/i.test(w));
-
-  for (const word of words) {
-    const phonemes = latinWordToPhonemes(word);
-    if (!phonemes) continue;
-    const escaped = word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    const re = new RegExp(`(?<!\\[\\[)\\b${escaped}\\b(?!\\]\\])`, 'giu');
-    result = result.replace(re, `[[${phonemes}]]`);
-  }
-  return result;
+function processAllLatinWords(text: string): string {
+  return text.replace(LATIN_TOKEN, (word) => wrapLatinWord(word));
 }
 
 function processRussianWords(text: string): string {
@@ -254,8 +148,7 @@ export function prepareYandexTtsText(
   const title = options.title ?? '';
   let text = sanitizeScriptForTts(script, artist, title);
   text = normalizeUnicodeStress(text);
-  text = processLatinSegments(text);
-  text = processBareLatinNames(text, artist, title);
+  text = processAllLatinWords(text);
   text = processRussianWords(text);
   if (options.sentencePauses !== false) {
     text = addSentencePauses(text);
@@ -265,8 +158,8 @@ export function prepareYandexTtsText(
 
 /** For tests / debugging */
 export function latinToPhonemeBlock(word: string): string | null {
-  const phonemes = latinWordToPhonemes(word);
+  const phonemes = englishWordToPhonemes(word);
   return phonemes ? `[[${phonemes}]]` : null;
 }
 
-export { STRESS_OVERRIDES, VALID_PHONEME };
+export { STRESS_OVERRIDES };

@@ -17,5 +17,7 @@ console.log(
   }),
 );
 
-console.log('\n=== Stress words ===');
-console.log(prepareYandexTtsText('Инженер у монитора в студии поставил атлас на замок.', {}));
+console.log('\n=== Dean Martin sample ===');
+const deanScript =
+  'На живом концерте Dean Martin вышел с «Mambo Italiano» — зал замолчал на первой ноте.';
+console.log(prepareYandexTtsText(deanScript, { artist: 'Dean Martin', title: 'Mambo Italiano' }));
