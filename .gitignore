@@ -1,0 +1,36 @@
+# Secrets — NEVER commit
+.env
+.env.*
+!.env.example
+**/.env
+**/.env.local
+
+# Backend
+backend/node_modules/
+backend/dist/
+backend/audio/*.ogg
+backend/audio/*.mp3
+backend/audio/*.wav
+!backend/audio/.gitkeep
+
+# Android
+android/.gradle/
+android/build/
+android/app/build/
+android/local.properties
+android/.idea/
+android/*.iml
+
+# OS / IDE
+.DS_Store
+Thumbs.db
+.idea/
+*.iml
+.vscode/
+
+# Build artifacts (keep APK out of git — use Releases instead)
+*.apk
+*.aab
+
+# Logs
+*.log

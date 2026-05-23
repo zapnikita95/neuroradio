@@ -1,0 +1,80 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Music Story</string>
+    <string name="notification_listener_label">Music Story — мониторинг медиа</string>
+
+    <string name="channel_monitor_name">Мониторинг музыки</string>
+    <string name="channel_monitor_description">Фоновое отслеживание воспроизведения Spotify и Яндекс Музыки</string>
+
+    <string name="home_title">Радио-истории</string>
+    <string name="settings_title">Настройки</string>
+    <string name="history_title">История прослушивания</string>
+    <string name="nav_history">История</string>
+    <string name="nav_settings">Настройки</string>
+
+    <string name="onboarding_title">Доступ к уведомлениям</string>
+    <string name="onboarding_description">Music Story читает метаданные треков из Spotify и Яндекс Музыки через доступ к уведомлениям. Без этого разрешения приложение не сможет определять текущий трек.</string>
+    <string name="onboarding_open_settings">Открыть настройки доступа</string>
+    <string name="onboarding_continue">Продолжить</string>
+
+    <string name="status_no_access">Нет доступа к уведомлениям</string>
+    <string name="status_monitoring">Мониторинг активен</string>
+    <string name="status_stopped">Служба остановлена</string>
+    <string name="action_grant_access">Выдать доступ</string>
+    <string name="action_manual_story">Рассказать историю</string>
+    <string name="action_stop_story">Остановить</string>
+    <string name="action_back">Назад</string>
+    <string name="action_save">Сохранить</string>
+
+    <string name="label_now_playing">Сейчас играет</string>
+    <string name="label_no_track">Трек не определён</string>
+    <string name="label_source">Источник: %1$s</string>
+    <string name="label_orchestrator">Режим работы</string>
+    <string name="label_tracks_until_story">До следующей истории: %1$d трек(ов)</string>
+    <string name="label_last_story">Последняя история</string>
+
+    <string name="mode_auto">Автоматический</string>
+    <string name="mode_manual">Ручной</string>
+
+    <string name="state_idle">Ожидание</string>
+    <string name="state_listening">Слушаем музыку</string>
+    <string name="state_fetching">Загружаем историю…</string>
+    <string name="state_playing">Воспроизводим историю</string>
+    <string name="state_error">Ошибка</string>
+
+    <string name="notification_listening">Ожидание музыки…</string>
+    <string name="notification_now_playing">%1$s — %2$s</string>
+
+    <string name="settings_manual_mode">Ручной режим</string>
+    <string name="settings_manual_mode_hint">Истории только по кнопке, без автоматического перехвата</string>
+    <string name="settings_auto_intercept">Автоперехват</string>
+    <string name="settings_auto_intercept_hint">Приостанавливать музыку и вставлять историю по триггеру</string>
+    <string name="settings_trigger_mode">Режим триггера</string>
+    <string name="settings_every_n_tracks">Каждые N треков</string>
+    <string name="settings_same_track_section">Один и тот же трек</string>
+    <string name="settings_same_track_every_n">Факт каждые N включений трека</string>
+    <string name="settings_same_track_every_n_hint">1 = каждый раз при срабатывании триггера. 3 = через два пропуска (по умолчанию). Не повторяет уже рассказанные факты.</string>
+    <string name="settings_backend_url">URL бэкенда / Railway</string>
+    <string name="settings_backend_secret">Секрет бэкенда (PROXY_SECRET)</string>
+    <string name="settings_backend_secret_hint">Тот же секрет, что в Railway Variables. Groq-ключ на телефоне тогда не нужен.</string>
+    <string name="settings_groq_api_key">Groq API ключ</string>
+    <string name="settings_groq_api_key_hint">Не нужен, если указан Railway URL. Иначе — console.groq.com (из РФ часто 403, лучше Railway).</string>
+    <string name="settings_groq_get_key">Получить ключ на Groq</string>
+    <string name="settings_groq_status_ok">Groq подключён — истории генерирует нейросеть (Llama 3.3)</string>
+    <string name="settings_groq_status_missing">Ключ не задан — работают локальные шаблоны, не AI</string>
+    <string name="home_groq_banner">Укажи URL Railway в настройках — Groq из РФ идёт через сервер за рубежом</string>
+    <string name="story_source_ai">Нейросеть Groq</string>
+    <string name="story_source_local">Локальный шаблон</string>
+    <string name="settings_backend_url_example">Railway: https://xxx.up.railway.app · Локально: http://192.168.x.x:3000</string>
+    <string name="settings_backend_hint">Railway = Groq + Yandex с сервера. Ключ Groq клади в Railway Variables, не на телефон.</string>
+    <string name="settings_offline_hint">Без Groq и без сервера — мгновенная локальная история + озвучка через системный голос Android.</string>
+
+    <string name="trigger_every_n">Каждые N треков</string>
+    <string name="trigger_artists">Конкретные артисты</string>
+    <string name="trigger_genres">Конкретные жанры</string>
+    <string name="trigger_always">Всегда</string>
+    <string name="trigger_never">Никогда</string>
+
+    <string name="history_empty">История пуста. Включите Spotify или Яндекс Музыку и начните воспроизведение.</string>
+    <string name="history_story_triggered">История воспроизведена</string>
+</resources>

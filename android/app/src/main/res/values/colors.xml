@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="deep_void">#FF08070B</color>
+    <color name="night_plum">#FF15101F</color>
+    <color name="ic_launcher_background">#FF1A1028</color>
+    <color name="ic_launcher_background_end">#FF3D2518</color>
+    <color name="gold_warm">#FFE8A838</color>
+    <color name="gold_bright">#FFFFC857</color>
+    <color name="cream">#FFF5EDE0</color>
+</resources>
