@@ -18,6 +18,7 @@ import com.musicstory.app.data.remote.RateLimitErrorBody
 import com.musicstory.app.data.model.StoryQuotaInfo
 import com.google.gson.Gson
 import com.musicstory.app.domain.StoryPersona
+import com.musicstory.app.domain.StoryScriptQuality
 import com.musicstory.app.util.StoryLog
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -70,7 +71,7 @@ class StoryRepository(
 
         if (!forceRefresh && previousScripts.isEmpty()) {
             val cached = storyDao.getByTrackKey(trackKey)
-            if (cached != null && !cached.demo && !isCacheExpired(cached) && !isStaleRadioScript(cached.script)) {
+            if (cached != null && !cached.demo && !isCacheExpired(cached) && !StoryScriptQuality.isTemplateLike(cached.script)) {
                 StoryLog.i("Story from cache")
                 return Result.success(cached.toResponse())
             }
@@ -121,6 +122,8 @@ class StoryRepository(
                 }
                 if (response.demo) {
                     StoryLog.w("Backend returned template/demo story — rejected")
+                } else if (StoryScriptQuality.isTemplateLike(response.script)) {
+                    StoryLog.w("Backend returned template-like story — rejected")
                 } else if (response.script.isNotBlank() && !isDuplicateScript(response.script, previousScripts)) {
                     response.quota?.let { quota ->
                         _dailyQuota.value = quota
@@ -165,10 +168,14 @@ class StoryRepository(
                         storyNarrator = storyNarrator,
                     )
                 }
-                if (groqStory != null && !isDuplicateScript(groqStory.script, previousScripts)) {
+                if (groqStory != null && !StoryScriptQuality.isTemplateLike(groqStory.script) &&
+                    !isDuplicateScript(groqStory.script, previousScripts)
+                ) {
                     StoryLog.i("Direct API key story OK")
                     persistStory(trackKey, track, groqStory, angle.labelRu)
                     return Result.success(groqStory)
+                } else if (groqStory != null) {
+                    StoryLog.w("Direct Groq returned template-like story — rejected")
                 }
             } catch (e: Exception) {
                 StoryLog.e("Direct Groq failed: ${e.message}", e)
@@ -315,18 +322,6 @@ class StoryRepository(
     private fun isCacheExpired(cached: CachedStory): Boolean {
         val maxAgeMs = 24 * 60 * 60 * 1000L
         return System.currentTimeMillis() - cached.fetchedAt > maxAgeMs
-    }
-
-    private fun isStaleRadioScript(script: String): Boolean {
-        val lower = script.lowercase()
-        return lower.contains("music story") ||
-            lower.contains("сейчас в эфире") ||
-            lower.contains("на волнах") ||
-            lower.contains("добро пожаловать") ||
-            lower.contains("братуха") ||
-            lower.contains("врубай громче") ||
-            lower.contains("стоял у радиолы") ||
-            lower.contains("фанат ") && lower.contains(" настояли")
     }
 
     private fun CachedStory.toResponse(): StoryResponse = StoryResponse(

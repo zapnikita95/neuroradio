@@ -8,6 +8,7 @@ import com.musicstory.app.domain.StoryLength
 import com.musicstory.app.domain.StoryNarrator
 import com.musicstory.app.domain.StoryPersona
 import com.musicstory.app.domain.StoryPrompts
+import com.musicstory.app.domain.StoryScriptQuality
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -99,7 +100,7 @@ class GroqStoryClient(
         return try {
             val obj = JSONObject(raw.substring(jsonStart, jsonEnd + 1))
             val script = obj.getString("script").trim()
-            if (script.isBlank()) return null
+            if (script.isBlank() || StoryScriptQuality.isTemplateLike(script)) return null
             StoryResponse(
                 artist = artist,
                 title = title,

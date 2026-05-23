@@ -284,10 +284,12 @@ private fun OrchestratorStatusCard(
             },
             style = MaterialTheme.typography.titleMedium,
         )
-        Text(
-            text = orchestratorStateLabel(context, state),
-            style = MaterialTheme.typography.bodyMedium,
-        )
+        if (state != OrchestratorState.FETCHING_STORY) {
+            Text(
+                text = orchestratorStateLabel(context, state),
+                style = MaterialTheme.typography.bodyMedium,
+            )
+        }
         if (tracksUntilNext != null) {
             Text(
                 text = context.getString(R.string.label_tracks_until_story, tracksUntilNext),

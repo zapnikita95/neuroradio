@@ -275,7 +275,12 @@ class StoryPlayer(context: Context) {
             putInt(TextToSpeech.Engine.KEY_PARAM_STREAM, AudioManager.STREAM_MUSIC)
         }
         val queueMode = if (index == 0) TextToSpeech.QUEUE_FLUSH else TextToSpeech.QUEUE_ADD
-        val result = engine.speak(segment.text, queueMode, params, utteranceId)
+        val spokenText = if (segment.lang == TtsScriptSegmenter.Lang.RU) {
+            RussianStress.apply(segment.text)
+        } else {
+            segment.text
+        }
+        val result = engine.speak(spokenText, queueMode, params, utteranceId)
         if (result == TextToSpeech.ERROR) {
             StoryLog.e("Android TTS speak returned ERROR for segment $index (${segment.lang})")
             _state.value = StoryPlaybackState.ERROR
