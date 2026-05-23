@@ -17,7 +17,6 @@ import com.musicstory.app.data.remote.MetadataEnricher
 import com.musicstory.app.data.remote.RateLimitErrorBody
 import com.musicstory.app.data.model.StoryQuotaInfo
 import com.google.gson.Gson
-import com.musicstory.app.domain.LocalStoryGenerator
 import com.musicstory.app.domain.StoryPersona
 import com.musicstory.app.util.StoryLog
 import kotlinx.coroutines.flow.Flow
@@ -98,6 +97,8 @@ class StoryRepository(
         val ttsSpeed = settingsDataStore.ttsSpeed.first()
         val ttsEmotion = settingsDataStore.ttsEmotion.first()
         val useBackend = shouldTryBackend(backendUrl)
+        var rateLimitHit = false
+        var rateLimitQuota: StoryQuotaInfo? = null
 
         if (useBackend) {
             try {
@@ -166,18 +167,46 @@ class StoryRepository(
             }
         }
 
-        StoryLog.w("Fallback to local template")
-        val local = LocalStoryGenerator.generate(
-            artist = track.artist,
-            title = track.title,
-            year = year,
-            genre = genre,
-            previousScripts = previousScripts,
-            angleIndex = previousScripts.size,
-            storyNarrator = storyNarrator,
+        val failureMessage = buildGenerationFailureMessage(
+            rateLimitHit = rateLimitHit,
+            rateLimitQuota = rateLimitQuota,
+            groqKeyPresent = groqKey.isNotEmpty(),
+            backendConfigured = useBackend,
         )
-        persistStory(trackKey, track, local, angle.labelRu)
-        return Result.success(local)
+        StoryLog.w("Story generation failed: $failureMessage")
+        return Result.failure(IOException(failureMessage))
+    }
+
+    private fun buildGenerationFailureMessage(
+        rateLimitHit: Boolean,
+        rateLimitQuota: StoryQuotaInfo?,
+        groqKeyPresent: Boolean,
+        backendConfigured: Boolean,
+    ): String {
+        if (rateLimitHit) {
+            val quotaText = rateLimitQuota?.let { "${it.used}/${it.limit}" }
+            return if (groqKeyPresent) {
+                if (quotaText != null) {
+                    "Лимит сервера исчерпан ($quotaText), свой Groq-ключ тоже не сработал. Попробуй позже."
+                } else {
+                    "Лимит сервера исчерпан, свой Groq-ключ тоже не сработал. Попробуй позже."
+                }
+            } else if (quotaText != null) {
+                "Лимит бесплатных историй исчерпан ($quotaText). Добавь Groq-ключ в настройках — тогда истории генерируются без лимита."
+            } else {
+                "Лимит бесплатных историй исчерпан. Добавь Groq-ключ в настройках — тогда истории генерируются без лимита."
+            }
+        }
+        return when {
+            groqKeyPresent && backendConfigured ->
+                "Не удалось сгенерировать историю: сервер и Groq недоступны. Проверь интернет и ключ Groq."
+            groqKeyPresent ->
+                "Groq не ответил. Проверь ключ в настройках или попробуй позже."
+            backendConfigured ->
+                "Сервер недоступен. Проверь интернет или добавь Groq-ключ в настройках."
+            else ->
+                "Укажи URL сервера или Groq-ключ в настройках."
+        }
     }
 
     private fun explainError(e: Exception): String = when (e) {

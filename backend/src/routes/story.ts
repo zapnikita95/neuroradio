@@ -9,6 +9,7 @@ import { synthesizeSpeech, hasYandexCredentials } from '../services/yandex-tts.j
 import { resolveVoiceForStory } from '../services/voices.js';
 import { buildDemoStory, isDemoMode } from '../services/demo.js';
 import { signAudioAccess } from '../services/audio-token.js';
+import { isUnlimitedInstall } from '../config/security.js';
 import { attachStoryQuotaHeaders, getDailyStoryQuota } from '../middleware/rate-limit.js';
 import type { StoryLengthId } from '../services/story-length.js';
 import type { StoryNarratorId } from '../services/story-narrator.js';
@@ -32,12 +33,15 @@ interface StoryFullBody {
 
 router.get('/quota', (req: Request, res: Response) => {
   const installId = req.installId ?? 'unknown';
+  const unlimited = isUnlimitedInstall(installId);
   const quota = getDailyStoryQuota(installId);
   attachStoryQuotaHeaders(res, installId);
   res.json({
-    tier: 'free',
+    tier: unlimited ? 'unlimited' : 'free',
     quota,
-    hint: 'Свой Groq-ключ в приложении — без дневного лимита на сервере (Groq с телефона).',
+    hint: unlimited
+      ? 'Без лимитов на этом устройстве.'
+      : 'Свой Groq-ключ в приложении — без дневного лимита на сервере (Groq с телефона).',
   });
 });
 

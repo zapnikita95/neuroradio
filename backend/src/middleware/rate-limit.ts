@@ -1,5 +1,5 @@
 import { Response } from 'express';
-import { SECURITY } from '../config/security.js';
+import { isUnlimitedInstall, SECURITY } from '../config/security.js';
 
 interface Bucket {
   count: number;
@@ -91,7 +91,15 @@ setInterval(() => {
   }
 }, 5 * MINUTE_MS).unref();
 
+const UNLIMITED_QUOTA: QuotaSnapshot = {
+  used: 0,
+  limit: 999_999,
+  remaining: 999_999,
+  resetsAt: Date.now() + DAY_MS,
+};
+
 export function getDailyStoryQuota(installId: string): QuotaSnapshot {
+  if (isUnlimitedInstall(installId)) return { ...UNLIMITED_QUOTA, resetsAt: Date.now() + DAY_MS };
   return peekUsage(
     `story:day:${installId}`,
     SECURITY.limits.storyPerInstallPerDay,
@@ -130,6 +138,11 @@ export function rateLimitHealth(req: import('express').Request, res: import('exp
 
 export function rateLimitStory(installId: string): (req: import('express').Request, res: import('express').Response, next: import('express').NextFunction) => void {
   return (req, res, next) => {
+    if (isUnlimitedInstall(installId)) {
+      next();
+      return;
+    }
+
     const ip = clientIp(req);
     const { limits } = SECURITY;
     const dailyLimit = limits.storyPerInstallPerDay;
