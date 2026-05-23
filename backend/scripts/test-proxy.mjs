@@ -8,7 +8,7 @@ const baseUrl = (process.env.RAILWAY_URL || 'http://localhost:3000').replace(/\/
 const packageName = process.env.ALLOWED_PACKAGE_NAME?.trim() || 'com.musicstory.app';
 const certSha256 =
   (process.env.ALLOWED_CERT_SHA256?.split(',')[0] ??
-    'a0105c5f4b340597d1f07f440356ffc9fcfca8c3fbdf002646a67d0a4ed733a8fc')
+    'a0105c5f4b340597d107f440356ffc9fcfa8c3fbdf002646a67d0a4ed733a8fc')
     .trim()
     .replace(/:/g, '')
     .toLowerCase();

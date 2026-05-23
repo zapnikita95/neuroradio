@@ -9,7 +9,7 @@ interface JwtPayload {
 }
 
 /** Android debug keystore — only when ALLOW_DEBUG_CERT is not false. */
-const DEBUG_CERT_SHA256 = 'a0105c5f4b340597d1f07f440356ffc9fcfca8c3fbdf002646a67d0a4ed733a8fc';
+const DEBUG_CERT_SHA256 = 'a0105c5f4b340597d107f440356ffc9fcfa8c3fbdf002646a67d0a4ed733a8fc';
 
 function base64UrlEncode(input: Buffer | string): string {
   const buffer = typeof input === 'string' ? Buffer.from(input, 'utf8') : input;
