@@ -40,6 +40,17 @@ export const ENGLISH_PHONEME_WORDS: Record<string, string> = {
   taylor: 't e i l ɛ r',
   thrill: 't r i l',
   '2pac': 't u p a k',
+  bega: 'b e g a',
+  bit: 'b i t',
+  hawkins: 'x o k i n z',
+  jay: 'd j e i',
+  little: 'l i t l',
+  lou: 'l u',
+  prado: 'p r a d o',
+  screamin: 's k r i m i n',
+  spell: 's p e l',
+  wilson: 'v i l s o n',
+  willy: 'v i l i',
 };
 
 /** Yandex SpeechKit supported phonemes (ru voice reading [[...]] blocks) */
@@ -76,7 +87,8 @@ export function englishWordToPhonemes(rawWord: string): string | null {
   const normalized = rawWord
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')
-    .replace(/['']/g, "'")
+    .replace(/[''´`]/g, '')
+    .replace(/[^a-z0-9]/gi, '')
     .toLowerCase();
 
   const dictHit = ENGLISH_PHONEME_WORDS[normalized];

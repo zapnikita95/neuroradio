@@ -39,6 +39,7 @@ class GroqStoryClient(
         angle: StoryAngle = StoryPersona.pickAngle(previousScripts.size),
         storyLength: StoryLength = StoryLength.SEC_30,
         storyNarrator: StoryNarrator = StoryNarrator.AUTO,
+        referenceFacts: List<String> = emptyList(),
         apiKey: String? = null,
     ): StoryResponse? = withContext(Dispatchers.IO) {
         val key = apiKey?.trim().orEmpty()
@@ -47,7 +48,7 @@ class GroqStoryClient(
         val persona = StoryNarrator.buildPersona(storyNarrator, year, genre, artist, title, countryCode)
         val system = StoryPrompts.systemPrompt(persona, storyLength)
         val user = StoryPrompts.userMessage(
-            artist, title, year, genre, angle, storyLength, previousScripts, storyNarrator, countryCode,
+            artist, title, year, genre, angle, storyLength, previousScripts, storyNarrator, countryCode, referenceFacts,
         )
 
         var lastError: IOException? = null

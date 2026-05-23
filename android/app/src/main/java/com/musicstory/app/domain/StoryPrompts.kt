@@ -51,9 +51,14 @@ $focusBlock
 
 ЗАПРЕЩЕНО:
 - цифры и даты (кроме имени/названия)
-- английские слова, кроме имён и названий
+- английские слова, кроме имён артистов и названий треков в «кавычках»
 - «братуха», «Music Story», «сейчас в эфире»
-- вода: «вкладывает душу», «магия музыки», «зал сходит с ума»
+- вода: «влияет на музыку», «легендарная», «уникальный пример», «суть в том что», «понял что музыка», «соединяет всех»
+- «он подсказывает [имя артиста]» — имя сцены не объект; говори «артист», «он», или ««имя»»
+
+ОБЯЗАТЕЛЬНО:
+- один конкретный факт из ОПОРНЫЕ ФАКТЫ — sample, кавер, скандал, инструмент, лейбл
+- первое предложение — факт или действие, не «я сидел в студии»
 
 JSON: {"script":"...", "word_count": число}
 """.trimIndent()
@@ -69,6 +74,7 @@ JSON: {"script":"...", "word_count": число}
         previousScripts: List<String>,
         narrator: StoryNarrator = StoryNarrator.AUTO,
         countryCode: String? = null,
+        referenceFacts: List<String> = emptyList(),
     ): String {
         val locale = TrackLocaleResolver.resolve(artist, title, year, genre, countryCode)
         val persona = StoryNarrator.buildPersona(narrator, year, genre, artist, title, countryCode)
@@ -88,6 +94,13 @@ JSON: {"script":"...", "word_count": число}
             }
             appendLine("Длина: ${length.wordsMin}–${length.wordsMax} слов.")
             appendLine("Помни: в script никаких цифр и годов, кроме цифр из имени артиста или названия трека.")
+            if (referenceFacts.isNotEmpty()) {
+                appendLine()
+                appendLine("ОПОРНЫЕ ФАКТЫ (выбери один, встрой в сцену — не пересказывай списком):")
+                referenceFacts.take(4).forEachIndexed { i, fact ->
+                    appendLine("${i + 1}. $fact")
+                }
+            }
             if (previousScripts.isNotEmpty()) {
                 appendLine("УЖЕ РАССКАЗАНО — другой факт, другая сцена:")
                 previousScripts.take(5).forEachIndexed { i, s ->

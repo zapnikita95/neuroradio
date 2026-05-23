@@ -29,6 +29,21 @@ export const BANNED_SCRIPT_PATTERNS: RegExp[] = [
   /помню студию — при записи/i,
   /фанат\s+\S+\s+настояли/i,
   /микрофон еле остыл/i,
+  /влия(?:ет|ли|ющ)/i,
+  /легендарн/i,
+  /уникальн(?:ый|ая|ое|ые|ом|ой|ую)/i,
+  /суть в том, что/i,
+  /понял[а]?, что музыка/i,
+  /музыка может соедин/i,
+  /чрезвычайно влия/i,
+  /сделает.*классик/i,
+  /собирались по вечерам/i,
+  /забыл обо вс[её]м/i,
+  /танцевали на стульях/i,
+  /характерный.*рифф/i,
+  /подсказывает\s+[A-Z]/i,
+  /подсказывает\s+«?[A-Za-z]/i,
+  /(?:^|[.!?…]\s*)я (?:сидел|вспоминаю) (?:в )?студии[,]?\s+где/i,
 ];
 
 const ENGLISH_LEAK_PATTERN =
@@ -124,16 +139,6 @@ export function validateStoryScript(
   const trimmed = script.trim();
   if (!trimmed) return { ok: false, reason: 'empty script' };
 
-  const words = countWords(trimmed);
-  const minWords = strictLength ? limits.wordsMin : Math.max(30, limits.wordsMin - 15);
-
-  if (words < minWords) {
-    return { ok: false, reason: `too short (${words} words, need ${minWords}+)` };
-  }
-  if (words > limits.wordsMax + 25) {
-    return { ok: false, reason: `too long (${words} words, max ~${limits.wordsMax})` };
-  }
-
   for (const pattern of BANNED_SCRIPT_PATTERNS) {
     if (pattern.test(trimmed)) {
       return { ok: false, reason: `banned pattern: ${pattern.source}` };
@@ -149,5 +154,41 @@ export function validateStoryScript(
     return { ok: false, reason: `forbidden numbers: ${numberIssue}` };
   }
 
+  const waterIssue = findWateryContent(trimmed);
+  if (waterIssue) {
+    return { ok: false, reason: waterIssue };
+  }
+
+  const words = countWords(trimmed);
+  const minWords = strictLength ? limits.wordsMin : Math.max(30, limits.wordsMin - 15);
+
+  if (words < minWords) {
+    return { ok: false, reason: `too short (${words} words, need ${minWords}+)` };
+  }
+  if (words > limits.wordsMax + 25) {
+    return { ok: false, reason: `too long (${words} words, max ~${limits.wordsMax})` };
+  }
+
   return { ok: true };
+}
+
+/** Reject generic filler without concrete detail. */
+export function findWateryContent(script: string): string | null {
+  const genericOpeners = [
+    /^«?\s*я (?:сидел|вспоминаю) (?:в )?студии/i,
+    /^«?\s*сквозь миганье лампочек/i,
+  ];
+  for (const pattern of genericOpeners) {
+    if (pattern.test(script)) {
+      return 'generic studio opener — start with a concrete fact';
+    }
+  }
+
+  const concreteSignals =
+    /\b(сэмпл|sample|перезапис|дубль|лейбл|продюсер|радио|телевиз|клип|чарт|billboard|гитар|барабан|клавиш|оркестр|сакс|труб|скрипк|микрофон|пластинк|кассет|vinyl|prado|pérez|перес|перез|кавер|cover|remix|plagiar|запрет|скандал|штраф|плагиат|первый раз|в эфир|на сцене|в раздевалке|backstage|soundcheck|монтаж|монтажн|сведени|master|микш|репетиц|фestival|фестив|Apollo|Монтр|Abbey|Sun Records|Columbia|EMI|Def Jam|Яндекс|Spotify|MTV|Grammy|«[^»]{3,}»)\b/i;
+  if (!concreteSignals.test(script)) {
+    return 'no concrete fact — need sample, place, person, instrument, label, or scandal detail';
+  }
+
+  return null;
 }

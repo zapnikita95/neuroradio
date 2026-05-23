@@ -24,7 +24,15 @@ export interface TtsMarkupOptions {
 }
 
 function processAllLatinWords(text: string): string {
-  return text.replace(LATIN_TOKEN, (word) => wrapLatinWord(word));
+  return text.replace(LATIN_TOKEN, (word, offset, full) => {
+    const before = full.slice(Math.max(0, offset - 2), offset);
+    const after = full.slice(offset + word.length, offset + word.length + 2);
+    if (before.endsWith('[[') || after.startsWith(']]')) return word;
+    const openBlocks = (full.slice(0, offset).match(/\[\[/g) ?? []).length;
+    const closeBlocks = (full.slice(0, offset).match(/\]\]/g) ?? []).length;
+    if (openBlocks > closeBlocks) return word;
+    return wrapLatinWord(word);
+  });
 }
 
 function processRussianWords(text: string): string {

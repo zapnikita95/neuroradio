@@ -95,6 +95,7 @@ class StoryRepository(
         val year = metadata.year
         val genre = metadata.genre
         val countryCode = metadata.countryCode
+        val referenceFacts = metadata.referenceFacts
         val angle = StoryPersona.pickAngle(previousScripts.size)
 
         val backendUrl = settingsDataStore.backendUrl.first().trim()
@@ -152,6 +153,7 @@ class StoryRepository(
                 angle = angle,
                 storyLength = storyLength,
                 storyNarrator = storyNarrator,
+                referenceFacts = referenceFacts,
             )) {
                 is StoryAttemptResult.Success -> return Result.success(groqResult.response)
                 is StoryAttemptResult.TemplateRejected -> templateRejected = true
@@ -195,6 +197,7 @@ class StoryRepository(
         angle: StoryAngle,
         storyLength: StoryLength,
         storyNarrator: StoryNarrator,
+        referenceFacts: List<String> = emptyList(),
     ): StoryAttemptResult {
         return try {
             StoryLog.i("Trying direct Groq from device")
@@ -210,6 +213,7 @@ class StoryRepository(
                     angle = angle,
                     storyLength = storyLength,
                     storyNarrator = storyNarrator,
+                    referenceFacts = referenceFacts,
                 )
             }
             when {
@@ -319,7 +323,7 @@ class StoryRepository(
         backendError: String?,
     ): String {
         if (templateRejected) {
-            return "История похожа на шаблон — попробуй ещё раз или другого рассказчика."
+            return "История слишком общая или похожа на шаблон — попробуй ещё раз."
         }
         if (groqKeyPresent && !groqError.isNullOrBlank()) {
             return groqError

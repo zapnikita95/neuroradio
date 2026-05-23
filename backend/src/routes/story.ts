@@ -4,6 +4,7 @@ import { requireAppAuth } from '../middleware/app-auth.js';
 import { validateStoryFullBody } from '../middleware/validate-story.js';
 import { safeErrorMessage } from '../middleware/security-headers.js';
 import { enrichTrackMetadata } from '../services/musicbrainz.js';
+import { fetchReferenceFacts } from '../services/wikipedia-facts.js';
 import { generateStoryScript, hasGroqApiKey } from '../services/groq.js';
 import { synthesizeSpeech, hasYandexCredentials } from '../services/yandex-tts.js';
 import { resolveVoiceForStory } from '../services/voices.js';
@@ -67,6 +68,11 @@ router.post('/full', validateStoryFullBody, async (req: Request, res: Response) 
 
   try {
     const metadata = await enrichTrackMetadata(artist, title);
+    const referenceFacts = await fetchReferenceFacts(
+      metadata.artist,
+      metadata.title,
+      metadata.countryCode,
+    );
     const voiceId = resolveVoiceForStory(ttsVoice, metadata.year, metadata.genre);
 
     const previousScripts = Array.isArray(previousScriptsRaw)
@@ -83,6 +89,7 @@ router.post('/full', validateStoryFullBody, async (req: Request, res: Response) 
       storyLength,
       storyNarrator,
       previousScripts,
+      referenceFacts,
     });
 
     const response: Record<string, unknown> = {

@@ -183,9 +183,16 @@ ${focusBlock}
 
 ЗАПРЕЩЕНО:
 - цифры и даты (кроме имени/названия)
-- английские слова, кроме имён и названий
+- английские слова, кроме имён артистов и названий треков в «кавычках»
 - «братуха», «братан», «Music Story», «сейчас в эфире»
-- вода: «вкладывает душу», «магия музыки», «зал сходит с ума»
+- вода: «вкладывает душу», «магия музыки», «зал сходит с ума», «влияет на рок/музыку», «легендарная», «уникальный пример», «суть в том что», «понял что музыка», «соединяет всех»
+- фразы «он подсказывает [имя артиста]» — имя сцены не объект глагола; говори «артист», «он», «Jay», или ««Screamin' Jay Hawkins»»
+- выдуманные вечера «сидели в студии и слушали треки» без конкретного факта
+
+ОБЯЗАТЕЛЬНО:
+- один конкретный факт из блока ОПОРНЫЕ ФАКТЫ (если есть) — sample, кавер, скандал, инструмент, лейбл, место записи
+- первое предложение — уже факт или действие, не «я сидел в студии»
+- имя артиста — только как сценическое имя в «кавычках», дальше «он/она/артист»
 
 JSON: {"script":"...", "word_count": число, "voiceId": "alena | filipp | ermil | jane | omazh | zahar | marina | dasha | julia | kirill | masha | alexander | lera"}`;
 }
@@ -201,6 +208,7 @@ export function buildStoryUserPrompt(params: {
   storyNarrator?: StoryNarratorId;
   previousScripts?: string[];
   retryReason?: string;
+  referenceFacts?: string[];
 }): string {
   const narratorId = resolveStoryNarrator(params.storyNarrator);
   const locale = resolveTrackLocale({
@@ -240,6 +248,13 @@ export function buildStoryUserPrompt(params: {
   }
   lines.push(`Длина: ${length.wordsMin}–${length.wordsMax} слов.`);
   lines.push('В script — никаких цифр и годов, кроме цифр из имени артиста или названия трека.');
+
+  const facts = params.referenceFacts?.filter(Boolean) ?? [];
+  if (facts.length > 0) {
+    lines.push('');
+    lines.push('ОПОРНЫЕ ФАКТЫ (выбери один, встрой в сцену — не пересказывай списком, не выдумывай):');
+    facts.forEach((fact, i) => lines.push(`${i + 1}. ${fact}`));
+  }
 
   if (params.retryReason) {
     lines.push('');

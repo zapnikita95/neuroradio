@@ -13,6 +13,7 @@ data class TrackMetadata(
     val year: Int? = null,
     val genre: String? = null,
     val countryCode: String? = null,
+    val referenceFacts: List<String> = emptyList(),
 )
 
 class MetadataEnricher(
@@ -42,9 +43,12 @@ class MetadataEnricher(
             val genre = extractGenre(rec)
             val countryCode = extractCountry(rec)
                 ?: TrackLocaleResolver.inferCountryFromText(artist, title)
-            TrackMetadata(year = year, genre = genre, countryCode = countryCode)
+            val facts = WikipediaFacts.fetch(artist, title, countryCode)
+            TrackMetadata(year = year, genre = genre, countryCode = countryCode, referenceFacts = facts)
         } catch (_: Exception) {
-            TrackMetadata(countryCode = TrackLocaleResolver.inferCountryFromText(artist, title))
+            val countryCode = TrackLocaleResolver.inferCountryFromText(artist, title)
+            val facts = runCatching { WikipediaFacts.fetch(artist, title, countryCode) }.getOrDefault(emptyList())
+            TrackMetadata(countryCode = countryCode, referenceFacts = facts)
         }
     }
 

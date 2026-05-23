@@ -40,6 +40,7 @@ export interface GenerateStoryInput {
   storyLength?: StoryLengthId;
   storyNarrator?: StoryNarratorId;
   previousScripts?: string[];
+  referenceFacts?: string[];
 }
 
 function parseStoryJson(raw: string): StoryScript | null {
