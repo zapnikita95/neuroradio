@@ -112,6 +112,7 @@ fun HomeScreen(
         (
             isPlaying ||
                 uiState.state == OrchestratorState.FETCHING_STORY ||
+                uiState.state == OrchestratorState.PREPARING_PLAYBACK ||
                 uiState.state == OrchestratorState.PLAYING_STORY
             )
 
@@ -189,7 +190,9 @@ fun HomeScreen(
                     tracksUntilNext = uiState.tracksUntilNext,
                 )
 
-                if (uiState.state == OrchestratorState.FETCHING_STORY) {
+                if (uiState.state == OrchestratorState.FETCHING_STORY ||
+                    uiState.state == OrchestratorState.PREPARING_PLAYBACK
+                ) {
                     Spacer(modifier = Modifier.height(16.dp))
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         CircularProgressIndicator(
@@ -198,7 +201,11 @@ fun HomeScreen(
                             strokeWidth = 2.dp,
                         )
                         Text(
-                            text = context.getString(R.string.state_fetching),
+                            text = when (uiState.state) {
+                                OrchestratorState.PREPARING_PLAYBACK ->
+                                    context.getString(R.string.state_preparing)
+                                else -> context.getString(R.string.state_fetching)
+                            },
                             modifier = Modifier.padding(start = 12.dp),
                             style = MaterialTheme.typography.bodyMedium,
                             color = MutedLavender,
@@ -230,10 +237,13 @@ fun HomeScreen(
                     text = context.getString(R.string.action_manual_story),
                     onClick = { app.storyOrchestrator.requestManualStory() },
                     enabled = uiState.state != OrchestratorState.FETCHING_STORY &&
+                        uiState.state != OrchestratorState.PREPARING_PLAYBACK &&
                         uiState.state != OrchestratorState.PLAYING_STORY,
                 )
 
-                if (uiState.state == OrchestratorState.PLAYING_STORY) {
+                if (uiState.state == OrchestratorState.PLAYING_STORY ||
+                    uiState.state == OrchestratorState.PREPARING_PLAYBACK
+                ) {
                     SecondaryStoryButton(
                         text = context.getString(R.string.action_stop_story),
                         onClick = { app.storyOrchestrator.stopStory() },
@@ -318,7 +328,9 @@ private fun OrchestratorStatusLine(
         OrchestratorMode.MANUAL -> context.getString(R.string.mode_manual)
     }
     val stateLabel = when (state) {
-        OrchestratorState.FETCHING_STORY -> null
+        OrchestratorState.FETCHING_STORY,
+        OrchestratorState.PREPARING_PLAYBACK,
+        -> null
         else -> orchestratorStateLabel(context, state)
     }
 
@@ -374,6 +386,7 @@ private fun orchestratorStateLabel(context: android.content.Context, state: Orch
         OrchestratorState.IDLE -> context.getString(R.string.state_idle)
         OrchestratorState.LISTENING -> context.getString(R.string.state_listening)
         OrchestratorState.FETCHING_STORY -> context.getString(R.string.state_fetching)
+        OrchestratorState.PREPARING_PLAYBACK -> context.getString(R.string.state_preparing)
         OrchestratorState.PLAYING_STORY -> context.getString(R.string.state_playing)
         OrchestratorState.ERROR -> context.getString(R.string.state_error)
     }

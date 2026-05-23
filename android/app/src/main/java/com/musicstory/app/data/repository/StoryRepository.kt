@@ -112,25 +112,6 @@ class StoryRepository(
         var groqError: String? = null
         var backendError: String? = null
 
-        if (groqKey.isNotEmpty()) {
-            when (val groqResult = tryDirectGroq(
-                groqKey = groqKey,
-                track = track,
-                trackKey = trackKey,
-                year = year,
-                genre = genre,
-                countryCode = countryCode,
-                previousScripts = previousScripts,
-                angle = angle,
-                storyLength = storyLength,
-                storyNarrator = storyNarrator,
-            )) {
-                is StoryAttemptResult.Success -> return Result.success(groqResult.response)
-                is StoryAttemptResult.TemplateRejected -> templateRejected = true
-                is StoryAttemptResult.Failed -> groqError = groqResult.reason
-            }
-        }
-
         if (useBackend) {
             when (val backendResult = tryBackendStory(
                 backendUrl = backendUrl,
@@ -157,6 +138,25 @@ class StoryRepository(
             }
         } else {
             StoryLog.w("Backend skipped (url=$backendUrl)")
+        }
+
+        if (groqKey.isNotEmpty()) {
+            when (val groqResult = tryDirectGroq(
+                groqKey = groqKey,
+                track = track,
+                trackKey = trackKey,
+                year = year,
+                genre = genre,
+                countryCode = countryCode,
+                previousScripts = previousScripts,
+                angle = angle,
+                storyLength = storyLength,
+                storyNarrator = storyNarrator,
+            )) {
+                is StoryAttemptResult.Success -> return Result.success(groqResult.response)
+                is StoryAttemptResult.TemplateRejected -> templateRejected = true
+                is StoryAttemptResult.Failed -> groqError = groqResult.reason
+            }
         }
 
         val failureMessage = buildGenerationFailureMessage(

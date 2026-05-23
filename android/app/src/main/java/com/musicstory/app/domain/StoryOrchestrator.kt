@@ -7,6 +7,7 @@ import com.musicstory.app.data.model.TrackInfo
 import com.musicstory.app.data.repository.ScrobbleRepository
 import com.musicstory.app.data.repository.StoryRepository
 import com.musicstory.app.media.MediaControllerManager
+import com.musicstory.app.util.StoryLog
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -29,6 +30,7 @@ enum class OrchestratorState {
     IDLE,
     LISTENING,
     FETCHING_STORY,
+    PREPARING_PLAYBACK,
     PLAYING_STORY,
     ERROR,
 }
@@ -52,6 +54,7 @@ class StoryOrchestrator(
 ) {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private val storyMutex = Mutex()
+    private var playbackSession = 0
 
     private val _mode = MutableStateFlow(OrchestratorMode.AUTO)
     val mode: StateFlow<OrchestratorMode> = _mode.asStateFlow()
@@ -98,22 +101,16 @@ class StoryOrchestrator(
 
         scope.launch {
             storyPlayer.state.collect { playbackState ->
-                when (playbackState) {
-                    StoryPlaybackState.PLAYING, StoryPlaybackState.PREPARING -> {
-                        _state.value = OrchestratorState.PLAYING_STORY
-                    }
-                    StoryPlaybackState.COMPLETED, StoryPlaybackState.IDLE -> {
-                        if (_state.value == OrchestratorState.PLAYING_STORY) {
-                            _state.value = OrchestratorState.LISTENING
-                        }
-                    }
-                    StoryPlaybackState.ERROR -> {
-                        _errorMessage.value = "Ошибка воспроизведения истории"
-                        _state.value = OrchestratorState.ERROR
-                    }
-                    else -> Unit
+                if (playbackState == StoryPlaybackState.ERROR &&
+                    (
+                        _state.value == OrchestratorState.PREPARING_PLAYBACK ||
+                            _state.value == OrchestratorState.PLAYING_STORY
+                        )
+                ) {
+                    _errorMessage.value = "Не удалось воспроизвести историю"
+                    _state.value = OrchestratorState.ERROR
+                    publishUiState()
                 }
-                publishUiState()
             }
         }
     }
@@ -143,7 +140,10 @@ class StoryOrchestrator(
 
         if (shouldTrigger) {
             playStoryForTrack(track, manual = false)
-        } else if (_state.value != OrchestratorState.PLAYING_STORY) {
+        } else if (_state.value != OrchestratorState.PLAYING_STORY &&
+            _state.value != OrchestratorState.PREPARING_PLAYBACK &&
+            _state.value != OrchestratorState.FETCHING_STORY
+        ) {
             _state.value = OrchestratorState.LISTENING
         }
         publishUiState()
@@ -164,6 +164,7 @@ class StoryOrchestrator(
 
     private suspend fun playStoryForTrack(track: TrackInfo, manual: Boolean) {
         storyMutex.withLock {
+            val session = ++playbackSession
             _state.value = OrchestratorState.FETCHING_STORY
             _errorMessage.value = null
             publishUiState()
@@ -183,6 +184,14 @@ class StoryOrchestrator(
                         }
                     }
 
+                    if (session != playbackSession) return@fold
+
+                    _state.value = OrchestratorState.PREPARING_PLAYBACK
+                    publishUiState()
+
+                    mediaControllerManager.pauseMusic()
+                    musicPausedForStory.set(true)
+
                     val audioUrl = storyRepository.resolveAudioUrl(response.audioUrl)
                     storyPlayer.playStory(
                         response = response,
@@ -190,16 +199,21 @@ class StoryOrchestrator(
                         speechRate = ttsSpeed,
                         resumeMusic = true,
                         onPlaybackStarted = {
-                            mediaControllerManager.pauseMusic()
-                            musicPausedForStory.set(true)
+                            if (session != playbackSession) return@playStory
+                            _state.value = OrchestratorState.PLAYING_STORY
+                            publishUiState()
                         },
                         onFinished = {
+                            if (session != playbackSession) return@playStory
                             if (musicPausedForStory.get() && storyPlayer.shouldResumeMusic()) {
                                 mediaControllerManager.resumeMusic()
                             }
-                            clearTransientState()
+                            _errorMessage.value = null
+                            _state.value = OrchestratorState.LISTENING
+                            publishUiState()
                         },
                         onError = {
+                            if (session != playbackSession) return@playStory
                             _errorMessage.value = "Не удалось воспроизвести историю"
                             _state.value = OrchestratorState.ERROR
                             if (musicPausedForStory.get()) {
@@ -209,8 +223,7 @@ class StoryOrchestrator(
                         },
                     )
                     scrobbleRepository.recordTrack(track, storyTriggered = true)
-                    _state.value = OrchestratorState.PLAYING_STORY
-                    publishUiState()
+                    schedulePlaybackWatchdog(session, musicPausedForStory)
                 },
                 onFailure = { error ->
                     _errorMessage.value = error.message ?: "Не удалось получить историю"
@@ -221,7 +234,33 @@ class StoryOrchestrator(
         }
     }
 
+    private fun schedulePlaybackWatchdog(session: Int, musicPausedForStory: AtomicBoolean) {
+        scope.launch {
+            delay(PLAYBACK_START_TIMEOUT_MS)
+            if (session != playbackSession) return@launch
+            if (_state.value != OrchestratorState.PREPARING_PLAYBACK &&
+                _state.value != OrchestratorState.PLAYING_STORY
+            ) {
+                return@launch
+            }
+            if (_state.value == OrchestratorState.PLAYING_STORY &&
+                storyPlayer.state.value == StoryPlaybackState.PLAYING
+            ) {
+                return@launch
+            }
+            StoryLog.w("Playback watchdog: story did not start in time")
+            storyPlayer.stop()
+            _errorMessage.value = "Озвучка не запустилась — попробуй ещё раз"
+            _state.value = OrchestratorState.ERROR
+            if (musicPausedForStory.get()) {
+                mediaControllerManager.resumeMusic()
+            }
+            publishUiState()
+        }
+    }
+
     fun stopStory() {
+        playbackSession++
         storyPlayer.stop()
         mediaControllerManager.resumeMusic()
         _state.value = OrchestratorState.LISTENING
@@ -238,7 +277,10 @@ class StoryOrchestrator(
 
     private fun clearTransientState() {
         _errorMessage.value = null
-        if (_state.value == OrchestratorState.ERROR || _state.value == OrchestratorState.PLAYING_STORY) {
+        if (_state.value == OrchestratorState.ERROR ||
+            _state.value == OrchestratorState.PLAYING_STORY ||
+            _state.value == OrchestratorState.PREPARING_PLAYBACK
+        ) {
             _state.value = OrchestratorState.LISTENING
         }
         publishUiState()
@@ -258,6 +300,7 @@ class StoryOrchestrator(
     companion object {
         /** Auto mode: let the track play at least this long before pausing for the story. */
         private const val AUTO_MIN_MUSIC_MS = 8_000L
+        private const val PLAYBACK_START_TIMEOUT_MS = 25_000L
     }
 }
 

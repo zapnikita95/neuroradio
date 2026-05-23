@@ -57,6 +57,8 @@ class StoryPlayer(context: Context) {
     private var playbackStartedNotified = false
     private var pendingScript: String? = null
     private var pendingSpeechRate = 0.92f
+    private var playbackTimeoutRunnable: Runnable? = null
+    private var ttsStartTimeoutRunnable: Runnable? = null
 
     private val _state = MutableStateFlow(StoryPlaybackState.IDLE)
     val state: StateFlow<StoryPlaybackState> = _state.asStateFlow()
@@ -79,6 +81,7 @@ class StoryPlayer(context: Context) {
                             }
                         }
                         Player.STATE_ENDED -> {
+                            cancelAllPlaybackTimeouts()
                             _state.value = StoryPlaybackState.COMPLETED
                             abandonAudioFocus()
                             invokeFinished()
@@ -93,6 +96,7 @@ class StoryPlayer(context: Context) {
 
                 override fun onIsPlayingChanged(isPlaying: Boolean) {
                     if (isPlaying) {
+                        cancelPlaybackTimeouts()
                         notifyPlaybackStarted()
                         _state.value = StoryPlaybackState.PLAYING
                     } else if (exoPlayer.playbackState == Player.STATE_READY) {
@@ -186,13 +190,69 @@ class StoryPlayer(context: Context) {
 
     private fun playWithExoPlayer(url: String) {
         _state.value = StoryPlaybackState.PREPARING
+        scheduleExoBufferingTimeout()
         exoPlayer.setMediaItem(MediaItem.fromUri(url))
         exoPlayer.prepare()
         exoPlayer.playWhenReady = true
     }
 
+    private fun scheduleExoBufferingTimeout() {
+        cancelPlaybackTimeouts()
+        playbackTimeoutRunnable = Runnable {
+            if (_state.value != StoryPlaybackState.PREPARING &&
+                _state.value != StoryPlaybackState.PLAYING
+            ) {
+                return@Runnable
+            }
+            if (exoPlayer.isPlaying) {
+                return@Runnable
+            }
+            val script = pendingScript
+            StoryLog.w("ExoPlayer start timeout, falling back to Android TTS")
+            exoPlayer.stop()
+            exoPlayer.clearMediaItems()
+            if (!script.isNullOrBlank()) {
+                playWithTts(script, pendingSpeechRate)
+            } else {
+                _state.value = StoryPlaybackState.ERROR
+                abandonAudioFocus()
+                invokeError()
+            }
+        }
+        mainHandler.postDelayed(playbackTimeoutRunnable!!, EXO_START_TIMEOUT_MS)
+    }
+
+    private fun scheduleTtsStartTimeout() {
+        cancelTtsStartTimeout()
+        ttsStartTimeoutRunnable = Runnable {
+            if (_state.value == StoryPlaybackState.PREPARING && !playbackStartedNotified) {
+                StoryLog.e("Android TTS start timeout")
+                _state.value = StoryPlaybackState.ERROR
+                abandonAudioFocus()
+                invokeError()
+            }
+        }
+        mainHandler.postDelayed(ttsStartTimeoutRunnable!!, TTS_START_TIMEOUT_MS)
+    }
+
+    private fun cancelPlaybackTimeouts() {
+        playbackTimeoutRunnable?.let { mainHandler.removeCallbacks(it) }
+        playbackTimeoutRunnable = null
+    }
+
+    private fun cancelTtsStartTimeout() {
+        ttsStartTimeoutRunnable?.let { mainHandler.removeCallbacks(it) }
+        ttsStartTimeoutRunnable = null
+    }
+
+    private fun cancelAllPlaybackTimeouts() {
+        cancelPlaybackTimeouts()
+        cancelTtsStartTimeout()
+    }
+
     private fun playWithTts(script: String, speechRate: Float) {
         _state.value = StoryPlaybackState.PREPARING
+        scheduleTtsStartTimeout()
         val segments = TtsScriptSegmenter.split(script)
         val startSpeaking = {
             val engine = tts
@@ -214,6 +274,7 @@ class StoryPlayer(context: Context) {
                     object : UtteranceProgressListener() {
                         override fun onStart(utteranceId: String?) {
                             mainHandler.post {
+                                cancelTtsStartTimeout()
                                 notifyPlaybackStarted()
                                 _state.value = StoryPlaybackState.PLAYING
                             }
@@ -223,6 +284,7 @@ class StoryPlayer(context: Context) {
                             mainHandler.post {
                                 segmentIndex++
                                 if (segmentIndex >= segments.size) {
+                                    cancelAllPlaybackTimeouts()
                                     _state.value = StoryPlaybackState.COMPLETED
                                     abandonAudioFocus()
                                     invokeFinished()
@@ -383,6 +445,7 @@ class StoryPlayer(context: Context) {
     }
 
     private fun stopInternal(clearCallback: Boolean) {
+        cancelAllPlaybackTimeouts()
         exoPlayer.stop()
         exoPlayer.clearMediaItems()
         tts?.stop()
@@ -412,5 +475,7 @@ class StoryPlayer(context: Context) {
 
     companion object {
         private const val UTTERANCE_ID = "music_story_utterance"
+        private const val EXO_START_TIMEOUT_MS = 15_000L
+        private const val TTS_START_TIMEOUT_MS = 12_000L
     }
 }

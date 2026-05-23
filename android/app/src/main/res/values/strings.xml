@@ -39,6 +39,7 @@
     <string name="state_idle">Ожидание</string>
     <string name="state_listening">Слушаем музыку</string>
     <string name="state_fetching">Готовим историю…</string>
+    <string name="state_preparing">Готовим озвучку…</string>
     <string name="state_playing">Воспроизводим историю</string>
     <string name="state_error">Ошибка</string>
 
