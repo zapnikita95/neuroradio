@@ -1,6 +1,12 @@
-/** ~30 sec Russian narration at natural pace */
-export const STORY_WORDS_MIN = 72;
-export const STORY_WORDS_MAX = 98;
+import {
+  DEFAULT_STORY_LENGTH,
+  getStoryLengthPreset,
+  StoryLengthId,
+  StoryLengthPreset,
+} from './story-length.js';
+
+export { DEFAULT_STORY_LENGTH, getStoryLengthPreset };
+export type { StoryLengthId, StoryLengthPreset };
 
 export const BANNED_SCRIPT_PATTERNS: RegExp[] = [
   /^«?\s*знаю\s+(интересн|один|такой|факт)/i,
@@ -20,16 +26,20 @@ export function countWords(text: string): number {
   return text.trim().split(/\s+/).filter(Boolean).length;
 }
 
-export function validateStoryScript(script: string): { ok: true } | { ok: false; reason: string } {
+export function validateStoryScript(
+  script: string,
+  lengthId: StoryLengthId = DEFAULT_STORY_LENGTH,
+): { ok: true } | { ok: false; reason: string } {
+  const limits = getStoryLengthPreset(lengthId);
   const trimmed = script.trim();
   if (!trimmed) return { ok: false, reason: 'empty script' };
 
   const words = countWords(trimmed);
-  if (words < STORY_WORDS_MIN) {
-    return { ok: false, reason: `too short (${words} words, need ${STORY_WORDS_MIN}+)` };
+  if (words < limits.wordsMin) {
+    return { ok: false, reason: `too short (${words} words, need ${limits.wordsMin}+)` };
   }
-  if (words > STORY_WORDS_MAX + 15) {
-    return { ok: false, reason: `too long (${words} words)` };
+  if (words > limits.wordsMax + 20) {
+    return { ok: false, reason: `too long (${words} words, max ~${limits.wordsMax})` };
   }
 
   for (const pattern of BANNED_SCRIPT_PATTERNS) {

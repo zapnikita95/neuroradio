@@ -1,10 +1,15 @@
 import { Request, Response, NextFunction } from 'express';
 import { SECURITY } from '../config/security.js';
+import { resolveStoryLength, StoryLengthId } from '../services/story-length.js';
+import { resolveTtsEmotion, resolveTtsSpeed, TtsEmotion } from '../services/tts-options.js';
 
 interface StoryFullBody {
   artist?: unknown;
   title?: unknown;
   previous_scripts?: unknown;
+  story_length?: unknown;
+  tts_speed?: unknown;
+  tts_emotion?: unknown;
 }
 
 function asTrimmedString(value: unknown, maxLen: number): string | null {
@@ -45,6 +50,19 @@ export function validateStoryFullBody(req: Request, res: Response, next: NextFun
     }
   }
 
-  req.body = { artist, title, previous_scripts: previousScripts };
+  const storyLength: StoryLengthId = resolveStoryLength(body.story_length);
+  const ttsSpeed = resolveTtsSpeed(
+    typeof body.tts_speed === 'number' ? body.tts_speed : Number(body.tts_speed),
+  );
+  const ttsEmotion: TtsEmotion = resolveTtsEmotion(body.tts_emotion);
+
+  req.body = {
+    artist,
+    title,
+    previous_scripts: previousScripts,
+    story_length: storyLength,
+    tts_speed: ttsSpeed,
+    tts_emotion: ttsEmotion,
+  };
   next();
 }

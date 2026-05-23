@@ -1,11 +1,17 @@
 package com.musicstory.app.data.model
 
 import com.google.gson.annotations.SerializedName
+import com.musicstory.app.domain.StoryLength
+import com.musicstory.app.domain.TtsEmotion
+import com.musicstory.app.domain.TtsSpeed
 
 data class StoryRequest(
     val artist: String,
     val title: String,
     @SerializedName("previous_scripts") val previousScripts: List<String> = emptyList(),
+    @SerializedName("story_length") val storyLength: String = StoryLength.SEC_30.id,
+    @SerializedName("tts_speed") val ttsSpeed: Float = TtsSpeed.NORMAL.yandexSpeed,
+    @SerializedName("tts_emotion") val ttsEmotion: String = TtsEmotion.LIVELY.id,
 )
 
 data class StoryResponse(

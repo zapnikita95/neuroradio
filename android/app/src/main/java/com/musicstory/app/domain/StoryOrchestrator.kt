@@ -38,7 +38,6 @@ data class OrchestratorUiState(
     val errorMessage: String? = null,
     val tracksUntilNext: Int? = null,
     val isServiceRunning: Boolean = false,
-    val fetchNote: String? = null,
 )
 
 class StoryOrchestrator(
@@ -82,17 +81,10 @@ class StoryOrchestrator(
             errorMessage = _errorMessage.value,
             tracksUntilNext = _tracksUntilNext.value,
             isServiceRunning = _serviceRunning.value,
-            fetchNote = storyRepository.lastFetchNote.value,
         )
     }
 
     init {
-        scope.launch {
-            storyRepository.lastFetchNote.collect {
-                publishUiState()
-            }
-        }
-
         scope.launch {
             settingsDataStore.manualMode.collect { manual ->
                 _mode.value = if (manual) OrchestratorMode.MANUAL else OrchestratorMode.AUTO
@@ -181,6 +173,7 @@ class StoryOrchestrator(
             mediaControllerManager.pauseMusic()
 
             val result = storyRepository.fetchStory(track, forceRefresh = true)
+            val ttsSpeed = settingsDataStore.ttsSpeed.first().androidRate
             result.fold(
                 onSuccess = { response ->
                     _lastStory.value = response
@@ -188,6 +181,7 @@ class StoryOrchestrator(
                     storyPlayer.playStory(
                         response = response,
                         audioUrl = audioUrl,
+                        speechRate = ttsSpeed,
                         resumeMusic = true,
                         onFinished = {
                             if (storyPlayer.shouldResumeMusic()) {

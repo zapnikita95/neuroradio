@@ -120,6 +120,7 @@ class StoryPlayer(context: Context) {
     fun playStory(
         response: StoryResponse,
         audioUrl: String?,
+        speechRate: Float = 0.92f,
         resumeMusic: Boolean = true,
         onFinished: (() -> Unit)? = null,
     ) {
@@ -133,7 +134,7 @@ class StoryPlayer(context: Context) {
             playWithExoPlayer(audioUrl)
         } else {
             com.musicstory.app.util.StoryLog.i("Playing Android TTS (${response.script.length} chars)")
-            playWithTts(response.script)
+            playWithTts(response.script, speechRate)
         }
     }
 
@@ -144,13 +145,14 @@ class StoryPlayer(context: Context) {
         exoPlayer.playWhenReady = true
     }
 
-    private fun playWithTts(script: String) {
+    private fun playWithTts(script: String, speechRate: Float) {
         _state.value = StoryPlaybackState.PREPARING
         val startSpeaking = {
             val engine = tts
             if (engine == null || !ttsReady) {
                 _state.value = StoryPlaybackState.ERROR
             } else {
+                engine.setSpeechRate(speechRate)
                 engine.setOnUtteranceProgressListener(
                     object : UtteranceProgressListener() {
                         override fun onStart(utteranceId: String?) {

@@ -10,6 +10,9 @@ import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.core.stringSetPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
+import com.musicstory.app.domain.StoryLength
+import com.musicstory.app.domain.TtsEmotion
+import com.musicstory.app.domain.TtsSpeed
 import com.musicstory.app.domain.TriggerMode
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
@@ -55,6 +58,18 @@ class SettingsDataStore(private val context: Context) {
 
     val sameTrackStoryEveryN: Flow<Int> = context.settingsDataStore.data.map { prefs ->
         prefs[KEY_SAME_TRACK_STORY_EVERY_N] ?: DEFAULT_SAME_TRACK_STORY_EVERY_N
+    }
+
+    val storyLength: Flow<StoryLength> = context.settingsDataStore.data.map { prefs ->
+        StoryLength.fromId(prefs[KEY_STORY_LENGTH])
+    }
+
+    val ttsSpeed: Flow<TtsSpeed> = context.settingsDataStore.data.map { prefs ->
+        TtsSpeed.fromId(prefs[KEY_TTS_SPEED])
+    }
+
+    val ttsEmotion: Flow<TtsEmotion> = context.settingsDataStore.data.map { prefs ->
+        TtsEmotion.fromId(prefs[KEY_TTS_EMOTION])
     }
 
     suspend fun setAutoIntercept(enabled: Boolean) {
@@ -126,6 +141,18 @@ class SettingsDataStore(private val context: Context) {
         }
     }
 
+    suspend fun setStoryLength(length: StoryLength) {
+        context.settingsDataStore.edit { it[KEY_STORY_LENGTH] = length.id }
+    }
+
+    suspend fun setTtsSpeed(speed: TtsSpeed) {
+        context.settingsDataStore.edit { it[KEY_TTS_SPEED] = speed.id }
+    }
+
+    suspend fun setTtsEmotion(emotion: TtsEmotion) {
+        context.settingsDataStore.edit { it[KEY_TTS_EMOTION] = emotion.id }
+    }
+
     companion object {
         const val DEFAULT_BACKEND_URL = "https://music-story-production.up.railway.app"
         const val DEFAULT_EVERY_N_TRACKS = 10
@@ -144,6 +171,9 @@ class SettingsDataStore(private val context: Context) {
         private val KEY_MANUAL_MODE = booleanPreferencesKey("manual_mode")
         private val KEY_GROQ_API_KEY = stringPreferencesKey("groq_api_key")
         private val KEY_SAME_TRACK_STORY_EVERY_N = intPreferencesKey("same_track_story_every_n")
+        private val KEY_STORY_LENGTH = stringPreferencesKey("story_length")
+        private val KEY_TTS_SPEED = stringPreferencesKey("tts_speed")
+        private val KEY_TTS_EMOTION = stringPreferencesKey("tts_emotion")
     }
 }
 

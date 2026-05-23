@@ -10,6 +10,8 @@ import { voiceForYear } from '../services/voices.js';
 import { buildDemoStory, isDemoMode } from '../services/demo.js';
 import { signAudioAccess } from '../services/audio-token.js';
 import { attachStoryQuotaHeaders, getDailyStoryQuota } from '../middleware/rate-limit.js';
+import type { StoryLengthId } from '../services/story-length.js';
+import type { TtsEmotion } from '../services/tts-options.js';
 
 const router = Router();
 
@@ -19,6 +21,9 @@ interface StoryFullBody {
   artist: string;
   title: string;
   previous_scripts?: string[];
+  story_length?: StoryLengthId;
+  tts_speed?: number;
+  tts_emotion?: TtsEmotion;
 }
 
 router.get('/quota', (req: Request, res: Response) => {
@@ -33,7 +38,14 @@ router.get('/quota', (req: Request, res: Response) => {
 });
 
 router.post('/full', validateStoryFullBody, async (req: Request, res: Response) => {
-  const { artist, title, previous_scripts: previousScriptsRaw } = req.body as StoryFullBody;
+  const {
+    artist,
+    title,
+    previous_scripts: previousScriptsRaw,
+    story_length: storyLength,
+    tts_speed: ttsSpeed,
+    tts_emotion: ttsEmotion,
+  } = req.body as StoryFullBody;
 
   try {
     const metadata = await enrichTrackMetadata(artist, title);
@@ -61,6 +73,7 @@ router.post('/full', validateStoryFullBody, async (req: Request, res: Response) 
         year: metadata.year,
         genre: metadata.genre,
         voiceId,
+        storyLength,
         previousScripts,
       });
     }
@@ -85,7 +98,10 @@ router.post('/full', validateStoryFullBody, async (req: Request, res: Response) 
 
     if (!demo && hasYandexCredentials()) {
       const id = uuidv4();
-      const audio = await synthesizeSpeech(story.script, story.voiceId, `${id}.ogg`);
+      const audio = await synthesizeSpeech(story.script, story.voiceId, `${id}.ogg`, {
+        speed: ttsSpeed,
+        emotion: ttsEmotion,
+      });
       response.audioUrl = signAudioAccess(audio.fileName) ?? audio.audioUrl;
       response.audioFile = audio.fileName;
     } else {

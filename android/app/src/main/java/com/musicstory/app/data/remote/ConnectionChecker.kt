@@ -41,15 +41,15 @@ class ConnectionChecker(
         runCatching {
             client.newCall(request).execute().use { response ->
                 when {
-                    response.isSuccessful -> true to "Groq: ключ работает"
+                    response.isSuccessful -> true to "Ключ работает"
                     response.code == 401 || response.code == 403 ->
-                        false to "Groq: неверный ключ (${response.code})"
-                    else -> false to "Groq: ошибка ${response.code}"
+                        false to "Неверный ключ"
+                    else -> false to "Ошибка ${response.code}"
                 }
             }
         }.getOrElse { e ->
             StoryLog.w("Groq test failed: ${e.message}")
-            false to "Groq: ${e.message ?: "нет сети"}"
+            false to (e.message ?: "Нет сети")
         }
     }
 
@@ -59,13 +59,13 @@ class ConnectionChecker(
             val groq = health["groq"] as? Boolean ?: false
             val yandex = health["yandexTts"] as? Boolean ?: false
             when {
-                groq && yandex -> true to "Сервер: Groq + голос Yandex OK"
-                groq -> true to "Сервер: Groq OK (Yandex TTS не настроен)"
-                else -> true to "Сервер доступен (Groq на сервере выключен)"
+                groq && yandex -> true to "Сервер работает"
+                groq -> true to "Сервер работает"
+                else -> true to "Сервер доступен"
             }
         }.getOrElse { e ->
             StoryLog.w("Backend health failed: ${e.message}")
-            false to "Сервер: ${e.message ?: "недоступен"}"
+            false to (e.message ?: "Недоступен")
         }
     }
 

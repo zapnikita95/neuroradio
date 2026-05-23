@@ -39,8 +39,6 @@ class StoryRepository(
     private val connectionChecker: ConnectionChecker = ConnectionChecker(),
 ) {
     private val gson = Gson()
-    private val _lastFetchNote = MutableStateFlow<String?>(null)
-    val lastFetchNote: StateFlow<String?> = _lastFetchNote.asStateFlow()
 
     private val _dailyQuota = MutableStateFlow<StoryQuotaInfo?>(null)
     val dailyQuota: StateFlow<StoryQuotaInfo?> = _dailyQuota.asStateFlow()
@@ -74,7 +72,7 @@ class StoryRepository(
         if (!forceRefresh && previousScripts.isEmpty()) {
             val cached = storyDao.getByTrackKey(trackKey)
             if (cached != null && !isCacheExpired(cached) && !isStaleRadioScript(cached.script)) {
-                _lastFetchNote.value = "Из кэша"
+                StoryLog.i("Story from cache")
                 return Result.success(cached.toResponse())
             }
         }
@@ -94,6 +92,9 @@ class StoryRepository(
 
         val backendUrl = settingsDataStore.backendUrl.first().trim()
         val groqKey = settingsDataStore.groqApiKey.first().trim()
+        val storyLength = settingsDataStore.storyLength.first()
+        val ttsSpeed = settingsDataStore.ttsSpeed.first()
+        val ttsEmotion = settingsDataStore.ttsEmotion.first()
         val useBackend = shouldTryBackend(backendUrl)
 
         if (useBackend) {
@@ -106,20 +107,17 @@ class StoryRepository(
                             artist = track.artist,
                             title = track.title,
                             previousScripts = previousScripts,
+                            storyLength = storyLength.id,
+                            ttsSpeed = ttsSpeed.yandexSpeed,
+                            ttsEmotion = ttsEmotion.id,
                         ),
                     )
                 }
                 if (response.script.isNotBlank() && !isDuplicateScript(response.script, previousScripts)) {
-                    val source = when {
-                        response.sources?.groq == true -> "Groq + Railway"
-                        response.demo -> "Railway (без Groq на сервере)"
-                        else -> "Railway"
-                    }
                     response.quota?.let { quota ->
                         _dailyQuota.value = quota
                     }
-                    _lastFetchNote.value = buildFetchNote(source, response.quota, groqKey.isEmpty())
-                    StoryLog.i("Backend OK: $source, audio=${response.audioUrl != null}, demo=${response.demo}")
+                    StoryLog.i("Backend OK: audio=${response.audioUrl != null}, demo=${response.demo}, quota=${response.quota?.remaining}/${response.quota?.limit}")
                     persistStory(trackKey, track, response, angle.labelRu)
                     return Result.success(response)
                 }
@@ -128,16 +126,10 @@ class StoryRepository(
                 if (e is HttpException && e.code() == 429) {
                     val quota = parseRateLimitBody(e)
                     quota?.let { _dailyQuota.value = it }
-                    _lastFetchNote.value = if (groqKey.isNotEmpty()) {
-                        "Лимит сервера (${quota?.used ?: "?"}/${quota?.limit ?: 10}) → ваш Groq"
-                    } else {
-                        "Лимит исчерпан (${quota?.limit ?: 10}/день). Укажи свой Groq-ключ."
-                    }
-                    StoryLog.w("Backend daily limit reached")
+                    StoryLog.w("Backend daily limit reached: ${quota?.used}/${quota?.limit}")
                 } else {
                     val reason = explainError(e)
                     StoryLog.e("Backend failed: $reason", e)
-                    _lastFetchNote.value = "Сервер: $reason"
                 }
             }
         } else {
@@ -156,10 +148,11 @@ class StoryRepository(
                         genre = genre,
                         previousScripts = previousScripts,
                         angle = angle,
+                        storyLength = storyLength,
                     )
                 }
                 if (groqStory != null && !isDuplicateScript(groqStory.script, previousScripts)) {
-                    _lastFetchNote.value = "Groq с телефона"
+                    StoryLog.i("Direct API key story OK")
                     persistStory(trackKey, track, groqStory, angle.labelRu)
                     return Result.success(groqStory)
                 }
@@ -169,8 +162,6 @@ class StoryRepository(
         }
 
         StoryLog.w("Fallback to local template")
-        _lastFetchNote.value = (_lastFetchNote.value ?: "Сервер недоступен") +
-            " → локальный шаблон + Android TTS"
         val local = LocalStoryGenerator.generate(
             artist = track.artist,
             title = track.title,
@@ -197,15 +188,6 @@ class StoryRepository(
         return runCatching {
             gson.fromJson(body, RateLimitErrorBody::class.java).quota
         }.getOrNull()
-    }
-
-    private fun buildFetchNote(
-        source: String,
-        quota: StoryQuotaInfo?,
-        showQuota: Boolean,
-    ): String {
-        if (!showQuota || quota == null) return source
-        return "$source · осталось ${quota.remaining}/${quota.limit} сегодня"
     }
 
     suspend fun recordStoryPlayed(track: TrackInfo, response: StoryResponse, angle: String?) {

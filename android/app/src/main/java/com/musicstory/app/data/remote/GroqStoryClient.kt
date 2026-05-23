@@ -4,6 +4,7 @@ import com.google.gson.Gson
 import com.google.gson.annotations.SerializedName
 import com.musicstory.app.data.model.StoryResponse
 import com.musicstory.app.domain.StoryAngle
+import com.musicstory.app.domain.StoryLength
 import com.musicstory.app.domain.StoryPersona
 import com.musicstory.app.domain.StoryPrompts
 import okhttp3.MediaType.Companion.toMediaType
@@ -30,19 +31,20 @@ class GroqStoryClient(
         genre: String? = null,
         previousScripts: List<String> = emptyList(),
         angle: StoryAngle = StoryPersona.pickAngle(previousScripts.size),
+        storyLength: StoryLength = StoryLength.SEC_30,
         apiKey: String? = null,
     ): StoryResponse? {
         val key = apiKey?.trim().orEmpty()
         if (key.isEmpty()) return null
 
         val persona = StoryPersona.forTrack(year, genre, artist)
-        val system = StoryPrompts.systemPrompt(persona)
-        val user = StoryPrompts.userMessage(artist, title, year, genre, angle, previousScripts)
+        val system = StoryPrompts.systemPrompt(persona, storyLength)
+        val user = StoryPrompts.userMessage(artist, title, year, genre, angle, storyLength, previousScripts)
 
         val body = JSONObject().apply {
             put("model", StoryPrompts.GROQ_MODEL)
             put("temperature", 0.82)
-            put("max_tokens", 650)
+            put("max_tokens", storyLength.maxTokens)
             put("response_format", JSONObject().put("type", "json_object"))
             put(
                 "messages",

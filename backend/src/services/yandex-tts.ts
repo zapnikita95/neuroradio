@@ -3,6 +3,12 @@ import { writeFile, mkdir } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { voiceSupportsEmotion, YandexVoiceId } from './voices.js';
+import {
+  DEFAULT_TTS_EMOTION,
+  DEFAULT_TTS_SPEED,
+  TtsEmotion,
+  TtsOptions,
+} from './tts-options.js';
 
 const TTS_URL = 'https://tts.api.cloud.yandex.net/speech/v1/tts:synthesize';
 
@@ -21,18 +27,23 @@ export function hasYandexCredentials(): boolean {
   );
 }
 
-function buildTtsParams(text: string, voiceId: YandexVoiceId, folderId: string): URLSearchParams {
+function buildTtsParams(
+  text: string,
+  voiceId: YandexVoiceId,
+  folderId: string,
+  options: TtsOptions,
+): URLSearchParams {
   const params = new URLSearchParams({
     text,
     lang: 'ru-RU',
     voice: voiceId,
     format: 'oggopus',
     folderId,
-    speed: '0.90',
+    speed: String(options.speed),
   });
 
   if (voiceSupportsEmotion(voiceId)) {
-    params.set('emotion', 'good');
+    params.set('emotion', options.emotion);
   }
 
   return params;
@@ -45,6 +56,7 @@ export async function synthesizeSpeech(
   text: string,
   voiceId: YandexVoiceId,
   fileName: string,
+  options: Partial<TtsOptions> = {},
 ): Promise<SynthesisResult> {
   const apiKey = process.env.YANDEX_API_KEY;
   const folderId = process.env.YANDEX_FOLDER_ID;
@@ -53,18 +65,22 @@ export async function synthesizeSpeech(
     throw new Error('YANDEX_API_KEY and YANDEX_FOLDER_ID are required');
   }
 
+  const ttsOptions: TtsOptions = {
+    speed: options.speed ?? DEFAULT_TTS_SPEED,
+    emotion: options.emotion ?? DEFAULT_TTS_EMOTION,
+  };
+
   await mkdir(AUDIO_DIR, { recursive: true });
 
-  let params = buildTtsParams(text, voiceId, folderId);
+  let params = buildTtsParams(text, voiceId, folderId, ttsOptions);
   let response = await fetch(`${TTS_URL}?${params.toString()}`, {
     method: 'POST',
     headers: { Authorization: `Api-Key ${apiKey}` },
     signal: AbortSignal.timeout(45000),
   });
 
-  if (!response.ok && params.has('emotion')) {
-    params = buildTtsParams(text, voiceId, folderId);
-    params.delete('emotion');
+  if (!response.ok && params.has('emotion') && ttsOptions.emotion !== 'neutral') {
+    params = buildTtsParams(text, voiceId, folderId, { ...ttsOptions, emotion: 'neutral' });
     response = await fetch(`${TTS_URL}?${params.toString()}`, {
       method: 'POST',
       headers: { Authorization: `Api-Key ${apiKey}` },
@@ -89,3 +105,5 @@ export async function synthesizeSpeech(
     audioUrl: `/audio/${safeName}`,
   };
 }
+
+export type { TtsEmotion, TtsOptions };

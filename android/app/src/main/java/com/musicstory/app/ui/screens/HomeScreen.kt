@@ -177,7 +177,6 @@ fun HomeScreen(
                         year = story.year,
                         genre = story.genre,
                         isAi = !story.demo,
-                        fetchNote = uiState.fetchNote,
                     )
                 }
 
@@ -321,7 +320,6 @@ private fun StoryPreviewCard(
     year: Int?,
     genre: String?,
     isAi: Boolean,
-    fetchNote: String? = null,
 ) {
     val context = LocalContext.current
     GlassCard(accentBorder = true) {
@@ -331,29 +329,19 @@ private fun StoryPreviewCard(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             SectionLabel(text = context.getString(R.string.label_last_story))
-            Text(
-                text = if (isAi) {
-                    context.getString(R.string.story_source_ai)
-                } else {
-                    context.getString(R.string.story_source_local)
-                },
-                style = MaterialTheme.typography.labelMedium,
-                color = if (isAi) LiveGreen else MutedLavender,
-            )
+            if (isAi) {
+                Text(
+                    text = context.getString(R.string.story_source_ai),
+                    style = MaterialTheme.typography.labelMedium,
+                    color = LiveGreen,
+                )
+            }
         }
         Spacer(modifier = Modifier.height(10.dp))
         Text(text = "$artist — $title", style = MaterialTheme.typography.titleMedium)
         val meta = listOfNotNull(year?.toString(), genre).joinToString(" · ")
         if (meta.isNotBlank()) {
             Text(text = meta, style = MaterialTheme.typography.labelMedium)
-        }
-        if (!fetchNote.isNullOrBlank()) {
-            Spacer(modifier = Modifier.height(6.dp))
-            Text(
-                text = fetchNote,
-                style = MaterialTheme.typography.bodySmall,
-                color = MutedLavender,
-            )
         }
         Spacer(modifier = Modifier.height(12.dp))
         Text(

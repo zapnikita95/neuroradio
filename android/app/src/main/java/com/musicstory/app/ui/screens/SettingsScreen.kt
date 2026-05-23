@@ -49,6 +49,9 @@ import com.musicstory.app.MusicStoryApp
 import com.musicstory.app.R
 import com.musicstory.app.data.local.SettingsDataStore
 import com.musicstory.app.data.remote.ConnectionCheckResult
+import com.musicstory.app.domain.StoryLength
+import com.musicstory.app.domain.TtsEmotion
+import com.musicstory.app.domain.TtsSpeed
 import com.musicstory.app.domain.TriggerMode
 import com.musicstory.app.ui.components.GlassCard
 import com.musicstory.app.ui.components.MusicStoryBackground
@@ -63,6 +66,7 @@ import com.musicstory.app.ui.theme.GoldWarm
 import com.musicstory.app.ui.theme.LiveGreen
 import com.musicstory.app.ui.theme.MutedLavender
 import com.musicstory.app.ui.theme.SurfaceGlass
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -79,15 +83,16 @@ fun SettingsScreen(
     val manualMode by settings.manualMode.collectAsState(initial = false)
     val autoIntercept by settings.autoIntercept.collectAsState(initial = SettingsDataStore.DEFAULT_AUTO_INTERCEPT)
     val everyN by settings.everyNTracks.collectAsState(initial = SettingsDataStore.DEFAULT_EVERY_N_TRACKS)
-    val backendUrl by settings.backendUrl.collectAsState(initial = SettingsDataStore.DEFAULT_BACKEND_URL)
     val groqApiKey by settings.groqApiKey.collectAsState(initial = "")
     val sameTrackEveryN by settings.sameTrackStoryEveryN.collectAsState(
         initial = SettingsDataStore.DEFAULT_SAME_TRACK_STORY_EVERY_N,
     )
     val triggerMode by settings.triggerMode.collectAsState(initial = TriggerMode.EVERY_N_TRACKS)
     val dailyQuota by app.storyRepository.dailyQuota.collectAsState(initial = null)
+    val storyLength by settings.storyLength.collectAsState(initial = StoryLength.SEC_30)
+    val ttsSpeed by settings.ttsSpeed.collectAsState(initial = TtsSpeed.NORMAL)
+    val ttsEmotion by settings.ttsEmotion.collectAsState(initial = TtsEmotion.LIVELY)
 
-    var urlInput by remember(backendUrl) { mutableStateOf(backendUrl) }
     var groqInput by remember(groqApiKey) { mutableStateOf(groqApiKey) }
     var nInput by remember(everyN) { mutableStateOf(everyN.toString()) }
     var sameTrackInput by remember(sameTrackEveryN) { mutableStateOf(sameTrackEveryN.toString()) }
@@ -96,7 +101,7 @@ fun SettingsScreen(
     var checkResult by remember { mutableStateOf<ConnectionCheckResult?>(null) }
     var checkSummary by remember { mutableStateOf<String?>(null) }
 
-    LaunchedEffect(backendUrl, groqApiKey) {
+    LaunchedEffect(groqApiKey) {
         if (groqApiKey.isBlank()) {
             app.storyRepository.refreshQuota()
         }
@@ -135,13 +140,11 @@ fun SettingsScreen(
                     Spacer(modifier = Modifier.height(8.dp))
                     SettingSwitchRow(
                         title = context.getString(R.string.settings_manual_mode),
-                        subtitle = context.getString(R.string.settings_manual_mode_hint),
                         checked = manualMode,
                         onCheckedChange = { scope.launch { settings.setManualMode(it) } },
                     )
                     SettingSwitchRow(
                         title = context.getString(R.string.settings_auto_intercept),
-                        subtitle = context.getString(R.string.settings_auto_intercept_hint),
                         checked = autoIntercept,
                         onCheckedChange = { scope.launch { settings.setAutoIntercept(it) } },
                     )
@@ -166,16 +169,81 @@ fun SettingsScreen(
                             Text(text = triggerModeLabel(context, mode), style = MaterialTheme.typography.bodyMedium, color = CreamText)
                         }
                     }
+                    if (triggerMode == TriggerMode.EVERY_N_TRACKS) {
+                        Spacer(modifier = Modifier.height(8.dp))
+                        OutlinedTextField(
+                            value = nInput,
+                            onValueChange = { nInput = it.filter { ch -> ch.isDigit() }.take(3) },
+                            label = { Text(context.getString(R.string.settings_every_n_tracks)) },
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                            modifier = Modifier.fillMaxWidth(),
+                            singleLine = true,
+                            colors = fieldColors,
+                            shape = RoundedCornerShape(14.dp),
+                        )
+                    }
                 }
 
                 GlassCard {
-                    SectionLabel(text = "Искусственный интеллект")
+                    SectionLabel(text = context.getString(R.string.settings_same_track_section))
                     Spacer(modifier = Modifier.height(8.dp))
+                    OutlinedTextField(
+                        value = sameTrackInput,
+                        onValueChange = { sameTrackInput = it.filter { ch -> ch.isDigit() }.take(2) },
+                        label = { Text(context.getString(R.string.settings_same_track_every_n)) },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true,
+                        colors = fieldColors,
+                        shape = RoundedCornerShape(14.dp),
+                    )
+                }
+
+                GlassCard {
+                    SectionLabel(text = context.getString(R.string.settings_voice_section))
+                    Spacer(modifier = Modifier.height(4.dp))
                     Text(
-                        text = context.getString(R.string.settings_groq_section_hint),
-                        style = MaterialTheme.typography.bodySmall,
+                        text = context.getString(R.string.settings_story_length),
+                        style = MaterialTheme.typography.labelMedium,
                         color = MutedLavender,
                     )
+                    StoryLength.entries.forEach { length ->
+                        PreferenceRadioRow(
+                            label = length.labelRu,
+                            selected = storyLength == length,
+                            onSelect = { scope.launch { settings.setStoryLength(length) } },
+                        )
+                    }
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = context.getString(R.string.settings_tts_speed),
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MutedLavender,
+                    )
+                    TtsSpeed.entries.forEach { speed ->
+                        PreferenceRadioRow(
+                            label = speed.labelRu,
+                            selected = ttsSpeed == speed,
+                            onSelect = { scope.launch { settings.setTtsSpeed(speed) } },
+                        )
+                    }
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = context.getString(R.string.settings_tts_emotion),
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MutedLavender,
+                    )
+                    TtsEmotion.entries.forEach { emotion ->
+                        PreferenceRadioRow(
+                            label = emotion.labelRu,
+                            selected = ttsEmotion == emotion,
+                            onSelect = { scope.launch { settings.setTtsEmotion(emotion) } },
+                        )
+                    }
+                }
+
+                GlassCard {
+                    SectionLabel(text = "AI")
                     Spacer(modifier = Modifier.height(8.dp))
                     Text(
                         text = if (groqApiKey.isNotBlank()) {
@@ -205,7 +273,6 @@ fun SettingsScreen(
                         value = groqInput,
                         onValueChange = { groqInput = it },
                         label = { Text(context.getString(R.string.settings_groq_api_key)) },
-                        supportingText = { Text(context.getString(R.string.settings_groq_api_key_hint), color = MutedLavender) },
                         modifier = Modifier.fillMaxWidth(),
                         singleLine = true,
                         visualTransformation = PasswordVisualTransformation(),
@@ -226,10 +293,10 @@ fun SettingsScreen(
                                 checkResult = null
                                 checkSummary = null
                                 settings.setGroqApiKey(groqInput)
-                                settings.setBackendUrl(urlInput)
+                                val backendUrl = settings.backendUrl.first()
                                 app.backendAuthManager.invalidateToken()
                                 app.apiClient.invalidateCache()
-                                val result = app.storyRepository.checkConnections(groqInput, urlInput)
+                                val result = app.storyRepository.checkConnections(groqInput, backendUrl)
                                 checkResult = result
                                 checkSummary = when {
                                     result.allOk && groqInput.isNotBlank() ->
@@ -267,31 +334,6 @@ fun SettingsScreen(
                             style = MaterialTheme.typography.labelMedium,
                             color = if (checkResult?.allOk == true || checkResult?.backendOk == true) LiveGreen else ErrorCoral,
                         )
-                        checkResult?.groqMessage?.let { msg ->
-                            Text(text = msg, style = MaterialTheme.typography.bodySmall, color = CreamText)
-                        }
-                        checkResult?.backendMessage?.let { msg ->
-                            Text(text = msg, style = MaterialTheme.typography.bodySmall, color = CreamText)
-                        }
-                        checkResult?.quota?.let { quota ->
-                            if (groqInput.isBlank()) {
-                                Text(
-                                    text = context.getString(
-                                        R.string.settings_free_quota,
-                                        quota.remaining,
-                                        quota.limit,
-                                    ),
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = GoldBright,
-                                )
-                            } else {
-                                Text(
-                                    text = context.getString(R.string.settings_unlimited_groq),
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = LiveGreen,
-                                )
-                            }
-                        }
                     }
                     Spacer(modifier = Modifier.height(8.dp))
                     SecondaryStoryButton(
@@ -304,72 +346,12 @@ fun SettingsScreen(
                     )
                 }
 
-                GlassCard {
-                    SectionLabel(text = context.getString(R.string.settings_same_track_section))
-                    Spacer(modifier = Modifier.height(8.dp))
-                    OutlinedTextField(
-                        value = sameTrackInput,
-                        onValueChange = { sameTrackInput = it.filter { ch -> ch.isDigit() }.take(2) },
-                        label = { Text(context.getString(R.string.settings_same_track_every_n)) },
-                        supportingText = {
-                            Text(context.getString(R.string.settings_same_track_every_n_hint), color = MutedLavender)
-                        },
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                        modifier = Modifier.fillMaxWidth(),
-                        singleLine = true,
-                        colors = fieldColors,
-                        shape = RoundedCornerShape(14.dp),
-                    )
-                }
-
-                GlassCard {
-                    SectionLabel(text = "Сервер")
-                    Spacer(modifier = Modifier.height(8.dp))
-                    OutlinedTextField(
-                        value = nInput,
-                        onValueChange = { nInput = it.filter { ch -> ch.isDigit() }.take(3) },
-                        label = { Text(context.getString(R.string.settings_every_n_tracks)) },
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                        modifier = Modifier.fillMaxWidth(),
-                        singleLine = true,
-                        enabled = triggerMode == TriggerMode.EVERY_N_TRACKS,
-                        colors = fieldColors,
-                        shape = RoundedCornerShape(14.dp),
-                    )
-                    Spacer(modifier = Modifier.height(12.dp))
-                    OutlinedTextField(
-                        value = urlInput,
-                        onValueChange = { urlInput = it },
-                        label = { Text(context.getString(R.string.settings_backend_url)) },
-                        supportingText = { Text(context.getString(R.string.settings_backend_url_example), color = MutedLavender) },
-                        modifier = Modifier.fillMaxWidth(),
-                        singleLine = true,
-                        colors = fieldColors,
-                        shape = RoundedCornerShape(14.dp),
-                    )
-                    Spacer(modifier = Modifier.height(12.dp))
-                    Text(text = context.getString(R.string.settings_backend_hint), style = MaterialTheme.typography.bodySmall)
-                    Text(text = context.getString(R.string.settings_backend_auth_hint), style = MaterialTheme.typography.bodySmall, color = MutedLavender)
-                    Text(text = context.getString(R.string.settings_offline_hint), style = MaterialTheme.typography.bodySmall)
-                }
-
-                GlassCard {
-                    SectionLabel(text = "Отладка")
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Text(
-                        text = context.getString(R.string.settings_debug_logs_hint),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MutedLavender,
-                    )
-                }
-
                 PrimaryStoryButton(
                     text = context.getString(R.string.action_save),
                     onClick = {
                         scope.launch {
                             nInput.toIntOrNull()?.let { settings.setEveryNTracks(it) }
                             sameTrackInput.toIntOrNull()?.let { settings.setSameTrackStoryEveryN(it) }
-                            settings.setBackendUrl(urlInput)
                             settings.setGroqApiKey(groqInput)
                             app.backendAuthManager.invalidateToken()
                             app.apiClient.invalidateCache()
@@ -384,9 +366,30 @@ fun SettingsScreen(
 }
 
 @Composable
+private fun PreferenceRadioRow(
+    label: String,
+    selected: Boolean,
+    onSelect: () -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(12.dp))
+            .padding(vertical = 2.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        RadioButton(
+            selected = selected,
+            onClick = onSelect,
+            colors = RadioButtonDefaults.colors(selectedColor = GoldBright),
+        )
+        Text(text = label, style = MaterialTheme.typography.bodyMedium, color = CreamText)
+    }
+}
+
+@Composable
 private fun SettingSwitchRow(
     title: String,
-    subtitle: String,
     checked: Boolean,
     onCheckedChange: (Boolean) -> Unit,
 ) {
@@ -396,10 +399,12 @@ private fun SettingSwitchRow(
             .padding(vertical = 6.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Column(modifier = Modifier.weight(1f)) {
-            Text(text = title, style = MaterialTheme.typography.titleMedium, color = CreamText)
-            Text(text = subtitle, style = MaterialTheme.typography.bodySmall, color = MutedLavender)
-        }
+        Text(
+            text = title,
+            modifier = Modifier.weight(1f),
+            style = MaterialTheme.typography.titleMedium,
+            color = CreamText,
+        )
         Switch(
             checked = checked,
             onCheckedChange = onCheckedChange,

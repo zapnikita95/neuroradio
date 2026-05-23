@@ -1,4 +1,5 @@
-import { STORY_WORDS_MAX, STORY_WORDS_MIN } from './story-quality.js';
+import { getStoryLengthPreset, StoryLengthId } from './story-length.js';
+import type { StoryLengthPreset } from './story-length.js';
 
 export interface StoryPersona {
   roleTitle: string;
@@ -162,7 +163,11 @@ export function personaForTrack(
   );
 }
 
-export function buildSystemPrompt(persona: StoryPersona): string {
+export function buildSystemPrompt(persona: StoryPersona, length: StoryLengthPreset): string {
+  const durationHint = length.targetSeconds
+    ? `~${length.targetSeconds} секунд речи`
+    : 'развёрнутый рассказ без жёсткого лимита';
+
   return `Ты пишешь текст для ОЗВУЧКИ — живой человек рассказывает историю другу.
 
 КТО ТЫ: ${persona.roleTitle}
@@ -177,8 +182,8 @@ export function buildSystemPrompt(persona: StoryPersona): string {
 - НЕ обращайся к слушателю как ведущий — ты просто делишься воспоминанием
 
 СОДЕРЖАНИЕ:
-- Минимум ${STORY_WORDS_MIN} слов, максимум ${STORY_WORDS_MAX} (~30 секунд речи)
-- 4–6 коротких предложений, каждое с конкретикой: место, год, деталь студии/концерта/людей
+- Минимум ${length.wordsMin} слов, максимум ${length.wordsMax} (${durationHint})
+- ${length.sentenceHint}, каждое с конкретикой: место, год, деталь студии/концерта/людей
 - Один запоминающийся факт или курьёз — не общие слова про «зал сходит с ума» или «артист в огне»
 - Если год трека неизвестен — не выдумывай точную дату, опирайся на эпоху
 - Если в названии «remix», «JXL», «vs» — можно про ремикс ИЛИ оригинал, но точно и правдоподобно
@@ -202,10 +207,12 @@ export function buildStoryUserPrompt(params: {
   genre?: string;
   voiceId: string;
   angle: string;
+  storyLength: StoryLengthId;
   previousScripts?: string[];
   retryReason?: string;
 }): string {
   const persona = personaForTrack(params.year, params.genre, params.artist);
+  const length = getStoryLengthPreset(params.storyLength);
   const lines: string[] = [
     `Артист: ${params.artist}`,
     `Трек: ${params.title}`,
@@ -217,7 +224,7 @@ export function buildStoryUserPrompt(params: {
   lines.push('');
   lines.push(`УГОЛ ИСТОРИИ: ${params.angle}`);
   lines.push(`Ты — ${persona.roleTitle}. Говоришь так: ${persona.speechStyle}`);
-  lines.push(`Длина: ${STORY_WORDS_MIN}–${STORY_WORDS_MAX} слов. Живая история, не справка.`);
+  lines.push(`Длина: ${length.wordsMin}–${length.wordsMax} слов. Живая история, не справка.`);
 
   if (params.retryReason) {
     lines.push('');
