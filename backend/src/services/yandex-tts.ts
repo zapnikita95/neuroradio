@@ -2,7 +2,7 @@ import fetch from 'node-fetch';
 import { writeFile, mkdir } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { YandexVoiceId } from './voices.js';
+import { voiceSupportsEmotion, YandexVoiceId } from './voices.js';
 
 const TTS_URL = 'https://tts.api.cloud.yandex.net/speech/v1/tts:synthesize';
 
@@ -19,6 +19,23 @@ export function hasYandexCredentials(): boolean {
   return Boolean(
     process.env.YANDEX_API_KEY?.trim() && process.env.YANDEX_FOLDER_ID?.trim(),
   );
+}
+
+function buildTtsParams(text: string, voiceId: YandexVoiceId, folderId: string): URLSearchParams {
+  const params = new URLSearchParams({
+    text,
+    lang: 'ru-RU',
+    voice: voiceId,
+    format: 'oggopus',
+    folderId,
+    speed: '0.90',
+  });
+
+  if (voiceSupportsEmotion(voiceId)) {
+    params.set('emotion', 'good');
+  }
+
+  return params;
 }
 
 /**
@@ -38,21 +55,22 @@ export async function synthesizeSpeech(
 
   await mkdir(AUDIO_DIR, { recursive: true });
 
-  const params = new URLSearchParams({
-    text,
-    lang: 'ru-RU',
-    voice: voiceId,
-    format: 'oggopus',
-    folderId,
+  let params = buildTtsParams(text, voiceId, folderId);
+  let response = await fetch(`${TTS_URL}?${params.toString()}`, {
+    method: 'POST',
+    headers: { Authorization: `Api-Key ${apiKey}` },
+    signal: AbortSignal.timeout(45000),
   });
 
-  const response = await fetch(`${TTS_URL}?${params.toString()}`, {
-    method: 'POST',
-    headers: {
-      Authorization: `Api-Key ${apiKey}`,
-    },
-    signal: AbortSignal.timeout(30000),
-  });
+  if (!response.ok && params.has('emotion')) {
+    params = buildTtsParams(text, voiceId, folderId);
+    params.delete('emotion');
+    response = await fetch(`${TTS_URL}?${params.toString()}`, {
+      method: 'POST',
+      headers: { Authorization: `Api-Key ${apiKey}` },
+      signal: AbortSignal.timeout(45000),
+    });
+  }
 
   if (!response.ok) {
     const body = await response.text();

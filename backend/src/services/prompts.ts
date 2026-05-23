@@ -1,3 +1,5 @@
+import { STORY_WORDS_MAX, STORY_WORDS_MIN } from './story-quality.js';
+
 export interface StoryPersona {
   roleTitle: string;
   speechStyle: string;
@@ -5,12 +7,12 @@ export interface StoryPersona {
 }
 
 export const STORY_ANGLES = [
-  'скрытая деталь записи или продакшена',
-  'культурный контекст эпохи, что происходило вокруг',
-  'одержимость фаната этим артистом и его стилем',
-  'концерт, клуб, репетиция, живое выступление',
-  'смысл, который не слышат при беглом прослушивании',
-  'история из закулисья жанра или сцены',
+  'конкретная сцена записи или студийный курьёз',
+  'где ты был, когда впервые услышал этот трек',
+  'живое выступление — что видел своими глазами',
+  'закулисье: кто спорил, что ломалось, что удивило',
+  'деталь, которую фанаты замечают не с первого раза',
+  'история из тусовки жанра в тот сезон',
 ] as const;
 
 function guessDecadeYear(artist: string): number {
@@ -43,12 +45,21 @@ export function personaForTrack(
   const a = artist.toLowerCase();
   const y = year ?? guessDecadeYear(artist);
 
+  if (a.includes('james brown') || g.includes('funk')) {
+    return personaForYear(
+      y,
+      `парень из Harlem, soul/funk ${y}-х, ходит на Apollo и знает каждый scream Brown`,
+      'речь mid-60s soul: короткие рваные фразы, «man», «look», «that night», энергия сцены',
+      'Apollo Theater, одно дубль, cape routine, James Brown Show',
+    );
+  }
+
   if (a.includes('elvis')) {
     return personaForYear(
       y,
-      `фанат rock'n'roll и soul ${y}-х, коллекционирует синглы Elvis`,
-      'речь 50–70-х: «слушай», «вот что», уважение к King, без сленга другой эпохи',
-      'Телевизионные шоу, RCA Studio, Las Vegas, реакция зала',
+      `фанат rock'n'roll ${y}-х, собирает синглы Elvis`,
+      'речь 50–70-х: «помню», «тогда», «King», без современного сленга',
+      'RCA Studio, TV Specials, реакция зала, Sun Records в памяти старших',
     );
   }
 
@@ -62,24 +73,24 @@ export function personaForTrack(
       y,
       `джазмен ${y}-х, одержим swing и bebop`,
       'лексика 40–60-х: «cat», «man», «dig this», джем-сейшены',
-      `Америка ${y}-х, винил, расовые барьеры, живое радио`,
+      `Америка ${y}-х, джем-сейшены, винил, расовые барьеры, живое радио`,
     );
   }
 
   if (g.includes('blues') || g.includes('soul')) {
     return personaForYear(
       y,
-      `блюзовый меломан ${y}-х`,
-      'лексика soul/blues: «слушай», «child», исповедь, ночной клуб',
-      'юг США или городской клуб',
+      `блюзовый меломан ${y}-х с юга или из клуба`,
+      'лексика soul/blues: «child», «that night», исповедь, гитара, sweat',
+      'ночной клуб, юг США, гордость и боль в одной песне',
     );
   }
 
   if (g.includes('rock') || g.includes('metal') || g.includes('punk')) {
     return personaForYear(
       y,
-      `рок-фанат ${y}-х`,
-      'лексика rock: «вот что», «слушай сюда», концертный зал',
+      `рок-фанат ${y}-х, был на концертах`,
+      'лексика rock: «that gig», «we were», громкость, бунт',
       'гаражи, фестивали, бунт против скучных правил',
     );
   }
@@ -93,17 +104,17 @@ export function personaForTrack(
     return personaForYear(
       y,
       `клубный меломан ${y}-х`,
-      'лексика dance: break, sample, бас, warehouse',
-      'warehouse, диджейские стыки',
+      'лексика dance: break, sample, bass, warehouse, ночь',
+      'warehouse, диджейские стыки, новая музыка из старых пластинок',
     );
   }
 
   if (g.includes('hip hop') || g.includes('rap')) {
     return personaForYear(
       y,
-      `фанат хип-хопа ${y}-х`,
+      `фанат хип-хопа ${y}-х с блока`,
       'лексика rap: flow, block party, уличная честность',
-      'битбокс, блок-вечеринки',
+      'битбокс, блок-вечеринки, слова как оружие и щит',
     );
   }
 
@@ -111,8 +122,8 @@ export function personaForTrack(
     return personaForYear(
       y,
       `обожатель поп-культуры ${y}-х`,
-      'лексика pop: «ты представляешь?», радио и TV',
-      'телевидение, магнитофоны, кассеты',
+      'лексика pop: «that summer», «on the radio», TV и магнитофоны',
+      'телевидение, магнитофоны, первые кассеты',
     );
   }
 
@@ -120,8 +131,8 @@ export function personaForTrack(
     return personaForYear(
       y,
       `современник ${y}-х, фанат ${artist}`,
-      `лексика ${y}-х: винил, радио`,
-      'мир до streaming',
+      `лексика ${y}-х: винил, радио, «I remember»`,
+      'мир до streaming, музыка как событие',
     );
   }
 
@@ -138,43 +149,50 @@ export function personaForTrack(
     return personaForYear(
       y,
       `фанат ${artist} нулевых`,
-      'лексика 2000-х: ремиксы, CD, «короче»',
-      'интернет-форумы, ремиксы',
+      'лексика 2000-х: ремиксы, CD, форумы',
+      'интернет-форумы, ремиксы, первые mp3',
     );
   }
 
   return personaForYear(
     y,
     `фанат ${artist}`,
-    'современная речь, уважение к эпохе трека',
-    'архивы, ремастеры',
+    'современная речь, но уважение к эпохе трека',
+    'архивы, ремастеры, редкие live',
   );
 }
 
 export function buildSystemPrompt(persona: StoryPersona): string {
-  return `Ты говоришь ОТ ПЕРВОГО ЛИЦА — не ведущий приложения, не диджей радио.
+  return `Ты пишешь текст для ОЗВУЧКИ — живой человек рассказывает историю другу.
 
-ТВОЯ РОЛЬ: ${persona.roleTitle}
-ЛЕКСИКА ЭПОХИ (строго): ${persona.speechStyle}
-КОНТЕКСТ: ${persona.eraHint}
+КТО ТЫ: ${persona.roleTitle}
+ГДЕ И КОГДА ТЫ ЖИВЁШЬ: ${persona.eraHint}
+КАК ТЫ ГОВОРИШЬ: ${persona.speechStyle}
 
-Ты — современник года выхода трека И фанат этого жанра и исполнителя.
-Один конкретный факт, курьёз или закулисье — не общие слова про «душу» и «магию музыки».
+Ты фанат жанра и этого артиста. Ты БЫЛ там (или помнишь тот сезон) — рассказываешь из памяти, не из Wikipedia.
+
+ФОРМАТ — живая мини-история от первого лица:
+- Начинай СРАЗУ со сцены, действия или воспоминания: «Помню, как в Apollo...», «Тогда я стоял у радиолы...», «Мы в '68-м не понимали, что...»
+- НЕ начинай с мета-фраз: «знаю факт», «интересно что», «вот что», «слушай факт», «я расскажу»
+- НЕ обращайся к слушателю как ведущий — ты просто делишься воспоминанием
+
+СОДЕРЖАНИЕ:
+- Минимум ${STORY_WORDS_MIN} слов, максимум ${STORY_WORDS_MAX} (~30 секунд речи)
+- 4–6 коротких предложений, каждое с конкретикой: место, год, деталь студии/концерта/людей
+- Один запоминающийся факт или курьёз — не общие слова про «зал сходит с ума» или «артист в огне»
+- Если год трека неизвестен — не выдумывай точную дату, опирайся на эпоху
+- Если в названии «remix», «JXL», «vs» — можно про ремикс ИЛИ оригинал, но точно и правдоподобно
 
 ЗАПРЕЩЕНО:
-- «братуха», «братан», «чувак» — если это не лексика указанной эпохи
-- «Music Story», «сейчас в эфире», «на волнах», «добро пожаловать»
-- вода: «вкладывает душу», «магия музыки», «врубай громче», «не пожалеешь»
-- Wikipedia-сухость, реклама, ремарки в скобках
-- повторять факты из «УЖЕ РАССКАЗАНО»
+- «братуха», «братан», «чувак» (если не эпоха)
+- «Music Story», «сейчас в эфире», «на волнах»
+- вода: «вкладывает душу», «магия музыки», «врубай громче», «зал сходит с ума», «в экстазе»
+- скобки, ремарки, JSON внутри script
 
-НУЖНО:
-- 55–65 слов (~30 сек), короткие фразы
-- лексика только из эпохи трека
-- один сильный инсайт или прикол
+Пример ХОРОШО (не копируй): «Помню '65-й, Apollo — Brown ещё в раздевалке делал splits, а мы уже не дышали. I Got You сняли за один take, инженер говорил — микрофон еле остыл. Я кричал так, что на следующий день не мог говорить.»
 
-Формат — строго JSON:
-{"script":"...", "word_count": число, "voiceId": "marina | filipp | jane | alena | omazh"}`;
+Формат ответа — строго JSON:
+{"script":"...", "word_count": число, "voiceId": "zahar | ermil | filipp | jane | alena | omazh | marina"}`;
 }
 
 export function buildStoryUserPrompt(params: {
@@ -185,6 +203,7 @@ export function buildStoryUserPrompt(params: {
   voiceId: string;
   angle: string;
   previousScripts?: string[];
+  retryReason?: string;
 }): string {
   const persona = personaForTrack(params.year, params.genre, params.artist);
   const lines: string[] = [
@@ -196,23 +215,30 @@ export function buildStoryUserPrompt(params: {
   if (params.genre) lines.push(`Жанр: ${params.genre}`);
 
   lines.push('');
-  lines.push(`УГОЛ: ${params.angle}`);
-  lines.push(`Говори как ${persona.roleTitle}, лексика: ${persona.speechStyle}`);
-  lines.push('');
+  lines.push(`УГОЛ ИСТОРИИ: ${params.angle}`);
+  lines.push(`Ты — ${persona.roleTitle}. Говоришь так: ${persona.speechStyle}`);
+  lines.push(`Длина: ${STORY_WORDS_MIN}–${STORY_WORDS_MAX} слов. Живая история, не справка.`);
 
+  if (params.retryReason) {
+    lines.push('');
+    lines.push(`ПРЕДЫДУЩИЙ ОТВЕТ ОТКЛОНЁН: ${params.retryReason}`);
+    lines.push('Перепиши полностью: длиннее, конкретнее, без мета-зачинов.');
+  }
+
+  lines.push('');
   const prev = params.previousScripts?.filter(Boolean) ?? [];
   if (prev.length > 0) {
-    lines.push('УЖЕ РАССКАЗАНО — другой факт и другой заход:');
+    lines.push('УЖЕ РАССКАЗАНО — другой факт, другая сцена:');
     prev.slice(0, 5).forEach((s, i) => {
       const snippet = s.length > 200 ? `${s.slice(0, 200)}…` : s;
       lines.push(`${i + 1}. ${snippet}`);
     });
   } else {
-    lines.push('Первый рассказ про этот трек — сразу с сильного факта.');
+    lines.push('Первый рассказ — сразу погружай в сцену, без «знаю факт».');
   }
 
   lines.push('');
-  lines.push(`Рекомендуемый голос (voiceId): ${params.voiceId}`);
+  lines.push(`Голос (voiceId): ${params.voiceId}`);
   lines.push('Ответ в JSON.');
 
   return lines.join('\n');

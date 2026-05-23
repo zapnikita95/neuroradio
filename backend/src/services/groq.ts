@@ -5,10 +5,16 @@ import {
   personaForTrack,
   pickAngle,
 } from './prompts.js';
-import { YandexVoiceId } from './voices.js';
+import { YandexVoiceId, voiceForYear } from './voices.js';
+import {
+  countWords,
+  STORY_WORDS_MIN,
+  validateStoryScript,
+} from './story-quality.js';
 
 const GROQ_API_URL = 'https://api.groq.com/openai/v1/chat/completions';
 const GROQ_MODEL = 'llama-3.3-70b-versatile';
+const MAX_ATTEMPTS = 3;
 
 export interface StoryScript {
   script: string;
@@ -25,13 +31,8 @@ export interface GenerateStoryInput {
   previousScripts?: string[];
 }
 
-function countWords(text: string): number {
-  return text.trim().split(/\s+/).filter(Boolean).length;
-}
-
 function parseStoryJson(raw: string): StoryScript | null {
   const trimmed = raw.trim();
-
   const jsonMatch = trimmed.match(/\{[\s\S]*\}/);
   if (!jsonMatch) return null;
 
@@ -42,34 +43,19 @@ function parseStoryJson(raw: string): StoryScript | null {
     return {
       script: parsed.script.trim(),
       word_count: parsed.word_count ?? countWords(parsed.script),
-      voiceId: (parsed.voiceId as YandexVoiceId) ?? 'marina',
+      voiceId: (parsed.voiceId as YandexVoiceId) ?? 'zahar',
     };
   } catch {
     return null;
   }
 }
 
-export function hasGroqApiKey(): boolean {
-  return Boolean(process.env.GROQ_API_KEY?.trim());
-}
-
-export async function generateStoryScript(
-  input: GenerateStoryInput,
-): Promise<StoryScript> {
+async function callGroq(
+  systemPrompt: string,
+  userPrompt: string,
+): Promise<string> {
   const apiKey = process.env.GROQ_API_KEY;
-  if (!apiKey) {
-    throw new Error('GROQ_API_KEY is not configured');
-  }
-
-  const previousScripts = input.previousScripts ?? [];
-  const angle = pickAngle(previousScripts.length);
-  const persona = personaForTrack(input.year, input.genre, input.artist);
-  const systemPrompt = buildSystemPrompt(persona);
-  const userPrompt = buildStoryUserPrompt({
-    ...input,
-    angle,
-    previousScripts,
-  });
+  if (!apiKey) throw new Error('GROQ_API_KEY is not configured');
 
   const response = await fetch(GROQ_API_URL, {
     method: 'POST',
@@ -79,15 +65,15 @@ export async function generateStoryScript(
     },
     body: JSON.stringify({
       model: GROQ_MODEL,
-      temperature: 0.92,
-      max_tokens: 450,
+      temperature: 0.82,
+      max_tokens: 650,
       response_format: { type: 'json_object' },
       messages: [
         { role: 'system', content: systemPrompt },
         { role: 'user', content: userPrompt },
       ],
     }),
-    signal: AbortSignal.timeout(30000),
+    signal: AbortSignal.timeout(45000),
   });
 
   if (!response.ok) {
@@ -100,17 +86,54 @@ export async function generateStoryScript(
   };
 
   const content = data.choices?.[0]?.message?.content;
-  if (!content) {
-    throw new Error('Groq returned empty content');
+  if (!content) throw new Error('Groq returned empty content');
+  return content;
+}
+
+export function hasGroqApiKey(): boolean {
+  return Boolean(process.env.GROQ_API_KEY?.trim());
+}
+
+export async function generateStoryScript(
+  input: GenerateStoryInput,
+): Promise<StoryScript> {
+  const previousScripts = input.previousScripts ?? [];
+  const angle = pickAngle(previousScripts.length);
+  const persona = personaForTrack(input.year, input.genre, input.artist);
+  const systemPrompt = buildSystemPrompt(persona);
+  const voiceId = input.voiceId ?? voiceForYear(input.year, input.genre);
+
+  let retryReason: string | undefined;
+
+  for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
+    const userPrompt = buildStoryUserPrompt({
+      ...input,
+      voiceId,
+      angle,
+      previousScripts,
+      retryReason,
+    });
+
+    const content = await callGroq(systemPrompt, userPrompt);
+    const story = parseStoryJson(content);
+    if (!story) {
+      retryReason = 'invalid JSON';
+      continue;
+    }
+
+    story.voiceId = voiceId;
+    story.word_count = countWords(story.script);
+
+    const quality = validateStoryScript(story.script);
+    if (quality.ok) {
+      return story;
+    }
+
+    retryReason = quality.reason;
+    console.warn(`Story quality reject (attempt ${attempt + 1}): ${quality.reason}`);
   }
 
-  const story = parseStoryJson(content);
-  if (!story) {
-    throw new Error('Failed to parse Groq JSON story response');
-  }
-
-  story.voiceId = input.voiceId;
-  story.word_count = countWords(story.script);
-
-  return story;
+  throw new Error(
+    `Groq could not produce a valid ${STORY_WORDS_MIN}+ word in-character story after ${MAX_ATTEMPTS} attempts`,
+  );
 }

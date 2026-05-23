@@ -98,8 +98,8 @@ class StoryPlayer(context: Context) {
                 if (status == TextToSpeech.SUCCESS) {
                     val engine = tts ?: return@post
                     engine.language = Locale("ru", "RU")
-                    engine.setSpeechRate(0.93f)
-                    engine.setPitch(1.02f)
+                    engine.setSpeechRate(0.88f)
+                    engine.setPitch(0.98f)
                     ttsReady = true
                     drainInitCallbacks()
                 } else {

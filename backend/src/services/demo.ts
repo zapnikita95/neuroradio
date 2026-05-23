@@ -61,7 +61,7 @@ export function buildDemoStory(
   genre?: string,
   previousScripts: string[] = [],
 ): StoryScript {
-  const voiceId: YandexVoiceId = voiceForYear(year);
+  const voiceId: YandexVoiceId = voiceForYear(year, genre);
   const eraYear = year ?? 1968;
   const persona = personaForTrack(year, genre, artist);
   let angleIndex = previousScripts.length;

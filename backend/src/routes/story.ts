@@ -25,7 +25,7 @@ router.post('/full', validateStoryFullBody, async (req: Request, res: Response) 
 
   try {
     const metadata = await enrichTrackMetadata(artist, title);
-    const voiceId = voiceForYear(metadata.year);
+    const voiceId = voiceForYear(metadata.year, metadata.genre);
     const demo = isDemoMode();
 
     const previousScripts = Array.isArray(previousScriptsRaw)

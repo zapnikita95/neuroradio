@@ -1,22 +1,34 @@
 /** Yandex SpeechKit voice identifiers used by the app */
-export type YandexVoiceId = 'marina' | 'filipp' | 'jane' | 'alena' | 'omazh';
+export type YandexVoiceId =
+  | 'zahar'
+  | 'ermil'
+  | 'filipp'
+  | 'marina'
+  | 'jane'
+  | 'alena'
+  | 'omazh';
 
 const VOICE_BY_DECADE: { maxYear: number; voice: YandexVoiceId }[] = [
-  { maxYear: 1979, voice: 'filipp' },
-  { maxYear: 1989, voice: 'omazh' },
-  { maxYear: 1999, voice: 'jane' },
-  { maxYear: 2009, voice: 'alena' },
-  { maxYear: 2019, voice: 'marina' },
+  { maxYear: 1969, voice: 'zahar' },
+  { maxYear: 1979, voice: 'ermil' },
+  { maxYear: 1989, voice: 'filipp' },
+  { maxYear: 1999, voice: 'omazh' },
+  { maxYear: 2009, voice: 'jane' },
+  { maxYear: 2019, voice: 'alena' },
   { maxYear: Infinity, voice: 'marina' },
 ];
 
-/**
- * Maps release year to a Yandex TTS voice for era-appropriate narration.
- * Falls back to marina when year is unknown.
- */
-export function voiceForYear(year?: number): YandexVoiceId {
+/** Soul/funk — тёплый мужской голос */
+const SOUL_VOICES: YandexVoiceId[] = ['zahar', 'ermil', 'filipp'];
+
+export function voiceForYear(year?: number, genre?: string): YandexVoiceId {
+  const g = (genre ?? '').toLowerCase();
+  if (g.includes('soul') || g.includes('funk') || g.includes('r&b')) {
+    return 'zahar';
+  }
+
   if (!year || year < 1950) {
-    return 'marina';
+    return 'zahar';
   }
 
   for (const entry of VOICE_BY_DECADE) {
@@ -29,9 +41,15 @@ export function voiceForYear(year?: number): YandexVoiceId {
 }
 
 export const ALL_VOICES: YandexVoiceId[] = [
-  'marina',
+  'zahar',
+  'ermil',
   'filipp',
+  'marina',
   'jane',
   'alena',
   'omazh',
 ];
+
+export function voiceSupportsEmotion(voiceId: YandexVoiceId): boolean {
+  return ALL_VOICES.includes(voiceId);
+}

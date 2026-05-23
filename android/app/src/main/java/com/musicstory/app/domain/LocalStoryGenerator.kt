@@ -47,37 +47,38 @@ object LocalStoryGenerator {
         persona: StoryPersona,
         angle: StoryAngle,
     ): String {
-        val hook = persona.openingPhrase()
-        val custom = artistFact(artist, title, year)
-        if (custom != null) {
-            return "$hook $custom"
-        }
+        artistFact(artist, title, year)?.let { return it }
 
         val genreNote = genre?.let { " В жанре $it это особенно заметно." }.orEmpty()
         return when (angle) {
-            StoryAngle.RECORDING_SECRET ->
-                "$hook В $year году при записи «$title» ${persona.shortRole()} " +
-                    "настояли оставить дубль с ошибкой — тот самый срыв голоса на секунде стал фирменным моментом.$genreNote"
+            StoryAngle.RECORDING_SCENE ->
+                "Помню $year-й, студия — при записи «$title» ${persona.shortRole()} " +
+                    "настояли оставить дубль с ошибкой. Тот срыв голоса на секунде стал фирменным моментом, " +
+                    "инженер потом говорил, что микрофон еле остыл.$genreNote"
 
-            StoryAngle.CULTURE_CONTEXT ->
-                "$hook $year-й: ${persona.eraHint}. «$title» от $artist попал ровно в этот момент — " +
-                    "не фон, а газета улицы, которую включают громче разговора."
-
-            StoryAngle.ARTIST_OBSESSION ->
-                "$hook Я собираю всё на $artist — bootleg’и, интервью, обложки. «$title» ($year) " +
-                    "каждый раз даёт новую деталь: ${persona.obsessionDetail()}."
+            StoryAngle.FIRST_HEAR ->
+                "Тогда я стоял у радиолы в $year-м — «$title» от $artist вылетел как удар. " +
+                    "Соседи стучали по батарее, а мы не могли выключить, потому что ${persona.eraHint} " +
+                    "и эта песня попала ровно в этот момент."
 
             StoryAngle.LIVE_MOMENT ->
-                "$hook На живом show $year года $artist вышел с «$title» — зал замолчал на первой ноте, " +
-                    "потом взорвался так, что монitors у engineers краснели."
+                "На живом show $year года $artist вышел с «$title» — зал замолчал на первой ноте. " +
+                    "Я стоял у мониторов, engineers краснели от feedback, а потом зал взорвался так, " +
+                    "что cape routine казался малым делом."
 
-            StoryAngle.HIDDEN_MEANING ->
-                "$hook «$title» звучит просто, но ${persona.shortRole()} слышит второй слой: " +
-                    "настроение $year-го, которое в чартах редко называют вслух."
+            StoryAngle.BACKSTAGE ->
+                "В $year-м за кулисами шептались: $artist и «$title» — не просто сингл. " +
+                    "Продюсеры спорили до утра, кто первым пустит такой звук в эфир, " +
+                    "а ${persona.shortRole()} уже знал — это изменит сезон."
+
+            StoryAngle.FAN_DETAIL ->
+                "Я собираю всё на $artist — bootleg'и, интервью, обложки. «$title» ($year) " +
+                    "каждый раз даёт новую деталь: в live-версии другая фраза, на B-side другой take. " +
+                    "Фанаты замечают это не с первого раза."
 
             StoryAngle.SCENE_GOSSIP ->
-                "$hook На сцене $year-го шептались: $artist и «$title» — не просто хит, а спор в кулуарах. " +
-                    "${persona.sceneGossip()}."
+                "В $year-м на сцене шептались: $artist и «$title» — спор в кулуарах, не просто хит. " +
+                    "${persona.sceneGossip()}. Я был там — помню запах дыма и то, как зал не дышал."
         }
     }
 
@@ -85,21 +86,33 @@ object LocalStoryGenerator {
         val a = artist.lowercase()
         val t = title.lowercase()
         return when {
+            a.contains("james brown") && t.contains("i got you") ->
+                "Помню '65-й, Apollo — Brown ещё в раздевалке делал splits, а мы уже не дышали. " +
+                    "I Got You сняли за один take, инженер говорил — микрофон еле остыл. " +
+                    "Я кричал так, что на следующий день не мог говорить, а сосед по ряду потерял голос раньше меня."
+
+            a.contains("james brown") ->
+                "That night в Apollo $year-го Brown вышел в cape — сбросил, надел, сбросил снова. " +
+                    "«$title» — не просто песня, это ритуал. Мы знали каждый scream, каждый drop на колено. " +
+                    "Harlem не спал после таких шоу."
+
             a.contains("elvis") && (t.contains("jxl") || t.contains("little less")) ->
-                "В 2002 JXL вытащил из архива RCA дemo 1968 года, наложил breakbeat — " +
-                    "и Elvis снова в чартах через четверть века. Без этого ремикса многие бы не узнали оригинал."
+                "Помню, как в 2002 JXL вытащил из архива RCA demo 1968 года — оригинал «A Little Less Conversation» " +
+                    "лежал мёртвым, пока breakbeat не вернул King в чарты. Я слушал обе версии подряд: " +
+                    "в 68-м Elvis пел для TV Special, а через тридцать лет трек снова качал клубы."
 
             a.contains("elvis") ->
-                "Elvis в $year-м ломал формат: телевизионные камеры ловили не только голос, " +
-                    "но и реакцию зала — «$title» записывали как шоу, не как сессию."
+                "Тогда, в $year-м, Elvis ломал формат — «$title» записывали как шоу для TV, не как сессию. " +
+                    "Камеры ловили не только голос, но и реакцию зала. King знал: зрители важнее чартов."
 
             a.contains("beatles") ->
-                "На «$title» ($year) Beatles экспериментировали со слоями — соседи в Abbey Road " +
-                    "жаловались на громкость, а инженеры прятали новые эффекты от лейбла."
+                "В Abbey Road, $year-й — на «$title» Beatles наслаивали дорожки, соседи жаловались на громкость. " +
+                    "Инженеры прятали новые эффекты от лейбла, а мы уже знали — это не просто сингл, это сдвиг."
 
             a.contains("miles davis") ->
-                "Miles в $year-м менял правила: «$title» — не мелодия, а настроение. " +
-                    "Музыканты в студии не всегда знали, что играют, пока не услышали монитор."
+                "Miles в $year-м менял правила в студии — «$title» не мелодия, а настроение. " +
+                    "Музыканты не всегда знали, что играют, пока не услышали монитор. " +
+                    "Я стоял за стеклом и не понимал, куда это ведёт — потом понял."
 
             else -> null
         }
@@ -126,32 +139,10 @@ object LocalStoryGenerator {
         text.trim().split(Regex("\\s+")).count { it.isNotEmpty() }
 }
 
-private fun StoryPersona.openingPhrase(): String = when {
-    speechStyle.contains("джаз", ignoreCase = true) -> "Знаешь,"
-    speechStyle.contains("блюз", ignoreCase = true) -> "Слушай,"
-    speechStyle.contains("рок", ignoreCase = true) -> "Вот что,"
-    speechStyle.contains("клуб", ignoreCase = true) || speechStyle.contains("неон", ignoreCase = true) -> "Смотри,"
-    speechStyle.contains("хип", ignoreCase = true) -> "Факт,"
-    yearHint() >= 2000 -> "Короче,"
-    yearHint() >= 1980 -> "Слушай сюда,"
-    else -> "Знаешь,"
-}
-
 private fun StoryPersona.shortRole(): String = roleTitle.substringBefore(',').trim()
-
-private fun StoryPersona.obsessionDetail(): String = when {
-    speechStyle.contains("винил", ignoreCase = true) -> "на B-side другой take"
-    speechStyle.contains("кассет", ignoreCase = true) -> "на старой кассете другой fade-out"
-    else -> "в live-версии другая фраза"
-}
 
 private fun StoryPersona.sceneGossip(): String = when {
     eraHint.contains("MTV", ignoreCase = true) -> "Кто-то спорил, что клип важнее пластинки"
     eraHint.contains("радио", ignoreCase = true) -> "Диджеи делили эфир — кому первому крутить"
     else -> "Продюсеры спорили, пускать ли такой сингл"
-}
-
-private fun StoryPersona.yearHint(): Int {
-    val match = Regex("(\\d{4})").find(roleTitle) ?: Regex("(\\d{4})").find(eraHint)
-    return match?.groupValues?.get(1)?.toIntOrNull() ?: 1970
 }

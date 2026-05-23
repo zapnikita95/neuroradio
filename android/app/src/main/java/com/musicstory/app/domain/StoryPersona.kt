@@ -1,12 +1,12 @@
 package com.musicstory.app.domain
 
 enum class StoryAngle(val labelRu: String) {
-    RECORDING_SECRET("скрытая деталь записи или продакшена"),
-    CULTURE_CONTEXT("культурный контекст эпохи, что происходило вокруг"),
-    ARTIST_OBSESSION("одержимость фаната этим артистом и его стилем"),
-    LIVE_MOMENT("концерт, клуб, репетиция, живое выступление"),
-    HIDDEN_MEANING("смысл, который не слышат при беглом прослушивании"),
-    SCENE_GOSSIP("история из закулисья жанра или сцены"),
+    RECORDING_SCENE("конкретная сцена записи или студийный курьёз"),
+    FIRST_HEAR("где ты был, когда впервые услышал этот трек"),
+    LIVE_MOMENT("живое выступление — что видел своими глазами"),
+    BACKSTAGE("закулисье: кто спорил, что ломалось, что удивило"),
+    FAN_DETAIL("деталь, которую фанаты замечают не с первого раза"),
+    SCENE_GOSSIP("история из тусовки жанра в тот сезон"),
 }
 
 data class StoryPersona(
@@ -21,63 +21,104 @@ data class StoryPersona(
             val y = year ?: guessDecadeYear(artist)
 
             return when {
+                a.contains("james brown") || g.contains("funk") ->
+                    personaForYear(
+                        y,
+                        "парень из Harlem, soul/funk $y-х, ходит на Apollo и знает каждый scream Brown",
+                        "речь mid-60s soul: короткие рваные фразы, «man», «look», «that night», энергия сцены",
+                        "Apollo Theater, одно дубль, cape routine, James Brown Show",
+                    )
+
                 a.contains("elvis") ->
-                    personaForYear(y, "фанат rock'n'roll и soul $y-х, коллекционирует синглы Elvis",
-                        "речь 50–70-х: «слушай», «вот что», уважение к King, без сленга другой эпохи",
-                        "Телевизионные шоу, RCA Studio, Las Vegas, реакция зала важнее чартов")
+                    personaForYear(
+                        y,
+                        "фанат rock'n'roll $y-х, собирает синглы Elvis",
+                        "речь 50–70-х: «помню», «тогда», «King», без современного сленга",
+                        "RCA Studio, TV Specials, реакция зала, Sun Records в памяти старших",
+                    )
 
                 g.contains("jazz") || g.contains("swing") || g.contains("bebop") ||
                     (y in 1935..1965 && (g.contains("blues") || g.isBlank())) ->
-                    personaForYear(y, "джазмен $y-х, одержим swing и bebop",
-                        "лексика 40–60-х: «cat», «man», «dig this», дым, джем-сейшены, уважение к мастерам",
-                        "Америка $y-х, джем-сейшены, винил, расовые барьеры, живое радио")
+                    personaForYear(
+                        y,
+                        "джазмен $y-х, одержим swing и bebop",
+                        "лексика 40–60-х: «cat», «man», «dig this», джем-сейшены",
+                        "Америка $y-х, джем-сейшены, винил, расовые барьеры, живое радио",
+                    )
 
                 g.contains("blues") || g.contains("soul") ->
-                    personaForYear(y, "блюзовый меломан $y-х",
-                        "лексика soul/blues: «слушай», «child», исповедь, гитара, ночной клуб",
-                        "юг США или городской клуб, боль и гордость в одной песне")
+                    personaForYear(
+                        y,
+                        "блюзовый меломан $y-х с юга или из клуба",
+                        "лексика soul/blues: «child», «that night», исповедь, гитара, sweat",
+                        "ночной клуб, юг США, гордость и боль в одной песне",
+                    )
 
                 g.contains("rock") || g.contains("metal") || g.contains("punk") ||
                     g.contains("rock'n") ->
-                    personaForYear(y, "рок-фанат $y-х",
-                        "лексика rock $y-х: «вот что», «слушай сюда», громкость, бунт, концертный зал",
-                        "гаражи, фестивали, бунт против скучных правил")
+                    personaForYear(
+                        y,
+                        "рок-фанат $y-х, был на концертах",
+                        "лексика rock: «that gig», «we were», громкость, бунт",
+                        "гаражи, фестивали, бунт против скучных правил",
+                    )
 
                 g.contains("electronic") || g.contains("house") || g.contains("techno") ||
                     g.contains("dance") ->
-                    personaForYear(y, "клубный меломан $y-х",
-                        "лексика dance/electronic: break, sample, бас, warehouse, ночь без сна",
-                        "warehouse, диджейские стыки, новая музыка из старых пластинок")
+                    personaForYear(
+                        y,
+                        "клубный меломан $y-х",
+                        "лексика dance: break, sample, bass, warehouse, ночь",
+                        "warehouse, диджейские стыки, новая музыка из старых пластинок",
+                    )
 
                 g.contains("hip hop") || g.contains("rap") ->
-                    personaForYear(y, "фанат хип-хопа $y-х",
-                        "лексика rap $y-х: flow, block party, уличная честность, уважение к MC",
-                        "битбокс, блок-вечеринки, слова как оружие и щит")
+                    personaForYear(
+                        y,
+                        "фанат хип-хопа $y-х с блока",
+                        "лексика rap: flow, block party, уличная честность",
+                        "битбокс, блок-вечеринки, слова как оружие и щит",
+                    )
 
                 g.contains("pop") || a.contains("beatles") || a.contains("abba") ->
-                    personaForYear(y, "обожатель поп-культуры $y-х",
-                        "лексика pop $y-х: «ты представляешь?», лёгкий юмор, радио и TV",
-                        "телевидение, магнитофоны, первые кассеты")
+                    personaForYear(
+                        y,
+                        "обожатель поп-культуры $y-х",
+                        "лексика pop: «that summer», «on the radio», TV и магнитофоны",
+                        "телевидение, магнитофоны, первые кассеты",
+                    )
 
                 y < 1970 ->
-                    personaForYear(y, "современник $y-х, фанат $artist",
-                        "лексика $y-х: винил, радио, уважение к старой школе",
-                        "мир до streaming, музыка как событие")
+                    personaForYear(
+                        y,
+                        "современник $y-х, фанат $artist",
+                        "лексика $y-х: винил, радио, «I remember»",
+                        "мир до streaming, музыка как событие",
+                    )
 
                 y < 1990 ->
-                    personaForYear(y, "меломан $y-х, коллекционер $artist",
-                        "лексика $y-х: кассеты, Walkman, MTV, «слушай сюда»",
-                        "кассеты, Walkman, первые MTV-образы")
+                    personaForYear(
+                        y,
+                        "меломан $y-х, коллекционер $artist",
+                        "лексика 80-х: кассеты, Walkman, MTV",
+                        "кассеты, Walkman, MTV",
+                    )
 
                 y < 2005 ->
-                    personaForYear(y, "фанат $artist нулевых",
-                        "лексика 2000-х: ремиксы, файлообмен, CD-rip, «короче»",
-                        "интернет-форумы, ремиксы, первые mp3")
+                    personaForYear(
+                        y,
+                        "фанат $artist нулевых",
+                        "лексика 2000-х: ремиксы, CD, форумы",
+                        "интернет-форумы, ремиксы, первые mp3",
+                    )
 
                 else ->
-                    personaForYear(y, "фанат $artist, копает глубже стриминга",
-                        "современная речь, но уважение к эпохе трека — без чужого сленга",
-                        "архивы, ремастеры, редкие live")
+                    personaForYear(
+                        y,
+                        "фанат $artist",
+                        "современная речь, но уважение к эпохе трека",
+                        "архивы, ремастеры, редкие live",
+                    )
             }
         }
 

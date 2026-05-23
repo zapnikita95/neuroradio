@@ -41,8 +41,8 @@ class GroqStoryClient(
 
         val body = JSONObject().apply {
             put("model", StoryPrompts.GROQ_MODEL)
-            put("temperature", 0.92)
-            put("max_tokens", 450)
+            put("temperature", 0.82)
+            put("max_tokens", 650)
             put("response_format", JSONObject().put("type", "json_object"))
             put(
                 "messages",
