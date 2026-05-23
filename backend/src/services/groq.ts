@@ -2,11 +2,16 @@ import fetch from 'node-fetch';
 import {
   buildStoryUserPrompt,
   buildSystemPrompt,
-  personaForTrack,
+  buildPersonaForNarrator,
   pickAngle,
 } from './prompts.js';
+import { resolveStoryNarrator, StoryNarratorId } from './story-narrator.js';
 import { YandexVoiceId, voiceForYear } from './voices.js';
-import { countWords, validateStoryScript } from './story-quality.js';
+import {
+  countWords,
+  sanitizeScriptForTts,
+  validateStoryScript,
+} from './story-quality.js';
 import {
   DEFAULT_STORY_LENGTH,
   getStoryLengthPreset,
@@ -15,7 +20,7 @@ import {
 
 const GROQ_API_URL = 'https://api.groq.com/openai/v1/chat/completions';
 const GROQ_MODEL = 'llama-3.3-70b-versatile';
-const MAX_ATTEMPTS = 3;
+const MAX_ATTEMPTS = 5;
 
 export interface StoryScript {
   script: string;
@@ -30,6 +35,7 @@ export interface GenerateStoryInput {
   genre?: string;
   voiceId: YandexVoiceId;
   storyLength?: StoryLengthId;
+  storyNarrator?: StoryNarratorId;
   previousScripts?: string[];
 }
 
@@ -68,7 +74,7 @@ async function callGroq(
     },
     body: JSON.stringify({
       model: GROQ_MODEL,
-      temperature: 0.82,
+      temperature: 0.72,
       max_tokens: maxTokens,
       response_format: { type: 'json_object' },
       messages: [
@@ -93,6 +99,20 @@ async function callGroq(
   return content;
 }
 
+function finalizeStory(
+  story: StoryScript,
+  input: GenerateStoryInput,
+  storyLength: StoryLengthId,
+): StoryScript {
+  const sanitized = sanitizeScriptForTts(story.script, input.artist, input.title);
+  return {
+    ...story,
+    script: sanitized,
+    word_count: countWords(sanitized),
+    voiceId: input.voiceId ?? story.voiceId,
+  };
+}
+
 export function hasGroqApiKey(): boolean {
   return Boolean(process.env.GROQ_API_KEY?.trim());
 }
@@ -104,11 +124,18 @@ export async function generateStoryScript(
   const storyLength = input.storyLength ?? DEFAULT_STORY_LENGTH;
   const lengthPreset = getStoryLengthPreset(storyLength);
   const angle = pickAngle(previousScripts.length);
-  const persona = personaForTrack(input.year, input.genre, input.artist);
+  const narratorId = resolveStoryNarrator(input.storyNarrator);
+  const persona = buildPersonaForNarrator(
+    narratorId,
+    input.year,
+    input.genre,
+    input.artist,
+  );
   const systemPrompt = buildSystemPrompt(persona, lengthPreset);
   const voiceId = input.voiceId ?? voiceForYear(input.year, input.genre);
 
   let retryReason: string | undefined;
+  let lastParsed: StoryScript | null = null;
 
   for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
     const userPrompt = buildStoryUserPrompt({
@@ -129,17 +156,50 @@ export async function generateStoryScript(
 
     story.voiceId = voiceId;
     story.word_count = countWords(story.script);
+    lastParsed = story;
 
-    const quality = validateStoryScript(story.script, storyLength);
+    const quality = validateStoryScript(
+      story.script,
+      storyLength,
+      input.artist,
+      input.title,
+    );
     if (quality.ok) {
-      return story;
+      return finalizeStory(story, { ...input, voiceId }, storyLength);
     }
 
-    retryReason = quality.reason;
-    console.warn(`Story quality reject (attempt ${attempt + 1}): ${quality.reason}`);
+    const sanitized = sanitizeScriptForTts(story.script, input.artist, input.title);
+    const sanitizedQuality = validateStoryScript(
+      sanitized,
+      storyLength,
+      input.artist,
+      input.title,
+    );
+    if (sanitizedQuality.ok) {
+      console.warn(`Story sanitized after attempt ${attempt + 1}: ${quality.reason}`);
+      return finalizeStory({ ...story, script: sanitized }, { ...input, voiceId }, storyLength);
+    }
+
+    retryReason = sanitizedQuality.reason ?? quality.reason;
+    console.warn(`Story quality reject (attempt ${attempt + 1}): ${retryReason}`);
+  }
+
+  if (lastParsed) {
+    const fallback = finalizeStory(lastParsed, { ...input, voiceId }, storyLength);
+    const relaxed = validateStoryScript(
+      fallback.script,
+      storyLength,
+      input.artist,
+      input.title,
+      { strictLength: false },
+    );
+    if (relaxed.ok || countWords(fallback.script) >= 30) {
+      console.warn(`Story returned after sanitize fallback: ${retryReason ?? 'quality retries exhausted'}`);
+      return fallback;
+    }
   }
 
   throw new Error(
-    `Groq could not produce a valid ${lengthPreset.wordsMin}+ word in-character story after ${MAX_ATTEMPTS} attempts`,
+    `Groq could not produce a usable story after ${MAX_ATTEMPTS} attempts`,
   );
 }

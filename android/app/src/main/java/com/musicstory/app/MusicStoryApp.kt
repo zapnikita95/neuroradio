@@ -79,6 +79,7 @@ class MusicStoryApp : Application() {
         )
         mediaControllerManager = MediaControllerManager(this)
         storyPlayer = StoryPlayer(this)
+        storyPlayer.ensureTtsInitialized()
         triggerEngine = TriggerEngine()
         storyOrchestrator = StoryOrchestrator(
             storyRepository = storyRepository,

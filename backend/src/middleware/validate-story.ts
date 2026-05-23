@@ -1,6 +1,8 @@
 import { Request, Response, NextFunction } from 'express';
 import { SECURITY } from '../config/security.js';
 import { resolveStoryLength, StoryLengthId } from '../services/story-length.js';
+import { resolveStoryNarrator, StoryNarratorId } from '../services/story-narrator.js';
+import { resolveTtsVoice, TtsVoiceSetting } from '../services/voices.js';
 import { resolveTtsEmotion, resolveTtsSpeed, TtsEmotion } from '../services/tts-options.js';
 
 interface StoryFullBody {
@@ -8,6 +10,8 @@ interface StoryFullBody {
   title?: unknown;
   previous_scripts?: unknown;
   story_length?: unknown;
+  story_narrator?: unknown;
+  tts_voice?: unknown;
   tts_speed?: unknown;
   tts_emotion?: unknown;
 }
@@ -51,6 +55,8 @@ export function validateStoryFullBody(req: Request, res: Response, next: NextFun
   }
 
   const storyLength: StoryLengthId = resolveStoryLength(body.story_length);
+  const storyNarrator: StoryNarratorId = resolveStoryNarrator(body.story_narrator);
+  const ttsVoice: TtsVoiceSetting = resolveTtsVoice(body.tts_voice);
   const ttsSpeed = resolveTtsSpeed(
     typeof body.tts_speed === 'number' ? body.tts_speed : Number(body.tts_speed),
   );
@@ -61,6 +67,8 @@ export function validateStoryFullBody(req: Request, res: Response, next: NextFun
     title,
     previous_scripts: previousScripts,
     story_length: storyLength,
+    story_narrator: storyNarrator,
+    tts_voice: ttsVoice,
     tts_speed: ttsSpeed,
     tts_emotion: ttsEmotion,
   };

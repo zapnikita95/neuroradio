@@ -21,9 +21,11 @@ enum class StoryLength(
 }
 
 enum class TtsSpeed(val id: String, val labelRu: String, val yandexSpeed: Float, val androidRate: Float) {
-    SLOW("slow", "Медленно", 0.82f, 0.84f),
+    VERY_SLOW("very_slow", "Очень медленно", 0.75f, 0.78f),
+    SLOW("slow", "Медленно", 0.85f, 0.86f),
     NORMAL("normal", "Нормально", 0.92f, 0.92f),
-    FAST("fast", "Быстро", 1.06f, 1.05f),
+    FAST("fast", "Быстро", 1.05f, 1.04f),
+    VERY_FAST("very_fast", "Очень быстро", 1.18f, 1.12f),
     ;
 
     companion object {
@@ -32,9 +34,10 @@ enum class TtsSpeed(val id: String, val labelRu: String, val yandexSpeed: Float,
     }
 }
 
-enum class TtsEmotion(val id: String, val labelRu: String) {
-    NEUTRAL("neutral", "Спокойная"),
-    LIVELY("good", "Живая"),
+enum class TtsEmotion(val id: String, val labelRu: String, val descriptionRu: String) {
+    NEUTRAL("neutral", "Нейтральная", "Ровная, спокойная подача"),
+    LIVELY("good", "Живая", "Дружелюбная, тёплая интонация"),
+    STRICT("evil", "Строгая", "Жёсткая, драматичная — лучше со строгими голосами"),
     ;
 
     companion object {

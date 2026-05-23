@@ -2,13 +2,14 @@ import fetch from 'node-fetch';
 import { writeFile, mkdir } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { voiceSupportsEmotion, YandexVoiceId } from './voices.js';
+import { voiceSupportsEmotion, voiceSupportsEvilEmotion, YandexVoiceId } from './voices.js';
 import {
   DEFAULT_TTS_EMOTION,
   DEFAULT_TTS_SPEED,
   TtsEmotion,
   TtsOptions,
 } from './tts-options.js';
+import { prepareYandexTtsText } from './tts-markup.js';
 
 const TTS_URL = 'https://tts.api.cloud.yandex.net/speech/v1/tts:synthesize';
 
@@ -43,7 +44,11 @@ function buildTtsParams(
   });
 
   if (voiceSupportsEmotion(voiceId)) {
-    params.set('emotion', options.emotion);
+    const emotion =
+      options.emotion === 'evil' && !voiceSupportsEvilEmotion(voiceId)
+        ? 'neutral'
+        : options.emotion;
+    params.set('emotion', emotion);
   }
 
   return params;
@@ -56,7 +61,7 @@ export async function synthesizeSpeech(
   text: string,
   voiceId: YandexVoiceId,
   fileName: string,
-  options: Partial<TtsOptions> = {},
+  options: Partial<TtsOptions> & { artist?: string; title?: string } = {},
 ): Promise<SynthesisResult> {
   const apiKey = process.env.YANDEX_API_KEY;
   const folderId = process.env.YANDEX_FOLDER_ID;
@@ -70,9 +75,15 @@ export async function synthesizeSpeech(
     emotion: options.emotion ?? DEFAULT_TTS_EMOTION,
   };
 
+  const markedText = prepareYandexTtsText(text, {
+    artist: options.artist,
+    title: options.title,
+    sentencePauses: true,
+  });
+
   await mkdir(AUDIO_DIR, { recursive: true });
 
-  let params = buildTtsParams(text, voiceId, folderId, ttsOptions);
+  let params = buildTtsParams(markedText, voiceId, folderId, ttsOptions);
   let response = await fetch(`${TTS_URL}?${params.toString()}`, {
     method: 'POST',
     headers: { Authorization: `Api-Key ${apiKey}` },
@@ -80,7 +91,7 @@ export async function synthesizeSpeech(
   });
 
   if (!response.ok && params.has('emotion') && ttsOptions.emotion !== 'neutral') {
-    params = buildTtsParams(text, voiceId, folderId, { ...ttsOptions, emotion: 'neutral' });
+    params = buildTtsParams(markedText, voiceId, folderId, { ...ttsOptions, emotion: 'neutral' });
     response = await fetch(`${TTS_URL}?${params.toString()}`, {
       method: 'POST',
       headers: { Authorization: `Api-Key ${apiKey}` },

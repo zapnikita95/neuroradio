@@ -11,8 +11,10 @@ import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.core.stringSetPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import com.musicstory.app.domain.StoryLength
+import com.musicstory.app.domain.StoryNarrator
 import com.musicstory.app.domain.TtsEmotion
 import com.musicstory.app.domain.TtsSpeed
+import com.musicstory.app.domain.TtsVoice
 import com.musicstory.app.domain.TriggerMode
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
@@ -62,6 +64,14 @@ class SettingsDataStore(private val context: Context) {
 
     val storyLength: Flow<StoryLength> = context.settingsDataStore.data.map { prefs ->
         StoryLength.fromId(prefs[KEY_STORY_LENGTH])
+    }
+
+    val storyNarrator: Flow<StoryNarrator> = context.settingsDataStore.data.map { prefs ->
+        StoryNarrator.fromId(prefs[KEY_STORY_NARRATOR])
+    }
+
+    val ttsVoice: Flow<TtsVoice> = context.settingsDataStore.data.map { prefs ->
+        TtsVoice.fromId(prefs[KEY_TTS_VOICE])
     }
 
     val ttsSpeed: Flow<TtsSpeed> = context.settingsDataStore.data.map { prefs ->
@@ -145,6 +155,14 @@ class SettingsDataStore(private val context: Context) {
         context.settingsDataStore.edit { it[KEY_STORY_LENGTH] = length.id }
     }
 
+    suspend fun setStoryNarrator(narrator: StoryNarrator) {
+        context.settingsDataStore.edit { it[KEY_STORY_NARRATOR] = narrator.id }
+    }
+
+    suspend fun setTtsVoice(voice: TtsVoice) {
+        context.settingsDataStore.edit { it[KEY_TTS_VOICE] = voice.id }
+    }
+
     suspend fun setTtsSpeed(speed: TtsSpeed) {
         context.settingsDataStore.edit { it[KEY_TTS_SPEED] = speed.id }
     }
@@ -172,6 +190,8 @@ class SettingsDataStore(private val context: Context) {
         private val KEY_GROQ_API_KEY = stringPreferencesKey("groq_api_key")
         private val KEY_SAME_TRACK_STORY_EVERY_N = intPreferencesKey("same_track_story_every_n")
         private val KEY_STORY_LENGTH = stringPreferencesKey("story_length")
+        private val KEY_STORY_NARRATOR = stringPreferencesKey("story_narrator")
+        private val KEY_TTS_VOICE = stringPreferencesKey("tts_voice")
         private val KEY_TTS_SPEED = stringPreferencesKey("tts_speed")
         private val KEY_TTS_EMOTION = stringPreferencesKey("tts_emotion")
     }

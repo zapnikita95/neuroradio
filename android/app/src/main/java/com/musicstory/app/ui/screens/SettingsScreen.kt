@@ -50,8 +50,10 @@ import com.musicstory.app.R
 import com.musicstory.app.data.local.SettingsDataStore
 import com.musicstory.app.data.remote.ConnectionCheckResult
 import com.musicstory.app.domain.StoryLength
+import com.musicstory.app.domain.StoryNarrator
 import com.musicstory.app.domain.TtsEmotion
 import com.musicstory.app.domain.TtsSpeed
+import com.musicstory.app.domain.TtsVoice
 import com.musicstory.app.domain.TriggerMode
 import com.musicstory.app.ui.components.GlassCard
 import com.musicstory.app.ui.components.MusicStoryBackground
@@ -90,6 +92,8 @@ fun SettingsScreen(
     val triggerMode by settings.triggerMode.collectAsState(initial = TriggerMode.EVERY_N_TRACKS)
     val dailyQuota by app.storyRepository.dailyQuota.collectAsState(initial = null)
     val storyLength by settings.storyLength.collectAsState(initial = StoryLength.SEC_30)
+    val storyNarrator by settings.storyNarrator.collectAsState(initial = StoryNarrator.AUTO)
+    val ttsVoice by settings.ttsVoice.collectAsState(initial = TtsVoice.AUTO)
     val ttsSpeed by settings.ttsSpeed.collectAsState(initial = TtsSpeed.NORMAL)
     val ttsEmotion by settings.ttsEmotion.collectAsState(initial = TtsEmotion.LIVELY)
 
@@ -200,18 +204,46 @@ fun SettingsScreen(
                 }
 
                 GlassCard {
+                    SectionLabel(text = context.getString(R.string.settings_narrator_section))
+                    Spacer(modifier = Modifier.height(4.dp))
+                    StoryNarrator.entries.forEach { narrator ->
+                        NarratorRadioRow(
+                            label = narrator.labelRu,
+                            description = narrator.descriptionRu,
+                            selected = storyNarrator == narrator,
+                            onSelect = { scope.launch { settings.setStoryNarrator(narrator) } },
+                        )
+                    }
+                }
+
+                GlassCard {
                     SectionLabel(text = context.getString(R.string.settings_voice_section))
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(
-                        text = context.getString(R.string.settings_story_length),
+                        text = context.getString(R.string.settings_tts_voice),
                         style = MaterialTheme.typography.labelMedium,
                         color = MutedLavender,
                     )
-                    StoryLength.entries.forEach { length ->
-                        PreferenceRadioRow(
-                            label = length.labelRu,
-                            selected = storyLength == length,
-                            onSelect = { scope.launch { settings.setStoryLength(length) } },
+                    TtsVoice.entries.forEach { voice ->
+                        NarratorRadioRow(
+                            label = voice.labelRu,
+                            description = voice.descriptionRu,
+                            selected = ttsVoice == voice,
+                            onSelect = { scope.launch { settings.setTtsVoice(voice) } },
+                        )
+                    }
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = context.getString(R.string.settings_tts_emotion),
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MutedLavender,
+                    )
+                    TtsEmotion.entries.forEach { emotion ->
+                        NarratorRadioRow(
+                            label = emotion.labelRu,
+                            description = emotion.descriptionRu,
+                            selected = ttsEmotion == emotion,
+                            onSelect = { scope.launch { settings.setTtsEmotion(emotion) } },
                         )
                     }
                     Spacer(modifier = Modifier.height(8.dp))
@@ -229,15 +261,15 @@ fun SettingsScreen(
                     }
                     Spacer(modifier = Modifier.height(8.dp))
                     Text(
-                        text = context.getString(R.string.settings_tts_emotion),
+                        text = context.getString(R.string.settings_story_length),
                         style = MaterialTheme.typography.labelMedium,
                         color = MutedLavender,
                     )
-                    TtsEmotion.entries.forEach { emotion ->
+                    StoryLength.entries.forEach { length ->
                         PreferenceRadioRow(
-                            label = emotion.labelRu,
-                            selected = ttsEmotion == emotion,
-                            onSelect = { scope.launch { settings.setTtsEmotion(emotion) } },
+                            label = length.labelRu,
+                            selected = storyLength == length,
+                            onSelect = { scope.launch { settings.setStoryLength(length) } },
                         )
                     }
                 }
@@ -361,6 +393,37 @@ fun SettingsScreen(
                     },
                 )
             }
+        }
+    }
+}
+
+@Composable
+private fun NarratorRadioRow(
+    label: String,
+    description: String,
+    selected: Boolean,
+    onSelect: () -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(12.dp))
+            .padding(vertical = 4.dp),
+        verticalAlignment = Alignment.Top,
+    ) {
+        RadioButton(
+            selected = selected,
+            onClick = onSelect,
+            colors = RadioButtonDefaults.colors(selectedColor = GoldBright),
+        )
+        Column(modifier = Modifier.padding(top = 12.dp, end = 8.dp)) {
+            Text(text = label, style = MaterialTheme.typography.bodyMedium, color = CreamText)
+            Text(
+                text = description,
+                style = MaterialTheme.typography.bodySmall,
+                color = MutedLavender,
+                modifier = Modifier.padding(top = 2.dp),
+            )
         }
     }
 }

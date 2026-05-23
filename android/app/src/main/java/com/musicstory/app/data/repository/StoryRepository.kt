@@ -93,6 +93,8 @@ class StoryRepository(
         val backendUrl = settingsDataStore.backendUrl.first().trim()
         val groqKey = settingsDataStore.groqApiKey.first().trim()
         val storyLength = settingsDataStore.storyLength.first()
+        val storyNarrator = settingsDataStore.storyNarrator.first()
+        val ttsVoice = settingsDataStore.ttsVoice.first()
         val ttsSpeed = settingsDataStore.ttsSpeed.first()
         val ttsEmotion = settingsDataStore.ttsEmotion.first()
         val useBackend = shouldTryBackend(backendUrl)
@@ -108,6 +110,8 @@ class StoryRepository(
                             title = track.title,
                             previousScripts = previousScripts,
                             storyLength = storyLength.id,
+                            storyNarrator = storyNarrator.id,
+                            ttsVoice = ttsVoice.id,
                             ttsSpeed = ttsSpeed.yandexSpeed,
                             ttsEmotion = ttsEmotion.id,
                         ),
@@ -149,6 +153,7 @@ class StoryRepository(
                         previousScripts = previousScripts,
                         angle = angle,
                         storyLength = storyLength,
+                        storyNarrator = storyNarrator,
                     )
                 }
                 if (groqStory != null && !isDuplicateScript(groqStory.script, previousScripts)) {
@@ -169,6 +174,7 @@ class StoryRepository(
             genre = genre,
             previousScripts = previousScripts,
             angleIndex = previousScripts.size,
+            storyNarrator = storyNarrator,
         )
         persistStory(trackKey, track, local, angle.labelRu)
         return Result.success(local)

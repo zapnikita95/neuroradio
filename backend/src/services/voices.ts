@@ -1,4 +1,4 @@
-/** Yandex SpeechKit voice identifiers used by the app */
+/** Yandex SpeechKit voice identifiers — https://yandex.cloud/docs/speechkit/tts/voices */
 export type YandexVoiceId =
   | 'zahar'
   | 'ermil'
@@ -6,7 +6,41 @@ export type YandexVoiceId =
   | 'marina'
   | 'jane'
   | 'alena'
-  | 'omazh';
+  | 'omazh'
+  | 'dasha'
+  | 'julia'
+  | 'kirill'
+  | 'masha'
+  | 'alexander'
+  | 'lera';
+
+export type TtsVoiceSetting = 'auto' | YandexVoiceId;
+
+export interface YandexVoicePreset {
+  id: YandexVoiceId;
+  labelRu: string;
+  genderRu: 'мужской' | 'женский';
+  toneRu: string;
+  supportsEvil: boolean;
+}
+
+export const YANDEX_VOICE_PRESETS: YandexVoicePreset[] = [
+  { id: 'alena', labelRu: 'Алёна', genderRu: 'женский', toneRu: 'мягкий, дружелюбный', supportsEvil: false },
+  { id: 'filipp', labelRu: 'Филипп', genderRu: 'мужской', toneRu: 'ровный, приятный', supportsEvil: false },
+  { id: 'ermil', labelRu: 'Ермил', genderRu: 'мужской', toneRu: 'нейтральный, спокойный', supportsEvil: false },
+  { id: 'jane', labelRu: 'Джейн', genderRu: 'женский', toneRu: 'строгий, чёткий', supportsEvil: true },
+  { id: 'omazh', labelRu: 'Омаж', genderRu: 'женский', toneRu: 'строгий, драматичный', supportsEvil: true },
+  { id: 'zahar', labelRu: 'Захар', genderRu: 'мужской', toneRu: 'строгий, уверенный', supportsEvil: true },
+  { id: 'marina', labelRu: 'Марина', genderRu: 'женский', toneRu: 'тёплый, мягкий', supportsEvil: false },
+  { id: 'dasha', labelRu: 'Даша', genderRu: 'женский', toneRu: 'живой, современный', supportsEvil: false },
+  { id: 'julia', labelRu: 'Юлия', genderRu: 'женский', toneRu: 'строгий, собранный', supportsEvil: true },
+  { id: 'kirill', labelRu: 'Кирилл', genderRu: 'мужской', toneRu: 'строгий, деловой', supportsEvil: true },
+  { id: 'masha', labelRu: 'Маша', genderRu: 'женский', toneRu: 'дружелюбный, лёгкий', supportsEvil: false },
+  { id: 'alexander', labelRu: 'Александр', genderRu: 'мужской', toneRu: 'нейтральный, универсальный', supportsEvil: false },
+  { id: 'lera', labelRu: 'Лера', genderRu: 'женский', toneRu: 'молодой, живой', supportsEvil: false },
+];
+
+export const ALL_VOICES: YandexVoiceId[] = YANDEX_VOICE_PRESETS.map((v) => v.id);
 
 const VOICE_BY_DECADE: { maxYear: number; voice: YandexVoiceId }[] = [
   { maxYear: 1969, voice: 'zahar' },
@@ -18,9 +52,25 @@ const VOICE_BY_DECADE: { maxYear: number; voice: YandexVoiceId }[] = [
   { maxYear: Infinity, voice: 'marina' },
 ];
 
-/** Soul/funk — тёплый мужской голос */
-const SOUL_VOICES: YandexVoiceId[] = ['zahar', 'ermil', 'filipp'];
+const VALID_VOICE_SETTINGS = new Set<string>(['auto', ...ALL_VOICES]);
 
+export function resolveTtsVoice(value: unknown): TtsVoiceSetting {
+  if (typeof value === 'string' && VALID_VOICE_SETTINGS.has(value)) {
+    return value as TtsVoiceSetting;
+  }
+  return 'auto';
+}
+
+export function resolveVoiceForStory(
+  ttsVoice: TtsVoiceSetting,
+  year?: number,
+  genre?: string,
+): YandexVoiceId {
+  if (ttsVoice !== 'auto') return ttsVoice;
+  return voiceForYear(year, genre);
+}
+
+/** Soul/funk — тёплый мужской голос */
 export function voiceForYear(year?: number, genre?: string): YandexVoiceId {
   const g = (genre ?? '').toLowerCase();
   if (g.includes('soul') || g.includes('funk') || g.includes('r&b')) {
@@ -40,16 +90,33 @@ export function voiceForYear(year?: number, genre?: string): YandexVoiceId {
   return 'marina';
 }
 
-export const ALL_VOICES: YandexVoiceId[] = [
-  'zahar',
-  'ermil',
-  'filipp',
-  'marina',
-  'jane',
-  'alena',
-  'omazh',
-];
+export function getVoicePreset(voiceId: YandexVoiceId): YandexVoicePreset | undefined {
+  return YANDEX_VOICE_PRESETS.find((v) => v.id === voiceId);
+}
 
 export function voiceSupportsEmotion(voiceId: YandexVoiceId): boolean {
   return ALL_VOICES.includes(voiceId);
+}
+
+export function voiceSupportsEvilEmotion(voiceId: YandexVoiceId): boolean {
+  return getVoicePreset(voiceId)?.supportsEvil ?? false;
+}
+
+export function listVoiceOptions(): Array<{
+  id: TtsVoiceSetting;
+  labelRu: string;
+  descriptionRu: string;
+}> {
+  return [
+    {
+      id: 'auto',
+      labelRu: 'Авто',
+      descriptionRu: 'Голос подбирается по эпохе и жанру трека',
+    },
+    ...YANDEX_VOICE_PRESETS.map((v) => ({
+      id: v.id,
+      labelRu: v.labelRu,
+      descriptionRu: `${v.genderRu}, ${v.toneRu}`,
+    })),
+  ];
 }

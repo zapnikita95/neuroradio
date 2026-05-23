@@ -38,7 +38,7 @@
 
     <string name="state_idle">Ожидание</string>
     <string name="state_listening">Слушаем музыку</string>
-    <string name="state_fetching">Загружаем историю…</string>
+    <string name="state_fetching">Готовим историю — музыка играет…</string>
     <string name="state_playing">Воспроизводим историю</string>
     <string name="state_error">Ошибка</string>
 
@@ -51,7 +51,9 @@
     <string name="settings_every_n_tracks">Каждые N треков</string>
     <string name="settings_same_track_section">Повтор того же трека</string>
     <string name="settings_same_track_every_n">Каждые N включений</string>
-    <string name="settings_voice_section">Голос и длина</string>
+    <string name="settings_narrator_section">Рассказчик (амлуа)</string>
+    <string name="settings_voice_section">Озвучка Yandex SpeechKit</string>
+    <string name="settings_tts_voice">Голос</string>
     <string name="settings_story_length">Длина истории</string>
     <string name="settings_tts_speed">Скорость речи</string>
     <string name="settings_tts_emotion">Интонация</string>

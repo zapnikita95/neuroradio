@@ -6,11 +6,13 @@ import { safeErrorMessage } from '../middleware/security-headers.js';
 import { enrichTrackMetadata } from '../services/musicbrainz.js';
 import { generateStoryScript, hasGroqApiKey } from '../services/groq.js';
 import { synthesizeSpeech, hasYandexCredentials } from '../services/yandex-tts.js';
-import { voiceForYear } from '../services/voices.js';
+import { resolveVoiceForStory } from '../services/voices.js';
 import { buildDemoStory, isDemoMode } from '../services/demo.js';
 import { signAudioAccess } from '../services/audio-token.js';
 import { attachStoryQuotaHeaders, getDailyStoryQuota } from '../middleware/rate-limit.js';
 import type { StoryLengthId } from '../services/story-length.js';
+import type { StoryNarratorId } from '../services/story-narrator.js';
+import type { TtsVoiceSetting } from '../services/voices.js';
 import type { TtsEmotion } from '../services/tts-options.js';
 
 const router = Router();
@@ -22,8 +24,10 @@ interface StoryFullBody {
   title: string;
   previous_scripts?: string[];
   story_length?: StoryLengthId;
-  tts_speed?: number;
-  tts_emotion?: TtsEmotion;
+  story_narrator: StoryNarratorId;
+  tts_voice: TtsVoiceSetting;
+  tts_speed: number;
+  tts_emotion: TtsEmotion;
 }
 
 router.get('/quota', (req: Request, res: Response) => {
@@ -43,13 +47,15 @@ router.post('/full', validateStoryFullBody, async (req: Request, res: Response) 
     title,
     previous_scripts: previousScriptsRaw,
     story_length: storyLength,
+    story_narrator: storyNarrator,
+    tts_voice: ttsVoice,
     tts_speed: ttsSpeed,
     tts_emotion: ttsEmotion,
   } = req.body as StoryFullBody;
 
   try {
     const metadata = await enrichTrackMetadata(artist, title);
-    const voiceId = voiceForYear(metadata.year, metadata.genre);
+    const voiceId = resolveVoiceForStory(ttsVoice, metadata.year, metadata.genre);
     const demo = isDemoMode();
 
     const previousScripts = Array.isArray(previousScriptsRaw)
@@ -57,6 +63,7 @@ router.post('/full', validateStoryFullBody, async (req: Request, res: Response) 
       : [];
 
     let story;
+    let usedDemoFallback = false;
 
     if (demo) {
       story = buildDemoStory(
@@ -65,17 +72,31 @@ router.post('/full', validateStoryFullBody, async (req: Request, res: Response) 
         metadata.year,
         metadata.genre,
         previousScripts,
+        storyNarrator,
       );
     } else {
-      story = await generateStoryScript({
-        artist: metadata.artist,
-        title: metadata.title,
-        year: metadata.year,
-        genre: metadata.genre,
-        voiceId,
-        storyLength,
-        previousScripts,
-      });
+      try {
+        story = await generateStoryScript({
+          artist: metadata.artist,
+          title: metadata.title,
+          year: metadata.year,
+          genre: metadata.genre,
+          voiceId,
+          storyLength,
+          storyNarrator,
+          previousScripts,
+        });
+      } catch (err) {
+        console.error('Groq failed, using demo fallback:', err);
+        story = buildDemoStory(
+          metadata.artist,
+          metadata.title,
+          metadata.year,
+          metadata.genre,
+          previousScripts,
+        );
+        usedDemoFallback = true;
+      }
     }
 
     const response: Record<string, unknown> = {
@@ -87,7 +108,7 @@ router.post('/full', validateStoryFullBody, async (req: Request, res: Response) 
       script: story.script,
       word_count: story.word_count,
       voiceId: story.voiceId,
-      demo,
+      demo: demo || usedDemoFallback,
       quota: getDailyStoryQuota(req.installId ?? 'unknown'),
       sources: {
         musicbrainz: Boolean(metadata.year || metadata.genre || metadata.mbid),
@@ -101,6 +122,8 @@ router.post('/full', validateStoryFullBody, async (req: Request, res: Response) 
       const audio = await synthesizeSpeech(story.script, story.voiceId, `${id}.ogg`, {
         speed: ttsSpeed,
         emotion: ttsEmotion,
+        artist: metadata.artist,
+        title: metadata.title,
       });
       response.audioUrl = signAudioAccess(audio.fileName) ?? audio.audioUrl;
       response.audioFile = audio.fileName;

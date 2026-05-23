@@ -13,128 +13,110 @@ data class StoryPersona(
     val roleTitle: String,
     val speechStyle: String,
     val eraHint: String,
+    val contentFocus: String? = null,
+    val formatRules: String? = null,
 ) {
     companion object {
+        /** Era hint for prompts only — model must NOT copy digits into script */
+        fun eraContextForPrompt(year: Int?, genre: String?): String {
+            val g = genre?.lowercase().orEmpty()
+            if (g.contains("jazz") || g.contains("swing")) return "джазовая эпоха, клубы и джем-сейшены"
+            if (g.contains("blues") || g.contains("soul")) return "soul и blues, южные клубы и ночные сцены"
+            if (g.contains("rock") || g.contains("metal") || g.contains("punk")) return "рок-сцена, концерты и гаражи"
+            if (g.contains("electronic") || g.contains("house") || g.contains("techno") || g.contains("dance")) {
+                return "клубная электроника, склады и диджейские стыки"
+            }
+            if (g.contains("hip hop") || g.contains("rap")) return "хип-хоп с блока, уличные вечеринки"
+            if (g.contains("pop")) return "поп-культура, радио и телевидение"
+            if (year == null) return "эпоха артиста, без точных дат в тексте"
+            if (year < 1960) return "ранний период, винил и живое радио"
+            if (year < 1970) return "расцвет soul и rock, Apollo и Abbey Road"
+            if (year < 1980) return "золотая эра рока и диско, большие залы"
+            if (year < 1990) return "MTV, кассеты и громкие фестивали"
+            if (year < 2000) return "клубы и ремиксы, переход в цифру"
+            if (year < 2010) return "интернет-форумы и первые стримы"
+            return "современная сцена, архивы и редкие концерты"
+        }
+
         fun forTrack(year: Int?, genre: String?, artist: String): StoryPersona {
             val g = genre?.lowercase().orEmpty()
             val a = artist.lowercase()
-            val y = year ?: guessDecadeYear(artist)
+            val era = eraContextForPrompt(year, genre)
 
             return when {
                 a.contains("james brown") || g.contains("funk") ->
                     personaForYear(
-                        y,
-                        "парень из Harlem, soul/funk $y-х, ходит на Apollo и знает каждый scream Brown",
-                        "речь mid-60s soul: короткие рваные фразы, «man», «look», «that night», энергия сцены",
-                        "Apollo Theater, одно дубль, cape routine, James Brown Show",
+                        "парень из Гарлема, soul/funk, ходит в Apollo и знает каждый крик Brown",
+                        "короткие рваные фразы, «слушай», «тогда», «та ночь», энергия сцены",
+                        "$era. Apollo Theater, один дубль, номер с плащом",
                     )
 
                 a.contains("elvis") ->
                     personaForYear(
-                        y,
-                        "фанат rock'n'roll $y-х, собирает синглы Elvis",
-                        "речь 50–70-х: «помню», «тогда», «King», без современного сленга",
-                        "RCA Studio, TV Specials, реакция зала, Sun Records в памяти старших",
+                        "фанат rock'n'roll, собирает синглы Elvis",
+                        "«помню», «тогда», «Король», без современного сленга",
+                        "$era. студия RCA, телеспецвыпуски, реакция зала",
                     )
 
                 g.contains("jazz") || g.contains("swing") || g.contains("bebop") ||
-                    (y in 1935..1965 && (g.contains("blues") || g.isBlank())) ->
+                    (year != null && year in 1935..1965 && (g.contains("blues") || g.isBlank())) ->
                     personaForYear(
-                        y,
-                        "джазмен $y-х, одержим swing и bebop",
-                        "лексика 40–60-х: «cat», «man», «dig this», джем-сейшены",
-                        "Америка $y-х, джем-сейшены, винил, расовые барьеры, живое радио",
+                        "джазмен, одержим свингом и бибопом",
+                        "«брат», «слушай сюда», джем-сейшены, импровизация",
+                        "$era. винил, живое радио, ночные клубы",
                     )
 
                 g.contains("blues") || g.contains("soul") ->
                     personaForYear(
-                        y,
-                        "блюзовый меломан $y-х с юга или из клуба",
-                        "лексика soul/blues: «child», «that night», исповедь, гитара, sweat",
-                        "ночной клуб, юг США, гордость и боль в одной песне",
+                        "блюзовый меломан с юга или из клуба",
+                        "«дитя», «та ночь», исповедь, гитара, пот на сцене",
+                        "$era. ночной клуб, юг США",
                     )
 
                 g.contains("rock") || g.contains("metal") || g.contains("punk") ||
                     g.contains("rock'n") ->
                     personaForYear(
-                        y,
-                        "рок-фанат $y-х, был на концертах",
-                        "лексика rock: «that gig», «we were», громкость, бунт",
-                        "гаражи, фестивали, бунт против скучных правил",
+                        "рок-фанат, был на концертах",
+                        "«тот концерт», «мы были», громкость, бунт",
+                        "$era. гаражи, фестивали",
                     )
 
                 g.contains("electronic") || g.contains("house") || g.contains("techno") ||
                     g.contains("dance") ->
                     personaForYear(
-                        y,
-                        "клубный меломан $y-х",
-                        "лексика dance: break, sample, bass, warehouse, ночь",
-                        "warehouse, диджейские стыки, новая музыка из старых пластинок",
+                        "клубный меломан",
+                        "брейк, сэмпл, бас, склад, ночь",
+                        "$era. диджейские стыки, новая музыка из старых пластинок",
                     )
 
                 g.contains("hip hop") || g.contains("rap") ->
                     personaForYear(
-                        y,
-                        "фанат хип-хопа $y-х с блока",
-                        "лексика rap: flow, block party, уличная честность",
-                        "битбокс, блок-вечеринки, слова как оружие и щит",
+                        "фанат хип-хопа с блока",
+                        "поток, вечеринка на блоке, уличная честность",
+                        "$era. битбокс, слова как оружие и щит",
                     )
 
                 g.contains("pop") || a.contains("beatles") || a.contains("abba") ->
                     personaForYear(
-                        y,
-                        "обожатель поп-культуры $y-х",
-                        "лексика pop: «that summer», «on the radio», TV и магнитофоны",
-                        "телевидение, магнитофоны, первые кассеты",
-                    )
-
-                y < 1970 ->
-                    personaForYear(
-                        y,
-                        "современник $y-х, фанат $artist",
-                        "лексика $y-х: винил, радио, «I remember»",
-                        "мир до streaming, музыка как событие",
-                    )
-
-                y < 1990 ->
-                    personaForYear(
-                        y,
-                        "меломан $y-х, коллекционер $artist",
-                        "лексика 80-х: кассеты, Walkman, MTV",
-                        "кассеты, Walkman, MTV",
-                    )
-
-                y < 2005 ->
-                    personaForYear(
-                        y,
-                        "фанат $artist нулевых",
-                        "лексика 2000-х: ремиксы, CD, форумы",
-                        "интернет-форумы, ремиксы, первые mp3",
+                        "обожатель поп-культуры",
+                        "«то лето», «по радио», телевизор и магнитофоны",
+                        "$era. телевидение, магнитофоны, кассеты",
                     )
 
                 else ->
                     personaForYear(
-                        y,
                         "фанат $artist",
-                        "современная речь, но уважение к эпохе трека",
-                        "архивы, ремастеры, редкие live",
+                        "живая речь, уважение к эпохе трека, без энциклопедичности",
+                        era,
                     )
             }
         }
 
-        private fun personaForYear(
-            year: Int,
-            role: String,
-            speech: String,
-            era: String,
-        ) = StoryPersona(roleTitle = role, speechStyle = speech, eraHint = era)
+        private fun personaForYear(role: String, speech: String, era: String) =
+            StoryPersona(roleTitle = role, speechStyle = speech, eraHint = era)
 
         fun pickAngle(previousCount: Int): StoryAngle {
             return StoryAngle.entries[previousCount % StoryAngle.entries.size]
-        }
-
-        private fun guessDecadeYear(artist: String): Int {
-            return 1955 + (artist.hashCode().and(0x7FFFFFFF) % 40)
         }
     }
 }

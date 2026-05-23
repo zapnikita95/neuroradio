@@ -1,7 +1,5 @@
 package com.musicstory.app.domain
 
-import com.musicstory.app.domain.StoryAngle
-
 object StoryPrompts {
 
     const val GROQ_MODEL = "llama-3.3-70b-versatile"
@@ -12,31 +10,42 @@ object StoryPrompts {
         } else {
             length.labelRu
         }
+        val formatBlock = persona.formatRules?.takeIf { it.isNotBlank() }
+            ?: "Начинай СРАЗУ со сцены. НЕ обращайся к слушателю как ведущий — ты делишься воспоминанием."
+        val focusBlock = persona.contentFocus?.takeIf { it.isNotBlank() }
+            ?.let { "ФОКУС СОДЕРЖАНИЯ: $it" }
+            ?: "Один запоминающийся факт — не «зал сходит с ума», не «артист в огне»"
+
         return """
-Ты пишешь текст для ОЗВУЧКИ — живой человек рассказывает историю другу.
+Ты пишешь текст для ОЗВУЧКИ — живой человек рассказывает историю.
 
 КТО ТЫ: ${persona.roleTitle}
-ГДЕ И КОГДА ТЫ ЖИВЁШЬ: ${persona.eraHint}
+КОНТЕКСТ ЭПОХИ: ${persona.eraHint}
 КАК ТЫ ГОВОРИШЬ: ${persona.speechStyle}
+$focusBlock
 
-Ты фанат жанра и этого артиста. Ты БЫЛ там (или помнишь тот сезон) — рассказываешь из памяти, не из Wikipedia.
+ЯЗЫК: только русский. Английский допустим ТОЛЬКО в именах артистов и названиях песен.
 
-ФОРМАТ — живая мини-история от первого лица:
-- Начинай СРАЗУ со сцены, действия или воспоминания
-- НЕ начинай с мета-фраз: «знаю факт», «интересно что», «вот что», «слушай факт»
-- НЕ обращайся к слушателю как ведущий — ты просто делишься воспоминанием
+ЧИСЛА — КРИТИЧНО:
+- В script НЕЛЬЗЯ писать цифры, годы, «N-й», «шестидесятых» и т.п.
+- Исключение: цифры только из имени артиста или названия трека (2Pac, «1999»)
+- Вместо дат: «тогда», «в те годы», «на заре», «однажды на концерте», «в студии»
+
+ФОРМАТ:
+- $formatBlock
+- НЕ начинай: «знаю факт», «интересно что», «вот что», «слушай факт»
 
 СОДЕРЖАНИЕ:
-- Минимум ${length.wordsMin} слов, максимум ${length.wordsMax} ($durationHint)
-- ${length.sentenceHint}, каждое с конкретикой: место, год, деталь студии/концерта/людей
-- Один запоминающийся факт или курьёз — не общие слова про «зал сходит с ума»
+- ${length.wordsMin}–${length.wordsMax} слов ($durationHint)
+- ${length.sentenceHint}, каждое с конкретикой: место, люди, звук, запах
 
 ЗАПРЕЩЕНО:
-- «братуха», «Music Story», «сейчас в эфире», вода про «магию музыки»
-- скобки, ремарки, JSON внутри script
+- цифры и даты (кроме имени/названия)
+- английские слова, кроме имён и названий
+- «братуха», «Music Story», «сейчас в эфире»
+- вода: «вкладывает душу», «магия музыки», «зал сходит с ума»
 
-Формат — строго JSON:
-{"script":"...", "word_count": число}
+JSON: {"script":"...", "word_count": число}
 """.trimIndent()
     }
 
@@ -48,18 +57,22 @@ object StoryPrompts {
         angle: StoryAngle,
         length: StoryLength,
         previousScripts: List<String>,
+        narrator: StoryNarrator = StoryNarrator.AUTO,
     ): String {
-        val persona = StoryPersona.forTrack(year, genre, artist)
+        val persona = StoryNarrator.buildPersona(narrator, year, genre, artist)
         return buildString {
             appendLine("Артист: $artist")
             appendLine("Трек: $title")
-            year?.let { appendLine("Год выхода (ориентир): $it") }
             genre?.let { appendLine("Жанр: $it") }
+            appendLine("Эпоха (для контекста, НЕ писать даты в текст): ${StoryPersona.eraContextForPrompt(year, genre)}")
             appendLine()
             appendLine("УГОЛ ИСТОРИИ: ${angle.labelRu}")
             appendLine("Ты — ${persona.roleTitle}. Говоришь так: ${persona.speechStyle}")
+            if (!narrator.isAuto) {
+                appendLine("РЕЖИМ РАССКАЗЧИКА: ${narrator.labelRu} — ${narrator.descriptionRu}")
+            }
             appendLine("Длина: ${length.wordsMin}–${length.wordsMax} слов.")
-            appendLine()
+            appendLine("Помни: в script никаких цифр и годов, кроме цифр из имени артиста или названия трека.")
             if (previousScripts.isNotEmpty()) {
                 appendLine("УЖЕ РАССКАЗАНО — другой факт, другая сцена:")
                 previousScripts.take(5).forEachIndexed { i, s ->
