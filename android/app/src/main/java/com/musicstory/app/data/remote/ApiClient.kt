@@ -5,6 +5,7 @@ import com.musicstory.app.data.local.SettingsDataStore
 import com.musicstory.app.util.StoryLog
 import com.musicstory.app.data.model.StoryRequest
 import com.musicstory.app.data.model.StoryResponse
+import com.musicstory.app.data.remote.QuotaResponse
 import kotlinx.coroutines.runBlocking
 import okhttp3.Interceptor
 import okhttp3.OkHttpClient
@@ -49,6 +50,14 @@ class ApiClient(
             authManager.invalidateToken()
             getApi(baseUrl).fetchFullStory(request)
         }
+    }
+
+    suspend fun fetchHealth(baseUrl: String): Map<String, Any?> {
+        return getApi(baseUrl).health()
+    }
+
+    suspend fun fetchQuota(baseUrl: String): QuotaResponse {
+        return getApi(baseUrl).fetchQuota()
     }
 
     fun getApi(baseUrl: String): StoryApi {

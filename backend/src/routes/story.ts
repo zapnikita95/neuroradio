@@ -9,6 +9,7 @@ import { synthesizeSpeech, hasYandexCredentials } from '../services/yandex-tts.j
 import { voiceForYear } from '../services/voices.js';
 import { buildDemoStory, isDemoMode } from '../services/demo.js';
 import { signAudioAccess } from '../services/audio-token.js';
+import { attachStoryQuotaHeaders, getDailyStoryQuota } from '../middleware/rate-limit.js';
 
 const router = Router();
 
@@ -19,6 +20,17 @@ interface StoryFullBody {
   title: string;
   previous_scripts?: string[];
 }
+
+router.get('/quota', (req: Request, res: Response) => {
+  const installId = req.installId ?? 'unknown';
+  const quota = getDailyStoryQuota(installId);
+  attachStoryQuotaHeaders(res, installId);
+  res.json({
+    tier: 'free',
+    quota,
+    hint: 'Свой Groq-ключ в приложении — без дневного лимита на сервере (Groq с телефона).',
+  });
+});
 
 router.post('/full', validateStoryFullBody, async (req: Request, res: Response) => {
   const { artist, title, previous_scripts: previousScriptsRaw } = req.body as StoryFullBody;
@@ -63,6 +75,7 @@ router.post('/full', validateStoryFullBody, async (req: Request, res: Response) 
       word_count: story.word_count,
       voiceId: story.voiceId,
       demo,
+      quota: getDailyStoryQuota(req.installId ?? 'unknown'),
       sources: {
         musicbrainz: Boolean(metadata.year || metadata.genre || metadata.mbid),
         groq: !demo && hasGroqApiKey(),
@@ -83,6 +96,8 @@ router.post('/full', validateStoryFullBody, async (req: Request, res: Response) 
         : 'Нет Yandex TTS — телефон озвучит текст через системный Android TTS';
     }
 
+    const installId = req.installId ?? 'unknown';
+    attachStoryQuotaHeaders(res, installId);
     res.json(response);
   } catch (err) {
     console.error('POST /v1/story/full failed:', err);

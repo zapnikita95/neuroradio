@@ -1,5 +1,7 @@
 package com.musicstory.app.ui.screens
 
+import androidx.compose.animation.animateContentSize
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -13,7 +15,9 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Album
+import androidx.compose.material.icons.filled.ExpandLess
+import androidx.compose.material.icons.filled.ExpandMore
+import androidx.compose.material.icons.automirrored.filled.MenuBook
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -24,6 +28,9 @@ import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableLongStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -31,7 +38,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.musicstory.app.MusicStoryApp
 import com.musicstory.app.R
-import com.musicstory.app.data.local.ScrobbleEntry
+import com.musicstory.app.data.local.StoryHistoryEntry
 import com.musicstory.app.ui.components.GlassCard
 import com.musicstory.app.ui.components.MusicStoryBackground
 import com.musicstory.app.ui.components.VinylDisc
@@ -51,7 +58,8 @@ fun HistoryScreen(
 ) {
     val context = LocalContext.current
     val app = context.applicationContext as MusicStoryApp
-    val history by app.scrobbleRepository.history.collectAsState(initial = emptyList())
+    val history by app.storyRepository.storyHistory.collectAsState(initial = emptyList())
+    var expandedId by remember { mutableLongStateOf(-1L) }
 
     MusicStoryBackground(modifier = modifier) {
         Column(modifier = Modifier.fillMaxSize()) {
@@ -90,7 +98,13 @@ fun HistoryScreen(
                     verticalArrangement = Arrangement.spacedBy(10.dp),
                 ) {
                     items(history, key = { it.id }) { entry ->
-                        HistoryItem(entry = entry)
+                        HistoryItem(
+                            entry = entry,
+                            expanded = expandedId == entry.id,
+                            onToggle = {
+                                expandedId = if (expandedId == entry.id) -1L else entry.id
+                            },
+                        )
                     }
                 }
             }
@@ -99,39 +113,90 @@ fun HistoryScreen(
 }
 
 @Composable
-private fun HistoryItem(entry: ScrobbleEntry) {
+private fun HistoryItem(
+    entry: StoryHistoryEntry,
+    expanded: Boolean,
+    onToggle: () -> Unit,
+) {
     val context = LocalContext.current
     val formatter = rememberDateFormatter()
 
-    GlassCard(cornerRadius = 18.dp) {
-        Row(verticalAlignment = Alignment.Top) {
+    GlassCard(
+        modifier = Modifier
+            .fillMaxWidth()
+            .animateContentSize()
+            .clickable(onClick = onToggle),
+        cornerRadius = 18.dp,
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.Top,
+        ) {
             Icon(
-                imageVector = Icons.Default.Album,
+                imageVector = Icons.AutoMirrored.Filled.MenuBook,
                 contentDescription = null,
                 tint = GoldBright.copy(alpha = 0.7f),
                 modifier = Modifier.size(28.dp),
             )
-            Column(modifier = Modifier.padding(start = 12.dp)) {
+            Column(
+                modifier = Modifier
+                    .weight(1f)
+                    .padding(start = 12.dp),
+            ) {
                 Text(
                     text = entry.title,
                     style = MaterialTheme.typography.titleMedium,
                     color = CreamText,
-                    maxLines = 1,
+                    maxLines = if (expanded) Int.MAX_VALUE else 1,
                     overflow = TextOverflow.Ellipsis,
                 )
                 Text(text = entry.artist, style = MaterialTheme.typography.bodyMedium)
                 Text(
-                    text = formatter.format(Date(entry.scrobbledAt)),
+                    text = formatter.format(Date(entry.playedAt)),
                     style = MaterialTheme.typography.bodySmall,
                 )
-                if (entry.storyTriggered) {
+                entry.angle?.takeIf { it.isNotBlank() }?.let { angle ->
                     Text(
-                        text = context.getString(R.string.history_story_triggered),
+                        text = angle.replaceFirstChar { it.uppercase() },
                         style = MaterialTheme.typography.labelMedium,
-                        color = GoldBright,
+                        color = GoldBright.copy(alpha = 0.85f),
+                    )
+                }
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    text = if (expanded) {
+                        entry.script
+                    } else {
+                        entry.script.take(PREVIEW_CHARS).let { preview ->
+                            if (entry.script.length > PREVIEW_CHARS) "$preview…" else preview
+                        }
+                    },
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = CreamText.copy(alpha = if (expanded) 1f else 0.88f),
+                    maxLines = if (expanded) Int.MAX_VALUE else 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                if (!expanded && entry.script.length > PREVIEW_CHARS) {
+                    Text(
+                        text = context.getString(R.string.history_tap_to_expand),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MutedLavender,
+                        modifier = Modifier.padding(top = 4.dp),
                     )
                 }
             }
+            Icon(
+                imageVector = if (expanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                contentDescription = if (expanded) {
+                    context.getString(R.string.history_collapse)
+                } else {
+                    context.getString(R.string.history_expand)
+                },
+                tint = GoldBright.copy(alpha = 0.75f),
+                modifier = Modifier
+                    .padding(start = 4.dp)
+                    .size(24.dp),
+            )
         }
     }
 }
@@ -140,3 +205,5 @@ private fun HistoryItem(entry: ScrobbleEntry) {
 private fun rememberDateFormatter(): SimpleDateFormat {
     return SimpleDateFormat("dd.MM.yyyy HH:mm", Locale("ru", "RU"))
 }
+
+private const val PREVIEW_CHARS = 120

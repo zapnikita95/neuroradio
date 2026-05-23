@@ -20,7 +20,8 @@ export const SECURITY = {
     authPerInstallPerDay: 12,
 
     storyPerInstallPerHour: 10,
-    storyPerInstallPerDay: 50,
+    /** Free tier on shared server Groq + Yandex TTS */
+    storyPerInstallPerDay: parseInt(process.env.FREE_STORY_DAILY_LIMIT ?? '10', 10),
     storyBurstPerInstallPerMinute: 2,
 
     ipGlobalPerHour: 80,

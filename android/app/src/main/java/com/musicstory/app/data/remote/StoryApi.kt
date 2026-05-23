@@ -10,6 +10,9 @@ interface StoryApi {
     @GET("health")
     suspend fun health(): Map<String, Any?>
 
+    @GET("v1/story/quota")
+    suspend fun fetchQuota(): QuotaResponse
+
     @POST("v1/story/full")
     suspend fun fetchFullStory(@Body request: StoryRequest): StoryResponse
 }

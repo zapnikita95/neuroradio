@@ -8,7 +8,7 @@
 
     <string name="home_title">Радио-истории</string>
     <string name="settings_title">Настройки</string>
-    <string name="history_title">История прослушивания</string>
+    <string name="history_title">История рассказов</string>
     <string name="nav_history">История</string>
     <string name="nav_settings">Настройки</string>
 
@@ -57,10 +57,18 @@
     <string name="settings_backend_url">Сервер (Railway)</string>
     <string name="settings_backend_auth_hint">Сервер подключается сам: JWT выдаётся по подписи приложения и обновляется в фоне. Ничего менять не нужно.</string>
     <string name="settings_groq_api_key">Groq API ключ</string>
-    <string name="settings_groq_api_key_hint">Не нужен, если указан Railway URL. Иначе — console.groq.com (из РФ часто 403, лучше Railway).</string>
+    <string name="settings_groq_api_key_hint">Необязательно. Без ключа — до 10 историй в день через наш сервер (Groq + голос Yandex). Со своим ключом — без лимита, Groq с телефона.</string>
+    <string name="settings_groq_section_hint">Свой ключ = ты платишь Groq сам, истории без дневного лимита. Без ключа = бесплатно до 10 историй/день на нашем Railway.</string>
     <string name="settings_groq_get_key">Получить ключ на Groq</string>
-    <string name="settings_groq_status_ok">Groq подключён — истории генерирует нейросеть (Llama 3.3)</string>
-    <string name="settings_groq_status_missing">Ключ не задан — работают локальные шаблоны, не AI</string>
+    <string name="settings_groq_save_test">Сохранить и проверить</string>
+    <string name="settings_groq_checking">Проверяем подключение…</string>
+    <string name="settings_groq_test_ok">Всё работает</string>
+    <string name="settings_groq_test_partial">Частично работает — см. детали ниже</string>
+    <string name="settings_groq_test_fail">Не удалось подключиться</string>
+    <string name="settings_free_quota">Бесплатно сегодня: %1$d из %2$d историй</string>
+    <string name="settings_unlimited_groq">Свой Groq-ключ — без дневного лимита</string>
+    <string name="settings_groq_status_ok">Свой Groq подключён — без лимита</string>
+    <string name="settings_groq_status_missing">Бесплатный режим — до 10 историй в день через сервер</string>
     <string name="home_groq_banner">Укажи URL Railway в настройках — Groq из РФ идёт через сервер за рубежом</string>
     <string name="story_source_ai">Нейросеть Groq</string>
     <string name="story_source_local">Локальный шаблон</string>
@@ -75,6 +83,8 @@
     <string name="trigger_always">Всегда</string>
     <string name="trigger_never">Никогда</string>
 
-    <string name="history_empty">История пуста. Включите Spotify или Яндекс Музыку и начните воспроизведение.</string>
-    <string name="history_story_triggered">История воспроизведена</string>
+    <string name="history_empty">Пока нет рассказов. Нажми «Рассказать историю» или дождись автоматического триггера.</string>
+    <string name="history_tap_to_expand">Нажми, чтобы прочитать целиком</string>
+    <string name="history_expand">Развернуть</string>
+    <string name="history_collapse">Свернуть</string>
 </resources>

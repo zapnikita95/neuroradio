@@ -22,10 +22,18 @@ data class StoryResponse(
     val audioFile: String? = null,
     val ttsHint: String? = null,
     val sources: StorySources? = null,
+    val quota: StoryQuotaInfo? = null,
 )
 
 data class StorySources(
     val musicbrainz: Boolean = false,
     val groq: Boolean = false,
     @SerializedName("yandexTts") val yandexTts: Boolean = false,
+)
+
+data class StoryQuotaInfo(
+    val used: Int = 0,
+    val limit: Int = 10,
+    val remaining: Int = 10,
+    @SerializedName("resetsAt") val resetsAt: Long = 0,
 )

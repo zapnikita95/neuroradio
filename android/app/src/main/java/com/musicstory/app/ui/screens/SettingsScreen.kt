@@ -14,6 +14,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -28,6 +29,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -41,10 +43,12 @@ import androidx.compose.ui.platform.LocalContext
 import android.content.Intent
 import android.net.Uri
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import com.musicstory.app.MusicStoryApp
 import com.musicstory.app.R
 import com.musicstory.app.data.local.SettingsDataStore
+import com.musicstory.app.data.remote.ConnectionCheckResult
 import com.musicstory.app.domain.TriggerMode
 import com.musicstory.app.ui.components.GlassCard
 import com.musicstory.app.ui.components.MusicStoryBackground
@@ -81,11 +85,22 @@ fun SettingsScreen(
         initial = SettingsDataStore.DEFAULT_SAME_TRACK_STORY_EVERY_N,
     )
     val triggerMode by settings.triggerMode.collectAsState(initial = TriggerMode.EVERY_N_TRACKS)
+    val dailyQuota by app.storyRepository.dailyQuota.collectAsState(initial = null)
 
     var urlInput by remember(backendUrl) { mutableStateOf(backendUrl) }
     var groqInput by remember(groqApiKey) { mutableStateOf(groqApiKey) }
     var nInput by remember(everyN) { mutableStateOf(everyN.toString()) }
     var sameTrackInput by remember(sameTrackEveryN) { mutableStateOf(sameTrackEveryN.toString()) }
+
+    var isChecking by remember { mutableStateOf(false) }
+    var checkResult by remember { mutableStateOf<ConnectionCheckResult?>(null) }
+    var checkSummary by remember { mutableStateOf<String?>(null) }
+
+    LaunchedEffect(backendUrl, groqApiKey) {
+        if (groqApiKey.isBlank()) {
+            app.storyRepository.refreshQuota()
+        }
+    }
 
     val fieldColors = OutlinedTextFieldDefaults.colors(
         focusedBorderColor = GoldBright,
@@ -157,14 +172,34 @@ fun SettingsScreen(
                     SectionLabel(text = "Искусственный интеллект")
                     Spacer(modifier = Modifier.height(8.dp))
                     Text(
+                        text = context.getString(R.string.settings_groq_section_hint),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MutedLavender,
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
                         text = if (groqApiKey.isNotBlank()) {
                             context.getString(R.string.settings_groq_status_ok)
                         } else {
                             context.getString(R.string.settings_groq_status_missing)
                         },
                         style = MaterialTheme.typography.bodySmall,
-                        color = if (groqApiKey.isNotBlank()) LiveGreen else ErrorCoral,
+                        color = if (groqApiKey.isNotBlank()) LiveGreen else MutedLavender,
                     )
+                    if (groqApiKey.isBlank()) {
+                        dailyQuota?.let { quota ->
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text(
+                                text = context.getString(
+                                    R.string.settings_free_quota,
+                                    quota.remaining,
+                                    quota.limit,
+                                ),
+                                style = MaterialTheme.typography.labelMedium,
+                                color = GoldBright,
+                            )
+                        }
+                    }
                     Spacer(modifier = Modifier.height(8.dp))
                     OutlinedTextField(
                         value = groqInput,
@@ -173,9 +208,91 @@ fun SettingsScreen(
                         supportingText = { Text(context.getString(R.string.settings_groq_api_key_hint), color = MutedLavender) },
                         modifier = Modifier.fillMaxWidth(),
                         singleLine = true,
+                        visualTransformation = PasswordVisualTransformation(),
                         colors = fieldColors,
                         shape = RoundedCornerShape(14.dp),
                     )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    PrimaryStoryButton(
+                        text = if (isChecking) {
+                            context.getString(R.string.settings_groq_checking)
+                        } else {
+                            context.getString(R.string.settings_groq_save_test)
+                        },
+                        onClick = {
+                            if (isChecking) return@PrimaryStoryButton
+                            scope.launch {
+                                isChecking = true
+                                checkResult = null
+                                checkSummary = null
+                                settings.setGroqApiKey(groqInput)
+                                settings.setBackendUrl(urlInput)
+                                app.backendAuthManager.invalidateToken()
+                                app.apiClient.invalidateCache()
+                                val result = app.storyRepository.checkConnections(groqInput, urlInput)
+                                checkResult = result
+                                checkSummary = when {
+                                    result.allOk && groqInput.isNotBlank() ->
+                                        context.getString(R.string.settings_groq_test_ok)
+                                    result.backendOk && groqInput.isBlank() ->
+                                        context.getString(R.string.settings_groq_test_ok)
+                                    result.backendOk || result.groqOk == true ->
+                                        context.getString(R.string.settings_groq_test_partial)
+                                    else -> context.getString(R.string.settings_groq_test_fail)
+                                }
+                                isChecking = false
+                            }
+                        },
+                    )
+                    if (isChecking) {
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.height(20.dp),
+                                color = GoldBright,
+                                strokeWidth = 2.dp,
+                            )
+                            Text(
+                                text = context.getString(R.string.settings_groq_checking),
+                                modifier = Modifier.padding(start = 12.dp),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MutedLavender,
+                            )
+                        }
+                    }
+                    checkSummary?.let { summary ->
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            text = summary,
+                            style = MaterialTheme.typography.labelMedium,
+                            color = if (checkResult?.allOk == true || checkResult?.backendOk == true) LiveGreen else ErrorCoral,
+                        )
+                        checkResult?.groqMessage?.let { msg ->
+                            Text(text = msg, style = MaterialTheme.typography.bodySmall, color = CreamText)
+                        }
+                        checkResult?.backendMessage?.let { msg ->
+                            Text(text = msg, style = MaterialTheme.typography.bodySmall, color = CreamText)
+                        }
+                        checkResult?.quota?.let { quota ->
+                            if (groqInput.isBlank()) {
+                                Text(
+                                    text = context.getString(
+                                        R.string.settings_free_quota,
+                                        quota.remaining,
+                                        quota.limit,
+                                    ),
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = GoldBright,
+                                )
+                            } else {
+                                Text(
+                                    text = context.getString(R.string.settings_unlimited_groq),
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = LiveGreen,
+                                )
+                            }
+                        }
+                    }
                     Spacer(modifier = Modifier.height(8.dp))
                     SecondaryStoryButton(
                         text = context.getString(R.string.settings_groq_get_key),
@@ -257,6 +374,7 @@ fun SettingsScreen(
                             app.backendAuthManager.invalidateToken()
                             app.apiClient.invalidateCache()
                             app.triggerEngine.resetCounter()
+                            app.storyRepository.refreshQuota()
                         }
                     },
                 )

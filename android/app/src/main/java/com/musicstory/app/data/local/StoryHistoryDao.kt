@@ -3,11 +3,15 @@ package com.musicstory.app.data.local
 import androidx.room.Dao
 import androidx.room.Insert
 import androidx.room.Query
+import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface StoryHistoryDao {
     @Insert
     suspend fun insert(entry: StoryHistoryEntry)
+
+    @Query("SELECT * FROM story_history ORDER BY playedAt DESC")
+    fun observeAll(): Flow<List<StoryHistoryEntry>>
 
     @Query(
         """
