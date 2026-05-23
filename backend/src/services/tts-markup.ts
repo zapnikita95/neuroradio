@@ -1,42 +1,22 @@
 /**
  * Yandex SpeechKit TTS markup (API v1, text format).
  * @see https://aistudio.yandex.ru/docs/ru/speechkit/tts/markup/tts-markup.html
- * @see https://aistudio.yandex.ru/docs/ru/speechkit/tts/markup/tts-supported-phonemes.html
+ *
+ * Cyrillic: server-side stress via + (dictionary).
+ * Latin/English: left as-is — Yandex reads names and titles natively.
  */
 
 import { sanitizeScriptForTts } from './story-quality.js';
-import { englishWordToPhonemes, wrapLatinWord, VALID_PHONEME } from './english-phonemes.js';
 import { applyRussianStress, RUSSIAN_STRESS } from './russian-stress.js';
-
-/** Valid Russian TTS phonemes — re-export for tests */
-export { VALID_PHONEME };
 
 /** @deprecated use RUSSIAN_STRESS from russian-stress.ts */
 const STRESS_OVERRIDES = RUSSIAN_STRESS;
-
-const LATIN_TOKEN = /\b[A-Za-z][A-Za-z0-9'’\-]*\b|\b\d+[A-Za-z]+\b|\b[A-Za-z]+\d+\b/g;
 
 export interface TtsMarkupOptions {
   artist?: string;
   title?: string;
   /** Add short pauses between sentences */
   sentencePauses?: boolean;
-}
-
-function processAllLatinWords(text: string): string {
-  return text.replace(LATIN_TOKEN, (word, offset, full) => {
-    const before = full.slice(Math.max(0, offset - 2), offset);
-    const after = full.slice(offset + word.length, offset + word.length + 2);
-    if (before.endsWith('[[') || after.startsWith(']]')) return word;
-    const openBlocks = (full.slice(0, offset).match(/\[\[/g) ?? []).length;
-    const closeBlocks = (full.slice(0, offset).match(/\]\]/g) ?? []).length;
-    if (openBlocks > closeBlocks) return word;
-    return wrapLatinWord(word);
-  });
-}
-
-function processRussianWords(text: string): string {
-  return applyRussianStress(text);
 }
 
 function addSentencePauses(text: string): string {
@@ -50,8 +30,8 @@ function collapseMarkupWhitespace(text: string): string {
 /**
  * Prepare story script for Yandex SpeechKit TTS:
  * - sanitize numbers for TTS
- * - Russian stress via + (dictionary + unicode normalization)
- * - Latin artist/title tokens via [[phonemes]]
+ * - Russian stress via + (dictionary) — Cyrillic only
+ * - Latin tokens unchanged (artist names, song titles)
  * - natural pauses between sentences
  */
 export function prepareYandexTtsText(
@@ -61,18 +41,11 @@ export function prepareYandexTtsText(
   const artist = options.artist ?? '';
   const title = options.title ?? '';
   let text = sanitizeScriptForTts(script, artist, title);
-  text = processAllLatinWords(text);
-  text = processRussianWords(text);
+  text = applyRussianStress(text);
   if (options.sentencePauses !== false) {
     text = addSentencePauses(text);
   }
   return collapseMarkupWhitespace(text);
-}
-
-/** For tests / debugging */
-export function latinToPhonemeBlock(word: string): string | null {
-  const phonemes = englishWordToPhonemes(word);
-  return phonemes ? `[[${phonemes}]]` : null;
 }
 
 export { STRESS_OVERRIDES, RUSSIAN_STRESS };

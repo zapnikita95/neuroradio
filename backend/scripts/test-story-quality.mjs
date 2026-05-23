@@ -1,8 +1,7 @@
 /**
  * Run: npm run build && node scripts/test-story-quality.mjs
  */
-import { validateStoryScript, findWateryContent } from '../dist/services/story-quality.js';
-import { wrapLatinWord, englishWordToPhonemes } from '../dist/services/english-phonemes.js';
+import { validateStoryScript } from '../dist/services/story-quality.js';
 import { prepareYandexTtsText } from '../dist/services/tts-markup.js';
 
 let failed = 0;
@@ -42,18 +41,14 @@ if (!goodVal.ok) {
   ok('concrete fact sample accepted');
 }
 
-for (const word of ['lou', 'bega', 'hawkins', 'screamin', 'mambo']) {
-  const phonemes = englishWordToPhonemes(word);
-  if (!phonemes) fail(`missing phonemes for ${word}`);
-  else ok(`${word} → [[${phonemes}]]`);
-}
-
-const marked = prepareYandexTtsText('Трек Lou Bega «Mambo No. 5»', {
+const marked = prepareYandexTtsText('Трек Lou Bega «Mambo No. 5» в студии.', {
   artist: 'Lou Bega',
   title: 'Mambo No. 5',
   sentencePauses: false,
 });
-if (!marked.includes('[[')) fail(`TTS markup missing phonemes: ${marked}`);
-else ok(`TTS markup: ${marked}`);
+if (marked.includes('[[')) fail(`TTS should not wrap Latin in phonemes: ${marked}`);
+else if (!marked.includes('Lou Bega')) fail(`Latin artist name lost: ${marked}`);
+else if (!marked.includes('ст+удии')) fail(`Cyrillic stress missing: ${marked}`);
+else ok(`TTS markup (Cyrillic stress only): ${marked}`);
 
 process.exit(failed > 0 ? 1 : 0);
