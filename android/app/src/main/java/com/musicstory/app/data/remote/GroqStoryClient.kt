@@ -9,11 +9,15 @@ import com.musicstory.app.domain.StoryNarrator
 import com.musicstory.app.domain.StoryPersona
 import com.musicstory.app.domain.StoryPrompts
 import com.musicstory.app.domain.StoryScriptQuality
+import com.musicstory.app.util.StoryLog
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONObject
+import java.io.IOException
 import java.util.concurrent.TimeUnit
 
 class GroqStoryClient(
@@ -25,7 +29,6 @@ class GroqStoryClient(
     private val gson: Gson = Gson(),
 ) {
 
-    /** Direct Groq only — backend proxy removed for security (no open LLM relay). */
     suspend fun generateStory(
         artist: String,
         title: String,
@@ -37,9 +40,9 @@ class GroqStoryClient(
         storyLength: StoryLength = StoryLength.SEC_30,
         storyNarrator: StoryNarrator = StoryNarrator.AUTO,
         apiKey: String? = null,
-    ): StoryResponse? {
+    ): StoryResponse? = withContext(Dispatchers.IO) {
         val key = apiKey?.trim().orEmpty()
-        if (key.isEmpty()) return null
+        if (key.isEmpty()) return@withContext null
 
         val persona = StoryNarrator.buildPersona(storyNarrator, year, genre, artist, title, countryCode)
         val system = StoryPrompts.systemPrompt(persona, storyLength)
@@ -47,8 +50,45 @@ class GroqStoryClient(
             artist, title, year, genre, angle, storyLength, previousScripts, storyNarrator, countryCode,
         )
 
+        var lastError: IOException? = null
+        for (model in StoryPrompts.GROQ_MODELS) {
+            try {
+                return@withContext requestStory(
+                    apiKey = key,
+                    model = model,
+                    system = system,
+                    user = user,
+                    storyLength = storyLength,
+                    artist = artist,
+                    title = title,
+                    year = year,
+                    genre = genre,
+                )
+            } catch (e: IOException) {
+                lastError = e
+                if (isRateLimitError(e) && model != StoryPrompts.GROQ_MODELS.last()) {
+                    StoryLog.w("Groq model $model rate-limited, trying fallback")
+                    continue
+                }
+                throw e
+            }
+        }
+        throw lastError ?: IOException("Groq не ответил")
+    }
+
+    private fun requestStory(
+        apiKey: String,
+        model: String,
+        system: String,
+        user: String,
+        storyLength: StoryLength,
+        artist: String,
+        title: String,
+        year: Int?,
+        genre: String?,
+    ): StoryResponse? {
         val body = JSONObject().apply {
-            put("model", StoryPrompts.GROQ_MODEL)
+            put("model", model)
             put("temperature", 0.82)
             put("max_tokens", storyLength.maxTokens)
             put("response_format", JSONObject().put("type", "json_object"))
@@ -64,14 +104,29 @@ class GroqStoryClient(
         val request = Request.Builder()
             .url("https://api.groq.com/openai/v1/chat/completions")
             .header("Content-Type", "application/json")
-            .header("Authorization", "Bearer $key")
+            .header("Authorization", "Bearer $apiKey")
             .post(body.toString().toRequestBody("application/json".toMediaType()))
             .build()
 
-        val response = client.newCall(request).execute()
-        if (!response.isSuccessful) return null
+        client.newCall(request).execute().use { response ->
+            if (!response.isSuccessful) {
+                val errorBody = response.body?.string()?.take(240).orEmpty()
+                throw IOException(
+                    if (errorBody.isBlank()) {
+                        "Groq HTTP ${response.code}"
+                    } else {
+                        "Groq HTTP ${response.code}: $errorBody"
+                    },
+                )
+            }
+            return parseGroqResponse(response.body?.string(), artist, title, year, genre)
+                ?: throw IOException("Groq ответил, но текст истории не разобрался")
+        }
+    }
 
-        return parseGroqResponse(response.body?.string(), artist, title, year, genre)
+    private fun isRateLimitError(error: IOException): Boolean {
+        val message = error.message.orEmpty().lowercase()
+        return message.contains("429") || message.contains("rate limit")
     }
 
     private fun parseGroqResponse(

@@ -17,8 +17,14 @@ import com.musicstory.app.data.remote.MetadataEnricher
 import com.musicstory.app.data.remote.RateLimitErrorBody
 import com.musicstory.app.data.model.StoryQuotaInfo
 import com.google.gson.Gson
+import com.musicstory.app.domain.StoryAngle
+import com.musicstory.app.domain.StoryLength
+import com.musicstory.app.domain.StoryNarrator
 import com.musicstory.app.domain.StoryPersona
 import com.musicstory.app.domain.StoryScriptQuality
+import com.musicstory.app.domain.TtsEmotion
+import com.musicstory.app.domain.TtsSpeed
+import com.musicstory.app.domain.TtsVoice
 import com.musicstory.app.util.StoryLog
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -101,85 +107,56 @@ class StoryRepository(
         val useBackend = shouldTryBackend(backendUrl)
         var rateLimitHit = false
         var rateLimitQuota: StoryQuotaInfo? = null
+        var backendGroqDown = false
+        var templateRejected = false
+        var groqError: String? = null
+        var backendError: String? = null
+
+        if (groqKey.isNotEmpty()) {
+            when (val groqResult = tryDirectGroq(
+                groqKey = groqKey,
+                track = track,
+                trackKey = trackKey,
+                year = year,
+                genre = genre,
+                countryCode = countryCode,
+                previousScripts = previousScripts,
+                angle = angle,
+                storyLength = storyLength,
+                storyNarrator = storyNarrator,
+            )) {
+                is StoryAttemptResult.Success -> return Result.success(groqResult.response)
+                is StoryAttemptResult.TemplateRejected -> templateRejected = true
+                is StoryAttemptResult.Failed -> groqError = groqResult.reason
+            }
+        }
 
         if (useBackend) {
-            try {
-                StoryLog.i("Fetching story from backend: $backendUrl")
-                val response = withTimeout(BACKEND_TIMEOUT_MS) {
-                    apiClient.fetchFullStory(
-                        backendUrl,
-                        StoryRequest(
-                            artist = track.artist,
-                            title = track.title,
-                            previousScripts = previousScripts,
-                            storyLength = storyLength.id,
-                            storyNarrator = storyNarrator.id,
-                            ttsVoice = ttsVoice.id,
-                            ttsSpeed = ttsSpeed.yandexSpeed,
-                            ttsEmotion = ttsEmotion.id,
-                        ),
-                    )
-                }
-                if (response.demo) {
-                    StoryLog.w("Backend returned template/demo story — rejected")
-                } else if (StoryScriptQuality.isTemplateLike(response.script)) {
-                    StoryLog.w("Backend returned template-like story — rejected")
-                } else if (response.script.isNotBlank() && !isDuplicateScript(response.script, previousScripts)) {
-                    response.quota?.let { quota ->
-                        _dailyQuota.value = quota
+            when (val backendResult = tryBackendStory(
+                backendUrl = backendUrl,
+                track = track,
+                trackKey = trackKey,
+                previousScripts = previousScripts,
+                angle = angle,
+                storyLength = storyLength,
+                storyNarrator = storyNarrator,
+                ttsVoice = ttsVoice,
+                ttsSpeed = ttsSpeed,
+                ttsEmotion = ttsEmotion,
+            )) {
+                is StoryAttemptResult.Success -> return Result.success(backendResult.response)
+                is StoryAttemptResult.TemplateRejected -> templateRejected = true
+                is StoryAttemptResult.Failed -> {
+                    backendError = backendResult.reason
+                    if (backendResult.backendGroqDown) backendGroqDown = true
+                    if (backendResult.rateLimitHit) {
+                        rateLimitHit = true
+                        rateLimitQuota = backendResult.rateLimitQuota
                     }
-                    StoryLog.i("Backend OK: audio=${response.audioUrl != null}, quota=${response.quota?.remaining}/${response.quota?.limit}")
-                    persistStory(trackKey, track, response, angle.labelRu)
-                    return Result.success(response)
-                }
-                StoryLog.w("Backend response rejected: empty, duplicate, or template")
-            } catch (e: Exception) {
-                if (e is HttpException && e.code() == 429) {
-                    rateLimitHit = true
-                    val quota = parseRateLimitBody(e)
-                    rateLimitQuota = quota
-                    quota?.let { _dailyQuota.value = it }
-                    StoryLog.w("Backend daily limit reached: ${quota?.used}/${quota?.limit}")
-                } else if (e is HttpException && e.code() == 503) {
-                    StoryLog.w("Backend Groq unavailable: ${explainError(e)}")
-                } else {
-                    val reason = explainError(e)
-                    StoryLog.e("Backend failed: $reason", e)
                 }
             }
         } else {
             StoryLog.w("Backend skipped (url=$backendUrl)")
-        }
-
-        if (groqKey.isNotEmpty()) {
-            try {
-                StoryLog.i("Trying direct Groq from device")
-                val groqStory = withTimeout(GROQ_TIMEOUT_MS) {
-                    groqStoryClient.generateStory(
-                        apiKey = groqKey,
-                        artist = track.artist,
-                        title = track.title,
-                        year = year,
-                        genre = genre,
-                        countryCode = countryCode,
-                        previousScripts = previousScripts,
-                        angle = angle,
-                        storyLength = storyLength,
-                        storyNarrator = storyNarrator,
-                    )
-                }
-                if (groqStory != null && !StoryScriptQuality.isTemplateLike(groqStory.script) &&
-                    !isDuplicateScript(groqStory.script, previousScripts)
-                ) {
-                    StoryLog.i("Direct API key story OK")
-                    persistStory(trackKey, track, groqStory, angle.labelRu)
-                    return Result.success(groqStory)
-                } else if (groqStory != null) {
-                    StoryLog.w("Direct Groq returned template-like story — rejected")
-                }
-            } catch (e: Exception) {
-                StoryLog.e("Direct Groq failed: ${e.message}", e)
-            }
         }
 
         val failureMessage = buildGenerationFailureMessage(
@@ -187,9 +164,148 @@ class StoryRepository(
             rateLimitQuota = rateLimitQuota,
             groqKeyPresent = groqKey.isNotEmpty(),
             backendConfigured = useBackend,
+            backendGroqDown = backendGroqDown,
+            templateRejected = templateRejected,
+            groqError = groqError,
+            backendError = backendError,
         )
         StoryLog.w("Story generation failed: $failureMessage")
         return Result.failure(IOException(failureMessage))
+    }
+
+    private sealed class StoryAttemptResult {
+        data class Success(val response: StoryResponse) : StoryAttemptResult()
+        data object TemplateRejected : StoryAttemptResult()
+        data class Failed(
+            val reason: String,
+            val backendGroqDown: Boolean = false,
+            val rateLimitHit: Boolean = false,
+            val rateLimitQuota: StoryQuotaInfo? = null,
+        ) : StoryAttemptResult()
+    }
+
+    private suspend fun tryDirectGroq(
+        groqKey: String,
+        track: TrackInfo,
+        trackKey: String,
+        year: Int?,
+        genre: String?,
+        countryCode: String?,
+        previousScripts: List<String>,
+        angle: StoryAngle,
+        storyLength: StoryLength,
+        storyNarrator: StoryNarrator,
+    ): StoryAttemptResult {
+        return try {
+            StoryLog.i("Trying direct Groq from device")
+            val groqStory = withTimeout(GROQ_TIMEOUT_MS) {
+                groqStoryClient.generateStory(
+                    apiKey = groqKey,
+                    artist = track.artist,
+                    title = track.title,
+                    year = year,
+                    genre = genre,
+                    countryCode = countryCode,
+                    previousScripts = previousScripts,
+                    angle = angle,
+                    storyLength = storyLength,
+                    storyNarrator = storyNarrator,
+                )
+            }
+            when {
+                groqStory == null -> StoryAttemptResult.Failed("Groq не вернул текст истории")
+                StoryScriptQuality.isTemplateLike(groqStory.script) -> {
+                    StoryLog.w("Direct Groq returned template-like story — rejected")
+                    StoryAttemptResult.TemplateRejected
+                }
+                isDuplicateScript(groqStory.script, previousScripts) -> {
+                    StoryLog.w("Direct Groq returned duplicate story — rejected")
+                    StoryAttemptResult.Failed("Groq вернул повтор предыдущей истории — попробуй ещё раз")
+                }
+                else -> {
+                    StoryLog.i("Direct API key story OK")
+                    persistStory(trackKey, track, groqStory, angle.labelRu)
+                    StoryAttemptResult.Success(groqStory)
+                }
+            }
+        } catch (e: Exception) {
+            val reason = formatGroqError(e.message?.take(240))
+            StoryLog.e("Direct Groq failed: $reason", e)
+            StoryAttemptResult.Failed(reason)
+        }
+    }
+
+    private suspend fun tryBackendStory(
+        backendUrl: String,
+        track: TrackInfo,
+        trackKey: String,
+        previousScripts: List<String>,
+        angle: StoryAngle,
+        storyLength: StoryLength,
+        storyNarrator: StoryNarrator,
+        ttsVoice: TtsVoice,
+        ttsSpeed: TtsSpeed,
+        ttsEmotion: TtsEmotion,
+    ): StoryAttemptResult {
+        return try {
+            StoryLog.i("Fetching story from backend: $backendUrl")
+            val response = withTimeout(BACKEND_TIMEOUT_MS) {
+                apiClient.fetchFullStory(
+                    backendUrl,
+                    StoryRequest(
+                        artist = track.artist,
+                        title = track.title,
+                        previousScripts = previousScripts,
+                        storyLength = storyLength.id,
+                        storyNarrator = storyNarrator.id,
+                        ttsVoice = ttsVoice.id,
+                        ttsSpeed = ttsSpeed.yandexSpeed,
+                        ttsEmotion = ttsEmotion.id,
+                    ),
+                )
+            }
+            when {
+                response.demo -> {
+                    StoryLog.w("Backend returned template/demo story — rejected")
+                    StoryAttemptResult.TemplateRejected
+                }
+                StoryScriptQuality.isTemplateLike(response.script) -> {
+                    StoryLog.w("Backend returned template-like story — rejected")
+                    StoryAttemptResult.TemplateRejected
+                }
+                response.script.isBlank() || isDuplicateScript(response.script, previousScripts) -> {
+                    StoryLog.w("Backend response rejected: empty or duplicate")
+                    StoryAttemptResult.Failed("Сервер вернул пустой или повторный текст")
+                }
+                else -> {
+                    response.quota?.let { quota -> _dailyQuota.value = quota }
+                    StoryLog.i("Backend OK: audio=${response.audioUrl != null}, quota=${response.quota?.remaining}/${response.quota?.limit}")
+                    persistStory(trackKey, track, response, angle.labelRu)
+                    StoryAttemptResult.Success(response)
+                }
+            }
+        } catch (e: Exception) {
+            if (e is HttpException && e.code() == 429) {
+                val quota = parseRateLimitBody(e)
+                quota?.let { _dailyQuota.value = it }
+                StoryLog.w("Backend daily limit reached: ${quota?.used}/${quota?.limit}")
+                return StoryAttemptResult.Failed(
+                    reason = "Лимит бесплатных историй на сервере",
+                    rateLimitHit = true,
+                    rateLimitQuota = quota,
+                )
+            }
+            if (e is HttpException && e.code() == 503) {
+                StoryLog.w("Backend Groq unavailable: ${explainError(e)}")
+                return StoryAttemptResult.Failed(
+                    reason = explainError(e),
+                    backendGroqDown = true,
+                )
+            }
+            val reason = explainError(e)
+            StoryLog.e("Backend failed: $reason", e)
+            StoryAttemptResult.Failed(reason)
+        }
     }
 
     private fun buildGenerationFailureMessage(
@@ -197,31 +313,62 @@ class StoryRepository(
         rateLimitQuota: StoryQuotaInfo?,
         groqKeyPresent: Boolean,
         backendConfigured: Boolean,
+        backendGroqDown: Boolean,
+        templateRejected: Boolean,
+        groqError: String?,
+        backendError: String?,
     ): String {
+        if (templateRejected) {
+            return "История похожа на шаблон — попробуй ещё раз или другого рассказчика."
+        }
+        if (groqKeyPresent && !groqError.isNullOrBlank()) {
+            return groqError
+        }
         if (rateLimitHit) {
             val quotaText = rateLimitQuota?.let { "${it.used}/${it.limit}" }
             return if (groqKeyPresent) {
                 if (quotaText != null) {
-                    "Лимит сервера исчерпан ($quotaText), свой Groq-ключ тоже не сработал. Попробуй позже."
+                    "Лимит сервера исчерпан ($quotaText). Groq с телефона тоже не ответил."
                 } else {
-                    "Лимит сервера исчерпан, свой Groq-ключ тоже не сработал. Попробуй позже."
+                    "Лимит сервера исчерпан. Groq с телефона тоже не ответил."
                 }
             } else if (quotaText != null) {
-                "Лимит бесплатных историй исчерпан ($quotaText). Добавь Groq-ключ в настройках — тогда истории генерируются без лимита."
+                "Лимит бесплатных историй исчерпан ($quotaText). Добавь Groq-ключ в настройках."
             } else {
-                "Лимит бесплатных историй исчерпан. Добавь Groq-ключ в настройках — тогда истории генерируются без лимита."
+                "Лимит бесплатных историй исчерпан. Добавь Groq-ключ в настройках."
             }
         }
-        return when {
-            groqKeyPresent && backendConfigured ->
-                "Не удалось сгенерировать историю: сервер и Groq недоступны. Проверь интернет и ключ Groq."
-            groqKeyPresent ->
-                "Groq не ответил. Проверь ключ в настройках или попробуй позже."
-            backendConfigured ->
-                "Сервер недоступен. Проверь интернет или добавь Groq-ключ в настройках."
-            else ->
-                "Укажи URL сервера или Groq-ключ в настройках."
+        if (groqKeyPresent && !backendError.isNullOrBlank()) {
+            return "Groq не сработал, сервер тоже: $backendError"
         }
+        if (groqKeyPresent) {
+            return "Groq не ответил. Проверь интернет и попробуй ещё раз."
+        }
+        if (backendConfigured && !backendError.isNullOrBlank()) {
+            return if (backendGroqDown) {
+                "Сервер без Groq. Добавь свой Groq-ключ в настройках."
+            } else {
+                "Сервер: $backendError"
+            }
+        }
+        return if (backendConfigured) {
+            "Сервер недоступен. Проверь интернет или добавь Groq-ключ в настройках."
+        } else {
+            "Укажи URL сервера или Groq-ключ в настройках."
+        }
+    }
+
+    private fun formatGroqError(raw: String?): String {
+        if (raw.isNullOrBlank()) return "Groq не ответил"
+        val lower = raw.lowercase()
+        if (lower.contains("429") && lower.contains("tokens per")) {
+            return "Лимит токенов Groq на сегодня исчерпан (считаются вход+выход, не число запросов). Приложение пробует другую модель — подожди минуту и нажми ещё раз."
+        }
+        if (lower.contains("429") || lower.contains("rate limit")) {
+            return "Groq временно ограничил запросы. Подожди минуту и попробуй снова."
+        }
+        if (lower.startsWith("groq http")) return raw.removePrefix("Groq HTTP ").removePrefix("Groq ")
+        return raw
     }
 
     private fun explainError(e: Exception): String = when (e) {

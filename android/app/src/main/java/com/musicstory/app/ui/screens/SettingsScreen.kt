@@ -1,7 +1,12 @@
 package com.musicstory.app.ui.screens
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.shrinkVertically
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -14,6 +19,8 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.ExpandLess
+import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -139,9 +146,16 @@ fun SettingsScreen(
                     .padding(20.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp),
             ) {
-                GlassCard {
-                    SectionLabel(text = "Режим")
-                    Spacer(modifier = Modifier.height(8.dp))
+                val modeSummary = if (manualMode) {
+                    context.getString(R.string.mode_manual)
+                } else {
+                    context.getString(R.string.mode_auto)
+                }
+
+                CollapsibleSettingsSection(
+                    title = context.getString(R.string.settings_mode_section),
+                    summary = modeSummary,
+                ) {
                     SettingSwitchRow(
                         title = context.getString(R.string.settings_manual_mode),
                         checked = manualMode,
@@ -154,9 +168,10 @@ fun SettingsScreen(
                     )
                 }
 
-                GlassCard {
-                    SectionLabel(text = context.getString(R.string.settings_trigger_mode))
-                    Spacer(modifier = Modifier.height(4.dp))
+                CollapsibleSettingsSection(
+                    title = context.getString(R.string.settings_trigger_mode),
+                    summary = triggerModeLabel(context, triggerMode),
+                ) {
                     TriggerMode.entries.forEach { mode ->
                         Row(
                             modifier = Modifier
@@ -188,9 +203,10 @@ fun SettingsScreen(
                     }
                 }
 
-                GlassCard {
-                    SectionLabel(text = context.getString(R.string.settings_same_track_section))
-                    Spacer(modifier = Modifier.height(8.dp))
+                CollapsibleSettingsSection(
+                    title = context.getString(R.string.settings_same_track_section),
+                    summary = context.getString(R.string.settings_same_track_every_n) + ": $sameTrackEveryN",
+                ) {
                     OutlinedTextField(
                         value = sameTrackInput,
                         onValueChange = { sameTrackInput = it.filter { ch -> ch.isDigit() }.take(2) },
@@ -203,9 +219,10 @@ fun SettingsScreen(
                     )
                 }
 
-                GlassCard {
-                    SectionLabel(text = context.getString(R.string.settings_narrator_section))
-                    Spacer(modifier = Modifier.height(4.dp))
+                CollapsibleSettingsSection(
+                    title = context.getString(R.string.settings_narrator_section),
+                    summary = storyNarrator.labelRu,
+                ) {
                     StoryNarrator.entries.forEach { narrator ->
                         NarratorRadioRow(
                             label = narrator.labelRu,
@@ -216,9 +233,10 @@ fun SettingsScreen(
                     }
                 }
 
-                GlassCard {
-                    SectionLabel(text = context.getString(R.string.settings_voice_section))
-                    Spacer(modifier = Modifier.height(4.dp))
+                CollapsibleSettingsSection(
+                    title = context.getString(R.string.settings_voice_section),
+                    summary = "${ttsVoice.labelRu} · ${ttsSpeed.labelRu} · ${storyLength.labelRu}",
+                ) {
                     Text(
                         text = context.getString(R.string.settings_tts_voice),
                         style = MaterialTheme.typography.labelMedium,
@@ -274,9 +292,18 @@ fun SettingsScreen(
                     }
                 }
 
-                GlassCard {
-                    SectionLabel(text = "AI")
-                    Spacer(modifier = Modifier.height(8.dp))
+                val aiSummary = if (groqApiKey.isNotBlank()) {
+                    context.getString(R.string.settings_groq_status_ok)
+                } else {
+                    dailyQuota?.let { quota ->
+                        context.getString(R.string.settings_free_quota, quota.remaining, quota.limit)
+                    } ?: context.getString(R.string.settings_groq_status_missing)
+                }
+
+                CollapsibleSettingsSection(
+                    title = context.getString(R.string.settings_ai_section),
+                    summary = aiSummary,
+                ) {
                     Text(
                         text = if (groqApiKey.isNotBlank()) {
                             context.getString(R.string.settings_groq_status_ok)
@@ -392,6 +419,58 @@ fun SettingsScreen(
                         }
                     },
                 )
+            }
+        }
+    }
+}
+
+@Composable
+private fun CollapsibleSettingsSection(
+    title: String,
+    summary: String,
+    initiallyExpanded: Boolean = false,
+    content: @Composable ColumnScope.() -> Unit,
+) {
+    var expanded by remember { mutableStateOf(initiallyExpanded) }
+
+    GlassCard {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable { expanded = !expanded }
+                .padding(vertical = 2.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                SectionLabel(text = title)
+                if (!expanded) {
+                    Text(
+                        text = summary,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MutedLavender,
+                        modifier = Modifier.padding(top = 4.dp),
+                    )
+                }
+            }
+            Icon(
+                imageVector = if (expanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                contentDescription = if (expanded) {
+                    LocalContext.current.getString(R.string.history_collapse)
+                } else {
+                    LocalContext.current.getString(R.string.history_expand)
+                },
+                tint = GoldBright,
+            )
+        }
+
+        AnimatedVisibility(
+            visible = expanded,
+            enter = expandVertically(),
+            exit = shrinkVertically(),
+        ) {
+            Column {
+                Spacer(modifier = Modifier.height(8.dp))
+                content()
             }
         }
     }
