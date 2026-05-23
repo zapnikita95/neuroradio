@@ -67,7 +67,6 @@ router.post('/full', validateStoryFullBody, async (req: Request, res: Response) 
       : [];
 
     let story;
-    let usedDemoFallback = false;
 
     if (demo) {
       story = buildDemoStory(
@@ -79,28 +78,16 @@ router.post('/full', validateStoryFullBody, async (req: Request, res: Response) 
         storyNarrator,
       );
     } else {
-      try {
-        story = await generateStoryScript({
-          artist: metadata.artist,
-          title: metadata.title,
-          year: metadata.year,
-          genre: metadata.genre,
-          voiceId,
-          storyLength,
-          storyNarrator,
-          previousScripts,
-        });
-      } catch (err) {
-        console.error('Groq failed, using demo fallback:', err);
-        story = buildDemoStory(
-          metadata.artist,
-          metadata.title,
-          metadata.year,
-          metadata.genre,
-          previousScripts,
-        );
-        usedDemoFallback = true;
-      }
+      story = await generateStoryScript({
+        artist: metadata.artist,
+        title: metadata.title,
+        year: metadata.year,
+        genre: metadata.genre,
+        voiceId,
+        storyLength,
+        storyNarrator,
+        previousScripts,
+      });
     }
 
     const response: Record<string, unknown> = {
@@ -112,7 +99,7 @@ router.post('/full', validateStoryFullBody, async (req: Request, res: Response) 
       script: story.script,
       word_count: story.word_count,
       voiceId: story.voiceId,
-      demo: demo || usedDemoFallback,
+      demo,
       quota: getDailyStoryQuota(req.installId ?? 'unknown'),
       sources: {
         musicbrainz: Boolean(metadata.year || metadata.genre || metadata.mbid),
@@ -144,9 +131,16 @@ router.post('/full', validateStoryFullBody, async (req: Request, res: Response) 
     res.json(response);
   } catch (err) {
     console.error('POST /v1/story/full failed:', err);
-    res.status(500).json({
-      error: 'Story generation failed',
-      message: safeErrorMessage(err),
+    const message = safeErrorMessage(err);
+    const groqUnavailable =
+      !isDemoMode() &&
+      (message.includes('Groq') || message.includes('GROQ') || message.includes('403'));
+    res.status(groqUnavailable ? 503 : 500).json({
+      error: groqUnavailable ? 'Story generation unavailable' : 'Story generation failed',
+      code: groqUnavailable ? 'GROQ_FAILED' : 'STORY_FAILED',
+      message: groqUnavailable
+        ? 'Groq не ответил — обнови GROQ_API_KEY на сервере или добавь свой ключ в настройках приложения.'
+        : message,
     });
   }
 });

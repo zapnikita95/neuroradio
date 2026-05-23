@@ -129,9 +129,13 @@ class StoryRepository(
                 StoryLog.w("Backend response rejected: empty or duplicate")
             } catch (e: Exception) {
                 if (e is HttpException && e.code() == 429) {
+                    rateLimitHit = true
                     val quota = parseRateLimitBody(e)
+                    rateLimitQuota = quota
                     quota?.let { _dailyQuota.value = it }
                     StoryLog.w("Backend daily limit reached: ${quota?.used}/${quota?.limit}")
+                } else if (e is HttpException && e.code() == 503) {
+                    StoryLog.w("Backend Groq unavailable: ${explainError(e)}")
                 } else {
                     val reason = explainError(e)
                     StoryLog.e("Backend failed: $reason", e)
@@ -212,6 +216,7 @@ class StoryRepository(
     private fun explainError(e: Exception): String = when (e) {
         is HttpException -> when (e.code()) {
             429 -> "лимит историй"
+            503 -> "Groq на сервере недоступен"
             else -> "HTTP ${e.code()}"
         }
         is IOException -> "нет сети"
