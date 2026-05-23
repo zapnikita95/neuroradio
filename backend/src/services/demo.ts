@@ -1,6 +1,6 @@
 import { StoryScript } from './groq.js';
-import { buildPersonaForNarrator } from './prompts.js';
-import { resolveStoryNarrator, StoryNarratorId } from './story-narrator.js';
+import { buildPersonaForNarrator, resolveStoryNarrator, StoryNarratorId } from './story-narrator.js';
+import { resolveTrackLocale } from './track-locale.js';
 import { voiceForYear, YandexVoiceId } from './voices.js';
 
 const ANGLES = [
@@ -62,17 +62,33 @@ function buildAngleScript(
   artist: string,
   title: string,
   angleIndex: number,
-  persona: ReturnType<typeof buildPersonaForNarrator>,
+  countryCode?: string,
+  year?: number,
 ): string {
-  const role = persona.roleTitle.split(',')[0].trim();
-  const templates = [
-    `Помню студию — при записи «${title}» ${artist} настоял оставить дубль с ошибкой. Тот срыв голоса стал фирменным моментом, инжен+ер потом говорил, что микрофон еле остыл.`,
-    `Тогда я стоял у радиолы — «${title}» от ${artist} вылетел как удар. Соседи стучали по батарее, а мы не могли выключить, потому что ${persona.eraHint.split('.')[0]}.`,
-    `На живом концерте ${artist} вышел с «${title}» — зал замолчал на первой ноте. Я стоял у мониторов, звукорежиссёры краснели от свиста в колонках, а потом зал взорвался.`,
-    `За кулисами шептались: ${artist} и «${title}» — не просто сингл. Продюсеры спорили до утра, кто первым пустит такой звук в эфир, а ${role} уже знал — это изменит сезон.`,
-    `Я собираю всё на ${artist} — концертные записи, интервью, обложки. «${title}» каждый раз даёт новую деталь: в живой версии другая фраза, на обороте сингла другой дубль.`,
-    `На сцене шептались: ${artist} и «${title}» — спор в кулуарах, не просто хит. Я был там — помню запах дыма и то, как зал не дышал.`,
-  ];
+  const locale = resolveTrackLocale({ artist, title, year, countryCode });
+  const scene = locale.sceneHintRu.split('.')[0];
+  const ru = locale.countryCode === 'RU';
+
+  const templates = ru
+    ? [
+        `В студии «${title}» — ${artist} настаивал оставить кривой дубль. Звукорежиссёр потом сказал: так и задумывали, это и есть характер трека.`,
+        `Первый раз услышал «${title}» — ${artist} прилетел из плейлиста, друзья пересылали в Telegram. На кухне сидели до утра, не могли выключить.`,
+        `На концерте ${artist} вытащил «${title}» — зал сначала замолчал, потом подхватил припев. Я стоял у колонок и ловил каждый удар.`,
+        `За кулисами спорили: «${title}» пускать как есть или переписывать. ${artist} не сдался — и именно эта версия пошла в релиз.`,
+        `У фанатов ${artist} «${title}» — отдельная история: в live другой темп, на демке другой бэк. Я собираю все версии.`,
+        `На площадке шептались про «${title}» — ${artist} тогда только набирал обороты, а трек уже знали наизусть.`,
+      ]
+    : [
+        `Помню студию — при записи «${title}» ${artist} настоял оставить дубль с ошибкой. Тот срыв голоса стал фирменным моментом, инжен+ер потом говорил, что микрофон еле остыл.`,
+        year !== undefined && year >= 2010
+          ? `Первый раз услышал «${title}» — ${artist} вылетел из плейлиста, и я не мог выключить. Переслушивал в наушниках всю ночь, потому что ${scene}.`
+          : `Тогда я стоял у радиолы — «${title}» от ${artist} вылетел как удар. Соседи стучали по батарее, а мы не могли выключить, потому что ${scene}.`,
+        `На живом концерте ${artist} вышел с «${title}» — зал замолчал на первой ноте. Я стоял у мониторов, звукорежиссёры краснели от свиста в колонках, а потом зал взорвался.`,
+        `За кулисами шептались: ${artist} и «${title}» — не просто сингл. Продюсеры спорили до утра, кто первым пустит такой звук в эфир.`,
+        `Я собираю всё на ${artist} — концертные записи, интервью, обложки. «${title}» каждый раз даёт новую деталь: в живой версии другая фраза, на обороте сингла другой дубль.`,
+        `На сцене шептались: ${artist} и «${title}» — спор в кулуарах, не просто хит. Я был там — помню запах дыма и то, как зал не дышал.`,
+      ];
+
   return templates[angleIndex % templates.length];
 }
 
@@ -124,10 +140,11 @@ export function buildDemoStory(
   genre?: string,
   previousScripts: string[] = [],
   storyNarrator: StoryNarratorId | unknown = 'auto',
+  countryCode?: string,
 ): StoryScript {
   const voiceId: YandexVoiceId = voiceForYear(year, genre);
   const narratorId = resolveStoryNarrator(storyNarrator);
-  const persona = buildPersonaForNarrator(narratorId, year, genre, artist);
+  buildPersonaForNarrator(narratorId, year, genre, artist, title, countryCode);
   let angleIndex = previousScripts.length;
 
   if (narratorId !== 'auto') {
@@ -160,7 +177,7 @@ export function buildDemoStory(
   }
 
   for (let attempt = 0; attempt < ANGLES.length; attempt++) {
-    const script = buildAngleScript(artist, title, angleIndex + attempt, persona);
+    const script = buildAngleScript(artist, title, angleIndex + attempt, countryCode, year);
     if (!isTooSimilar(script, previousScripts)) {
       return {
         script,
@@ -170,7 +187,7 @@ export function buildDemoStory(
     }
   }
 
-  const fallback = buildAngleScript(artist, title, 0, persona);
+  const fallback = buildAngleScript(artist, title, 0, countryCode, year);
   return {
     script: fallback,
     word_count: fallback.trim().split(/\s+/).filter(Boolean).length,

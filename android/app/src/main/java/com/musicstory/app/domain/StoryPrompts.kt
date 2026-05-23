@@ -26,6 +26,11 @@ $focusBlock
 
 ЯЗЫК: только русский. Английский допустим ТОЛЬКО в именах артистов и названиях песен.
 
+ЛОКАЛЬ И ЭПОХА:
+- История должна совпадать со страной происхождения трека и его реальной эпохой
+- Российский современный трек — не «радиола», не Apollo, не Nashville
+- Если год неизвестен, не выдумывай винтаж — ориентируйся на сцену страны артиста
+
 ЧИСЛА — КРИТИЧНО:
 - В script НЕЛЬЗЯ писать цифры, годы, «N-й», «шестидесятых» и т.п.
 - Исключение: цифры только из имени артиста или названия трека (2Pac, «1999»)
@@ -58,13 +63,18 @@ JSON: {"script":"...", "word_count": число}
         length: StoryLength,
         previousScripts: List<String>,
         narrator: StoryNarrator = StoryNarrator.AUTO,
+        countryCode: String? = null,
     ): String {
-        val persona = StoryNarrator.buildPersona(narrator, year, genre, artist)
+        val locale = TrackLocaleResolver.resolve(artist, title, year, genre, countryCode)
+        val persona = StoryNarrator.buildPersona(narrator, year, genre, artist, title, countryCode)
         return buildString {
             appendLine("Артист: $artist")
             appendLine("Трек: $title")
             genre?.let { appendLine("Жанр: $it") }
-            appendLine("Эпоха (для контекста, НЕ писать даты в текст): ${StoryPersona.eraContextForPrompt(year, genre)}")
+            appendLine("Страна/сцена: ${locale.countryLabelRu}")
+            appendLine("Год релиза (только для тебя, НЕ писать цифры в script): ${locale.yearLabelRu}")
+            appendLine("Эпоха и контекст: ${locale.sceneHintRu}")
+            appendLine("ЛОКАЛЬ: ${locale.localeRulesRu}")
             appendLine()
             appendLine("УГОЛ ИСТОРИИ: ${angle.labelRu}")
             appendLine("Ты — ${persona.roleTitle}. Говоришь так: ${persona.speechStyle}")

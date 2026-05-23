@@ -76,6 +76,7 @@ router.post('/full', validateStoryFullBody, async (req: Request, res: Response) 
         metadata.genre,
         previousScripts,
         storyNarrator,
+        metadata.countryCode,
       );
     } else {
       story = await generateStoryScript({
@@ -83,6 +84,7 @@ router.post('/full', validateStoryFullBody, async (req: Request, res: Response) 
         title: metadata.title,
         year: metadata.year,
         genre: metadata.genre,
+        countryCode: metadata.countryCode,
         voiceId,
         storyLength,
         storyNarrator,
@@ -95,6 +97,7 @@ router.post('/full', validateStoryFullBody, async (req: Request, res: Response) 
       title: metadata.title,
       year: metadata.year ?? null,
       genre: metadata.genre ?? null,
+      country: metadata.countryCode ?? null,
       mbid: metadata.mbid ?? null,
       script: story.script,
       word_count: story.word_count,

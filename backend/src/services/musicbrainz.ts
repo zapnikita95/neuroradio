@@ -8,7 +8,18 @@ export interface TrackMetadata {
   title: string;
   year?: number;
   genre?: string;
+  countryCode?: string;
   mbid?: string;
+}
+
+interface MusicBrainzArtist {
+  id?: string;
+  name?: string;
+  country?: string;
+}
+
+interface MusicBrainzArtistCredit {
+  artist?: MusicBrainzArtist;
 }
 
 interface MusicBrainzRecording {
@@ -17,6 +28,7 @@ interface MusicBrainzRecording {
   'first-release-date'?: string;
   releases?: Array<{ date?: string }>;
   tags?: Array<{ name: string; count: number }>;
+  'artist-credit'?: MusicBrainzArtistCredit[];
 }
 
 interface MusicBrainzSearchResponse {
@@ -49,6 +61,14 @@ function pickYear(recording: MusicBrainzRecording): number | undefined {
   return undefined;
 }
 
+function pickCountry(recording: MusicBrainzRecording): string | undefined {
+  for (const credit of recording['artist-credit'] ?? []) {
+    const code = credit.artist?.country?.trim().toUpperCase();
+    if (code && /^[A-Z]{2}$/.test(code)) return code;
+  }
+  return undefined;
+}
+
 /**
  * Enriches artist/title with year and genre via MusicBrainz recording search.
  * Returns input fields unchanged when lookup fails.
@@ -61,7 +81,7 @@ export async function enrichTrackMetadata(
 
   try {
     const query = encodeURIComponent(`artist:"${artist}" AND recording:"${title}"`);
-    const url = `${MUSICBRAINZ_BASE}/recording?query=${query}&fmt=json&limit=5`;
+    const url = `${MUSICBRAINZ_BASE}/recording?query=${query}&fmt=json&limit=5&inc=artist-credits`;
 
     const response = await fetch(url, {
       headers: { 'User-Agent': USER_AGENT },
@@ -85,6 +105,7 @@ export async function enrichTrackMetadata(
       title: recording.title ?? title,
       year: pickYear(recording),
       genre: pickGenre(recording.tags),
+      countryCode: pickCountry(recording),
       mbid: recording.id,
     };
   } catch (err) {

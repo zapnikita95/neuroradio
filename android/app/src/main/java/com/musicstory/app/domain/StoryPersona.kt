@@ -17,31 +17,25 @@ data class StoryPersona(
     val formatRules: String? = null,
 ) {
     companion object {
-        /** Era hint for prompts only — model must NOT copy digits into script */
-        fun eraContextForPrompt(year: Int?, genre: String?): String {
-            val g = genre?.lowercase().orEmpty()
-            if (g.contains("jazz") || g.contains("swing")) return "джазовая эпоха, клубы и джем-сейшены"
-            if (g.contains("blues") || g.contains("soul")) return "soul и blues, южные клубы и ночные сцены"
-            if (g.contains("rock") || g.contains("metal") || g.contains("punk")) return "рок-сцена, концерты и гаражи"
-            if (g.contains("electronic") || g.contains("house") || g.contains("techno") || g.contains("dance")) {
-                return "клубная электроника, склады и диджейские стыки"
-            }
-            if (g.contains("hip hop") || g.contains("rap")) return "хип-хоп с блока, уличные вечеринки"
-            if (g.contains("pop")) return "поп-культура, радио и телевидение"
-            if (year == null) return "эпоха артиста, без точных дат в тексте"
-            if (year < 1960) return "ранний период, винил и живое радио"
-            if (year < 1970) return "расцвет soul и rock, Apollo и Abbey Road"
-            if (year < 1980) return "золотая эра рока и диско, большие залы"
-            if (year < 1990) return "MTV, кассеты и громкие фестивали"
-            if (year < 2000) return "клубы и ремиксы, переход в цифру"
-            if (year < 2010) return "интернет-форумы и первые стримы"
-            return "современная сцена, архивы и редкие концерты"
-        }
+        fun eraContextForPrompt(
+            year: Int?,
+            genre: String?,
+            countryCode: String? = null,
+            artist: String = "",
+            title: String = "",
+        ): String = TrackLocaleResolver.eraContextForPrompt(year, genre, countryCode, artist, title)
 
-        fun forTrack(year: Int?, genre: String?, artist: String): StoryPersona {
+        fun forTrack(
+            year: Int?,
+            genre: String?,
+            artist: String,
+            title: String = "",
+            countryCode: String? = null,
+        ): StoryPersona {
+            val locale = TrackLocaleResolver.resolve(artist, title, year, genre, countryCode)
             val g = genre?.lowercase().orEmpty()
             val a = artist.lowercase()
-            val era = eraContextForPrompt(year, genre)
+            val era = locale.sceneHintRu
 
             return when {
                 a.contains("james brown") || g.contains("funk") ->
@@ -91,9 +85,24 @@ data class StoryPersona(
 
                 g.contains("hip hop") || g.contains("rap") ->
                     personaForYear(
-                        "фанат хип-хопа с блока",
-                        "поток, вечеринка на блоке, уличная честность",
-                        "$era. битбокс, слова как оружие и щит",
+                        if (locale.countryCode == "RU") "фанат российского рэпа" else "фанат хип-хопа с блока",
+                        if (locale.countryCode == "RU") {
+                            "поток, площадки, студии, честная уличная речь"
+                        } else {
+                            "поток, вечеринка на блоке, уличная честность"
+                        },
+                        era,
+                    )
+
+                g.contains("country") || title.lowercase().contains("кантри") ->
+                    personaForYear(
+                        if (locale.countryCode == "RU") "фанат $artist, российская кантри-сцена" else "фанат $artist",
+                        if (locale.countryCode == "RU") {
+                            "живая речь, российские студии и площадки, без Nashville-клише"
+                        } else {
+                            "живая речь, уважение к эпохе трека"
+                        },
+                        era,
                     )
 
                 g.contains("pop") || a.contains("beatles") || a.contains("abba") ->

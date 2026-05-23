@@ -85,14 +85,16 @@ enum class StoryNarrator(
             year: Int?,
             genre: String?,
             artist: String,
+            title: String = "",
+            countryCode: String? = null,
         ): StoryPersona {
-            if (narrator.isAuto) return StoryPersona.forTrack(year, genre, artist)
-            val era = StoryPersona.eraContextForPrompt(year, genre)
+            if (narrator.isAuto) return StoryPersona.forTrack(year, genre, artist, title, countryCode)
+            val locale = TrackLocaleResolver.resolve(artist, title, year, genre, countryCode)
             val genreNote = genre?.let { "Жанр: $it. " }.orEmpty()
             return StoryPersona(
                 roleTitle = "${narrator.roleTitle}. ${genreNote}Артист: $artist",
                 speechStyle = narrator.speechStyle,
-                eraHint = era,
+                eraHint = locale.sceneHintRu,
                 contentFocus = narrator.contentFocus,
                 formatRules = narrator.formatRules,
             )

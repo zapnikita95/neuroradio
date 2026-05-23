@@ -87,6 +87,7 @@ class StoryRepository(
 
         val year = metadata.year
         val genre = metadata.genre
+        val countryCode = metadata.countryCode
         val angle = StoryPersona.pickAngle(previousScripts.size)
 
         val backendUrl = settingsDataStore.backendUrl.first().trim()
@@ -155,6 +156,7 @@ class StoryRepository(
                         title = track.title,
                         year = year,
                         genre = genre,
+                        countryCode = countryCode,
                         previousScripts = previousScripts,
                         angle = angle,
                         storyLength = storyLength,

@@ -6,6 +6,10 @@ import {
   resolveStoryNarrator,
   StoryNarratorId,
 } from './story-narrator.js';
+import { eraContextForPrompt, resolveTrackLocale, type TrackLocale } from './track-locale.js';
+
+export { eraContextForPrompt, resolveTrackLocale };
+export type { TrackLocale };
 
 export { buildPersonaForNarrator, resolveStoryNarrator };
 export type { StoryNarratorId };
@@ -26,26 +30,6 @@ export const STORY_ANGLES = [
   'история из тусовки жанра в тот сезон',
 ] as const;
 
-export function eraContextForPrompt(year: number | undefined, genre: string | undefined): string {
-  const g = (genre ?? '').toLowerCase();
-  if (g.includes('jazz') || g.includes('swing')) return 'джазовая эпоха, клубы и джем-сейшены';
-  if (g.includes('blues') || g.includes('soul')) return 'soul и blues, южные клубы и ночные сцены';
-  if (g.includes('rock') || g.includes('metal') || g.includes('punk')) return 'рок-сцена, концерты и гаражи';
-  if (g.includes('electronic') || g.includes('house') || g.includes('techno') || g.includes('dance')) {
-    return 'клубная электроника, склады и диджейские стыки';
-  }
-  if (g.includes('hip hop') || g.includes('rap')) return 'хип-хоп с блока, уличные вечеринки';
-  if (g.includes('pop')) return 'поп-культура, радио и телевидение';
-  if (!year) return 'эпоха артиста';
-  if (year < 1960) return 'ранний период, винил и живое радио';
-  if (year < 1970) return 'расцвет soul и rock, Apollo и Abbey Road';
-  if (year < 1980) return 'золотая эра рока и диско';
-  if (year < 1990) return 'MTV, кассеты и фестивали';
-  if (year < 2000) return 'клубы и ремиксы';
-  if (year < 2010) return 'интернет-форумы и первые стримы';
-  return 'современная сцена, архивы и редкие концерты';
-}
-
 export function pickAngle(previousCount: number): string {
   return STORY_ANGLES[previousCount % STORY_ANGLES.length];
 }
@@ -58,10 +42,13 @@ export function personaForTrack(
   year: number | undefined,
   genre: string | undefined,
   artist: string,
+  title = '',
+  countryCode?: string,
 ): StoryPersona {
+  const locale = resolveTrackLocale({ artist, title, year, genre, countryCode });
   const g = (genre ?? '').toLowerCase();
   const a = artist.toLowerCase();
-  const era = eraContextForPrompt(year, genre);
+  const era = locale.sceneHintRu;
 
   if (a.includes('james brown') || g.includes('funk')) {
     return personaForYear(
@@ -118,9 +105,21 @@ export function personaForTrack(
 
   if (g.includes('hip hop') || g.includes('rap')) {
     return personaForYear(
-      'фанат хип-хопа с блока',
-      'поток, вечеринка на блоке, уличная честность',
-      `${era}. битбокс, слова как оружие и щит`,
+      locale.countryCode === 'RU' ? 'фанат российского рэпа' : 'фанат хип-хопа с блока',
+      locale.countryCode === 'RU'
+        ? 'поток, площадки, студии, честная уличная речь'
+        : 'поток, вечеринка на блоке, уличная честность',
+      era,
+    );
+  }
+
+  if (g.includes('country') || title.toLowerCase().includes('кантри')) {
+    return personaForYear(
+      locale.countryCode === 'RU' ? `фанат ${artist}, российская кантри-сцена` : `фанат ${artist}`,
+      locale.countryCode === 'RU'
+        ? 'живая речь, российские студии и площадки, без Nashville-клише'
+        : 'живая речь, уважение к эпохе трека',
+      era,
     );
   }
 
@@ -159,6 +158,11 @@ export function buildSystemPrompt(persona: StoryPersona, length: StoryLengthPres
 КАК ТЫ ГОВОРИШЬ: ${persona.speechStyle}
 ${focusBlock}
 
+ЛОКАЛЬ И ЭПОХА:
+- История должна совпадать со страной происхождения трека и его реальной эпохой
+- Российский современный трек — не «радиола», не Apollo, не Nashville
+- Если год неизвестен, не выдумывай винтаж — ориентируйся на сцену страны артиста
+
 ЯЗЫК: только русский. Английский допустим ТОЛЬКО в именах артистов и названиях песен.
 
 ЧИСЛА — КРИТИЧНО:
@@ -190,6 +194,7 @@ export function buildStoryUserPrompt(params: {
   title: string;
   year?: number;
   genre?: string;
+  countryCode?: string;
   voiceId: string;
   angle: string;
   storyLength: StoryLengthId;
@@ -198,16 +203,32 @@ export function buildStoryUserPrompt(params: {
   retryReason?: string;
 }): string {
   const narratorId = resolveStoryNarrator(params.storyNarrator);
-  const persona = buildPersonaForNarrator(narratorId, params.year, params.genre, params.artist);
+  const locale = resolveTrackLocale({
+    artist: params.artist,
+    title: params.title,
+    year: params.year,
+    genre: params.genre,
+    countryCode: params.countryCode,
+  });
+  const persona = buildPersonaForNarrator(
+    narratorId,
+    params.year,
+    params.genre,
+    params.artist,
+    params.title,
+    params.countryCode,
+  );
   const length = getStoryLengthPreset(params.storyLength);
-  const era = eraContextForPrompt(params.year, params.genre);
   const lines: string[] = [
     `Артист: ${params.artist}`,
     `Трек: ${params.title}`,
   ];
 
   if (params.genre) lines.push(`Жанр: ${params.genre}`);
-  lines.push(`Эпоха (контекст, НЕ писать даты в текст): ${era}`);
+  lines.push(`Страна/сцена: ${locale.countryLabelRu}`);
+  lines.push(`Год релиза (только для тебя, НЕ писать цифры в script): ${locale.yearLabelRu}`);
+  lines.push(`Эпоха и контекст: ${locale.sceneHintRu}`);
+  lines.push(`ЛОКАЛЬ: ${locale.localeRulesRu}`);
   lines.push('');
   lines.push(`УГОЛ ИСТОРИИ: ${params.angle}`);
   lines.push(`Ты — ${persona.roleTitle}. Говоришь так: ${persona.speechStyle}`);

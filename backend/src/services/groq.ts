@@ -33,6 +33,7 @@ export interface GenerateStoryInput {
   title: string;
   year?: number;
   genre?: string;
+  countryCode?: string;
   voiceId: YandexVoiceId;
   storyLength?: StoryLengthId;
   storyNarrator?: StoryNarratorId;
@@ -130,6 +131,8 @@ export async function generateStoryScript(
     input.year,
     input.genre,
     input.artist,
+    input.title,
+    input.countryCode,
   );
   const systemPrompt = buildSystemPrompt(persona, lengthPreset);
   const voiceId = input.voiceId ?? voiceForYear(input.year, input.genre);

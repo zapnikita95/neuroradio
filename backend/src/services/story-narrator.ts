@@ -1,4 +1,5 @@
-import { eraContextForPrompt, personaForTrack, StoryPersona } from './prompts.js';
+import { personaForTrack, StoryPersona } from './prompts.js';
+import { resolveTrackLocale } from './track-locale.js';
 
 export type StoryNarratorId =
   | 'auto'
@@ -114,19 +115,21 @@ export function buildPersonaForNarrator(
   year: number | undefined,
   genre: string | undefined,
   artist: string,
+  title = '',
+  countryCode?: string,
 ): StoryPersona {
   if (narratorId === 'auto') {
-    return personaForTrack(year, genre, artist);
+    return personaForTrack(year, genre, artist, title, countryCode);
   }
 
   const preset = STORY_NARRATOR_PRESETS[narratorId];
-  const era = eraContextForPrompt(year, genre);
+  const locale = resolveTrackLocale({ artist, title, year, genre, countryCode });
   const genreNote = genre ? `Жанр: ${genre}. ` : '';
 
   return {
     roleTitle: `${preset.roleTitle}. ${genreNote}Артист: ${artist}`,
     speechStyle: preset.speechStyle,
-    eraHint: era,
+    eraHint: locale.sceneHintRu,
     contentFocus: preset.contentFocus,
     formatRules: preset.formatRules,
   };
