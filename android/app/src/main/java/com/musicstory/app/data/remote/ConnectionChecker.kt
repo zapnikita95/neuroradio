@@ -44,7 +44,7 @@ class ConnectionChecker(
         }
 
         val body = org.json.JSONObject().apply {
-            put("model", "llama-3.1-8b-instant")
+            put("model", "llama-3.3-70b-versatile")
             put("max_tokens", 8)
             put("messages", org.json.JSONArray().apply {
                 put(org.json.JSONObject().put("role", "user").put("content", "ok"))

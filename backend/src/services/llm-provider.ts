@@ -8,8 +8,9 @@ export function resolveLlmProvider(override?: unknown): LlmProviderId {
   if (raw === 'gemini' || raw === 'groq') return raw;
   const fromEnv = process.env.LLM_PROVIDER?.trim().toLowerCase();
   if (fromEnv === 'gemini' || fromEnv === 'groq') return fromEnv;
-  // Gemini: несколько бесплатных моделей с ротацией; Groq — fallback.
-  return hasGeminiApiKey() ? 'gemini' : 'groq';
+  if (hasGroqApiKey()) return 'groq';
+  if (hasGeminiApiKey()) return 'gemini';
+  return 'groq';
 }
 
 export function hasLlmKeyForProvider(provider: LlmProviderId): boolean {

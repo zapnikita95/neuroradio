@@ -1,8 +1,9 @@
 /** Groq chat models — try in order on 429 / overload. */
 
+/** Primary: 70B quality; 8b-instant only when 70B rate-limited. */
 export const GROQ_STORY_MODELS = [
-  'llama-3.1-8b-instant',
   'llama-3.3-70b-versatile',
+  'llama-3.1-8b-instant',
   'gemma2-9b-it',
 ] as const;
 

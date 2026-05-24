@@ -22,6 +22,11 @@ import {
   getStoryLengthPreset,
   StoryLengthId,
 } from './story-length.js';
+import {
+  finalizeAfterQualityLoop,
+  qualityOptionsForAttempt,
+  validateGeneratedStory,
+} from './story-generate-loop.js';
 
 const GEMINI_API_BASE = 'https://generativelanguage.googleapis.com/v1beta/models';
 const MAX_ATTEMPTS = 3;
@@ -254,6 +259,7 @@ export async function generateStoryScript(
 
   let retryReason: string | undefined;
   let geminiModelIndex = 0;
+  let lastCandidate: StoryScript | null = null;
 
   for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
     const userPrompt = buildStoryUserPrompt({
@@ -298,41 +304,43 @@ export async function generateStoryScript(
     story.voiceId = voiceId;
     story.word_count = countWords(story.script);
 
-    const quality = validateStoryScript(
+    const qOpts = qualityOptionsForAttempt(attempt, MAX_ATTEMPTS, referenceFacts);
+
+    const quality = validateGeneratedStory(
       story.script,
       storyLength,
       input.artist,
       input.title,
-      {
-        strictLength: attempt === MAX_ATTEMPTS - 1 ? false : true,
-        skipWatery: attempt === MAX_ATTEMPTS - 1,
-        referenceFacts,
-      },
+      qOpts,
     );
     if (quality.ok) {
       return finalizeStory(story, { ...input, voiceId }, storyLength);
     }
 
     const sanitized = sanitizeScriptForTts(story.script, input.artist, input.title);
-    const sanitizedQuality = validateStoryScript(
+    const sanitizedQuality = validateGeneratedStory(
       sanitized,
       storyLength,
       input.artist,
       input.title,
-      {
-        strictLength: attempt === MAX_ATTEMPTS - 1 ? false : true,
-        skipWatery: attempt === MAX_ATTEMPTS - 1,
-        referenceFacts,
-      },
+      qOpts,
     );
     if (sanitizedQuality.ok) {
       console.warn(`Gemini story sanitized after attempt ${attempt + 1}: ${quality.reason}`);
       return finalizeStory({ ...story, script: sanitized }, { ...input, voiceId }, storyLength);
     }
 
+    lastCandidate = { ...story, script: sanitized };
     retryReason = sanitizedQuality.reason ?? quality.reason;
     console.warn(`Gemini story quality reject (attempt ${attempt + 1}): ${retryReason}`);
   }
+
+  const fallback = finalizeAfterQualityLoop(
+    lastCandidate,
+    { artist: input.artist, title: input.title },
+    (s) => finalizeStory(s, { ...input, voiceId }, storyLength),
+  );
+  if (fallback) return fallback;
 
   throw new Error('Could not produce a usable story');
 }

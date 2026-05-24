@@ -45,13 +45,13 @@ export const BANNED_SCRIPT_PATTERNS: RegExp[] = [
   /подсказывает\s+[A-Z]/i,
   /подсказывает\s+«?[A-Za-z]/i,
   /(?:^|[.!?…]\s*)я (?:сидел|вспоминаю) (?:в )?студии[,]?\s+где/i,
-  /^я помню/i,
   /^я (?:был|была) в клубе/i,
   /^я (?:помню|был|была), когда впервые/i,
   /^на сцене артист начинает/i,
   /я помню студию/i,
   /мы были в клубе/i,
   /я стоял у мониторов/i,
+  // /^я помню/i — removed: valid opener, caused false rejects
 ];
 
 const CYR = '[а-яё]+';
@@ -211,22 +211,34 @@ export function validateStoryScript(
   lengthId: StoryLengthId = DEFAULT_STORY_LENGTH,
   artist = '',
   title = '',
-  options: { strictLength?: boolean; skipWatery?: boolean; referenceFacts?: string[] } = {},
+  options: {
+    strictLength?: boolean;
+    skipWatery?: boolean;
+    referenceFacts?: string[];
+    skipReferenceAnchor?: boolean;
+    skipBannedPatterns?: boolean;
+    skipEnglishCheck?: boolean;
+  } = {},
 ): { ok: true } | { ok: false; reason: string } {
   const limits = getStoryLengthPreset(lengthId);
   const strictLength = options.strictLength ?? true;
   const skipWatery = options.skipWatery ?? false;
+  const skipReferenceAnchor = options.skipReferenceAnchor ?? false;
+  const skipBannedPatterns = options.skipBannedPatterns ?? false;
+  const skipEnglishCheck = options.skipEnglishCheck ?? false;
   const referenceFacts = options.referenceFacts ?? [];
   const trimmed = script.trim();
   if (!trimmed) return { ok: false, reason: 'empty script' };
 
-  for (const pattern of BANNED_SCRIPT_PATTERNS) {
-    if (pattern.test(trimmed)) {
-      return { ok: false, reason: `banned pattern: ${pattern.source}` };
+  if (!skipBannedPatterns) {
+    for (const pattern of BANNED_SCRIPT_PATTERNS) {
+      if (pattern.test(trimmed)) {
+        return { ok: false, reason: `banned pattern: ${pattern.source}` };
+      }
     }
   }
 
-  if (hasEnglishLeak(trimmed, artist, title)) {
+  if (!skipEnglishCheck && hasEnglishLeak(trimmed, artist, title)) {
     return { ok: false, reason: 'english words in Russian narration' };
   }
 
@@ -242,7 +254,11 @@ export function validateStoryScript(
     }
   }
 
-  if (referenceFacts.length > 0 && !anchorsReferenceFact(trimmed, referenceFacts)) {
+  if (
+    !skipReferenceAnchor &&
+    referenceFacts.length > 0 &&
+    !anchorsReferenceFact(trimmed, referenceFacts)
+  ) {
     return { ok: false, reason: 'story ignores Wikipedia reference facts' };
   }
 
