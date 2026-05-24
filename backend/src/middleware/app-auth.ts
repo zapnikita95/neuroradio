@@ -1,5 +1,10 @@
 import { Request, Response, NextFunction } from 'express';
-import { getAllowedPackageName, getAuthJwtSecret, verifyJwt } from '../services/jwt.js';
+import {
+  DESKTOP_CLIENT_ID,
+  getAllowedPackageName,
+  getAuthJwtSecret,
+  verifyJwt,
+} from '../services/jwt.js';
 import { rateLimitStory } from './rate-limit.js';
 
 declare global {
@@ -36,7 +41,7 @@ export function requireAppAuth(req: Request, res: Response, next: NextFunction):
     return;
   }
 
-  if (payload.pkg && payload.pkg !== getAllowedPackageName()) {
+  if (payload.client !== DESKTOP_CLIENT_ID && payload.pkg && payload.pkg !== getAllowedPackageName()) {
     res.status(403).json({ error: 'Forbidden' });
     return;
   }

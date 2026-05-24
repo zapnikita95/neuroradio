@@ -12,15 +12,17 @@ import {
   sanitizeScriptForTts,
   validateStoryScript,
 } from './story-quality.js';
-import { hasEnglishLeak, RUSSIAN_LANGUAGE_PROMPT_BLOCK } from './story-russian-language.js';
+import {
+  DEFAULT_GEMINI_MODEL,
+  resolveGeminiModel,
+} from './gemini-models.js';
 import {
   DEFAULT_STORY_LENGTH,
   getStoryLengthPreset,
   StoryLengthId,
 } from './story-length.js';
 
-const GROQ_API_URL = 'https://api.groq.com/openai/v1/chat/completions';
-const GROQ_MODEL = 'llama-3.1-8b-instant';
+const GEMINI_API_BASE = 'https://generativelanguage.googleapis.com/v1beta/models';
 const MAX_ATTEMPTS = 3;
 
 export interface StoryScript {
@@ -41,6 +43,7 @@ export interface GenerateStoryInput {
   previousScripts?: string[];
   referenceFacts?: string[];
   selectedReferenceFact?: { fact: string; scope: 'artist' | 'track'; scopeLabelRu: string };
+  geminiModel?: string;
 }
 
 function parseStoryJson(raw: string): StoryScript | null {
@@ -62,69 +65,137 @@ function parseStoryJson(raw: string): StoryScript | null {
   }
 }
 
-function extractFailedGeneration(errorBody: string): string | null {
-  try {
-    const root = JSON.parse(errorBody) as { error?: { failed_generation?: string } };
-    return root.error?.failed_generation?.trim() || null;
-  } catch {
-    return null;
-  }
-}
-
-async function callGroqOnce(
+async function callGeminiOnce(
   apiKey: string,
+  model: string,
   systemPrompt: string,
   userPrompt: string,
   maxTokens: number,
   useJsonMode: boolean,
 ): Promise<string> {
-  const body: Record<string, unknown> = {
-    model: GROQ_MODEL,
+  const url = `${GEMINI_API_BASE}/${model}:generateContent?key=${encodeURIComponent(apiKey)}`;
+  const generationConfig: Record<string, unknown> = {
     temperature: useJsonMode ? 0.72 : 0.65,
-    max_tokens: maxTokens,
-    messages: [
-      { role: 'system', content: systemPrompt },
-      { role: 'user', content: userPrompt },
-    ],
+    maxOutputTokens: maxTokens,
   };
-  if (useJsonMode) body.response_format = { type: 'json_object' };
+  if (useJsonMode) {
+    generationConfig.responseMimeType = 'application/json';
+  }
+  if (model.startsWith('gemini-2.5')) {
+    generationConfig.thinkingConfig = { thinkingBudget: 0 };
+  }
 
-  const response = await fetch(GROQ_API_URL, {
+  const response = await fetch(url, {
     method: 'POST',
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify(body),
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      system_instruction: { parts: [{ text: systemPrompt }] },
+      contents: [{ role: 'user', parts: [{ text: userPrompt }] }],
+      generationConfig,
+    }),
     signal: AbortSignal.timeout(45000),
   });
 
   const rawBody = await response.text();
   if (!response.ok) {
-    if (useJsonMode && response.status === 400 && rawBody.includes('json_validate_failed')) {
-      const recovered = extractFailedGeneration(rawBody);
+    if (useJsonMode && response.status === 400) {
+      const recovered = extractTextFromGeminiBody(rawBody);
       if (recovered) return recovered;
-      return callGroqOnce(apiKey, systemPrompt, userPrompt, maxTokens, false);
     }
-    throw new Error(`Groq API error ${response.status}: ${rawBody.slice(0, 400)}`);
+    const err = new Error(`Gemini API error ${response.status}: ${rawBody.slice(0, 400)}`) as Error & {
+      status?: number;
+      retryable?: boolean;
+      tryNextModel?: boolean;
+    };
+    err.status = response.status;
+    err.tryNextModel =
+      response.status === 404 ||
+      (response.status === 400 &&
+        (rawBody.includes('location is not supported') ||
+          rawBody.includes('not found') ||
+          rawBody.includes('not supported'))) ||
+      (response.status === 429 && rawBody.includes('limit: 0'));
+    err.retryable = response.status === 429 || response.status >= 500;
+    throw err;
   }
 
-  const data = JSON.parse(rawBody) as {
-    choices?: Array<{ message?: { content?: string } }>;
-  };
-  const content = data.choices?.[0]?.message?.content;
-  if (!content) throw new Error('Groq returned empty content');
-  return content;
+  const text = extractTextFromGeminiBody(rawBody);
+  if (!text) throw new Error('Gemini returned empty content');
+  return text;
 }
 
-async function callGroq(
+function extractTextFromGeminiBody(rawBody: string): string | null {
+  try {
+    const data = JSON.parse(rawBody) as {
+      candidates?: Array<{
+        finishReason?: string;
+        content?: { parts?: Array<{ text?: string }> };
+      }>;
+    };
+    const candidate = data.candidates?.[0];
+    const text = candidate?.content?.parts?.map((p) => p.text ?? '').join('').trim();
+    if (text) return text;
+    if (candidate?.finishReason === 'SAFETY') {
+      throw new Error('Gemini blocked response (safety filter)');
+    }
+    return null;
+  } catch (err) {
+    if (err instanceof Error && err.message.includes('safety')) throw err;
+    return null;
+  }
+}
+
+async function callGeminiWithModel(
+  apiKey: string,
+  model: string,
   systemPrompt: string,
   userPrompt: string,
   maxTokens: number,
 ): Promise<string> {
-  const apiKey = process.env.GROQ_API_KEY;
-  if (!apiKey) throw new Error('GROQ_API_KEY is not configured');
-  return callGroqOnce(apiKey, systemPrompt, userPrompt, maxTokens, true);
+  try {
+    return await callGeminiOnce(apiKey, model, systemPrompt, userPrompt, maxTokens, true);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    const tryNext = (err as { tryNextModel?: boolean }).tryNextModel;
+    if (message.includes('400') || message.includes('JSON')) {
+      return callGeminiOnce(apiKey, model, systemPrompt, userPrompt, maxTokens, false);
+    }
+    if (tryNext) throw err;
+    throw err;
+  }
+}
+
+async function callGemini(
+  systemPrompt: string,
+  userPrompt: string,
+  maxTokens: number,
+  geminiModel?: string,
+): Promise<string> {
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) throw new Error('GEMINI_API_KEY is not configured');
+
+  const primary = resolveGeminiModel(geminiModel);
+  const fallbacks = primary === DEFAULT_GEMINI_MODEL
+    ? [primary]
+    : [primary, DEFAULT_GEMINI_MODEL];
+
+  let lastError: Error | null = null;
+  for (const model of fallbacks) {
+    try {
+      return await callGeminiWithModel(apiKey, model, systemPrompt, userPrompt, maxTokens);
+    } catch (err) {
+      lastError = err instanceof Error ? err : new Error(String(err));
+      const tryNext = (err as { tryNextModel?: boolean }).tryNextModel;
+      if (tryNext && model !== DEFAULT_GEMINI_MODEL) {
+        console.warn(`Gemini model ${model} unavailable, falling back to ${DEFAULT_GEMINI_MODEL}…`);
+        continue;
+      }
+      throw lastError;
+    }
+  }
+  throw lastError ?? new Error(
+    'Gemini недоступен: проверь бесплатную квоту на ai.google.dev. Платные модели мы не используем.',
+  );
 }
 
 function finalizeStory(
@@ -141,8 +212,8 @@ function finalizeStory(
   };
 }
 
-export function hasGroqApiKey(): boolean {
-  return Boolean(process.env.GROQ_API_KEY?.trim());
+export function hasGeminiApiKey(): boolean {
+  return Boolean(process.env.GEMINI_API_KEY?.trim());
 }
 
 export async function generateStoryScript(
@@ -178,7 +249,12 @@ export async function generateStoryScript(
       selectedReferenceFact: input.selectedReferenceFact,
     });
 
-    const content = await callGroq(systemPrompt, userPrompt, lengthPreset.maxTokens);
+    const content = await callGemini(
+      systemPrompt,
+      userPrompt,
+      lengthPreset.maxTokens,
+      input.geminiModel,
+    );
     const story = parseStoryJson(content);
     if (!story) {
       retryReason = 'invalid JSON';
@@ -216,12 +292,12 @@ export async function generateStoryScript(
       },
     );
     if (sanitizedQuality.ok) {
-      console.warn(`Story sanitized after attempt ${attempt + 1}: ${quality.reason}`);
+      console.warn(`Gemini story sanitized after attempt ${attempt + 1}: ${quality.reason}`);
       return finalizeStory({ ...story, script: sanitized }, { ...input, voiceId }, storyLength);
     }
 
     retryReason = sanitizedQuality.reason ?? quality.reason;
-    console.warn(`Story quality reject (attempt ${attempt + 1}): ${retryReason}`);
+    console.warn(`Gemini story quality reject (attempt ${attempt + 1}): ${retryReason}`);
   }
 
   throw new Error('Could not produce a usable story');

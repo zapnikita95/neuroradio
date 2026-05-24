@@ -1,5 +1,11 @@
-import { getStoryLengthPreset, StoryLengthId } from './story-length.js';
-import type { StoryLengthPreset } from './story-length.js';
+import { RUSSIAN_LANGUAGE_PROMPT_BLOCK } from './story-russian-language.js';
+import {
+  buildLengthStructurePlan,
+  DEFAULT_STORY_LENGTH,
+  getStoryLengthPreset,
+  StoryLengthId,
+  type StoryLengthPreset,
+} from './story-length.js';
 import {
   buildPersonaForNarrator,
   getNarratorPreset,
@@ -178,63 +184,57 @@ export function buildSystemPrompt(persona: StoryPersona, length: StoryLengthPres
 
   const formatBlock = persona.formatRules
     ? persona.formatRules
-    : 'Начни с факта. Подача — от лица персонажа, но факт должен быть настоящим (из ОПОРНЫЕ ФАКТЫ).';
+    : 'Рассказываешь другу за барной стойкой: факт + метафора + ударная строка.';
 
   const focusBlock = persona.contentFocus
-    ? `ФОКУС СОДЕРЖАНИЯ: ${persona.contentFocus}`
-    : 'Один проверяемый факт из ОПОРНЫЕ ФАКТЫ — не выдуманное «я помню»';
+    ? `ФОКУС: ${persona.contentFocus}`
+    : 'Драма и контраст — не сухая статья Wikipedia';
 
-  return `Ты пишешь текст для ОЗВУЧКИ — живой человек рассказывает историю.
+  const lengthPlan = buildLengthStructurePlan(length);
 
-ГЛАВНОЕ ПРАВИЛО:
-- Сначала ФАКТ (из блока ОПОРНЫЕ ФАКТЫ в запросе). Потом — подача в амплуа.
-- НЕ выдумывай личные воспоминания, которых нет в фактах: «я помню студию», «я был в клубе», «мы сидели и слушали».
-- Угол истории = только СТИЛЬ подачи факта, не повод для fiction.
+  return `Ты пишешь текст для ОЗВУЧКИ — харизматичный музыкальный рассказчик, знаешь изнанку шоу-бизнеса.
 
-КТО ТЫ: ${persona.roleTitle}
-КОНТЕКСТ ЭПОХИ: ${persona.eraHint}
-КАК ТЫ ГОВОРИШЬ: ${persona.speechStyle}
+РОЛЬ: ${persona.roleTitle}
+ЭПОХА: ${persona.eraHint}
+ГОЛОС: ${persona.speechStyle}
 ${focusBlock}
 
-ЛОКАЛЬ И ЭПОХА:
-- История должна совпадать со страной происхождения трека и его реальной эпохой
-- Российский современный трек — не «радиола», не Apollo, не Nashville
-- Если год неизвестен, не выдумывай винтаж — ориентируйся на сцену страны артиста
+РЕЦЕПТ (масштабируй по длительности):
+- Факт + метафора + ударная строка.
+- Ищи ДРАМУ и КОНТРАСТ: конфликт, прорыв, скандал, возвращение — что люди почувствовали.
+- Опорный факт Wikipedia = семя. Не выдумывай людей и события, которых нет в факте.
 
-ЯЗЫК: только русский. Английский допустим ТОЛЬКО в именах артистов и названиях песен.
+${lengthPlan}
 
-ЧИСЛА — КРИТИЧНО:
-- В script НЕЛЬЗЯ писать цифры, годы, «N-й», «шестидесятых» и т.п.
-- Исключение: цифры только из имени артиста или названия трека (2Pac, «1999»)
-- Вместо дат: «тогда», «в те годы», «на заре», «однажды на концерте», «в студии»
+СТИЛЬ: друг за барной стойкой. Можно «слушай», «чувак», «брат». Не Wikipedia.
+
+КАТЕГОРИЧЕСКИ НЕЛЬЗЯ:
+- «изначально называлась», «группа из…», состав, дискография.
+- Перечисление рекламы, саундтреков, игр, фильмов.
+- Generic-студия: «помогаюсь», «команда работает над треком».
+
+ЯЗЫК: только русский. Английский — только внутри «имя артиста» или «название трека».
+
+${RUSSIAN_LANGUAGE_PROMPT_BLOCK}
+
+ЧИСЛА: без цифр и годов (кроме цифр в имени/названии). Вместо дат: «тогда», «в те годы».
 
 ФОРМАТ:
 - ${formatBlock}
-- НЕ начинай: «знаю факт», «интересно что», «вот что», «слушай факт»
+- Не начинай: «знаю факт», «интересно что», «вот что»
 
-СОДЕРЖАНИЕ:
-- ${length.wordsMin}–${length.wordsMax} слов (${durationHint})
-- ${length.sentenceHint}, каждое с конкретикой: место, люди, звук, запах
+ЖЁСТКИЙ ОБЪЁМ: ${length.wordsMin}–${length.wordsMax} слов (${durationHint}). ${length.sentenceHint}.
+- word_count в JSON — строго в этом диапазоне.
 
-РАЗМЕТКА ДЛЯ Yandex SpeechKit:
-- НЕ ставь знаки + и [[фонемы]] в script — сервер расставит ударения и произношение имён сам
+РАЗМЕТКА: без + и [[фонем]] в script.
 
-ЗАПРЕЩЕНО:
-- цифры и даты (кроме имени/названия)
-- английские слова, кроме имён артистов и названий треков в «кавычках»
-- «братуха», «братан», «Music Story», «сейчас в эфире»
-- вода: «вкладывает душу», «магия музыки», «зал сходит с ума», «влияет на рок/музыку», «легендарная», «уникальный пример», «суть в том что», «понял что музыка», «соединяет всех»
-- фразы «он подсказывает [имя артиста]» — имя сцены не объект глагола; говори «артист», «он», «Jay», или ««Screamin' Jay Hawkins»»
-- выдуманные вечера «сидели в студии и слушали треки» без конкретного факта
-- выдуманные воспоминания: «я помню», «я был в клубе», «когда впервые услышал», «на сцене артист начинает петь» — если этого нет в ОПОРНЫЕ ФАКТЫ
+ЗАПРЕЩЕНО: выдуманные люди, «Music Story», вода «магия музыки», «легендарная».
 
-ОБЯЗАТЕЛЬНО:
-- центральный факт из ОПОРНЫЕ ФАКТЫ — его суть должна быть узнаваема в тексте
-- первое предложение — уже факт (кто, что, где записал/выпустил/сэмплировал), не «я помню»
-- имя артиста — только как сценическое имя в «кавычках», дальше «он/она/артист»
+ОБЯЗАТЕЛЬНО: слушатель понимает ПОЧЕМУ это цепляет; суть семени факта узнаваема.
 
 JSON: {"script":"...", "word_count": число, "voiceId": "alena | filipp | ermil | jane | omazh | zahar | marina | dasha | julia | kirill | masha | alexander | lera"}`;
 }
+
 export function buildStoryUserPrompt(params: {
   artist: string;
   title: string;
@@ -248,6 +248,7 @@ export function buildStoryUserPrompt(params: {
   previousScripts?: string[];
   retryReason?: string;
   referenceFacts?: string[];
+  selectedReferenceFact?: { fact: string; scope: 'artist' | 'track'; scopeLabelRu: string };
 }): string {
   const narratorId = resolveStoryNarrator(params.storyNarrator);
   const locale = resolveTrackLocale({
@@ -288,19 +289,31 @@ export function buildStoryUserPrompt(params: {
       lines.push(`РЕЖИМ РАССКАЗЧИКА: ${preset.labelRu} — ${preset.descriptionRu}`);
     }
   }
-  lines.push(`Длина: ${length.wordsMin}–${length.wordsMax} слов.`);
+  lines.push(`ЖЁСТКАЯ ДЛИНА: ${length.wordsMin}–${length.wordsMax} слов (${length.labelRu}).`);
+  lines.push(buildLengthStructurePlan(length));
   lines.push('В script — никаких цифр и годов, кроме цифр из имени артиста или названия трека.');
 
   const facts = params.referenceFacts?.filter(Boolean) ?? [];
-  if (facts.length > 0) {
+  const selected = params.selectedReferenceFact;
+  if (selected) {
     lines.push('');
-    lines.push('ОПОРНЫЕ ФАКТЫ (из Wikipedia — выбери ОДИН, это ядро истории; не выдумывай противоречащее):');
+    lines.push(`ФОКУС ИСТОРИИ: факт про ${selected.scopeLabelRu.toUpperCase()} (не смешивай с другими темами).`);
+    lines.push('СЕМЯ ИСТОРИИ (проверенный факт из интернета — только это ядро):');
+    lines.push(selected.fact);
+    lines.push('РЕЦЕПТ ПОДАЧИ:');
+    lines.push('1. КРЮЧОК — парадокс или безумный поворот из семени.');
+    lines.push('2. КУХНЯ — человеческая драма из семени (если укладываешься по времени).');
+    lines.push('3. СМЫСЛ — почему цепляет душу.');
+  lines.push('НЕ перечисляй рекламу/фильмы/игры. НЕ Wikipedia. Факт + метафора + удар.');
+    lines.push(RUSSIAN_LANGUAGE_PROMPT_BLOCK);
+  } else if (facts.length > 0) {
+    lines.push('');
+    lines.push('СЕМЕНА ИСТОРИЙ (выбери ОДНО с максимальной драмой — не рекламу и не дискографию):');
     facts.forEach((fact, i) => lines.push(`${i + 1}. ${fact}`));
-    lines.push('Факт нельзя заменить вымышленным «я помню» или «я был в клубе».');
   } else {
     lines.push('');
     lines.push(
-      'ОПОРНЫЕ ФАКТЫ: не найдены в Wikipedia. Не выдумывай личные воспоминания. Только общеизвестное об артисте/треке, без fiction.',
+      'ОПОРНЫЕ ФАКТЫ: Wikipedia, Wikidata, DuckDuckGo, MusicBrainz. Выбери самое живое — без fiction.',
     );
   }
 
@@ -319,7 +332,7 @@ export function buildStoryUserPrompt(params: {
       lines.push(`${i + 1}. ${snippet}`);
     });
   } else {
-    lines.push('Первый рассказ — сразу погружай в сцену.');
+    lines.push('Первый рассказ — сразу с факта из Wikipedia, не со студийного fiction.');
   }
 
   lines.push('');

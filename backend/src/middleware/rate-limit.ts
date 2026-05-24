@@ -1,5 +1,6 @@
 import { Response } from 'express';
 import { isUnlimitedInstall, SECURITY } from '../config/security.js';
+import { getQuotaSubject } from '../services/account-store.js';
 
 interface Bucket {
   count: number;
@@ -98,10 +99,14 @@ const UNLIMITED_QUOTA: QuotaSnapshot = {
   resetsAt: Date.now() + DAY_MS,
 };
 
+function quotaKey(installId: string): string {
+  return `story:day:${getQuotaSubject(installId)}`;
+}
+
 export function getDailyStoryQuota(installId: string): QuotaSnapshot {
   if (isUnlimitedInstall(installId)) return { ...UNLIMITED_QUOTA, resetsAt: Date.now() + DAY_MS };
   return peekUsage(
-    `story:day:${installId}`,
+    quotaKey(installId),
     SECURITY.limits.storyPerInstallPerDay,
     DAY_MS,
   );
@@ -148,10 +153,11 @@ export function rateLimitStory(installId: string): (req: import('express').Reque
     const dailyLimit = limits.storyPerInstallPerDay;
 
     if (!enforce(`ip:hour:${ip}`, limits.ipGlobalPerHour, HOUR_MS, res, 'Too many requests from this network', 'IP_HOURLY')) return;
-    if (!enforce(`story:burst:${installId}`, limits.storyBurstPerInstallPerMinute, MINUTE_MS, res, 'Slow down — story generation is rate limited', 'STORY_BURST')) return;
-    if (!enforce(`story:hour:${installId}`, limits.storyPerInstallPerHour, HOUR_MS, res, 'Hourly story limit reached', 'STORY_HOURLY')) return;
+    const subject = getQuotaSubject(installId);
+    if (!enforce(`story:burst:${subject}`, limits.storyBurstPerInstallPerMinute, MINUTE_MS, res, 'Slow down — story generation is rate limited', 'STORY_BURST')) return;
+    if (!enforce(`story:hour:${subject}`, limits.storyPerInstallPerHour, HOUR_MS, res, 'Hourly story limit reached', 'STORY_HOURLY')) return;
     if (!enforce(
-      `story:day:${installId}`,
+      quotaKey(installId),
       dailyLimit,
       DAY_MS,
       res,

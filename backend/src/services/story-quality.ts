@@ -4,6 +4,7 @@ import {
   StoryLengthId,
   StoryLengthPreset,
 } from './story-length.js';
+import { hasEnglishLeak } from './story-russian-language.js';
 
 export { DEFAULT_STORY_LENGTH, getStoryLengthPreset };
 export type { StoryLengthId, StoryLengthPreset };
@@ -52,9 +53,6 @@ export const BANNED_SCRIPT_PATTERNS: RegExp[] = [
   /мы были в клубе/i,
   /я стоял у мониторов/i,
 ];
-
-const ENGLISH_LEAK_PATTERN =
-  /\b(show|feedback|engineers|monitors|bootleg|cape routine|that night|warehouse|remember when)\b/i;
 
 const CYR = '[а-яё]+';
 const SPELLED_YEAR_PATTERN = new RegExp(
@@ -168,15 +166,43 @@ function significantWords(text: string): string[] {
     .filter((word) => word.length >= 5);
 }
 
+const CONCEPT_BRIDGES: Array<{ factPattern: RegExp; scriptTokens: string[] }> = [
+  { factPattern: /native american/i, scriptTokens: ['индейск', 'коренн', 'плем'] },
+  { factPattern: /billboard|hot 100|\bchart\b/i, scriptTokens: ['чарт', 'хит', 'парад'] },
+  { factPattern: /top five|top 5|top-five|top ten|top 10/i, scriptTokens: ['пятёрк', 'пятер', 'десятк', 'топ'] },
+  { factPattern: /number one|#\s*1|no\.?\s*1\b|only.*#1/i, scriptTokens: ['перв', 'единствен', 'лидер', 'номер'] },
+  { factPattern: /\bbootleg/i, scriptTokens: ['бутлег', 'подпол', 'нелегал', 'магнит'] },
+  { factPattern: /segregat|racial|integrat/i, scriptTokens: ['сегрегац', 'расов', 'интегр', 'черн'] },
+  { factPattern: /\bminer|\bcoal|\bmining/i, scriptTokens: ['шахт', 'уголь', 'шахтёр'] },
+  { factPattern: /overdub|multi-?track|tape generation/i, scriptTokens: ['дубл', 'плёнк', 'налож', 'поколен'] },
+  { factPattern: /shock rock|macabre|theatrical/i, scriptTokens: ['шок', 'театр', 'сцен', 'безум', 'реквиз'] },
+  { factPattern: /\bviral\b|reddit|discord/i, scriptTokens: ['вирус', 'reddit', 'discord', 'ажиотаж', 'форум'] },
+  { factPattern: /cobain|pixies|pop song/i, scriptTokens: ['кобейн', 'pixies', 'поп', 'панк'] },
+  { factPattern: /\bband\b|\bgroup\b/i, scriptTokens: ['групп', 'коллект'] },
+  { factPattern: /u\.?\s?s\.?\s?ssr|soviet/i, scriptTokens: ['ссср', 'совет', 'подпол'] },
+];
+
+function matchesConceptBridge(fact: string, scriptWords: Set<string>): boolean {
+  const words = [...scriptWords];
+  return CONCEPT_BRIDGES.some(
+    (bridge) =>
+      bridge.factPattern.test(fact) &&
+      bridge.scriptTokens.some((token) => words.some((word) => word.includes(token))),
+  );
+}
+
 /** Script must reflect at least one reference fact (Wikipedia anchor). */
 export function anchorsReferenceFact(script: string, referenceFacts: string[]): boolean {
   if (referenceFacts.length === 0) return true;
   const scriptWords = new Set(significantWords(script));
   return referenceFacts.some((fact) => {
     const factWords = significantWords(fact);
-    if (factWords.length === 0) return false;
-    const hits = factWords.filter((word) => scriptWords.has(word)).length;
-    return hits >= Math.min(2, factWords.length);
+    if (factWords.length > 0) {
+      const hits = factWords.filter((word) => scriptWords.has(word)).length;
+      const required = factWords.length <= 2 ? factWords.length : Math.max(2, Math.ceil(factWords.length * 0.35));
+      if (hits >= required) return true;
+    }
+    return matchesConceptBridge(fact, scriptWords);
   });
 }
 
@@ -200,7 +226,7 @@ export function validateStoryScript(
     }
   }
 
-  if (ENGLISH_LEAK_PATTERN.test(trimmed)) {
+  if (hasEnglishLeak(trimmed, artist, title)) {
     return { ok: false, reason: 'english words in Russian narration' };
   }
 

@@ -11,6 +11,7 @@ export interface TrackMetadata {
   genre?: string;
   countryCode?: string;
   mbid?: string;
+  artistMbid?: string;
 }
 
 interface MusicBrainzArtist {
@@ -60,6 +61,10 @@ function pickYear(recording: MusicBrainzRecording): number | undefined {
   }
 
   return undefined;
+}
+
+function pickArtistMbid(recording: MusicBrainzRecording): string | undefined {
+  return recording['artist-credit']?.[0]?.artist?.id;
 }
 
 function pickCountry(recording: MusicBrainzRecording): string | undefined {
@@ -132,6 +137,7 @@ export async function enrichTrackMetadata(
       genre: pickGenre(recording.tags),
       countryCode: pickCountry(recording),
       mbid: recording.id,
+      artistMbid: pickArtistMbid(recording),
     };
   } catch (err) {
     console.warn('MusicBrainz lookup failed:', err);

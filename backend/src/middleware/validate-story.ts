@@ -4,6 +4,8 @@ import { resolveStoryLength, StoryLengthId } from '../services/story-length.js';
 import { resolveStoryNarrator, StoryNarratorId } from '../services/story-narrator.js';
 import { resolveTtsVoice, TtsVoiceSetting } from '../services/voices.js';
 import { resolveTtsEmotion, resolveTtsSpeed, TtsEmotion } from '../services/tts-options.js';
+import { resolveLlmProvider } from '../services/llm-provider.js';
+import { resolveGeminiModel } from '../services/gemini-models.js';
 
 interface StoryFullBody {
   artist?: unknown;
@@ -14,6 +16,8 @@ interface StoryFullBody {
   tts_voice?: unknown;
   tts_speed?: unknown;
   tts_emotion?: unknown;
+  llm_provider?: unknown;
+  gemini_model?: unknown;
 }
 
 function asTrimmedString(value: unknown, maxLen: number): string | null {
@@ -61,6 +65,8 @@ export function validateStoryFullBody(req: Request, res: Response, next: NextFun
     typeof body.tts_speed === 'number' ? body.tts_speed : Number(body.tts_speed),
   );
   const ttsEmotion: TtsEmotion = resolveTtsEmotion(body.tts_emotion);
+  const llmProvider = resolveLlmProvider(body.llm_provider);
+  const geminiModel = resolveGeminiModel(body.gemini_model);
 
   req.body = {
     artist,
@@ -71,6 +77,8 @@ export function validateStoryFullBody(req: Request, res: Response, next: NextFun
     tts_voice: ttsVoice,
     tts_speed: ttsSpeed,
     tts_emotion: ttsEmotion,
+    llm_provider: llmProvider,
+    gemini_model: geminiModel,
   };
   next();
 }

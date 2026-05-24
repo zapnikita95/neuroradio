@@ -1,12 +1,15 @@
 import { Router, Request, Response } from 'express';
 import {
+  DESKTOP_CLIENT_ID,
   getAllowedCertFingerprints,
   getAllowedPackageName,
   getAuthJwtSecret,
   getTokenTtlSeconds,
+  isDesktopAuthEnabled,
   isValidCertFingerprint,
   normalizeCertSha256,
   signJwt,
+  verifyDesktopAuthSecret,
 } from '../services/jwt.js';
 import { rateLimitAuth } from '../middleware/rate-limit.js';
 
@@ -17,10 +20,29 @@ interface TokenRequestBody {
   package_name?: string;
   cert_sha256?: string;
   app_version?: string;
+  client_type?: string;
+  desktop_secret?: string;
 }
 
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+function issueDesktopToken(installId: string, jwtSecret: string, ttl: number, res: Response): void {
+  const accessToken = signJwt(
+    {
+      sub: installId,
+      client: DESKTOP_CLIENT_ID,
+    },
+    jwtSecret,
+    ttl,
+  );
+
+  res.json({
+    access_token: accessToken,
+    token_type: 'Bearer',
+    expires_in: ttl,
+  });
+}
 
 router.post('/token', rateLimitAuth, (req: Request, res: Response) => {
   const jwtSecret = getAuthJwtSecret();
@@ -29,13 +51,32 @@ router.post('/token', rateLimitAuth, (req: Request, res: Response) => {
     return;
   }
 
-  const { install_id: installId, package_name: packageName, cert_sha256: certSha256 } =
-    req.body as TokenRequestBody;
+  const body = req.body as TokenRequestBody;
+  const installId = body.install_id?.trim();
 
-  if (!installId?.trim() || !UUID_RE.test(installId.trim())) {
+  if (!installId || !UUID_RE.test(installId)) {
     res.status(400).json({ error: 'Invalid install_id' });
     return;
   }
+
+  const clientType = body.client_type?.trim().toLowerCase();
+  if (clientType === 'desktop') {
+    if (!isDesktopAuthEnabled()) {
+      res.status(503).json({ error: 'Desktop auth is not configured' });
+      return;
+    }
+
+    const desktopSecret = body.desktop_secret?.trim() ?? '';
+    if (!verifyDesktopAuthSecret(desktopSecret)) {
+      res.status(403).json({ error: 'Forbidden' });
+      return;
+    }
+
+    issueDesktopToken(installId, jwtSecret, getTokenTtlSeconds(), res);
+    return;
+  }
+
+  const { package_name: packageName, cert_sha256: certSha256 } = body;
 
   const expectedPackage = getAllowedPackageName();
   if (packageName?.trim() !== expectedPackage) {
@@ -58,7 +99,7 @@ router.post('/token', rateLimitAuth, (req: Request, res: Response) => {
   const ttl = getTokenTtlSeconds();
   const accessToken = signJwt(
     {
-      sub: installId.trim(),
+      sub: installId,
       pkg: expectedPackage,
       cert: normalizedCert,
     },

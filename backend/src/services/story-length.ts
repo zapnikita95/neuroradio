@@ -62,3 +62,27 @@ export function resolveStoryLength(value: unknown): StoryLengthId {
 export function getStoryLengthPreset(id: StoryLengthId): StoryLengthPreset {
   return STORY_LENGTH_PRESETS[id];
 }
+
+/** Scales Gemini recipe (hook → drama → meaning) to selected TTS duration. */
+export function buildLengthStructurePlan(length: StoryLengthPreset): string {
+  switch (length.id) {
+    case '15s':
+      return `ПЛАН ДЛИТЕЛЬНОСТИ (15 сек — ЖЁСТКИЙ ЛИМИТ):
+- Только КРЮЧОК + одна ударная финальная строка.
+- ${length.wordsMin}–${length.wordsMax} слов максимум, ${length.sentenceHint}.
+- Без «кухни» и развёрнутого смысла — один удар и точка.`;
+    case '30s':
+      return `ПЛАН ДЛИТЕЛЬНОСТИ (30 сек — ЖЁСТКИЙ ЛИМИТ):
+- КРЮЧОК → одна сцена драмы из факта → финал-смысл одной фразой.
+- ${length.wordsMin}–${length.wordsMax} слов максимум, ${length.sentenceHint}.
+- Если длиннее — обрежут при озвучке. Не раздувай.`;
+    case '60s':
+      return `ПЛАН ДЛИТЕЛЬНОСТИ (60 сек):
+- Крючок → внутренняя кухня (человеческая драма из факта) → глубокий смысл.
+- ${length.wordsMin}–${length.wordsMax} слов, ${length.sentenceHint}.`;
+    default:
+      return `ПЛАН ДЛИТЕЛЬНОСТИ (развёрнуто):
+- Полная байка: крючок → кухня → смысл → финальный удар.
+- ${length.wordsMin}–${length.wordsMax} слов, ${length.sentenceHint}.`;
+  }
+}

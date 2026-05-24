@@ -1,4 +1,6 @@
 import fetch from 'node-fetch';
+import type { ReferenceFactBundle } from './fact-picker.js';
+import { filterAndRankFacts, isBoringFact } from './reference-fact-quality.js';
 
 const USER_AGENT = 'MusicStoryBFF/1.0 (contact@example.com)';
 
@@ -45,123 +47,241 @@ async function searchWikiTitle(lang: 'ru' | 'en', query: string): Promise<string
   }
 }
 
-function extractFactBullets(text: string, max = 4): string[] {
+function extractFactBullets(text: string, max = 12): string[] {
   const sentences = text
     .replace(/\([^)]*\)/g, ' ')
     .split(/(?<=[.!?…])\s+/)
     .map((s) => s.trim())
-    .filter((s) => s.length >= 35 && s.length <= 220);
+    .filter((s) => s.length >= 35 && s.length <= 240);
 
-  const scored = sentences
-    .map((sentence) => {
-      let score = 0;
-      if (
-        /\b(sample|cover|remix|record|recorded|studio|producer|billboard|chart|grammy|originally|written|composed|released|debut|soundtrack|film|movie|tv|radio|label|vinyl|cassette|single|album|tour|concert|festival|orchestra|guitar|piano|drum|bass|vocal|lyric|translate|adapt|based on|plagiar|ban|scandal|hit|million|platinum|gold|mambo|hawkins|bega|prado|day|donovan)\b/i.test(
-          sentence,
-        )
-      ) {
-        score += 3;
-      }
-      if (/\b(запис|продюс|релиз|сингл|альбом|клип|радио|лейбл|кавер|сэмпл|оркестр|гитар|композ|напис|выпуст|эфир|чарт|скандал|плагиат)\b/i.test(sentence)) {
-        score += 3;
-      }
-      if (/\b(влия|легендар|уникальн|магия музыки|соединяет людей)\b/i.test(sentence)) {
-        score -= 5;
-      }
-      return { sentence, score };
-    })
-    .filter((item) => item.score >= 0)
-    .sort((a, b) => b.score - a.score);
-
-  return scored.slice(0, max).map((item) => item.sentence);
+  return filterAndRankFacts(sentences, max);
 }
 
-function extractSentencesMentioning(text: string, needle: string, max = 3): string[] {
-  const tokens = needle
-    .toLowerCase()
-    .replace(/[^\p{L}\p{N}\s]/gu, ' ')
-    .split(/\s+/)
-    .filter((part) => part.length >= 4);
+function extractSentencesMentioning(text: string, needle: string, max = 6): string[] {
+  const normalizedNeedle = normalizeForMatch(needle);
+  const tokens = normalizedNeedle
+    .split(' ')
+    .filter((part) => part.length >= 3);
   if (tokens.length === 0) return [];
 
   return text
     .replace(/\([^)]*\)/g, ' ')
     .split(/(?<=[.!?…])\s+/)
     .map((s) => s.trim())
-    .filter((s) => s.length >= 35 && s.length <= 220)
+    .filter((s) => s.length >= 35 && s.length <= 240)
     .filter((sentence) => {
-      const lower = sentence.toLowerCase();
+      const lower = normalizeForMatch(sentence);
+      if (normalizedNeedle.length >= 8 && lower.includes(normalizedNeedle)) return true;
       const hits = tokens.filter((token) => lower.includes(token)).length;
-      return hits >= Math.min(2, tokens.length);
+      const threshold = tokens.length <= 2 ? 1 : Math.min(2, tokens.length);
+      return hits >= threshold;
     })
     .slice(0, max);
 }
 
-function buildTitleCandidates(artist: string, title: string): string[] {
+function normalizeForMatch(text: string): string {
+  return text
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}\s]/gu, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function buildTrackTitleCandidates(artist: string, title: string): string[] {
   const cleanTitle = title.replace(/\s*\([^)]*\)\s*/g, ' ').trim();
   return [
+    cleanTitle,
     `${cleanTitle} (${artist} song)`,
     `${cleanTitle} (song)`,
     `${cleanTitle} by ${artist}`,
-    cleanTitle,
     `${artist} ${cleanTitle}`,
+  ].filter((value, index, arr) => value.length > 1 && arr.indexOf(value) === index);
+}
+
+function buildArtistTitleCandidates(artist: string): string[] {
+  return [
+    `${artist} (band)`,
+    `${artist} (musical group)`,
+    `${artist} (musician)`,
+    `${artist} (singer)`,
     artist,
   ].filter((value, index, arr) => value.length > 1 && arr.indexOf(value) === index);
 }
 
-function buildSearchQueries(artist: string, title: string): string[] {
+function buildTrackSearchQueries(artist: string, title: string): string[] {
   const cleanTitle = title.replace(/\s*\([^)]*\)\s*/g, ' ').trim();
   return [
     `${cleanTitle} ${artist} song`,
     `${cleanTitle} song ${artist}`,
     `${artist} ${cleanTitle}`,
-    `${artist} musician`,
   ];
 }
 
-async function fetchFactsForTitle(lang: 'ru' | 'en', title: string, songTitle: string): Promise<string[]> {
-  const summary = await fetchSummary(lang, title);
-  if (!summary) return [];
-  const bullets = extractFactBullets(summary);
+function buildArtistSearchQueries(artist: string): string[] {
+  return [
+    `${artist} band`,
+    `${artist} musical group`,
+    `${artist} musician`,
+    `${artist} singer`,
+    artist,
+  ];
+}
+
+function isDisambiguationExtract(text: string): boolean {
+  return /\b(may refer to|most commonly refers to|disambiguation page|can refer to)\b/i.test(text);
+}
+
+function isWeakFact(sentence: string): boolean {
+  return (
+    /\b(may refer to|most commonly refers to|Queen regnant|Queen consort|disambiguation)\b/i.test(sentence) ||
+    isBoringFact(sentence)
+  );
+}
+
+async function fetchExtendedExtract(lang: 'ru' | 'en', title: string, sentences = 24): Promise<string | null> {
+  const encodedTitle = encodeURIComponent(title.trim().replace(/\s+/g, '_'));
+  const url =
+    `https://${lang}.wikipedia.org/w/api.php?action=query&prop=extracts&explaintext=1` +
+    `&exsentences=${sentences}&format=json&origin=*&titles=${encodedTitle}`;
+  try {
+    const response = await fetch(url, {
+      headers: { 'User-Agent': USER_AGENT, Accept: 'application/json' },
+      signal: AbortSignal.timeout(6000),
+    });
+    if (!response.ok) return null;
+    const data = (await response.json()) as {
+      query?: { pages?: Record<string, { extract?: string }> };
+    };
+    const pages = data.query?.pages;
+    if (!pages) return null;
+    const page = Object.values(pages)[0];
+    const extract = page?.extract?.trim();
+    return extract && extract.length > 40 ? extract : null;
+  } catch {
+    return null;
+  }
+}
+
+async function fetchFactsForTitle(
+  lang: 'ru' | 'en',
+  title: string,
+  mentionNeedle: string,
+): Promise<string[]> {
+  await sleep(120);
+  const summary =
+    (await fetchExtendedExtract(lang, title)) ?? (await fetchSummary(lang, title));
+  if (!summary || isDisambiguationExtract(summary)) return [];
+  const bullets = extractFactBullets(summary).filter((fact) => !isWeakFact(fact));
   if (bullets.length > 0) return bullets;
-  return extractSentencesMentioning(summary, songTitle);
+  return filterAndRankFacts(
+    extractSentencesMentioning(summary, mentionNeedle).filter((fact) => !isWeakFact(fact)),
+    6,
+  );
+}
+
+async function fetchArtistMentionsForTrack(
+  lang: 'ru' | 'en',
+  artist: string,
+  title: string,
+): Promise<string[]> {
+  for (const candidate of buildArtistTitleCandidates(artist)) {
+    await sleep(120);
+    const summary =
+      (await fetchExtendedExtract(lang, candidate, 28)) ?? (await fetchSummary(lang, candidate));
+    if (!summary || isDisambiguationExtract(summary)) continue;
+    const mentions = filterAndRankFacts(
+      extractSentencesMentioning(summary, title).filter((fact) => !isWeakFact(fact)),
+      4,
+    );
+    if (mentions.length > 0) return mentions;
+  }
+  return [];
+}
+
+async function fetchFactsForLang(
+  lang: 'ru' | 'en',
+  artist: string,
+  title: string,
+  scope: 'track' | 'artist',
+): Promise<string[]> {
+  const candidates = scope === 'track'
+    ? buildTrackTitleCandidates(artist, title)
+    : buildArtistTitleCandidates(artist);
+  const queries = scope === 'track'
+    ? buildTrackSearchQueries(artist, title)
+    : buildArtistSearchQueries(artist);
+  const mentionNeedle = scope === 'track' ? title : artist;
+
+  for (const candidate of candidates) {
+    const facts = await fetchFactsForTitle(lang, candidate, mentionNeedle);
+    if (facts.length > 0) return facts;
+  }
+
+  for (const query of queries) {
+    const foundTitle = await searchWikiTitle(lang, query);
+    if (!foundTitle) continue;
+    if (scope === 'artist' && /\bdisambiguation\b/i.test(foundTitle)) continue;
+    const facts = await fetchFactsForTitle(lang, foundTitle, mentionNeedle);
+    if (facts.length > 0) return facts;
+  }
+
+  return [];
+}
+
+async function fetchScopeFacts(
+  artist: string,
+  title: string,
+  countryCode: string | undefined,
+  scope: 'track' | 'artist',
+): Promise<string[]> {
+  const primaryLang = wikiLang(countryCode);
+  const primary = await fetchFactsForLang(primaryLang, artist, title, scope);
+  if (primary.length > 0) return primary;
+
+  // Enrich RU tracks from English Wikipedia; avoid RU fallback for Western artists (wrong language/extract).
+  if (primaryLang === 'ru') {
+    return fetchFactsForLang('en', artist, title, scope);
+  }
+  return [];
 }
 
 /**
- * Pull short factual bullets from Wikipedia (EN/RU) to anchor Groq stories.
+ * Pull factual bullets from Wikipedia — track page and artist page separately.
  */
+export async function fetchReferenceFactBundle(
+  artist: string,
+  title: string,
+  countryCode?: string,
+): Promise<ReferenceFactBundle> {
+  const primaryLang = wikiLang(countryCode);
+  const [trackFacts, artistFacts] = await Promise.all([
+    fetchScopeFacts(artist, title, countryCode, 'track'),
+    fetchScopeFacts(artist, title, countryCode, 'artist'),
+  ]);
+
+  let mergedTrackFacts = trackFacts;
+  if (mergedTrackFacts.length === 0) {
+    const fromArtist = await fetchArtistMentionsForTrack(primaryLang, artist, title);
+    if (fromArtist.length > 0) {
+      mergedTrackFacts = fromArtist;
+    } else if (primaryLang === 'ru') {
+      mergedTrackFacts = await fetchArtistMentionsForTrack('en', artist, title);
+    }
+  }
+
+  return { trackFacts: mergedTrackFacts, artistFacts };
+}
+
+/** @deprecated use fetchReferenceFactBundle + pickReferenceFact */
 export async function fetchReferenceFacts(
   artist: string,
   title: string,
   countryCode?: string,
 ): Promise<string[]> {
-  const lang = wikiLang(countryCode);
-  const candidates = buildTitleCandidates(artist, title);
-
-  for (const candidate of candidates) {
-    const facts = await fetchFactsForTitle(lang, candidate, title);
-    if (facts.length > 0) return facts;
-  }
-
-  for (const query of buildSearchQueries(artist, title)) {
-    const foundTitle = await searchWikiTitle(lang, query);
-    if (!foundTitle) continue;
-    const facts = await fetchFactsForTitle(lang, foundTitle, title);
-    if (facts.length > 0) return facts;
-  }
-
-  if (lang === 'en') {
-    for (const candidate of candidates) {
-      const facts = await fetchFactsForTitle('ru', candidate, title);
-      if (facts.length > 0) return facts;
-    }
-    for (const query of buildSearchQueries(artist, title)) {
-      const foundTitle = await searchWikiTitle('ru', query);
-      if (!foundTitle) continue;
-      const facts = await fetchFactsForTitle('ru', foundTitle, title);
-      if (facts.length > 0) return facts;
-    }
-  }
-
-  return [];
+  const bundle = await fetchReferenceFactBundle(artist, title, countryCode);
+  return [...bundle.trackFacts, ...bundle.artistFacts].slice(0, 6);
 }

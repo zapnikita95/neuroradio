@@ -62,13 +62,13 @@ function sceneForCountry(countryCode: string | undefined, year: number | undefin
       return modern ? 'российская рок-сцена, клубы и фестивали' : 'российский рок, свои площадки и студии';
     }
     if (g.includes('pop')) {
-      return modern ? 'российская поп-сцена, стриминги и соцсети' : 'российская эстрада и pop';
+      return modern ? 'российская поп-сцена, стриминги и соцсети' : 'российская эстрада и поп';
     }
     if (modern) {
       return 'современная российская музыка: стриминги, VK, Telegram, студии, фестивали';
     }
     if (year !== undefined && year >= 2000) {
-      return 'российская сцена нулевых: MTV Russia, mp3, первые стримы';
+      return 'российская сцена нулевых: музыкальное ТВ, mp3, первые стримы';
     }
     if (year !== undefined && year >= 1990) {
       return 'российская сцена девяностых: кассеты, рок-клубы, первые частные студии';
@@ -97,7 +97,7 @@ export function eraContextForPrompt(
 
   const g = (genre ?? '').toLowerCase();
   if (g.includes('jazz') || g.includes('swing')) return 'джазовая эпоха, клубы и джем-сейшены';
-  if (g.includes('blues') || g.includes('soul')) return 'soul и blues, южные клубы и ночные сцены';
+  if (g.includes('blues') || g.includes('soul')) return 'соул и блюз, южные клубы и ночные сцены';
   if (g.includes('rock') || g.includes('metal') || g.includes('punk')) return 'рок-сцена, концерты и гаражи';
   if (g.includes('electronic') || g.includes('house') || g.includes('techno') || g.includes('dance')) {
     return 'клубная электроника, склады и диджейские стыки';
@@ -106,9 +106,9 @@ export function eraContextForPrompt(
   if (g.includes('pop')) return 'поп-культура, радио и телевидение';
   if (!year) return 'эпоха артиста — без винтажных клише, если трек современный';
   if (year < 1960) return 'ранний период, винил и живое радио';
-  if (year < 1970) return 'расцвет soul и rock';
+  if (year < 1970) return 'расцвет соула и рока';
   if (year < 1980) return 'золотая эра рока и диско';
-  if (year < 1990) return 'MTV, кассеты и фестивали';
+  if (year < 1990) return 'музыкальное телевидение, кассеты и фестивали';
   if (year < 2000) return 'клубы и ремиксы';
   if (year < 2010) return 'интернет-форумы и первые стримы';
   return 'современная сцена, стриминги и соцсети';
