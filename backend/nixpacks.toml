@@ -1,0 +1,9 @@
+# Fallback when Dockerfile builder is not selected (Nixpacks auto-detect).
+[phases.install]
+cmds = ["npm ci"]
+
+[phases.build]
+cmds = ["npm run build"]
+
+[start]
+cmd = "node dist/index.js"

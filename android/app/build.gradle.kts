@@ -1,9 +1,14 @@
+import java.io.File
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.ksp)
 }
+
+val localBuildDir = File(System.getenv("LOCALAPPDATA") ?: System.getProperty("java.io.tmpdir"), "MusicStoryBuild/app")
+layout.buildDirectory.set(localBuildDir)
 
 android {
     namespace = "com.musicstory.app"
@@ -13,8 +18,8 @@ android {
         applicationId = "com.musicstory.app"
         minSdk = 26
         targetSdk = 35
-        versionCode = 33
-        versionName = "1.3.9"
+        versionCode = 55
+        versionName = "1.5.11"
 
         buildConfigField("String", "VERSION_NAME", "\"$versionName\"")
         buildConfigField("int", "VERSION_CODE", "$versionCode")
@@ -96,4 +101,6 @@ dependencies {
 
     implementation(libs.androidx.work.runtime.ktx)
     implementation(libs.androidx.datastore.preferences)
+
+    testImplementation(libs.junit4)
 }

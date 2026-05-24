@@ -70,7 +70,7 @@ for (const id of ['auto', ...Object.keys(STORY_NARRATOR_PRESETS)]) {
     fail(`${id}: system prompt missing role`);
   }
   if (narratorId !== 'auto') {
-    if (!system.includes('ФОКУС СОДЕРЖАНИЯ')) {
+    if (!system.includes('ФОКУС:')) {
       fail(`${id}: missing content focus block`);
     }
     const preset = STORY_NARRATOR_PRESETS[narratorId];

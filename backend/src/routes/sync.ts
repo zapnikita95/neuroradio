@@ -100,12 +100,18 @@ router.post('/history', (req: Request, res: Response) => {
     return;
   }
 
-  const history = pushHistory(req.installId!, entry);
+  const installId = req.installId!;
+  let history = pushHistory(installId, entry);
   if (!history) {
-    res.status(404).json({ error: 'Not linked' });
+    // Railway redeploys wipe file-backed accounts — re-register this install silently.
+    createAccount(installId);
+    history = pushHistory(installId, entry);
+  }
+  if (!history) {
+    res.status(200).json({ ok: false, skipped: true, reason: 'not_linked' });
     return;
   }
-  res.json({ history });
+  res.json({ ok: true, history });
 });
 
 export default router;

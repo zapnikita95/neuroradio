@@ -10,6 +10,8 @@ import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.core.stringSetPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
+import com.musicstory.app.domain.GeminiModel
+import com.musicstory.app.domain.LlmProvider
 import com.musicstory.app.domain.StoryLength
 import com.musicstory.app.domain.StoryNarrator
 import com.musicstory.app.domain.TtsEmotion
@@ -54,8 +56,39 @@ class SettingsDataStore(private val context: Context) {
         prefs[KEY_MANUAL_MODE] ?: false
     }
 
+    val syncCode: Flow<String> = context.settingsDataStore.data.map { prefs ->
+        prefs[KEY_SYNC_CODE].orEmpty()
+    }
+
+    val accountLinked: Flow<Boolean> = context.settingsDataStore.data.map { prefs ->
+        prefs[KEY_ACCOUNT_LINKED] ?: false
+    }
+
+    suspend fun setSyncCode(code: String) {
+        context.settingsDataStore.edit {
+            it[KEY_SYNC_CODE] = code.trim()
+            it[KEY_ACCOUNT_LINKED] = code.isNotBlank()
+        }
+    }
+
+    suspend fun setAccountLinked(linked: Boolean) {
+        context.settingsDataStore.edit { it[KEY_ACCOUNT_LINKED] = linked }
+    }
+
     val groqApiKey: Flow<String> = context.settingsDataStore.data.map { prefs ->
         prefs[KEY_GROQ_API_KEY] ?: ""
+    }
+
+    val geminiApiKey: Flow<String> = context.settingsDataStore.data.map { prefs ->
+        prefs[KEY_GEMINI_API_KEY] ?: ""
+    }
+
+    val llmProvider: Flow<LlmProvider> = context.settingsDataStore.data.map { prefs ->
+        LlmProvider.fromId(prefs[KEY_LLM_PROVIDER])
+    }
+
+    val geminiModel: Flow<GeminiModel> = context.settingsDataStore.data.map { prefs ->
+        GeminiModel.fromId(prefs[KEY_GEMINI_MODEL])
     }
 
     val sameTrackStoryEveryN: Flow<Int> = context.settingsDataStore.data.map { prefs ->
@@ -80,6 +113,10 @@ class SettingsDataStore(private val context: Context) {
 
     val ttsEmotion: Flow<TtsEmotion> = context.settingsDataStore.data.map { prefs ->
         TtsEmotion.fromId(prefs[KEY_TTS_EMOTION])
+    }
+
+    val monitorPausedByUser: Flow<Boolean> = context.settingsDataStore.data.map { prefs ->
+        prefs[KEY_MONITOR_PAUSED_BY_USER] ?: false
     }
 
     suspend fun setAutoIntercept(enabled: Boolean) {
@@ -145,6 +182,18 @@ class SettingsDataStore(private val context: Context) {
         context.settingsDataStore.edit { it[KEY_GROQ_API_KEY] = key.trim() }
     }
 
+    suspend fun setGeminiApiKey(key: String) {
+        context.settingsDataStore.edit { it[KEY_GEMINI_API_KEY] = key.trim() }
+    }
+
+    suspend fun setLlmProvider(provider: LlmProvider) {
+        context.settingsDataStore.edit { it[KEY_LLM_PROVIDER] = provider.id }
+    }
+
+    suspend fun setGeminiModel(model: GeminiModel) {
+        context.settingsDataStore.edit { it[KEY_GEMINI_MODEL] = model.id }
+    }
+
     suspend fun setSameTrackStoryEveryN(n: Int) {
         context.settingsDataStore.edit {
             it[KEY_SAME_TRACK_STORY_EVERY_N] = n.coerceIn(1, 20)
@@ -171,6 +220,12 @@ class SettingsDataStore(private val context: Context) {
         context.settingsDataStore.edit { it[KEY_TTS_EMOTION] = emotion.id }
     }
 
+    suspend fun setMonitorPausedByUser(paused: Boolean) {
+        context.settingsDataStore.edit { it[KEY_MONITOR_PAUSED_BY_USER] = paused }
+    }
+
+    suspend fun isMonitorPausedByUser(): Boolean = monitorPausedByUser.first()
+
     companion object {
         const val DEFAULT_BACKEND_URL = "https://music-story-production.up.railway.app"
         const val DEFAULT_EVERY_N_TRACKS = 10
@@ -188,12 +243,18 @@ class SettingsDataStore(private val context: Context) {
         private val KEY_SPECIFIC_GENRES = stringSetPreferencesKey("specific_genres")
         private val KEY_MANUAL_MODE = booleanPreferencesKey("manual_mode")
         private val KEY_GROQ_API_KEY = stringPreferencesKey("groq_api_key")
+        private val KEY_GEMINI_API_KEY = stringPreferencesKey("gemini_api_key")
+        private val KEY_LLM_PROVIDER = stringPreferencesKey("llm_provider")
+        private val KEY_GEMINI_MODEL = stringPreferencesKey("gemini_model")
         private val KEY_SAME_TRACK_STORY_EVERY_N = intPreferencesKey("same_track_story_every_n")
         private val KEY_STORY_LENGTH = stringPreferencesKey("story_length")
         private val KEY_STORY_NARRATOR = stringPreferencesKey("story_narrator")
         private val KEY_TTS_VOICE = stringPreferencesKey("tts_voice")
         private val KEY_TTS_SPEED = stringPreferencesKey("tts_speed")
         private val KEY_TTS_EMOTION = stringPreferencesKey("tts_emotion")
+        private val KEY_MONITOR_PAUSED_BY_USER = booleanPreferencesKey("monitor_paused_by_user")
+        private val KEY_SYNC_CODE = stringPreferencesKey("sync_code")
+        private val KEY_ACCOUNT_LINKED = booleanPreferencesKey("account_linked")
     }
 }
 

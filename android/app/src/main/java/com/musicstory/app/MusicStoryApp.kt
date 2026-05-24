@@ -6,11 +6,16 @@ import android.app.NotificationManager
 import android.os.Build
 import com.musicstory.app.data.local.AppDatabase
 import com.musicstory.app.data.local.SettingsDataStore
+import com.musicstory.app.data.remote.AccountSyncManager
 import com.musicstory.app.data.remote.ApiClient
 import com.musicstory.app.data.remote.BackendAuthManager
+import com.musicstory.app.data.remote.GeminiStoryClient
 import com.musicstory.app.data.remote.GroqStoryClient
+import com.musicstory.app.data.remote.MetadataCache
+import com.musicstory.app.data.remote.MetadataEnricher
 import com.musicstory.app.data.repository.ScrobbleRepository
 import com.musicstory.app.data.repository.StoryRepository
+import com.musicstory.app.domain.MonitorLifecycle
 import com.musicstory.app.domain.StoryOrchestrator
 import com.musicstory.app.domain.StoryPlayer
 import com.musicstory.app.domain.TriggerEngine
@@ -39,6 +44,9 @@ class MusicStoryApp : Application() {
     lateinit var apiClient: ApiClient
         private set
 
+    lateinit var accountSyncManager: AccountSyncManager
+        private set
+
     lateinit var scrobbleRepository: ScrobbleRepository
         private set
 
@@ -54,10 +62,13 @@ class MusicStoryApp : Application() {
     lateinit var triggerEngine: TriggerEngine
         private set
 
+    lateinit var monitorLifecycle: MonitorLifecycle
+        private set
+
     lateinit var storyOrchestrator: StoryOrchestrator
         private set
 
-    private val appScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    val appScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     override fun onCreate() {
         super.onCreate()
@@ -69,25 +80,39 @@ class MusicStoryApp : Application() {
         settingsDataStore = SettingsDataStore(this)
         backendAuthManager = BackendAuthManager(this, settingsDataStore)
         apiClient = ApiClient(backendAuthManager)
+        accountSyncManager = AccountSyncManager(backendAuthManager)
         scrobbleRepository = ScrobbleRepository(database.scrobbleDao())
+        val metadataEnricher = MetadataEnricher()
+        val metadataCache = MetadataCache(metadataEnricher)
         storyRepository = StoryRepository(
             storyDao = database.storyDao(),
             storyHistoryDao = database.storyHistoryDao(),
             settingsDataStore = settingsDataStore,
             apiClient = apiClient,
             groqStoryClient = GroqStoryClient(),
+            geminiStoryClient = GeminiStoryClient(),
+            accountSyncManager = accountSyncManager,
+            metadataCache = metadataCache,
         )
         mediaControllerManager = MediaControllerManager(this)
         storyPlayer = StoryPlayer(this)
         storyPlayer.ensureTtsInitialized()
         triggerEngine = TriggerEngine()
         storyOrchestrator = StoryOrchestrator(
+            context = applicationContext,
             storyRepository = storyRepository,
             scrobbleRepository = scrobbleRepository,
             settingsDataStore = settingsDataStore,
             mediaControllerManager = mediaControllerManager,
             storyPlayer = storyPlayer,
             triggerEngine = triggerEngine,
+        )
+        monitorLifecycle = MonitorLifecycle(
+            context = this,
+            settingsDataStore = settingsDataStore,
+            mediaControllerManager = mediaControllerManager,
+            storyOrchestrator = storyOrchestrator,
+            scope = appScope,
         )
         scheduleBackgroundAuthRefresh()
         prefetchBackendAuth()

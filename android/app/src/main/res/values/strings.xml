@@ -28,13 +28,21 @@
     <string name="onboarding_continue">Продолжить</string>
 
     <string name="status_no_access">Нет доступа к уведомлениям</string>
-    <string name="status_monitoring">Мониторинг активен</string>
+    <string name="status_monitoring">Музыка играет</string>
+    <string name="status_waiting_music">Ожидание музыки</string>
+    <string name="status_waiting_music_hint">Уведомление появится, когда включишь трек</string>
     <string name="status_stopped">Служба остановлена</string>
     <string name="action_grant_access">Выдать доступ</string>
     <string name="action_manual_story">Рассказать историю</string>
-    <string name="action_stop_story">Остановить</string>
+    <string name="action_stop_monitor">Остановить</string>
+    <string name="action_stop_story">Остановить историю</string>
+    <string name="action_resume_monitor">Возобновить мониторинг</string>
+    <string name="status_monitoring_paused">Мониторинг приостановлен</string>
+    <string name="status_monitoring_paused_hint">Включится сам, когда откроешь Spotify или Яндекс Музыку</string>
     <string name="action_back">Назад</string>
     <string name="action_save">Сохранить</string>
+    <string name="settings_saved">Сохранено</string>
+    <string name="settings_saving">Сохраняю…</string>
 
     <string name="label_now_playing">Сейчас играет</string>
     <string name="label_no_track">Трек не определён</string>
@@ -54,6 +62,7 @@
     <string name="state_error">Ошибка</string>
 
     <string name="notification_listening">Ожидание музыки…</string>
+    <string name="notification_listening_hint">Включи трек в Spotify или Яндекс Музыке</string>
     <string name="notification_now_playing">%1$s — %2$s</string>
 
     <string name="settings_manual_mode">Ручной режим</string>
@@ -66,12 +75,23 @@
     <string name="settings_narrator_section">Рассказчик (амлуа)</string>
     <string name="settings_voice_section">Озвучка</string>
     <string name="settings_ai_section">AI</string>
+    <string name="settings_llm_provider">Провайдер AI</string>
+    <string name="settings_llm_provider_hint">Groq или Gemini — переключается здесь, в приложении. Серверные переменные не нужны.</string>
+    <string name="settings_llm_active">Сейчас: %1$s</string>
+    <string name="settings_api_key">API-ключ</string>
+    <string name="settings_api_key_clear">Очистить ключ</string>
+    <string name="settings_groq_api_key">Groq API-ключ</string>
+    <string name="settings_gemini_api_key">Gemini API-ключ</string>
+    <string name="settings_gemini_model">Модель Gemini</string>
+    <string name="settings_gemini_model_hint">Только бесплатные модели (free tier). Платные — тарифы на ai.google.dev/pricing</string>
+    <string name="settings_gemini_paid_models">Платные (не используются): %1$s</string>
+    <string name="settings_gemini_pricing_link">Тарифы Google AI</string>
+    <string name="settings_gemini_get_key">Получить Gemini-ключ</string>
     <string name="settings_tts_voice">Голос</string>
     <string name="settings_story_length">Длина истории</string>
     <string name="settings_tts_speed">Скорость речи</string>
     <string name="settings_tts_emotion">Интонация</string>
-    <string name="settings_groq_api_key">API-ключ</string>
-    <string name="settings_groq_get_key">Получить ключ</string>
+    <string name="settings_groq_get_key">Получить Groq-ключ</string>
     <string name="settings_groq_save_test">Сохранить и проверить</string>
     <string name="settings_groq_checking">Проверяем подключение…</string>
     <string name="settings_groq_test_ok">Всё работает</string>
@@ -80,7 +100,8 @@
     <string name="settings_free_quota">Сегодня: %1$d из %2$d</string>
     <string name="settings_unlimited_groq">Без дневного лимита</string>
     <string name="settings_groq_status_ok">Ключ сохранён</string>
-    <string name="settings_groq_status_missing">До 10 историй в день</string>
+    <string name="settings_groq_status_missing">Без своего ключа — до 10 историй в день на сервере</string>
+    <string name="settings_own_api_key_hint">Свой ключ — лимит сервера Music Story не действует (лимиты только у Google)</string>
     <string name="story_source_ai">AI</string>
 
     <string name="trigger_every_n">Каждые N треков</string>
@@ -93,4 +114,19 @@
     <string name="history_tap_to_expand">Нажми, чтобы прочитать целиком</string>
     <string name="history_expand">Развернуть</string>
     <string name="history_collapse">Свернуть</string>
+
+    <string name="settings_sync_section">Синхронизация устройств</string>
+    <string name="settings_sync_summary">Код MS-… — телефон и виджет Windows</string>
+    <string name="settings_sync_hint">Без почты: создай код здесь и введи на другом устройстве. Общие настройки, история и лимит.</string>
+    <string name="settings_sync_your_code">Твой код</string>
+    <string name="settings_sync_create_code">Создать код</string>
+    <string name="settings_sync_link_code">Код с другого устройства</string>
+    <string name="settings_sync_link_action">Привязать</string>
+    <string name="settings_sync_code_created">Код создан: %1$s</string>
+    <string name="settings_sync_linked">Устройства связаны</string>
+    <string name="settings_sync_link_failed">Не удалось привязать — проверь код</string>
+    <string name="settings_sync_error">Ошибка синхронизации</string>
+
+    <string name="tts_error_message">Озвучка не запустилась — нажми «Рассказать историю» ещё раз</string>
+    <string name="server_audio_error_message">Не удалось загрузить озвучку с сервера — попробуй ещё раз через минуту</string>
 </resources>

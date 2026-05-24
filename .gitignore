@@ -8,6 +8,7 @@
 # Backend
 backend/node_modules/
 backend/dist/
+backend/data/
 backend/audio/*.ogg
 backend/audio/*.mp3
 backend/audio/*.wav

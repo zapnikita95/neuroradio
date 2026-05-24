@@ -15,57 +15,53 @@ object StoryPrompts {
             length.labelRu
         }
         val formatBlock = persona.formatRules?.takeIf { it.isNotBlank() }
-            ?: "Начни с факта. Подача — от лица персонажа, но факт должен быть настоящим (из ОПОРНЫЕ ФАКТЫ)."
+            ?: "Рассказываешь другу за барной стойкой: факт + метафора + ударная строка."
         val focusBlock = persona.contentFocus?.takeIf { it.isNotBlank() }
-            ?.let { "ФОКУС СОДЕРЖАНИЯ: $it" }
-            ?: "Один проверяемый факт из ОПОРНЫЕ ФАКТЫ — не выдуманное «я помню»"
+            ?.let { "ФОКУС: $it" }
+            ?: "Драма и контраст — не сухая статья Wikipedia"
+        val lengthPlan = StoryLengthPlan.structurePlan(length)
 
         return """
-Ты пишешь текст для ОЗВУЧКИ — живой человек рассказывает историю.
+Ты пишешь текст для ОЗВУЧКИ — харизматичный музыкальный рассказчик, знаешь изнанку шоу-бизнеса.
 
-ГЛАВНОЕ ПРАВИЛО:
-- Сначала ФАКТ (из блока ОПОРНЫЕ ФАКТЫ). Потом — подача в амплуа.
-- НЕ выдумывай личные воспоминания: «я помню студию», «я был в клубе», «когда впервые услышал».
-- Стиль подачи = только форма, не повод для fiction.
-
-КТО ТЫ: ${persona.roleTitle}
-КОНТЕКСТ ЭПОХИ: ${persona.eraHint}
-КАК ТЫ ГОВОРИШЬ: ${persona.speechStyle}
+РОЛЬ: ${persona.roleTitle}
+ЭПОХА: ${persona.eraHint}
+ГОЛОС: ${persona.speechStyle}
 $focusBlock
 
-ЯЗЫК: только русский. Английский допустим ТОЛЬКО в именах артистов и названиях песен.
+РЕЦЕПТ (масштабируй по длительности):
+- Факт + метафора + ударная строка.
+- Ищи ДРАМУ и КОНТРАСТ: конфликт, прорыв, скандал, возвращение — что люди почувствовали.
+- Опорный факт Wikipedia = семя. Не выдумывай людей и события, которых нет в факте.
 
-ЛОКАЛЬ И ЭПОХА:
-- История должна совпадать со страной происхождения трека и его реальной эпохой
-- Российский современный трек — не «радиола», не Apollo, не Nashville
-- Если год неизвестен, не выдумывай винтаж — ориентируйся на сцену страны артиста
+$lengthPlan
 
-ЧИСЛА — КРИТИЧНО:
-- В script НЕЛЬЗЯ писать цифры, годы, «N-й», «шестидесятых» и т.п.
-- Исключение: цифры только из имени артиста или названия трека (2Pac, «1999»)
-- Вместо дат: «тогда», «в те годы», «на заре», «однажды на концерте», «в студии»
+СТИЛЬ: друг за барной стойкой. Можно «слушай», «чувак», «брат». Не Wikipedia.
+
+КАТЕГОРИЧЕСКИ НЕЛЬЗЯ:
+- «изначально называлась», «группа из…», состав, дискография.
+- Перечисление рекламы, саундтреков, игр, фильмов.
+- Generic-студия: «помогаюсь», «команда работает над треком».
+
+ЯЗЫК: только русский. Английский — только внутри «имя артиста» или «название трека».
+
+${StoryRussianLanguage.PROMPT_BLOCK}
+
+ЧИСЛА: без цифр и годов (кроме цифр в имени/названии). Вместо дат: «тогда», «в те годы».
 
 ФОРМАТ:
 - $formatBlock
-- НЕ начинай: «знаю факт», «интересно что», «вот что», «слушай факт»
+- Не начинай: «знаю факт», «интересно что», «вот что»
 
-СОДЕРЖАНИЕ:
-- ${length.wordsMin}–${length.wordsMax} слов ($durationHint)
-- ${length.sentenceHint}, каждое с конкретикой: место, люди, звук, запах
+ЖЁСТКИЙ ОБЪЁМ: ${length.wordsMin}–${length.wordsMax} слов ($durationHint). ${length.sentenceHint}.
+- word_count в JSON — строго в этом диапазоне.
 
-ЗАПРЕЩЕНО:
-- цифры и даты (кроме имени/названия)
-- английские слова, кроме имён артистов и названий треков в «кавычках»
-- «братуха», «Music Story», «сейчас в эфире»
-- вода: «влияет на музыку», «легендарная», «уникальный пример», «суть в том что», «понял что музыка», «соединяет всех»
-- «он подсказывает [имя артиста]» — имя сцены не объект; говори «артист», «он», или ««имя»»
-- выдуманные воспоминания: «я помню», «я был в клубе», «когда впервые услышал»
+ЗАПРЕЩЕНО: выдуманные люди, «Music Story», вода «магия музыки», «легендарная».
 
-ОБЯЗАТЕЛЬНО:
-- центральный факт из ОПОРНЫЕ ФАКТЫ — его суть должна быть узнаваема в тексте
-- первое предложение — уже факт, не «я помню»
+ОБЯЗАТЕЛЬНО: слушатель понимает ПОЧЕМУ это цепляет; суть семени факта узнаваема.
 
 JSON: {"script":"...", "word_count": число}
+Верни ТОЛЬКО JSON — без markdown, без текста до или после скобок.
 """.trimIndent()
     }
 
@@ -80,6 +76,7 @@ JSON: {"script":"...", "word_count": число}
         narrator: StoryNarrator = StoryNarrator.AUTO,
         countryCode: String? = null,
         referenceFacts: List<String> = emptyList(),
+        selectedFact: SelectedReferenceFact? = null,
     ): String {
         val locale = TrackLocaleResolver.resolve(artist, title, year, genre, countryCode)
         val persona = StoryNarrator.buildPersona(narrator, year, genre, artist, title, countryCode)
@@ -88,39 +85,45 @@ JSON: {"script":"...", "word_count": число}
             appendLine("Трек: $title")
             genre?.let { appendLine("Жанр: $it") }
             appendLine("Страна/сцена: ${locale.countryLabelRu}")
-            appendLine("Год релиза (только для тебя, НЕ писать цифры в script): ${locale.yearLabelRu}")
-            appendLine("Эпоха и контекст: ${locale.sceneHintRu}")
-            appendLine("ЛОКАЛЬ: ${locale.localeRulesRu}")
+            appendLine("Год (не писать цифрами в script): ${locale.yearLabelRu}")
+            appendLine("Эпоха: ${locale.sceneHintRu}")
             appendLine()
-            appendLine("СТИЛЬ ПОДАЧИ: ${angle.labelRu}")
-            appendLine("Как подать факт: ${angle.wrapHint}")
-            appendLine("Ты — ${persona.roleTitle}. Говоришь так: ${persona.speechStyle}")
+            appendLine("УГОЛ ПОДАЧИ: ${angle.labelRu} — ${angle.wrapHint}")
+            appendLine("Ты — ${persona.roleTitle}. Говоришь: ${persona.speechStyle}")
             if (!narrator.isAuto) {
-                appendLine("РЕЖИМ РАССКАЗЧИКА: ${narrator.labelRu} — ${narrator.descriptionRu}")
+                appendLine("РАССКАЗЧИК: ${narrator.labelRu} — ${narrator.formatRules}")
             }
-            appendLine("Длина: ${length.wordsMin}–${length.wordsMax} слов.")
-            appendLine("Помни: в script никаких цифр и годов, кроме цифр из имени артиста или названия трека.")
-            if (referenceFacts.isNotEmpty()) {
+            appendLine("ЖЁСТКАЯ ДЛИНА: ${length.wordsMin}–${length.wordsMax} слов (${length.labelRu}).")
+            appendLine(StoryLengthPlan.structurePlan(length))
+            appendLine(StoryRussianLanguage.PROMPT_BLOCK)
+            if (selectedFact != null) {
                 appendLine()
-                appendLine("ОПОРНЫЕ ФАКТЫ (из Wikipedia — выбери ОДИН, это ядро истории):")
+                appendLine("СЕМЯ ИСТОРИИ (проверенный факт из интернета — только это ядро):")
+                appendLine(selectedFact.fact)
+                appendLine()
+                appendLine("РЕЦЕПТ ПОДАЧИ:")
+                appendLine("1. КРЮЧОК — парадокс или безумный поворот из семени.")
+                appendLine("2. КУХНЯ — человеческая драма из семени (если укладываешься по времени).")
+                appendLine("3. СМЫСЛ — почему цепляет душу.")
+                appendLine("НЕ перечисляй рекламу/фильмы/игры. НЕ Wikipedia. Факт + метафора + удар.")
+            } else if (referenceFacts.isNotEmpty()) {
+                appendLine()
+                appendLine("СЕМЕНА ИСТОРИЙ (выбери ОДНО с максимальной драмой — не рекламу и не дискографию):")
                 referenceFacts.take(4).forEachIndexed { i, fact ->
                     appendLine("${i + 1}. $fact")
                 }
-                appendLine("Факт нельзя заменить вымышленным «я помню» или «я был в клубе».")
             } else {
                 appendLine()
-                appendLine("ОПОРНЫЕ ФАКТЫ: не найдены. Не выдумывай личные воспоминания — только общеизвестное об артисте.")
+                appendLine("Факты из Wikipedia, Wikidata, DuckDuckGo, MusicBrainz — выбери самое живое:")
             }
             if (previousScripts.isNotEmpty()) {
-                appendLine("УЖЕ РАССКАЗАНО — другой факт, другая подача:")
-                previousScripts.take(5).forEachIndexed { i, s ->
-                    appendLine("${i + 1}. ${s.take(200)}${if (s.length > 200) "…" else ""}")
+                appendLine("УЖЕ БЫЛО — другой факт, другая подача:")
+                previousScripts.take(3).forEachIndexed { i, s ->
+                    appendLine("${i + 1}. ${s.take(180)}…")
                 }
-            } else {
-                appendLine("Первый рассказ — сразу с факта.")
             }
             appendLine()
-            appendLine("Ответ в JSON.")
+            appendLine("JSON.")
         }
     }
 }

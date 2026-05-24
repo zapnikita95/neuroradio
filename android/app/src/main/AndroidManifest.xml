@@ -67,6 +67,7 @@
             android:exported="false">
             <intent-filter>
                 <action android:name="com.musicstory.app.ACTION_MANUAL_STORY" />
+                <action android:name="com.musicstory.app.ACTION_STOP_MONITOR" />
             </intent-filter>
         </receiver>
     </application>

@@ -5,7 +5,7 @@ import com.musicstory.app.data.local.ScrobbleDao
 import com.musicstory.app.data.local.ScrobbleEntry
 import com.musicstory.app.data.local.ScrobbleGenreStat
 import com.musicstory.app.data.model.TrackInfo
-import com.musicstory.app.data.remote.MetadataEnricher
+import com.musicstory.app.data.remote.MusicBrainzGenreLookup
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -15,7 +15,6 @@ import java.util.concurrent.ConcurrentHashMap
 
 class ScrobbleRepository(
     private val scrobbleDao: ScrobbleDao,
-    private val metadataEnricher: MetadataEnricher = MetadataEnricher(),
 ) {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val genreCache = ConcurrentHashMap<String, String>()
@@ -84,8 +83,8 @@ class ScrobbleRepository(
     private fun enrichGenreAsync(entryId: Long, track: TrackInfo) {
         scope.launch {
             runCatching {
-                val metadata = metadataEnricher.enrich(track.artist, track.title)
-                val genre = metadata.genre?.trim()?.takeIf { it.isNotEmpty() } ?: return@launch
+                val genre = MusicBrainzGenreLookup.fetchGenre(track.artist, track.title)?.trim()?.takeIf { it.isNotEmpty() }
+                    ?: return@launch
                 scrobbleDao.updateGenre(entryId, genre)
                 genreCache[trackKey(track.artist, track.title)] = genre
             }

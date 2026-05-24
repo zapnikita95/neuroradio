@@ -21,6 +21,9 @@ class MediaControllerManager(
     private val _nowPlaying = MutableStateFlow<TrackInfo?>(null)
     val nowPlaying: StateFlow<TrackInfo?> = _nowPlaying.asStateFlow()
 
+    private val _effectiveNowPlaying = MutableStateFlow<TrackInfo?>(null)
+    val effectiveNowPlaying: StateFlow<TrackInfo?> = _effectiveNowPlaying.asStateFlow()
+
     private val _isPlaying = MutableStateFlow(false)
     val isPlaying: StateFlow<Boolean> = _isPlaying.asStateFlow()
 
@@ -125,6 +128,7 @@ class MediaControllerManager(
             _nowPlaying.value = null
             _isPlaying.value = false
             _activePackage.value = null
+            syncEffectiveNowPlaying()
             return
         }
 
@@ -149,5 +153,12 @@ class MediaControllerManager(
 
         val state = controller.playbackState?.state
         _isPlaying.value = state == android.media.session.PlaybackState.STATE_PLAYING
+        syncEffectiveNowPlaying()
+    }
+
+    fun syncEffectiveNowPlaying() {
+        val session = _nowPlaying.value?.takeIf { it.isValid() }
+        val fromNotification = MediaNotificationListener.lastNotificationTrack.value?.takeIf { it.isValid() }
+        _effectiveNowPlaying.value = session ?: fromNotification
     }
 }

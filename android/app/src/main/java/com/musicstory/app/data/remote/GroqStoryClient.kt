@@ -3,6 +3,7 @@ package com.musicstory.app.data.remote
 import com.google.gson.Gson
 import com.google.gson.annotations.SerializedName
 import com.musicstory.app.data.model.StoryResponse
+import com.musicstory.app.domain.SelectedReferenceFact
 import com.musicstory.app.domain.StoryAngle
 import com.musicstory.app.domain.StoryLength
 import com.musicstory.app.domain.StoryNarrator
@@ -40,6 +41,7 @@ class GroqStoryClient(
         storyLength: StoryLength = StoryLength.SEC_30,
         storyNarrator: StoryNarrator = StoryNarrator.AUTO,
         referenceFacts: List<String> = emptyList(),
+        selectedFact: SelectedReferenceFact? = null,
         apiKey: String? = null,
     ): StoryResponse? = withContext(Dispatchers.IO) {
         val key = apiKey?.trim().orEmpty()
@@ -47,13 +49,18 @@ class GroqStoryClient(
 
         val persona = StoryNarrator.buildPersona(storyNarrator, year, genre, artist, title, countryCode)
         val system = StoryPrompts.systemPrompt(persona, storyLength)
-        val user = StoryPrompts.userMessage(
-            artist, title, year, genre, angle, storyLength, previousScripts, storyNarrator, countryCode, referenceFacts,
+        val baseUser = StoryPrompts.userMessage(
+            artist, title, year, genre, angle, storyLength, previousScripts, storyNarrator, countryCode, referenceFacts, selectedFact,
         )
 
-        var lastError: IOException? = null
-        for (attempt in 0 until MAX_ATTEMPTS) {
-            val relaxed = attempt == MAX_ATTEMPTS - 1
+        var lastRejectReason = "quality filter"
+        repeat(MAX_ATTEMPTS) { attempt ->
+            val strictAnchor = attempt < MAX_ATTEMPTS - 1
+            val user = if (attempt == 0) {
+                baseUser
+            } else {
+                "$baseUser\n\nПерегенерируй: предыдущий ответ отклонён ($lastRejectReason). Только русский текст, без английских слов вне «$artist»/«$title», опирайся на семя факта."
+            }
             try {
                 val story = requestStory(
                     apiKey = key,
@@ -65,17 +72,26 @@ class GroqStoryClient(
                     title = title,
                     year = year,
                     genre = genre,
-                    relaxedQuality = relaxed,
+                    referenceFacts = referenceFacts,
+                    countryCode = countryCode,
+                    strictReferenceAnchor = strictAnchor,
                 )
                 if (story != null) return@withContext story
-                StoryLog.w("Direct Groq attempt ${attempt + 1}: quality rejected")
+                lastRejectReason = "шаблон или слабый факт"
+                StoryLog.w("Groq story rejected (attempt ${attempt + 1}/$MAX_ATTEMPTS)")
             } catch (e: IOException) {
-                lastError = e
-                if (isRateLimitError(e)) throw e
-                StoryLog.w("Direct Groq attempt ${attempt + 1} failed: ${e.message}")
+                if (GroqErrorParser.isNonRetryable(e.message.orEmpty())) throw e
+                if (GroqErrorParser.isJsonModeFailure(e.message.orEmpty())) {
+                    lastRejectReason = "формат JSON"
+                    StoryLog.w("Groq JSON mode failed (attempt ${attempt + 1}/$MAX_ATTEMPTS)")
+                    return@repeat
+                }
+                StoryLog.w("Groq request failed (attempt ${attempt + 1}/$MAX_ATTEMPTS): ${e.message}")
+                throw e
             }
         }
-        throw lastError ?: IOException("Groq не смог собрать историю после $MAX_ATTEMPTS попыток")
+        StoryLog.w("Groq story rejected after $MAX_ATTEMPTS attempts")
+        throw IOException(STORY_RETRY_MESSAGE)
     }
 
     private fun requestStory(
@@ -88,13 +104,45 @@ class GroqStoryClient(
         title: String,
         year: Int?,
         genre: String?,
-        relaxedQuality: Boolean,
+        referenceFacts: List<String>,
+        countryCode: String?,
+        strictReferenceAnchor: Boolean = true,
+    ): StoryResponse? {
+        val jsonModeStory = callGroq(
+            apiKey, model, system, user, storyLength, artist, title, year, genre,
+            referenceFacts, countryCode, strictReferenceAnchor, useJsonMode = true,
+        )
+        if (jsonModeStory != null) return jsonModeStory
+
+        StoryLog.w("Groq JSON mode empty/failed — retry without response_format")
+        return callGroq(
+            apiKey, model, system, user, storyLength, artist, title, year, genre,
+            referenceFacts, countryCode, strictReferenceAnchor, useJsonMode = false,
+        )
+    }
+
+    private fun callGroq(
+        apiKey: String,
+        model: String,
+        system: String,
+        user: String,
+        storyLength: StoryLength,
+        artist: String,
+        title: String,
+        year: Int?,
+        genre: String?,
+        referenceFacts: List<String>,
+        countryCode: String?,
+        strictReferenceAnchor: Boolean,
+        useJsonMode: Boolean,
     ): StoryResponse? {
         val body = JSONObject().apply {
             put("model", model)
-            put("temperature", 0.82)
+            put("temperature", if (useJsonMode) 0.72 else 0.65)
             put("max_tokens", storyLength.maxTokens)
-            put("response_format", JSONObject().put("type", "json_object"))
+            if (useJsonMode) {
+                put("response_format", JSONObject().put("type", "json_object"))
+            }
             put(
                 "messages",
                 org.json.JSONArray().apply {
@@ -112,30 +160,36 @@ class GroqStoryClient(
             .build()
 
         client.newCall(request).execute().use { response ->
+            val rawBody = response.body?.string().orEmpty()
             if (!response.isSuccessful) {
-                val errorBody = response.body?.string()?.take(240).orEmpty()
+                if (useJsonMode && response.code == 400) {
+                    extractFailedGeneration(rawBody)?.let { failed ->
+                        parseStoryJson(
+                            failed, artist, title, year, genre, referenceFacts, countryCode, strictReferenceAnchor,
+                        )?.let { return it }
+                    }
+                    return null
+                }
                 throw IOException(
-                    if (errorBody.isBlank()) {
-                        "Groq HTTP ${response.code}"
-                    } else {
-                        "Groq HTTP ${response.code}: $errorBody"
-                    },
+                    if (rawBody.isBlank()) "Groq HTTP ${response.code}"
+                    else GroqApiErrorParser.parse(response.code, rawBody),
                 )
             }
             return parseGroqResponse(
-                response.body?.string(),
-                artist,
-                title,
-                year,
-                genre,
-                relaxedQuality,
+                rawBody, artist, title, year, genre, referenceFacts, countryCode, strictReferenceAnchor,
             )
         }
     }
 
-    private fun isRateLimitError(error: IOException): Boolean {
-        val message = error.message.orEmpty().lowercase()
-        return message.contains("429") || message.contains("rate limit")
+    private fun extractFailedGeneration(errorBody: String): String? {
+        if (errorBody.isBlank()) return null
+        return try {
+            val root = JSONObject(errorBody)
+            val error = root.optJSONObject("error") ?: return null
+            error.optString("failed_generation").takeIf { it.isNotBlank() }
+        } catch (_: Exception) {
+            null
+        }
     }
 
     private fun parseGroqResponse(
@@ -144,11 +198,13 @@ class GroqStoryClient(
         title: String,
         year: Int?,
         genre: String?,
-        relaxedQuality: Boolean,
+        referenceFacts: List<String>,
+        countryCode: String?,
+        strictReferenceAnchor: Boolean = true,
     ): StoryResponse? {
         val payload = gson.fromJson(rawBody, GroqChatResponse::class.java)
         val content = payload.choices?.firstOrNull()?.message?.content ?: return null
-        return parseStoryJson(content, artist, title, year, genre, relaxedQuality)
+        return parseStoryJson(content, artist, title, year, genre, referenceFacts, countryCode, strictReferenceAnchor)
     }
 
     private fun parseStoryJson(
@@ -157,7 +213,9 @@ class GroqStoryClient(
         title: String,
         year: Int?,
         genre: String?,
-        relaxedQuality: Boolean,
+        referenceFacts: List<String>,
+        countryCode: String?,
+        strictReferenceAnchor: Boolean = true,
     ): StoryResponse? {
         val jsonStart = raw.indexOf('{')
         val jsonEnd = raw.lastIndexOf('}')
@@ -168,7 +226,16 @@ class GroqStoryClient(
             val script = obj.getString("script").trim()
             if (script.isBlank()) return null
             if (StoryScriptQuality.hasBannedPattern(script)) return null
-            if (!relaxedQuality && StoryScriptQuality.isTemplateLike(script, artist, title)) return null
+            if (StoryScriptQuality.isTemplateLike(
+                    script,
+                    artist,
+                    title,
+                    referenceFacts,
+                    countryCode,
+                    year,
+                    strictReferenceAnchor = strictReferenceAnchor,
+                )
+            ) return null
             StoryResponse(
                 artist = artist,
                 title = title,
@@ -197,5 +264,7 @@ class GroqStoryClient(
 
     companion object {
         private const val MAX_ATTEMPTS = 3
+        const val STORY_RETRY_MESSAGE =
+            "Не получилось собрать историю — нажми «Рассказать историю» ещё раз."
     }
 }

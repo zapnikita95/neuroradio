@@ -14,6 +14,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.musicstory.app.domain.GenerationPreviewState
@@ -44,14 +45,16 @@ fun GenerationStoryPreview(
         scrollState.animateScrollTo(scrollState.maxValue)
     }
 
+    val maxHeight = (LocalConfiguration.current.screenHeightDp * 0.28f).coerceIn(120f, 240f).dp
+
     Text(
         text = visibleText,
         modifier = modifier
             .fillMaxWidth()
-            .heightIn(max = 140.dp)
+            .heightIn(min = 48.dp, max = maxHeight)
             .verticalScroll(scrollState)
             .alpha(animatedAlpha)
-            .padding(horizontal = 4.dp, vertical = 8.dp),
+            .padding(horizontal = 8.dp, vertical = 10.dp),
         style = MaterialTheme.typography.bodyLarge,
         color = if (preview.visibleWordCount >= preview.words.size) {
             CreamText
@@ -59,5 +62,6 @@ fun GenerationStoryPreview(
             MutedLavender
         },
         textAlign = TextAlign.Center,
+        softWrap = true,
     )
 }

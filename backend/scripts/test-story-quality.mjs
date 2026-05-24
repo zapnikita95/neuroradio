@@ -2,6 +2,7 @@
  * Run: npm run build && node scripts/test-story-quality.mjs
  */
 import { validateStoryScript } from '../dist/services/story-quality.js';
+import { hasEnglishLeak } from '../dist/services/story-russian-language.js';
 import { prepareYandexTtsText } from '../dist/services/tts-markup.js';
 
 let failed = 0;
@@ -20,7 +21,7 @@ const BAD_HAWKINS =
   "Сквозь миганье лампочек студии я слышу шепот гитариста. Он подсказывает Screamin' Jay Hawkins, как создать шарм. Эта песня чрезвычайно влияющая на развитие рока.";
 
 const GOOD_SAMPLE =
-  'Продюсер взял старый сэмпл Perez Prado — «Mambo No. 5» — и Lou Bega дописал куплеты в студии в Мюнхене. На радио сначала крутили только клубную версию, без списка имён. Потом лейбл вытащил сингл в эфир, и каждый куплет перечислял девушку с другого континента — от Sandra до Marilyn. Именно этот приём сделали главной фишкой трека, а не гитарный рифф, как многие думают сегодня в клубах.';
+  'Продюсер взял старый сэмпл «Perez Prado» — «Mambo No. 5» — и Lou Bega дописал куплеты в студии в Мюнхене. На радио сначала крутили только клубную версию, без списка имён. Потом лейбл вытащил сингл в эфир, и каждый куплет перечислял девушку с другого континента — от «Sandra» до «Marilyn». Именно этот приём сделали главной фишкой трека, а не гитарный рифф, как многие думают сегодня в клубах.';
 
 for (const [label, text] of [
   ['Lou Bega water', BAD_LOU_BEGA],
@@ -39,6 +40,42 @@ if (!goodVal.ok) {
   fail(`good sample rejected: ${goodVal.reason}`);
 } else {
   ok('concrete fact sample accepted');
+}
+
+const ENGLISH_LEAK =
+  '«Dancing Queen» — единственный #1 ABBA в США, viral hit на Billboard top-5.';
+if (!hasEnglishLeak(ENGLISH_LEAK, 'ABBA', 'Dancing Queen')) {
+  fail('english leak sample should be detected');
+} else {
+  ok('english leak detected');
+}
+const englishVal = validateStoryScript(ENGLISH_LEAK, '30s', 'ABBA', 'Dancing Queen');
+if (englishVal.ok) {
+  fail('english leak script should be rejected');
+} else {
+  ok(`english leak rejected (${englishVal.reason})`);
+}
+
+const RUSSIAN_ABBA =
+  '«Dancing Queen» — единственный хит ABBA, который дошёл до первого места в американском хит-параде. Для шведов это был редкий случай: их песню услышала вся страна по радио, хотя дома они уже давно правили эфиром.';
+const ruVal = validateStoryScript(RUSSIAN_ABBA, '15s', 'ABBA', 'Dancing Queen', {
+  referenceFacts: ['It was ABBA\'s only number-one hit on the Billboard Hot 100.'],
+  strictLength: false,
+});
+if (hasEnglishLeak(RUSSIAN_ABBA, 'ABBA', 'Dancing Queen')) {
+  fail('pure Russian ABBA sample should not leak English');
+} else if (!ruVal.ok) {
+  fail(`Russian ABBA sample rejected: ${ruVal.reason}`);
+} else {
+  ok('Russian ABBA sample accepted');
+}
+
+const POP_HYBRID =
+  'В те годы было популярно сочетание pop-музыки и электроники, и «Alors on danse» Stromae это точно показал в студии.';
+if (hasEnglishLeak(POP_HYBRID, 'Stromae', 'Alors on danse')) {
+  fail('pop-музыки hybrid should not count as English leak');
+} else {
+  ok('pop-музыки hybrid allowed');
 }
 
 const marked = prepareYandexTtsText('Трек Lou Bega «Mambo No. 5» в студии.', {

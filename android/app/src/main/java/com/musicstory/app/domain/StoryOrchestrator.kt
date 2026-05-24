@@ -1,6 +1,8 @@
 package com.musicstory.app.domain
 
+import android.content.Context
 import android.os.SystemClock
+import com.musicstory.app.R
 import com.musicstory.app.data.local.SettingsDataStore
 import com.musicstory.app.data.model.StoryResponse
 import com.musicstory.app.data.model.TrackInfo
@@ -54,6 +56,7 @@ data class GenerationPreviewState(
 )
 
 class StoryOrchestrator(
+    private val context: Context,
     private val storyRepository: StoryRepository,
     private val scrobbleRepository: ScrobbleRepository,
     private val settingsDataStore: SettingsDataStore,
@@ -90,7 +93,7 @@ class StoryOrchestrator(
         _uiState.value = OrchestratorUiState(
             mode = _mode.value,
             state = _state.value,
-            currentTrack = mediaControllerManager.nowPlaying.value,
+            currentTrack = mediaControllerManager.effectiveNowPlaying.value,
             errorMessage = _errorMessage.value,
             tracksUntilNext = _tracksUntilNext.value,
             isServiceRunning = _serviceRunning.value,
@@ -136,6 +139,12 @@ class StoryOrchestrator(
         publishUiState()
     }
 
+    fun isStorySessionActive(): Boolean {
+        return _state.value == OrchestratorState.FETCHING_STORY ||
+            _state.value == OrchestratorState.PREPARING_PLAYBACK ||
+            _state.value == OrchestratorState.PLAYING_STORY
+    }
+
     suspend fun onTrackChanged(track: TrackInfo) {
         if (!track.isValid()) return
 
@@ -166,7 +175,7 @@ class StoryOrchestrator(
     }
 
     fun requestManualStory() {
-        val track = mediaControllerManager.nowPlaying.value
+        val track = mediaControllerManager.effectiveNowPlaying.value
         if (track == null || !track.isValid()) {
             _errorMessage.value = "Нет активного трека для истории"
             _state.value = OrchestratorState.ERROR
@@ -185,11 +194,12 @@ class StoryOrchestrator(
             _state.value = OrchestratorState.FETCHING_STORY
             _errorMessage.value = null
             publishUiState()
+            storyPlayer.ensureTtsInitialized()
 
             val fetchStartedAt = SystemClock.elapsedRealtime()
             val musicPausedForStory = AtomicBoolean(false)
 
-            val result = storyRepository.fetchStory(track, forceRefresh = true)
+            val result = storyRepository.fetchStory(track, forceRefresh = manual)
             val ttsSpeed = settingsDataStore.ttsSpeed.first().androidRate
             result.fold(
                 onSuccess = { response ->
@@ -233,7 +243,14 @@ class StoryOrchestrator(
                         },
                         onError = {
                             if (session != playbackSession) return@playStory
-                            _errorMessage.value = "Не удалось воспроизвести историю"
+                            val ttsState = storyPlayer.state.value
+                            _errorMessage.value = when {
+                                storyPlayer.lastPlaybackUsedServerAudio() ->
+                                    context.getString(R.string.server_audio_error_message)
+                                ttsState == StoryPlaybackState.ERROR ->
+                                    context.getString(R.string.tts_error_message)
+                                else -> "Не удалось воспроизвести историю"
+                            }
                             _state.value = OrchestratorState.ERROR
                             if (musicPausedForStory.get()) {
                                 mediaControllerManager.resumeMusic()
@@ -343,7 +360,9 @@ class StoryOrchestrator(
             for (index in 1..words.size) {
                 if (session != playbackSession) return@launch
                 _generationPreview.value = _generationPreview.value.copy(visibleWordCount = index)
-                publishUiState()
+                if (index == 1 || index == words.size || index % 2 == 0) {
+                    publishUiState()
+                }
                 if (index < words.size) {
                     delay(wordDelayMs)
                 }
@@ -356,7 +375,9 @@ class StoryOrchestrator(
                 if (session != playbackSession) return@launch
                 val alpha = 1f - ((step + 1).toFloat() / fadeSteps.toFloat())
                 _generationPreview.value = _generationPreview.value.copy(alpha = alpha)
-                publishUiState()
+                if (step == fadeSteps - 1 || step % 3 == 0) {
+                    publishUiState()
+                }
                 delay(PREVIEW_FADE_STEP_MS)
             }
 

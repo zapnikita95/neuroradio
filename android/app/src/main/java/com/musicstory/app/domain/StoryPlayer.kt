@@ -57,11 +57,18 @@ class StoryPlayer(context: Context) {
     private var playbackStartedNotified = false
     private var pendingScript: String? = null
     private var pendingSpeechRate = 0.92f
+    private var ttsPlainFallbackUsed = false
+    private var usedServerAudio = false
+    private var exoRetryUsed = false
+    private var currentExoUrl: String? = null
     private var playbackTimeoutRunnable: Runnable? = null
     private var ttsStartTimeoutRunnable: Runnable? = null
 
     private val _state = MutableStateFlow(StoryPlaybackState.IDLE)
     val state: StateFlow<StoryPlaybackState> = _state.asStateFlow()
+
+    /** True when the last [playStory] call used Yandex audio from the backend (ExoPlayer path). */
+    fun lastPlaybackUsedServerAudio(): Boolean = usedServerAudio
 
     private val _currentScript = MutableStateFlow<String?>(null)
     val currentScript: StateFlow<String?> = _currentScript.asStateFlow()
@@ -106,15 +113,20 @@ class StoryPlayer(context: Context) {
 
                 override fun onPlayerError(error: androidx.media3.common.PlaybackException) {
                     StoryLog.e("ExoPlayer error: ${error.message}", error)
-                    val script = pendingScript
-                    if (!script.isNullOrBlank()) {
-                        StoryLog.w("Falling back to Android TTS after server audio failed")
-                        playWithTts(script, pendingSpeechRate)
-                    } else {
-                        _state.value = StoryPlaybackState.ERROR
-                        abandonAudioFocus()
-                        invokeError()
+                    if (!exoRetryUsed) {
+                        exoRetryUsed = true
+                        val retryUrl = currentExoUrl
+                        if (!retryUrl.isNullOrBlank()) {
+                            StoryLog.w("ExoPlayer error — retrying server audio once")
+                            exoPlayer.stop()
+                            exoPlayer.clearMediaItems()
+                            playWithExoPlayer(retryUrl)
+                            return
+                        }
                     }
+                    _state.value = StoryPlaybackState.ERROR
+                    abandonAudioFocus()
+                    invokeError()
                 }
             },
         )
@@ -173,6 +185,9 @@ class StoryPlayer(context: Context) {
         playbackStartedNotified = false
         pendingScript = response.script
         pendingSpeechRate = speechRate
+        ttsPlainFallbackUsed = false
+        exoRetryUsed = false
+        usedServerAudio = !audioUrl.isNullOrBlank()
         _currentScript.value = response.script
 
         if (!requestAudioFocus()) {
@@ -183,12 +198,14 @@ class StoryPlayer(context: Context) {
             StoryLog.i("Playing server audio: $audioUrl")
             playWithExoPlayer(audioUrl)
         } else {
+            usedServerAudio = false
             StoryLog.i("Playing Android TTS (${response.script.length} chars)")
             playWithTts(response.script, speechRate)
         }
     }
 
     private fun playWithExoPlayer(url: String) {
+        currentExoUrl = url
         _state.value = StoryPlaybackState.PREPARING
         scheduleExoBufferingTimeout()
         exoPlayer.setMediaItem(MediaItem.fromUri(url))
@@ -208,16 +225,23 @@ class StoryPlayer(context: Context) {
                 return@Runnable
             }
             val script = pendingScript
-            StoryLog.w("ExoPlayer start timeout, falling back to Android TTS")
+            if (!exoRetryUsed) {
+                exoRetryUsed = true
+                StoryLog.w("ExoPlayer start timeout — retrying server audio once")
+                exoPlayer.stop()
+                exoPlayer.clearMediaItems()
+                val retryUrl = currentExoUrl
+                if (!retryUrl.isNullOrBlank()) {
+                    playWithExoPlayer(retryUrl)
+                    return@Runnable
+                }
+            }
+            StoryLog.w("ExoPlayer start timeout after retry")
             exoPlayer.stop()
             exoPlayer.clearMediaItems()
-            if (!script.isNullOrBlank()) {
-                playWithTts(script, pendingSpeechRate)
-            } else {
-                _state.value = StoryPlaybackState.ERROR
-                abandonAudioFocus()
-                invokeError()
-            }
+            _state.value = StoryPlaybackState.ERROR
+            abandonAudioFocus()
+            invokeError()
         }
         mainHandler.postDelayed(playbackTimeoutRunnable!!, EXO_START_TIMEOUT_MS)
     }
@@ -370,10 +394,78 @@ class StoryPlayer(context: Context) {
             )
             return
         }
+        if (!ttsPlainFallbackUsed) {
+            ttsPlainFallbackUsed = true
+            val script = pendingScript
+            if (!script.isNullOrBlank()) {
+                StoryLog.w("TTS segmented playback failed — retry whole script as Russian")
+                playWithTtsPlainRussian(script, speechRate)
+                return
+            }
+        }
         StoryLog.e("Android TTS speak error on segment $failedIndex")
         _state.value = StoryPlaybackState.ERROR
         abandonAudioFocus()
         invokeError()
+    }
+
+    private fun playWithTtsPlainRussian(script: String, speechRate: Float) {
+        val engine = tts
+        if (engine == null || !ttsReady) {
+            _state.value = StoryPlaybackState.ERROR
+            abandonAudioFocus()
+            invokeError()
+            return
+        }
+        _state.value = StoryPlaybackState.PREPARING
+        scheduleTtsStartTimeout()
+        engine.language = Locale("ru", "RU")
+        engine.setSpeechRate(speechRate)
+        val spoken = RussianStress.apply(script)
+        engine.setOnUtteranceProgressListener(
+            object : UtteranceProgressListener() {
+                override fun onStart(utteranceId: String?) {
+                    mainHandler.post {
+                        cancelTtsStartTimeout()
+                        notifyPlaybackStarted()
+                        _state.value = StoryPlaybackState.PLAYING
+                    }
+                }
+
+                override fun onDone(utteranceId: String?) {
+                    mainHandler.post {
+                        cancelAllPlaybackTimeouts()
+                        _state.value = StoryPlaybackState.COMPLETED
+                        abandonAudioFocus()
+                        invokeFinished()
+                    }
+                }
+
+                @Deprecated("Deprecated in Java")
+                override fun onError(utteranceId: String?) {
+                    mainHandler.post {
+                        _state.value = StoryPlaybackState.ERROR
+                        abandonAudioFocus()
+                        invokeError()
+                    }
+                }
+
+                override fun onError(utteranceId: String?, errorCode: Int) {
+                    onError(utteranceId)
+                }
+            },
+        )
+        val params = Bundle().apply {
+            putString(TextToSpeech.Engine.KEY_PARAM_UTTERANCE_ID, "${UTTERANCE_ID}_plain")
+            putFloat(TextToSpeech.Engine.KEY_PARAM_VOLUME, 1.0f)
+            putInt(TextToSpeech.Engine.KEY_PARAM_STREAM, AudioManager.STREAM_MUSIC)
+        }
+        val result = engine.speak(spoken, TextToSpeech.QUEUE_FLUSH, params, "${UTTERANCE_ID}_plain")
+        if (result == TextToSpeech.ERROR) {
+            _state.value = StoryPlaybackState.ERROR
+            abandonAudioFocus()
+            invokeError()
+        }
     }
 
     private fun requestAudioFocus(): Boolean {
@@ -454,6 +546,7 @@ class StoryPlayer(context: Context) {
         _currentScript.value = null
         pendingScript = null
         playbackStartedNotified = false
+        ttsPlainFallbackUsed = false
         onPlaybackStartedCallback = null
         if (clearCallback) {
             onFinishedCallback = null
@@ -475,7 +568,7 @@ class StoryPlayer(context: Context) {
 
     companion object {
         private const val UTTERANCE_ID = "music_story_utterance"
-        private const val EXO_START_TIMEOUT_MS = 15_000L
-        private const val TTS_START_TIMEOUT_MS = 12_000L
+        private const val EXO_START_TIMEOUT_MS = 28_000L
+        private const val TTS_START_TIMEOUT_MS = 25_000L
     }
 }

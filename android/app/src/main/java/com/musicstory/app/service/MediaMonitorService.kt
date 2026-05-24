@@ -8,8 +8,8 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.IBinder
-import androidx.core.content.ContextCompat
 import androidx.core.app.NotificationCompat
+import androidx.core.content.ContextCompat
 import com.musicstory.app.MainActivity
 import com.musicstory.app.MusicStoryApp
 import com.musicstory.app.R
@@ -20,13 +20,14 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 
 class MediaMonitorService : Service() {
 
-    private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
+    private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private var trackObserverJob: Job? = null
     private var lastTrackKey: String? = null
 
@@ -39,18 +40,25 @@ class MediaMonitorService : Service() {
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         try {
-            startForeground(NOTIFICATION_ID, buildNotification(null))
+            val app = application as MusicStoryApp
+            val track = app.mediaControllerManager.effectiveNowPlaying.value
+            startForeground(NOTIFICATION_ID, buildNotification(track))
         } catch (e: SecurityException) {
             stopSelf()
             return START_NOT_STICKY
         }
-        return START_STICKY
+        return START_NOT_STICKY
     }
 
     override fun onDestroy() {
         trackObserverJob?.cancel()
         serviceScope.cancel()
-        (application as? MusicStoryApp)?.mediaControllerManager?.stop()
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+            stopForeground(STOP_FOREGROUND_REMOVE)
+        } else {
+            @Suppress("DEPRECATION")
+            stopForeground(true)
+        }
         super.onDestroy()
     }
 
@@ -59,12 +67,14 @@ class MediaMonitorService : Service() {
     private fun observeTracks(app: MusicStoryApp) {
         trackObserverJob?.cancel()
         trackObserverJob = serviceScope.launch {
-            app.mediaControllerManager.nowPlaying
-                .map { track -> track?.displayKey }
+            combine(
+                app.mediaControllerManager.nowPlaying.map { it?.displayKey },
+                MediaNotificationListener.lastNotificationTrack.map { it?.displayKey },
+            ) { sessionKey, notificationKey -> sessionKey ?: notificationKey }
                 .distinctUntilChanged()
                 .collect { key ->
-                    val track = app.mediaControllerManager.nowPlaying.value
-                    if (track != null && track.isValid() && key != lastTrackKey) {
+                    val track = app.mediaControllerManager.effectiveNowPlaying.value
+                    if (track != null && track.isValid() && key != null && key != lastTrackKey) {
                         lastTrackKey = key
                         onNewTrack(app, track)
                     }
@@ -103,13 +113,26 @@ class MediaMonitorService : Service() {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         )
 
-        val contentText = when {
-            track != null -> getString(R.string.notification_now_playing, track.artist, track.title)
+        val stopMonitor = PendingIntent.getBroadcast(
+            this,
+            2,
+            Intent(this, StoryActionReceiver::class.java).apply {
+                action = StoryActionReceiver.ACTION_STOP_MONITOR
+            },
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+        )
+
+        val contentTitle = when {
+            track != null && track.isValid() -> "${track.artist} — ${track.title}"
             else -> getString(R.string.notification_listening)
+        }
+        val contentText = when {
+            track != null && track.isValid() -> getString(R.string.notification_now_playing, track.artist, track.title)
+            else -> getString(R.string.notification_listening_hint)
         }
 
         return NotificationCompat.Builder(this, MusicStoryApp.CHANNEL_MONITOR)
-            .setContentTitle(getString(R.string.app_name))
+            .setContentTitle(contentTitle)
             .setContentText(contentText)
             .setSmallIcon(R.drawable.ic_notification)
             .setContentIntent(openApp)
@@ -119,6 +142,11 @@ class MediaMonitorService : Service() {
                 R.drawable.ic_notification,
                 getString(R.string.action_manual_story),
                 manualStory,
+            )
+            .addAction(
+                R.drawable.ic_notification,
+                getString(R.string.action_stop_monitor),
+                stopMonitor,
             )
             .setForegroundServiceBehavior(Notification.FOREGROUND_SERVICE_IMMEDIATE)
             .build()
@@ -139,9 +167,7 @@ class MediaMonitorService : Service() {
             try {
                 context.startForegroundService(intent)
             } catch (_: IllegalStateException) {
-                // Background start restriction — skip until next foreground
             } catch (_: SecurityException) {
-                // Missing FGS / notification permission
             }
         }
 

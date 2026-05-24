@@ -6,6 +6,8 @@ import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -33,6 +35,7 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -44,7 +47,6 @@ import com.musicstory.app.MusicStoryApp
 import com.musicstory.app.R
 import com.musicstory.app.domain.OrchestratorMode
 import com.musicstory.app.domain.OrchestratorState
-import com.musicstory.app.service.MediaMonitorService
 import com.musicstory.app.ui.components.GenerationStoryPreview
 import com.musicstory.app.ui.components.LivePulseDot
 import com.musicstory.app.ui.components.MusicStoryBackground
@@ -58,6 +60,7 @@ import com.musicstory.app.ui.theme.ErrorCoral
 import com.musicstory.app.ui.theme.GoldBright
 import com.musicstory.app.ui.theme.LiveGreen
 import com.musicstory.app.ui.theme.MutedLavender
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -72,6 +75,8 @@ fun HomeScreen(
     val uiState by app.storyOrchestrator.uiState.collectAsState()
     val hasAccess = app.mediaControllerManager.hasNotificationAccess()
     val isPlaying = app.mediaControllerManager.isPlaying.collectAsState().value
+    val monitorPaused by app.settingsDataStore.monitorPausedByUser.collectAsState(initial = false)
+    val scope = rememberCoroutineScope()
 
     DisposableEffect(Unit) {
         onDispose {
@@ -83,12 +88,11 @@ fun HomeScreen(
         contract = ActivityResultContracts.RequestPermission(),
     ) { _ ->
         if (hasAccess) {
-            MediaMonitorService.start(context)
-            app.storyOrchestrator.setServiceRunning(true)
+            app.monitorLifecycle.ensureListening()
         }
     }
 
-    LaunchedEffect(hasAccess) {
+    LaunchedEffect(hasAccess, monitorPaused) {
         if (!hasAccess) {
             app.storyOrchestrator.setServiceRunning(false)
             return@LaunchedEffect
@@ -103,12 +107,15 @@ fun HomeScreen(
                 return@LaunchedEffect
             }
         }
-        MediaMonitorService.start(context)
-        app.storyOrchestrator.setServiceRunning(true)
+        if (monitorPaused) {
+            app.storyOrchestrator.setServiceRunning(false)
+            return@LaunchedEffect
+        }
+        app.monitorLifecycle.ensureListening()
     }
 
-    val isSpinning = hasAccess &&
-        uiState.isServiceRunning &&
+    val isListening = hasAccess && !monitorPaused
+    val isSpinning = isListening &&
         uiState.currentTrack != null &&
         (
             isPlaying ||
@@ -159,10 +166,13 @@ fun HomeScreen(
                 modifier = Modifier
                     .weight(1f)
                     .fillMaxWidth()
+                    .verticalScroll(rememberScrollState())
                     .padding(horizontal = 24.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.Center,
+                verticalArrangement = Arrangement.Top,
             ) {
+                Spacer(modifier = Modifier.height(8.dp))
+
                 VinylDisc(
                     isSpinning = isSpinning,
                     size = 196.dp,
@@ -171,8 +181,9 @@ fun HomeScreen(
                 Spacer(modifier = Modifier.height(14.dp))
 
                 ServiceStatusRow(
-                    isRunning = uiState.isServiceRunning,
                     hasAccess = hasAccess,
+                    monitorPaused = monitorPaused,
+                    notificationVisible = uiState.isServiceRunning,
                 )
 
                 Spacer(modifier = Modifier.height(28.dp))
@@ -215,8 +226,16 @@ fun HomeScreen(
                 }
 
                 if (!uiState.errorMessage.isNullOrBlank()) {
-                    Spacer(modifier = Modifier.height(16.dp))
+                    Spacer(modifier = Modifier.height(12.dp))
                     ErrorBanner(message = uiState.errorMessage!!)
+                }
+
+                if (uiState.generationPreview.isActive && uiState.generationPreview.words.isNotEmpty()) {
+                    Spacer(modifier = Modifier.height(12.dp))
+                    GenerationStoryPreview(
+                        preview = uiState.generationPreview,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
                 }
             }
 
@@ -227,15 +246,19 @@ fun HomeScreen(
                     .padding(bottom = 28.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
-                GenerationStoryPreview(
-                    preview = uiState.generationPreview,
-                    modifier = Modifier.padding(bottom = 4.dp),
-                )
-
                 if (!hasAccess) {
                     SecondaryStoryButton(
                         text = context.getString(R.string.action_grant_access),
                         onClick = onRequestNotificationAccess,
+                    )
+                }
+
+                if (hasAccess && monitorPaused && !uiState.isServiceRunning) {
+                    SecondaryStoryButton(
+                        text = context.getString(R.string.action_resume_monitor),
+                        onClick = {
+                            scope.launch { app.monitorLifecycle.resume() }
+                        },
                     )
                 }
 
@@ -262,27 +285,50 @@ fun HomeScreen(
 
 @Composable
 private fun ServiceStatusRow(
-    isRunning: Boolean,
     hasAccess: Boolean,
+    monitorPaused: Boolean,
+    notificationVisible: Boolean,
 ) {
     val context = LocalContext.current
+    val isListening = hasAccess && !monitorPaused
     val dotColor = when {
         !hasAccess -> ErrorCoral
-        isRunning -> LiveGreen
+        monitorPaused -> GoldBright
+        notificationVisible -> LiveGreen
+        isListening -> GoldBright
         else -> MutedLavender
     }
     Row(verticalAlignment = Alignment.CenterVertically) {
-        LivePulseDot(color = dotColor, active = hasAccess && isRunning)
-        Text(
-            text = when {
-                !hasAccess -> context.getString(R.string.status_no_access)
-                isRunning -> context.getString(R.string.status_monitoring)
-                else -> context.getString(R.string.status_stopped)
-            },
-            modifier = Modifier.padding(start = 10.dp),
-            style = MaterialTheme.typography.bodyMedium,
-            color = CreamText,
-        )
+        LivePulseDot(color = dotColor, active = isListening && notificationVisible)
+        Column(modifier = Modifier.padding(start = 10.dp)) {
+            Text(
+                text = when {
+                    !hasAccess -> context.getString(R.string.status_no_access)
+                    monitorPaused -> context.getString(R.string.status_monitoring_paused)
+                    notificationVisible -> context.getString(R.string.status_monitoring)
+                    isListening -> context.getString(R.string.status_waiting_music)
+                    else -> context.getString(R.string.status_stopped)
+                },
+                style = MaterialTheme.typography.bodyMedium,
+                color = CreamText,
+            )
+            when {
+                monitorPaused && hasAccess -> {
+                    Text(
+                        text = context.getString(R.string.status_monitoring_paused_hint),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MutedLavender,
+                    )
+                }
+                isListening && !notificationVisible -> {
+                    Text(
+                        text = context.getString(R.string.status_waiting_music_hint),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MutedLavender,
+                    )
+                }
+            }
+        }
     }
 }
 

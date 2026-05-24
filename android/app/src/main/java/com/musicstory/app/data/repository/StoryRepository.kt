@@ -9,18 +9,26 @@ import com.musicstory.app.data.local.StoryHistoryEntry
 import com.musicstory.app.data.model.StoryRequest
 import com.musicstory.app.data.model.StoryResponse
 import com.musicstory.app.data.model.TrackInfo
+import com.musicstory.app.data.remote.AccountSyncManager
 import com.musicstory.app.data.remote.ApiClient
 import com.musicstory.app.data.remote.ConnectionCheckResult
 import com.musicstory.app.data.remote.ConnectionChecker
+import com.musicstory.app.data.remote.GeminiStoryClient
+import com.musicstory.app.data.remote.GroqErrorParser
 import com.musicstory.app.data.remote.GroqStoryClient
-import com.musicstory.app.data.remote.MetadataEnricher
+import com.musicstory.app.data.remote.MetadataCache
 import com.musicstory.app.data.remote.RateLimitErrorBody
 import com.musicstory.app.data.model.StoryQuotaInfo
 import com.google.gson.Gson
+import com.musicstory.app.domain.GeminiModel
+import com.musicstory.app.domain.LlmProvider
+import com.musicstory.app.domain.ReferenceFactPicker
+import com.musicstory.app.domain.SelectedReferenceFact
 import com.musicstory.app.domain.StoryAngle
 import com.musicstory.app.domain.StoryLength
 import com.musicstory.app.domain.StoryNarrator
 import com.musicstory.app.domain.StoryPersona
+import com.musicstory.app.domain.StoryRussianLanguage
 import com.musicstory.app.domain.StoryScriptQuality
 import com.musicstory.app.domain.TtsEmotion
 import com.musicstory.app.domain.TtsSpeed
@@ -31,6 +39,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeout
 import retrofit2.HttpException
 import java.io.IOException
@@ -41,7 +50,9 @@ class StoryRepository(
     private val settingsDataStore: SettingsDataStore,
     private val apiClient: ApiClient,
     private val groqStoryClient: GroqStoryClient,
-    private val metadataEnricher: MetadataEnricher = MetadataEnricher(),
+    private val geminiStoryClient: GeminiStoryClient,
+    private val accountSyncManager: AccountSyncManager? = null,
+    private val metadataCache: MetadataCache,
     private val connectionChecker: ConnectionChecker = ConnectionChecker(),
 ) {
     private val gson = Gson()
@@ -61,8 +72,21 @@ class StoryRepository(
         }
     }
 
-    suspend fun checkConnections(groqApiKey: String, backendUrl: String): ConnectionCheckResult {
-        val result = connectionChecker.runFullCheck(apiClient, backendUrl.trim(), groqApiKey.trim())
+    suspend fun checkConnections(
+        llmProvider: LlmProvider,
+        groqApiKey: String,
+        geminiApiKey: String,
+        geminiModel: GeminiModel,
+        backendUrl: String,
+    ): ConnectionCheckResult {
+        val result = connectionChecker.runFullCheck(
+            apiClient,
+            backendUrl.trim(),
+            llmProvider,
+            groqApiKey.trim(),
+            geminiApiKey.trim(),
+            geminiModel.id,
+        )
         result.quota?.let { _dailyQuota.value = it }
         return result
     }
@@ -87,7 +111,7 @@ class StoryRepository(
 
         val metadata = try {
             withTimeout(METADATA_TIMEOUT_MS) {
-                metadataEnricher.enrich(track.artist, track.title)
+                metadataCache.getOrFetch(track.artist, track.title)
             }
         } catch (e: Exception) {
             StoryLog.w("MusicBrainz enrich failed: ${e.message}")
@@ -97,23 +121,102 @@ class StoryRepository(
         val year = metadata.year
         val genre = metadata.genre
         val countryCode = metadata.countryCode
-        val referenceFacts = metadata.referenceFacts
+        val factBundle = metadata.factBundle
+        val selectedFact = ReferenceFactPicker.pick(factBundle, previousScripts)
+        val referenceFacts = ReferenceFactPicker.factsForPrompt(selectedFact)
+            .ifEmpty { metadata.referenceFacts }
+            .ifEmpty { (factBundle.trackFacts + factBundle.artistFacts).take(4) }
         val angle = StoryPersona.pickAngle(previousScripts.size)
 
         val backendUrl = settingsDataStore.backendUrl.first().trim()
+        val llmProvider = settingsDataStore.llmProvider.first()
         val groqKey = settingsDataStore.groqApiKey.first().trim()
+        val geminiKey = settingsDataStore.geminiApiKey.first().trim()
         val storyLength = settingsDataStore.storyLength.first()
         val storyNarrator = settingsDataStore.storyNarrator.first()
         val ttsVoice = settingsDataStore.ttsVoice.first()
         val ttsSpeed = settingsDataStore.ttsSpeed.first()
         val ttsEmotion = settingsDataStore.ttsEmotion.first()
+        val geminiModel = settingsDataStore.geminiModel.first()
         val useBackend = shouldTryBackend(backendUrl)
         var rateLimitHit = false
         var rateLimitQuota: StoryQuotaInfo? = null
         var backendGroqDown = false
         var templateRejected = false
-        var groqError: String? = null
+        var llmError: String? = null
         var backendError: String? = null
+
+        val directApiKey = when (llmProvider) {
+            LlmProvider.GROQ -> groqKey
+            LlmProvider.GEMINI -> geminiKey
+        }
+
+        StoryLog.i(
+            "fetchStory ${track.artist} — ${track.title}: provider=${llmProvider.id}, " +
+                "ownKey=${directApiKey.isNotEmpty()}, backend=$useBackend",
+        )
+
+        if (llmProvider == LlmProvider.GEMINI && geminiKey.isEmpty()) {
+            return Result.failure(
+                IOException(
+                    "Выбран Gemini, но API-ключ не сохранён. Вставь ключ в Настройки → AI и нажми «Сохранить».",
+                ),
+            )
+        }
+        if (llmProvider == LlmProvider.GROQ && groqKey.isEmpty() && !useBackend) {
+            return Result.failure(
+                IOException(
+                    "Выбран Groq, но API-ключ не сохранён и сервер не настроен.",
+                ),
+            )
+        }
+
+        // Свой ключ — прямой вызов LLM с телефона, без лимитов сервера.
+        if (directApiKey.isNotEmpty()) {
+            return when (llmProvider) {
+                LlmProvider.GEMINI -> when (val geminiResult = tryDirectGemini(
+                    geminiKey = geminiKey,
+                    geminiModel = geminiModel,
+                    track = track,
+                    trackKey = trackKey,
+                    year = year,
+                    genre = genre,
+                    countryCode = countryCode,
+                    previousScripts = previousScripts,
+                    angle = angle,
+                    storyLength = storyLength,
+                    storyNarrator = storyNarrator,
+                    referenceFacts = referenceFacts,
+                    selectedFact = selectedFact,
+                )) {
+                    is StoryAttemptResult.Success -> Result.success(geminiResult.response)
+                    is StoryAttemptResult.TemplateRejected -> Result.failure(
+                        IOException(GroqStoryClient.STORY_RETRY_MESSAGE),
+                    )
+                    is StoryAttemptResult.Failed -> Result.failure(IOException(geminiResult.reason))
+                }
+                LlmProvider.GROQ -> when (val groqResult = tryDirectGroq(
+                    groqKey = groqKey,
+                    track = track,
+                    trackKey = trackKey,
+                    year = year,
+                    genre = genre,
+                    countryCode = countryCode,
+                    previousScripts = previousScripts,
+                    angle = angle,
+                    storyLength = storyLength,
+                    storyNarrator = storyNarrator,
+                    referenceFacts = referenceFacts,
+                    selectedFact = selectedFact,
+                )) {
+                    is StoryAttemptResult.Success -> Result.success(groqResult.response)
+                    is StoryAttemptResult.TemplateRejected -> Result.failure(
+                        IOException(GroqStoryClient.STORY_RETRY_MESSAGE),
+                    )
+                    is StoryAttemptResult.Failed -> Result.failure(IOException(groqResult.reason))
+                }
+            }
+        }
 
         if (useBackend) {
             when (val backendResult = tryBackendStory(
@@ -127,6 +230,8 @@ class StoryRepository(
                 ttsVoice = ttsVoice,
                 ttsSpeed = ttsSpeed,
                 ttsEmotion = ttsEmotion,
+                llmProvider = llmProvider,
+                geminiModel = geminiModel,
             )) {
                 is StoryAttemptResult.Success -> return Result.success(backendResult.response)
                 is StoryAttemptResult.TemplateRejected -> templateRejected = true
@@ -143,34 +248,15 @@ class StoryRepository(
             StoryLog.w("Backend skipped (url=$backendUrl)")
         }
 
-        if (groqKey.isNotEmpty()) {
-            when (val groqResult = tryDirectGroq(
-                groqKey = groqKey,
-                track = track,
-                trackKey = trackKey,
-                year = year,
-                genre = genre,
-                countryCode = countryCode,
-                previousScripts = previousScripts,
-                angle = angle,
-                storyLength = storyLength,
-                storyNarrator = storyNarrator,
-                referenceFacts = referenceFacts,
-            )) {
-                is StoryAttemptResult.Success -> return Result.success(groqResult.response)
-                is StoryAttemptResult.TemplateRejected -> templateRejected = true
-                is StoryAttemptResult.Failed -> groqError = groqResult.reason
-            }
-        }
-
         val failureMessage = buildGenerationFailureMessage(
             rateLimitHit = rateLimitHit,
             rateLimitQuota = rateLimitQuota,
-            groqKeyPresent = groqKey.isNotEmpty(),
+            llmKeyPresent = directApiKey.isNotEmpty(),
+            llmProvider = llmProvider,
             backendConfigured = useBackend,
             backendGroqDown = backendGroqDown,
             templateRejected = templateRejected,
-            groqError = groqError,
+            llmError = llmError,
             backendError = backendError,
         )
         StoryLog.w("Story generation failed: $failureMessage")
@@ -200,6 +286,7 @@ class StoryRepository(
         storyLength: StoryLength,
         storyNarrator: StoryNarrator,
         referenceFacts: List<String> = emptyList(),
+        selectedFact: SelectedReferenceFact? = null,
     ): StoryAttemptResult {
         return try {
             StoryLog.i("Trying direct Groq from device")
@@ -216,12 +303,14 @@ class StoryRepository(
                     storyLength = storyLength,
                     storyNarrator = storyNarrator,
                     referenceFacts = referenceFacts,
+                    selectedFact = selectedFact,
                 )
             }
             when {
                 groqStory == null -> StoryAttemptResult.Failed("Groq не вернул текст истории")
-                StoryScriptQuality.isTemplateLike(groqStory.script, track.artist, track.title) -> {
-                    StoryLog.w("Direct Groq returned template-like story — rejected")
+                StoryScriptQuality.hasBannedPattern(groqStory.script) ||
+                    StoryRussianLanguage.hasEnglishLeak(groqStory.script, track.artist, track.title) -> {
+                    StoryLog.w("Direct Groq returned low-quality story — rejected")
                     StoryAttemptResult.TemplateRejected
                 }
                 isDuplicateScript(groqStory.script, previousScripts) -> {
@@ -235,8 +324,66 @@ class StoryRepository(
                 }
             }
         } catch (e: Exception) {
-            val reason = formatGroqError(e.message?.take(240))
+            val reason = GroqErrorParser.parse(e.message, LlmProvider.GROQ)
             StoryLog.e("Direct Groq failed: $reason", e)
+            StoryAttemptResult.Failed(reason)
+        }
+    }
+
+    private suspend fun tryDirectGemini(
+        geminiKey: String,
+        geminiModel: GeminiModel,
+        track: TrackInfo,
+        trackKey: String,
+        year: Int?,
+        genre: String?,
+        countryCode: String?,
+        previousScripts: List<String>,
+        angle: StoryAngle,
+        storyLength: StoryLength,
+        storyNarrator: StoryNarrator,
+        referenceFacts: List<String> = emptyList(),
+        selectedFact: SelectedReferenceFact? = null,
+    ): StoryAttemptResult {
+        return try {
+            StoryLog.i("Trying direct Gemini from device (${geminiModel.id})")
+            val geminiStory = withTimeout(GROQ_TIMEOUT_MS) {
+                geminiStoryClient.generateStory(
+                    apiKey = geminiKey,
+                    geminiModel = geminiModel,
+                    artist = track.artist,
+                    title = track.title,
+                    year = year,
+                    genre = genre,
+                    countryCode = countryCode,
+                    previousScripts = previousScripts,
+                    angle = angle,
+                    storyLength = storyLength,
+                    storyNarrator = storyNarrator,
+                    referenceFacts = referenceFacts,
+                    selectedFact = selectedFact,
+                )
+            }
+            when {
+                geminiStory == null -> StoryAttemptResult.Failed("Gemini не вернул текст истории")
+                StoryScriptQuality.hasBannedPattern(geminiStory.script) ||
+                    StoryRussianLanguage.hasEnglishLeak(geminiStory.script, track.artist, track.title) -> {
+                    StoryLog.w("Direct Gemini returned low-quality story — rejected")
+                    StoryAttemptResult.TemplateRejected
+                }
+                isDuplicateScript(geminiStory.script, previousScripts) -> {
+                    StoryLog.w("Direct Gemini returned duplicate story — rejected")
+                    StoryAttemptResult.Failed("Gemini вернул повтор предыдущей истории — попробуй ещё раз")
+                }
+                else -> {
+                    StoryLog.i("Direct Gemini API key story OK")
+                    persistStory(trackKey, track, geminiStory, angle.labelRu)
+                    StoryAttemptResult.Success(geminiStory)
+                }
+            }
+        } catch (e: Exception) {
+            val reason = GroqErrorParser.parse(e.message, LlmProvider.GEMINI)
+            StoryLog.e("Direct Gemini failed: $reason", e)
             StoryAttemptResult.Failed(reason)
         }
     }
@@ -252,9 +399,11 @@ class StoryRepository(
         ttsVoice: TtsVoice,
         ttsSpeed: TtsSpeed,
         ttsEmotion: TtsEmotion,
+        llmProvider: LlmProvider,
+        geminiModel: GeminiModel,
     ): StoryAttemptResult {
         return try {
-            StoryLog.i("Fetching story from backend: $backendUrl")
+            StoryLog.i("Fetching story from backend: $backendUrl (llm=${llmProvider.id}, gemini=${geminiModel.id})")
             val response = withTimeout(BACKEND_TIMEOUT_MS) {
                 apiClient.fetchFullStory(
                     backendUrl,
@@ -267,6 +416,8 @@ class StoryRepository(
                         ttsVoice = ttsVoice.id,
                         ttsSpeed = ttsSpeed.yandexSpeed,
                         ttsEmotion = ttsEmotion.id,
+                        llmProvider = llmProvider.id,
+                        geminiModel = if (llmProvider == LlmProvider.GEMINI) geminiModel.id else null,
                     ),
                 )
             }
@@ -302,13 +453,18 @@ class StoryRepository(
                 )
             }
             if (e is HttpException && e.code() == 503) {
-                StoryLog.w("Backend Groq unavailable: ${explainError(e)}")
+                val reason = sanitizeBackendError(parseHttpErrorBody(e, llmProvider), llmProvider)
+                    ?: "Сервер без ${llmProvider.labelRu} — добавь свой ключ в настройках"
+                StoryLog.w("Backend LLM unavailable: $reason")
                 return StoryAttemptResult.Failed(
-                    reason = explainError(e),
+                    reason = reason,
                     backendGroqDown = true,
                 )
             }
-            val reason = explainError(e)
+            val reason = sanitizeBackendError(
+                (e as? HttpException)?.let { parseHttpErrorBody(it, llmProvider) },
+                llmProvider,
+            ) ?: explainError(e, llmProvider)
             StoryLog.e("Backend failed: $reason", e)
             StoryAttemptResult.Failed(reason)
         }
@@ -317,70 +473,93 @@ class StoryRepository(
     private fun buildGenerationFailureMessage(
         rateLimitHit: Boolean,
         rateLimitQuota: StoryQuotaInfo?,
-        groqKeyPresent: Boolean,
+        llmKeyPresent: Boolean,
+        llmProvider: LlmProvider,
         backendConfigured: Boolean,
         backendGroqDown: Boolean,
         templateRejected: Boolean,
-        groqError: String?,
+        llmError: String?,
         backendError: String?,
     ): String {
+        val providerLabel = llmProvider.labelRu
         if (templateRejected) {
-            return "История слишком общая или похожа на шаблон — попробуй ещё раз."
+            return GroqStoryClient.STORY_RETRY_MESSAGE
         }
-        if (groqKeyPresent && !groqError.isNullOrBlank()) {
-            return groqError
+        if (llmKeyPresent && !llmError.isNullOrBlank()) {
+            return llmError
+        }
+        if (rateLimitHit && llmKeyPresent) {
+            return llmError ?: "Лимит бесплатных историй на сервере. Свой $providerLabel-ключ тоже не сработал — см. ошибку выше."
         }
         if (rateLimitHit) {
             val quotaText = rateLimitQuota?.let { "${it.used}/${it.limit}" }
-            return if (groqKeyPresent) {
-                if (quotaText != null) {
-                    "Лимит сервера исчерпан ($quotaText). Groq с телефона тоже не ответил."
-                } else {
-                    "Лимит сервера исчерпан. Groq с телефона тоже не ответил."
-                }
-            } else if (quotaText != null) {
-                "Лимит бесплатных историй исчерпан ($quotaText). Добавь Groq-ключ в настройках."
+            return if (quotaText != null) {
+                "Лимит сервера Music Story ($quotaText из ${rateLimitQuota.limit} в день). Свой $providerLabel-ключ обходит этот лимит."
             } else {
-                "Лимит бесплатных историй исчерпан. Добавь Groq-ключ в настройках."
+                "Лимит сервера Music Story (10 историй в день). Свой $providerLabel-ключ обходит этот лимит."
             }
         }
-        if (groqKeyPresent && !backendError.isNullOrBlank()) {
-            return "Groq не сработал, сервер тоже: $backendError"
+        if (llmKeyPresent && !backendError.isNullOrBlank()) {
+            return "$providerLabel не сработал, сервер тоже: $backendError"
         }
-        if (groqKeyPresent) {
-            return "Groq не ответил. Проверь интернет и попробуй ещё раз."
+        if (llmKeyPresent) {
+            return "$providerLabel не ответил. Проверь интернет и попробуй ещё раз."
         }
         if (backendConfigured && !backendError.isNullOrBlank()) {
             return if (backendGroqDown) {
-                "Сервер без Groq. Добавь свой Groq-ключ в настройках."
+                "Сервер без $providerLabel. Добавь свой $providerLabel-ключ в настройках."
             } else {
                 "Сервер: $backendError"
             }
         }
         return if (backendConfigured) {
-            "Сервер недоступен. Проверь интернет или добавь Groq-ключ в настройках."
+            "Сервер недоступен. Проверь интернет или добавь $providerLabel-ключ в настройках."
         } else {
-            "Укажи URL сервера или Groq-ключ в настройках."
+            "Укажи URL сервера или $providerLabel-ключ в настройках."
         }
     }
 
-    private fun formatGroqError(raw: String?): String {
-        if (raw.isNullOrBlank()) return "Groq не ответил"
-        val lower = raw.lowercase()
-        if (lower.contains("429") && lower.contains("tokens per")) {
-            return "Лимит токенов Groq на сегодня исчерпан (считаются вход+выход, не число запросов). Приложение пробует другую модель — подожди минуту и нажми ещё раз."
-        }
-        if (lower.contains("429") || lower.contains("rate limit")) {
-            return "Groq временно ограничил запросы. Подожди минуту и попробуй снова."
-        }
-        if (lower.startsWith("groq http")) return raw.removePrefix("Groq HTTP ").removePrefix("Groq ")
-        return raw
+    private fun parseHttpErrorBody(e: HttpException, llmProvider: LlmProvider): String? {
+        val body = e.response()?.errorBody()?.string().orEmpty()
+        if (body.isBlank()) return null
+        return runCatching {
+            val json = gson.fromJson(body, Map::class.java)
+            val message = json["message"] as? String
+            val code = json["code"] as? String
+            when {
+                message.isNullOrBlank() -> null
+                llmProvider == LlmProvider.GEMINI && (
+                    code == "GROQ_RATE_LIMIT" ||
+                        code == "GROQ_FAILED" ||
+                        code == "GROQ_NOT_CONFIGURED" ||
+                        message.contains("Groq", ignoreCase = true)
+                    ) ->
+                    "Сервер ещё на старом Groq-бэкенде. Добавь свой Gemini-ключ или задеплой новый бэкенд на Railway."
+                GroqErrorParser.isAuthError(message) ->
+                    "Неверный API-ключ на сервере — добавь свой ${llmProvider.labelRu}-ключ в настройках."
+                else -> message.take(200)
+            }
+        }.getOrNull()
     }
 
-    private fun explainError(e: Exception): String = when (e) {
+    private fun sanitizeBackendError(message: String?, llmProvider: LlmProvider): String? {
+        if (message.isNullOrBlank()) return null
+        if (llmProvider != LlmProvider.GEMINI) return message
+        if (message.contains("Groq", ignoreCase = true) &&
+            (message.contains("лимит", ignoreCase = true) || message.contains("limit", ignoreCase = true))
+        ) {
+            return "Ошибка сервера (Groq), а у тебя выбран Gemini. Сохрани Gemini-ключ в настройках — истории пойдут с телефона, минуя сервер."
+        }
+        if (message.contains("Groq", ignoreCase = true)) {
+            return "Сервер ответил про Groq, хотя выбран Gemini. Сохрани Gemini-ключ или обнови бэкенд на Railway."
+        }
+        return message
+    }
+
+    private fun explainError(e: Exception, llmProvider: LlmProvider): String = when (e) {
         is HttpException -> when (e.code()) {
-            429 -> "лимит историй"
-            503 -> "Groq на сервере недоступен"
+            429 -> "Лимит сервера Music Story (10/день)"
+            503 -> "${llmProvider.labelRu} на сервере недоступен"
             else -> "HTTP ${e.code()}"
         }
         is IOException -> "нет сети"
@@ -432,15 +611,31 @@ class StoryRepository(
                 demo = response.demo,
             ),
         )
-        storyHistoryDao.insert(
-            StoryHistoryEntry(
-                trackKey = trackKey,
-                artist = track.artist,
-                title = track.title,
-                script = response.script,
-                angle = angle,
-            ),
+        val entry = StoryHistoryEntry(
+            trackKey = trackKey,
+            artist = track.artist,
+            title = track.title,
+            script = response.script,
+            angle = angle,
         )
+        storyHistoryDao.insert(entry)
+        scopePushSyncHistory(entry)
+    }
+
+    private fun scopePushSyncHistory(entry: StoryHistoryEntry) {
+        kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.SupervisorJob() + kotlinx.coroutines.Dispatchers.IO).launch {
+            val sync = accountSyncManager ?: return@launch
+            val url = settingsDataStore.backendUrl.first()
+            if (url.isBlank()) return@launch
+            val syncCode = settingsDataStore.syncCode.first()
+            if (syncCode.isBlank() && !settingsDataStore.accountLinked.first()) return@launch
+            sync.pushHistoryEntry(
+                baseUrl = url,
+                entry = entry,
+                localSyncCode = syncCode,
+                onSyncCodeUpdated = { settingsDataStore.setSyncCode(it) },
+            )
+        }
     }
 
     private fun isDuplicateScript(script: String, previous: List<String>): Boolean {
@@ -490,7 +685,7 @@ class StoryRepository(
     companion object {
         private const val GROQ_TIMEOUT_MS = 50_000L
         private const val BACKEND_TIMEOUT_MS = 55_000L
-        private const val METADATA_TIMEOUT_MS = 4_000L
+        private const val METADATA_TIMEOUT_MS = 15_000L
     }
 }
 

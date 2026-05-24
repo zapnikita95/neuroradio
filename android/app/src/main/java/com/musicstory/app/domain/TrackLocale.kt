@@ -45,8 +45,10 @@ object TrackLocaleResolver {
             }
         val localeRules = when (code) {
             "RU" -> "Трек из России: места, быт, сленг и индустрия — российские. Не Nashville, не Apollo, не «радиола» для современного российского трека."
-            null -> "Страна неизвестна — не приписывай конкретную американскую или советскую эпоху без оснований."
-            else -> "Трек связан со страной $countryLabel: история должна быть из этой культурной сцены."
+            "US" -> "Трек из США: американское радио, винил, главный хит-парад, студии США. НЕ VK, НЕ Telegram, НЕ ВКонтакте, НЕ Яндекс — это не российский трек."
+            "GB" -> "Трек из Великобритании: британская сцена, радио BBC, студии UK. Не VK, не российские соцсети."
+            null -> "Страна неизвестна — не приписывай VK/Telegram и не выдумывай конкретную американскую или советскую эпоху без оснований."
+            else -> "Трек связан со страной $countryLabel: история должна быть из этой культурной сцены. Не VK/Telegram, если это не Россия."
         }
         return TrackLocale(
             countryCode = code,
@@ -68,7 +70,7 @@ object TrackLocaleResolver {
     private fun genericEraFallback(year: Int?, genre: String?): String {
         val g = genre?.lowercase().orEmpty()
         if (g.contains("jazz") || g.contains("swing")) return "джазовая эпоха, клубы и джем-сейшены"
-        if (g.contains("blues") || g.contains("soul")) return "soul и blues, южные клубы и ночные сцены"
+        if (g.contains("blues") || g.contains("soul")) return "соул и блюз, южные клубы и ночные сцены"
         if (g.contains("rock") || g.contains("metal") || g.contains("punk")) return "рок-сцена, концерты и гаражи"
         if (g.contains("electronic") || g.contains("house") || g.contains("techno") || g.contains("dance")) {
             return "клубная электроника, склады и диджейские стыки"
@@ -77,9 +79,9 @@ object TrackLocaleResolver {
         if (g.contains("pop")) return "поп-культура, радио и телевидение"
         if (year == null) return "эпоха артиста — без винтажных клише, если трек современный"
         if (year < 1960) return "ранний период, винил и живое радио"
-        if (year < 1970) return "расцвет soul и rock"
+        if (year < 1970) return "расцвет соула и рока"
         if (year < 1980) return "золотая эра рока и диско"
-        if (year < 1990) return "MTV, кассеты и фестивали"
+        if (year < 1990) return "музыкальное телевидение, кассеты и фестивали"
         if (year < 2000) return "клубы и ремиксы"
         if (year < 2010) return "интернет-форумы и первые стримы"
         return "современная сцена, стриминги и соцсети"
@@ -103,6 +105,21 @@ object TrackLocaleResolver {
         val g = genre?.lowercase().orEmpty()
         val modern = year == null || year >= 2010
 
+        if (code == "US") {
+            return when {
+                year != null && year < 1960 -> "американская сцена: радио, винил, южные и пригородные студии"
+                year != null && year < 1980 -> "американское радио и винил, соул и рок, главный хит-парад"
+                year != null && year < 2000 -> "американские студии, музыкальное телевидение, кассеты, фестивали США"
+                else -> "американская музыкальная индустрия — без российских соцсетей"
+            }
+        }
+        if (code == "GB") {
+            return when {
+                year != null && year < 1980 -> "британская сцена: радио BBC, студии UK, клубы"
+                else -> "британская поп- и рок-сцена, студии UK"
+            }
+        }
+
         if (code != "RU") return null
 
         if (isRussianCountryGenre(genre, title, artist)) {
@@ -121,13 +138,13 @@ object TrackLocaleResolver {
             else "российский рок, свои площадки и студии"
         }
         if (g.contains("pop")) {
-            return if (modern) "российская pop-сцена, стриминги и соцсети"
-            else "российская эстрада и pop"
+            return if (modern) "российская поп-сцена, стриминги и соцсети"
+            else "российская эстрада и поп"
         }
         return if (modern) {
             "современная российская музыка: стриминги, VK, Telegram, студии, фестивали"
         } else if (year != null && year >= 2000) {
-            "российская сцена нулевых: MTV Russia, mp3, первые стримы"
+            "российская сцена нулевых: музыкальное ТВ, mp3, первые стримы"
         } else if (year != null && year >= 1990) {
             "российская сцена девяностых: кассеты, рок-клубы, первые частные студии"
         } else {

@@ -1,22 +1,33 @@
 package com.musicstory.app.data.remote
 
 import com.musicstory.app.data.model.StoryQuotaInfo
+import com.musicstory.app.domain.GeminiModel
+import com.musicstory.app.domain.LlmProvider
 import com.musicstory.app.util.StoryLog
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
+import okhttp3.RequestBody.Companion.toRequestBody
 import java.util.concurrent.TimeUnit
 
 data class ConnectionCheckResult(
-    val groqOk: Boolean? = null,
-    val groqMessage: String? = null,
+    val llmOk: Boolean? = null,
+    val llmMessage: String? = null,
     val backendOk: Boolean = false,
     val backendMessage: String? = null,
     val quota: StoryQuotaInfo? = null,
 ) {
     val allOk: Boolean
-        get() = backendOk && (groqOk != false)
+        get() = when {
+            llmOk == true -> true
+            llmOk == null -> backendOk
+            else -> false
+        }
+
+    /** @deprecated use llmOk */
+    val groqOk: Boolean? get() = llmOk
 }
 
 class ConnectionChecker(
@@ -32,23 +43,75 @@ class ConnectionChecker(
             return@withContext false to "Ключ пустой"
         }
 
+        val body = org.json.JSONObject().apply {
+            put("model", "llama-3.1-8b-instant")
+            put("max_tokens", 8)
+            put("messages", org.json.JSONArray().apply {
+                put(org.json.JSONObject().put("role", "user").put("content", "ok"))
+            })
+        }
+
         val request = Request.Builder()
-            .url("https://api.groq.com/openai/v1/models")
+            .url("https://api.groq.com/openai/v1/chat/completions")
+            .header("Content-Type", "application/json")
             .header("Authorization", "Bearer $key")
-            .get()
+            .post(body.toString().toRequestBody("application/json".toMediaType()))
             .build()
 
         runCatching {
             client.newCall(request).execute().use { response ->
+                val errorBody = response.body?.string().orEmpty()
                 when {
-                    response.isSuccessful -> true to "Ключ работает"
-                    response.code == 401 || response.code == 403 ->
-                        false to "Неверный ключ"
-                    else -> false to "Ошибка ${response.code}"
+                    response.isSuccessful -> true to "Ключ работает — можно генерировать истории"
+                    else -> false to GroqApiErrorParser.parse(response.code, errorBody)
                 }
             }
         }.getOrElse { e ->
             StoryLog.w("Groq test failed: ${e.message}")
+            false to (e.message ?: "Нет сети")
+        }
+    }
+
+    suspend fun testGeminiKey(apiKey: String, modelId: String = GeminiModel.defaultRecommended.id): Pair<Boolean, String> = withContext(Dispatchers.IO) {
+        val key = apiKey.trim()
+        if (key.isEmpty()) {
+            return@withContext false to "Ключ пустой"
+        }
+
+        val url = "https://generativelanguage.googleapis.com/v1beta/models/$modelId:generateContent?key=${java.net.URLEncoder.encode(key, "UTF-8")}"
+        val body = org.json.JSONObject().apply {
+            put("contents", org.json.JSONArray().apply {
+                put(org.json.JSONObject().apply {
+                    put("role", "user")
+                    put("parts", org.json.JSONArray().apply {
+                        put(org.json.JSONObject().put("text", "ok"))
+                    })
+                })
+            })
+            put("generationConfig", org.json.JSONObject().apply {
+                put("maxOutputTokens", 8)
+                if (modelId.startsWith("gemini-2.5")) {
+                    put("thinkingConfig", org.json.JSONObject().put("thinkingBudget", 0))
+                }
+            })
+        }
+
+        val request = Request.Builder()
+            .url(url)
+            .header("Content-Type", "application/json")
+            .post(body.toString().toRequestBody("application/json".toMediaType()))
+            .build()
+
+        runCatching {
+            client.newCall(request).execute().use { response ->
+                val errorBody = response.body?.string().orEmpty()
+                when {
+                    response.isSuccessful -> true to "Ключ работает — можно генерировать истории"
+                    else -> false to GeminiErrorParser.parse(response.code, errorBody)
+                }
+            }
+        }.getOrElse { e ->
+            StoryLog.w("Gemini test failed: ${e.message}")
             false to (e.message ?: "Нет сети")
         }
     }
@@ -81,10 +144,20 @@ class ConnectionChecker(
     suspend fun runFullCheck(
         apiClient: ApiClient,
         backendUrl: String,
+        llmProvider: LlmProvider,
         groqApiKey: String,
+        geminiApiKey: String,
+        geminiModelId: String,
     ): ConnectionCheckResult {
-        val groqResult = if (groqApiKey.isNotBlank()) {
-            testGroqKey(groqApiKey)
+        val activeKey = when (llmProvider) {
+            LlmProvider.GROQ -> groqApiKey
+            LlmProvider.GEMINI -> geminiApiKey
+        }
+        val llmResult = if (activeKey.isNotBlank()) {
+            when (llmProvider) {
+                LlmProvider.GROQ -> testGroqKey(activeKey)
+                LlmProvider.GEMINI -> testGeminiKey(activeKey, geminiModelId)
+            }
         } else {
             null
         }
@@ -97,8 +170,8 @@ class ConnectionChecker(
         }
 
         return ConnectionCheckResult(
-            groqOk = groqResult?.first,
-            groqMessage = groqResult?.second,
+            llmOk = llmResult?.first,
+            llmMessage = llmResult?.second,
             backendOk = backendResult.first,
             backendMessage = backendResult.second,
             quota = quota,

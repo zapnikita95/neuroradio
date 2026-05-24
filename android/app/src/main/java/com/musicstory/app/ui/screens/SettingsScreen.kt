@@ -19,9 +19,14 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ExposedDropdownMenuBox
+import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -56,6 +61,8 @@ import com.musicstory.app.MusicStoryApp
 import com.musicstory.app.R
 import com.musicstory.app.data.local.SettingsDataStore
 import com.musicstory.app.data.remote.ConnectionCheckResult
+import com.musicstory.app.domain.GeminiModel
+import com.musicstory.app.domain.LlmProvider
 import com.musicstory.app.domain.StoryLength
 import com.musicstory.app.domain.StoryNarrator
 import com.musicstory.app.domain.TtsEmotion
@@ -76,6 +83,7 @@ import com.musicstory.app.ui.theme.GoldWarm
 import com.musicstory.app.ui.theme.LiveGreen
 import com.musicstory.app.ui.theme.MutedLavender
 import com.musicstory.app.ui.theme.SurfaceGlass
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
@@ -94,6 +102,9 @@ fun SettingsScreen(
     val autoIntercept by settings.autoIntercept.collectAsState(initial = SettingsDataStore.DEFAULT_AUTO_INTERCEPT)
     val everyN by settings.everyNTracks.collectAsState(initial = SettingsDataStore.DEFAULT_EVERY_N_TRACKS)
     val groqApiKey by settings.groqApiKey.collectAsState(initial = "")
+    val geminiApiKey by settings.geminiApiKey.collectAsState(initial = "")
+    val llmProvider by settings.llmProvider.collectAsState(initial = LlmProvider.GROQ)
+    val geminiModel by settings.geminiModel.collectAsState(initial = GeminiModel.defaultRecommended)
     val sameTrackEveryN by settings.sameTrackStoryEveryN.collectAsState(
         initial = SettingsDataStore.DEFAULT_SAME_TRACK_STORY_EVERY_N,
     )
@@ -110,15 +121,49 @@ fun SettingsScreen(
     val ttsEmotion by settings.ttsEmotion.collectAsState(initial = TtsEmotion.LIVELY)
 
     var groqInput by remember(groqApiKey) { mutableStateOf(groqApiKey) }
+    var geminiInput by remember(geminiApiKey) { mutableStateOf(geminiApiKey) }
     var nInput by remember(everyN) { mutableStateOf(everyN.toString()) }
     var sameTrackInput by remember(sameTrackEveryN) { mutableStateOf(sameTrackEveryN.toString()) }
 
     var isChecking by remember { mutableStateOf(false) }
     var checkResult by remember { mutableStateOf<ConnectionCheckResult?>(null) }
     var checkSummary by remember { mutableStateOf<String?>(null) }
+    var isSaving by remember { mutableStateOf(false) }
+    var saveFeedback by remember { mutableStateOf<String?>(null) }
 
-    LaunchedEffect(groqApiKey) {
-        if (groqApiKey.isBlank()) {
+    val activeApiKey = when (llmProvider) {
+        LlmProvider.GROQ -> groqApiKey
+        LlmProvider.GEMINI -> geminiApiKey
+    }
+    val activeApiInput = when (llmProvider) {
+        LlmProvider.GROQ -> groqInput
+        LlmProvider.GEMINI -> geminiInput
+    }
+
+    val hasPendingChanges = remember(
+        groqInput,
+        groqApiKey,
+        geminiInput,
+        geminiApiKey,
+        llmProvider,
+        nInput,
+        everyN,
+        sameTrackInput,
+        sameTrackEveryN,
+        triggerMode,
+    ) {
+        groqInput.trim() != groqApiKey.trim() ||
+            geminiInput.trim() != geminiApiKey.trim() ||
+            sameTrackInput.toIntOrNull() != sameTrackEveryN ||
+            (triggerMode == TriggerMode.EVERY_N_TRACKS && nInput.toIntOrNull() != everyN)
+    }
+
+    LaunchedEffect(groqApiKey, geminiApiKey, llmProvider) {
+        val hasOwnKey = when (llmProvider) {
+            LlmProvider.GROQ -> groqApiKey.isNotBlank()
+            LlmProvider.GEMINI -> geminiApiKey.isNotBlank()
+        }
+        if (!hasOwnKey) {
             app.storyRepository.refreshQuota()
         }
     }
@@ -171,6 +216,13 @@ fun SettingsScreen(
                         checked = autoIntercept,
                         onCheckedChange = { scope.launch { settings.setAutoIntercept(it) } },
                     )
+                }
+
+                CollapsibleSettingsSection(
+                    title = context.getString(R.string.settings_sync_section),
+                    summary = context.getString(R.string.settings_sync_summary),
+                ) {
+                    SyncDevicesSection(app = app, scope = scope)
                 }
 
                 CollapsibleSettingsSection(
@@ -360,8 +412,11 @@ fun SettingsScreen(
                     }
                 }
 
-                val aiSummary = if (groqApiKey.isNotBlank()) {
-                    context.getString(R.string.settings_groq_status_ok)
+                val aiSummary = if (activeApiKey.isNotBlank()) {
+                    when (llmProvider) {
+                        LlmProvider.GEMINI -> "${llmProvider.labelRu}: ${geminiModel.settingsLabelRu}"
+                        LlmProvider.GROQ -> "${llmProvider.labelRu}: ${context.getString(R.string.settings_groq_status_ok)}"
+                    }
                 } else {
                     dailyQuota?.let { quota ->
                         context.getString(R.string.settings_free_quota, quota.remaining, quota.limit)
@@ -371,17 +426,149 @@ fun SettingsScreen(
                 CollapsibleSettingsSection(
                     title = context.getString(R.string.settings_ai_section),
                     summary = aiSummary,
+                    initiallyExpanded = true,
                 ) {
+                    var providerMenuExpanded by remember { mutableStateOf(false) }
+                    var geminiModelMenuExpanded by remember { mutableStateOf(false) }
+
                     Text(
-                        text = if (groqApiKey.isNotBlank()) {
+                        text = context.getString(R.string.settings_llm_provider_hint),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MutedLavender,
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    ExposedDropdownMenuBox(
+                        expanded = providerMenuExpanded,
+                        onExpandedChange = { providerMenuExpanded = it },
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        OutlinedTextField(
+                            value = llmProvider.labelRu,
+                            onValueChange = {},
+                            readOnly = true,
+                            label = { Text(context.getString(R.string.settings_llm_provider)) },
+                            trailingIcon = {
+                                ExposedDropdownMenuDefaults.TrailingIcon(expanded = providerMenuExpanded)
+                            },
+                            modifier = Modifier
+                                .menuAnchor()
+                                .fillMaxWidth(),
+                            colors = fieldColors,
+                            shape = RoundedCornerShape(14.dp),
+                        )
+                        DropdownMenu(
+                            expanded = providerMenuExpanded,
+                            onDismissRequest = { providerMenuExpanded = false },
+                        ) {
+                            LlmProvider.entries.forEach { provider ->
+                                DropdownMenuItem(
+                                    text = { Text(provider.labelRu, color = CreamText) },
+                                    onClick = {
+                                        providerMenuExpanded = false
+                                        scope.launch { settings.setLlmProvider(provider) }
+                                    },
+                                )
+                            }
+                        }
+                    }
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = context.getString(R.string.settings_llm_active, llmProvider.labelRu),
+                        style = MaterialTheme.typography.labelMedium,
+                        color = GoldBright,
+                    )
+                    if (llmProvider == LlmProvider.GEMINI) {
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Text(
+                            text = context.getString(R.string.settings_gemini_model_hint),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MutedLavender,
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        ExposedDropdownMenuBox(
+                            expanded = geminiModelMenuExpanded,
+                            onExpandedChange = { geminiModelMenuExpanded = it },
+                            modifier = Modifier.fillMaxWidth(),
+                        ) {
+                            OutlinedTextField(
+                                value = geminiModel.settingsLabelRu,
+                                onValueChange = {},
+                                readOnly = true,
+                                label = { Text(context.getString(R.string.settings_gemini_model)) },
+                                trailingIcon = {
+                                    ExposedDropdownMenuDefaults.TrailingIcon(expanded = geminiModelMenuExpanded)
+                                },
+                                modifier = Modifier
+                                    .menuAnchor()
+                                    .fillMaxWidth(),
+                                colors = fieldColors,
+                                shape = RoundedCornerShape(14.dp),
+                            )
+                            DropdownMenu(
+                                expanded = geminiModelMenuExpanded,
+                                onDismissRequest = { geminiModelMenuExpanded = false },
+                            ) {
+                                GeminiModel.entries.forEach { model ->
+                                    DropdownMenuItem(
+                                        text = {
+                                            Column {
+                                                Text(model.settingsLabelRu, color = CreamText)
+                                                Text(
+                                                    model.descriptionRu,
+                                                    style = MaterialTheme.typography.bodySmall,
+                                                    color = MutedLavender,
+                                                )
+                                            }
+                                        },
+                                        onClick = {
+                                            geminiModelMenuExpanded = false
+                                            scope.launch { settings.setGeminiModel(model) }
+                                        },
+                                    )
+                                }
+                            }
+                        }
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            text = context.getString(
+                                R.string.settings_gemini_paid_models,
+                                GeminiModel.paidReferences.joinToString(", ") { it.labelRu },
+                            ),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MutedLavender,
+                        )
+                        Text(
+                            text = context.getString(R.string.settings_gemini_pricing_link),
+                            style = MaterialTheme.typography.labelMedium,
+                            color = GoldBright,
+                            modifier = Modifier
+                                .padding(top = 4.dp)
+                                .clickable {
+                                    context.startActivity(
+                                        Intent(Intent.ACTION_VIEW, Uri.parse("https://ai.google.dev/pricing")),
+                                    )
+                                },
+                        )
+                    }
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = if (activeApiKey.isNotBlank()) {
                             context.getString(R.string.settings_groq_status_ok)
                         } else {
                             context.getString(R.string.settings_groq_status_missing)
                         },
                         style = MaterialTheme.typography.bodySmall,
-                        color = if (groqApiKey.isNotBlank()) LiveGreen else MutedLavender,
+                        color = if (activeApiKey.isNotBlank()) LiveGreen else MutedLavender,
                     )
-                    if (groqApiKey.isBlank()) {
+                    if (activeApiKey.isNotBlank()) {
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = context.getString(R.string.settings_own_api_key_hint),
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MutedLavender,
+                        )
+                    }
+                    if (activeApiKey.isBlank()) {
                         dailyQuota?.let { quota ->
                             Spacer(modifier = Modifier.height(4.dp))
                             Text(
@@ -395,16 +582,39 @@ fun SettingsScreen(
                             )
                         }
                     }
-                    Spacer(modifier = Modifier.height(8.dp))
+                    Spacer(modifier = Modifier.height(12.dp))
                     OutlinedTextField(
-                        value = groqInput,
-                        onValueChange = { groqInput = it },
-                        label = { Text(context.getString(R.string.settings_groq_api_key)) },
+                        value = activeApiInput,
+                        onValueChange = { value ->
+                            when (llmProvider) {
+                                LlmProvider.GROQ -> groqInput = value
+                                LlmProvider.GEMINI -> geminiInput = value
+                            }
+                        },
+                        label = { Text(context.getString(R.string.settings_api_key)) },
                         modifier = Modifier.fillMaxWidth(),
                         singleLine = true,
                         visualTransformation = PasswordVisualTransformation(),
                         colors = fieldColors,
                         shape = RoundedCornerShape(14.dp),
+                        trailingIcon = {
+                            if (activeApiInput.isNotEmpty()) {
+                                IconButton(
+                                    onClick = {
+                                        when (llmProvider) {
+                                            LlmProvider.GROQ -> groqInput = ""
+                                            LlmProvider.GEMINI -> geminiInput = ""
+                                        }
+                                    },
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Clear,
+                                        contentDescription = context.getString(R.string.settings_api_key_clear),
+                                        tint = MutedLavender,
+                                    )
+                                }
+                            }
+                        },
                     )
                     Spacer(modifier = Modifier.height(8.dp))
                     PrimaryStoryButton(
@@ -420,19 +630,34 @@ fun SettingsScreen(
                                 checkResult = null
                                 checkSummary = null
                                 settings.setGroqApiKey(groqInput)
+                                settings.setGeminiApiKey(geminiInput)
                                 val backendUrl = settings.backendUrl.first()
                                 app.backendAuthManager.invalidateToken()
                                 app.apiClient.invalidateCache()
-                                val result = app.storyRepository.checkConnections(groqInput, backendUrl)
+                                val result = app.storyRepository.checkConnections(
+                                    llmProvider = llmProvider,
+                                    groqApiKey = groqInput,
+                                    geminiApiKey = geminiInput,
+                                    geminiModel = geminiModel,
+                                    backendUrl = backendUrl,
+                                )
                                 checkResult = result
+                                val checkedKey = when (llmProvider) {
+                                    LlmProvider.GROQ -> groqInput.trim()
+                                    LlmProvider.GEMINI -> geminiInput.trim()
+                                }
                                 checkSummary = when {
-                                    result.allOk && groqInput.isNotBlank() ->
+                                    checkedKey.isNotBlank() && result.llmOk == true ->
+                                        result.llmMessage ?: context.getString(R.string.settings_groq_test_ok)
+                                    checkedKey.isBlank() && result.backendOk ->
                                         context.getString(R.string.settings_groq_test_ok)
-                                    result.backendOk && groqInput.isBlank() ->
-                                        context.getString(R.string.settings_groq_test_ok)
-                                    result.backendOk || result.groqOk == true ->
-                                        context.getString(R.string.settings_groq_test_partial)
-                                    else -> context.getString(R.string.settings_groq_test_fail)
+                                    checkedKey.isNotBlank() && result.llmOk == false ->
+                                        result.llmMessage ?: context.getString(R.string.settings_groq_test_fail)
+                                    result.backendOk ->
+                                        result.backendMessage ?: context.getString(R.string.settings_groq_test_ok)
+                                    else ->
+                                        result.llmMessage ?: result.backendMessage
+                                            ?: context.getString(R.string.settings_groq_test_fail)
                                 }
                                 isChecking = false
                             }
@@ -456,34 +681,55 @@ fun SettingsScreen(
                     }
                     checkSummary?.let { summary ->
                         Spacer(modifier = Modifier.height(8.dp))
+                        val checkOk = checkResult?.llmOk == true ||
+                            (activeApiInput.isBlank() && checkResult?.backendOk == true)
                         Text(
                             text = summary,
                             style = MaterialTheme.typography.labelMedium,
-                            color = if (checkResult?.allOk == true || checkResult?.backendOk == true) LiveGreen else ErrorCoral,
+                            color = if (checkOk) LiveGreen else ErrorCoral,
                         )
                     }
                     Spacer(modifier = Modifier.height(8.dp))
                     SecondaryStoryButton(
-                        text = context.getString(R.string.settings_groq_get_key),
+                        text = when (llmProvider) {
+                            LlmProvider.GROQ -> context.getString(R.string.settings_groq_get_key)
+                            LlmProvider.GEMINI -> context.getString(R.string.settings_gemini_get_key)
+                        },
                         onClick = {
-                            context.startActivity(
-                                Intent(Intent.ACTION_VIEW, Uri.parse("https://console.groq.com/keys")),
-                            )
+                            val url = when (llmProvider) {
+                                LlmProvider.GROQ -> "https://console.groq.com/keys"
+                                LlmProvider.GEMINI -> "https://aistudio.google.com/apikey"
+                            }
+                            context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
                         },
                     )
                 }
 
                 PrimaryStoryButton(
-                    text = context.getString(R.string.action_save),
+                    text = when {
+                        isSaving -> context.getString(R.string.settings_saving)
+                        saveFeedback != null -> saveFeedback!!
+                        else -> context.getString(R.string.action_save)
+                    },
+                    enabled = hasPendingChanges && !isSaving,
                     onClick = {
                         scope.launch {
+                            isSaving = true
+                            saveFeedback = null
                             nInput.toIntOrNull()?.let { settings.setEveryNTracks(it) }
                             sameTrackInput.toIntOrNull()?.let { settings.setSameTrackStoryEveryN(it) }
                             settings.setGroqApiKey(groqInput)
+                            settings.setGeminiApiKey(geminiInput)
                             app.backendAuthManager.invalidateToken()
                             app.apiClient.invalidateCache()
                             app.triggerEngine.resetCounter()
                             app.storyRepository.refreshQuota()
+                            isSaving = false
+                            saveFeedback = context.getString(R.string.settings_saved)
+                            delay(2500)
+                            if (saveFeedback == context.getString(R.string.settings_saved)) {
+                                saveFeedback = null
+                            }
                         }
                     },
                 )

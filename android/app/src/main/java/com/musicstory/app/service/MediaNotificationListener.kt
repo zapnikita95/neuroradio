@@ -6,17 +6,27 @@ import android.service.notification.StatusBarNotification
 import com.musicstory.app.MusicStoryApp
 import com.musicstory.app.data.model.TrackInfo
 import com.musicstory.app.media.MediaSessionSelector
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.launch
 
 class MediaNotificationListener : NotificationListenerService() {
+
+    private val refreshScope = CoroutineScope(Dispatchers.Main.immediate)
+    private var refreshJob: Job? = null
 
     override fun onListenerConnected() {
         super.onListenerConnected()
         instance = this
         connected.value = true
-        refreshSessions()
+        val app = application as? MusicStoryApp
+        app?.monitorLifecycle?.ensureListening()
+        refreshSessionsImmediate()
     }
 
     override fun onListenerDisconnected() {
@@ -27,20 +37,37 @@ class MediaNotificationListener : NotificationListenerService() {
 
     override fun onNotificationPosted(sbn: StatusBarNotification?) {
         sbn ?: return
-        if (!MediaSessionSelector.isPreferredPackage(sbn.packageName)) return
-        parseNotificationTrack(sbn)?.let { track ->
-            notificationTrack.value = track
+        if (MediaSessionSelector.isPreferredPackage(sbn.packageName)) {
+            parseNotificationTrack(sbn)?.let { track ->
+                notificationTrack.value = track
+                (application as? MusicStoryApp)?.mediaControllerManager?.syncEffectiveNowPlaying()
+            }
+            val app = application as? MusicStoryApp
+            app?.monitorLifecycle?.tryWakeFromMusicApp(sbn.packageName)
+            refreshSessionsDebounced()
         }
-        refreshSessions()
     }
 
     override fun onNotificationRemoved(sbn: StatusBarNotification?) {
-        refreshSessions()
+        sbn ?: return
+        if (MediaSessionSelector.isPreferredPackage(sbn.packageName)) {
+            refreshSessionsDebounced()
+        }
     }
 
-    private fun refreshSessions() {
+    private fun refreshSessionsDebounced() {
+        refreshJob?.cancel()
+        refreshJob = refreshScope.launch {
+            delay(400)
+            refreshSessionsImmediate()
+        }
+    }
+
+    private fun refreshSessionsImmediate() {
         val app = application as? MusicStoryApp ?: return
         app.mediaControllerManager.refreshActiveController()
+        app.mediaControllerManager.syncEffectiveNowPlaying()
+        app.monitorLifecycle.tryWakeFromActiveMedia()
     }
 
     private fun parseNotificationTrack(sbn: StatusBarNotification): TrackInfo? {

@@ -1,0 +1,9 @@
+node_modules
+dist
+.env
+.env.*
+audio/*.ogg
+audio/*.mp3
+audio/*.wav
+scripts
+*.md

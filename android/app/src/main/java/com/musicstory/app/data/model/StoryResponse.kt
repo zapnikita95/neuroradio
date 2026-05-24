@@ -16,6 +16,8 @@ data class StoryRequest(
     @SerializedName("tts_voice") val ttsVoice: String = TtsVoice.AUTO.id,
     @SerializedName("tts_speed") val ttsSpeed: Float = TtsSpeed.NORMAL.yandexSpeed,
     @SerializedName("tts_emotion") val ttsEmotion: String = TtsEmotion.LIVELY.id,
+    @SerializedName("llm_provider") val llmProvider: String? = null,
+    @SerializedName("gemini_model") val geminiModel: String? = null,
 )
 
 data class StoryResponse(

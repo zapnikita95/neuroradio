@@ -14,7 +14,6 @@ import { hasYandexCredentials } from './services/yandex-tts.js';
 import { securityHeaders } from './middleware/security-headers.js';
 import { requireSignedAudioAccess } from './middleware/audio-auth.js';
 import { requestLogger } from './middleware/request-logger.js';
-import { rateLimitHealth } from './middleware/rate-limit.js';
 import { isProduction } from './config/security.js';
 import { SECURITY } from './config/security.js';
 
@@ -43,7 +42,7 @@ app.use('/audio', requireSignedAudioAccess, express.static(AUDIO_DIR, {
   maxAge: 0,
 }));
 
-app.get('/health', rateLimitHealth, (_req, res) => {
+app.get('/health', (_req, res) => {
   if (isProduction()) {
     res.json({ status: 'ok' });
     return;
@@ -67,7 +66,7 @@ app.use((_req, res) => {
   res.status(404).json({ error: 'Not found' });
 });
 
-app.listen(PORT, '0.0.0.0', () => {
+const server = app.listen(PORT, '0.0.0.0', () => {
   console.log(`Music Story BFF listening on http://0.0.0.0:${PORT}`);
   console.log(`[boot] llm=${resolveLlmProvider()} groq=${hasGroqApiKey()} gemini=${hasGeminiApiKey()} yandexTts=${hasYandexCredentials()} auth=${isAppAuthEnabled()}`);
   console.log(`  POST /v1/auth/token — app JWT`);
@@ -76,3 +75,12 @@ app.listen(PORT, '0.0.0.0', () => {
   console.log(`  GET  /health — health check`);
   console.log(`  GET  /audio/* — signed audio only`);
 });
+
+function shutdown(signal: string): void {
+  console.log(`[shutdown] ${signal} — closing HTTP server`);
+  server.close(() => process.exit(0));
+  setTimeout(() => process.exit(0), 10_000).unref();
+}
+
+process.on('SIGTERM', () => shutdown('SIGTERM'));
+process.on('SIGINT', () => shutdown('SIGINT'));
