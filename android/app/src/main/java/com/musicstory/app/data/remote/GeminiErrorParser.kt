@@ -31,8 +31,10 @@ object GeminiErrorParser {
         }
 
         if (httpCode == 429) {
-            if (apiMessage.isNotBlank()) return "Gemini: ${apiMessage.take(200)}"
-            return "Gemini: слишком много запросов — подожди 30–60 сек."
+            if (apiMessage.isNotBlank()) {
+                return "Gemini (RPM/минутный лимит, не обязательно «день кончился»): ${apiMessage.take(180)}"
+            }
+            return "Gemini: лимит запросов в минуту (RPM) — подожди 1–2 мин."
         }
 
         if (httpCode == 404 || lower.contains("not found")) {

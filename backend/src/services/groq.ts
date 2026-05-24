@@ -143,43 +143,38 @@ async function callGroqOnce(
   return content;
 }
 
+/** One Groq model per call — caller rotates index after 429. */
 async function callGroq(
   systemPrompt: string,
   userPrompt: string,
   maxTokens: number,
+  modelIndex = 0,
 ): Promise<{ content: string; model: string }> {
   const apiKey = process.env.GROQ_API_KEY;
   if (!apiKey) throw new Error('GROQ_API_KEY is not configured');
 
   const models = resolveGroqModelOrder();
-  let lastError: Error | null = null;
+  const model = models[modelIndex];
+  if (!model) throw new Error('All Groq models failed');
 
-  for (const model of models) {
-    try {
-      const content = await callGroqOnce(
-        apiKey,
-        model,
-        systemPrompt,
-        userPrompt,
-        maxTokens,
-        true,
-      );
-      if (model !== models[0]) {
-        console.warn(`[groq] succeeded with fallback model ${model}`);
-      }
-      return { content, model };
-    } catch (err) {
-      lastError = err instanceof Error ? err : new Error(String(err));
-      const status = err instanceof GroqApiError ? err.status : 0;
-      console.warn(
-        `[groq] model ${model} failed (${status || 'err'}): ${lastError.message.slice(0, 120)}`,
-      );
-      if (err instanceof GroqApiError && err.retryable) continue;
-      throw lastError;
-    }
+  try {
+    const content = await callGroqOnce(
+      apiKey,
+      model,
+      systemPrompt,
+      userPrompt,
+      maxTokens,
+      true,
+    );
+    return { content, model };
+  } catch (err) {
+    const lastError = err instanceof Error ? err : new Error(String(err));
+    const status = err instanceof GroqApiError ? err.status : 0;
+    console.warn(
+      `[groq] model ${model} failed (${status || 'err'}): ${lastError.message.slice(0, 120)}`,
+    );
+    throw lastError;
   }
-
-  throw lastError ?? new Error('All Groq models failed');
 }
 
 function finalizeStory(
@@ -221,6 +216,7 @@ export async function generateStoryScript(
   const voiceId = input.voiceId ?? voiceForYear(input.year, input.genre);
 
   let retryReason: string | undefined;
+  let groqModelIndex = 0;
 
   for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
     const userPrompt = buildStoryUserPrompt({
@@ -233,7 +229,20 @@ export async function generateStoryScript(
       selectedReferenceFact: input.selectedReferenceFact,
     });
 
-    const { content } = await callGroq(systemPrompt, userPrompt, lengthPreset.maxTokens);
+    let content: string;
+    try {
+      const result = await callGroq(systemPrompt, userPrompt, lengthPreset.maxTokens, groqModelIndex);
+      content = result.content;
+      const idx = resolveGroqModelOrder().indexOf(result.model);
+      if (idx >= 0) groqModelIndex = idx;
+    } catch (err) {
+      if (err instanceof GroqApiError && err.status === 429 && groqModelIndex + 1 < resolveGroqModelOrder().length) {
+        groqModelIndex += 1;
+        console.warn(`[groq] quality attempt ${attempt + 1}: rotating to model index ${groqModelIndex}`);
+        continue;
+      }
+      throw err;
+    }
     const story = parseStoryJson(content);
     if (!story) {
       retryReason = 'invalid JSON';

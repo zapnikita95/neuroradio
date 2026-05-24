@@ -17,7 +17,7 @@ import com.musicstory.app.data.remote.GeminiStoryClient
 import com.musicstory.app.data.remote.GroqErrorParser
 import com.musicstory.app.data.remote.GroqStoryClient
 import com.musicstory.app.data.remote.MetadataCache
-import com.musicstory.app.data.remote.RateLimitErrorBody
+import com.musicstory.app.data.remote.ServerRateLimitParser
 import com.musicstory.app.data.model.StoryQuotaInfo
 import com.google.gson.Gson
 import com.musicstory.app.domain.GeminiModel
@@ -141,6 +141,8 @@ class StoryRepository(
         val useBackend = shouldTryBackend(backendUrl)
         var rateLimitHit = false
         var rateLimitQuota: StoryQuotaInfo? = null
+        var rateLimitCode: String? = null
+        var serverRateLimit = false
         var backendGroqDown = false
         var templateRejected = false
         var llmError: String? = null
@@ -195,6 +197,8 @@ class StoryRepository(
                     if (backendResult.rateLimitHit) {
                         rateLimitHit = true
                         rateLimitQuota = backendResult.rateLimitQuota
+                        rateLimitCode = backendResult.rateLimitCode
+                        serverRateLimit = backendResult.serverRateLimit
                     }
                 }
             }
@@ -251,6 +255,9 @@ class StoryRepository(
         val failureMessage = buildGenerationFailureMessage(
             rateLimitHit = rateLimitHit,
             rateLimitQuota = rateLimitQuota,
+            rateLimitCode = rateLimitCode,
+            serverRateLimit = serverRateLimit,
+            backendError = backendError,
             llmKeyPresent = directApiKey.isNotEmpty(),
             llmProvider = llmProvider,
             backendConfigured = useBackend,
@@ -271,6 +278,8 @@ class StoryRepository(
             val backendGroqDown: Boolean = false,
             val rateLimitHit: Boolean = false,
             val rateLimitQuota: StoryQuotaInfo? = null,
+            val rateLimitCode: String? = null,
+            val serverRateLimit: Boolean = false,
         ) : StoryAttemptResult()
     }
 
@@ -449,13 +458,18 @@ class StoryRepository(
             }
         } catch (e: Exception) {
             if (e is HttpException && e.code() == 429) {
-                val quota = parseRateLimitBody(e)
-                quota?.let { _dailyQuota.value = it }
-                StoryLog.w("Backend daily limit reached: ${quota?.used}/${quota?.limit}")
+                val parsed = parseServerRateLimit(e)
+                parsed.quota?.let { _dailyQuota.value = it }
+                StoryLog.w(
+                    "Backend rate limit code=${parsed.code} server=${parsed.isServerSource} " +
+                        "quota=${parsed.quota?.used}/${parsed.quota?.limit}",
+                )
                 return StoryAttemptResult.Failed(
-                    reason = "Лимит бесплатных историй на сервере",
+                    reason = parsed.message,
                     rateLimitHit = true,
-                    rateLimitQuota = quota,
+                    rateLimitQuota = parsed.quota,
+                    rateLimitCode = parsed.code,
+                    serverRateLimit = parsed.isServerSource,
                 )
             }
             if (e is HttpException && e.code() == 503) {
@@ -479,31 +493,37 @@ class StoryRepository(
     private fun buildGenerationFailureMessage(
         rateLimitHit: Boolean,
         rateLimitQuota: StoryQuotaInfo?,
+        rateLimitCode: String?,
+        serverRateLimit: Boolean,
+        backendError: String?,
         llmKeyPresent: Boolean,
         llmProvider: LlmProvider,
         backendConfigured: Boolean,
         backendGroqDown: Boolean,
         templateRejected: Boolean,
         llmError: String?,
-        backendError: String?,
     ): String {
         val providerLabel = llmProvider.labelRu
         if (templateRejected) {
             return GroqStoryClient.STORY_RETRY_MESSAGE
         }
-        if (llmKeyPresent && !llmError.isNullOrBlank()) {
-            return llmError
-        }
-        if (rateLimitHit && llmKeyPresent) {
-            return llmError ?: "Лимит бесплатных историй на сервере. Свой $providerLabel-ключ тоже не сработал — см. ошибку выше."
+        if (rateLimitHit && serverRateLimit) {
+            val serverMsg = backendError?.trim().orEmpty().ifBlank {
+                "Лимит сервера Music Story (не Google Gemini)."
+            }
+            if (!llmError.isNullOrBlank() && rateLimitCode == "STORY_BURST") {
+                return "$serverMsg Ключ $providerLabel: $llmError"
+            }
+            if (!llmError.isNullOrBlank() && rateLimitCode == "DAILY_LIMIT") {
+                return "$serverMsg Попытка с телефона: $llmError"
+            }
+            return serverMsg
         }
         if (rateLimitHit) {
-            val quotaText = rateLimitQuota?.let { "${it.used}/${it.limit}" }
-            return if (quotaText != null) {
-                "Лимит сервера Music Story ($quotaText из ${rateLimitQuota.limit} в день). Свой $providerLabel-ключ обходит этот лимит."
-            } else {
-                "Лимит сервера Music Story (10 историй в день). Свой $providerLabel-ключ обходит этот лимит."
-            }
+            return backendError ?: "Лимит запросов."
+        }
+        if (llmKeyPresent && !llmError.isNullOrBlank()) {
+            return llmError
         }
         if (llmKeyPresent && !backendError.isNullOrBlank()) {
             return "$providerLabel не сработал, сервер тоже: $backendError"
@@ -564,7 +584,7 @@ class StoryRepository(
 
     private fun explainError(e: Exception, llmProvider: LlmProvider): String = when (e) {
         is HttpException -> when (e.code()) {
-            429 -> "Лимит сервера Music Story (10/день)"
+            429 -> "Лимит сервера Music Story (не Gemini)"
             503 -> "${llmProvider.labelRu} на сервере недоступен"
             else -> "HTTP ${e.code()}"
         }
@@ -572,11 +592,15 @@ class StoryRepository(
         else -> e.message?.take(80) ?: e.javaClass.simpleName
     }
 
-    private fun parseRateLimitBody(e: HttpException): StoryQuotaInfo? {
-        val body = e.response()?.errorBody()?.string() ?: return null
-        return runCatching {
-            gson.fromJson(body, RateLimitErrorBody::class.java).quota
-        }.getOrNull()
+    private fun parseServerRateLimit(e: HttpException): ServerRateLimitParser.Parsed {
+        val body = e.response()?.errorBody()?.string().orEmpty()
+        return ServerRateLimitParser.parse(body)
+            ?: ServerRateLimitParser.Parsed(
+                message = "Лимит сервера Music Story (429). Это не квота Gemini.",
+                code = null,
+                quota = null,
+                isServerSource = true,
+            )
     }
 
     suspend fun recordStoryPlayed(track: TrackInfo, response: StoryResponse, angle: String?) {

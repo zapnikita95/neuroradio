@@ -2,7 +2,6 @@ import { Router, Request, Response } from 'express';
 import { v4 as uuidv4 } from 'uuid';
 import { requireAppAuth } from '../middleware/app-auth.js';
 import { validateStoryFullBody } from '../middleware/validate-story.js';
-import { safeErrorMessage } from '../middleware/security-headers.js';
 import { enrichTrackMetadata } from '../services/musicbrainz.js';
 import { fetchAggregatedFactBundle } from '../services/fact-aggregator.js';
 import { pickReferenceFact } from '../services/fact-picker.js';
@@ -13,7 +12,8 @@ import { synthesizeSpeech, hasYandexCredentials } from '../services/yandex-tts.j
 import { resolveVoiceForStory } from '../services/voices.js';
 import { signAudioAccess } from '../services/audio-token.js';
 import { isUnlimitedInstall } from '../config/security.js';
-import { attachStoryQuotaHeaders, getDailyStoryQuota } from '../middleware/rate-limit.js';
+import { attachStoryQuotaHeaders, getDailyStoryQuota, recordStoryGeneration } from '../middleware/rate-limit.js';
+import { classifyStoryLlmError } from '../services/llm-error-message.js';
 import type { StoryLengthId } from '../services/story-length.js';
 import type { StoryNarratorId } from '../services/story-narrator.js';
 import type { TtsVoiceSetting } from '../services/voices.js';
@@ -153,6 +153,7 @@ router.post('/full', validateStoryFullBody, async (req: Request, res: Response) 
       response.ttsHint = 'Yandex TTS не настроен на сервере (YANDEX_API_KEY, YANDEX_FOLDER_ID)';
     }
 
+    recordStoryGeneration(installId, req);
     attachStoryQuotaHeaders(res, installId);
     console.log(
       `[story] ok install=${installId.slice(0, 8)} llm=${llmUsed} words=${story.word_count} audio=${Boolean(response.audioUrl)}`,
@@ -164,38 +165,16 @@ router.post('/full', validateStoryFullBody, async (req: Request, res: Response) 
       `[story] fail install=${installId.slice(0, 8)} llm=${llmProvider} artist="${artist}" title="${title}" err=${rawMessage.slice(0, 300)}`,
       err,
     );
-    const isRateLimit = /\b429\b|rate_limit_exceeded/i.test(rawMessage);
-    const isAuthError = /invalid_api_key|invalid api key|\b401\b.*invalid|\b403\b forbidden/i.test(rawMessage);
-    const groqUnavailable = /groq api error|403 forbidden|groq http/i.test(rawMessage);
-    const geminiUnavailable = /gemini api error|gemini http/i.test(rawMessage);
-    const llmUnavailable = groqUnavailable || geminiUnavailable;
-    const qualityRejected = /could not produce a usable story/i.test(rawMessage);
-    const errorCode = isAuthError
-        ? (llmProvider === 'gemini' ? 'GEMINI_INVALID_KEY' : 'GROQ_INVALID_KEY')
-        : isRateLimit
-          ? (llmProvider === 'gemini' ? 'GEMINI_RATE_LIMIT' : 'GROQ_RATE_LIMIT')
-          : llmUnavailable
-            ? (llmProvider === 'gemini' ? 'GEMINI_FAILED' : 'GROQ_FAILED')
-            : qualityRejected
-              ? 'STORY_QUALITY_REJECTED'
-              : 'STORY_FAILED';
-    const userMessage = isAuthError
-        ? `${llmProvider === 'gemini' ? 'Gemini' : 'Groq'} API-ключ на сервере недействителен.`
-        : isRateLimit
-          ? `${llmProvider === 'gemini' ? 'Gemini' : 'Groq'}: лимит запросов — подожди минуту.`
-          : llmUnavailable
-            ? `${llmProvider === 'gemini' ? 'Gemini' : 'Groq'} не ответил — попробуй через минуту.`
-            : qualityRejected
-              ? 'Не получилось собрать историю — нажми «Рассказать историю» ещё раз.'
-              : safeErrorMessage(err);
+    const { code: errorCode, message: userMessage, httpStatus } = classifyStoryLlmError(err, llmProvider);
     setLogDetail(
       res,
       `code=${errorCode} llm=${llmProvider} ${rawMessage.slice(0, 200)}`,
     );
-    res.status(llmUnavailable ? 503 : 500).json({
-      error: llmUnavailable ? 'Story generation unavailable' : 'Story generation failed',
+    res.status(httpStatus).json({
+      error: httpStatus === 503 ? 'Story generation unavailable' : 'Story generation failed',
       code: errorCode,
       message: userMessage,
+      source: 'llm',
     });
   }
 });

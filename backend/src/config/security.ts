@@ -22,7 +22,8 @@ export const SECURITY = {
     storyPerInstallPerHour: 10,
     /** Free tier on shared server Groq + Yandex TTS */
     storyPerInstallPerDay: parseInt(process.env.FREE_STORY_DAILY_LIMIT ?? '10', 10),
-    storyBurstPerInstallPerMinute: 2,
+    /** Per-minute cap on /v1/story/full — not Gemini RPM */
+    storyBurstPerInstallPerMinute: 6,
 
     ipGlobalPerHour: 80,
     healthPerIpPerMinute: 30,

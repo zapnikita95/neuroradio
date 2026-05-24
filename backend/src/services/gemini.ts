@@ -182,40 +182,36 @@ export function isGeminiStoryFailure(err: unknown): boolean {
   );
 }
 
+/** One Gemini model per invocation — caller rotates index on 429 / unsupported model. */
 async function callGemini(
   systemPrompt: string,
   userPrompt: string,
   maxTokens: number,
-  geminiModel?: string,
+  geminiModel: string | undefined,
+  modelIndex = 0,
 ): Promise<{ content: string; model: string }> {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) throw new Error('GEMINI_API_KEY is not configured');
 
   const models = geminiModelsToTry(geminiModel);
-  let lastError: Error | null = null;
-
-  for (const model of models) {
-    try {
-      const content = await callGeminiWithModel(apiKey, model, systemPrompt, userPrompt, maxTokens);
-      if (model !== models[0]) {
-        console.warn(`[gemini] succeeded with fallback model ${model}`);
-      }
-      return { content, model };
-    } catch (err) {
-      lastError = err instanceof Error ? err : new Error(String(err));
-      const tryNext = (err as { tryNextModel?: boolean }).tryNextModel;
-      const status = (err as { status?: number }).status;
-      console.warn(
-        `[gemini] model ${model} failed (${status ?? 'err'}): ${lastError.message.slice(0, 120)}`,
-      );
-      if (tryNext) continue;
-      throw lastError;
-    }
+  const model = models[modelIndex];
+  if (!model) {
+    throw new Error(
+      'Все бесплатные модели Gemini недоступны (квота). Попробуй через минуту.',
+    );
   }
 
-  throw lastError ?? new Error(
-    'Все бесплатные модели Gemini недоступны (квота). Попробуй через минуту.',
-  );
+  try {
+    const content = await callGeminiWithModel(apiKey, model, systemPrompt, userPrompt, maxTokens);
+    return { content, model };
+  } catch (err) {
+    const lastError = err instanceof Error ? err : new Error(String(err));
+    const status = (err as { status?: number }).status;
+    console.warn(
+      `[gemini] model ${model} failed (${status ?? 'err'}): ${lastError.message.slice(0, 120)}`,
+    );
+    throw lastError;
+  }
 }
 
 function finalizeStory(
@@ -257,6 +253,7 @@ export async function generateStoryScript(
   const voiceId = input.voiceId ?? voiceForYear(input.year, input.genre);
 
   let retryReason: string | undefined;
+  let geminiModelIndex = 0;
 
   for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
     const userPrompt = buildStoryUserPrompt({
@@ -269,12 +266,29 @@ export async function generateStoryScript(
       selectedReferenceFact: input.selectedReferenceFact,
     });
 
-    const { content } = await callGemini(
-      systemPrompt,
-      userPrompt,
-      lengthPreset.maxTokens,
-      input.geminiModel,
-    );
+    let content: string;
+    try {
+      const result = await callGemini(
+        systemPrompt,
+        userPrompt,
+        lengthPreset.maxTokens,
+        input.geminiModel,
+        geminiModelIndex,
+      );
+      content = result.content;
+      const idx = geminiModelsToTry(input.geminiModel).indexOf(result.model);
+      if (idx >= 0) geminiModelIndex = idx;
+    } catch (err) {
+      const status = (err as { status?: number }).status;
+      const tryNext = (err as { tryNextModel?: boolean }).tryNextModel;
+      const models = geminiModelsToTry(input.geminiModel);
+      if ((status === 429 || tryNext) && geminiModelIndex + 1 < models.length) {
+        geminiModelIndex += 1;
+        console.warn(`[gemini] attempt ${attempt + 1}: next model index ${geminiModelIndex}`);
+        continue;
+      }
+      throw err;
+    }
     const story = parseStoryJson(content);
     if (!story) {
       retryReason = 'invalid JSON';

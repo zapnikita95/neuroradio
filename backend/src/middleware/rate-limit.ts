@@ -1,6 +1,7 @@
 import { Response } from 'express';
 import { isUnlimitedInstall, SECURITY } from '../config/security.js';
 import { getQuotaSubject } from '../services/account-store.js';
+import { setLogDetail } from './request-logger.js';
 
 interface Bucket {
   count: number;
@@ -46,16 +47,20 @@ function peekUsage(key: string, maxRequests: number, windowMs: number): QuotaSna
   };
 }
 
-function checkLimit(key: string, maxRequests: number, windowMs: number): boolean {
+function wouldAllow(key: string, maxRequests: number, windowMs: number): boolean {
+  const bucket = getBucket(key);
+  if (!bucket) return true;
+  return bucket.count < maxRequests;
+}
+
+function consumeLimit(key: string, maxRequests: number, windowMs: number): void {
   const now = Date.now();
   const bucket = buckets.get(key);
   if (!bucket || now >= bucket.resetAt) {
     buckets.set(key, { count: 1, resetAt: now + windowMs });
-    return true;
+    return;
   }
-  if (bucket.count >= maxRequests) return false;
   bucket.count += 1;
-  return true;
 }
 
 function sendLimitError(
@@ -64,14 +69,17 @@ function sendLimitError(
   code: string,
   quota: QuotaSnapshot,
 ): void {
+  console.warn(`[rate-limit] ${code} remaining=${quota.remaining}/${quota.limit}`);
+  setLogDetail(res, `server_rate_limit code=${code} remaining=${quota.remaining}/${quota.limit}`);
   res.status(429).json({
     error: message,
     code,
     quota,
+    source: 'server',
   });
 }
 
-function enforce(
+function rejectIfOverLimit(
   key: string,
   max: number,
   windowMs: number,
@@ -79,7 +87,7 @@ function enforce(
   message: string,
   code: string,
 ): boolean {
-  if (checkLimit(key, max, windowMs)) return true;
+  if (wouldAllow(key, max, windowMs)) return true;
   sendLimitError(res, message, code, peekUsage(key, max, windowMs));
   return false;
 }
@@ -128,19 +136,25 @@ export function rateLimitAuth(req: import('express').Request, res: import('expre
   const installId = typeof req.body?.install_id === 'string' ? req.body.install_id.trim() : '';
   const { limits } = SECURITY;
 
-  if (!enforce(`auth:ip:min:${ip}`, limits.authPerIpPerMinute, MINUTE_MS, res, 'Too many auth attempts', 'AUTH_RATE')) return;
-  if (!enforce(`auth:ip:day:${ip}`, limits.authPerIpPerDay, DAY_MS, res, 'Daily auth limit reached', 'AUTH_DAILY')) return;
-  if (installId && !enforce(`auth:install:day:${installId}`, limits.authPerInstallPerDay, DAY_MS, res, 'Daily token limit reached', 'AUTH_INSTALL_DAILY')) return;
+  if (!rejectIfOverLimit(`auth:ip:min:${ip}`, limits.authPerIpPerMinute, MINUTE_MS, res, 'Too many auth attempts', 'AUTH_RATE')) return;
+  if (!rejectIfOverLimit(`auth:ip:day:${ip}`, limits.authPerIpPerDay, DAY_MS, res, 'Daily auth limit reached', 'AUTH_DAILY')) return;
+  if (installId && !rejectIfOverLimit(`auth:install:day:${installId}`, limits.authPerInstallPerDay, DAY_MS, res, 'Daily token limit reached', 'AUTH_INSTALL_DAILY')) return;
+
+  consumeLimit(`auth:ip:min:${ip}`, limits.authPerIpPerMinute, MINUTE_MS);
+  if (installId) consumeLimit(`auth:install:day:${installId}`, limits.authPerInstallPerDay, DAY_MS);
+  consumeLimit(`auth:ip:day:${ip}`, limits.authPerIpPerDay, DAY_MS);
 
   next();
 }
 
 export function rateLimitHealth(req: import('express').Request, res: import('express').Response, next: import('express').NextFunction): void {
   const ip = clientIp(req);
-  if (!enforce(`health:ip:min:${ip}`, SECURITY.limits.healthPerIpPerMinute, MINUTE_MS, res, 'Too many requests', 'HEALTH_RATE')) return;
+  if (!rejectIfOverLimit(`health:ip:min:${ip}`, SECURITY.limits.healthPerIpPerMinute, MINUTE_MS, res, 'Too many requests', 'HEALTH_RATE')) return;
+  consumeLimit(`health:ip:min:${ip}`, SECURITY.limits.healthPerIpPerMinute, MINUTE_MS);
   next();
 }
 
+/** Peek only — does not consume quota (failed LLM runs do not burn free tier). */
 export function rateLimitStory(installId: string): (req: import('express').Request, res: import('express').Response, next: import('express').NextFunction) => void {
   return (req, res, next) => {
     if (isUnlimitedInstall(installId)) {
@@ -151,12 +165,12 @@ export function rateLimitStory(installId: string): (req: import('express').Reque
     const ip = clientIp(req);
     const { limits } = SECURITY;
     const dailyLimit = limits.storyPerInstallPerDay;
-
-    if (!enforce(`ip:hour:${ip}`, limits.ipGlobalPerHour, HOUR_MS, res, 'Too many requests from this network', 'IP_HOURLY')) return;
     const subject = getQuotaSubject(installId);
-    if (!enforce(`story:burst:${subject}`, limits.storyBurstPerInstallPerMinute, MINUTE_MS, res, 'Slow down — story generation is rate limited', 'STORY_BURST')) return;
-    if (!enforce(`story:hour:${subject}`, limits.storyPerInstallPerHour, HOUR_MS, res, 'Hourly story limit reached', 'STORY_HOURLY')) return;
-    if (!enforce(
+
+    if (!rejectIfOverLimit(`ip:hour:${ip}`, limits.ipGlobalPerHour, HOUR_MS, res, 'Too many requests from this network', 'IP_HOURLY')) return;
+    if (!rejectIfOverLimit(`story:burst:${subject}`, limits.storyBurstPerInstallPerMinute, MINUTE_MS, res, 'Подожди минуту — слишком частые запросы историй', 'STORY_BURST')) return;
+    if (!rejectIfOverLimit(`story:hour:${subject}`, limits.storyPerInstallPerHour, HOUR_MS, res, 'Hourly story limit reached', 'STORY_HOURLY')) return;
+    if (!rejectIfOverLimit(
       quotaKey(installId),
       dailyLimit,
       DAY_MS,
@@ -167,4 +181,21 @@ export function rateLimitStory(installId: string): (req: import('express').Reque
 
     next();
   };
+}
+
+/** Call once after a story was successfully generated and sent to the client. */
+export function recordStoryGeneration(
+  installId: string,
+  req: { header(name: string): string | undefined; socket: { remoteAddress?: string } },
+): void {
+  if (isUnlimitedInstall(installId)) return;
+
+  const ip = clientIp(req);
+  const { limits } = SECURITY;
+  const subject = getQuotaSubject(installId);
+
+  consumeLimit(`ip:hour:${ip}`, limits.ipGlobalPerHour, HOUR_MS);
+  consumeLimit(`story:burst:${subject}`, limits.storyBurstPerInstallPerMinute, MINUTE_MS);
+  consumeLimit(`story:hour:${subject}`, limits.storyPerInstallPerHour, HOUR_MS);
+  consumeLimit(quotaKey(installId), limits.storyPerInstallPerDay, DAY_MS);
 }
