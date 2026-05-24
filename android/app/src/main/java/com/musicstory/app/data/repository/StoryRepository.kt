@@ -102,7 +102,8 @@ class StoryRepository(
         if (!forceRefresh && previousScripts.isEmpty()) {
             val cached = storyDao.getByTrackKey(trackKey)
             if (cached != null && !cached.demo && !isCacheExpired(cached) &&
-                !StoryScriptQuality.isTemplateLike(cached.script, cached.artist, cached.title)
+                (!cached.audioUrl.isNullOrBlank() ||
+                    !StoryScriptQuality.isTemplateLike(cached.script, cached.artist, cached.title))
             ) {
                 StoryLog.i("Story from cache")
                 return Result.success(cached.toResponse())
@@ -434,10 +435,6 @@ class StoryRepository(
                     StoryLog.w("Backend returned template/demo story — rejected")
                     StoryAttemptResult.TemplateRejected
                 }
-                StoryScriptQuality.isTemplateLike(response.script, track.artist, track.title) -> {
-                    StoryLog.w("Backend returned template-like story — rejected")
-                    StoryAttemptResult.TemplateRejected
-                }
                 response.script.isBlank() || isDuplicateScript(response.script, previousScripts) -> {
                     StoryLog.w("Backend response rejected: empty or duplicate")
                     StoryAttemptResult.Failed("Сервер вернул пустой или повторный текст")
@@ -504,7 +501,9 @@ class StoryRepository(
     ): String {
         val providerLabel = llmProvider.labelRu
         if (templateRejected) {
-            return GroqStoryClient.STORY_RETRY_MESSAGE
+            return backendError
+                ?: llmError
+                ?: "Текст истории не прошёл проверку на телефоне. Нажми «Рассказать историю» ещё раз."
         }
         if (rateLimitHit && serverRateLimit) {
             val serverMsg = backendError?.trim().orEmpty().ifBlank {
