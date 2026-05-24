@@ -194,7 +194,6 @@ class StoryOrchestrator(
             _state.value = OrchestratorState.FETCHING_STORY
             _errorMessage.value = null
             publishUiState()
-            storyPlayer.ensureTtsInitialized()
 
             val fetchStartedAt = SystemClock.elapsedRealtime()
             val musicPausedForStory = AtomicBoolean(false)
@@ -243,14 +242,7 @@ class StoryOrchestrator(
                         },
                         onError = {
                             if (session != playbackSession) return@playStory
-                            val ttsState = storyPlayer.state.value
-                            _errorMessage.value = when {
-                                storyPlayer.lastPlaybackUsedServerAudio() ->
-                                    context.getString(R.string.server_audio_error_message)
-                                ttsState == StoryPlaybackState.ERROR ->
-                                    context.getString(R.string.tts_error_message)
-                                else -> "Не удалось воспроизвести историю"
-                            }
+                            _errorMessage.value = context.getString(R.string.server_audio_error_message)
                             _state.value = OrchestratorState.ERROR
                             if (musicPausedForStory.get()) {
                                 mediaControllerManager.resumeMusic()
@@ -287,7 +279,7 @@ class StoryOrchestrator(
             }
             StoryLog.w("Playback watchdog: story did not start in time")
             storyPlayer.stop()
-            _errorMessage.value = "Озвучка не запустилась — попробуй ещё раз"
+            _errorMessage.value = context.getString(R.string.server_audio_error_message)
             _state.value = OrchestratorState.ERROR
             if (musicPausedForStory.get()) {
                 mediaControllerManager.resumeMusic()

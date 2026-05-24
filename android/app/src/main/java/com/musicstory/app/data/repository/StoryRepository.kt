@@ -434,9 +434,15 @@ class StoryRepository(
                     StoryLog.w("Backend response rejected: empty or duplicate")
                     StoryAttemptResult.Failed("Сервер вернул пустой или повторный текст")
                 }
+                response.audioUrl.isNullOrBlank() -> {
+                    StoryLog.e("Backend returned story without Yandex audioUrl")
+                    StoryAttemptResult.Failed(
+                        "Сервер не отдал озвучку Yandex. Проверь YANDEX_API_KEY и YANDEX_FOLDER_ID на Railway.",
+                    )
+                }
                 else -> {
                     response.quota?.let { quota -> _dailyQuota.value = quota }
-                    StoryLog.i("Backend OK: audio=${response.audioUrl != null}, quota=${response.quota?.remaining}/${response.quota?.limit}")
+                    StoryLog.i("Backend OK: audio=yes, quota=${response.quota?.remaining}/${response.quota?.limit}")
                     persistStory(trackKey, track, response, angle.labelRu)
                     StoryAttemptResult.Success(response)
                 }
