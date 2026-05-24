@@ -180,6 +180,8 @@ const CONCEPT_BRIDGES: Array<{ factPattern: RegExp; scriptTokens: string[] }> = 
   { factPattern: /cobain|pixies|pop song/i, scriptTokens: ['кобейн', 'pixies', 'поп', 'панк'] },
   { factPattern: /\bband\b|\bgroup\b/i, scriptTokens: ['групп', 'коллект'] },
   { factPattern: /u\.?\s?s\.?\s?ssr|soviet/i, scriptTokens: ['ссср', 'совет', 'подпол'] },
+  { factPattern: /bossa nova|jorge ben|mas que nada|samba/i, scriptTokens: ['босса', 'самба', 'жорж', 'бен', 'ритм', 'удар'] },
+  { factPattern: /instrumental|wordless|no lyrics/i, scriptTokens: ['без слов', 'инструмент', 'свист', 'крик'] },
 ];
 
 function matchesConceptBridge(fact: string, scriptWords: Set<string>): boolean {
@@ -275,8 +277,47 @@ export function validateStoryScript(
   return { ok: true };
 }
 
-/** Reject generic filler without concrete detail. */
+const CLICHE_FILLER_PATTERNS: RegExp[] = [
+  /мало кто знает/i,
+  /стал[аи]?\s+легенд/i,
+  /зал[ауе]?\s+слав/i,
+  /трогает\s+сердц/i,
+  /суть\s+в\s+том/i,
+  /заслуженн\w*\s+место/i,
+  /получил[аи]?\s+заслуженн/i,
+  /до\s+сих\s+пор\s+трогает/i,
+  /именно\s+здесь[^.]{0,40}легенд/i,
+  /место\s+в\s+истории\s+музык/i,
+];
+
+export function findClicheFiller(script: string): string | null {
+  for (const pattern of CLICHE_FILLER_PATTERNS) {
+    if (pattern.test(script)) {
+      return `cliche filler: ${pattern.source}`;
+    }
+  }
+  return null;
+}
+
+/** Reject generic filler — artist name alone is not enough. */
 export function findWateryContent(script: string, artist = '', title = ''): string | null {
-  if (hasConcreteFact(script, artist, title)) return null;
-  return 'no concrete fact — mention artist, title, instrument, label, or recording detail';
+  const cliche = findClicheFiller(script);
+  if (cliche) return cliche;
+
+  let stripped = script;
+  for (const token of [...significantTokens(artist), ...significantTokens(title)]) {
+    if (token.length >= 3) {
+      stripped = stripped.replace(new RegExp(`\\b${token}\\b`, 'gi'), ' ');
+    }
+  }
+  if (findClicheFiller(stripped)) {
+    return 'only artist/title with cliche filler';
+  }
+
+  if (hasConcreteFact(stripped, '', '')) return null;
+  if (hasConcreteFact(script, artist, title)) {
+    const scriptNorm = normalizeForMatch(stripped);
+    if (scriptNorm.split(' ').filter((w) => w.length >= 5).length >= 3) return null;
+  }
+  return 'no concrete fact — use detail from seed fact (instrument, label, scandal, sample)';
 }

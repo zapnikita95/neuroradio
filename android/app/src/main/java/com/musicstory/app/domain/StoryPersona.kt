@@ -36,6 +36,7 @@ data class StoryPersona(
     val eraHint: String,
     val contentFocus: String? = null,
     val formatRules: String? = null,
+    val narratorAddendum: String? = null,
 ) {
     companion object {
         fun eraContextForPrompt(

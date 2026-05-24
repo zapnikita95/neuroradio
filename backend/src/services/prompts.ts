@@ -25,6 +25,7 @@ export interface StoryPersona {
   eraHint: string;
   contentFocus?: string;
   formatRules?: string;
+  narratorAddendum?: string;
 }
 
 export const STORY_ANGLE_PRESETS = [
@@ -191,6 +192,9 @@ export function buildSystemPrompt(persona: StoryPersona, length: StoryLengthPres
     : 'Драма и контраст — не сухая статья Wikipedia';
 
   const lengthPlan = buildLengthStructurePlan(length);
+  const narratorBlock = persona.narratorAddendum
+    ? `\n${persona.narratorAddendum}\n`
+    : '';
 
   return `Ты пишешь текст для ОЗВУЧКИ — харизматичный музыкальный рассказчик, знаешь изнанку шоу-бизнеса.
 
@@ -198,7 +202,7 @@ export function buildSystemPrompt(persona: StoryPersona, length: StoryLengthPres
 ЭПОХА: ${persona.eraHint}
 ГОЛОС: ${persona.speechStyle}
 ${focusBlock}
-
+${narratorBlock}
 РЕЦЕПТ (масштабируй по длительности):
 - Факт + метафора + ударная строка.
 - Ищи ДРАМУ и КОНТРАСТ: конфликт, прорыв, скандал, возвращение — что люди почувствовали.
@@ -229,8 +233,9 @@ ${RUSSIAN_LANGUAGE_PROMPT_BLOCK}
 РАЗМЕТКА: без + и [[фонем]] в script.
 
 ЗАПРЕЩЕНО: выдуманные люди, «Music Story», вода «магия музыки», «легендарная».
+ЗАПРЕЩЕНО (вода): «мало кто знает», «стала легендой», «зал славы», «суть в том что», «трогает сердца», «заслуженное место» — без конкретики из семени.
 
-ОБЯЗАТЕЛЬНО: слушатель понимает ПОЧЕМУ это цепляет; суть семени факта узнаваема.
+ОБЯЗАТЕЛЬНО: в тексте узнаётся СЕМЯ факта (имя, событие, жанровый поворот, скандал, прибор, кавер); слушатель понимает ПОЧЕМУ это безумно/важно.
 
 JSON: {"script":"...", "word_count": число, "voiceId": "alena | filipp | ermil | jane | omazh | zahar | marina | dasha | julia | kirill | masha | alexander | lera"}`;
 }
@@ -287,6 +292,7 @@ export function buildStoryUserPrompt(params: {
     const preset = getNarratorPreset(narratorId);
     if (preset) {
       lines.push(`РЕЖИМ РАССКАЗЧИКА: ${preset.labelRu} — ${preset.descriptionRu}`);
+      lines.push(preset.promptAddendum);
     }
   }
   lines.push(`ЖЁСТКАЯ ДЛИНА: ${length.wordsMin}–${length.wordsMax} слов (${length.labelRu}).`);
@@ -301,10 +307,10 @@ export function buildStoryUserPrompt(params: {
     lines.push('СЕМЯ ИСТОРИИ (проверенный факт из интернета — только это ядро):');
     lines.push(selected.fact);
     lines.push('РЕЦЕПТ ПОДАЧИ:');
-    lines.push('1. КРЮЧОК — парадокс или безумный поворот из семени.');
-    lines.push('2. КУХНЯ — человеческая драма из семени (если укладываешься по времени).');
-    lines.push('3. СМЫСЛ — почему цепляет душу.');
-  lines.push('НЕ перечисляй рекламу/фильмы/игры. НЕ Wikipedia. Факт + метафора + удар.');
+    lines.push('1. КРЮЧОК — первая фраза = конкретика из семени (имя, спор, сэмпл, запрет, абсурд).');
+    lines.push('2. РАЗВИТИЕ — одна деталь из семени, переведённая в живую речь (не пересказ статьи).');
+    lines.push('3. УДАР — почему это цепляет, опираясь на то же семя.');
+    lines.push('НЕ: «мало кто знает», «легенда», «зал славы», «трогает сердца». ДА: факт + образ + финал.');
     lines.push(RUSSIAN_LANGUAGE_PROMPT_BLOCK);
   } else if (facts.length > 0) {
     lines.push('');

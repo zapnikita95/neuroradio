@@ -49,6 +49,18 @@ object StoryScriptQuality {
         Regex("""brad\s+sullivan""", RegexOption.IGNORE_CASE),
     )
 
+    private val clicheFillerPatterns = listOf(
+        Regex("""мало кто знает""", RegexOption.IGNORE_CASE),
+        Regex("""стал[аи]?\s+легенд""", RegexOption.IGNORE_CASE),
+        Regex("""зал[ауе]?\s+слав""", RegexOption.IGNORE_CASE),
+        Regex("""трогает\s+сердц""", RegexOption.IGNORE_CASE),
+        Regex("""суть\s+в\s+том""", RegexOption.IGNORE_CASE),
+        Regex("""заслуженн\w*\s+место""", RegexOption.IGNORE_CASE),
+    )
+
+    fun hasClicheFiller(script: String): Boolean =
+        clicheFillerPatterns.any { it.containsMatchIn(script.trim()) }
+
     fun isTemplateLike(
         script: String,
         artist: String = "",
@@ -60,6 +72,7 @@ object StoryScriptQuality {
     ): Boolean {
         val text = script.trim()
         if (text.isBlank()) return true
+        if (hasClicheFiller(text)) return true
         if (hasBannedPattern(text)) return true
         if (hasLocaleViolation(text, countryCode, year)) return true
         if (hasFictionPattern(text)) return true

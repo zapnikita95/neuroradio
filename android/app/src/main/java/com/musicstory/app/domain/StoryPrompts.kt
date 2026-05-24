@@ -19,6 +19,7 @@ object StoryPrompts {
         val focusBlock = persona.contentFocus?.takeIf { it.isNotBlank() }
             ?.let { "ФОКУС: $it" }
             ?: "Драма и контраст — не сухая статья Wikipedia"
+        val narratorBlock = persona.narratorAddendum?.takeIf { it.isNotBlank() }?.let { "\n$it\n" }.orEmpty()
         val lengthPlan = StoryLengthPlan.structurePlan(length)
 
         return """
@@ -28,7 +29,7 @@ object StoryPrompts {
 ЭПОХА: ${persona.eraHint}
 ГОЛОС: ${persona.speechStyle}
 $focusBlock
-
+$narratorBlock
 РЕЦЕПТ (масштабируй по длительности):
 - Факт + метафора + ударная строка.
 - Ищи ДРАМУ и КОНТРАСТ: конфликт, прорыв, скандал, возвращение — что люди почувствовали.
@@ -57,8 +58,9 @@ ${StoryRussianLanguage.PROMPT_BLOCK}
 - word_count в JSON — строго в этом диапазоне.
 
 ЗАПРЕЩЕНО: выдуманные люди, «Music Story», вода «магия музыки», «легендарная».
+ЗАПРЕЩЕНО (вода): «мало кто знает», «стала легендой», «зал славы», «суть в том», «трогает сердца».
 
-ОБЯЗАТЕЛЬНО: слушатель понимает ПОЧЕМУ это цепляет; суть семени факта узнаваема.
+ОБЯЗАТЕЛЬНО: в тексте узнаётся СЕМЯ факта; слушатель понимает ПОЧЕМУ это безумно/важно.
 
 JSON: {"script":"...", "word_count": число}
 Верни ТОЛЬКО JSON — без markdown, без текста до или после скобок.
@@ -91,7 +93,8 @@ JSON: {"script":"...", "word_count": число}
             appendLine("УГОЛ ПОДАЧИ: ${angle.labelRu} — ${angle.wrapHint}")
             appendLine("Ты — ${persona.roleTitle}. Говоришь: ${persona.speechStyle}")
             if (!narrator.isAuto) {
-                appendLine("РАССКАЗЧИК: ${narrator.labelRu} — ${narrator.formatRules}")
+                appendLine("РАССКАЗЧИК: ${narrator.labelRu} — ${narrator.descriptionRu}")
+                appendLine(narrator.promptAddendum)
             }
             appendLine("ЖЁСТКАЯ ДЛИНА: ${length.wordsMin}–${length.wordsMax} слов (${length.labelRu}).")
             appendLine(StoryLengthPlan.structurePlan(length))
@@ -101,11 +104,8 @@ JSON: {"script":"...", "word_count": число}
                 appendLine("СЕМЯ ИСТОРИИ (проверенный факт из интернета — только это ядро):")
                 appendLine(selectedFact.fact)
                 appendLine()
-                appendLine("РЕЦЕПТ ПОДАЧИ:")
-                appendLine("1. КРЮЧОК — парадокс или безумный поворот из семени.")
-                appendLine("2. КУХНЯ — человеческая драма из семени (если укладываешься по времени).")
-                appendLine("3. СМЫСЛ — почему цепляет душу.")
-                appendLine("НЕ перечисляй рекламу/фильмы/игры. НЕ Wikipedia. Факт + метафора + удар.")
+                appendLine("РЕЦЕПТ: 1) крючок = конкретика из семени 2) деталь 3) удар.")
+                appendLine("НЕ: «мало кто знает», «легенда», «зал славы», «трогает сердца».")
             } else if (referenceFacts.isNotEmpty()) {
                 appendLine()
                 appendLine("СЕМЕНА ИСТОРИЙ (выбери ОДНО с максимальной драмой — не рекламу и не дискографию):")

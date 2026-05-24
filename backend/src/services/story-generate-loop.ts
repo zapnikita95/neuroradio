@@ -1,5 +1,5 @@
 import type { StoryLengthId } from './story-length.js';
-import { sanitizeScriptForTts, validateStoryScript } from './story-quality.js';
+import { findWateryContent, sanitizeScriptForTts, validateStoryScript } from './story-quality.js';
 
 export interface StoryQualityAttemptOptions {
   strictLength?: boolean;
@@ -44,6 +44,11 @@ export function finalizeAfterQualityLoop<T extends { script: string }>(
 ): T | null {
   if (!lastCandidate?.script?.trim()) return null;
   const sanitized = sanitizeScriptForTts(lastCandidate.script, input.artist, input.title);
+  const water = findWateryContent(sanitized, input.artist, input.title);
+  if (water) {
+    console.warn(`[story] last script rejected as water: ${water}`);
+    return null;
+  }
   const story = { ...lastCandidate, script: sanitized };
   console.warn('[story] accepting last script after quality retries exhausted');
   return finalize(story);
