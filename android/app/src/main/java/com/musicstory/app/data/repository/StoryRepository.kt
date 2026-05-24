@@ -264,7 +264,6 @@ class StoryRepository(
             backendGroqDown = backendGroqDown,
             templateRejected = templateRejected,
             llmError = llmError,
-            backendError = backendError,
         )
         StoryLog.w("Story generation failed: $failureMessage")
         return Result.failure(IOException(failureMessage))
