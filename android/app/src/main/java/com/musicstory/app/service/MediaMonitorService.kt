@@ -14,6 +14,7 @@ import com.musicstory.app.MainActivity
 import com.musicstory.app.MusicStoryApp
 import com.musicstory.app.R
 import com.musicstory.app.data.model.TrackInfo
+import com.musicstory.app.domain.MonitorNotificationState
 import com.musicstory.app.receiver.StoryActionReceiver
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -33,6 +34,7 @@ class MediaMonitorService : Service() {
 
     override fun onCreate() {
         super.onCreate()
+        instance = this
         val app = application as MusicStoryApp
         app.mediaControllerManager.start()
         observeTracks(app)
@@ -51,6 +53,7 @@ class MediaMonitorService : Service() {
     }
 
     override fun onDestroy() {
+        if (instance === this) instance = null
         trackObserverJob?.cancel()
         serviceScope.cancel()
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
@@ -70,7 +73,8 @@ class MediaMonitorService : Service() {
             combine(
                 app.mediaControllerManager.nowPlaying.map { it?.displayKey },
                 MediaNotificationListener.lastNotificationTrack.map { it?.displayKey },
-            ) { sessionKey, notificationKey -> sessionKey ?: notificationKey }
+                MonitorNotificationState.preparingStory,
+            ) { sessionKey, notificationKey, _ -> sessionKey ?: notificationKey }
                 .distinctUntilChanged()
                 .collect { key ->
                     val track = app.mediaControllerManager.effectiveNowPlaying.value
@@ -80,6 +84,11 @@ class MediaMonitorService : Service() {
                     }
                     updateNotification(track)
                 }
+        }
+        serviceScope.launch {
+            MonitorNotificationState.preparingStory.collect {
+                updateNotification(app.mediaControllerManager.effectiveNowPlaying.value)
+            }
         }
     }
 
@@ -122,13 +131,21 @@ class MediaMonitorService : Service() {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         )
 
+        val preparing = MonitorNotificationState.preparingStory.value
         val contentTitle = when {
+            preparing -> getString(R.string.notification_preparing_story)
             track != null && track.isValid() -> "${track.artist} — ${track.title}"
             else -> getString(R.string.notification_listening)
         }
         val contentText = when {
+            preparing -> getString(R.string.notification_preparing_story)
             track != null && track.isValid() -> getString(R.string.notification_now_playing, track.artist, track.title)
             else -> getString(R.string.notification_listening_hint)
+        }
+        val storyActionLabel = if (preparing) {
+            getString(R.string.action_preparing_story)
+        } else {
+            getString(R.string.action_manual_story)
         }
 
         return NotificationCompat.Builder(this, MusicStoryApp.CHANNEL_MONITOR)
@@ -140,7 +157,7 @@ class MediaMonitorService : Service() {
             .setOnlyAlertOnce(true)
             .addAction(
                 R.drawable.ic_notification,
-                getString(R.string.action_manual_story),
+                storyActionLabel,
                 manualStory,
             )
             .addAction(
@@ -154,6 +171,16 @@ class MediaMonitorService : Service() {
 
     companion object {
         const val NOTIFICATION_ID = 1001
+
+        @Volatile
+        private var instance: MediaMonitorService? = null
+
+        fun refreshNotification(context: Context) {
+            val service = instance ?: return
+            val app = context.applicationContext as? MusicStoryApp ?: return
+            val track = app.mediaControllerManager.effectiveNowPlaying.value
+            service.updateNotification(track)
+        }
 
         fun start(context: Context) {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {

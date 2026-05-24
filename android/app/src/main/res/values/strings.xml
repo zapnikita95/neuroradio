@@ -34,6 +34,8 @@
     <string name="status_stopped">Служба остановлена</string>
     <string name="action_grant_access">Выдать доступ</string>
     <string name="action_manual_story">Рассказать историю</string>
+    <string name="action_preparing_story">Готовим историю…</string>
+    <string name="notification_preparing_story">Готовим историю…</string>
     <string name="action_stop_monitor">Остановить</string>
     <string name="action_stop_story">Остановить историю</string>
     <string name="action_resume_monitor">Возобновить мониторинг</string>

@@ -42,6 +42,8 @@ MediaNotificationListener
 
 Локальный fallback (свой `GROQ_API_KEY` / `GEMINI_API_KEY` на телефоне) — **только текст**, без Yandex; для озвучки всё равно нужен успешный **backend** с `audioUrl`.
 
+**Android `StoryRepository`:** при настроенном Railway URL **сначала всегда** `POST /v1/story/full` (Yandex), **не** прямой Groq с телефона, даже если в настройках сохранён Groq-ключ. Прямой ключ — только запасной вариант, если сервер не ответил.
+
 ---
 
 ## Репозиторий

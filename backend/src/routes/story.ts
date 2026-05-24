@@ -6,9 +6,14 @@ import { safeErrorMessage } from '../middleware/security-headers.js';
 import { enrichTrackMetadata } from '../services/musicbrainz.js';
 import { fetchAggregatedFactBundle } from '../services/fact-aggregator.js';
 import { pickReferenceFact } from '../services/fact-picker.js';
-import { generateStoryScript as generateGroqStory } from '../services/groq.js';
+import {
+  generateStoryScript as generateGroqStory,
+  isGroqRateLimitError,
+} from '../services/groq.js';
 import { generateStoryScript as generateGeminiStory } from '../services/gemini.js';
+import { hasGeminiApiKey } from '../services/gemini.js';
 import { hasLlmKeyForProvider, resolveLlmProvider } from '../services/llm-provider.js';
+import { setLogDetail } from '../middleware/request-logger.js';
 import { synthesizeSpeech, hasYandexCredentials } from '../services/yandex-tts.js';
 import { resolveVoiceForStory } from '../services/voices.js';
 import { signAudioAccess } from '../services/audio-token.js';
@@ -100,7 +105,7 @@ router.post('/full', validateStoryFullBody, async (req: Request, res: Response) 
       ? [selectedFact.fact]
       : [...factBundle.trackFacts, ...factBundle.artistFacts].slice(0, 4);
 
-    const story = await (llmProvider === 'gemini' ? generateGeminiStory : generateGroqStory)({
+    const storyInput = {
       artist: metadata.artist,
       title: metadata.title,
       year: metadata.year,
@@ -113,7 +118,23 @@ router.post('/full', validateStoryFullBody, async (req: Request, res: Response) 
       referenceFacts,
       selectedReferenceFact: selectedFact ?? undefined,
       ...(llmProvider === 'gemini' ? { geminiModel } : {}),
-    });
+    };
+
+    let story;
+    let llmUsed = llmProvider;
+    try {
+      story = await (llmProvider === 'gemini' ? generateGeminiStory : generateGroqStory)(storyInput);
+    } catch (genErr) {
+      if (llmProvider === 'groq' && hasGeminiApiKey() && isGroqRateLimitError(genErr)) {
+        console.warn(
+          `[story] groq rate limited install=${installId.slice(0, 8)} — fallback to gemini artist="${artist}" title="${title}"`,
+        );
+        story = await generateGeminiStory({ ...storyInput, geminiModel });
+        llmUsed = 'gemini';
+      } else {
+        throw genErr;
+      }
+    }
 
     const response: Record<string, unknown> = {
       artist: metadata.artist,
@@ -129,8 +150,8 @@ router.post('/full', validateStoryFullBody, async (req: Request, res: Response) 
       quota: getDailyStoryQuota(req.installId ?? 'unknown'),
       sources: {
         musicbrainz: Boolean(metadata.year || metadata.genre || metadata.mbid),
-        groq: llmProvider === 'groq',
-        gemini: llmProvider === 'gemini',
+        groq: llmUsed === 'groq',
+        gemini: llmUsed === 'gemini',
         yandexTts: hasYandexCredentials(),
       },
     };
@@ -148,29 +169,27 @@ router.post('/full', validateStoryFullBody, async (req: Request, res: Response) 
     } else {
       response.audioUrl = null;
       response.audioFile = null;
-      response.ttsHint = 'Нет Yandex TTS — телефон озвучит текст через системный Android TTS';
+      response.ttsHint = 'Yandex TTS не настроен на сервере (YANDEX_API_KEY, YANDEX_FOLDER_ID)';
     }
 
     attachStoryQuotaHeaders(res, installId);
     console.log(
-      `[story] ok install=${installId.slice(0, 8)} llm=${llmProvider} words=${story.word_count} audio=${Boolean(response.audioUrl)}`,
+      `[story] ok install=${installId.slice(0, 8)} llm=${llmUsed} words=${story.word_count} audio=${Boolean(response.audioUrl)}`,
     );
     res.json(response);
   } catch (err) {
+    const rawMessage = err instanceof Error ? err.message : String(err);
     console.error(
-      `[story] fail install=${installId.slice(0, 8)} llm=${llmProvider} artist="${artist}" title="${title}":`,
+      `[story] fail install=${installId.slice(0, 8)} llm=${llmProvider} artist="${artist}" title="${title}" err=${rawMessage.slice(0, 300)}`,
       err,
     );
-    const rawMessage = err instanceof Error ? err.message : String(err);
     const isRateLimit = /\b429\b|rate_limit_exceeded/i.test(rawMessage);
     const isAuthError = /invalid_api_key|invalid api key|\b401\b.*invalid|\b403\b forbidden/i.test(rawMessage);
     const groqUnavailable = /groq api error|403 forbidden|groq http/i.test(rawMessage);
     const geminiUnavailable = /gemini api error|gemini http/i.test(rawMessage);
     const llmUnavailable = groqUnavailable || geminiUnavailable;
     const qualityRejected = /could not produce a usable story/i.test(rawMessage);
-    res.status(llmUnavailable ? 503 : 500).json({
-      error: llmUnavailable ? 'Story generation unavailable' : 'Story generation failed',
-      code: isAuthError
+    const errorCode = isAuthError
         ? (llmProvider === 'gemini' ? 'GEMINI_INVALID_KEY' : 'GROQ_INVALID_KEY')
         : isRateLimit
           ? (llmProvider === 'gemini' ? 'GEMINI_RATE_LIMIT' : 'GROQ_RATE_LIMIT')
@@ -178,16 +197,24 @@ router.post('/full', validateStoryFullBody, async (req: Request, res: Response) 
             ? (llmProvider === 'gemini' ? 'GEMINI_FAILED' : 'GROQ_FAILED')
             : qualityRejected
               ? 'STORY_QUALITY_REJECTED'
-              : 'STORY_FAILED',
-      message: isAuthError
-        ? `${llmProvider === 'gemini' ? 'Gemini' : 'Groq'} API-ключ на сервере недействителен. Добавь свой ключ в приложении — он обходит сервер.`
+              : 'STORY_FAILED';
+    const userMessage = isAuthError
+        ? `${llmProvider === 'gemini' ? 'Gemini' : 'Groq'} API-ключ на сервере недействителен.`
         : isRateLimit
-          ? `Лимит ${llmProvider === 'gemini' ? 'Gemini' : 'Groq'} на сервере исчерпан. Свой ключ в настройках приложения обходит этот лимит.`
+          ? `${llmProvider === 'gemini' ? 'Gemini' : 'Groq'}: лимит запросов — подожди минуту.`
           : llmUnavailable
-            ? `${llmProvider === 'gemini' ? 'Gemini' : 'Groq'} не ответил. Добавь свой ключ в настройках или попробуй через минуту.`
+            ? `${llmProvider === 'gemini' ? 'Gemini' : 'Groq'} не ответил — попробуй через минуту.`
             : qualityRejected
               ? 'Не получилось собрать историю — нажми «Рассказать историю» ещё раз.'
-              : safeErrorMessage(err),
+              : safeErrorMessage(err);
+    setLogDetail(
+      res,
+      `code=${errorCode} llm=${llmProvider} ${rawMessage.slice(0, 200)}`,
+    );
+    res.status(llmUnavailable ? 503 : 500).json({
+      error: llmUnavailable ? 'Story generation unavailable' : 'Story generation failed',
+      code: errorCode,
+      message: userMessage,
     });
   }
 });

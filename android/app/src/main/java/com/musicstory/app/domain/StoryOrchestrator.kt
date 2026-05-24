@@ -9,6 +9,7 @@ import com.musicstory.app.data.model.TrackInfo
 import com.musicstory.app.data.repository.ScrobbleRepository
 import com.musicstory.app.data.repository.StoryRepository
 import com.musicstory.app.media.MediaControllerManager
+import com.musicstory.app.service.MediaMonitorService
 import com.musicstory.app.util.StoryLog
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -90,6 +91,14 @@ class StoryOrchestrator(
     private var previewJob: Job? = null
 
     private fun publishUiState() {
+        if (_state.value != OrchestratorState.FETCHING_STORY &&
+            _state.value != OrchestratorState.PREPARING_PLAYBACK
+        ) {
+            if (MonitorNotificationState.preparingStory.value) {
+                MonitorNotificationState.setPreparing(false)
+                MediaMonitorService.refreshNotification(context)
+            }
+        }
         _uiState.value = OrchestratorUiState(
             mode = _mode.value,
             state = _state.value,

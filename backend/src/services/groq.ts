@@ -12,7 +12,6 @@ import {
   sanitizeScriptForTts,
   validateStoryScript,
 } from './story-quality.js';
-import { hasEnglishLeak, RUSSIAN_LANGUAGE_PROMPT_BLOCK } from './story-russian-language.js';
 import {
   DEFAULT_STORY_LENGTH,
   getStoryLengthPreset,
@@ -22,6 +21,7 @@ import {
 const GROQ_API_URL = 'https://api.groq.com/openai/v1/chat/completions';
 const GROQ_MODEL = 'llama-3.1-8b-instant';
 const MAX_ATTEMPTS = 3;
+const GROQ_429_MAX_RETRIES = 4;
 
 export interface StoryScript {
   script: string;
@@ -41,6 +41,30 @@ export interface GenerateStoryInput {
   previousScripts?: string[];
   referenceFacts?: string[];
   selectedReferenceFact?: { fact: string; scope: 'artist' | 'track'; scopeLabelRu: string };
+}
+
+export class GroqApiError extends Error {
+  readonly status: number;
+  readonly bodySnippet: string;
+  readonly retryable: boolean;
+
+  constructor(status: number, bodySnippet: string) {
+    super(`Groq API error ${status}: ${bodySnippet}`);
+    this.name = 'GroqApiError';
+    this.status = status;
+    this.bodySnippet = bodySnippet;
+    this.retryable = status === 429 || status >= 500;
+  }
+}
+
+export function isGroqRateLimitError(err: unknown): boolean {
+  if (err instanceof GroqApiError) return err.status === 429;
+  const msg = err instanceof Error ? err.message : String(err);
+  return /\b429\b|rate_limit_exceeded/i.test(msg);
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 function parseStoryJson(raw: string): StoryScript | null {
@@ -77,6 +101,7 @@ async function callGroqOnce(
   userPrompt: string,
   maxTokens: number,
   useJsonMode: boolean,
+  rateLimitAttempt = 0,
 ): Promise<string> {
   const body: Record<string, unknown> = {
     model: GROQ_MODEL,
@@ -101,12 +126,27 @@ async function callGroqOnce(
 
   const rawBody = await response.text();
   if (!response.ok) {
+    if (response.status === 429 && rateLimitAttempt < GROQ_429_MAX_RETRIES) {
+      const waitMs = 1500 * (rateLimitAttempt + 1);
+      console.warn(
+        `[groq] 429 rate_limit — retry ${rateLimitAttempt + 1}/${GROQ_429_MAX_RETRIES} after ${waitMs}ms body=${rawBody.slice(0, 120)}`,
+      );
+      await sleep(waitMs);
+      return callGroqOnce(
+        apiKey,
+        systemPrompt,
+        userPrompt,
+        maxTokens,
+        useJsonMode,
+        rateLimitAttempt + 1,
+      );
+    }
     if (useJsonMode && response.status === 400 && rawBody.includes('json_validate_failed')) {
       const recovered = extractFailedGeneration(rawBody);
       if (recovered) return recovered;
-      return callGroqOnce(apiKey, systemPrompt, userPrompt, maxTokens, false);
+      return callGroqOnce(apiKey, systemPrompt, userPrompt, maxTokens, false, rateLimitAttempt);
     }
-    throw new Error(`Groq API error ${response.status}: ${rawBody.slice(0, 400)}`);
+    throw new GroqApiError(response.status, rawBody.slice(0, 400));
   }
 
   const data = JSON.parse(rawBody) as {

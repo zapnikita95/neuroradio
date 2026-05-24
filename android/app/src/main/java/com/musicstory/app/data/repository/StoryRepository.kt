@@ -171,53 +171,7 @@ class StoryRepository(
             )
         }
 
-        // Свой ключ — прямой вызов LLM с телефона, без лимитов сервера.
-        if (directApiKey.isNotEmpty()) {
-            return when (llmProvider) {
-                LlmProvider.GEMINI -> when (val geminiResult = tryDirectGemini(
-                    geminiKey = geminiKey,
-                    geminiModel = geminiModel,
-                    track = track,
-                    trackKey = trackKey,
-                    year = year,
-                    genre = genre,
-                    countryCode = countryCode,
-                    previousScripts = previousScripts,
-                    angle = angle,
-                    storyLength = storyLength,
-                    storyNarrator = storyNarrator,
-                    referenceFacts = referenceFacts,
-                    selectedFact = selectedFact,
-                )) {
-                    is StoryAttemptResult.Success -> Result.success(geminiResult.response)
-                    is StoryAttemptResult.TemplateRejected -> Result.failure(
-                        IOException(GroqStoryClient.STORY_RETRY_MESSAGE),
-                    )
-                    is StoryAttemptResult.Failed -> Result.failure(IOException(geminiResult.reason))
-                }
-                LlmProvider.GROQ -> when (val groqResult = tryDirectGroq(
-                    groqKey = groqKey,
-                    track = track,
-                    trackKey = trackKey,
-                    year = year,
-                    genre = genre,
-                    countryCode = countryCode,
-                    previousScripts = previousScripts,
-                    angle = angle,
-                    storyLength = storyLength,
-                    storyNarrator = storyNarrator,
-                    referenceFacts = referenceFacts,
-                    selectedFact = selectedFact,
-                )) {
-                    is StoryAttemptResult.Success -> Result.success(groqResult.response)
-                    is StoryAttemptResult.TemplateRejected -> Result.failure(
-                        IOException(GroqStoryClient.STORY_RETRY_MESSAGE),
-                    )
-                    is StoryAttemptResult.Failed -> Result.failure(IOException(groqResult.reason))
-                }
-            }
-        }
-
+        // Railway first: Groq/Gemini + Yandex TTS (озвучка только с сервера).
         if (useBackend) {
             when (val backendResult = tryBackendStory(
                 backendUrl = backendUrl,
@@ -246,6 +200,52 @@ class StoryRepository(
             }
         } else {
             StoryLog.w("Backend skipped (url=$backendUrl)")
+        }
+
+        // Свой ключ — только если сервер не дал историю (без Yandex-озвучки на Groq с телефона).
+        if (directApiKey.isNotEmpty()) {
+            when (llmProvider) {
+                LlmProvider.GEMINI -> when (val geminiResult = tryDirectGemini(
+                    geminiKey = geminiKey,
+                    geminiModel = geminiModel,
+                    track = track,
+                    trackKey = trackKey,
+                    year = year,
+                    genre = genre,
+                    countryCode = countryCode,
+                    previousScripts = previousScripts,
+                    angle = angle,
+                    storyLength = storyLength,
+                    storyNarrator = storyNarrator,
+                    referenceFacts = referenceFacts,
+                    selectedFact = selectedFact,
+                )) {
+                    is StoryAttemptResult.Success -> return Result.success(geminiResult.response)
+                    is StoryAttemptResult.TemplateRejected -> templateRejected = true
+                    is StoryAttemptResult.Failed -> llmError = geminiResult.reason
+                }
+                LlmProvider.GROQ -> when (val groqResult = tryDirectGroq(
+                    groqKey = groqKey,
+                    track = track,
+                    trackKey = trackKey,
+                    year = year,
+                    genre = genre,
+                    countryCode = countryCode,
+                    previousScripts = previousScripts,
+                    angle = angle,
+                    storyLength = storyLength,
+                    storyNarrator = storyNarrator,
+                    referenceFacts = referenceFacts,
+                    selectedFact = selectedFact,
+                )) {
+                    is StoryAttemptResult.Success -> {
+                        StoryLog.w("Direct Groq text OK but no Yandex audio — Railway required")
+                        llmError = "Озвучка только с сервера Railway. Убери Groq-ключ из настроек телефона."
+                    }
+                    is StoryAttemptResult.TemplateRejected -> templateRejected = true
+                    is StoryAttemptResult.Failed -> llmError = groqResult.reason
+                }
+            }
         }
 
         val failureMessage = buildGenerationFailureMessage(
