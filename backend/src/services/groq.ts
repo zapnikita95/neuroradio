@@ -17,11 +17,10 @@ import {
   getStoryLengthPreset,
   StoryLengthId,
 } from './story-length.js';
+import { resolveGroqModelOrder } from './groq-models.js';
 
 const GROQ_API_URL = 'https://api.groq.com/openai/v1/chat/completions';
-const GROQ_MODEL = 'llama-3.1-8b-instant';
 const MAX_ATTEMPTS = 3;
-const GROQ_429_MAX_RETRIES = 4;
 
 export interface StoryScript {
   script: string;
@@ -63,8 +62,10 @@ export function isGroqRateLimitError(err: unknown): boolean {
   return /\b429\b|rate_limit_exceeded/i.test(msg);
 }
 
-function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
+export function isGroqStoryFailure(err: unknown): boolean {
+  if (isGroqRateLimitError(err)) return true;
+  const msg = err instanceof Error ? err.message : String(err);
+  return /could not produce a usable story|groq api error/i.test(msg);
 }
 
 function parseStoryJson(raw: string): StoryScript | null {
@@ -97,14 +98,14 @@ function extractFailedGeneration(errorBody: string): string | null {
 
 async function callGroqOnce(
   apiKey: string,
+  model: string,
   systemPrompt: string,
   userPrompt: string,
   maxTokens: number,
   useJsonMode: boolean,
-  rateLimitAttempt = 0,
 ): Promise<string> {
   const body: Record<string, unknown> = {
-    model: GROQ_MODEL,
+    model,
     temperature: useJsonMode ? 0.72 : 0.65,
     max_tokens: maxTokens,
     messages: [
@@ -126,25 +127,10 @@ async function callGroqOnce(
 
   const rawBody = await response.text();
   if (!response.ok) {
-    if (response.status === 429 && rateLimitAttempt < GROQ_429_MAX_RETRIES) {
-      const waitMs = 1500 * (rateLimitAttempt + 1);
-      console.warn(
-        `[groq] 429 rate_limit — retry ${rateLimitAttempt + 1}/${GROQ_429_MAX_RETRIES} after ${waitMs}ms body=${rawBody.slice(0, 120)}`,
-      );
-      await sleep(waitMs);
-      return callGroqOnce(
-        apiKey,
-        systemPrompt,
-        userPrompt,
-        maxTokens,
-        useJsonMode,
-        rateLimitAttempt + 1,
-      );
-    }
     if (useJsonMode && response.status === 400 && rawBody.includes('json_validate_failed')) {
       const recovered = extractFailedGeneration(rawBody);
       if (recovered) return recovered;
-      return callGroqOnce(apiKey, systemPrompt, userPrompt, maxTokens, false, rateLimitAttempt);
+      return callGroqOnce(apiKey, model, systemPrompt, userPrompt, maxTokens, false);
     }
     throw new GroqApiError(response.status, rawBody.slice(0, 400));
   }
@@ -161,10 +147,39 @@ async function callGroq(
   systemPrompt: string,
   userPrompt: string,
   maxTokens: number,
-): Promise<string> {
+): Promise<{ content: string; model: string }> {
   const apiKey = process.env.GROQ_API_KEY;
   if (!apiKey) throw new Error('GROQ_API_KEY is not configured');
-  return callGroqOnce(apiKey, systemPrompt, userPrompt, maxTokens, true);
+
+  const models = resolveGroqModelOrder();
+  let lastError: Error | null = null;
+
+  for (const model of models) {
+    try {
+      const content = await callGroqOnce(
+        apiKey,
+        model,
+        systemPrompt,
+        userPrompt,
+        maxTokens,
+        true,
+      );
+      if (model !== models[0]) {
+        console.warn(`[groq] succeeded with fallback model ${model}`);
+      }
+      return { content, model };
+    } catch (err) {
+      lastError = err instanceof Error ? err : new Error(String(err));
+      const status = err instanceof GroqApiError ? err.status : 0;
+      console.warn(
+        `[groq] model ${model} failed (${status || 'err'}): ${lastError.message.slice(0, 120)}`,
+      );
+      if (err instanceof GroqApiError && err.retryable) continue;
+      throw lastError;
+    }
+  }
+
+  throw lastError ?? new Error('All Groq models failed');
 }
 
 function finalizeStory(
@@ -218,7 +233,7 @@ export async function generateStoryScript(
       selectedReferenceFact: input.selectedReferenceFact,
     });
 
-    const content = await callGroq(systemPrompt, userPrompt, lengthPreset.maxTokens);
+    const { content } = await callGroq(systemPrompt, userPrompt, lengthPreset.maxTokens);
     const story = parseStoryJson(content);
     if (!story) {
       retryReason = 'invalid JSON';

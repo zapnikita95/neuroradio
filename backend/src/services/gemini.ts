@@ -14,6 +14,7 @@ import {
 } from './story-quality.js';
 import {
   DEFAULT_GEMINI_MODEL,
+  GEMINI_FREE_MODELS,
   resolveGeminiModel,
 } from './gemini-models.js';
 import {
@@ -114,7 +115,10 @@ async function callGeminiOnce(
         (rawBody.includes('location is not supported') ||
           rawBody.includes('not found') ||
           rawBody.includes('not supported'))) ||
-      (response.status === 429 && rawBody.includes('limit: 0'));
+      response.status === 429 ||
+      rawBody.includes('limit: 0') ||
+      rawBody.includes('RESOURCE_EXHAUSTED') ||
+      rawBody.includes('quota');
     err.retryable = response.status === 429 || response.status >= 500;
     throw err;
   }
@@ -165,36 +169,52 @@ async function callGeminiWithModel(
   }
 }
 
+function geminiModelsToTry(preferred?: string): string[] {
+  const primary = resolveGeminiModel(preferred);
+  const rest = GEMINI_FREE_MODELS.map((m) => m.id).filter((id) => id !== primary);
+  return [primary, ...rest];
+}
+
+export function isGeminiStoryFailure(err: unknown): boolean {
+  const msg = err instanceof Error ? err.message : String(err);
+  return /\b429\b|gemini api error|could not produce a usable story|quota exceeded|resource_exhausted/i.test(
+    msg,
+  );
+}
+
 async function callGemini(
   systemPrompt: string,
   userPrompt: string,
   maxTokens: number,
   geminiModel?: string,
-): Promise<string> {
+): Promise<{ content: string; model: string }> {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) throw new Error('GEMINI_API_KEY is not configured');
 
-  const primary = resolveGeminiModel(geminiModel);
-  const fallbacks = primary === DEFAULT_GEMINI_MODEL
-    ? [primary]
-    : [primary, DEFAULT_GEMINI_MODEL];
-
+  const models = geminiModelsToTry(geminiModel);
   let lastError: Error | null = null;
-  for (const model of fallbacks) {
+
+  for (const model of models) {
     try {
-      return await callGeminiWithModel(apiKey, model, systemPrompt, userPrompt, maxTokens);
+      const content = await callGeminiWithModel(apiKey, model, systemPrompt, userPrompt, maxTokens);
+      if (model !== models[0]) {
+        console.warn(`[gemini] succeeded with fallback model ${model}`);
+      }
+      return { content, model };
     } catch (err) {
       lastError = err instanceof Error ? err : new Error(String(err));
       const tryNext = (err as { tryNextModel?: boolean }).tryNextModel;
-      if (tryNext && model !== DEFAULT_GEMINI_MODEL) {
-        console.warn(`Gemini model ${model} unavailable, falling back to ${DEFAULT_GEMINI_MODEL}…`);
-        continue;
-      }
+      const status = (err as { status?: number }).status;
+      console.warn(
+        `[gemini] model ${model} failed (${status ?? 'err'}): ${lastError.message.slice(0, 120)}`,
+      );
+      if (tryNext) continue;
       throw lastError;
     }
   }
+
   throw lastError ?? new Error(
-    'Gemini недоступен: проверь бесплатную квоту на ai.google.dev. Платные модели мы не используем.',
+    'Все бесплатные модели Gemini недоступны (квота). Попробуй через минуту.',
   );
 }
 
@@ -249,7 +269,7 @@ export async function generateStoryScript(
       selectedReferenceFact: input.selectedReferenceFact,
     });
 
-    const content = await callGemini(
+    const { content } = await callGemini(
       systemPrompt,
       userPrompt,
       lengthPreset.maxTokens,

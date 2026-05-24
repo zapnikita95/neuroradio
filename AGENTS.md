@@ -67,6 +67,8 @@ MediaNotificationListener
 | GET | `/health` | Healthcheck Railway |
 | POST | `/v1/auth/token` | JWT для APK (cert SHA256) |
 | POST | `/v1/story/full` | Метаданные + LLM + **Yandex TTS** + `audioUrl` |
+
+**LLM на сервере:** `story-llm-router.ts` — сначала выбранный провайдер (`LLM_PROVIDER`), при 429/качестве — второй. Внутри Groq/Gemini автоматически перебираются **все модели** (`groq-models.ts`, `gemini-models.ts`). **Не** менять на один жёсткий model без fallback.
 | GET | `/audio/*` | Раздача OGG (только signed URL) |
 | GET/POST | `/v1/sync/*` | Синхронизация настроек/истории между устройствами (опционально для пользователя) |
 

@@ -6,13 +6,8 @@ import { safeErrorMessage } from '../middleware/security-headers.js';
 import { enrichTrackMetadata } from '../services/musicbrainz.js';
 import { fetchAggregatedFactBundle } from '../services/fact-aggregator.js';
 import { pickReferenceFact } from '../services/fact-picker.js';
-import {
-  generateStoryScript as generateGroqStory,
-  isGroqRateLimitError,
-} from '../services/groq.js';
-import { generateStoryScript as generateGeminiStory } from '../services/gemini.js';
-import { hasGeminiApiKey } from '../services/gemini.js';
 import { hasLlmKeyForProvider, resolveLlmProvider } from '../services/llm-provider.js';
+import { generateStoryWithFallback } from '../services/story-llm-router.js';
 import { setLogDetail } from '../middleware/request-logger.js';
 import { synthesizeSpeech, hasYandexCredentials } from '../services/yandex-tts.js';
 import { resolveVoiceForStory } from '../services/voices.js';
@@ -120,21 +115,7 @@ router.post('/full', validateStoryFullBody, async (req: Request, res: Response) 
       ...(llmProvider === 'gemini' ? { geminiModel } : {}),
     };
 
-    let story;
-    let llmUsed = llmProvider;
-    try {
-      story = await (llmProvider === 'gemini' ? generateGeminiStory : generateGroqStory)(storyInput);
-    } catch (genErr) {
-      if (llmProvider === 'groq' && hasGeminiApiKey() && isGroqRateLimitError(genErr)) {
-        console.warn(
-          `[story] groq rate limited install=${installId.slice(0, 8)} — fallback to gemini artist="${artist}" title="${title}"`,
-        );
-        story = await generateGeminiStory({ ...storyInput, geminiModel });
-        llmUsed = 'gemini';
-      } else {
-        throw genErr;
-      }
-    }
+    const { story, llmUsed } = await generateStoryWithFallback(storyInput, llmProvider);
 
     const response: Record<string, unknown> = {
       artist: metadata.artist,
