@@ -34,6 +34,22 @@ class TriggerEngine {
     private var tracksSinceLastStory = 0
     private val sameTrackPlayCounts = mutableMapOf<String, Int>()
 
+    fun restoreTracksSinceLastStory(value: Int) {
+        tracksSinceLastStory = value.coerceAtLeast(0)
+    }
+
+    fun currentTracksSinceLastStory(): Int = tracksSinceLastStory
+
+    /** Call when story audio actually started — then start counting N tracks again. */
+    fun onStoryPlaybackStarted() {
+        tracksSinceLastStory = 0
+    }
+
+    /** Story failed before playback — allow auto trigger to retry on a later track. */
+    fun rollbackFailedStoryTrigger(everyNTracks: Int) {
+        tracksSinceLastStory = (everyNTracks - 1).coerceAtLeast(0)
+    }
+
     fun resetCounter() {
         tracksSinceLastStory = 0
         sameTrackPlayCounts.clear()
@@ -59,12 +75,7 @@ class TriggerEngine {
             TriggerMode.NEVER -> false
             TriggerMode.EVERY_N_TRACKS -> {
                 tracksSinceLastStory++
-                if (tracksSinceLastStory >= settings.everyNTracks) {
-                    tracksSinceLastStory = 0
-                    true
-                } else {
-                    false
-                }
+                tracksSinceLastStory >= settings.everyNTracks
             }
             TriggerMode.SPECIFIC_ARTISTS ->
                 settings.specificArtists.any { selected ->

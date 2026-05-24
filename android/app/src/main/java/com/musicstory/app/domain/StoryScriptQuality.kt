@@ -2,8 +2,35 @@ package com.musicstory.app.domain
 
 object StoryScriptQuality {
 
+    private val fictionPatterns = listOf(
+        Regex("""запах\s+(?:сигарет|кофе)""", RegexOption.IGNORE_CASE),
+        Regex("""на\s+моей\s+полке""", RegexOption.IGNORE_CASE),
+        Regex("""скрыты(?:й|ого)\s+смысл""", RegexOption.IGNORE_CASE),
+        Regex("""истори(?:я|ю)\s+о\s+(?:свобод|любви)""", RegexOption.IGNORE_CASE),
+        Regex("""взрывает\s+сцен""", RegexOption.IGNORE_CASE),
+        Regex("""пел\s+с\s+огон""", RegexOption.IGNORE_CASE),
+        Regex("""зрител(?:и|ей)\s+сход""", RegexOption.IGNORE_CASE),
+        Regex("""не\s+просто\s+весёл""", RegexOption.IGNORE_CASE),
+        Regex("""в\s+студии\s+тогда""", RegexOption.IGNORE_CASE),
+        Regex("""слушайте,.*взрывает""", RegexOption.IGNORE_CASE),
+        Regex("""политически\s+неправиль""", RegexOption.IGNORE_CASE),
+        Regex("""запрещен[аы]?\s+на\s+радио""", RegexOption.IGNORE_CASE),
+        Regex("""сломал[аи]?\s+правил""", RegexOption.IGNORE_CASE),
+        Regex("""двойн(?:ую|ой)\s+сесси""", RegexOption.IGNORE_CASE),
+        Regex("""сотни\s+дубл""", RegexOption.IGNORE_CASE),
+        Regex("""сотен\s+дубл""", RegexOption.IGNORE_CASE),
+    )
+
+    private val ungroundedClaimChecks = listOf(
+        Regex("""политически\s+неправиль|запрещен[аы]?\s+на\s+радио""", RegexOption.IGNORE_CASE) to
+            Regex("""banned|forbidden|censored|politic|запрет|цензур""", RegexOption.IGNORE_CASE),
+        Regex("""двойн(?:ую|ой)\s+сесси|сотни\s+дубл|сотен\s+дубл""", RegexOption.IGNORE_CASE) to
+            Regex("""double\s+session|overdub|hundred|\bдубл|\bсесси""", RegexOption.IGNORE_CASE),
+        Regex("""сломал[аи]?\s+правил""", RegexOption.IGNORE_CASE) to
+            Regex("""rules?\b|правил""", RegexOption.IGNORE_CASE),
+    )
+
     private val templatePatterns = listOf(
-        Regex("""стоял у мониторов,\s*звукорежиссёры краснели""", RegexOption.IGNORE_CASE),
         Regex("""зал замолчал на первой ноте""", RegexOption.IGNORE_CASE),
         Regex("""стоял у радиолы""", RegexOption.IGNORE_CASE),
         Regex("""помню студию — при записи""", RegexOption.IGNORE_CASE),
@@ -73,11 +100,13 @@ object StoryScriptQuality {
         val text = script.trim()
         if (text.isBlank()) return true
         if (hasClicheFiller(text)) return true
+        if (fictionPatterns.any { it.containsMatchIn(text) }) return true
         if (hasBannedPattern(text)) return true
         if (hasLocaleViolation(text, countryCode, year)) return true
         if (hasFictionPattern(text)) return true
         if (hasDryEncyclopediaTone(text)) return true
         if (StoryRussianLanguage.hasEnglishLeak(text, artist, title)) return true
+        if (hasUngroundedClaims(text, referenceFacts)) return true
         if (referenceFacts.isNotEmpty()) {
             if (strictReferenceAnchor) {
                 return !anchorsReferenceFact(text, referenceFacts)
@@ -89,6 +118,12 @@ object StoryScriptQuality {
 
     fun hasBannedPattern(script: String): Boolean =
         templatePatterns.any { it.containsMatchIn(script.trim()) }
+
+    fun hasUngroundedClaims(script: String, referenceFacts: List<String>): Boolean =
+        ungroundedClaimChecks.any { (claim, factHint) ->
+            claim.containsMatchIn(script) &&
+                (referenceFacts.isEmpty() || !factHint.containsMatchIn(referenceFacts.joinToString(" ")))
+        }
 
     fun hasFictionPattern(script: String): Boolean {
         val lower = script.lowercase()
@@ -172,7 +207,9 @@ object StoryScriptQuality {
             Regex("""\bviral\b|reddit|discord""", RegexOption.IGNORE_CASE) to listOf("вирус", "reddit", "discord", "ажиотаж", "форум"),
             Regex("""cobain|pixies|pop song""", RegexOption.IGNORE_CASE) to listOf("кобейн", "pixies", "поп", "панк"),
             Regex("""\bband\b|\bgroup\b""", RegexOption.IGNORE_CASE) to listOf("групп", "коллект"),
-            Regex("""u\.?\s?s\.?\s?ssr|soviet""", RegexOption.IGNORE_CASE) to listOf("ссср", "совет", "подпол"),
+            Regex("""u\.?\s?s\.?\s?ssr|soviet|iron curtain|eastern bloc""", RegexOption.IGNORE_CASE) to listOf("ссср", "совет", "пионер", "железн"),
+            Regex("""\b(?:equality|president|hafanana)\b""", RegexOption.IGNORE_CASE) to listOf("президент", "равн", "хафанан", "равен"),
+            Regex("""\b(?:Bollywood|Hindi)\b""", RegexOption.IGNORE_CASE) to listOf("болливуд", "индий"),
         )
         return bridges.any { (pattern, tokens) ->
             pattern.containsMatchIn(fact) && tokens.any { token -> scriptWords.any { word -> word.contains(token) } }

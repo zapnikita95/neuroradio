@@ -27,6 +27,19 @@ function mergeFacts(...pools: string[][]): string[] {
   return filterAndRankFacts(pools.flat(), 8);
 }
 
+function factsAboutTrackOrArtist(facts: string[], artist: string, title: string): string[] {
+  const artistTokens = normalize(artist)
+    .split(' ')
+    .filter((word) => word.length >= 4);
+  const titleNorm = normalize(title);
+  return facts.filter((fact) => {
+    const norm = normalize(fact);
+    if (titleNorm.length >= 4 && norm.includes(titleNorm)) return true;
+    if (artistTokens.length === 0) return false;
+  return artistTokens.some((token) => norm.includes(token));
+  });
+}
+
 async function fetchDuckDuckGo(artist: string, title: string): Promise<string[]> {
   const queries = [
     `${artist} ${title} song`,
@@ -136,16 +149,18 @@ export async function fetchAggregatedFactBundle(
   recordingMbid?: string,
   artistMbid?: string,
 ): Promise<ReferenceFactBundle> {
-  const [wiki, ddg, wikidata, mbTrack, mbArtist] = await Promise.all([
-    fetchWikipediaBundle(artist, title, countryCode),
+  const wiki = await fetchWikipediaBundle(artist, title, countryCode);
+  const [ddg, wikidata, mbTrack, mbArtist] = await Promise.all([
     fetchDuckDuckGo(artist, title),
     fetchWikidata(artist, title, countryCode),
     fetchMusicBrainzAnnotations('recording', recordingMbid),
     fetchMusicBrainzAnnotations('artist', artistMbid),
   ]);
 
-  const ddgSplit = splitByMention(ddg, title, artist);
-  const wdSplit = splitByMention(wikidata, title, artist);
+  const ddgFiltered = factsAboutTrackOrArtist(ddg, artist, title);
+  const wdFiltered = factsAboutTrackOrArtist(wikidata, artist, title);
+  const ddgSplit = splitByMention(ddgFiltered, title, artist);
+  const wdSplit = splitByMention(wdFiltered, title, artist);
 
   return {
     trackFacts: mergeFacts(wiki.trackFacts, ddgSplit.track, wdSplit.track, mbTrack),

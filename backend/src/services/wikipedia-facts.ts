@@ -89,22 +89,36 @@ function extractFactBullets(text: string, max = 12): string[] {
   return filterAndRankFacts(splitWikiSentences(text), max);
 }
 
-function extractSentencesMentioning(text: string, needle: string, max = 6): string[] {
+function sentenceMentions(sentence: string, needle: string): boolean {
   const normalizedNeedle = normalizeForMatch(needle);
-  const tokens = normalizedNeedle
-    .split(' ')
-    .filter((part) => part.length >= 3);
-  if (tokens.length === 0) return [];
+  const tokens = normalizedNeedle.split(' ').filter((part) => part.length >= 3);
+  if (tokens.length === 0) return false;
+  const lower = normalizeForMatch(sentence);
+  if (normalizedNeedle.length >= 4 && lower.includes(normalizedNeedle)) return true;
+  const hits = tokens.filter((token) => lower.includes(token)).length;
+  const threshold = tokens.length <= 2 ? 1 : Math.min(2, tokens.length);
+  return hits >= threshold;
+}
 
+function extractSentencesMentioning(text: string, needle: string, max = 6): string[] {
   return splitWikiSentences(text)
-    .filter((sentence) => {
-      const lower = normalizeForMatch(sentence);
-      if (normalizedNeedle.length >= 8 && lower.includes(normalizedNeedle)) return true;
-      const hits = tokens.filter((token) => lower.includes(token)).length;
-      const threshold = tokens.length <= 2 ? 1 : Math.min(2, tokens.length);
-      return hits >= threshold;
-    })
+    .filter((sentence) => sentenceMentions(sentence, needle))
     .slice(0, max);
+}
+
+/** Title mention + next sentences — catches «Hafanana» → Iron Curtain / East Berlin on artist page. */
+function extractTrackContextFacts(text: string, title: string, contextAfter = 2, max = 8): string[] {
+  const sentences = splitWikiSentences(text);
+  const indices = new Set<number>();
+  sentences.forEach((sentence, index) => {
+    if (!sentenceMentions(sentence, title)) return;
+    indices.add(index);
+    for (let offset = 1; offset <= contextAfter && index + offset < sentences.length; offset++) {
+      indices.add(index + offset);
+    }
+  });
+  const facts = [...indices].sort((a, b) => a - b).map((index) => sentences[index]);
+  return filterAndRankFacts(facts, max);
 }
 
 function normalizeForMatch(text: string): string {
@@ -117,6 +131,13 @@ function normalizeForMatch(text: string): string {
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+const extractCache = new Map<string, { at: number; text: string }>();
+const EXTRACT_CACHE_MS = 5 * 60 * 1000;
+
+function cacheKey(lang: string, title: string): string {
+  return `${lang}:${title.trim().toLowerCase()}`;
 }
 
 function buildTrackTitleCandidates(artist: string, title: string): string[] {
@@ -132,11 +153,11 @@ function buildTrackTitleCandidates(artist: string, title: string): string[] {
 
 function buildArtistTitleCandidates(artist: string): string[] {
   return [
-    `${artist} (band)`,
-    `${artist} (musical group)`,
+    artist,
     `${artist} (musician)`,
     `${artist} (singer)`,
-    artist,
+    `${artist} (band)`,
+    `${artist} (musical group)`,
   ].filter((value, index, arr) => value.length > 1 && arr.indexOf(value) === index);
 }
 
@@ -146,6 +167,7 @@ function buildTrackSearchQueries(artist: string, title: string): string[] {
     `${cleanTitle} ${artist} song`,
     `${cleanTitle} song ${artist}`,
     `${artist} ${cleanTitle}`,
+    `${cleanTitle} song`,
   ];
 }
 
@@ -173,41 +195,60 @@ function isWeakFact(sentence: string): boolean {
   );
 }
 
-async function fetchExtendedExtract(lang: 'ru' | 'en', title: string, sentences = 40): Promise<string | null> {
+async function fetchFullExtract(lang: 'ru' | 'en', title: string): Promise<string | null> {
+  const key = cacheKey(lang, title);
+  const cached = extractCache.get(key);
+  if (cached && Date.now() - cached.at < EXTRACT_CACHE_MS) return cached.text;
+
   const encodedTitle = encodeURIComponent(title.trim().replace(/\s+/g, '_'));
   const url =
     `https://${lang}.wikipedia.org/w/api.php?action=query&prop=extracts&explaintext=1` +
-    `&exsentences=${sentences}&format=json&origin=*&titles=${encodedTitle}`;
-  try {
-    const response = await fetch(url, {
-      headers: { 'User-Agent': USER_AGENT, Accept: 'application/json' },
-      signal: AbortSignal.timeout(6000),
-    });
-    if (!response.ok) return null;
-    const data = (await response.json()) as {
-      query?: { pages?: Record<string, { extract?: string }> };
-    };
-    const pages = data.query?.pages;
-    if (!pages) return null;
-    const page = Object.values(pages)[0];
-    const extract = page?.extract?.trim();
-    return extract && extract.length > 40 ? extract : null;
-  } catch {
-    return null;
+    `&format=json&origin=*&titles=${encodedTitle}`;
+
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try {
+      if (attempt > 0) await sleep(400 * attempt);
+      const response = await fetch(url, {
+        headers: { 'User-Agent': USER_AGENT, Accept: 'application/json' },
+        signal: AbortSignal.timeout(8000),
+      });
+      if (response.status === 429) continue;
+      if (!response.ok) return null;
+      const data = (await response.json()) as {
+        query?: { pages?: Record<string, { extract?: string; missing?: string }> };
+      };
+      const pages = data.query?.pages;
+      if (!pages) return null;
+      const page = Object.values(pages)[0];
+      if (page?.missing !== undefined) return null;
+      const extract = page?.extract?.trim();
+      if (!extract || extract.length <= 40) return null;
+      extractCache.set(key, { at: Date.now(), text: extract });
+      return extract;
+    } catch {
+      // retry
+    }
   }
+  return null;
 }
 
 async function fetchFactsForTitle(
   lang: 'ru' | 'en',
   title: string,
   mentionNeedle: string,
+  trackContext = false,
 ): Promise<string[]> {
   await sleep(120);
-  const summary =
-    (await fetchExtendedExtract(lang, title)) ?? (await fetchSummary(lang, title));
+  const summary = (await fetchFullExtract(lang, title)) ?? (await fetchSummary(lang, title));
   if (!summary || isDisambiguationExtract(summary)) return [];
   const bullets = extractFactBullets(summary).filter((fact) => !isWeakFact(fact));
   if (bullets.length > 0) return bullets;
+  if (trackContext) {
+    const contextual = extractTrackContextFacts(summary, mentionNeedle).filter(
+      (fact) => !isWeakFact(fact),
+    );
+    if (contextual.length > 0) return contextual;
+  }
   return filterAndRankFacts(
     extractSentencesMentioning(summary, mentionNeedle).filter((fact) => !isWeakFact(fact)),
     6,
@@ -219,15 +260,18 @@ async function fetchArtistMentionsForTrack(
   artist: string,
   title: string,
 ): Promise<string[]> {
+  const titlesToTry = new Set<string>();
+  const searched = await searchWikiTitle(lang, `${artist} musician`);
+  if (searched) titlesToTry.add(searched);
   for (const candidate of buildArtistTitleCandidates(artist)) {
+    titlesToTry.add(candidate);
+  }
+
+  for (const candidate of titlesToTry) {
     await sleep(120);
-    const summary =
-      (await fetchExtendedExtract(lang, candidate, 44)) ?? (await fetchSummary(lang, candidate));
+    const summary = (await fetchFullExtract(lang, candidate)) ?? (await fetchSummary(lang, candidate));
     if (!summary || isDisambiguationExtract(summary)) continue;
-    const mentions = filterAndRankFacts(
-      extractSentencesMentioning(summary, title).filter((fact) => !isWeakFact(fact)),
-      4,
-    );
+    const mentions = extractTrackContextFacts(summary, title).filter((fact) => !isWeakFact(fact));
     if (mentions.length > 0) return mentions;
   }
   return [];
@@ -247,8 +291,10 @@ async function fetchFactsForLang(
     : buildArtistSearchQueries(artist);
   const mentionNeedle = scope === 'track' ? title : artist;
 
+  const trackContext = scope === 'track';
+
   for (const candidate of candidates) {
-    const facts = await fetchFactsForTitle(lang, candidate, mentionNeedle);
+    const facts = await fetchFactsForTitle(lang, candidate, mentionNeedle, trackContext);
     if (facts.length > 0) return facts;
   }
 
@@ -256,7 +302,7 @@ async function fetchFactsForLang(
     const foundTitle = await searchWikiTitle(lang, query);
     if (!foundTitle) continue;
     if (scope === 'artist' && /\bdisambiguation\b/i.test(foundTitle)) continue;
-    const facts = await fetchFactsForTitle(lang, foundTitle, mentionNeedle);
+    const facts = await fetchFactsForTitle(lang, foundTitle, mentionNeedle, trackContext);
     if (facts.length > 0) return facts;
   }
 
@@ -289,22 +335,18 @@ export async function fetchReferenceFactBundle(
   countryCode?: string,
 ): Promise<ReferenceFactBundle> {
   const primaryLang = wikiLang(countryCode);
-  const [trackFacts, artistFacts] = await Promise.all([
-    fetchScopeFacts(artist, title, countryCode, 'track'),
-    fetchScopeFacts(artist, title, countryCode, 'artist'),
-  ]);
 
-  let mergedTrackFacts = trackFacts;
-  if (mergedTrackFacts.length === 0) {
-    const fromArtist = await fetchArtistMentionsForTrack(primaryLang, artist, title);
-    if (fromArtist.length > 0) {
-      mergedTrackFacts = fromArtist;
-    } else if (primaryLang === 'ru') {
-      mergedTrackFacts = await fetchArtistMentionsForTrack('en', artist, title);
-    }
+  let trackFacts = await fetchArtistMentionsForTrack(primaryLang, artist, title);
+  if (trackFacts.length === 0 && primaryLang === 'ru') {
+    trackFacts = await fetchArtistMentionsForTrack('en', artist, title);
+  }
+  if (trackFacts.length === 0) {
+    trackFacts = await fetchScopeFacts(artist, title, countryCode, 'track');
   }
 
-  return { trackFacts: mergedTrackFacts, artistFacts };
+  const artistFacts = await fetchScopeFacts(artist, title, countryCode, 'artist');
+
+  return { trackFacts, artistFacts };
 }
 
 /** @deprecated use fetchReferenceFactBundle + pickReferenceFact */

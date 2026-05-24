@@ -38,11 +38,6 @@ fun MusicStoryNavGraph(
                         popUpTo(Routes.ONBOARDING) { inclusive = true }
                     }
                 },
-                onSkip = {
-                    navController.navigate(Routes.HOME) {
-                        popUpTo(Routes.ONBOARDING) { inclusive = true }
-                    }
-                },
             )
         }
         composable(Routes.HOME) {

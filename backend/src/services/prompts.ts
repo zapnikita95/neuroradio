@@ -250,7 +250,6 @@ export function buildStoryUserPrompt(params: {
   genre?: string;
   countryCode?: string;
   voiceId: string;
-  angle: string | { labelRu: string; wrapHint: string };
   storyLength: StoryLengthId;
   storyNarrator?: StoryNarratorId;
   previousScripts?: string[];
@@ -286,18 +285,17 @@ export function buildStoryUserPrompt(params: {
   lines.push(`Эпоха и контекст: ${locale.sceneHintRu}`);
   lines.push(`ЛОКАЛЬ: ${locale.localeRulesRu}`);
   lines.push('');
-  const angleLabel = typeof params.angle === 'string' ? params.angle : params.angle.labelRu;
-  const angleWrap = typeof params.angle === 'string' ? params.angle : params.angle.wrapHint;
-  lines.push(`СТИЛЬ ПОДАЧИ: ${angleLabel}`);
-  lines.push(`Как подать факт: ${angleWrap}`);
   lines.push(`Ты — ${persona.roleTitle}. Говоришь так: ${persona.speechStyle}`);
   if (narratorId !== 'auto') {
     const preset = getNarratorPreset(narratorId);
     if (preset) {
-      lines.push(`РЕЖИМ РАССКАЗЧИКА: ${preset.labelRu} — ${preset.descriptionRu}`);
+      lines.push(`РАССКАЗЧИК (АМЛУА): ${preset.labelRu} — ${preset.descriptionRu}`);
       lines.push(preset.promptAddendum);
     }
   }
+  lines.push(
+    'Подача ТОЛЬКО через выбранного рассказчика. Не подгоняй факт под «студию», «концерт» или «релиз» — бери любую грань из семени.',
+  );
   lines.push(`ЖЁСТКАЯ ДЛИНА: ${length.wordsMin}–${length.wordsMax} слов (${length.labelRu}).`);
   lines.push(buildLengthStructurePlan(length));
   lines.push('В script — никаких цифр и годов, кроме цифр из имени артиста или названия трека.');
@@ -313,7 +311,10 @@ export function buildStoryUserPrompt(params: {
     lines.push('1. КРЮЧОК — первая фраза = контраст/парадокс из семени (не «интересный факт»).');
     lines.push('2. РАЗВИТИЕ — одна деталь из семени, переведённая в живую речь (не пересказ статьи).');
     lines.push('3. УДАР — почему это «разорвёт кабину», опираясь на то же семя.');
-    lines.push('НЕ: «мало кто знает», «легенда», «зал славы», «трогает сердца», перевод названия. ДА: контраст + образ + финал.');
+    lines.push('НЕ: «мало кто знает», «легенда», «зал славы», «трогает сердца», перевод названия.');
+    lines.push('НЕ ВЫДУМЫВАЙ: запах сигарет/кофе, «на моей полке», «скрытый смысл — свобода», «зрители сходили с ума» — только если это ЕСТЬ в семени.');
+    lines.push('НЕ ВЫДУМЫВАЙ: запрет на радио, «политически неправильная», двойная сессия, сотни дублей — только если это ЕСТЬ в семени.');
+    lines.push('ОБЯЗАТЕЛЬНО: минимум два смысловых якоря из семени (имя, место, событие, скандал — переведи на русский).');
     lines.push(RUSSIAN_LANGUAGE_PROMPT_BLOCK);
   } else if (facts.length > 0) {
     lines.push('');

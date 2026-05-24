@@ -146,6 +146,27 @@ class StoryOrchestrator(
             _state.value = OrchestratorState.LISTENING
         }
         publishUiState()
+        if (running) {
+            checkOverdueAutoTrigger()
+        }
+    }
+
+    /** Counter already at N (e.g. restored) but story never fired — trigger on current track. */
+    private fun checkOverdueAutoTrigger() {
+        scope.launch {
+            if (_mode.value != OrchestratorMode.AUTO || isStorySessionActive()) return@launch
+            val track = mediaControllerManager.effectiveNowPlaying.value ?: return@launch
+            if (!track.isValid()) return@launch
+            val settings = loadTriggerSettings()
+            if (!settings.autoIntercept || settings.mode != TriggerMode.EVERY_N_TRACKS) return@launch
+            triggerEngine.restoreTracksSinceLastStory(settingsDataStore.tracksSinceLastStory.first())
+            _tracksUntilNext.value = triggerEngine.tracksUntilNext(settings)
+            publishUiState()
+            if (triggerEngine.currentTracksSinceLastStory() >= settings.everyNTracks) {
+                StoryLog.i("Auto story overdue — triggering for ${track.artist} — ${track.title}")
+                playStoryForTrack(track, manual = false)
+            }
+        }
     }
 
     fun isStorySessionActive(): Boolean {
@@ -157,9 +178,13 @@ class StoryOrchestrator(
     suspend fun onTrackChanged(track: TrackInfo) {
         if (!track.isValid()) return
 
+        triggerEngine.restoreTracksSinceLastStory(settingsDataStore.tracksSinceLastStory.first())
+
         val settings = loadTriggerSettings()
         val trackGenre = scrobbleRepository.lookupGenre(track.artist, track.title)
         val shouldTrigger = _mode.value == OrchestratorMode.AUTO &&
+            settings.autoIntercept &&
+            !isStorySessionActive() &&
             triggerEngine.onTrackPlayed(
                 settings = settings,
                 trackKey = track.displayKey,
@@ -167,12 +192,12 @@ class StoryOrchestrator(
                 trackGenre = trackGenre,
             )
 
+        settingsDataStore.setTracksSinceLastStory(triggerEngine.currentTracksSinceLastStory())
         _tracksUntilNext.value = triggerEngine.tracksUntilNext(settings)
-        if (shouldTrigger) {
-            scrobbleRepository.markStoryTriggered(track)
-        }
 
         if (shouldTrigger) {
+            StoryLog.i("Auto story trigger: ${track.artist} — ${track.title}")
+            scrobbleRepository.markStoryTriggered(track)
             playStoryForTrack(track, manual = false)
         } else if (_state.value != OrchestratorState.PLAYING_STORY &&
             _state.value != OrchestratorState.PREPARING_PLAYBACK &&
@@ -211,13 +236,24 @@ class StoryOrchestrator(
             val ttsSpeed = settingsDataStore.ttsSpeed.first().androidRate
             result.fold(
                 onSuccess = { response ->
-                    startGenerationPreview(response.script, session)
+                    if (session != playbackSession) return@fold
+
+                    if (!manual) {
+                        mediaControllerManager.pauseMusic()
+                        musicPausedForStory.set(true)
+                    }
+
+                    if (manual) {
+                        startGenerationPreview(response.script, session)
+                    } else {
+                        startGenerationPreview(response.script, session, autoMode = true)
+                    }
 
                     if (!manual) {
                         val elapsed = SystemClock.elapsedRealtime() - fetchStartedAt
                         val remaining = AUTO_MIN_MUSIC_MS - elapsed
                         if (remaining > 0) {
-                            delay(remaining)
+                            delay(remaining.coerceAtMost(AUTO_PREVIEW_MAX_WAIT_MS))
                         }
                     }
 
@@ -226,8 +262,10 @@ class StoryOrchestrator(
                     _state.value = OrchestratorState.PREPARING_PLAYBACK
                     publishUiState()
 
-                    mediaControllerManager.pauseMusic()
-                    musicPausedForStory.set(true)
+                    if (manual) {
+                        mediaControllerManager.pauseMusic()
+                        musicPausedForStory.set(true)
+                    }
 
                     val audioUrl = storyRepository.resolveAudioUrl(response.audioUrl)
                     storyPlayer.playStory(
@@ -237,6 +275,12 @@ class StoryOrchestrator(
                         resumeMusic = true,
                         onPlaybackStarted = {
                             if (session != playbackSession) return@playStory
+                            if (!manual) {
+                                triggerEngine.onStoryPlaybackStarted()
+                                scope.launch {
+                                    settingsDataStore.setTracksSinceLastStory(0)
+                                }
+                            }
                             _state.value = OrchestratorState.PLAYING_STORY
                             publishUiState()
                         },
@@ -251,6 +295,15 @@ class StoryOrchestrator(
                         },
                         onError = {
                             if (session != playbackSession) return@playStory
+                            if (!manual) {
+                                scope.launch {
+                                    val everyN = settingsDataStore.everyNTracks.first()
+                                    triggerEngine.rollbackFailedStoryTrigger(everyN)
+                                    settingsDataStore.setTracksSinceLastStory(
+                                        triggerEngine.currentTracksSinceLastStory(),
+                                    )
+                                }
+                            }
                             _errorMessage.value = context.getString(R.string.server_audio_error_message)
                             _state.value = OrchestratorState.ERROR
                             if (musicPausedForStory.get()) {
@@ -264,6 +317,15 @@ class StoryOrchestrator(
                 },
                 onFailure = { error ->
                     cancelGenerationPreview()
+                    if (!manual) {
+                        val everyN = settingsDataStore.everyNTracks.first()
+                        triggerEngine.rollbackFailedStoryTrigger(everyN)
+                        scope.launch {
+                            settingsDataStore.setTracksSinceLastStory(
+                                triggerEngine.currentTracksSinceLastStory(),
+                            )
+                        }
+                    }
                     _errorMessage.value = error.message ?: "Не удалось получить историю"
                     _state.value = OrchestratorState.ERROR
                     publishUiState()
@@ -288,6 +350,9 @@ class StoryOrchestrator(
             }
             StoryLog.w("Playback watchdog: story did not start in time")
             storyPlayer.stop()
+            val everyN = settingsDataStore.everyNTracks.first()
+            triggerEngine.rollbackFailedStoryTrigger(everyN)
+            settingsDataStore.setTracksSinceLastStory(triggerEngine.currentTracksSinceLastStory())
             _errorMessage.value = context.getString(R.string.server_audio_error_message)
             _state.value = OrchestratorState.ERROR
             if (musicPausedForStory.get()) {
@@ -343,12 +408,14 @@ class StoryOrchestrator(
         _generationPreview.value = GenerationPreviewState()
     }
 
-    private fun startGenerationPreview(script: String, session: Int) {
+    private fun startGenerationPreview(script: String, session: Int, autoMode: Boolean = false) {
         val words = script.trim().split(Regex("\\s+")).filter { it.isNotEmpty() }
         if (words.isEmpty()) return
 
         previewJob?.cancel()
         previewJob = scope.launch {
+            val revealMaxMs = if (autoMode) AUTO_PREVIEW_REVEAL_MAX_MS else PREVIEW_REVEAL_MAX_MS
+            val holdMs = if (autoMode) AUTO_PREVIEW_HOLD_MS else PREVIEW_HOLD_MS
             _generationPreview.value = GenerationPreviewState(
                 words = words,
                 visibleWordCount = 0,
@@ -357,7 +424,7 @@ class StoryOrchestrator(
             )
             publishUiState()
 
-            val wordDelayMs = wordRevealDelayMs(words.size)
+            val wordDelayMs = wordRevealDelayMs(words.size, revealMaxMs)
             for (index in 1..words.size) {
                 if (session != playbackSession) return@launch
                 _generationPreview.value = _generationPreview.value.copy(visibleWordCount = index)
@@ -369,7 +436,7 @@ class StoryOrchestrator(
                 }
             }
 
-            delay(PREVIEW_HOLD_MS)
+            delay(holdMs)
 
             val fadeSteps = 12
             repeat(fadeSteps) { step ->
@@ -389,17 +456,20 @@ class StoryOrchestrator(
         }
     }
 
-    private fun wordRevealDelayMs(wordCount: Int): Long {
+    private fun wordRevealDelayMs(wordCount: Int, revealMaxMs: Long = PREVIEW_REVEAL_MAX_MS): Long {
         if (wordCount <= 1) return 0L
-        return (PREVIEW_REVEAL_MAX_MS / wordCount).coerceIn(40L, 160L)
+        return (revealMaxMs / wordCount).coerceIn(40L, 160L)
     }
 
     companion object {
-        /** Auto mode: let the track play at least this long before pausing for the story. */
-        private const val AUTO_MIN_MUSIC_MS = 8_000L
+        /** Auto: short beat of music after fetch, then story audio. */
+        private const val AUTO_MIN_MUSIC_MS = 2_000L
+        private const val AUTO_PREVIEW_MAX_WAIT_MS = 3_500L
         private const val PLAYBACK_START_TIMEOUT_MS = 25_000L
         private const val PREVIEW_REVEAL_MAX_MS = 7_000L
         private const val PREVIEW_HOLD_MS = 7_000L
+        private const val AUTO_PREVIEW_REVEAL_MAX_MS = 1_800L
+        private const val AUTO_PREVIEW_HOLD_MS = 600L
         private const val PREVIEW_FADE_STEP_MS = 70L
     }
 }

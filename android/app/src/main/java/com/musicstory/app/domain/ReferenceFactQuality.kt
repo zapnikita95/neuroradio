@@ -73,7 +73,8 @@ object ReferenceFactQuality {
 
     private val weakTriviaPatterns = listOf(
         Regex("""\b(?:title|name)\b.*\b(?:means|meaning|translat)\b""", RegexOption.IGNORE_CASE),
-        Regex("""\b(?:reached|peaked|charted|billboard|hot 100)\b""", RegexOption.IGNORE_CASE),
+        Regex("""\b(?:reached|peaked|charted)\s+(?:number\s+)?(?:one|#\s*\d|\d+\s+on)\b""", RegexOption.IGNORE_CASE),
+        Regex("""\bbillboard\b|\bhot 100\b""", RegexOption.IGNORE_CASE),
         Regex("""\b(?:inducted|hall of fame|greatest.*song)\b""", RegexOption.IGNORE_CASE),
         Regex("""\b(?:название|перевод|означает)\b""", RegexOption.IGNORE_CASE),
     )

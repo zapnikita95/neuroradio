@@ -105,6 +105,12 @@ class MediaMonitorService : Service() {
         manager.notify(NOTIFICATION_ID, notification)
     }
 
+    private fun friendlySourceLabel(packageName: String?): String? = when (packageName) {
+        "com.spotify.music" -> "Spotify"
+        "ru.yandex.music" -> "Яндекс Музыка"
+        else -> packageName?.substringAfterLast('.')?.takeIf { it.isNotBlank() }
+    }
+
     private fun buildNotification(track: TrackInfo?): Notification {
         val openApp = PendingIntent.getActivity(
             this,
@@ -133,33 +139,34 @@ class MediaMonitorService : Service() {
 
         val preparing = MonitorNotificationState.preparingStory.value
         val contentTitle = when {
-            preparing -> getString(R.string.notification_preparing_story)
+            preparing -> getString(R.string.app_name)
             track != null && track.isValid() -> "${track.artist} — ${track.title}"
-            else -> getString(R.string.notification_listening)
+            else -> getString(R.string.app_name)
         }
         val contentText = when {
             preparing -> getString(R.string.notification_preparing_story)
-            track != null && track.isValid() -> getString(R.string.notification_now_playing, track.artist, track.title)
+            track != null && track.isValid() -> friendlySourceLabel(track.packageName)
+                ?: getString(R.string.status_monitoring)
             else -> getString(R.string.notification_listening_hint)
         }
-        val storyActionLabel = if (preparing) {
-            getString(R.string.action_preparing_story)
-        } else {
-            getString(R.string.action_manual_story)
-        }
 
-        return NotificationCompat.Builder(this, MusicStoryApp.CHANNEL_MONITOR)
+        val builder = NotificationCompat.Builder(this, MusicStoryApp.CHANNEL_MONITOR)
             .setContentTitle(contentTitle)
             .setContentText(contentText)
             .setSmallIcon(R.drawable.ic_notification)
             .setContentIntent(openApp)
             .setOngoing(true)
             .setOnlyAlertOnce(true)
-            .addAction(
+
+        if (!preparing) {
+            builder.addAction(
                 R.drawable.ic_notification,
-                storyActionLabel,
+                getString(R.string.action_manual_story),
                 manualStory,
             )
+        }
+
+        return builder
             .addAction(
                 R.drawable.ic_notification,
                 getString(R.string.action_stop_monitor),

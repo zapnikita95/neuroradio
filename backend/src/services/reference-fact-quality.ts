@@ -61,7 +61,9 @@ const STORY_FACT_PATTERNS: RegExp[] = [
   /\b(?:meaning|metaphor|written\s+(?:about|after|during|in\s+response)|inspired\s+by|based\s+on\s+(?:a|the|his|her|true))\b/i,
   /\b(?:took\s+issue|disagreed|argued|nearly\s+(?:didn't|dropped)|rejected\s+at\s+first|refused|described|attempt\s+to\s+write|bounced|overdubs|generations\s+of)\b/i,
   /\b(?:platinum|gold|number\s+one|topped|billboard\s+hot\s+100)\b/i,
-  /\b(?:прорыв|скандал|запрет|возвращени|забвени|историческ|впервые|расизм|сегрегац|шахт|уголь|рабств|смысл|метафор|вдохновен|бутлег|подполь|крови|Цой)\b/i,
+  /\b(?:iron curtain|eastern bloc|ussr|soviet union|soviet)\b/i,
+  /\b(?:mozambique|mozambican|african musician)\b/i,
+  /\b(?:прорыв|скандал|запрет|возвращени|забвени|историческ|впервые|расизм|сегрегац|шахт|уголь|рабств|смысл|метафор|вдохновен|бутлег|подполь|крови|Цой|ссср|совет)\b/i,
 ];
 
 export const MIN_PICK_INTEREST_SCORE = 6;

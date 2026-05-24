@@ -16,13 +16,14 @@ export function qualityOptionsForAttempt(
   referenceFacts: string[],
 ): StoryQualityAttemptOptions {
   const isLast = attempt >= maxAttempts - 1;
+  const hasFacts = referenceFacts.length > 0;
   return {
     strictLength: !isLast,
-    skipWatery: isLast,
-    skipReferenceAnchor: isLast,
-    skipBannedPatterns: isLast,
-    skipEnglishCheck: isLast,
-    referenceFacts: isLast ? [] : referenceFacts,
+    skipWatery: false,
+    skipReferenceAnchor: !hasFacts,
+    skipBannedPatterns: false,
+    skipEnglishCheck: false,
+    referenceFacts: hasFacts ? referenceFacts : [],
   };
 }
 

@@ -1,35 +1,5 @@
 package com.musicstory.app.domain
 
-enum class StoryAngle(
-    val labelRu: String,
-    val wrapHint: String,
-) {
-    STUDIO(
-        labelRu = "Студия и запись",
-        wrapHint = "Подай факт про запись, продюсера или дубль как закулисную деталь со студии.",
-    ),
-    RELEASE(
-        labelRu = "Релиз и эфир",
-        wrapHint = "Подай факт про выход сингла, радио, чарт или лейбл как эфирную историю.",
-    ),
-    LIVE(
-        labelRu = "Концерт и сцена",
-        wrapHint = "Подай факт про живое выступление, тур или площадку как сцену концерта.",
-    ),
-    PRODUCTION(
-        labelRu = "Продакшн и аранжировка",
-        wrapHint = "Подай факт про аранжировку, сэмпл, кавер или сведение как техническую находку.",
-    ),
-    FAN_DETAIL(
-        labelRu = "Деталь для фанатов",
-        wrapHint = "Подай малоизвестный факт как секрет для внимательных слушателей.",
-    ),
-    CONTEXT(
-        labelRu = "Эпоха и контекст",
-        wrapHint = "Подай факт про происхождение трека или жанр как картину того времени.",
-    ),
-}
-
 data class StoryPersona(
     val roleTitle: String,
     val speechStyle: String,
@@ -145,9 +115,5 @@ data class StoryPersona(
 
         private fun personaForYear(role: String, speech: String, era: String) =
             StoryPersona(roleTitle = role, speechStyle = speech, eraHint = era)
-
-        fun pickAngle(previousCount: Int): StoryAngle {
-            return StoryAngle.entries[previousCount % StoryAngle.entries.size]
-        }
     }
 }

@@ -3,10 +3,8 @@ package com.musicstory.app.data.remote
 import com.musicstory.app.data.model.StoryResponse
 import com.musicstory.app.domain.GeminiModel
 import com.musicstory.app.domain.SelectedReferenceFact
-import com.musicstory.app.domain.StoryAngle
 import com.musicstory.app.domain.StoryLength
 import com.musicstory.app.domain.StoryNarrator
-import com.musicstory.app.domain.StoryPersona
 import com.musicstory.app.domain.StoryPrompts
 import com.musicstory.app.domain.StoryRussianLanguage
 import com.musicstory.app.domain.StoryScriptQuality
@@ -36,7 +34,6 @@ class GeminiStoryClient(
         genre: String? = null,
         countryCode: String? = null,
         previousScripts: List<String> = emptyList(),
-        angle: StoryAngle = StoryPersona.pickAngle(previousScripts.size),
         storyLength: StoryLength = StoryLength.SEC_30,
         storyNarrator: StoryNarrator = StoryNarrator.AUTO,
         referenceFacts: List<String> = emptyList(),
@@ -50,12 +47,12 @@ class GeminiStoryClient(
         val persona = StoryNarrator.buildPersona(storyNarrator, year, genre, artist, title, countryCode)
         val system = StoryPrompts.systemPrompt(persona, storyLength)
         val baseUser = StoryPrompts.userMessage(
-            artist, title, year, genre, angle, storyLength, previousScripts, storyNarrator, countryCode, referenceFacts, selectedFact,
+            artist, title, year, genre, storyLength, previousScripts, storyNarrator, countryCode, referenceFacts, selectedFact,
         )
 
         var lastRejectReason = "quality filter"
         repeat(MAX_ATTEMPTS) { attempt ->
-            val strictAnchor = attempt < MAX_ATTEMPTS - 1
+            val strictAnchor = referenceFacts.isNotEmpty() || attempt < MAX_ATTEMPTS - 1
             val acceptSoftQuality = attempt == MAX_ATTEMPTS - 1
             val user = if (attempt == 0) {
                 baseUser

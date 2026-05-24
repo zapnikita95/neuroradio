@@ -114,6 +114,13 @@ fun HomeScreen(
         app.monitorLifecycle.ensureListening()
     }
 
+    if (!hasAccess) {
+        LaunchedEffect(Unit) {
+            onRequestNotificationAccess()
+        }
+        return
+    }
+
     val isListening = hasAccess && !monitorPaused
     val isSpinning = isListening &&
         uiState.currentTrack != null &&

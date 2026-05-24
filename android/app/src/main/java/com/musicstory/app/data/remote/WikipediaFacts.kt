@@ -3,8 +3,6 @@ package com.musicstory.app.data.remote
 import com.musicstory.app.domain.ReferenceFactBundle
 import com.musicstory.app.domain.ReferenceFactQuality
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.async
-import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
@@ -22,23 +20,19 @@ object WikipediaFacts {
 
     suspend fun fetchBundle(artist: String, title: String, countryCode: String?): ReferenceFactBundle =
         withContext(Dispatchers.IO) {
-            coroutineScope {
-                val track = async { fetchScope(artist, title, countryCode, Scope.TRACK) }
-                val artistFacts = async { fetchScope(artist, title, countryCode, Scope.ARTIST) }
-                var trackFacts = track.await()
-                val artistList = artistFacts.await()
-                if (trackFacts.isEmpty()) {
-                    val lang = if (countryCode == "RU") "ru" else "en"
-                    trackFacts = fetchArtistMentionsForTrack(lang, artist, title)
-                    if (trackFacts.isEmpty() && countryCode == "RU") {
-                        trackFacts = fetchArtistMentionsForTrack("en", artist, title)
-                    }
-                }
-                ReferenceFactBundle(
-                    trackFacts = trackFacts,
-                    artistFacts = artistList,
-                )
+            val lang = if (countryCode == "RU") "ru" else "en"
+            var trackFacts = fetchArtistMentionsForTrack(lang, artist, title)
+            if (trackFacts.isEmpty() && countryCode == "RU") {
+                trackFacts = fetchArtistMentionsForTrack("en", artist, title)
             }
+            if (trackFacts.isEmpty()) {
+                trackFacts = fetchScope(artist, title, countryCode, Scope.TRACK)
+            }
+            val artistList = fetchScope(artist, title, countryCode, Scope.ARTIST)
+            ReferenceFactBundle(
+                trackFacts = trackFacts,
+                artistFacts = artistList,
+            )
         }
 
     suspend fun fetch(artist: String, title: String, countryCode: String?): List<String> {
@@ -60,24 +54,26 @@ object WikipediaFacts {
             Scope.TRACK -> listOf(
                 cleanTitle,
                 "$cleanTitle ($artist song)",
+                "$cleanTitle (song)",
             )
             Scope.ARTIST -> listOf(
-                "$artist (band)",
-                "$artist (musician)",
                 artist,
+                "$artist (musician)",
+                "$artist (singer)",
+                "$artist (band)",
             )
         }.distinct().filter { it.length > 1 }
 
         val queries = when (scope) {
-            Scope.TRACK -> listOf("$cleanTitle $artist song")
-            Scope.ARTIST -> listOf("$artist musician")
+            Scope.TRACK -> listOf("$cleanTitle $artist song", "$cleanTitle song", "$artist $cleanTitle")
+            Scope.ARTIST -> listOf("$artist musician", artist)
         }
 
         val mention = if (scope == Scope.TRACK) title else artist
 
         for (candidate in candidates) {
             delay(120)
-            val bullets = fetchFactsForTitle(lang, candidate, mention)
+            val bullets = fetchFactsForTitle(lang, candidate, mention, trackContext = scope == Scope.TRACK)
             if (bullets.isNotEmpty()) return bullets
         }
 
@@ -85,47 +81,78 @@ object WikipediaFacts {
             delay(120)
             val foundTitle = searchWikiTitle(lang, query) ?: continue
             if (scope == Scope.ARTIST && foundTitle.contains("disambiguation", ignoreCase = true)) continue
-            val bullets = fetchFactsForTitle(lang, foundTitle, mention)
+            val bullets = fetchFactsForTitle(lang, foundTitle, mention, trackContext = scope == Scope.TRACK)
             if (bullets.isNotEmpty()) return bullets
         }
 
-        val fallbackLang = if (lang == "en") "ru" else "en"
         if (countryCode == "RU") {
-            for (candidate in candidates.take(1)) {
-                delay(120)
-                val bullets = fetchFactsForTitle(fallbackLang, candidate, mention)
-                if (bullets.isNotEmpty()) return bullets
-            }
+            return fetchScopeEnFallback(artist, title, scope, mention)
+        }
+        return emptyList()
+    }
+
+    private suspend fun fetchScopeEnFallback(
+        artist: String,
+        title: String,
+        scope: Scope,
+        mention: String,
+    ): List<String> {
+        val cleanTitle = title.replace(Regex("\\s*\\([^)]*\\)\\s*"), " ").trim()
+        val candidates = when (scope) {
+            Scope.TRACK -> listOf(cleanTitle, "$cleanTitle ($artist song)", "$cleanTitle (song)")
+            Scope.ARTIST -> listOf(artist, "$artist (musician)", "$artist (singer)")
+        }.distinct()
+        val queries = when (scope) {
+            Scope.TRACK -> listOf("$cleanTitle $artist song", "$cleanTitle song")
+            Scope.ARTIST -> listOf("$artist musician", artist)
+        }
+        for (candidate in candidates) {
+            delay(120)
+            val bullets = fetchFactsForTitle("en", candidate, mention, trackContext = scope == Scope.TRACK)
+            if (bullets.isNotEmpty()) return bullets
+        }
+        for (query in queries) {
+            delay(120)
+            val foundTitle = searchWikiTitle("en", query) ?: continue
+            val bullets = fetchFactsForTitle("en", foundTitle, mention, trackContext = scope == Scope.TRACK)
+            if (bullets.isNotEmpty()) return bullets
         }
         return emptyList()
     }
 
     private fun fetchArtistMentionsForTrack(lang: String, artist: String, title: String): List<String> {
-        val candidates = listOf(
-            "$artist (band)",
-            "$artist (musical group)",
-            "$artist (musician)",
-            "$artist (singer)",
-            artist,
-        ).distinct()
-        for (candidate in candidates.take(2)) {
+        val titlesToTry = linkedSetOf<String>()
+        searchWikiTitle(lang, "$artist musician")?.let { titlesToTry.add(it) }
+        listOf(artist, "$artist (musician)", "$artist (singer)", "$artist (band)").forEach { titlesToTry.add(it) }
+        for (candidate in titlesToTry) {
             Thread.sleep(120)
-            val summary = fetchExtendedExtract(lang, candidate, 28) ?: fetchSummary(lang, candidate) ?: continue
+            val summary = fetchFullExtract(lang, candidate) ?: fetchSummary(lang, candidate) ?: continue
             if (isDisambiguation(summary)) continue
             val mentions = ReferenceFactQuality.filterAndRank(
-                extractSentencesMentioning(summary, title).filterNot { isWeakFact(it) },
-                max = 4,
+                extractTrackContextFacts(summary, title).filterNot { isWeakFact(it) },
+                max = 6,
             )
             if (mentions.isNotEmpty()) return mentions
         }
         return emptyList()
     }
 
-    private fun fetchFactsForTitle(lang: String, title: String, mention: String): List<String> {
-        val summary = fetchExtendedExtract(lang, title) ?: fetchSummary(lang, title) ?: return emptyList()
+    private fun fetchFactsForTitle(
+        lang: String,
+        title: String,
+        mention: String,
+        trackContext: Boolean = false,
+    ): List<String> {
+        val summary = fetchFullExtract(lang, title) ?: fetchSummary(lang, title) ?: return emptyList()
         if (isDisambiguation(summary)) return emptyList()
         val bullets = extractBullets(summary).filterNot { ReferenceFactQuality.isBoringFact(it) }
         if (bullets.isNotEmpty()) return ReferenceFactQuality.filterAndRank(bullets)
+        if (trackContext) {
+            val contextual = ReferenceFactQuality.filterAndRank(
+                extractTrackContextFacts(summary, mention).filterNot { isWeakFact(it) },
+            )
+            if (contextual.isNotEmpty()) return contextual
+        }
         return ReferenceFactQuality.filterAndRank(
             extractSentencesMentioning(summary, mention).filterNot { isWeakFact(it) },
         )
@@ -161,12 +188,12 @@ object WikipediaFacts {
         }
     }
 
-    private fun fetchExtendedExtract(lang: String, title: String, sentences: Int = 24): String? {
+    private fun fetchFullExtract(lang: String, title: String): String? {
         return try {
             val encodedTitle = URLEncoder.encode(title.replace(' ', '_'), "UTF-8")
             val url =
                 "https://$lang.wikipedia.org/w/api.php?action=query&prop=extracts&explaintext=1" +
-                    "&exsentences=$sentences&format=json&origin=*&titles=$encodedTitle"
+                    "&format=json&origin=*&titles=$encodedTitle"
             val request = Request.Builder()
                 .url(url)
                 .header("User-Agent", "MusicStoryApp/1.0 (Android)")
@@ -206,37 +233,54 @@ object WikipediaFacts {
         }
     }
 
-    private fun extractBullets(text: String): List<String> {
-        return text
-            .replace(Regex("\\([^)]*\\)"), " ")
+    private fun normalizeWikiText(text: String): String =
+        text
+            .replace(Regex("(?m)^=+\\s*.+?\\s*=+\\s*$"), " ")
+            .replace(Regex("\\s=+\\s*[^=\\n]+?\\s*=+\\s*"), " ")
+            .replace(Regex("\\(\\d{4}[^)]{0,120}\\)"), " ")
+            .replace(Regex("\\[[^\\]]{0,120}\\]"), " ")
+            .replace(Regex("\\s+"), " ")
+            .trim()
+
+    private fun splitWikiSentences(text: String): List<String> =
+        normalizeWikiText(text)
             .split(Regex("(?<=[.!?…])\\s+"))
             .map { it.trim() }
-            .filter { it.length in 35..240 }
+            .filter { it.length in 35..360 }
+
+    private fun extractBullets(text: String): List<String> =
+        splitWikiSentences(text)
             .filterNot { isDisambiguation(it) }
             .filterNot { it.contains(Regex("влия|легендар|уникальн|магия музыки", RegexOption.IGNORE_CASE)) }
             .sortedByDescending { ReferenceFactQuality.interestScore(it) }
             .take(12)
-    }
 
-    private fun extractSentencesMentioning(text: String, needle: String): List<String> {
+    private fun sentenceMentions(sentence: String, needle: String): Boolean {
         val normalizedNeedle = normalize(needle)
         val tokens = normalizedNeedle.split(' ').filter { it.length >= 3 }
-        if (tokens.isEmpty()) return emptyList()
-
-        return text
-            .replace(Regex("\\([^)]*\\)"), " ")
-            .split(Regex("(?<=[.!?…])\\s+"))
-            .map { it.trim() }
-            .filter { it.length in 35..240 }
-            .filter { sentence ->
-                val lower = normalize(sentence)
-                if (normalizedNeedle.length >= 8 && lower.contains(normalizedNeedle)) return@filter true
-                val hits = tokens.count { lower.contains(it) }
-                val threshold = if (tokens.size <= 2) 1 else minOf(2, tokens.size)
-                hits >= threshold
-            }
-            .take(8)
+        if (tokens.isEmpty()) return false
+        val lower = normalize(sentence)
+        if (normalizedNeedle.length >= 4 && lower.contains(normalizedNeedle)) return true
+        val hits = tokens.count { lower.contains(it) }
+        val threshold = if (tokens.size <= 2) 1 else minOf(2, tokens.size)
+        return hits >= threshold
     }
+
+    private fun extractTrackContextFacts(text: String, title: String, contextAfter: Int = 2): List<String> {
+        val sentences = splitWikiSentences(text)
+        val indices = linkedSetOf<Int>()
+        sentences.forEachIndexed { index, sentence ->
+            if (!sentenceMentions(sentence, title)) return@forEachIndexed
+            indices.add(index)
+            for (offset in 1..contextAfter) {
+                if (index + offset < sentences.size) indices.add(index + offset)
+            }
+        }
+        return indices.sorted().map { sentences[it] }
+    }
+
+    private fun extractSentencesMentioning(text: String, needle: String): List<String> =
+        splitWikiSentences(text).filter { sentenceMentions(it, needle) }.take(8)
 
     private fun normalize(text: String): String =
         text.lowercase().replace(Regex("[^\\p{L}\\p{N}\\s]"), " ").replace(Regex("\\s+"), " ").trim()

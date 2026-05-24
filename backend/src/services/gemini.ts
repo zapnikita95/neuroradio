@@ -3,7 +3,6 @@ import {
   buildStoryUserPrompt,
   buildSystemPrompt,
   buildPersonaForNarrator,
-  pickAngle,
 } from './prompts.js';
 import { resolveStoryNarrator, StoryNarratorId } from './story-narrator.js';
 import { YandexVoiceId, voiceForYear } from './voices.js';
@@ -243,7 +242,6 @@ export async function generateStoryScript(
   const previousScripts = input.previousScripts ?? [];
   const storyLength = input.storyLength ?? DEFAULT_STORY_LENGTH;
   const lengthPreset = getStoryLengthPreset(storyLength);
-  const angle = pickAngle(previousScripts.length);
   const referenceFacts = input.referenceFacts ?? [];
   const narratorId = resolveStoryNarrator(input.storyNarrator);
   const persona = buildPersonaForNarrator(
@@ -265,7 +263,6 @@ export async function generateStoryScript(
     const userPrompt = buildStoryUserPrompt({
       ...input,
       voiceId,
-      angle,
       storyLength,
       previousScripts,
       retryReason,

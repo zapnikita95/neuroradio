@@ -24,7 +24,6 @@ import com.musicstory.app.domain.GeminiModel
 import com.musicstory.app.domain.LlmProvider
 import com.musicstory.app.domain.ReferenceFactPicker
 import com.musicstory.app.domain.SelectedReferenceFact
-import com.musicstory.app.domain.StoryAngle
 import com.musicstory.app.domain.StoryLength
 import com.musicstory.app.domain.StoryNarrator
 import com.musicstory.app.domain.StoryPersona
@@ -127,7 +126,6 @@ class StoryRepository(
         val referenceFacts = ReferenceFactPicker.factsForPrompt(selectedFact)
             .ifEmpty { metadata.referenceFacts }
             .ifEmpty { (factBundle.trackFacts + factBundle.artistFacts).take(4) }
-        val angle = StoryPersona.pickAngle(previousScripts.size)
 
         val backendUrl = settingsDataStore.backendUrl.first().trim()
         val llmProvider = settingsDataStore.llmProvider.first()
@@ -139,6 +137,7 @@ class StoryRepository(
         val ttsSpeed = settingsDataStore.ttsSpeed.first()
         val ttsEmotion = settingsDataStore.ttsEmotion.first()
         val geminiModel = settingsDataStore.geminiModel.first()
+        val narratorTag = storyNarrator.labelRu
         val useBackend = shouldTryBackend(backendUrl)
         var rateLimitHit = false
         var rateLimitQuota: StoryQuotaInfo? = null
@@ -181,7 +180,7 @@ class StoryRepository(
                 track = track,
                 trackKey = trackKey,
                 previousScripts = previousScripts,
-                angle = angle,
+                narratorTag = narratorTag,
                 storyLength = storyLength,
                 storyNarrator = storyNarrator,
                 ttsVoice = ttsVoice,
@@ -219,7 +218,7 @@ class StoryRepository(
                     genre = genre,
                     countryCode = countryCode,
                     previousScripts = previousScripts,
-                    angle = angle,
+                    narratorTag = narratorTag,
                     storyLength = storyLength,
                     storyNarrator = storyNarrator,
                     referenceFacts = referenceFacts,
@@ -237,7 +236,7 @@ class StoryRepository(
                     genre = genre,
                     countryCode = countryCode,
                     previousScripts = previousScripts,
-                    angle = angle,
+                    narratorTag = narratorTag,
                     storyLength = storyLength,
                     storyNarrator = storyNarrator,
                     referenceFacts = referenceFacts,
@@ -291,7 +290,7 @@ class StoryRepository(
         genre: String?,
         countryCode: String?,
         previousScripts: List<String>,
-        angle: StoryAngle,
+        narratorTag: String,
         storyLength: StoryLength,
         storyNarrator: StoryNarrator,
         referenceFacts: List<String> = emptyList(),
@@ -308,7 +307,6 @@ class StoryRepository(
                     genre = genre,
                     countryCode = countryCode,
                     previousScripts = previousScripts,
-                    angle = angle,
                     storyLength = storyLength,
                     storyNarrator = storyNarrator,
                     referenceFacts = referenceFacts,
@@ -328,7 +326,7 @@ class StoryRepository(
                 }
                 else -> {
                     StoryLog.i("Direct API key story OK")
-                    persistStory(trackKey, track, groqStory, angle.labelRu)
+                    persistStory(trackKey, track, groqStory, narratorTag)
                     StoryAttemptResult.Success(groqStory)
                 }
             }
@@ -348,7 +346,7 @@ class StoryRepository(
         genre: String?,
         countryCode: String?,
         previousScripts: List<String>,
-        angle: StoryAngle,
+        narratorTag: String,
         storyLength: StoryLength,
         storyNarrator: StoryNarrator,
         referenceFacts: List<String> = emptyList(),
@@ -366,7 +364,6 @@ class StoryRepository(
                     genre = genre,
                     countryCode = countryCode,
                     previousScripts = previousScripts,
-                    angle = angle,
                     storyLength = storyLength,
                     storyNarrator = storyNarrator,
                     referenceFacts = referenceFacts,
@@ -386,7 +383,7 @@ class StoryRepository(
                 }
                 else -> {
                     StoryLog.i("Direct Gemini API key story OK")
-                    persistStory(trackKey, track, geminiStory, angle.labelRu)
+                    persistStory(trackKey, track, geminiStory, narratorTag)
                     StoryAttemptResult.Success(geminiStory)
                 }
             }
@@ -402,7 +399,7 @@ class StoryRepository(
         track: TrackInfo,
         trackKey: String,
         previousScripts: List<String>,
-        angle: StoryAngle,
+        narratorTag: String,
         storyLength: StoryLength,
         storyNarrator: StoryNarrator,
         ttsVoice: TtsVoice,
@@ -448,7 +445,7 @@ class StoryRepository(
                 else -> {
                     response.quota?.let { quota -> _dailyQuota.value = quota }
                     StoryLog.i("Backend OK: audio=yes, quota=${response.quota?.remaining}/${response.quota?.limit}")
-                    persistStory(trackKey, track, response, angle.labelRu)
+                    persistStory(trackKey, track, response, narratorTag)
                     StoryAttemptResult.Success(response)
                 }
             }

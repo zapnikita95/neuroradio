@@ -23,9 +23,11 @@
     <string name="nav_settings">Настройки</string>
 
     <string name="onboarding_title">Доступ к уведомлениям</string>
-    <string name="onboarding_description">Music Story читает метаданные треков из Spotify и Яндекс Музыки через доступ к уведомлениям. Без этого разрешения приложение не сможет определять текущий трек.</string>
+    <string name="onboarding_description">Music Story читает метаданные треков из Spotify и Яндекс Музыки через специальный доступ к уведомлениям. Без него приложение не видит, что сейчас играет.</string>
+    <string name="onboarding_steps">1. Нажми «Открыть настройки» ниже.\n2. Найди в списке «Music Story — мониторинг медиа».\n3. Включи переключатель.\n4. Вернись сюда и нажми «Проверить и войти».\n\nЕсли список не открылся: Настройки → Приложения → Особые права → Доступ к уведомлениям (на Huawei: Настройки → Уведомления → Управление доступом).</string>
     <string name="onboarding_open_settings">Открыть настройки доступа</string>
-    <string name="onboarding_continue">Продолжить</string>
+    <string name="onboarding_check_access">Проверить и войти</string>
+    <string name="onboarding_not_granted_yet">Сначала включи «Music Story — мониторинг медиа» в настройках доступа к уведомлениям.</string>
 
     <string name="status_no_access">Нет доступа к уведомлениям</string>
     <string name="status_monitoring">Музыка играет</string>

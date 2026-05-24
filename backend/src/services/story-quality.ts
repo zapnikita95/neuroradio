@@ -156,7 +156,7 @@ export function hasConcreteFact(script: string, artist = '', title = ''): boolea
   }
 
   const concreteSignals =
-    /\b(сэмпл|sample|перезапис|дубль|лейбл|продюсер|радио|телевиз|клип|чарт|billboard|гитар|барабан|клавиш|оркестр|сакс|труб|скрипк|микрофон|пластинк|кассет|vinyl|prado|pérez|перес|кавер|cover|remix|plagiar|запрет|скандал|плагиат|первый раз|в эфир|на сцене|в раздевалке|backstage|soundcheck|сведени|master|микш|репетиц|фестив|Apollo|Abbey|Columbia|EMI|MTV|Grammy|песн|трек|альбом|сингл|куплет|мелоди|исполн|запис|верси|оркестр|джаз|свинг|рок|блюз|саксоф|фортеп|ударн|вокал|хор|дириж|композ|arrang|оригинал|перевод|эфир|премьер|релиз|дебют|soundtrack|сцен|зал|студи|концерт|пластин|винил|кассет|радиол|припев|бридж|solo|соло)\b/i;
+    /\b(сэмпл|перезапис|дубль|лейбл|продюсер|радио|телевиз|клип|чарт|гитар|барабан|клавиш|оркестр|сакс|труб|скрипк|микрофон|пластинк|кассет|кавер|remix|plagiar|запрет|скандал|плагиат|первый раз|в эфир|на сцене|в раздевалке|сведени|master|микш|репетиц|фестив|Apollo|Abbey|Columbia|EMI|MTV|Grammy|сингл|куплет|мелоди|исполн|запис|верси|оркестр|джаз|свинг|рок|блюз|саксоф|фортеп|ударн|вокал|хор|дириж|композ|оригинал|перевод|эфир|премьер|релиз|дебют|soundtrack|винил|радиол|припев|бридж|solo|соло|ссср|совет|пионер|президент|равен|мозамб|болливуд|железн)\b/i;
   return concreteSignals.test(trimmed);
 }
 
@@ -179,7 +179,10 @@ const CONCEPT_BRIDGES: Array<{ factPattern: RegExp; scriptTokens: string[] }> = 
   { factPattern: /\bviral\b|reddit|discord/i, scriptTokens: ['вирус', 'reddit', 'discord', 'ажиотаж', 'форум'] },
   { factPattern: /cobain|pixies|pop song/i, scriptTokens: ['кобейн', 'pixies', 'поп', 'панк'] },
   { factPattern: /\bband\b|\bgroup\b/i, scriptTokens: ['групп', 'коллект'] },
-  { factPattern: /u\.?\s?s\.?\s?ssr|soviet/i, scriptTokens: ['ссср', 'совет', 'подпол'] },
+  { factPattern: /u\.?\s?s\.?\s?ssr|soviet|eastern bloc|iron curtain/i, scriptTokens: ['ссср', 'совет', 'пионер', 'подпол', 'железн'] },
+  { factPattern: /equality|president|black or white|hafanana|take it easy/i, scriptTokens: ['президент', 'равн', 'чёрн', 'бел', 'хафанан', 'равен'] },
+  { factPattern: /bollywood|hindi cinema|rd burman|anu malik/i, scriptTokens: ['болливуд', 'индий', 'болlywood', 'кино'] },
+  { factPattern: /mozambique|african musician|iron curtain/i, scriptTokens: ['мозамб', 'африк', 'афр'] },
   { factPattern: /bossa nova|jorge ben|mas que nada|samba/i, scriptTokens: ['босса', 'самба', 'жорж', 'бен', 'ритм', 'удар'] },
   { factPattern: /instrumental|wordless|no lyrics/i, scriptTokens: ['без слов', 'инструмент', 'свист', 'крик'] },
 ];
@@ -250,6 +253,14 @@ export function validateStoryScript(
   }
 
   if (!skipWatery) {
+    const fictionIssue = findGenericFiction(trimmed);
+    if (fictionIssue) {
+      return { ok: false, reason: fictionIssue };
+    }
+    const ungrounded = findUngroundedClaims(trimmed, referenceFacts);
+    if (ungrounded) {
+      return { ok: false, reason: ungrounded };
+    }
     const waterIssue = findWateryContent(trimmed, artist, title);
     if (waterIssue) {
       return { ok: false, reason: waterIssue };
@@ -277,6 +288,63 @@ export function validateStoryScript(
   return { ok: true };
 }
 
+const GENERIC_FICTION_PATTERNS: RegExp[] = [
+  /запах\s+(?:сигарет|кофе)/i,
+  /на\s+моей\s+полке/i,
+  /скрыты(?:й|ого)\s+смысл/i,
+  /истори(?:я|ю)\s+о\s+(?:свобод|любви)/i,
+  /взрывает\s+сцен/i,
+  /пел\s+с\s+огон/i,
+  /зрител(?:и|ей)\s+сход/i,
+  /не\s+просто\s+весёлы/i,
+  /не\s+просто\s+весел/i,
+  /откроешь\s+новую\s+гран/i,
+  /новую\s+грань\s+в\s+творчеств/i,
+  /фанаты\s+спорят\s+о\s+происхожден/i,
+  /звучало\s+как\s+революц/i,
+  /продюсер\s+добавля/i,
+  /записывал\s+.*\s+он\s+пел/i,
+  /в\s+студии\s+тогда/i,
+  /слушайте,.*взрывает/i,
+  /политически\s+неправиль/i,
+  /запрещен[аы]?\s+на\s+радио/i,
+  /сломал[аи]?\s+правил/i,
+  /двойн(?:ую|ой)\s+сесси/i,
+  /сотни\s+дубл/i,
+  /сотен\s+дубл/i,
+];
+
+const UNGROUNDED_CLAIM_CHECKS: Array<{ claim: RegExp; factHint: RegExp }> = [
+  {
+    claim: /политически\s+неправиль|запрещен[аы]?\s+на\s+радио/i,
+    factHint: /banned|forbidden|censored|politic|запрет|цензур/i,
+  },
+  {
+    claim: /двойн(?:ую|ой)\s+сесси|сотни\s+дубл|сотен\s+дубл/i,
+    factHint: /double\s+session|overdub|hundred|\bдубл|\bсесси/i,
+  },
+  { claim: /сломал[аи]?\s+правил/i, factHint: /rules?\b|правил/i },
+];
+
+export function findUngroundedClaims(script: string, referenceFacts: string[] = []): string | null {
+  const factsText = referenceFacts.join(' ');
+  for (const { claim, factHint } of UNGROUNDED_CLAIM_CHECKS) {
+    if (claim.test(script) && (referenceFacts.length === 0 || !factHint.test(factsText))) {
+      return `ungrounded claim: ${claim.source}`;
+    }
+  }
+  return null;
+}
+
+export function findGenericFiction(script: string): string | null {
+  for (const pattern of GENERIC_FICTION_PATTERNS) {
+    if (pattern.test(script)) {
+      return `generic fiction: ${pattern.source}`;
+    }
+  }
+  return null;
+}
+
 const CLICHE_FILLER_PATTERNS: RegExp[] = [
   /мало кто знает/i,
   /стал[аи]?\s+легенд/i,
@@ -301,6 +369,9 @@ export function findClicheFiller(script: string): string | null {
 
 /** Reject generic filler — artist name alone is not enough. */
 export function findWateryContent(script: string, artist = '', title = ''): string | null {
+  const fiction = findGenericFiction(script);
+  if (fiction) return fiction;
+
   const cliche = findClicheFiller(script);
   if (cliche) return cliche;
 

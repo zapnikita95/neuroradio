@@ -3,7 +3,6 @@ import {
   buildStoryUserPrompt,
   buildSystemPrompt,
   buildPersonaForNarrator,
-  pickAngle,
 } from './prompts.js';
 import { resolveStoryNarrator, StoryNarratorId } from './story-narrator.js';
 import { YandexVoiceId, voiceForYear } from './voices.js';
@@ -25,7 +24,7 @@ import {
 } from './story-generate-loop.js';
 
 const GROQ_API_URL = 'https://api.groq.com/openai/v1/chat/completions';
-const MAX_ATTEMPTS = 3;
+const MAX_ATTEMPTS = 4;
 
 export interface StoryScript {
   script: string;
@@ -111,7 +110,7 @@ async function callGroqOnce(
 ): Promise<string> {
   const body: Record<string, unknown> = {
     model,
-    temperature: useJsonMode ? 0.72 : 0.65,
+    temperature: useJsonMode ? 0.58 : 0.52,
     max_tokens: maxTokens,
     messages: [
       { role: 'system', content: systemPrompt },
@@ -206,7 +205,6 @@ export async function generateStoryScript(
   const previousScripts = input.previousScripts ?? [];
   const storyLength = input.storyLength ?? DEFAULT_STORY_LENGTH;
   const lengthPreset = getStoryLengthPreset(storyLength);
-  const angle = pickAngle(previousScripts.length);
   const referenceFacts = input.referenceFacts ?? [];
   const narratorId = resolveStoryNarrator(input.storyNarrator);
   const persona = buildPersonaForNarrator(
@@ -228,7 +226,6 @@ export async function generateStoryScript(
     const userPrompt = buildStoryUserPrompt({
       ...input,
       voiceId,
-      angle,
       storyLength,
       previousScripts,
       retryReason,

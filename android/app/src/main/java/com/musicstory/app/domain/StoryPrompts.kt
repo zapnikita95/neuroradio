@@ -74,7 +74,6 @@ JSON: {"script":"...", "word_count": число}
         title: String,
         year: Int?,
         genre: String?,
-        angle: StoryAngle,
         length: StoryLength,
         previousScripts: List<String>,
         narrator: StoryNarrator = StoryNarrator.AUTO,
@@ -92,12 +91,14 @@ JSON: {"script":"...", "word_count": число}
             appendLine("Год (не писать цифрами в script): ${locale.yearLabelRu}")
             appendLine("Эпоха: ${locale.sceneHintRu}")
             appendLine()
-            appendLine("УГОЛ ПОДАЧИ: ${angle.labelRu} — ${angle.wrapHint}")
             appendLine("Ты — ${persona.roleTitle}. Говоришь: ${persona.speechStyle}")
             if (!narrator.isAuto) {
-                appendLine("РАССКАЗЧИК: ${narrator.labelRu} — ${narrator.descriptionRu}")
+                appendLine("РАССКАЗЧИК (АМЛУА): ${narrator.labelRu} — ${narrator.descriptionRu}")
                 appendLine(narrator.promptAddendum)
             }
+            appendLine(
+                "Подача ТОЛЬКО через выбранного рассказчика. Не подгоняй факт под «студию», «концерт» или «релиз» — бери любую грань из семени.",
+            )
             appendLine("ЖЁСТКАЯ ДЛИНА: ${length.wordsMin}–${length.wordsMax} слов (${length.labelRu}).")
             appendLine(StoryLengthPlan.structurePlan(length))
             appendLine(StoryRussianLanguage.PROMPT_BLOCK)
@@ -108,6 +109,7 @@ JSON: {"script":"...", "word_count": число}
                 appendLine()
                 appendLine("РЕЦЕПТ: 1) крючок = контраст/парадокс из семени 2) деталь 3) удар «разорвёт кабину».")
                 appendLine("НЕ: «мало кто знает», «легенда», «зал славы», перевод названия.")
+                appendLine("НЕ ВЫДУМЫВАЙ: запрет на радио, «политически неправильная», двойная сессия, сотни дублей — только если это ЕСТЬ в семени.")
             } else if (referenceFacts.isNotEmpty()) {
                 appendLine()
                 appendLine(StoryFactHunt.PROMPT_BLOCK)

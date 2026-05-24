@@ -10,15 +10,27 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import com.musicstory.app.MusicStoryApp
 import com.musicstory.app.R
 import com.musicstory.app.service.MediaNotificationListener
 import com.musicstory.app.ui.components.GlassCard
@@ -27,22 +39,46 @@ import com.musicstory.app.ui.components.PrimaryStoryButton
 import com.musicstory.app.ui.components.SecondaryStoryButton
 import com.musicstory.app.ui.components.VinylDisc
 import com.musicstory.app.ui.theme.CreamText
+import com.musicstory.app.ui.theme.ErrorCoral
 import com.musicstory.app.ui.theme.GoldBright
 import com.musicstory.app.ui.theme.MutedLavender
-import androidx.compose.ui.platform.LocalContext
 
 @Composable
 fun OnboardingScreen(
     onAccessGranted: () -> Unit,
-    onSkip: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
+    val app = context.applicationContext as MusicStoryApp
+    var hintMessage by remember { mutableStateOf<String?>(null) }
+
+    fun checkAccess(andEnter: Boolean) {
+        val granted = app.mediaControllerManager.hasNotificationAccess()
+        if (granted) {
+            hintMessage = null
+            MediaNotificationListener.requestRebind(context)
+            onAccessGranted()
+        } else if (andEnter) {
+            hintMessage = context.getString(R.string.onboarding_not_granted_yet)
+        }
+    }
+
+    val lifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) {
+                checkAccess(andEnter = true)
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
 
     MusicStoryBackground(modifier = modifier) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
+                .verticalScroll(rememberScrollState())
                 .padding(24.dp),
             verticalArrangement = Arrangement.Center,
             horizontalAlignment = Alignment.CenterHorizontally,
@@ -83,9 +119,20 @@ fun OnboardingScreen(
                 )
                 Spacer(modifier = Modifier.height(12.dp))
                 Text(
-                    text = "Spotify · Яндекс Музыка · нейрорадио о каждом треке",
-                    style = MaterialTheme.typography.labelMedium,
-                    color = GoldBright,
+                    text = context.getString(R.string.onboarding_steps),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = CreamText,
+                    textAlign = TextAlign.Start,
+                )
+            }
+
+            if (!hintMessage.isNullOrBlank()) {
+                Spacer(modifier = Modifier.height(12.dp))
+                Text(
+                    text = hintMessage!!,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = ErrorCoral,
+                    textAlign = TextAlign.Center,
                 )
             }
 
@@ -94,6 +141,7 @@ fun OnboardingScreen(
             PrimaryStoryButton(
                 text = context.getString(R.string.onboarding_open_settings),
                 onClick = {
+                    hintMessage = null
                     context.startActivity(
                         Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS).apply {
                             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
@@ -106,18 +154,8 @@ fun OnboardingScreen(
             Spacer(modifier = Modifier.height(12.dp))
 
             SecondaryStoryButton(
-                text = context.getString(R.string.onboarding_continue),
-                onClick = {
-                    if (Settings.Secure.getString(
-                            context.contentResolver,
-                            "enabled_notification_listeners",
-                        )?.contains(context.packageName) == true
-                    ) {
-                        onAccessGranted()
-                    } else {
-                        onSkip()
-                    }
-                },
+                text = context.getString(R.string.onboarding_check_access),
+                onClick = { checkAccess(andEnter = true) },
             )
         }
     }

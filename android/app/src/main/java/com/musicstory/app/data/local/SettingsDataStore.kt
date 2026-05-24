@@ -36,6 +36,10 @@ class SettingsDataStore(private val context: Context) {
         prefs[KEY_EVERY_N_TRACKS] ?: DEFAULT_EVERY_N_TRACKS
     }
 
+    val tracksSinceLastStory: Flow<Int> = context.settingsDataStore.data.map { prefs ->
+        prefs[KEY_TRACKS_SINCE_LAST_STORY] ?: 0
+    }
+
     val backendUrl: Flow<String> = context.settingsDataStore.data.map { prefs ->
         prefs[KEY_BACKEND_URL].orEmpty().trim().ifBlank { DEFAULT_BACKEND_URL }
     }
@@ -125,6 +129,12 @@ class SettingsDataStore(private val context: Context) {
 
     suspend fun setEveryNTracks(n: Int) {
         context.settingsDataStore.edit { it[KEY_EVERY_N_TRACKS] = n.coerceAtLeast(1) }
+    }
+
+    suspend fun setTracksSinceLastStory(count: Int) {
+        context.settingsDataStore.edit {
+            it[KEY_TRACKS_SINCE_LAST_STORY] = count.coerceAtLeast(0)
+        }
     }
 
     suspend fun setBackendUrl(url: String) {
@@ -234,6 +244,7 @@ class SettingsDataStore(private val context: Context) {
 
         private val KEY_AUTO_INTERCEPT = booleanPreferencesKey("auto_intercept")
         private val KEY_EVERY_N_TRACKS = intPreferencesKey("every_n_tracks")
+        private val KEY_TRACKS_SINCE_LAST_STORY = intPreferencesKey("tracks_since_last_story")
         private val KEY_BACKEND_URL = stringPreferencesKey("backend_url")
         private val KEY_AUTH_INSTALL_ID = stringPreferencesKey("auth_install_id")
         private val KEY_AUTH_ACCESS_TOKEN = stringPreferencesKey("auth_access_token")
