@@ -47,14 +47,46 @@ async function searchWikiTitle(lang: 'ru' | 'en', query: string): Promise<string
   }
 }
 
-function extractFactBullets(text: string, max = 12): string[] {
-  const sentences = text
-    .replace(/\([^)]*\)/g, ' ')
-    .split(/(?<=[.!?…])\s+/)
-    .map((s) => s.trim())
-    .filter((s) => s.length >= 35 && s.length <= 240);
+function normalizeWikiText(text: string): string {
+  return text
+    .replace(/^=+\s*.+?\s*=+\s*$/gm, ' ')
+    .replace(/\s=+\s*[^=\n]+?\s*=+\s*/g, ' ')
+    .replace(/\(\d{4}[^)]{0,120}\)/g, ' ')
+    .replace(/\[[^\]]{0,120}\]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
 
-  return filterAndRankFacts(sentences, max);
+function mergeSentenceFragments(raw: string[]): string[] {
+  const merged: string[] = [];
+  for (const part of raw) {
+    const sentence = part.trim();
+    if (!sentence) continue;
+    if (
+      merged.length > 0 &&
+      (/^[,;:]/.test(sentence) || /^which\b/i.test(sentence) || sentence.length < 50)
+    ) {
+      merged[merged.length - 1] = `${merged[merged.length - 1]} ${sentence}`.replace(/\s+/g, ' ').trim();
+    } else {
+      merged.push(sentence);
+    }
+  }
+  return merged;
+}
+
+const MAX_FACT_SENTENCE_LEN = 360;
+
+function splitWikiSentences(text: string): string[] {
+  return mergeSentenceFragments(
+    normalizeWikiText(text)
+      .split(/(?<=[.!?…])\s+/)
+      .map((s) => s.trim())
+      .filter(Boolean),
+  ).filter((s) => s.length >= 35 && s.length <= MAX_FACT_SENTENCE_LEN);
+}
+
+function extractFactBullets(text: string, max = 12): string[] {
+  return filterAndRankFacts(splitWikiSentences(text), max);
 }
 
 function extractSentencesMentioning(text: string, needle: string, max = 6): string[] {
@@ -64,11 +96,7 @@ function extractSentencesMentioning(text: string, needle: string, max = 6): stri
     .filter((part) => part.length >= 3);
   if (tokens.length === 0) return [];
 
-  return text
-    .replace(/\([^)]*\)/g, ' ')
-    .split(/(?<=[.!?…])\s+/)
-    .map((s) => s.trim())
-    .filter((s) => s.length >= 35 && s.length <= 240)
+  return splitWikiSentences(text)
     .filter((sentence) => {
       const lower = normalizeForMatch(sentence);
       if (normalizedNeedle.length >= 8 && lower.includes(normalizedNeedle)) return true;
@@ -136,13 +164,16 @@ function isDisambiguationExtract(text: string): boolean {
 }
 
 function isWeakFact(sentence: string): boolean {
+  const trimmed = sentence.trim();
+  if (/^[,;:]/.test(trimmed)) return true;
+  if (/^which\b/i.test(trimmed)) return true;
   return (
     /\b(may refer to|most commonly refers to|Queen regnant|Queen consort|disambiguation)\b/i.test(sentence) ||
     isBoringFact(sentence)
   );
 }
 
-async function fetchExtendedExtract(lang: 'ru' | 'en', title: string, sentences = 24): Promise<string | null> {
+async function fetchExtendedExtract(lang: 'ru' | 'en', title: string, sentences = 40): Promise<string | null> {
   const encodedTitle = encodeURIComponent(title.trim().replace(/\s+/g, '_'));
   const url =
     `https://${lang}.wikipedia.org/w/api.php?action=query&prop=extracts&explaintext=1` +
@@ -191,7 +222,7 @@ async function fetchArtistMentionsForTrack(
   for (const candidate of buildArtistTitleCandidates(artist)) {
     await sleep(120);
     const summary =
-      (await fetchExtendedExtract(lang, candidate, 28)) ?? (await fetchSummary(lang, candidate));
+      (await fetchExtendedExtract(lang, candidate, 44)) ?? (await fetchSummary(lang, candidate));
     if (!summary || isDisambiguationExtract(summary)) continue;
     const mentions = filterAndRankFacts(
       extractSentencesMentioning(summary, title).filter((fact) => !isWeakFact(fact)),

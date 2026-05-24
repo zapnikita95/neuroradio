@@ -95,6 +95,11 @@ router.post('/full', validateStoryFullBody, async (req: Request, res: Response) 
       metadata.mbid,
       metadata.artistMbid,
     );
+    const trackFactCount = factBundle.trackFacts.length;
+    const artistFactCount = factBundle.artistFacts.length;
+    console.log(
+      `[facts] ${metadata.artist} — ${metadata.title}: track=${trackFactCount} artist=${artistFactCount}`,
+    );
     const selectedFact = pickReferenceFact(factBundle, previousScripts);
     const referenceFacts = selectedFact
       ? [selectedFact.fact]
@@ -130,6 +135,10 @@ router.post('/full', validateStoryFullBody, async (req: Request, res: Response) 
       demo: false,
       quota: getDailyStoryQuota(req.installId ?? 'unknown'),
       sources: {
+        wikipedia: trackFactCount + artistFactCount > 0,
+        factCountTrack: trackFactCount,
+        factCountArtist: artistFactCount,
+        referenceFactPicked: Boolean(selectedFact),
         musicbrainz: Boolean(metadata.year || metadata.genre || metadata.mbid),
         groq: llmUsed === 'groq',
         gemini: llmUsed === 'gemini',

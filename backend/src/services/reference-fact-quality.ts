@@ -1,3 +1,5 @@
+import { highImpactBonus } from './story-fact-hunt.js';
+
 /** Filters dry encyclopedia lines; ranks human drama, breakthroughs, meaning — not working titles. */
 
 const BORING_FACT_PATTERNS: RegExp[] = [
@@ -91,6 +93,7 @@ export function interestScore(fact: string): number {
   if (/\babout\s+(?:a|the|his|her)\s+\w+/i.test(fact) && /\b(?:miner|mine|coal|love|war|death|life|pain|protest)\b/i.test(fact)) {
     score += 5;
   }
+  score += highImpactBonus(fact);
   return score;
 }
 

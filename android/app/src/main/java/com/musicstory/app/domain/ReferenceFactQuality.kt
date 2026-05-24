@@ -60,8 +60,25 @@ object ReferenceFactQuality {
         Regex("""\brecorded\s+cover\s+versions\b""", RegexOption.IGNORE_CASE),
     )
 
+    private val highImpactPatterns = listOf(
+        Regex("""\b(?:hidden|secret|disguised|misunderstood|ironic|paradox)\b""", RegexOption.IGNORE_CASE),
+        Regex("""\b(?:invocation|incantation|chant|orix|umbanda|candombl|syncret|goddess|deity|ritual)\b""", RegexOption.IGNORE_CASE),
+        Regex("""\b(?:underlying|borrowed|adapted|derived|sampled|based on|earlier|predates)\b.*\b(?:melody|motif|recording|song)\b""", RegexOption.IGNORE_CASE),
+        Regex("""\b(?:more\s+(?:well\s+)?known|better\s+known|definitive)\b.*\b(?:cover|version|arrangement)\b""", RegexOption.IGNORE_CASE),
+        Regex("""\b(?:refused|denied|rejected|left early|return flight|racism|racial|barber|lawsuit|sued|plagiar)\b""", RegexOption.IGNORE_CASE),
+        Regex("""\b(?:could not read|didn't know|never learned).*(?:music|notes)\b""", RegexOption.IGNORE_CASE),
+        Regex("""\b(?:wrote|composed).*(?:army|military|prison)\b""", RegexOption.IGNORE_CASE),
+        Regex("""\b(?:скрыт|заклинан|заимствован|мотив|плагиат|расизм|отказал|суд|арми|не умел|кавер)\b""", RegexOption.IGNORE_CASE),
+    )
+
+    private val weakTriviaPatterns = listOf(
+        Regex("""\b(?:title|name)\b.*\b(?:means|meaning|translat)\b""", RegexOption.IGNORE_CASE),
+        Regex("""\b(?:reached|peaked|charted|billboard|hot 100)\b""", RegexOption.IGNORE_CASE),
+        Regex("""\b(?:inducted|hall of fame|greatest.*song)\b""", RegexOption.IGNORE_CASE),
+        Regex("""\b(?:название|перевод|означает)\b""", RegexOption.IGNORE_CASE),
+    )
+
     private val storyPatterns = listOf(
-        Regex("""\bfirst\s+(?:Native\s+American|Black|woman|integrated|time)\b""", RegexOption.IGNORE_CASE),
         Regex("""\b(?:historic|historical|legendary|breakthrough|milestone|revival|resurg|comeback|forgotten|oblivion|rediscover)\b""", RegexOption.IGNORE_CASE),
         Regex("""\b(?:Guardians\s+of\s+the\s+Galaxy|interest\s+increased|resurged|viral|phenomenon)\b""", RegexOption.IGNORE_CASE),
         Regex("""\b(?:segregat|racial|illegal|defied|banned|forbidden|controvers|scandal|protest|censored|lawsuit|plagiar)\b""", RegexOption.IGNORE_CASE),
@@ -115,6 +132,12 @@ object ReferenceFactQuality {
             Regex("""\b(?:miner|mine|coal|love|war|death|life|pain|protest)\b""", RegexOption.IGNORE_CASE).containsMatchIn(fact)
         ) {
             score += 5
+        }
+        for (pattern in highImpactPatterns) {
+            if (pattern.containsMatchIn(fact)) score += 6
+        }
+        for (pattern in weakTriviaPatterns) {
+            if (pattern.containsMatchIn(fact)) score -= 10
         }
         return score
     }

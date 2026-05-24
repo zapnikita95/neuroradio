@@ -35,6 +35,8 @@ $narratorBlock
 - Ищи ДРАМУ и КОНТРАСТ: конфликт, прорыв, скандал, возвращение — что люди почувствовали.
 - Опорный факт Wikipedia = семя. Не выдумывай людей и события, которых нет в факте.
 
+${StoryFactHunt.PROMPT_BLOCK}
+
 $lengthPlan
 
 СТИЛЬ: друг за барной стойкой. Можно «слушай», «чувак», «брат». Не Wikipedia.
@@ -104,17 +106,21 @@ JSON: {"script":"...", "word_count": число}
                 appendLine("СЕМЯ ИСТОРИИ (проверенный факт из интернета — только это ядро):")
                 appendLine(selectedFact.fact)
                 appendLine()
-                appendLine("РЕЦЕПТ: 1) крючок = конкретика из семени 2) деталь 3) удар.")
-                appendLine("НЕ: «мало кто знает», «легенда», «зал славы», «трогает сердца».")
+                appendLine("РЕЦЕПТ: 1) крючок = контраст/парадокс из семени 2) деталь 3) удар «разорвёт кабину».")
+                appendLine("НЕ: «мало кто знает», «легенда», «зал славы», перевод названия.")
             } else if (referenceFacts.isNotEmpty()) {
                 appendLine()
-                appendLine("СЕМЕНА ИСТОРИЙ (выбери ОДНО с максимальной драмой — не рекламу и не дискографию):")
+                appendLine(StoryFactHunt.PROMPT_BLOCK)
+                appendLine()
+                appendLine("СЕМЕНА (выбери ОДНО с максимальным контрастом — не рекламу и не дискографию):")
                 referenceFacts.take(4).forEachIndexed { i, fact ->
                     appendLine("${i + 1}. $fact")
                 }
             } else {
                 appendLine()
-                appendLine("Факты из Wikipedia, Wikidata, DuckDuckGo, MusicBrainz — выбери самое живое:")
+                appendLine(StoryFactHunt.PROMPT_BLOCK)
+                appendLine()
+                appendLine("Факты из Wikipedia, Wikidata, DuckDuckGo, MusicBrainz — копай глубже, выбери семя с контрастом:")
             }
             if (previousScripts.isNotEmpty()) {
                 appendLine("УЖЕ БЫЛО — другой факт, другая подача:")

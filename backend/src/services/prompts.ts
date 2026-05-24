@@ -1,3 +1,4 @@
+import { FACT_HUNT_PROMPT_BLOCK } from './story-fact-hunt.js';
 import { RUSSIAN_LANGUAGE_PROMPT_BLOCK } from './story-russian-language.js';
 import {
   buildLengthStructurePlan,
@@ -208,6 +209,8 @@ ${narratorBlock}
 - Ищи ДРАМУ и КОНТРАСТ: конфликт, прорыв, скандал, возвращение — что люди почувствовали.
 - Опорный факт Wikipedia = семя. Не выдумывай людей и события, которых нет в факте.
 
+${FACT_HUNT_PROMPT_BLOCK}
+
 ${lengthPlan}
 
 СТИЛЬ: друг за барной стойкой. Можно «слушай», «чувак», «брат». Не Wikipedia.
@@ -307,19 +310,23 @@ export function buildStoryUserPrompt(params: {
     lines.push('СЕМЯ ИСТОРИИ (проверенный факт из интернета — только это ядро):');
     lines.push(selected.fact);
     lines.push('РЕЦЕПТ ПОДАЧИ:');
-    lines.push('1. КРЮЧОК — первая фраза = конкретика из семени (имя, спор, сэмпл, запрет, абсурд).');
+    lines.push('1. КРЮЧОК — первая фраза = контраст/парадокс из семени (не «интересный факт»).');
     lines.push('2. РАЗВИТИЕ — одна деталь из семени, переведённая в живую речь (не пересказ статьи).');
-    lines.push('3. УДАР — почему это цепляет, опираясь на то же семя.');
-    lines.push('НЕ: «мало кто знает», «легенда», «зал славы», «трогает сердца». ДА: факт + образ + финал.');
+    lines.push('3. УДАР — почему это «разорвёт кабину», опираясь на то же семя.');
+    lines.push('НЕ: «мало кто знает», «легенда», «зал славы», «трогает сердца», перевод названия. ДА: контраст + образ + финал.');
     lines.push(RUSSIAN_LANGUAGE_PROMPT_BLOCK);
   } else if (facts.length > 0) {
     lines.push('');
-    lines.push('СЕМЕНА ИСТОРИЙ (выбери ОДНО с максимальной драмой — не рекламу и не дискографию):');
+    lines.push(FACT_HUNT_PROMPT_BLOCK);
+    lines.push('');
+    lines.push('СЕМЕНА ИСТОРИЙ (выбери ОДНО с максимальным контрастом — не рекламу и не дискографию):');
     facts.forEach((fact, i) => lines.push(`${i + 1}. ${fact}`));
   } else {
     lines.push('');
+    lines.push(FACT_HUNT_PROMPT_BLOCK);
+    lines.push('');
     lines.push(
-      'ОПОРНЫЕ ФАКТЫ: Wikipedia, Wikidata, DuckDuckGo, MusicBrainz. Выбери самое живое — без fiction.',
+      'ОПОРНЫЕ ФАКТЫ: Wikipedia, Wikidata, DuckDuckGo, MusicBrainz. Копай глубже — выбери семя с контрастом, без fiction.',
     );
   }
 

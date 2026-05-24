@@ -1,6 +1,7 @@
 import fetch from 'node-fetch';
 import type { ReferenceFactBundle } from './fact-picker.js';
 import { filterAndRankFacts } from './reference-fact-quality.js';
+import { buildFactHuntSearchQueries } from './story-fact-hunt.js';
 import { fetchReferenceFactBundle as fetchWikipediaBundle } from './wikipedia-facts.js';
 
 const USER_AGENT = 'MusicStoryBFF/1.0 (contact@example.com)';
@@ -27,7 +28,11 @@ function mergeFacts(...pools: string[][]): string[] {
 }
 
 async function fetchDuckDuckGo(artist: string, title: string): Promise<string[]> {
-  const queries = [`${artist} ${title} song`, `${artist} musician biography`];
+  const queries = [
+    `${artist} ${title} song`,
+    `${artist} musician biography`,
+    ...buildFactHuntSearchQueries(artist, title),
+  ];
   const collected: string[] = [];
   for (const query of queries) {
     const url = `https://api.duckduckgo.com/?q=${encodeURIComponent(query)}&format=json&no_html=1&skip_disambig=1`;
@@ -93,28 +98,35 @@ async function fetchMusicBrainzAnnotations(entity: 'recording' | 'artist', mbid?
   const id = mbid?.trim();
   if (!id) return [];
   const url = `https://musicbrainz.org/ws/2/${entity}/${id}?inc=annotations&fmt=json`;
-  try {
-    const response = await fetch(url, {
-      headers: { 'User-Agent': USER_AGENT, Accept: 'application/json' },
-      signal: AbortSignal.timeout(6000),
-    });
-    if (!response.ok) return [];
-    const data = (await response.json()) as { annotations?: Array<{ annotation?: string }> };
-    const texts: string[] = [];
-    for (const item of data.annotations ?? []) {
-      const raw = item.annotation?.trim();
-      if (!raw || raw.length < 35) continue;
-      texts.push(
-        ...raw
-          .split(/(?<=[.!?…])\s+/)
-          .map((s) => s.trim())
-          .filter((s) => s.length >= 35 && s.length <= 240),
-      );
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      const response = await fetch(url, {
+        headers: { 'User-Agent': USER_AGENT, Accept: 'application/json' },
+        signal: AbortSignal.timeout(8000),
+      });
+      if (!response.ok) return [];
+      const data = (await response.json()) as { annotations?: Array<{ annotation?: string }> };
+      const texts: string[] = [];
+      for (const item of data.annotations ?? []) {
+        const raw = item.annotation?.trim();
+        if (!raw || raw.length < 35) continue;
+        texts.push(
+          ...raw
+            .split(/(?<=[.!?…])\s+/)
+            .map((s) => s.trim())
+            .filter((s) => s.length >= 35 && s.length <= 240),
+        );
+      }
+      return filterAndRankFacts(texts, 4);
+    } catch (err) {
+      if (attempt === 0) {
+        await new Promise((r) => setTimeout(r, 400));
+        continue;
+      }
+      console.warn(`MusicBrainz annotations failed (${entity}):`, err);
     }
-    return filterAndRankFacts(texts, 4);
-  } catch {
-    return [];
   }
+  return [];
 }
 
 export async function fetchAggregatedFactBundle(

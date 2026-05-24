@@ -59,4 +59,5 @@ export const RUSSIAN_LANGUAGE_PROMPT_BLOCK = `ЯЗЫК — ТОЛЬКО РУСС
 - Факты с Wikipedia на английском переводи мыслью, не копируй английские термины.
 - ПЛОХО: «Native American на Billboard top-5», «#1 ABBA», «shock rock», «viral на Reddit», «overdub на tape».
 - ХОРОШО: «индейская группа в пятёрке американского хит-парада», «единственное первое место ABBA в США», «шок-шоу на сцене», «вирусный ажиотаж на Reddit», «сотни дублей на плёнке».
-- Запрещены английские слова вне кавычек с именем/названием: chart, band, single, live, performance, mainstream, underground и т.п.`;
+- Запрещены английские слова вне кавычек с именем/названием: chart, band, single, live, performance, mainstream, underground и т.п.
+- Запрещены гибриды лatin+кириллица (гuitarist, brazilian, bonus) и любые английские корни в русских словах — переводи.`;
