@@ -52,9 +52,11 @@ object WikipediaFacts {
         val cleanTitle = title.replace(Regex("\\s*\\([^)]*\\)\\s*"), " ").trim()
         val candidates = when (scope) {
             Scope.TRACK -> listOf(
-                cleanTitle,
                 "$cleanTitle ($artist song)",
+                "$cleanTitle by $artist",
+                "$artist $cleanTitle",
                 "$cleanTitle (song)",
+                cleanTitle,
             )
             Scope.ARTIST -> listOf(
                 artist,
@@ -73,15 +75,23 @@ object WikipediaFacts {
 
         for (candidate in candidates) {
             delay(120)
-            val bullets = fetchFactsForTitle(lang, candidate, mention, trackContext = scope == Scope.TRACK)
+            val bullets = fetchFactsForTitle(
+                lang, candidate, mention,
+                trackContext = scope == Scope.TRACK,
+                artist = artist,
+            )
             if (bullets.isNotEmpty()) return bullets
         }
 
         for (query in queries) {
             delay(120)
-            val foundTitle = searchWikiTitle(lang, query) ?: continue
+            val foundTitle = searchWikiTitle(lang, query, artist, title) ?: continue
             if (scope == Scope.ARTIST && foundTitle.contains("disambiguation", ignoreCase = true)) continue
-            val bullets = fetchFactsForTitle(lang, foundTitle, mention, trackContext = scope == Scope.TRACK)
+            val bullets = fetchFactsForTitle(
+                lang, foundTitle, mention,
+                trackContext = scope == Scope.TRACK,
+                artist = artist,
+            )
             if (bullets.isNotEmpty()) return bullets
         }
 
@@ -99,7 +109,13 @@ object WikipediaFacts {
     ): List<String> {
         val cleanTitle = title.replace(Regex("\\s*\\([^)]*\\)\\s*"), " ").trim()
         val candidates = when (scope) {
-            Scope.TRACK -> listOf(cleanTitle, "$cleanTitle ($artist song)", "$cleanTitle (song)")
+            Scope.TRACK -> listOf(
+                "$cleanTitle ($artist song)",
+                "$cleanTitle by $artist",
+                "$artist $cleanTitle",
+                "$cleanTitle (song)",
+                cleanTitle,
+            )
             Scope.ARTIST -> listOf(artist, "$artist (musician)", "$artist (singer)")
         }.distinct()
         val queries = when (scope) {
@@ -108,13 +124,21 @@ object WikipediaFacts {
         }
         for (candidate in candidates) {
             delay(120)
-            val bullets = fetchFactsForTitle("en", candidate, mention, trackContext = scope == Scope.TRACK)
+            val bullets = fetchFactsForTitle(
+                "en", candidate, mention,
+                trackContext = scope == Scope.TRACK,
+                artist = artist,
+            )
             if (bullets.isNotEmpty()) return bullets
         }
         for (query in queries) {
             delay(120)
-            val foundTitle = searchWikiTitle("en", query) ?: continue
-            val bullets = fetchFactsForTitle("en", foundTitle, mention, trackContext = scope == Scope.TRACK)
+            val foundTitle = searchWikiTitle("en", query, artist, title) ?: continue
+            val bullets = fetchFactsForTitle(
+                "en", foundTitle, mention,
+                trackContext = scope == Scope.TRACK,
+                artist = artist,
+            )
             if (bullets.isNotEmpty()) return bullets
         }
         return emptyList()
@@ -142,30 +166,81 @@ object WikipediaFacts {
         title: String,
         mention: String,
         trackContext: Boolean = false,
+        artist: String = "",
     ): List<String> {
         val summary = fetchFullExtract(lang, title) ?: fetchSummary(lang, title) ?: return emptyList()
         if (isDisambiguation(summary)) return emptyList()
-        val bullets = extractBullets(summary).filterNot { ReferenceFactQuality.isBoringFact(it) }
+        if (artist.isNotBlank() && isWrongMusicTopic(artist, summary, title)) return emptyList()
+        val requireTrackAnchor = trackContext && artist.isNotBlank()
+        val bullets = filterMusicFacts(extractBullets(summary), artist, mention, requireTrackAnchor)
         if (bullets.isNotEmpty()) return ReferenceFactQuality.filterAndRank(bullets)
         if (trackContext) {
             val contextual = ReferenceFactQuality.filterAndRank(
-                extractTrackContextFacts(summary, mention).filterNot { isWeakFact(it) },
+                filterMusicFacts(extractTrackContextFacts(summary, mention), artist, mention, requireTrackAnchor),
             )
             if (contextual.isNotEmpty()) return contextual
         }
         return ReferenceFactQuality.filterAndRank(
-            extractSentencesMentioning(summary, mention).filterNot { isWeakFact(it) },
+            filterMusicFacts(extractSentencesMentioning(summary, mention), artist, mention, requireTrackAnchor),
         )
     }
 
     private fun isDisambiguation(text: String): Boolean =
         text.contains(Regex("may refer to|most commonly refers to|disambiguation page|can refer to", RegexOption.IGNORE_CASE))
 
+    private val wrongMusicTopicPatterns = listOf(
+        Regex("""book of daniel|persecution of the jews|destruction of the temple""", RegexOption.IGNORE_CASE),
+        Regex("""characteristically gothic|count dracula|fin de siècle|vampire fiction""", RegexOption.IGNORE_CASE),
+        Regex("""esoteric numerology|heavenly journeys""", RegexOption.IGNORE_CASE),
+        Regex("""the novel is|this novel""", RegexOption.IGNORE_CASE),
+    )
+
+    private fun factMentionsArtist(fact: String, artist: String): Boolean {
+        val tokens = normalize(artist).split(' ').filter { it.length >= 3 }
+        if (tokens.isEmpty()) return true
+        val norm = normalize(fact)
+        return tokens.any { norm.contains(it) }
+    }
+
+    private fun isTrackAnchored(fact: String, artist: String, trackTitle: String): Boolean =
+        ReferenceFactQuality.isCollectorFact(fact) ||
+            factMentionsArtist(fact, artist) ||
+            (trackTitle.isNotBlank() && sentenceMentions(fact, trackTitle.replace(Regex("""\s*\([^)]*\)\s*"""), " ").trim()))
+
+    private fun isWrongMusicTopic(artist: String, extract: String, pageTitle: String = ""): Boolean {
+        val combined = "$pageTitle $extract"
+        if (!wrongMusicTopicPatterns.any { it.containsMatchIn(combined) }) return false
+        return !factMentionsArtist(extract, artist)
+    }
+
+    private fun filterMusicFacts(
+        facts: List<String>,
+        artist: String,
+        trackTitle: String,
+        requireTrackAnchor: Boolean,
+    ): List<String> =
+        facts.filter { fact ->
+            !isWeakFact(fact) &&
+                !(wrongMusicTopicPatterns.any { it.containsMatchIn(fact) } && !factMentionsArtist(fact, artist)) &&
+                (!requireTrackAnchor || isTrackAnchored(fact, artist, trackTitle))
+        }
+
+    private fun scoreSearchTitle(title: String, artist: String, trackTitle: String): Int {
+        val lower = title.lowercase()
+        var score = 0
+        if (Regex("""\(song\)|\(.*song\)""").containsMatchIn(lower)) score += 12
+        if (lower.contains("disambiguation")) score -= 20
+        if (normalize(lower).contains(normalize(artist))) score += 8
+        if (normalize(lower).contains(normalize(trackTitle))) score += 6
+        if (lower.contains("novel") && !lower.contains("(song)")) score -= 8
+        return score
+    }
+
     private fun isWeakFact(sentence: String): Boolean =
         sentence.contains(Regex("may refer to|most commonly refers to|Queen regnant|Queen consort|disambiguation", RegexOption.IGNORE_CASE)) ||
             ReferenceFactQuality.isBoringFact(sentence)
 
-    private fun searchWikiTitle(lang: String, query: String): String? {
+    private fun searchWikiTitle(lang: String, query: String, artist: String = "", trackTitle: String = ""): String? {
         return try {
             val url =
                 "https://$lang.wikipedia.org/w/api.php?action=query&list=search&format=json&origin=*" +
@@ -180,8 +255,14 @@ object WikipediaFacts {
                 if (!response.isSuccessful) return null
                 val search = JSONObject(response.body?.string().orEmpty())
                     .optJSONObject("query")
-                    ?.optJSONArray("search")
-                search?.optJSONObject(0)?.optString("title")?.takeIf { it.isNotBlank() }
+                    ?.optJSONArray("search") ?: return null
+                if (artist.isBlank()) {
+                    return search.optJSONObject(0)?.optString("title")?.takeIf { it.isNotBlank() }
+                }
+                val titles = (0 until search.length())
+                    .mapNotNull { i -> search.optJSONObject(i)?.optString("title")?.takeIf { it.isNotBlank() } }
+                    .sortedByDescending { scoreSearchTitle(it, artist, trackTitle) }
+                titles.firstOrNull()
             }
         } catch (_: Exception) {
             null

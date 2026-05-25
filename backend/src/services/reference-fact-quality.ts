@@ -49,6 +49,24 @@ const BORING_FACT_PATTERNS: RegExp[] = [
   /\brecorded\s+cover\s+versions\b/i,
 ];
 
+/** Цифры релиза, платформы, редкость — семя для «Фанат-коллекционер». */
+export const COLLECTOR_FACT_PATTERNS: RegExp[] = [
+  /\b(?:tiktok|spotify|youtube|apple\s+music|streaming)\b/i,
+  /\b(?:billion|million)\b.*\b(?:streams?|plays|views?)\b/i,
+  /\b(?:streams?|plays)\b.*\b(?:billion|million|spotify)\b/i,
+  /\b(?:hot\s+100|billboard)\b/i,
+  /\bco[- ]?writ(?:ten|er)\b/i,
+  /\b(?:bush\s+doof|music\s+video|official\s+video)\b/i,
+  /\b(?:limited\s+edition|vinyl|pressing|bootleg|b[- ]?side|cassette|7[- ]?inch)\b/i,
+  /\b(?:debut\s+single|lead\s+single)\b.*\b(?:since|first|only)\b/i,
+  /\b(?:did\s+not\s+chart|charted)\b.*\b(?:until|following|after)\b/i,
+  /\b(?:прорыв|тикток|стрим|миллиард|миллион|хит\s+100|соавтор|бутлег|винил|лимитк)\b/i,
+];
+
+export function isCollectorFact(fact: string): boolean {
+  return COLLECTOR_FACT_PATTERNS.some((pattern) => pattern.test(fact));
+}
+
 const STORY_FACT_PATTERNS: RegExp[] = [
   /\bfirst\s+(?:Native\s+American|Black|woman|integrated|time)\b/i,
   /\b(?:historic|historical|legendary|breakthrough|milestone|revival|resurg|comeback|forgotten|oblivion|rediscover)\b/i,
@@ -78,6 +96,7 @@ function normalizeForMatch(text: string): string {
 
 export function interestScore(fact: string): number {
   let score = 0;
+  if (isCollectorFact(fact)) score += 8;
   for (const pattern of STORY_FACT_PATTERNS) {
     if (pattern.test(fact)) score += 5;
   }
@@ -102,6 +121,7 @@ export function interestScore(fact: string): number {
 export function isBoringFact(fact: string): boolean {
   const trimmed = fact.trim();
   if (trimmed.length < 30) return true;
+  if (isCollectorFact(trimmed)) return false;
   if (BORING_FACT_PATTERNS.some((pattern) => pattern.test(trimmed))) return true;
   if (interestScore(trimmed) < 4) return true;
   return false;

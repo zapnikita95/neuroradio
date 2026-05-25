@@ -1,6 +1,6 @@
 import fetch from 'node-fetch';
 import type { ReferenceFactBundle } from './fact-picker.js';
-import { filterAndRankFacts, isBoringFact } from './reference-fact-quality.js';
+import { filterAndRankFacts, isBoringFact, isCollectorFact } from './reference-fact-quality.js';
 
 const USER_AGENT = 'MusicStoryBFF/1.0 (contact@example.com)';
 
@@ -28,7 +28,12 @@ async function fetchSummary(lang: 'ru' | 'en', title: string): Promise<string | 
   }
 }
 
-async function searchWikiTitle(lang: 'ru' | 'en', query: string): Promise<string | null> {
+async function searchWikiTitle(
+  lang: 'ru' | 'en',
+  query: string,
+  artist = '',
+  trackTitle = '',
+): Promise<string | null> {
   const url =
     `https://${lang}.wikipedia.org/w/api.php?action=query&list=search&format=json&origin=*` +
     `&srlimit=5&srsearch=${encodeURIComponent(query)}`;
@@ -41,7 +46,17 @@ async function searchWikiTitle(lang: 'ru' | 'en', query: string): Promise<string
     const data = (await response.json()) as {
       query?: { search?: Array<{ title?: string }> };
     };
-    return data.query?.search?.[0]?.title ?? null;
+    const hits = data.query?.search ?? [];
+    if (hits.length === 0) return null;
+    if (!artist) return hits[0]?.title ?? null;
+    const ranked = hits
+      .map((hit) => hit.title?.trim() ?? '')
+      .filter(Boolean)
+      .sort(
+        (a, b) =>
+          scoreSearchTitle(b, artist, trackTitle) - scoreSearchTitle(a, artist, trackTitle),
+      );
+    return ranked[0] ?? null;
   } catch {
     return null;
   }
@@ -142,12 +157,13 @@ function cacheKey(lang: string, title: string): string {
 
 function buildTrackTitleCandidates(artist: string, title: string): string[] {
   const cleanTitle = title.replace(/\s*\([^)]*\)\s*/g, ' ').trim();
+  // Сначала страница песни — иначе «Apocalypse»/«Dracula» уводят на религию/роман.
   return [
-    cleanTitle,
     `${cleanTitle} (${artist} song)`,
-    `${cleanTitle} (song)`,
     `${cleanTitle} by ${artist}`,
     `${artist} ${cleanTitle}`,
+    `${cleanTitle} (song)`,
+    cleanTitle,
   ].filter((value, index, arr) => value.length > 1 && arr.indexOf(value) === index);
 }
 
@@ -183,6 +199,53 @@ function buildArtistSearchQueries(artist: string): string[] {
 
 function isDisambiguationExtract(text: string): boolean {
   return /\b(may refer to|most commonly refers to|disambiguation page|can refer to)\b/i.test(text);
+}
+
+const WRONG_MUSIC_TOPIC_PATTERNS: RegExp[] = [
+  /\b(?:book of daniel|persecution of the jews|destruction of the temple|2nd century bce|4 ezra|2 baruch)\b/i,
+  /\b(?:characteristically gothic|count dracula|fin de si[eè]cle|vampire fiction|invasion literature)\b/i,
+  /\b(?:esoteric numerology|heavenly journeys|pseudonyms, claiming)\b/i,
+  /\b(?:the novel is|this novel|literary genre)\b/i,
+];
+
+function factMentionsArtist(fact: string, artist: string): boolean {
+  const tokens = normalizeForMatch(artist)
+    .split(' ')
+    .filter((part) => part.length >= 3);
+  if (tokens.length === 0) return true;
+  const norm = normalizeForMatch(fact);
+  return tokens.some((token) => norm.includes(token));
+}
+
+function factMentionsTrack(fact: string, title: string): boolean {
+  return sentenceMentions(fact, title.replace(/\s*\([^)]*\)\s*/g, ' ').trim());
+}
+
+function isTrackAnchored(fact: string, artist: string, title: string): boolean {
+  return (
+    isCollectorFact(fact) ||
+    factMentionsArtist(fact, artist) ||
+    (title.length > 0 && factMentionsTrack(fact, title))
+  );
+}
+
+function isWrongMusicTopic(artist: string, extract: string, pageTitle = ''): boolean {
+  const combined = `${pageTitle} ${extract}`;
+  if (!WRONG_MUSIC_TOPIC_PATTERNS.some((pattern) => pattern.test(combined))) {
+    return false;
+  }
+  return !factMentionsArtist(extract, artist);
+}
+
+function scoreSearchTitle(title: string, artist: string, trackTitle: string): number {
+  const lower = title.toLowerCase();
+  let score = 0;
+  if (/\(song\)|\(.*song\)/i.test(lower)) score += 12;
+  if (lower.includes('disambiguation')) score -= 20;
+  if (normalizeForMatch(lower).includes(normalizeForMatch(artist))) score += 8;
+  if (normalizeForMatch(lower).includes(normalizeForMatch(trackTitle))) score += 6;
+  if (/\bnovel\b/i.test(lower) && !/\(song\)/i.test(lower)) score -= 8;
+  return score;
 }
 
 function isWeakFact(sentence: string): boolean {
@@ -232,25 +295,58 @@ async function fetchFullExtract(lang: 'ru' | 'en', title: string): Promise<strin
   return null;
 }
 
+function filterMusicFacts(
+  facts: string[],
+  artist: string,
+  trackTitle: string,
+  requireTrackAnchor: boolean,
+): string[] {
+  return facts.filter((fact) => {
+    if (isWeakFact(fact)) return false;
+    if (WRONG_MUSIC_TOPIC_PATTERNS.some((pattern) => pattern.test(fact)) && !factMentionsArtist(fact, artist)) {
+      return false;
+    }
+    if (requireTrackAnchor && !isTrackAnchored(fact, artist, trackTitle)) return false;
+    return true;
+  });
+}
+
 async function fetchFactsForTitle(
   lang: 'ru' | 'en',
   title: string,
   mentionNeedle: string,
   trackContext = false,
+  artist = '',
 ): Promise<string[]> {
   await sleep(120);
   const summary = (await fetchFullExtract(lang, title)) ?? (await fetchSummary(lang, title));
   if (!summary || isDisambiguationExtract(summary)) return [];
-  const bullets = extractFactBullets(summary).filter((fact) => !isWeakFact(fact));
+  if (artist && isWrongMusicTopic(artist, summary, title)) return [];
+
+  const requireTrackAnchor = trackContext && artist.length > 0;
+  const bullets = filterMusicFacts(
+    extractFactBullets(summary),
+    artist,
+    mentionNeedle,
+    requireTrackAnchor,
+  );
   if (bullets.length > 0) return bullets;
   if (trackContext) {
-    const contextual = extractTrackContextFacts(summary, mentionNeedle).filter(
-      (fact) => !isWeakFact(fact),
+    const contextual = filterMusicFacts(
+      extractTrackContextFacts(summary, mentionNeedle),
+      artist,
+      mentionNeedle,
+      requireTrackAnchor,
     );
     if (contextual.length > 0) return contextual;
   }
   return filterAndRankFacts(
-    extractSentencesMentioning(summary, mentionNeedle).filter((fact) => !isWeakFact(fact)),
+    filterMusicFacts(
+      extractSentencesMentioning(summary, mentionNeedle),
+      artist,
+      mentionNeedle,
+      requireTrackAnchor,
+    ),
     6,
   );
 }
@@ -294,15 +390,15 @@ async function fetchFactsForLang(
   const trackContext = scope === 'track';
 
   for (const candidate of candidates) {
-    const facts = await fetchFactsForTitle(lang, candidate, mentionNeedle, trackContext);
+    const facts = await fetchFactsForTitle(lang, candidate, mentionNeedle, trackContext, artist);
     if (facts.length > 0) return facts;
   }
 
   for (const query of queries) {
-    const foundTitle = await searchWikiTitle(lang, query);
+    const foundTitle = await searchWikiTitle(lang, query, artist, title);
     if (!foundTitle) continue;
     if (scope === 'artist' && /\bdisambiguation\b/i.test(foundTitle)) continue;
-    const facts = await fetchFactsForTitle(lang, foundTitle, mentionNeedle, trackContext);
+    const facts = await fetchFactsForTitle(lang, foundTitle, mentionNeedle, trackContext, artist);
     if (facts.length > 0) return facts;
   }
 

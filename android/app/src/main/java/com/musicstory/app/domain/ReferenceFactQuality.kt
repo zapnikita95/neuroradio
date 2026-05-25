@@ -79,6 +79,20 @@ object ReferenceFactQuality {
         Regex("""\b(?:название|перевод|означает)\b""", RegexOption.IGNORE_CASE),
     )
 
+    private val collectorPatterns = listOf(
+        Regex("""\b(?:tiktok|spotify|youtube|apple\s+music|streaming)\b""", RegexOption.IGNORE_CASE),
+        Regex("""\b(?:billion|million)\b.*\b(?:streams?|plays|views?)\b""", RegexOption.IGNORE_CASE),
+        Regex("""\b(?:streams?|plays)\b.*\b(?:billion|million|spotify)\b""", RegexOption.IGNORE_CASE),
+        Regex("""\b(?:hot\s+100|billboard)\b""", RegexOption.IGNORE_CASE),
+        Regex("""\bco[- ]?writ(?:ten|er)\b""", RegexOption.IGNORE_CASE),
+        Regex("""\b(?:bush\s+doof|music\s+video|official\s+video)\b""", RegexOption.IGNORE_CASE),
+        Regex("""\b(?:limited\s+edition|vinyl|pressing|bootleg|b[- ]?side|cassette|7[- ]?inch)\b""", RegexOption.IGNORE_CASE),
+        Regex("""\b(?:did\s+not\s+chart|charted)\b.*\b(?:until|following|after)\b""", RegexOption.IGNORE_CASE),
+    )
+
+    fun isCollectorFact(fact: String): Boolean =
+        collectorPatterns.any { it.containsMatchIn(fact) }
+
     private val storyPatterns = listOf(
         Regex("""\b(?:historic|historical|legendary|breakthrough|milestone|revival|resurg|comeback|forgotten|oblivion|rediscover)\b""", RegexOption.IGNORE_CASE),
         Regex("""\b(?:Guardians\s+of\s+the\s+Galaxy|interest\s+increased|resurged|viral|phenomenon)\b""", RegexOption.IGNORE_CASE),
@@ -96,6 +110,7 @@ object ReferenceFactQuality {
     fun isBoringFact(fact: String): Boolean {
         val trimmed = fact.trim()
         if (trimmed.length < 30) return true
+        if (isCollectorFact(trimmed)) return false
         if (boringPatterns.any { it.containsMatchIn(trimmed) }) return true
         if (interestScore(trimmed) < 4) return true
         return false
@@ -103,6 +118,7 @@ object ReferenceFactQuality {
 
     fun interestScore(fact: String): Int {
         var score = 0
+        if (isCollectorFact(fact)) score += 8
         for (pattern in storyPatterns) {
             if (pattern.containsMatchIn(fact)) score += 5
         }
@@ -134,6 +150,7 @@ object ReferenceFactQuality {
         ) {
             score += 5
         }
+        if (isCollectorFact(fact)) return score
         for (pattern in highImpactPatterns) {
             if (pattern.containsMatchIn(fact)) score += 6
         }
