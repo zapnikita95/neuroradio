@@ -1,4 +1,10 @@
-import { filterAndRankFacts, interestScore, isBoringFact, MIN_PICK_INTEREST_SCORE } from './reference-fact-quality.js';
+import {
+  filterAndRankFacts,
+  interestScore,
+  isBackstoryFact,
+  isBoringFact,
+  MIN_PICK_INTEREST_SCORE,
+} from './reference-fact-quality.js';
 
 export type FactScope = 'artist' | 'track';
 
@@ -56,6 +62,23 @@ function pickFromPool(
   return null;
 }
 
+function normalize(text: string): string {
+  return text.trim().toLowerCase();
+}
+
+function pickBackstoryFromPool(
+  facts: string[],
+  previousScripts: string[],
+): string | null {
+  for (const fact of facts) {
+    if (!isBackstoryFact(fact)) continue;
+    if (isBoringFact(fact)) continue;
+    if (factOverlapsPrevious(fact, previousScripts)) continue;
+    return fact;
+  }
+  return null;
+}
+
 /**
  * Alternate track vs artist facts; skip ones already covered in previous scripts.
  */
@@ -72,6 +95,24 @@ export function pickReferenceFact(
   const fallback = preferTrack ? artistFacts : trackFacts;
   const primaryScope: FactScope = preferTrack ? 'track' : 'artist';
   const fallbackScope: FactScope = preferTrack ? 'artist' : 'track';
+
+  // 0) First try a soulful/human backstory fact for better narrative quality.
+  const backstoryPrimary = pickBackstoryFromPool(primary, previousScripts);
+  if (backstoryPrimary) {
+    return {
+      fact: backstoryPrimary,
+      scope: primaryScope,
+      scopeLabelRu: primaryScope === 'track' ? 'трек' : 'группа/артист',
+    };
+  }
+  const backstoryFallback = pickBackstoryFromPool(fallback, previousScripts);
+  if (backstoryFallback) {
+    return {
+      fact: backstoryFallback,
+      scope: fallbackScope,
+      scopeLabelRu: fallbackScope === 'track' ? 'трек' : 'группа/артист',
+    };
+  }
 
   const primaryPick = pickFromPool(primary, previousScripts);
   if (primaryPick) {
@@ -105,6 +146,29 @@ export function pickReferenceFact(
   }
 
   return null;
+}
+
+/**
+ * Debug helper: explain why a specific fact was selected.
+ * Used for docs/logging and future audits.
+ */
+export function explainReferenceFactSelection(
+  bundle: ReferenceFactBundle,
+  selected: SelectedReferenceFact | null,
+): string {
+  if (!selected) return 'No fact selected.';
+  const trackPool = dedupeFacts(bundle.trackFacts);
+  const artistPool = dedupeFacts(bundle.artistFacts);
+  const scopePool = selected.scope === 'track' ? trackPool : artistPool;
+  const fromPool = scopePool.some((fact) => normalize(fact) === normalize(selected.fact));
+  const backstory = isBackstoryFact(selected.fact);
+  const score = interestScore(selected.fact);
+  const reasons: string[] = [];
+  reasons.push(fromPool ? `scope=${selected.scope}` : `scope=${selected.scope} (fallback pool)`);
+  reasons.push(`interestScore=${score}`);
+  if (backstory) reasons.push('backstory=true');
+  if (!backstory) reasons.push('backstory=false');
+  return reasons.join(', ');
 }
 
 export function mergeReferenceFacts(bundle: ReferenceFactBundle, max = 6): string[] {

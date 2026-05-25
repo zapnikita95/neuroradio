@@ -50,12 +50,20 @@ export function classifyStoryLlmError(
     /\b429\b/.test(rawMessage) ||
     /rate_limit_exceeded|resource_exhausted/i.test(lower);
 
+  if (/model_decommissioned|has been decommissioned/i.test(lower)) {
+    return {
+      code: 'GROQ_MODEL_UNAVAILABLE',
+      message:
+        'На сервере устарела запасная модель Groq — обнови backend (убран gemma2). Подожди минуту и попробуй снова.',
+      httpStatus: 503,
+    };
+  }
+
   if (isRateLimit) {
     return {
       code: llmProvider === 'gemini' ? 'GEMINI_RATE_LIMIT' : 'GROQ_RATE_LIMIT',
       message:
-        `${label}: временный лимит запросов в минуту (RPM), не дневная квота. Подожди 1–2 минуты. ` +
-        'На Free tier лимиты по RPM/TPM/RPD — см. AI Studio.',
+        `${label}: слишком много запросов в минуту (RPM). Подожди 1–2 минуты — не жми «Рассказать» подряд на каждом треке.`,
       httpStatus: 503,
     };
   }

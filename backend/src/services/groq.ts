@@ -24,7 +24,17 @@ import {
 } from './story-generate-loop.js';
 
 const GROQ_API_URL = 'https://api.groq.com/openai/v1/chat/completions';
-const MAX_ATTEMPTS = 4;
+/** Fewer LLM calls — shared Groq RPM is tight on free tier. */
+const MAX_ATTEMPTS = 3;
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function isGroqModelDecommissioned(err: unknown): boolean {
+  if (!(err instanceof GroqApiError) || err.status !== 400) return false;
+  return /model_decommissioned|has been decommissioned/i.test(err.bodySnippet);
+}
 
 export interface StoryScript {
   script: string;
@@ -239,9 +249,19 @@ export async function generateStoryScript(
       const idx = resolveGroqModelOrder().indexOf(result.model);
       if (idx >= 0) groqModelIndex = idx;
     } catch (err) {
-      if (err instanceof GroqApiError && err.status === 429 && groqModelIndex + 1 < resolveGroqModelOrder().length) {
+      const models = resolveGroqModelOrder();
+      if (isGroqModelDecommissioned(err) && groqModelIndex + 1 < models.length) {
         groqModelIndex += 1;
-        console.warn(`[groq] quality attempt ${attempt + 1}: rotating to model index ${groqModelIndex}`);
+        console.warn(`[groq] decommissioned model — skip to index ${groqModelIndex} (${models[groqModelIndex]})`);
+        continue;
+      }
+      if (err instanceof GroqApiError && err.status === 429 && groqModelIndex + 1 < models.length) {
+        groqModelIndex += 1;
+        const waitMs = 1500 + attempt * 800;
+        console.warn(
+          `[groq] 429 on ${models[groqModelIndex - 1]} — wait ${waitMs}ms, try ${models[groqModelIndex]} (attempt ${attempt + 1})`,
+        );
+        await sleep(waitMs);
         continue;
       }
       throw err;

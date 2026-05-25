@@ -84,6 +84,15 @@ const STORY_FACT_PATTERNS: RegExp[] = [
   /\b(?:прорыв|скандал|запрет|возвращени|забвени|историческ|впервые|расизм|сегрегац|шахт|уголь|рабств|смысл|метафор|вдохновен|бутлег|подполь|крови|Цой|ссср|совет)\b/i,
 ];
 
+/** Human backstory > metrics-only trivia. */
+const BACKSTORY_FACT_PATTERNS: RegExp[] = [
+  /\b(?:daughter|son|family|parents|mother|father|wife|divorce|custody|adopt(?:ed|ion)?|child(?:ren)?)\b/i,
+  /\b(?:apology|letter|explained|explain|emotional|heartfelt|most emotional|dedicated to)\b/i,
+  /\b(?:interview|said|he called|she said|told)\b/i,
+  /\b(?:personal|real[- ]life|autobiograph|memoir)\b/i,
+  /\b(?:дочер|сын|семь|мать|отец|жена|развод|опек|усынов|извини|объясн|личн|эмоцион)\b/i,
+];
+
 export const MIN_PICK_INTEREST_SCORE = 6;
 
 function normalizeForMatch(text: string): string {
@@ -97,6 +106,7 @@ function normalizeForMatch(text: string): string {
 export function interestScore(fact: string): number {
   let score = 0;
   if (isCollectorFact(fact)) score += 8;
+  if (BACKSTORY_FACT_PATTERNS.some((pattern) => pattern.test(fact))) score += 12;
   for (const pattern of STORY_FACT_PATTERNS) {
     if (pattern.test(fact)) score += 5;
   }
@@ -141,4 +151,9 @@ export function filterAndRankFacts(facts: string[], max = 6): string[] {
     .sort((a, b) => interestScore(b) - interestScore(a))
     .filter((fact) => !isBoringFact(fact))
     .slice(0, max);
+}
+
+/** Fact reads like a soulful human story anchor. */
+export function isBackstoryFact(fact: string): boolean {
+  return BACKSTORY_FACT_PATTERNS.some((pattern) => pattern.test(fact));
 }

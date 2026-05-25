@@ -85,6 +85,20 @@ function allowedDigitSequences(artist: string, title: string): Set<string> {
   return new Set(matches);
 }
 
+function allowedLatinNameTokens(artist: string, title: string): Set<string> {
+  const tokens = new Set<string>();
+  const collect = (value: string) => {
+    value
+      .split(/[^\p{L}\p{N}]+/u)
+      .map((part) => part.trim())
+      .filter((part) => part.length >= 2 && /[a-z]/i.test(part))
+      .forEach((part) => tokens.add(part.toLowerCase()));
+  };
+  collect(artist);
+  collect(title);
+  return tokens;
+}
+
 export function findForbiddenNumbers(
   script: string,
   artist: string,
@@ -114,6 +128,7 @@ export function findForbiddenNumbers(
 
 export function sanitizeScriptForTts(script: string, artist: string, title: string): string {
   const allowed = allowedDigitSequences(artist, title);
+  const allowedLatin = allowedLatinNameTokens(artist, title);
   let result = script.trim();
 
   for (const [pattern, replacement] of ENGLISH_REPLACEMENTS) {
@@ -123,6 +138,9 @@ export function sanitizeScriptForTts(script: string, artist: string, title: stri
   result = result.replace(DIGIT_ORDINAL_SUFFIX, ' тогда ');
   DIGIT_ORDINAL_SUFFIX.lastIndex = 0;
   result = result.replace(/\d+/g, (match) => (allowed.has(match) ? match : ''));
+  result = result.replace(/\b[a-z]{2,}\b/gi, (match) => {
+    return allowedLatin.has(match.toLowerCase()) ? match : '';
+  });
   result = result.replace(ORPHAN_ORDINAL_SUFFIX, ' тогда ');
   ORPHAN_ORDINAL_SUFFIX.lastIndex = 0;
   result = result.replace(SPELLED_YEAR_PATTERN, ' тогда ');
@@ -274,6 +292,9 @@ export function validateStoryScript(
   ) {
     return { ok: false, reason: 'story ignores Wikipedia reference facts' };
   }
+  if (referenceFacts.length > 0 && !firstSentenceAnchoredToFact(trimmed, referenceFacts)) {
+    return { ok: false, reason: 'first sentence is not anchored to seed fact' };
+  }
 
   const words = countWords(trimmed);
   const minWords = strictLength ? limits.wordsMin : Math.max(30, limits.wordsMin - 15);
@@ -286,6 +307,13 @@ export function validateStoryScript(
   }
 
   return { ok: true };
+}
+
+export function firstSentenceAnchoredToFact(script: string, referenceFacts: string[]): boolean {
+  if (referenceFacts.length === 0) return true;
+  const firstSentence = script.split(/(?<=[.!?…])\s+/).find(Boolean)?.trim() ?? '';
+  if (firstSentence.length < 12) return false;
+  return anchorsReferenceFact(firstSentence, referenceFacts);
 }
 
 const GENERIC_FICTION_PATTERNS: RegExp[] = [
@@ -319,6 +347,9 @@ const GENERIC_FICTION_PATTERNS: RegExp[] = [
   /путешествие\s+в\s+мир/i,
   /не\s+все\s+замечают:.*не\s+просто\s+поп/i,
   /отражение\s+настроений/i,
+  /хит-?пара[дт]\w*\s+христиан\w*\s+музык/i,
+  /христиан\w*\s+хит-?пара[дт]/i,
+  /возглавил\w*\s+.*христиан\w*\s+чарт/i,
 ];
 
 const UNGROUNDED_CLAIM_CHECKS: Array<{ claim: RegExp; factHint: RegExp }> = [
@@ -331,6 +362,10 @@ const UNGROUNDED_CLAIM_CHECKS: Array<{ claim: RegExp; factHint: RegExp }> = [
     factHint: /double\s+session|overdub|hundred|\bдубл|\bсесси/i,
   },
   { claim: /сломал[аи]?\s+правил/i, factHint: /rules?\b|правил/i },
+  {
+    claim: /хит-?пара[дт]\w*\s+христиан\w*\s+музык|христиан\w*\s+хит-?пара[дт]|христиан\w*\s+чарт/i,
+    factHint: /christian|gospel|ccb|christian chart|религиозн|госпел/i,
+  },
 ];
 
 export function findUngroundedClaims(script: string, referenceFacts: string[] = []): string | null {

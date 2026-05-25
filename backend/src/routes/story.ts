@@ -4,7 +4,7 @@ import { requireAppAuth } from '../middleware/app-auth.js';
 import { validateStoryFullBody } from '../middleware/validate-story.js';
 import { enrichTrackMetadata } from '../services/musicbrainz.js';
 import { fetchAggregatedFactBundle } from '../services/fact-aggregator.js';
-import { pickReferenceFact } from '../services/fact-picker.js';
+import { explainReferenceFactSelection, pickReferenceFact } from '../services/fact-picker.js';
 import { hasLlmKeyForProvider, resolveLlmProvider } from '../services/llm-provider.js';
 import { generateStoryWithFallback } from '../services/story-llm-router.js';
 import { setLogDetail } from '../middleware/request-logger.js';
@@ -77,7 +77,9 @@ router.post('/full', validateStoryFullBody, async (req: Request, res: Response) 
   const installId = req.installId ?? 'unknown';
 
   console.log(
-    `[story] start install=${installId.slice(0, 8)} llm=${llmProvider} artist="${artist}" title="${title}"`,
+    `[story] start install=${installId.slice(0, 8)} llm=${llmProvider}` +
+      (llmProvider === 'gemini' ? ` model=${geminiModel ?? 'default'}` : '') +
+      ` artist="${artist}" title="${title}"`,
   );
 
   try {
@@ -101,6 +103,7 @@ router.post('/full', validateStoryFullBody, async (req: Request, res: Response) 
       `[facts] ${metadata.artist} — ${metadata.title}: track=${trackFactCount} artist=${artistFactCount}`,
     );
     const selectedFact = pickReferenceFact(factBundle, previousScripts);
+    const selectedFactWhy = explainReferenceFactSelection(factBundle, selectedFact);
     const referenceFacts = selectedFact
       ? [selectedFact.fact]
       : [...factBundle.trackFacts, ...factBundle.artistFacts].slice(0, 4);
@@ -121,6 +124,20 @@ router.post('/full', validateStoryFullBody, async (req: Request, res: Response) 
     };
 
     const { story, llmUsed } = await generateStoryWithFallback(storyInput, llmProvider);
+
+    // Copy-friendly Railway logs: seed + final script with clear block markers.
+    if (selectedFact?.fact) {
+      console.log(
+        `[story-seed] ${metadata.artist} — ${metadata.title} | scope=${selectedFact.scope} | ${selectedFact.fact}`,
+      );
+      console.log(`[story-seed-why] ${selectedFactWhy}`);
+    }
+    console.log(
+      `[story-script] ${metadata.artist} — ${metadata.title} | llm=${llmUsed} | narrator=${storyNarrator} | words=${story.word_count}`,
+    );
+    console.log('[story-script-begin]');
+    console.log(story.script);
+    console.log('[story-script-end]');
 
     const response: Record<string, unknown> = {
       artist: metadata.artist,

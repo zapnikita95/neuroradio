@@ -29,6 +29,11 @@ import {
 
 const GEMINI_API_BASE = 'https://generativelanguage.googleapis.com/v1beta/models';
 const MAX_ATTEMPTS = 3;
+const GEMINI_FALLBACK_MODEL = 'gemini-2.0-flash-lite';
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
 
 export interface StoryScript {
   script: string;
@@ -53,8 +58,23 @@ export interface GenerateStoryInput {
 
 function parseStoryJson(raw: string): StoryScript | null {
   const trimmed = raw.trim();
+  const plain = trimmed
+    .replace(/^```json\s*/i, '')
+    .replace(/^```\s*/i, '')
+    .replace(/```$/i, '')
+    .trim();
   const jsonMatch = trimmed.match(/\{[\s\S]*\}/);
-  if (!jsonMatch) return null;
+  if (!jsonMatch) {
+    // Gemini can return plain text even with JSON prompt.
+    if (plain.length >= 80) {
+      return {
+        script: plain,
+        word_count: countWords(plain),
+        voiceId: 'zahar',
+      };
+    }
+    return null;
+  }
 
   try {
     const parsed = JSON.parse(jsonMatch[0]) as Partial<StoryScript>;
@@ -80,7 +100,7 @@ async function callGeminiOnce(
 ): Promise<string> {
   const url = `${GEMINI_API_BASE}/${model}:generateContent?key=${encodeURIComponent(apiKey)}`;
   const generationConfig: Record<string, unknown> = {
-    temperature: useJsonMode ? 0.72 : 0.65,
+    temperature: useJsonMode ? 0.38 : 0.32,
     maxOutputTokens: maxTokens,
   };
   if (useJsonMode) {
@@ -113,16 +133,15 @@ async function callGeminiOnce(
       tryNextModel?: boolean;
     };
     err.status = response.status;
+    // 429 = RPM burst for this key — rotating models burns ALL model quotas (see Railway logs).
     err.tryNextModel =
       response.status === 404 ||
       (response.status === 400 &&
         (rawBody.includes('location is not supported') ||
           rawBody.includes('not found') ||
           rawBody.includes('not supported'))) ||
-      response.status === 429 ||
       rawBody.includes('limit: 0') ||
-      rawBody.includes('RESOURCE_EXHAUSTED') ||
-      rawBody.includes('quota');
+      (rawBody.includes('RESOURCE_EXHAUSTED') && !rawBody.includes('PerMinute'));
     err.retryable = response.status === 429 || response.status >= 500;
     throw err;
   }
@@ -173,10 +192,11 @@ async function callGeminiWithModel(
   }
 }
 
+/** User-selected model first; one stable fallback — not all 4 models on every 429. */
 function geminiModelsToTry(preferred?: string): string[] {
   const primary = resolveGeminiModel(preferred);
-  const rest = GEMINI_FREE_MODELS.map((m) => m.id).filter((id) => id !== primary);
-  return [primary, ...rest];
+  if (primary === GEMINI_FALLBACK_MODEL) return [primary];
+  return [primary, GEMINI_FALLBACK_MODEL];
 }
 
 export function isGeminiStoryFailure(err: unknown): boolean {
@@ -232,6 +252,44 @@ function finalizeStory(
   };
 }
 
+function validateGeminiHardQuality(
+  script: string,
+  input: GenerateStoryInput,
+  storyLength: StoryLengthId,
+  referenceFacts: string[],
+): { ok: true } | { ok: false; reason: string } {
+  return validateStoryScript(script, storyLength, input.artist, input.title, {
+    // Keep anti-leak and factual checks strict, but allow slightly shorter scripts
+    // so Gemini can converge instead of failing the whole request with 500.
+    strictLength: false,
+    skipWatery: false,
+    // Reference anchor is already enforced in per-attempt quality checks.
+    // Here we keep leak/length/filler gates and avoid over-rejecting final candidates.
+    skipReferenceAnchor: true,
+    skipBannedPatterns: false,
+    skipEnglishCheck: false,
+    referenceFacts,
+  });
+}
+
+function validateGeminiGracefulFallback(
+  script: string,
+  input: GenerateStoryInput,
+  storyLength: StoryLengthId,
+  referenceFacts: string[],
+): { ok: true } | { ok: false; reason: string } {
+  return validateStoryScript(script, storyLength, input.artist, input.title, {
+    // Graceful fallback: keep anti-leak/anti-water checks strict, but
+    // do not hard-fail the whole request on anchor precision after retries.
+    strictLength: false,
+    skipWatery: false,
+    skipReferenceAnchor: true,
+    skipBannedPatterns: false,
+    skipEnglishCheck: false,
+    referenceFacts,
+  });
+}
+
 export function hasGeminiApiKey(): boolean {
   return Boolean(process.env.GEMINI_API_KEY?.trim());
 }
@@ -260,7 +318,7 @@ export async function generateStoryScript(
   let lastCandidate: StoryScript | null = null;
 
   for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
-    const userPrompt = buildStoryUserPrompt({
+    const basePrompt = buildStoryUserPrompt({
       ...input,
       voiceId,
       storyLength,
@@ -268,6 +326,10 @@ export async function generateStoryScript(
       retryReason,
       selectedReferenceFact: input.selectedReferenceFact,
     });
+    const retryDirective = buildRetryDirective(retryReason, lengthPreset.wordsMin);
+    const userPrompt = retryDirective
+      ? `${basePrompt}\n\nКРИТИЧЕСКАЯ ПРАВКА:\n${retryDirective}`
+      : basePrompt;
 
     let content: string;
     try {
@@ -285,9 +347,22 @@ export async function generateStoryScript(
       const status = (err as { status?: number }).status;
       const tryNext = (err as { tryNextModel?: boolean }).tryNextModel;
       const models = geminiModelsToTry(input.geminiModel);
-      if ((status === 429 || tryNext) && geminiModelIndex + 1 < models.length) {
+
+      if (status === 429) {
+        const waitMs = 2000 + attempt * 1200;
+        if (attempt < MAX_ATTEMPTS - 1) {
+          console.warn(`[gemini] 429 on ${models[geminiModelIndex]} — wait ${waitMs}ms, retry same model`);
+          await sleep(waitMs);
+          continue;
+        }
+        throw err;
+      }
+
+      if (tryNext && geminiModelIndex + 1 < models.length) {
         geminiModelIndex += 1;
-        console.warn(`[gemini] attempt ${attempt + 1}: next model index ${geminiModelIndex}`);
+        console.warn(
+          `[gemini] model unavailable — fallback ${models[geminiModelIndex]} (attempt ${attempt + 1})`,
+        );
         continue;
       }
       throw err;
@@ -302,6 +377,10 @@ export async function generateStoryScript(
     story.word_count = countWords(story.script);
 
     const qOpts = qualityOptionsForAttempt(attempt, MAX_ATTEMPTS, referenceFacts);
+    if (attempt >= MAX_ATTEMPTS - 1) {
+      // Last Gemini attempt: avoid hard 500 on anchor-parsing edge cases.
+      qOpts.skipReferenceAnchor = true;
+    }
 
     const quality = validateGeneratedStory(
       story.script,
@@ -311,7 +390,14 @@ export async function generateStoryScript(
       qOpts,
     );
     if (quality.ok) {
-      return finalizeStory(story, { ...input, voiceId }, storyLength);
+      const hard = validateGeminiHardQuality(story.script, input, storyLength, referenceFacts);
+      if (hard.ok) {
+        return finalizeStory(story, { ...input, voiceId }, storyLength);
+      }
+      retryReason = hard.reason;
+      lastCandidate = story;
+      console.warn(`Gemini hard-quality reject (attempt ${attempt + 1}): ${retryReason}`);
+      continue;
     }
 
     const sanitized = sanitizeScriptForTts(story.script, input.artist, input.title);
@@ -323,8 +409,15 @@ export async function generateStoryScript(
       qOpts,
     );
     if (sanitizedQuality.ok) {
-      console.warn(`Gemini story sanitized after attempt ${attempt + 1}: ${quality.reason}`);
-      return finalizeStory({ ...story, script: sanitized }, { ...input, voiceId }, storyLength);
+      const hard = validateGeminiHardQuality(sanitized, input, storyLength, referenceFacts);
+      if (hard.ok) {
+        console.warn(`Gemini story sanitized after attempt ${attempt + 1}: ${quality.reason}`);
+        return finalizeStory({ ...story, script: sanitized }, { ...input, voiceId }, storyLength);
+      }
+      retryReason = hard.reason;
+      lastCandidate = { ...story, script: sanitized };
+      console.warn(`Gemini hard-quality reject (attempt ${attempt + 1}): ${retryReason}`);
+      continue;
     }
 
     lastCandidate = { ...story, script: sanitized };
@@ -337,7 +430,42 @@ export async function generateStoryScript(
     { artist: input.artist, title: input.title },
     (s) => finalizeStory(s, { ...input, voiceId }, storyLength),
   );
-  if (fallback) return fallback;
+  if (fallback) {
+    const hard = validateGeminiHardQuality(fallback.script, input, storyLength, referenceFacts);
+    if (hard.ok) return fallback;
+    const graceful = validateGeminiGracefulFallback(
+      fallback.script,
+      input,
+      storyLength,
+      referenceFacts,
+    );
+    if (graceful.ok) {
+      console.warn(`Gemini fallback accepted by graceful-quality: ${hard.reason}`);
+      return fallback;
+    }
+    console.warn(
+      `Gemini fallback rejected by hard+graceful quality: hard=${hard.reason}; graceful=${graceful.reason}`,
+    );
+  }
 
   throw new Error('Could not produce a usable story');
+}
+
+function buildRetryDirective(reason: string | undefined, minWords: number): string | null {
+  if (!reason) return null;
+  const lower = reason.toLowerCase();
+  const directives: string[] = [];
+  if (lower.includes('english words') || lower.includes('english leak')) {
+    directives.push('Только русский текст: переведи всю латиницу и английские термины.');
+  }
+  if (lower.includes('too short')) {
+    directives.push(`Сделай не меньше ${minWords} слов без воды, добавь одну конкретную деталь из семени.`);
+  }
+  if (lower.includes('first sentence')) {
+    directives.push('Первая фраза обязана сразу содержать якорь из seed-факта.');
+  }
+  if (lower.includes('ignores wikipedia') || lower.includes('reference')) {
+    directives.push('Сохрани минимум два якоря из seed-факта (событие/место/персона/чарт).');
+  }
+  return directives.length > 0 ? directives.join(' ') : null;
 }

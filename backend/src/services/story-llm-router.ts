@@ -21,10 +21,18 @@ function isGeminiRateLimitError(err: unknown): boolean {
   return /\b429\b|resource_exhausted|quota exceeded/i.test(err.message);
 }
 
-/** Cross-provider fallback only on API rate limits — not quality rejects (saves Gemini quota). */
+function isQualityRejectError(err: unknown): boolean {
+  if (!(err instanceof Error)) return false;
+  return /could not produce a usable story|story quality rejected|english words in russian narration|too short|first sentence is not anchored|story ignores wikipedia/i.test(
+    err.message,
+  );
+}
+
+/** Cross-provider fallback on rate limits OR hard quality rejects. */
 function shouldFallbackToAlternateProvider(err: unknown): boolean {
   if (isGroqRateLimitError(err)) return true;
   if (isGeminiRateLimitError(err)) return true;
+  if (isQualityRejectError(err)) return true;
   return false;
 }
 
