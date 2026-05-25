@@ -16,6 +16,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -162,7 +163,8 @@ class StoryOrchestrator(
             triggerEngine.restoreTracksSinceLastStory(settingsDataStore.tracksSinceLastStory.first())
             _tracksUntilNext.value = triggerEngine.tracksUntilNext(settings)
             publishUiState()
-            if (triggerEngine.currentTracksSinceLastStory() >= settings.everyNTracks) {
+            val firstTrackBonus = !settingsDataStore.firstAutoStoryCompleted.first()
+            if (firstTrackBonus || triggerEngine.currentTracksSinceLastStory() >= settings.everyNTracks) {
                 StoryLog.i("Auto story overdue — triggering for ${track.artist} — ${track.title}")
                 playStoryForTrack(track, manual = false)
             }
@@ -182,6 +184,8 @@ class StoryOrchestrator(
 
         val settings = loadTriggerSettings()
         val trackGenre = scrobbleRepository.lookupGenre(track.artist, track.title)
+        val firstTrackBonus = !settingsDataStore.firstAutoStoryCompleted.first() &&
+            settings.mode == TriggerMode.EVERY_N_TRACKS
         val shouldTrigger = _mode.value == OrchestratorMode.AUTO &&
             settings.autoIntercept &&
             !isStorySessionActive() &&
@@ -190,6 +194,7 @@ class StoryOrchestrator(
                 trackKey = track.displayKey,
                 trackArtist = track.artist,
                 trackGenre = trackGenre,
+                firstTrackBonus = firstTrackBonus,
             )
 
         settingsDataStore.setTracksSinceLastStory(triggerEngine.currentTracksSinceLastStory())
@@ -221,7 +226,7 @@ class StoryOrchestrator(
         }
     }
 
-    private suspend fun playStoryForTrack(track: TrackInfo, manual: Boolean) {
+    private suspend fun playStoryForTrack(requestedTrack: TrackInfo, manual: Boolean) {
         storyMutex.withLock {
             val session = ++playbackSession
             cancelGenerationPreview()
@@ -229,8 +234,29 @@ class StoryOrchestrator(
             _errorMessage.value = null
             publishUiState()
 
-            val fetchStartedAt = SystemClock.elapsedRealtime()
             val musicPausedForStory = AtomicBoolean(false)
+            val interruptionMode = settingsDataStore.musicInterruptionMode.first()
+            val fadeSeconds = settingsDataStore.musicFadeSeconds.first()
+
+            fun resolveTrack(): TrackInfo? {
+                val fresh = mediaControllerManager.resolveNowPlayingTrack()
+                return fresh ?: requestedTrack.takeIf { it.isValid() }
+            }
+
+            var track = resolveTrack() ?: run {
+                _errorMessage.value = "Нет активного трека для истории"
+                _state.value = OrchestratorState.ERROR
+                publishUiState()
+                return@withLock
+            }
+
+            if (!manual) {
+                val current = mediaControllerManager.resolveNowPlayingTrack()
+                if (current != null && current.displayKey != track.displayKey) {
+                    StoryLog.i("Track changed before fetch — using ${current.artist} — ${current.title}")
+                    track = current
+                }
+            }
 
             val result = storyRepository.fetchStory(track, forceRefresh = manual)
             val ttsSpeed = settingsDataStore.ttsSpeed.first().androidRate
@@ -239,33 +265,31 @@ class StoryOrchestrator(
                     if (session != playbackSession) return@fold
 
                     if (!manual) {
-                        mediaControllerManager.pauseMusic()
-                        musicPausedForStory.set(true)
+                        val current = mediaControllerManager.resolveNowPlayingTrack()
+                        if (current != null && current.displayKey != track.displayKey) {
+                            StoryLog.w("Track changed after fetch — skip stale story for ${track.artist}")
+                            _state.value = OrchestratorState.LISTENING
+                            publishUiState()
+                            return@fold
+                        }
                     }
 
                     if (manual) {
-                        startGenerationPreview(response.script, session)
-                    } else {
-                        startGenerationPreview(response.script, session, autoMode = true)
-                    }
-
-                    if (!manual) {
-                        val elapsed = SystemClock.elapsedRealtime() - fetchStartedAt
-                        val remaining = AUTO_MIN_MUSIC_MS - elapsed
-                        if (remaining > 0) {
-                            delay(remaining.coerceAtMost(AUTO_PREVIEW_MAX_WAIT_MS))
+                        if (interruptionMode == MusicInterruptionMode.FADE) {
+                            scope.launch {
+                                mediaControllerManager.fadeOutAndPause(fadeSeconds)
+                            }
+                        } else {
+                            mediaControllerManager.pauseMusic()
                         }
+                        musicPausedForStory.set(true)
+                        startGenerationPreview(response.script, session)
                     }
 
                     if (session != playbackSession) return@fold
 
                     _state.value = OrchestratorState.PREPARING_PLAYBACK
                     publishUiState()
-
-                    if (manual) {
-                        mediaControllerManager.pauseMusic()
-                        musicPausedForStory.set(true)
-                    }
 
                     val audioUrl = storyRepository.resolveAudioUrl(response.audioUrl)
                     storyPlayer.playStory(
@@ -275,10 +299,19 @@ class StoryOrchestrator(
                         resumeMusic = true,
                         onPlaybackStarted = {
                             if (session != playbackSession) return@playStory
-                            if (!manual) {
-                                triggerEngine.onStoryPlaybackStarted()
-                                scope.launch {
+                            scope.launch {
+                                if (!manual) {
+                                    withContext(Dispatchers.Main.immediate) {
+                                        if (interruptionMode == MusicInterruptionMode.FADE) {
+                                            mediaControllerManager.fadeOutAndPause(fadeSeconds)
+                                        } else {
+                                            mediaControllerManager.pauseMusic()
+                                        }
+                                    }
+                                    musicPausedForStory.set(true)
+                                    triggerEngine.onStoryPlaybackStarted()
                                     settingsDataStore.setTracksSinceLastStory(0)
+                                    settingsDataStore.setFirstAutoStoryCompleted(true)
                                 }
                             }
                             _state.value = OrchestratorState.PLAYING_STORY
@@ -286,6 +319,7 @@ class StoryOrchestrator(
                         },
                         onFinished = {
                             if (session != playbackSession) return@playStory
+                            cancelGenerationPreview()
                             if (musicPausedForStory.get() && storyPlayer.shouldResumeMusic()) {
                                 mediaControllerManager.resumeMusic()
                             }
@@ -295,6 +329,7 @@ class StoryOrchestrator(
                         },
                         onError = {
                             if (session != playbackSession) return@playStory
+                            cancelGenerationPreview()
                             if (!manual) {
                                 scope.launch {
                                     val everyN = settingsDataStore.everyNTracks.first()
@@ -350,6 +385,7 @@ class StoryOrchestrator(
             }
             StoryLog.w("Playback watchdog: story did not start in time")
             storyPlayer.stop()
+            cancelGenerationPreview()
             val everyN = settingsDataStore.everyNTracks.first()
             triggerEngine.rollbackFailedStoryTrigger(everyN)
             settingsDataStore.setTracksSinceLastStory(triggerEngine.currentTracksSinceLastStory())
@@ -408,14 +444,14 @@ class StoryOrchestrator(
         _generationPreview.value = GenerationPreviewState()
     }
 
-    private fun startGenerationPreview(script: String, session: Int, autoMode: Boolean = false) {
+    private fun startGenerationPreview(script: String, session: Int) {
         val words = script.trim().split(Regex("\\s+")).filter { it.isNotEmpty() }
         if (words.isEmpty()) return
 
         previewJob?.cancel()
         previewJob = scope.launch {
-            val revealMaxMs = if (autoMode) AUTO_PREVIEW_REVEAL_MAX_MS else PREVIEW_REVEAL_MAX_MS
-            val holdMs = if (autoMode) AUTO_PREVIEW_HOLD_MS else PREVIEW_HOLD_MS
+            val revealMaxMs = PREVIEW_REVEAL_MAX_MS
+            val holdMs = PREVIEW_HOLD_MS
             _generationPreview.value = GenerationPreviewState(
                 words = words,
                 visibleWordCount = 0,
@@ -435,24 +471,10 @@ class StoryOrchestrator(
                     delay(wordDelayMs)
                 }
             }
-
-            delay(holdMs)
-
-            val fadeSteps = 12
-            repeat(fadeSteps) { step ->
-                if (session != playbackSession) return@launch
-                val alpha = 1f - ((step + 1).toFloat() / fadeSteps.toFloat())
-                _generationPreview.value = _generationPreview.value.copy(alpha = alpha)
-                if (step == fadeSteps - 1 || step % 3 == 0) {
-                    publishUiState()
-                }
-                delay(PREVIEW_FADE_STEP_MS)
-            }
-
-            if (session == playbackSession) {
-                _generationPreview.value = GenerationPreviewState()
-                publishUiState()
-            }
+            delay(holdMs.coerceAtMost(1_100L))
+            if (session != playbackSession) return@launch
+            _generationPreview.value = _generationPreview.value.copy(alpha = 1f, isActive = true)
+            publishUiState()
         }
     }
 
@@ -462,15 +484,9 @@ class StoryOrchestrator(
     }
 
     companion object {
-        /** Auto: short beat of music after fetch, then story audio. */
-        private const val AUTO_MIN_MUSIC_MS = 2_000L
-        private const val AUTO_PREVIEW_MAX_WAIT_MS = 3_500L
         private const val PLAYBACK_START_TIMEOUT_MS = 25_000L
         private const val PREVIEW_REVEAL_MAX_MS = 7_000L
         private const val PREVIEW_HOLD_MS = 7_000L
-        private const val AUTO_PREVIEW_REVEAL_MAX_MS = 1_800L
-        private const val AUTO_PREVIEW_HOLD_MS = 600L
-        private const val PREVIEW_FADE_STEP_MS = 70L
     }
 }
 

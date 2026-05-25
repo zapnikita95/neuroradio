@@ -1,3 +1,4 @@
+import { factAppliesToRequest } from './fact-relevance.js';
 import {
   filterAndRankFacts,
   interestScore,
@@ -86,9 +87,15 @@ export function pickReferenceFact(
   bundle: ReferenceFactBundle,
   previousScripts: string[],
   storyIndex = previousScripts.length,
+  artist = '',
+  title = '',
 ): SelectedReferenceFact | null {
-  const trackFacts = dedupeFacts(bundle.trackFacts);
-  const artistFacts = dedupeFacts(bundle.artistFacts);
+  const trackFacts = dedupeFacts(bundle.trackFacts).filter((f) =>
+    factAppliesToRequest(f, artist, title, 'track'),
+  );
+  const artistFacts = dedupeFacts(bundle.artistFacts).filter((f) =>
+    factAppliesToRequest(f, artist, title, 'artist'),
+  );
   const preferTrack = storyIndex % 2 === 0;
 
   const primary = preferTrack ? trackFacts : artistFacts;

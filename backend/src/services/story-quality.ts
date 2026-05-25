@@ -4,6 +4,7 @@ import {
   StoryLengthId,
   StoryLengthPreset,
 } from './story-length.js';
+import { factNamesForeignEntity } from './fact-relevance.js';
 import { hasEnglishLeak } from './story-russian-language.js';
 
 export { DEFAULT_STORY_LENGTH, getStoryLengthPreset };
@@ -252,6 +253,10 @@ export function validateStoryScript(
   const referenceFacts = options.referenceFacts ?? [];
   const trimmed = script.trim();
   if (!trimmed) return { ok: false, reason: 'empty script' };
+
+  if (factNamesForeignEntity(trimmed, artist, title)) {
+    return { ok: false, reason: 'story names a different artist than the track' };
+  }
 
   if (!skipBannedPatterns) {
     for (const pattern of BANNED_SCRIPT_PATTERNS) {

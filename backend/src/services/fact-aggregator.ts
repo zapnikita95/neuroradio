@@ -1,5 +1,6 @@
 import fetch from 'node-fetch';
 import type { ReferenceFactBundle } from './fact-picker.js';
+import { factAppliesToRequest } from './fact-relevance.js';
 import { filterAndRankFacts } from './reference-fact-quality.js';
 import { buildFactHuntSearchQueries } from './story-fact-hunt.js';
 import { fetchReferenceFactBundle as fetchWikipediaBundle } from './wikipedia-facts.js';
@@ -28,16 +29,11 @@ function mergeFacts(...pools: string[][]): string[] {
 }
 
 function factsAboutTrackOrArtist(facts: string[], artist: string, title: string): string[] {
-  const artistTokens = normalize(artist)
-    .split(' ')
-    .filter((word) => word.length >= 4);
-  const titleNorm = normalize(title);
-  return facts.filter((fact) => {
-    const norm = normalize(fact);
-    if (titleNorm.length >= 4 && norm.includes(titleNorm)) return true;
-    if (artistTokens.length === 0) return false;
-  return artistTokens.some((token) => norm.includes(token));
-  });
+  return facts.filter(
+    (fact) =>
+      factAppliesToRequest(fact, artist, title, 'track') ||
+      factAppliesToRequest(fact, artist, title, 'artist'),
+  );
 }
 
 async function fetchDuckDuckGo(artist: string, title: string): Promise<string[]> {

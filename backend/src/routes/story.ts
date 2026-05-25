@@ -102,7 +102,13 @@ router.post('/full', validateStoryFullBody, async (req: Request, res: Response) 
     console.log(
       `[facts] ${metadata.artist} — ${metadata.title}: track=${trackFactCount} artist=${artistFactCount}`,
     );
-    const selectedFact = pickReferenceFact(factBundle, previousScripts);
+    const selectedFact = pickReferenceFact(
+      factBundle,
+      previousScripts,
+      previousScripts.length,
+      metadata.artist,
+      metadata.title,
+    );
     const selectedFactWhy = explainReferenceFactSelection(factBundle, selectedFact);
     const referenceFacts = selectedFact
       ? [selectedFact.fact]

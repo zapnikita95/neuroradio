@@ -1,5 +1,6 @@
 import fetch from 'node-fetch';
 import type { ReferenceFactBundle } from './fact-picker.js';
+import { factNamesForeignEntity } from './fact-relevance.js';
 import { filterAndRankFacts, isBoringFact, isCollectorFact } from './reference-fact-quality.js';
 
 const USER_AGENT = 'MusicStoryBFF/1.0 (contact@example.com)';
@@ -122,7 +123,13 @@ function extractSentencesMentioning(text: string, needle: string, max = 6): stri
 }
 
 /** Title mention + next sentences — catches «Hafanana» → Iron Curtain / East Berlin on artist page. */
-function extractTrackContextFacts(text: string, title: string, contextAfter = 2, max = 8): string[] {
+function extractTrackContextFacts(
+  text: string,
+  title: string,
+  artist = '',
+  contextAfter = 2,
+  max = 8,
+): string[] {
   const sentences = splitWikiSentences(text);
   const indices = new Set<number>();
   sentences.forEach((sentence, index) => {
@@ -133,7 +140,13 @@ function extractTrackContextFacts(text: string, title: string, contextAfter = 2,
     }
   });
   const facts = [...indices].sort((a, b) => a - b).map((index) => sentences[index]);
-  return filterAndRankFacts(facts, max);
+  const anchored = artist
+    ? facts.filter(
+        (fact) =>
+          isTrackAnchored(fact, artist, title) && !factNamesForeignEntity(fact, artist, title),
+      )
+    : facts.filter((fact) => !factNamesForeignEntity(fact, artist, title));
+  return filterAndRankFacts(anchored, max);
 }
 
 function normalizeForMatch(text: string): string {
@@ -333,7 +346,7 @@ async function fetchFactsForTitle(
   if (bullets.length > 0) return bullets;
   if (trackContext) {
     const contextual = filterMusicFacts(
-      extractTrackContextFacts(summary, mentionNeedle),
+      extractTrackContextFacts(summary, mentionNeedle, artist),
       artist,
       mentionNeedle,
       requireTrackAnchor,
@@ -367,7 +380,7 @@ async function fetchArtistMentionsForTrack(
     await sleep(120);
     const summary = (await fetchFullExtract(lang, candidate)) ?? (await fetchSummary(lang, candidate));
     if (!summary || isDisambiguationExtract(summary)) continue;
-    const mentions = extractTrackContextFacts(summary, title).filter((fact) => !isWeakFact(fact));
+    const mentions = extractTrackContextFacts(summary, title, artist).filter((fact) => !isWeakFact(fact));
     if (mentions.length > 0) return mentions;
   }
   return [];
