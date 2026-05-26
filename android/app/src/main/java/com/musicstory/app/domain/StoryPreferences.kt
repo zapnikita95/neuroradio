@@ -8,24 +8,48 @@ enum class StoryLength(
     val sentenceHint: String,
     val maxTokens: Int,
 ) {
-    SEC_15("15s", "15 секунд", 30, 42, "2–3 коротких предложения", 380),
-    SEC_30("30s", "30 секунд", 65, 85, "4–6 коротких предложений", 650),
-    SEC_60("60s", "1 минута", 125, 160, "6–10 предложений", 1200),
-    UNLIMITED("unlimited", "Не ограничено", 180, 300, "8–14 предложений", 1500),
+    SEC_30(
+        id = "30s",
+        labelRu = "30 секунд · быстрый темп",
+        wordsMin = 72,
+        wordsMax = 100,
+        sentenceHint = "4–7 коротких предложений — под быструю озвучку",
+        maxTokens = 720,
+    ),
+    SEC_60(
+        id = "60s",
+        labelRu = "1 минута · основной",
+        wordsMin = 130,
+        wordsMax = 175,
+        sentenceHint = "7–11 предложений — основной режим",
+        maxTokens = 1300,
+    ),
+    UNLIMITED(
+        id = "unlimited",
+        labelRu = "Не ограничено",
+        wordsMin = 195,
+        wordsMax = 320,
+        sentenceHint = "9–15 предложений",
+        maxTokens = 1600,
+    ),
     ;
 
     companion object {
-        fun fromId(id: String?): StoryLength =
-            entries.firstOrNull { it.id == id } ?: SEC_30
+        fun fromId(id: String?): StoryLength = when (id) {
+            "15s" -> SEC_30
+            null -> SEC_60
+            else -> entries.firstOrNull { it.id == id } ?: SEC_60
+        }
     }
 }
 
+/** Slightly above Yandex “normal” (1.0) — app default pacing feels brisk, not sluggish. */
 enum class TtsSpeed(val id: String, val labelRu: String, val yandexSpeed: Float, val androidRate: Float) {
-    VERY_SLOW("very_slow", "Очень медленно", 0.75f, 0.78f),
-    SLOW("slow", "Медленно", 0.85f, 0.86f),
-    NORMAL("normal", "Нормально", 0.92f, 0.92f),
-    FAST("fast", "Быстро", 1.05f, 1.04f),
-    VERY_FAST("very_fast", "Очень быстро", 1.18f, 1.12f),
+    VERY_SLOW("very_slow", "Очень медленно", 0.82f, 0.84f),
+    SLOW("slow", "Медленно", 0.90f, 0.90f),
+    NORMAL("normal", "Нормально", 1.0f, 1.0f),
+    FAST("fast", "Быстро", 1.08f, 1.06f),
+    VERY_FAST("very_fast", "Очень быстро", 1.14f, 1.10f),
     ;
 
     companion object {

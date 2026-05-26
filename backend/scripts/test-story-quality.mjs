@@ -58,7 +58,7 @@ if (englishVal.ok) {
 
 const RUSSIAN_ABBA =
   '«Dancing Queen» — единственный хит ABBA, который дошёл до первого места в американском хит-параде. Для шведов это был редкий случай: их песню услышала вся страна по радио, хотя дома они уже давно правили эфиром.';
-const ruVal = validateStoryScript(RUSSIAN_ABBA, '15s', 'ABBA', 'Dancing Queen', {
+const ruVal = validateStoryScript(RUSSIAN_ABBA, '30s', 'ABBA', 'Dancing Queen', {
   referenceFacts: ['It was ABBA\'s only number-one hit on the Billboard Hot 100.'],
   strictLength: false,
 });

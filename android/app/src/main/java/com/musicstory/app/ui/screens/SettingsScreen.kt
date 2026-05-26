@@ -126,7 +126,7 @@ fun SettingsScreen(
     val scrobbledArtists by app.scrobbleRepository.topArtists().collectAsState(initial = emptyList())
     val scrobbledGenres by app.scrobbleRepository.topGenres().collectAsState(initial = emptyList())
     val dailyQuota by app.storyRepository.dailyQuota.collectAsState(initial = null)
-    val storyLength by settings.storyLength.collectAsState(initial = StoryLength.SEC_30)
+    val storyLength by settings.storyLength.collectAsState(initial = StoryLength.SEC_60)
     val storyNarrator by settings.storyNarrator.collectAsState(initial = StoryNarrator.AUTO)
     val ttsVoice by settings.ttsVoice.collectAsState(initial = TtsVoice.AUTO)
     val ttsSpeed by settings.ttsSpeed.collectAsState(initial = TtsSpeed.NORMAL)

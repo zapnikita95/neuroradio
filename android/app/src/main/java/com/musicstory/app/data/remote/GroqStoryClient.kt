@@ -35,7 +35,7 @@ class GroqStoryClient(
         genre: String? = null,
         countryCode: String? = null,
         previousScripts: List<String> = emptyList(),
-        storyLength: StoryLength = StoryLength.SEC_30,
+        storyLength: StoryLength = StoryLength.SEC_60,
         storyNarrator: StoryNarrator = StoryNarrator.AUTO,
         referenceFacts: List<String> = emptyList(),
         selectedFact: SelectedReferenceFact? = null,

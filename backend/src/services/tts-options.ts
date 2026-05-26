@@ -8,7 +8,7 @@ export interface TtsOptions {
 
 export const TTS_SPEED_MIN = 0.1;
 export const TTS_SPEED_MAX = 3.0;
-export const DEFAULT_TTS_SPEED = 0.92;
+export const DEFAULT_TTS_SPEED = 1.0;
 export const DEFAULT_TTS_EMOTION: TtsEmotion = 'good';
 
 export const TTS_EMOTION_PRESETS: Array<{
@@ -26,11 +26,11 @@ export const TTS_SPEED_PRESETS: Array<{
   labelRu: string;
   speed: number;
 }> = [
-  { id: 'very_slow', labelRu: 'Очень медленно', speed: 0.75 },
-  { id: 'slow', labelRu: 'Медленно', speed: 0.85 },
-  { id: 'normal', labelRu: 'Нормально', speed: 0.92 },
-  { id: 'fast', labelRu: 'Быстро', speed: 1.05 },
-  { id: 'very_fast', labelRu: 'Очень быстро', speed: 1.18 },
+  { id: 'very_slow', labelRu: 'Очень медленно', speed: 0.82 },
+  { id: 'slow', labelRu: 'Медленно', speed: 0.9 },
+  { id: 'normal', labelRu: 'Нормально', speed: 1.0 },
+  { id: 'fast', labelRu: 'Быстро', speed: 1.08 },
+  { id: 'very_fast', labelRu: 'Очень быстро', speed: 1.14 },
 ];
 
 export function resolveTtsSpeed(value: unknown): number {

@@ -18,7 +18,7 @@ const TRACK = {
   countryCode: 'US',
 };
 
-const LENGTHS = ['15s', '30s', '60s', 'unlimited'];
+const LENGTHS = ['30s', '60s', 'unlimited'];
 const NARRATORS = ['contemporary', 'night_dj', 'expert', 'fan'];
 
 const rimmelFact =

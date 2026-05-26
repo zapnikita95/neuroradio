@@ -36,7 +36,7 @@ class GeminiStoryClient(
         genre: String? = null,
         countryCode: String? = null,
         previousScripts: List<String> = emptyList(),
-        storyLength: StoryLength = StoryLength.SEC_30,
+        storyLength: StoryLength = StoryLength.SEC_60,
         storyNarrator: StoryNarrator = StoryNarrator.AUTO,
         referenceFacts: List<String> = emptyList(),
         selectedFact: SelectedReferenceFact? = null,
@@ -303,10 +303,9 @@ class GeminiStoryClient(
     }
 
     private fun lengthBounds(storyLength: StoryLength): LengthBounds = when (storyLength) {
-        StoryLength.SEC_15 -> LengthBounds(minWords = 30, maxWords = 42)
-        StoryLength.SEC_30 -> LengthBounds(minWords = 65, maxWords = 85)
-        StoryLength.SEC_60 -> LengthBounds(minWords = 125, maxWords = 160)
-        StoryLength.UNLIMITED -> LengthBounds(minWords = 180, maxWords = 300)
+        StoryLength.SEC_30 -> LengthBounds(minWords = 72, maxWords = 100)
+        StoryLength.SEC_60 -> LengthBounds(minWords = 130, maxWords = 175)
+        StoryLength.UNLIMITED -> LengthBounds(minWords = 195, maxWords = 320)
     }
 
     companion object {

@@ -11,7 +11,7 @@ data class StoryRequest(
     val artist: String,
     val title: String,
     @SerializedName("previous_scripts") val previousScripts: List<String> = emptyList(),
-    @SerializedName("story_length") val storyLength: String = StoryLength.SEC_30.id,
+    @SerializedName("story_length") val storyLength: String = StoryLength.SEC_60.id,
     @SerializedName("story_narrator") val storyNarrator: String = StoryNarrator.AUTO.id,
     @SerializedName("tts_voice") val ttsVoice: String = TtsVoice.AUTO.id,
     @SerializedName("tts_speed") val ttsSpeed: Float = TtsSpeed.NORMAL.yandexSpeed,

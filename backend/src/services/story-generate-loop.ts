@@ -68,7 +68,7 @@ export function finalizeAfterQualityLoop<T extends { script: string }>(
     console.warn('[story] last script rejected: no reference facts');
     return null;
   }
-  const anchorCheck = validateStoryScript(sanitized, '30s', input.artist, input.title, {
+  const anchorCheck = validateStoryScript(sanitized, '60s', input.artist, input.title, {
     strictLength: false,
     referenceFacts,
     skipBannedPatterns: false,

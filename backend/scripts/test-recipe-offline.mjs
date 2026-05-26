@@ -20,7 +20,7 @@ const mediaFact =
 if (!isBoringFact(mediaFact)) fail('Rimmel media list should be boring');
 else ok('Rimmel media list rejected');
 
-for (const id of ['15s', '30s', '60s', 'unlimited']) {
+for (const id of ['30s', '60s', 'unlimited']) {
   const length = getStoryLengthPreset(id);
   const persona = buildPersonaForNarrator('contemporary', 1974, 'rock', 'Redbone', 'Come and Get Your Love', 'US');
   const system = buildSystemPrompt(persona, length);
@@ -47,8 +47,8 @@ for (const id of ['15s', '30s', '60s', 'unlimited']) {
   if (!user.includes('ЖЁСТКАЯ ДЛИНА')) fail(`${id}: missing strict length in user`);
   if (!user.includes('КРЮЧОК')) fail(`${id}: missing recipe hook in user`);
 
-  if (id === '15s' && !system.includes('КРЮЧОК + одна ударная')) fail('15s plan missing hook-only');
-  if (id === '30s' && !system.includes('4–6 коротких')) fail('30s plan missing sentence hint');
+  if (id === '30s' && !system.includes('БЫСТРЫЙ темп')) fail('30s plan missing fast-tempo hint');
+  if (id === '60s' && !system.includes('ОСНОВНОЙ')) fail('60s plan missing main-mode hint');
   if (id === '60s' && !system.includes('внутренняя кухня')) fail('60s plan missing kitchen');
 }
 
