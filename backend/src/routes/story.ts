@@ -173,11 +173,19 @@ router.post('/full', validateStoryFullBody, async (req: Request, res: Response) 
 
     if (hasYandexCredentials()) {
       const id = uuidv4();
+      console.log(
+        `[yandex-tts] queue${installId.slice(0, 8)} voice=${voiceId} speed=${ttsSpeed} emotion=${ttsEmotion} words=${story.word_count}`,
+      );
       const audio = await synthesizeSpeech(story.script, voiceId, `${id}.ogg`, {
         speed: ttsSpeed,
         emotion: ttsEmotion,
         artist: metadata.artist,
         title: metadata.title,
+        logContext: {
+          installId,
+          artist: metadata.artist,
+          title: metadata.title,
+        },
       });
       response.audioUrl = signAudioAccess(audio.fileName) ?? audio.audioUrl;
       response.audioFile = audio.fileName;
@@ -195,20 +203,26 @@ router.post('/full', validateStoryFullBody, async (req: Request, res: Response) 
     res.json(response);
   } catch (err) {
     const rawMessage = err instanceof Error ? err.message : String(err);
-    console.error(
-      `[story] fail install=${installId.slice(0, 8)} llm=${llmProvider} artist="${artist}" title="${title}" err=${rawMessage.slice(0, 300)}`,
-      err,
-    );
+    const isTts = /yandex tts|speechkit|tts\.api\.cloud\.yandex/i.test(rawMessage);
+    if (isTts) {
+      console.error(
+        `[yandex-tts] story-fail install=${installId.slice(0, 8)} artist="${artist}" title="${title}" speed=${(req.body as StoryFullBody).tts_speed} emotion=${(req.body as StoryFullBody).tts_emotion} err=${rawMessage.slice(0, 280)}`,
+      );
+    } else {
+      console.error(
+        `[story] fail install=${installId.slice(0, 8)} llm=${llmProvider} artist="${artist}" title="${title}" err=${rawMessage.slice(0, 300)}`,
+      );
+    }
     const { code: errorCode, message: userMessage, httpStatus } = classifyStoryLlmError(err, llmProvider);
     setLogDetail(
       res,
-      `code=${errorCode} llm=${llmProvider} ${rawMessage.slice(0, 200)}`,
+      `code=${errorCode} ${isTts ? 'yandex-tts' : `llm=${llmProvider}`} ${rawMessage.slice(0, 200)}`,
     );
     res.status(httpStatus).json({
       error: httpStatus === 503 ? 'Story generation unavailable' : 'Story generation failed',
       code: errorCode,
       message: userMessage,
-      source: 'llm',
+      source: isTts ? 'tts' : 'llm',
     });
   }
 });

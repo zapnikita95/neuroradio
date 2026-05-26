@@ -88,6 +88,23 @@ export function classifyStoryLlmError(
     };
   }
 
+  if (/yandex tts|speechkit|tts\.api\.cloud\.yandex/i.test(lower)) {
+    if (/speed|tempo|rate/i.test(lower)) {
+      return {
+        code: 'YANDEX_TTS_SPEED',
+        message:
+          'Yandex не принял скорость озвучки — попробуй «Быстро» или «Нормально» в настройках голоса.',
+        httpStatus: 503,
+      };
+    }
+    return {
+      code: 'YANDEX_TTS_FAILED',
+      message:
+        'Yandex не смог озвучить историю на сервере. Подожди минуту и попробуй снова.',
+      httpStatus: 503,
+    };
+  }
+
   return {
     code: 'STORY_FAILED',
     message: rawMessage.slice(0, 200) || 'Story generation failed',

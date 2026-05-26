@@ -120,8 +120,11 @@ export function getVoicePreset(voiceId: YandexVoiceId): YandexVoicePreset | unde
   return YANDEX_VOICE_PRESETS.find((v) => v.id === voiceId);
 }
 
+/** SpeechKit v1: emotion only for ru-RU voices jane and omazh. */
+const EMOTION_VOICES = new Set<YandexVoiceId>(['jane', 'omazh']);
+
 export function voiceSupportsEmotion(voiceId: YandexVoiceId): boolean {
-  return ALL_VOICES.includes(voiceId);
+  return EMOTION_VOICES.has(voiceId);
 }
 
 export function voiceSupportsEvilEmotion(voiceId: YandexVoiceId): boolean {
