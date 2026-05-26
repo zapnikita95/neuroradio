@@ -8,6 +8,7 @@ object StoryScriptQuality {
         Regex("""скрыты(?:й|ого)\s+смысл""", RegexOption.IGNORE_CASE),
         Regex("""истори(?:я|ю)\s+о\s+(?:свобод|любви)""", RegexOption.IGNORE_CASE),
         Regex("""взрывает\s+сцен""", RegexOption.IGNORE_CASE),
+        Regex("""разорв\w*\s+кабин""", RegexOption.IGNORE_CASE),
         Regex("""пел\s+с\s+огон""", RegexOption.IGNORE_CASE),
         Regex("""зрител(?:и|ей)\s+сход""", RegexOption.IGNORE_CASE),
         Regex("""не\s+просто\s+весёл""", RegexOption.IGNORE_CASE),
@@ -36,6 +37,7 @@ object StoryScriptQuality {
     )
 
     private val templatePatterns = listOf(
+        Regex("""разорв\w*\s+кабин""", RegexOption.IGNORE_CASE),
         Regex("""зал замолчал на первой ноте""", RegexOption.IGNORE_CASE),
         Regex("""стоял у радиолы""", RegexOption.IGNORE_CASE),
         Regex("""помню студию — при записи""", RegexOption.IGNORE_CASE),

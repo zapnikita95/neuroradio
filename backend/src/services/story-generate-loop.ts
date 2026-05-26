@@ -1,5 +1,6 @@
 import type { StoryLengthId } from './story-length.js';
 import {
+  BANNED_SCRIPT_PATTERNS,
   countWords,
   findWateryContent,
   sanitizeScriptForTts,
@@ -55,6 +56,12 @@ export function finalizeAfterQualityLoop<T extends { script: string }>(
   if (water) {
     console.warn(`[story] last script rejected as water: ${water}`);
     return null;
+  }
+  for (const pattern of BANNED_SCRIPT_PATTERNS) {
+    if (pattern.test(sanitized)) {
+      console.warn(`[story] last script rejected as banned: ${pattern.source}`);
+      return null;
+    }
   }
   if (wordCount < 28) {
     console.warn(`[story] last script rejected as too short after retries: ${wordCount} words`);
