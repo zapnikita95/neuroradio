@@ -14,6 +14,7 @@ import { signAudioAccess } from '../services/audio-token.js';
 import { isUnlimitedInstall } from '../config/security.js';
 import { attachStoryQuotaHeaders, getDailyStoryQuota, recordStoryGeneration } from '../middleware/rate-limit.js';
 import { classifyStoryLlmError } from '../services/llm-error-message.js';
+import { isNoReferenceFactsError, NoReferenceFactsError } from '../services/story-errors.js';
 import type { StoryLengthId } from '../services/story-length.js';
 import type { StoryNarratorId } from '../services/story-narrator.js';
 import type { TtsVoiceSetting } from '../services/voices.js';
@@ -92,15 +93,28 @@ router.post('/full', validateStoryFullBody, async (req: Request, res: Response) 
       ? previousScriptsRaw.filter((s): s is string => typeof s === 'string' && s.trim().length > 0)
       : [];
 
-    const factBundle = await fetchAggregatedFactBundle(
+    let factBundle = await fetchAggregatedFactBundle(
       metadata.artist,
       metadata.title,
       metadata.countryCode,
       metadata.mbid,
       metadata.artistMbid,
     );
-    const trackFactCount = factBundle.trackFacts.length;
-    const artistFactCount = factBundle.artistFacts.length;
+    let trackFactCount = factBundle.trackFacts.length;
+    let artistFactCount = factBundle.artistFacts.length;
+    if (trackFactCount + artistFactCount === 0) {
+      console.warn(`[facts] empty bundle for "${metadata.artist}" — "${metadata.title}", retrying sources`);
+      await new Promise((r) => setTimeout(r, 700));
+      factBundle = await fetchAggregatedFactBundle(
+        metadata.artist,
+        metadata.title,
+        metadata.countryCode,
+        metadata.mbid,
+        metadata.artistMbid,
+      );
+      trackFactCount = factBundle.trackFacts.length;
+      artistFactCount = factBundle.artistFacts.length;
+    }
     console.log(
       `[facts] ${metadata.artist} — ${metadata.title}: track=${trackFactCount} artist=${artistFactCount}`,
     );
@@ -115,6 +129,10 @@ router.post('/full', validateStoryFullBody, async (req: Request, res: Response) 
     const referenceFacts = selectedFact
       ? [selectedFact.fact]
       : [...factBundle.trackFacts, ...factBundle.artistFacts].slice(0, 4);
+
+    if (referenceFacts.length === 0) {
+      throw new NoReferenceFactsError(metadata.artist, metadata.title);
+    }
 
     const storyInput = {
       artist: metadata.artist,
@@ -213,6 +231,18 @@ router.post('/full', validateStoryFullBody, async (req: Request, res: Response) 
         `[story] fail install=${installId.slice(0, 8)} llm=${llmProvider} artist="${artist}" title="${title}" err=${rawMessage.slice(0, 300)}`,
       );
     }
+    if (isNoReferenceFactsError(err)) {
+      setLogDetail(res, 'code=NO_REFERENCE_FACTS no grounded facts from sources');
+      res.status(503).json({
+        error: 'Story generation unavailable',
+        code: 'NO_REFERENCE_FACTS',
+        message:
+          'Не нашли проверенных фактов про этот трек — история не сгенерирована, чтобы не выдумывать. Попробуй через минуту или другой трек.',
+        source: 'facts',
+      });
+      return;
+    }
+
     const { code: errorCode, message: userMessage, httpStatus } = classifyStoryLlmError(err, llmProvider);
     setLogDetail(
       res,

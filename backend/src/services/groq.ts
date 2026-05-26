@@ -309,6 +309,7 @@ export async function generateStoryScript(
     lastCandidate,
     { artist: input.artist, title: input.title },
     (s) => finalizeStory(s, { ...input, voiceId }, storyLength),
+    referenceFacts,
   );
   if (fallback) return fallback;
 

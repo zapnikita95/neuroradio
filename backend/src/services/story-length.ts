@@ -1,5 +1,8 @@
-/** ~144 Russian words/min ≈ 2.4 words/sec at natural TTS pace (speed 0.92) */
-export type StoryLengthId = '15s' | '30s' | '60s' | 'unlimited';
+/**
+ * Word budgets assume TTS slightly above normal (~1.0): ~150 wpm at speed 1.0.
+ * 30s preset targets fast speech (1.05–1.14); 60s = main mode at normal–brisk pace.
+ */
+export type StoryLengthId = '30s' | '60s' | 'unlimited';
 
 export interface StoryLengthPreset {
   id: StoryLengthId;
@@ -12,47 +15,39 @@ export interface StoryLengthPreset {
 }
 
 export const STORY_LENGTH_PRESETS: Record<StoryLengthId, StoryLengthPreset> = {
-  '15s': {
-    id: '15s',
-    labelRu: '15 секунд',
-    targetSeconds: 15,
-    wordsMin: 30,
-    wordsMax: 42,
-    sentenceHint: '2–3 коротких предложения',
-    maxTokens: 380,
-  },
   '30s': {
     id: '30s',
-    labelRu: '30 секунд',
+    labelRu: '30 секунд · быстрый темп',
     targetSeconds: 30,
-    wordsMin: 65,
-    wordsMax: 85,
-    sentenceHint: '4–6 коротких предложений',
-    maxTokens: 650,
+    wordsMin: 72,
+    wordsMax: 100,
+    sentenceHint: '4–7 коротких предложений — уложится за ~30 с при быстрой озвучке',
+    maxTokens: 720,
   },
   '60s': {
     id: '60s',
-    labelRu: '1 минута',
+    labelRu: '1 минута · основной',
     targetSeconds: 60,
-    wordsMin: 125,
-    wordsMax: 160,
-    sentenceHint: '6–10 предложений',
-    maxTokens: 1200,
+    wordsMin: 130,
+    wordsMax: 175,
+    sentenceHint: '7–11 предложений — полноценный факт за ~60 с при слегка ускоренной речи',
+    maxTokens: 1300,
   },
   unlimited: {
     id: 'unlimited',
     labelRu: 'Не ограничено',
     targetSeconds: null,
-    wordsMin: 180,
-    wordsMax: 300,
-    sentenceHint: '8–14 предложений, развёрнутая история',
-    maxTokens: 1500,
+    wordsMin: 195,
+    wordsMax: 320,
+    sentenceHint: '9–15 предложений, развёрнутая история',
+    maxTokens: 1600,
   },
 };
 
-export const DEFAULT_STORY_LENGTH: StoryLengthId = '30s';
+export const DEFAULT_STORY_LENGTH: StoryLengthId = '60s';
 
 export function resolveStoryLength(value: unknown): StoryLengthId {
+  if (value === '15s') return '30s';
   if (typeof value === 'string' && value in STORY_LENGTH_PRESETS) {
     return value as StoryLengthId;
   }
@@ -63,23 +58,19 @@ export function getStoryLengthPreset(id: StoryLengthId): StoryLengthPreset {
   return STORY_LENGTH_PRESETS[id];
 }
 
-/** Scales Gemini recipe (hook → drama → meaning) to selected TTS duration. */
+/** Scales recipe (hook → drama → meaning) to selected TTS duration. */
 export function buildLengthStructurePlan(length: StoryLengthPreset): string {
   switch (length.id) {
-    case '15s':
-      return `ПЛАН ДЛИТЕЛЬНОСТИ (15 сек — ЖЁСТКИЙ ЛИМИТ):
-- Только КРЮЧОК + одна ударная финальная строка.
-- ${length.wordsMin}–${length.wordsMax} слов максимум, ${length.sentenceHint}.
-- Без «кухни» и развёрнутого смысла — один удар и точка.`;
     case '30s':
-      return `ПЛАН ДЛИТЕЛЬНОСТИ (30 сек — ЖЁСТКИЙ ЛИМИТ):
-- КРЮЧОК → одна сцена драмы из факта → финал-смысл одной фразой.
+      return `ПЛАН ДЛИТЕЛЬНОСТИ (30 сек — короткая, под БЫСТРЫЙ темп озвучки):
+- КРЮЧОК → одна сцена драмы из факта → финал одной фразой.
 - ${length.wordsMin}–${length.wordsMax} слов максимум, ${length.sentenceHint}.
-- Если длиннее — обрежут при озвучке. Не раздувай.`;
+- Пользователь обычно включает «Быстро» или «Очень быстро» — не раздувай, иначе обрежут.`;
     case '60s':
-      return `ПЛАН ДЛИТЕЛЬНОСТИ (60 сек):
-- Крючок → внутренняя кухня (человеческая драма из факта) → глубокий смысл.
-- ${length.wordsMin}–${length.wordsMax} слов, ${length.sentenceHint}.`;
+      return `ПЛАН ДЛИТЕЛЬНОСТИ (60 сек — ОСНОВНОЙ режим, слегка ускоренная речь):
+- Крючок → внутренняя кухня (драма из факта) → глубокий смысл.
+- ${length.wordsMin}–${length.wordsMax} слов, ${length.sentenceHint}.
+- Должен поместиться один сильный факт без воды.`;
     default:
       return `ПЛАН ДЛИТЕЛЬНОСТИ (развёрнуто):
 - Полная байка: крючок → кухня → смысл → финальный удар.

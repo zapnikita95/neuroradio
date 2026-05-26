@@ -80,6 +80,15 @@ export function classifyStoryLlmError(
     };
   }
 
+  if (/no reference facts/i.test(lower)) {
+    return {
+      code: 'NO_REFERENCE_FACTS',
+      message:
+        'Не нашли проверенных фактов про этот трек — история не сгенерирована, чтобы не выдумывать. Попробуй через минуту.',
+      httpStatus: 503,
+    };
+  }
+
   if (/could not produce a usable story/i.test(lower)) {
     return {
       code: 'STORY_QUALITY_REJECTED',

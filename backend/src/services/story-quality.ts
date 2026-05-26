@@ -20,6 +20,10 @@ export const BANNED_SCRIPT_PATTERNS: RegExp[] = [
   /зрители в экстазе/i,
   /разорв\w*\s+кабин/i,
   /разорвёт\s+кабин/i,
+  /заставляет\s+задуматься\s+о\s+важности/i,
+  /тем[аыу]\s+расизм/i,
+  /наполнен\w*\s+темой\s+расизм/i,
+  /личн\w*\s+опыт\w*\s+с\s+расизмом/i,
   /элвис в огне/i,
   /вкладывает душу/i,
   /магия музыки/i,
@@ -177,7 +181,7 @@ export function hasConcreteFact(script: string, artist = '', title = ''): boolea
   }
 
   const concreteSignals =
-    /\b(сэмпл|перезапис|дубль|лейбл|продюсер|радио|телевиз|клип|чарт|гитар|барабан|клавиш|оркестр|сакс|труб|скрипк|микрофон|пластинк|кассет|кавер|remix|plagiar|запрет|скандал|плагиат|первый раз|в эфир|на сцене|в раздевалке|сведени|master|микш|репетиц|фестив|Apollo|Abbey|Columbia|EMI|MTV|Grammy|сингл|куплет|мелоди|исполн|запис|верси|оркестр|джаз|свинг|рок|блюз|саксоф|фортеп|ударн|вокал|хор|дириж|композ|оригинал|перевод|эфир|премьер|релиз|дебют|soundtrack|винил|радиол|припев|бридж|solo|соло|ссср|совет|пионер|президент|равен|мозамб|болливуд|железн)\b/i;
+    /\b(сэмпл|перезапис|дубль|лейбл|продюсер|радио|телевиз|клип|чарт|гитар|барабан|клавиш|оркестр|сакс|труб|скрипк|микрофон|пластинк|кассет|кавер|remix|plagiar|запрет|скандал|плагиат|первый раз|в эфир|на сцене|в раздевалке|сведени|master|микш|репетиц|фестив|Apollo|Abbey|Columbia|EMI|MTV|Grammy|сингл|куплет|мелоди|исполн|запис|верси|оркестр|джаз|свинг|рок|блюз|саксоф|фортеп|ударн|вокал|хор|дириж|композ|оригинал|перевод|эфир|премьер|релиз|дебют|soundtrack|винил|радиол|припев|бридж|solo|соло|ссср|совет|пионер|президент|мозамб|болливуд|железн|латино|реггетон|сальса|бачата|фламенко|танго|серенад|баллад)\b/i;
   return concreteSignals.test(trimmed);
 }
 
@@ -255,6 +259,10 @@ export function validateStoryScript(
   const referenceFacts = options.referenceFacts ?? [];
   const trimmed = script.trim();
   if (!trimmed) return { ok: false, reason: 'empty script' };
+
+  if (referenceFacts.length === 0) {
+    return { ok: false, reason: 'no reference facts — story must be grounded in sources' };
+  }
 
   if (factNamesForeignEntity(trimmed, artist, title)) {
     return { ok: false, reason: 'story names a different artist than the track' };
@@ -362,6 +370,10 @@ const GENERIC_FICTION_PATTERNS: RegExp[] = [
 
 const UNGROUNDED_CLAIM_CHECKS: Array<{ claim: RegExp; factHint: RegExp }> = [
   {
+    claim: /расизм|расист|дискриминац|ксенофоб|равенств\w*\s+и\s+справедливост|важност\w*\s+равенств/i,
+    factHint: /racis|discriminat|xenophob|equal|justice|равенств|справедлив|дискримин|расизм/i,
+  },
+  {
     claim: /политически\s+неправиль|запрещен[аы]?\s+на\s+радио/i,
     factHint: /banned|forbidden|censored|politic|запрет|цензур/i,
   },
@@ -406,6 +418,8 @@ const CLICHE_FILLER_PATTERNS: RegExp[] = [
   /до\s+сих\s+пор\s+трогает/i,
   /именно\s+здесь[^.]{0,40}легенд/i,
   /место\s+в\s+истории\s+музык/i,
+  /потрясающ\w*\s+песн\w*,\s+которая\s+заставляет/i,
+  /действительно\s+потрясающ/i,
 ];
 
 export function findClicheFiller(script: string): string | null {

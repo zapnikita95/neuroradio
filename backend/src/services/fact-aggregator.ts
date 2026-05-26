@@ -160,8 +160,25 @@ export async function fetchAggregatedFactBundle(
   const ddgSplit = splitByMention(ddgFiltered, title, artist);
   const wdSplit = splitByMention(wdFiltered, title, artist);
 
+  const trackFacts = mergeFacts(wiki.trackFacts, ddgSplit.track, wdSplit.track, mbTrack);
+  const artistFacts = mergeFacts(wiki.artistFacts, ddgSplit.artist, wdSplit.artist, mbArtist);
+
+  if (trackFacts.length + artistFacts.length > 0) {
+    return { trackFacts, artistFacts };
+  }
+
+  // Last resort: DDG abstracts often mention the artist even when strict relevance filter drops them.
+  const ddgRelaxed = filterAndRankFacts(await fetchDuckDuckGo(artist, title), 5);
+  if (ddgRelaxed.length === 0) {
+    return { trackFacts: [], artistFacts: [] };
+  }
+  const relaxedSplit = splitByMention(ddgRelaxed, title, artist);
+  console.warn(
+    `[facts] relaxed DDG fallback for "${artist}" — "${title}" (${ddgRelaxed.length} snippets)`,
+  );
   return {
-    trackFacts: mergeFacts(wiki.trackFacts, ddgSplit.track, wdSplit.track, mbTrack),
-    artistFacts: mergeFacts(wiki.artistFacts, ddgSplit.artist, wdSplit.artist, mbArtist),
+    trackFacts: relaxedSplit.track.length > 0 ? relaxedSplit.track : ddgRelaxed.slice(0, 2),
+    artistFacts:
+      relaxedSplit.artist.length > 0 ? relaxedSplit.artist : ddgRelaxed.slice(2, 4),
   };
 }

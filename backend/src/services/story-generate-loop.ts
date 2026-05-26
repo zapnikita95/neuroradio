@@ -48,6 +48,7 @@ export function finalizeAfterQualityLoop<T extends { script: string }>(
   lastCandidate: T | null,
   input: { artist: string; title: string },
   finalize: (story: T) => T,
+  referenceFacts: string[] = [],
 ): T | null {
   if (!lastCandidate?.script?.trim()) return null;
   const sanitized = sanitizeScriptForTts(lastCandidate.script, input.artist, input.title);
@@ -62,6 +63,22 @@ export function finalizeAfterQualityLoop<T extends { script: string }>(
       console.warn(`[story] last script rejected as banned: ${pattern.source}`);
       return null;
     }
+  }
+  if (referenceFacts.length === 0) {
+    console.warn('[story] last script rejected: no reference facts');
+    return null;
+  }
+  const anchorCheck = validateStoryScript(sanitized, '30s', input.artist, input.title, {
+    strictLength: false,
+    referenceFacts,
+    skipBannedPatterns: false,
+    skipEnglishCheck: false,
+    skipWatery: false,
+    skipReferenceAnchor: false,
+  });
+  if (!anchorCheck.ok) {
+    console.warn(`[story] last script rejected on finalize: ${anchorCheck.reason}`);
+    return null;
   }
   if (wordCount < 28) {
     console.warn(`[story] last script rejected as too short after retries: ${wordCount} words`);

@@ -28,6 +28,8 @@ object StoryScriptQuality {
     )
 
     private val ungroundedClaimChecks = listOf(
+        Regex("""расизм|дискриминац|равенств\w*\s+и\s+справедливост""", RegexOption.IGNORE_CASE) to
+            Regex("""racis|discriminat|equal|justice|равенств|расизм""", RegexOption.IGNORE_CASE),
         Regex("""политически\s+неправиль|запрещен[аы]?\s+на\s+радио""", RegexOption.IGNORE_CASE) to
             Regex("""banned|forbidden|censored|politic|запрет|цензур""", RegexOption.IGNORE_CASE),
         Regex("""двойн(?:ую|ой)\s+сесси|сотни\s+дубл|сотен\s+дубл""", RegexOption.IGNORE_CASE) to
@@ -38,6 +40,9 @@ object StoryScriptQuality {
 
     private val templatePatterns = listOf(
         Regex("""разорв\w*\s+кабин""", RegexOption.IGNORE_CASE),
+        Regex("""тем[аыу]\s+расизм""", RegexOption.IGNORE_CASE),
+        Regex("""расизм|дискриминац|равенств\w*\s+и\s+справедливост""", RegexOption.IGNORE_CASE),
+        Regex("""заставляет\s+задуматься\s+о\s+важности""", RegexOption.IGNORE_CASE),
         Regex("""зал замолчал на первой ноте""", RegexOption.IGNORE_CASE),
         Regex("""стоял у радиолы""", RegexOption.IGNORE_CASE),
         Regex("""помню студию — при записи""", RegexOption.IGNORE_CASE),
