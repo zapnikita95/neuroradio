@@ -107,6 +107,17 @@ object ReferenceFactQuality {
         Regex("""\b(?:прорыв|скандал|запрет|возвращени|забвени|слёз|зал\s+взорвал|историческ|впервые|расизм|сегрегац|шахт|рабств|забастов|смысл|метафор|вдохновлен)\b""", RegexOption.IGNORE_CASE),
     )
 
+    private val backstoryPatterns = listOf(
+        Regex("""\b(?:daughter|son|family|parents|mother|father|wife|divorce|custody|adopt(?:ed|ion)?|child(?:ren)?)\b""", RegexOption.IGNORE_CASE),
+        Regex("""\b(?:apology|letter|explained|explain|emotional|heartfelt|most emotional|dedicated to)\b""", RegexOption.IGNORE_CASE),
+        Regex("""\b(?:interview|said|he called|she said|told)\b""", RegexOption.IGNORE_CASE),
+        Regex("""\b(?:personal|real[- ]life|autobiograph|memoir)\b""", RegexOption.IGNORE_CASE),
+        Regex("""\b(?:дочер|сын|семь|мать|отец|жена|развод|опек|усынов|извини|объясн|личн|эмоцион)\b""", RegexOption.IGNORE_CASE),
+    )
+
+    fun isBackstoryFact(fact: String): Boolean =
+        backstoryPatterns.any { it.containsMatchIn(fact) }
+
     fun isBoringFact(fact: String): Boolean {
         val trimmed = fact.trim()
         if (trimmed.length < 30) return true
@@ -119,6 +130,7 @@ object ReferenceFactQuality {
     fun interestScore(fact: String): Int {
         var score = 0
         if (isCollectorFact(fact)) score += 8
+        if (isBackstoryFact(fact)) score += 12
         for (pattern in storyPatterns) {
             if (pattern.containsMatchIn(fact)) score += 5
         }

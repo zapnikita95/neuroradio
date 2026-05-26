@@ -39,6 +39,9 @@ class MediaNotificationListener : NotificationListenerService() {
         sbn ?: return
         if (MediaSessionSelector.isPreferredPackage(sbn.packageName)) {
             parseNotificationTrack(sbn)?.let { track ->
+                if (notificationTrack.value?.displayKey != track.displayKey) {
+                    lastNotificationUpdateMs = System.currentTimeMillis()
+                }
                 notificationTrack.value = track
                 (application as? MusicStoryApp)?.mediaControllerManager?.syncEffectiveNowPlaying()
             }
@@ -99,6 +102,10 @@ class MediaNotificationListener : NotificationListenerService() {
 
         private val notificationTrack = MutableStateFlow<TrackInfo?>(null)
         val lastNotificationTrack: StateFlow<TrackInfo?> = notificationTrack.asStateFlow()
+
+        @Volatile
+        var lastNotificationUpdateMs: Long = 0L
+            private set
 
         fun requestRebind(context: android.content.Context) {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {

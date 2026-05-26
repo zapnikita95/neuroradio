@@ -198,5 +198,7 @@ adb shell am force-stop com.musicstory.app
 ## Ссылки
 
 - Подробнее о API бэкенда: [backend/README.md](../backend/README.md)
+- Регламент поиска фактов по амплуа: [FACT_SEARCH_BY_NARRATOR.md](./FACT_SEARCH_BY_NARRATOR.md)
+- Система выбора seed-факта (от и до): [FACT_SELECTION_SYSTEM.md](./FACT_SELECTION_SYSTEM.md)
 - Groq: https://console.groq.com
 - Yandex SpeechKit: https://cloud.yandex.ru/docs/speechkit/

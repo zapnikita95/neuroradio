@@ -113,6 +113,7 @@ object StoryScriptQuality {
         if (StoryRussianLanguage.hasEnglishLeak(text, artist, title)) return true
         if (hasUngroundedClaims(text, referenceFacts)) return true
         if (referenceFacts.isNotEmpty()) {
+            if (!firstSentenceAnchoredToFact(text, referenceFacts)) return true
             if (strictReferenceAnchor) {
                 return !anchorsReferenceFact(text, referenceFacts)
             }
@@ -129,6 +130,17 @@ object StoryScriptQuality {
             claim.containsMatchIn(script) &&
                 (referenceFacts.isEmpty() || !factHint.containsMatchIn(referenceFacts.joinToString(" ")))
         }
+
+    fun firstSentenceAnchoredToFact(script: String, referenceFacts: List<String>): Boolean {
+        if (referenceFacts.isEmpty()) return true
+        val firstSentence = script
+            .split(Regex("""(?<=[.!?…])\s+"""))
+            .firstOrNull()
+            ?.trim()
+            .orEmpty()
+        if (firstSentence.length < 12) return false
+        return anchorsReferenceFact(firstSentence, referenceFacts)
+    }
 
     fun hasFictionPattern(script: String): Boolean {
         val lower = script.lowercase()

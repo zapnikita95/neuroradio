@@ -26,6 +26,10 @@ object GroqApiErrorParser {
             return formatRateLimit(text, lower)
         }
 
+        if (httpCode == 400 && (errorCode == "model_decommissioned" || lower.contains("decommissioned"))) {
+            return "Groq: модель на сервере устарела — обнови приложение или подожди деплой Railway."
+        }
+
         if (httpCode == 400 && lower.contains("json_validate_failed")) {
             return GroqStoryClient.STORY_RETRY_MESSAGE
         }

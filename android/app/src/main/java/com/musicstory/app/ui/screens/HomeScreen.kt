@@ -47,6 +47,7 @@ import com.musicstory.app.MusicStoryApp
 import com.musicstory.app.R
 import com.musicstory.app.domain.OrchestratorMode
 import com.musicstory.app.domain.OrchestratorState
+import com.musicstory.app.domain.StoryNarrator
 import com.musicstory.app.ui.components.GenerationStoryPreview
 import com.musicstory.app.ui.components.LivePulseDot
 import com.musicstory.app.ui.components.MusicStoryBackground
@@ -76,6 +77,7 @@ fun HomeScreen(
     val hasAccess = app.mediaControllerManager.hasNotificationAccess()
     val isPlaying = app.mediaControllerManager.isPlaying.collectAsState().value
     val monitorPaused by app.settingsDataStore.monitorPausedByUser.collectAsState(initial = false)
+    val storyNarrator by app.settingsDataStore.storyNarrator.collectAsState(initial = StoryNarrator.AUTO)
     val scope = rememberCoroutineScope()
 
     DisposableEffect(Unit) {
@@ -205,6 +207,7 @@ fun HomeScreen(
 
                 OrchestratorStatusLine(
                     mode = uiState.mode,
+                    narratorLabel = storyNarrator.labelRu,
                     state = uiState.state,
                     tracksUntilNext = uiState.tracksUntilNext,
                 )
@@ -378,6 +381,7 @@ private fun NowPlayingSection(
 @Composable
 private fun OrchestratorStatusLine(
     mode: OrchestratorMode,
+    narratorLabel: String,
     state: OrchestratorState,
     tracksUntilNext: Int?,
 ) {
@@ -395,9 +399,15 @@ private fun OrchestratorStatusLine(
 
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
         Text(
-            text = modeLabel,
+            text = narratorLabel,
             style = MaterialTheme.typography.labelLarge,
             color = MutedLavender,
+        )
+        Spacer(modifier = Modifier.height(2.dp))
+        Text(
+            text = modeLabel,
+            style = MaterialTheme.typography.bodySmall,
+            color = MutedLavender.copy(alpha = 0.85f),
         )
         if (stateLabel != null) {
             Spacer(modifier = Modifier.height(4.dp))

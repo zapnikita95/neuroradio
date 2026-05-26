@@ -2,10 +2,12 @@ package com.musicstory.app.media
 
 import android.content.ComponentName
 import android.content.Context
+import android.media.AudioManager
 import android.media.session.MediaController
 import android.media.session.MediaSessionManager
 import com.musicstory.app.data.model.TrackInfo
 import com.musicstory.app.service.MediaNotificationListener
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -13,10 +15,13 @@ import kotlinx.coroutines.flow.asStateFlow
 class MediaControllerManager(
     private val context: Context,
 ) {
+    private val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
     private val sessionManager: MediaSessionManager =
         context.getSystemService(MediaSessionManager::class.java)
+    private var fadedStreamOriginalVolume: Int? = null
 
     private var activeController: MediaController? = null
+    private var sessionTrackUpdatedAtMs = 0L
 
     private val _nowPlaying = MutableStateFlow<TrackInfo?>(null)
     val nowPlaying: StateFlow<TrackInfo?> = _nowPlaying.asStateFlow()
@@ -84,7 +89,35 @@ class MediaControllerManager(
         activeController?.transportControls?.pause()
     }
 
+    suspend fun fadeOutAndPause(seconds: Float) {
+        val controls = activeController?.transportControls ?: return
+        val currentVolume = audioManager.getStreamVolume(AudioManager.STREAM_MUSIC)
+        if (currentVolume <= 0) {
+            controls.pause()
+            return
+        }
+        if (fadedStreamOriginalVolume == null) {
+            fadedStreamOriginalVolume = currentVolume
+        }
+        if (seconds <= 0.2f) {
+            controls.pause()
+            return
+        }
+        val steps = currentVolume.coerceIn(4, 12)
+        val stepDelayMs = ((seconds * 1000f) / steps).toLong().coerceAtLeast(50L)
+        for (i in steps downTo 1) {
+            val vol = (currentVolume * i / steps).coerceAtLeast(1)
+            audioManager.setStreamVolume(AudioManager.STREAM_MUSIC, vol, 0)
+            delay(stepDelayMs)
+        }
+        controls.pause()
+    }
+
     fun resumeMusic() {
+        fadedStreamOriginalVolume?.let { original ->
+            audioManager.setStreamVolume(AudioManager.STREAM_MUSIC, original, 0)
+            fadedStreamOriginalVolume = null
+        }
         activeController?.transportControls?.play()
     }
 
@@ -142,13 +175,17 @@ class MediaControllerManager(
         val duration = metadata?.getLong(android.media.MediaMetadata.METADATA_KEY_DURATION) ?: 0L
 
         if (artist.isNotBlank() && title.isNotBlank()) {
-            _nowPlaying.value = TrackInfo(
+            val next = TrackInfo(
                 artist = artist,
                 title = title,
                 album = album,
                 packageName = controller.packageName,
                 durationMs = duration,
             )
+            if (_nowPlaying.value?.displayKey != next.displayKey) {
+                sessionTrackUpdatedAtMs = System.currentTimeMillis()
+            }
+            _nowPlaying.value = next
         }
 
         val state = controller.playbackState?.state
@@ -159,6 +196,29 @@ class MediaControllerManager(
     fun syncEffectiveNowPlaying() {
         val session = _nowPlaying.value?.takeIf { it.isValid() }
         val fromNotification = MediaNotificationListener.lastNotificationTrack.value?.takeIf { it.isValid() }
-        _effectiveNowPlaying.value = session ?: fromNotification
+        _effectiveNowPlaying.value = pickBestTrack(session, fromNotification)
+    }
+
+    /** Fresh track for story API — avoids stale MediaSession metadata (e.g. old «Кино» while 50 Cent plays). */
+    fun resolveNowPlayingTrack(): TrackInfo? = pickBestTrack(
+        _nowPlaying.value?.takeIf { it.isValid() },
+        MediaNotificationListener.lastNotificationTrack.value?.takeIf { it.isValid() },
+    )
+
+    private fun pickBestTrack(session: TrackInfo?, notification: TrackInfo?): TrackInfo? {
+        when {
+            session == null -> return notification
+            notification == null -> return session
+            session.displayKey == notification.displayKey -> return session
+            _isPlaying.value && session.packageName != null &&
+                session.packageName == _activePackage.value -> {
+                val notifAt = MediaNotificationListener.lastNotificationUpdateMs
+                return if (notifAt > sessionTrackUpdatedAtMs) notification else session
+            }
+            else -> {
+                val notifAt = MediaNotificationListener.lastNotificationUpdateMs
+                return if (notifAt >= sessionTrackUpdatedAtMs) notification else session
+            }
+        }
     }
 }

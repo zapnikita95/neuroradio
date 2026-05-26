@@ -25,12 +25,12 @@ enum class GeminiModel(
     FLASH_LITE_25(
         id = "gemini-2.5-flash-lite",
         labelRu = "Gemini 2.5 Flash-Lite",
-        descriptionRu = "Новее, компактная",
+        descriptionRu = "Новее; на free tier часто жёстче RPM, чем 2.0 Flash-Lite",
     ),
     FLASH_25(
         id = "gemini-2.5-flash",
         labelRu = "Gemini 2.5 Flash",
-        descriptionRu = "Сильнее на сложных фактах",
+        descriptionRu = "Сильнее, но free RPM ниже — при 429 выбери 2.0 Flash-Lite",
     ),
     ;
 

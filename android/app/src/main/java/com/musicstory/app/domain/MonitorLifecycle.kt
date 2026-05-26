@@ -86,7 +86,9 @@ class MonitorLifecycle(
 
         if (!MediaSessionSelector.isPreferredPackage(pkg)) return false
 
-        return mediaControllerManager.isPlaying.value
+        if (mediaControllerManager.isPlaying.value) return true
+        // Some OEM builds keep playback state stale; valid metadata is enough to keep monitor awake.
+        return mediaControllerManager.effectiveNowPlaying.value?.isValid() == true
 
     }
 

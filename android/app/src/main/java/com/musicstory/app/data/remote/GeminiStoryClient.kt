@@ -27,6 +27,8 @@ class GeminiStoryClient(
         .build(),
 ) {
 
+    private data class LengthBounds(val minWords: Int, val maxWords: Int)
+
     suspend fun generateStory(
         artist: String,
         title: String,
@@ -52,14 +54,15 @@ class GeminiStoryClient(
 
         var lastRejectReason = "quality filter"
         repeat(MAX_ATTEMPTS) { attempt ->
-            val strictAnchor = referenceFacts.isNotEmpty() || attempt < MAX_ATTEMPTS - 1
-            val acceptSoftQuality = attempt == MAX_ATTEMPTS - 1
+            val strictAnchor = referenceFacts.isNotEmpty()
+            val acceptSoftQuality = false
             val user = if (attempt == 0) {
                 baseUser
             } else {
                 "$baseUser\n\nПерегенерируй: предыдущий ответ отклонён ($lastRejectReason). Только русский текст, без английских слов вне «$artist»/«$title», опирайся на семя факта."
             }
             try {
+                val bounds = lengthBounds(storyLength)
                 val story = requestStory(
                     apiKey = key,
                     model = geminiModel.id,
@@ -74,6 +77,7 @@ class GeminiStoryClient(
                     countryCode = countryCode,
                     strictReferenceAnchor = strictAnchor,
                     acceptSoftQuality = acceptSoftQuality,
+                    lengthBounds = bounds,
                 )
                 if (story != null) return@withContext story
                 lastRejectReason = "шаблон или слабый факт"
@@ -102,11 +106,12 @@ class GeminiStoryClient(
         countryCode: String?,
         strictReferenceAnchor: Boolean = true,
         acceptSoftQuality: Boolean = false,
+        lengthBounds: LengthBounds,
     ): StoryResponse? {
         runCatching {
             callGemini(
                 apiKey, model, system, user, storyLength, artist, title, year, genre,
-                referenceFacts, countryCode, strictReferenceAnchor, acceptSoftQuality, useJsonMode = true,
+                referenceFacts, countryCode, strictReferenceAnchor, acceptSoftQuality, lengthBounds, useJsonMode = true,
             )
         }.getOrNull()?.let { return it }
 
@@ -114,7 +119,7 @@ class GeminiStoryClient(
         return runCatching {
             callGemini(
                 apiKey, model, system, user, storyLength, artist, title, year, genre,
-                referenceFacts, countryCode, strictReferenceAnchor, acceptSoftQuality, useJsonMode = false,
+                referenceFacts, countryCode, strictReferenceAnchor, acceptSoftQuality, lengthBounds, useJsonMode = false,
             )
         }.getOrNull()
     }
@@ -133,10 +138,11 @@ class GeminiStoryClient(
         countryCode: String?,
         strictReferenceAnchor: Boolean,
         acceptSoftQuality: Boolean,
+        lengthBounds: LengthBounds,
         useJsonMode: Boolean,
     ): StoryResponse? {
         val generationConfig = JSONObject().apply {
-            put("temperature", if (useJsonMode) 0.72 else 0.65)
+            put("temperature", if (useJsonMode) 0.38 else 0.32)
             put("maxOutputTokens", storyLength.maxTokens)
             if (useJsonMode) {
                 put("responseMimeType", "application/json")
@@ -178,7 +184,7 @@ class GeminiStoryClient(
             }
             return parseGeminiResponse(
                 rawBody, artist, title, year, genre, referenceFacts, countryCode,
-                strictReferenceAnchor, acceptSoftQuality,
+                strictReferenceAnchor, acceptSoftQuality, lengthBounds,
             )
         }
     }
@@ -193,11 +199,12 @@ class GeminiStoryClient(
         countryCode: String?,
         strictReferenceAnchor: Boolean = true,
         acceptSoftQuality: Boolean = false,
+        lengthBounds: LengthBounds,
     ): StoryResponse? {
         val content = extractGeminiText(rawBody) ?: return null
         return parseStoryJson(
             content, artist, title, year, genre, referenceFacts, countryCode,
-            strictReferenceAnchor, acceptSoftQuality,
+            strictReferenceAnchor, acceptSoftQuality, lengthBounds,
         )
     }
 
@@ -227,6 +234,7 @@ class GeminiStoryClient(
         countryCode: String?,
         strictReferenceAnchor: Boolean = true,
         acceptSoftQuality: Boolean = false,
+        lengthBounds: LengthBounds,
     ): StoryResponse? {
         val jsonStart = raw.indexOf('{')
         val jsonEnd = raw.lastIndexOf('}')
@@ -246,6 +254,7 @@ class GeminiStoryClient(
                     year,
                     strictReferenceAnchor,
                     acceptSoftQuality,
+                    lengthBounds,
                 )
             ) return null
             StoryResponse(
@@ -276,9 +285,12 @@ class GeminiStoryClient(
         year: Int?,
         strictReferenceAnchor: Boolean,
         acceptSoftQuality: Boolean,
+        lengthBounds: LengthBounds,
     ): Boolean {
         if (StoryRussianLanguage.hasEnglishLeak(script, artist, title)) return false
-        if (acceptSoftQuality) return true
+        if (acceptSoftQuality) return false
+        val words = countWords(script)
+        if (words < lengthBounds.minWords || words > lengthBounds.maxWords + 25) return false
         return !StoryScriptQuality.isTemplateLike(
             script,
             artist,
@@ -290,8 +302,15 @@ class GeminiStoryClient(
         )
     }
 
+    private fun lengthBounds(storyLength: StoryLength): LengthBounds = when (storyLength) {
+        StoryLength.SEC_15 -> LengthBounds(minWords = 30, maxWords = 42)
+        StoryLength.SEC_30 -> LengthBounds(minWords = 65, maxWords = 85)
+        StoryLength.SEC_60 -> LengthBounds(minWords = 125, maxWords = 160)
+        StoryLength.UNLIMITED -> LengthBounds(minWords = 180, maxWords = 300)
+    }
+
     companion object {
-        private const val MAX_ATTEMPTS = 3
+        private const val MAX_ATTEMPTS = 4
         private const val GEMINI_API_BASE = "https://generativelanguage.googleapis.com/v1beta/models"
     }
 }

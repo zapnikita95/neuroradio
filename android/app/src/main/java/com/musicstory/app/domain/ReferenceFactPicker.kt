@@ -66,10 +66,16 @@ object ReferenceFactPicker {
 
 
 
-        pickFromPool(primary, previousScripts)?.let { fact ->
-
+        pickBackstoryFromPool(primary, previousScripts)?.let { fact ->
             return SelectedReferenceFact(fact, primaryScope, scopeLabel(primaryScope))
+        }
 
+        pickBackstoryFromPool(fallback, previousScripts)?.let { fact ->
+            return SelectedReferenceFact(fact, fallbackScope, scopeLabel(fallbackScope))
+        }
+
+        pickFromPool(primary, previousScripts)?.let { fact ->
+            return SelectedReferenceFact(fact, primaryScope, scopeLabel(primaryScope))
         }
 
         pickFromPool(fallback, previousScripts)?.let { fact ->
@@ -114,6 +120,15 @@ object ReferenceFactPicker {
             if (!overlapsPrevious(fact, previousScripts)) return fact
         }
         for (fact in facts) {
+            if (ReferenceFactQuality.isBoringFact(fact)) continue
+            if (!overlapsPrevious(fact, previousScripts)) return fact
+        }
+        return null
+    }
+
+    private fun pickBackstoryFromPool(facts: List<String>, previousScripts: List<String>): String? {
+        for (fact in facts) {
+            if (!ReferenceFactQuality.isBackstoryFact(fact)) continue
             if (ReferenceFactQuality.isBoringFact(fact)) continue
             if (!overlapsPrevious(fact, previousScripts)) return fact
         }

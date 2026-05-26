@@ -29,6 +29,21 @@
     <string name="onboarding_check_access">Проверить и войти</string>
     <string name="onboarding_not_granted_yet">Сначала включи «Music Story — мониторинг медиа» в настройках доступа к уведомлениям.</string>
 
+    <string name="tour_step_mode_title">Режим работы</string>
+    <string name="tour_step_mode_body">Автоматический — истории по счётчику треков. Ручной — только кнопка «Рассказать». Первый реальный трек после установки тоже получит историю.</string>
+    <string name="tour_step_trigger_title">Когда вставлять историю</string>
+    <string name="tour_step_trigger_body">«Каждые N треков» — твоя настройка из авто-режима. Можно выбрать артистов, жанры или всегда.</string>
+    <string name="tour_step_same_track_title">Повтор того же трека</string>
+    <string name="tour_step_same_track_body">Если один трек крутится в плейлисте — не спамить: история не чаще, чем раз в N проигрываний.</string>
+    <string name="tour_step_narrator_title">Ведущий</string>
+    <string name="tour_step_narrator_body">Тон рассказа: эксперт, диджей, фанат. Влияет на стиль, не на факты из Wikipedia.</string>
+    <string name="tour_step_voice_title">Голос и длина</string>
+    <string name="tour_step_voice_body">Озвучка Yandex: голос, эмоция, скорость. Длина — сколько секунд говорит ведущий.</string>
+    <string name="tour_step_music_title">Музыка во время истории</string>
+    <string name="tour_step_music_body">Пауза ставится, когда начинается озвучка, не раньше. Затухание — плавное приглушение перед речью.</string>
+    <string name="tour_step_ai_title">Нейросеть</string>
+    <string name="tour_step_ai_body">Groq или Gemini. Для Gemini на free tier лучше 2.0 Flash-Lite. Свой ключ снимает лимит сервера.</string>
+
     <string name="status_no_access">Нет доступа к уведомлениям</string>
     <string name="status_monitoring">Музыка играет</string>
     <string name="status_waiting_music">Ожидание музыки</string>
@@ -78,9 +93,15 @@
     <string name="settings_mode_section">Режим</string>
     <string name="settings_narrator_section">Рассказчик (амлуа)</string>
     <string name="settings_voice_section">Озвучка</string>
+    <string name="settings_music_interrupt_section">Прерывание музыки</string>
+    <string name="settings_music_interrupt_mode">Как прерывать музыку</string>
+    <string name="settings_music_interrupt_pause">Жёсткая пауза</string>
+    <string name="settings_music_interrupt_fade">Плавное затемнение</string>
+    <string name="settings_music_fade_seconds">Длительность затемнения (сек)</string>
+    <string name="settings_music_fade_hint">Используется только в режиме «Плавное затемнение»</string>
     <string name="settings_ai_section">AI</string>
     <string name="settings_llm_provider">Провайдер AI</string>
-    <string name="settings_llm_provider_hint">Groq или Gemini — переключается здесь, в приложении. Серверные переменные не нужны.</string>
+    <string name="settings_llm_provider_hint">Groq или Gemini — переключается здесь. Если один уперся в лимит, приложение попробует второй при сохраненном ключе.</string>
     <string name="settings_llm_active">Сейчас: %1$s</string>
     <string name="settings_api_key">API-ключ</string>
     <string name="settings_api_key_clear">Очистить ключ</string>
@@ -105,7 +126,7 @@
     <string name="settings_unlimited_groq">Без дневного лимита</string>
     <string name="settings_groq_status_ok">Ключ сохранён</string>
     <string name="settings_groq_status_missing">Без своего ключа — до 10 историй в день на сервере</string>
-    <string name="settings_own_api_key_hint">Свой ключ — лимит сервера Music Story не действует (лимиты только у Google)</string>
+    <string name="settings_own_api_key_hint">Сохрани оба ключа (Groq и Gemini): при лимите одного приложение переключится на второй.</string>
     <string name="story_source_ai">AI</string>
 
     <string name="trigger_every_n">Каждые N треков</string>

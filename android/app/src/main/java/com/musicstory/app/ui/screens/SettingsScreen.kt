@@ -17,12 +17,13 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.gestures.animateScrollBy
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExposedDropdownMenuBox
@@ -51,7 +52,13 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.layout.LayoutCoordinates
+import androidx.compose.ui.layout.boundsInRoot
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInParent
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import android.content.Intent
 import android.net.Uri
 import androidx.compose.ui.text.input.KeyboardType
@@ -63,6 +70,7 @@ import com.musicstory.app.data.local.SettingsDataStore
 import com.musicstory.app.data.remote.ConnectionCheckResult
 import com.musicstory.app.domain.GeminiModel
 import com.musicstory.app.domain.LlmProvider
+import com.musicstory.app.domain.MusicInterruptionMode
 import com.musicstory.app.domain.StoryLength
 import com.musicstory.app.domain.StoryNarrator
 import com.musicstory.app.domain.TtsEmotion
@@ -75,6 +83,9 @@ import com.musicstory.app.ui.components.PrimaryStoryButton
 import com.musicstory.app.ui.components.SecondaryStoryButton
 import com.musicstory.app.ui.components.ScrobblePickList
 import com.musicstory.app.ui.components.SectionLabel
+import com.musicstory.app.ui.tour.SettingsTourSpotlightOverlay
+import com.musicstory.app.ui.tour.SettingsTourStep
+import com.musicstory.app.ui.tour.settingsTourHighlight
 import com.musicstory.app.ui.theme.CreamText
 import com.musicstory.app.ui.theme.DeepVoid
 import com.musicstory.app.ui.theme.ErrorCoral
@@ -86,6 +97,7 @@ import com.musicstory.app.ui.theme.SurfaceGlass
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -119,11 +131,63 @@ fun SettingsScreen(
     val ttsVoice by settings.ttsVoice.collectAsState(initial = TtsVoice.AUTO)
     val ttsSpeed by settings.ttsSpeed.collectAsState(initial = TtsSpeed.NORMAL)
     val ttsEmotion by settings.ttsEmotion.collectAsState(initial = TtsEmotion.LIVELY)
+    val musicInterruptionMode by settings.musicInterruptionMode.collectAsState(initial = MusicInterruptionMode.PAUSE)
+    val musicFadeSeconds by settings.musicFadeSeconds.collectAsState(initial = SettingsDataStore.DEFAULT_MUSIC_FADE_SECONDS)
+    val tourPending by settings.settingsTourPending.collectAsState(initial = false)
+
+    var tourStep by remember { mutableStateOf<Int?>(null) }
+    var tourTargetBounds by remember { mutableStateOf<Rect?>(null) }
+    val density = LocalDensity.current
+    val tourSteps = remember {
+        listOf(
+            SettingsTourStep(context.getString(R.string.tour_step_mode_title), context.getString(R.string.tour_step_mode_body)),
+            SettingsTourStep(context.getString(R.string.tour_step_trigger_title), context.getString(R.string.tour_step_trigger_body)),
+            SettingsTourStep(context.getString(R.string.tour_step_same_track_title), context.getString(R.string.tour_step_same_track_body)),
+            SettingsTourStep(context.getString(R.string.tour_step_narrator_title), context.getString(R.string.tour_step_narrator_body)),
+            SettingsTourStep(context.getString(R.string.tour_step_voice_title), context.getString(R.string.tour_step_voice_body)),
+            SettingsTourStep(context.getString(R.string.tour_step_music_title), context.getString(R.string.tour_step_music_body)),
+            SettingsTourStep(context.getString(R.string.tour_step_ai_title), context.getString(R.string.tour_step_ai_body)),
+        )
+    }
+    val scrollState = rememberScrollState()
+
+    LaunchedEffect(tourPending) {
+        if (tourPending) tourStep = 0
+    }
+
+    LaunchedEffect(tourStep) {
+        tourTargetBounds = null
+    }
+
+    fun tourLayoutHandler(stepIndex: Int): ((LayoutCoordinates) -> Unit)? {
+        if (tourStep != stepIndex) return null
+        return { coords ->
+            tourTargetBounds = coords.boundsInRoot()
+            scope.launch {
+                delay(80)
+                val topPad = with(density) { if (stepIndex >= 3) 48.dp.toPx() else 96.dp.toPx() }
+                val targetScroll = (coords.positionInParent().y - topPad)
+                    .toInt()
+                    .coerceIn(0, scrollState.maxValue)
+                val delta = targetScroll - scrollState.value
+                if (delta != 0) scrollState.animateScrollBy(delta.toFloat())
+            }
+        }
+    }
 
     var groqInput by remember(groqApiKey) { mutableStateOf(groqApiKey) }
     var geminiInput by remember(geminiApiKey) { mutableStateOf(geminiApiKey) }
     var nInput by remember(everyN) { mutableStateOf(everyN.toString()) }
     var sameTrackInput by remember(sameTrackEveryN) { mutableStateOf(sameTrackEveryN.toString()) }
+    var musicFadeInput by remember(musicFadeSeconds) {
+        mutableStateOf(
+            if (musicFadeSeconds % 1f == 0f) {
+                musicFadeSeconds.toInt().toString()
+            } else {
+                String.format(Locale.US, "%.1f", musicFadeSeconds)
+            },
+        )
+    }
 
     var isChecking by remember { mutableStateOf(false) }
     var checkResult by remember { mutableStateOf<ConnectionCheckResult?>(null) }
@@ -151,10 +215,13 @@ fun SettingsScreen(
         sameTrackInput,
         sameTrackEveryN,
         triggerMode,
+        musicFadeInput,
+        musicFadeSeconds,
     ) {
         groqInput.trim() != groqApiKey.trim() ||
             geminiInput.trim() != geminiApiKey.trim() ||
             sameTrackInput.toIntOrNull() != sameTrackEveryN ||
+            musicFadeInput.toFloatOrNull()?.coerceIn(0.5f, 8f) != musicFadeSeconds ||
             (triggerMode == TriggerMode.EVERY_N_TRACKS && nInput.toIntOrNull() != everyN)
     }
 
@@ -178,6 +245,7 @@ fun SettingsScreen(
     )
 
     MusicStoryBackground(modifier = modifier) {
+        Box(modifier = Modifier.fillMaxSize()) {
         Column(modifier = Modifier.fillMaxSize()) {
             TopAppBar(
                 title = { Text(context.getString(R.string.settings_title), style = MaterialTheme.typography.titleLarge) },
@@ -192,7 +260,7 @@ fun SettingsScreen(
             Column(
                 modifier = Modifier
                     .fillMaxSize()
-                    .verticalScroll(rememberScrollState())
+                    .verticalScroll(scrollState)
                     .padding(20.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp),
             ) {
@@ -205,6 +273,10 @@ fun SettingsScreen(
                 CollapsibleSettingsSection(
                     title = context.getString(R.string.settings_mode_section),
                     summary = modeSummary,
+                    tourHighlight = tourStep == 0,
+                    forceExpanded = tourStep == 0,
+                    tourActive = tourStep == 0,
+                    onTourLayout = tourLayoutHandler(0),
                 ) {
                     SettingSwitchRow(
                         title = context.getString(R.string.settings_manual_mode),
@@ -235,6 +307,10 @@ fun SettingsScreen(
                     ),
                     initiallyExpanded = triggerMode == TriggerMode.SPECIFIC_ARTISTS ||
                         triggerMode == TriggerMode.SPECIFIC_GENRES,
+                    tourHighlight = tourStep == 1,
+                    forceExpanded = tourStep == 1,
+                    tourActive = tourStep == 1,
+                    onTourLayout = tourLayoutHandler(1),
                 ) {
                     TriggerMode.entries.forEach { mode ->
                         Row(
@@ -326,6 +402,10 @@ fun SettingsScreen(
                 CollapsibleSettingsSection(
                     title = context.getString(R.string.settings_same_track_section),
                     summary = context.getString(R.string.settings_same_track_every_n) + ": $sameTrackEveryN",
+                    tourHighlight = tourStep == 2,
+                    forceExpanded = tourStep == 2,
+                    tourActive = tourStep == 2,
+                    onTourLayout = tourLayoutHandler(2),
                 ) {
                     OutlinedTextField(
                         value = sameTrackInput,
@@ -342,6 +422,10 @@ fun SettingsScreen(
                 CollapsibleSettingsSection(
                     title = context.getString(R.string.settings_narrator_section),
                     summary = storyNarrator.labelRu,
+                    tourHighlight = tourStep == 3,
+                    forceExpanded = tourStep == 3,
+                    tourActive = tourStep == 3,
+                    onTourLayout = tourLayoutHandler(3),
                 ) {
                     StoryNarrator.entries.forEach { narrator ->
                         NarratorRadioRow(
@@ -356,6 +440,10 @@ fun SettingsScreen(
                 CollapsibleSettingsSection(
                     title = context.getString(R.string.settings_voice_section),
                     summary = "${ttsVoice.labelRu} · ${ttsSpeed.labelRu} · ${storyLength.labelRu}",
+                    tourHighlight = tourStep == 4,
+                    forceExpanded = tourStep == 4,
+                    tourActive = tourStep == 4,
+                    onTourLayout = tourLayoutHandler(4),
                 ) {
                     Text(
                         text = context.getString(R.string.settings_tts_voice),
@@ -412,6 +500,98 @@ fun SettingsScreen(
                     }
                 }
 
+                CollapsibleSettingsSection(
+                    title = context.getString(R.string.settings_music_interrupt_section),
+                    tourHighlight = tourStep == 5,
+                    forceExpanded = tourStep == 5,
+                    tourActive = tourStep == 5,
+                    onTourLayout = tourLayoutHandler(5),
+                    summary = when (musicInterruptionMode) {
+                        MusicInterruptionMode.PAUSE ->
+                            context.getString(R.string.settings_music_interrupt_pause)
+                        MusicInterruptionMode.FADE ->
+                            "${context.getString(R.string.settings_music_interrupt_fade)} · ${musicFadeSeconds}s"
+                    },
+                ) {
+                    Text(
+                        text = context.getString(R.string.settings_music_interrupt_mode),
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MutedLavender,
+                    )
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(12.dp))
+                            .padding(vertical = 2.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        RadioButton(
+                            selected = musicInterruptionMode == MusicInterruptionMode.PAUSE,
+                            onClick = {
+                                scope.launch {
+                                    settings.setMusicInterruptionMode(MusicInterruptionMode.PAUSE)
+                                }
+                            },
+                            colors = RadioButtonDefaults.colors(selectedColor = GoldBright),
+                        )
+                        Text(
+                            text = context.getString(R.string.settings_music_interrupt_pause),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = CreamText,
+                        )
+                    }
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(12.dp))
+                            .padding(vertical = 2.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        RadioButton(
+                            selected = musicInterruptionMode == MusicInterruptionMode.FADE,
+                            onClick = {
+                                scope.launch {
+                                    settings.setMusicInterruptionMode(MusicInterruptionMode.FADE)
+                                }
+                            },
+                            colors = RadioButtonDefaults.colors(selectedColor = GoldBright),
+                        )
+                        Text(
+                            text = context.getString(R.string.settings_music_interrupt_fade),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = CreamText,
+                        )
+                    }
+
+                    if (musicInterruptionMode == MusicInterruptionMode.FADE) {
+                        Spacer(modifier = Modifier.height(8.dp))
+                        OutlinedTextField(
+                            value = musicFadeInput,
+                            onValueChange = { input ->
+                                val normalized = input
+                                    .replace(',', '.')
+                                    .filterIndexed { index, ch ->
+                                        ch.isDigit() || (ch == '.' && !input.take(index).contains('.'))
+                                    }
+                                    .take(4)
+                                musicFadeInput = normalized
+                            },
+                            label = { Text(context.getString(R.string.settings_music_fade_seconds)) },
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                            modifier = Modifier.fillMaxWidth(),
+                            singleLine = true,
+                            colors = fieldColors,
+                            shape = RoundedCornerShape(14.dp),
+                        )
+                        Text(
+                            text = context.getString(R.string.settings_music_fade_hint),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MutedLavender,
+                            modifier = Modifier.padding(top = 4.dp),
+                        )
+                    }
+                }
+
                 val aiSummary = if (activeApiKey.isNotBlank()) {
                     when (llmProvider) {
                         LlmProvider.GEMINI -> "${llmProvider.labelRu}: ${geminiModel.settingsLabelRu}"
@@ -427,6 +607,10 @@ fun SettingsScreen(
                     title = context.getString(R.string.settings_ai_section),
                     summary = aiSummary,
                     initiallyExpanded = true,
+                    tourHighlight = tourStep == 6,
+                    forceExpanded = tourStep == 6,
+                    tourActive = tourStep == 6,
+                    onTourLayout = tourLayoutHandler(6),
                 ) {
                     var providerMenuExpanded by remember { mutableStateOf(false) }
                     var geminiModelMenuExpanded by remember { mutableStateOf(false) }
@@ -623,8 +807,9 @@ fun SettingsScreen(
                         } else {
                             context.getString(R.string.settings_groq_save_test)
                         },
+                        loading = isChecking,
+                        enabled = !isChecking,
                         onClick = {
-                            if (isChecking) return@PrimaryStoryButton
                             scope.launch {
                                 isChecking = true
                                 checkResult = null
@@ -663,22 +848,6 @@ fun SettingsScreen(
                             }
                         },
                     )
-                    if (isChecking) {
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            CircularProgressIndicator(
-                                modifier = Modifier.height(20.dp),
-                                color = GoldBright,
-                                strokeWidth = 2.dp,
-                            )
-                            Text(
-                                text = context.getString(R.string.settings_groq_checking),
-                                modifier = Modifier.padding(start = 12.dp),
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MutedLavender,
-                            )
-                        }
-                    }
                     checkSummary?.let { summary ->
                         Spacer(modifier = Modifier.height(8.dp))
                         val checkOk = checkResult?.llmOk == true ||
@@ -718,6 +887,8 @@ fun SettingsScreen(
                             saveFeedback = null
                             nInput.toIntOrNull()?.let { settings.setEveryNTracks(it) }
                             sameTrackInput.toIntOrNull()?.let { settings.setSameTrackStoryEveryN(it) }
+                            settings.setMusicInterruptionMode(musicInterruptionMode)
+                            musicFadeInput.toFloatOrNull()?.let { settings.setMusicFadeSeconds(it) }
                             settings.setGroqApiKey(groqInput)
                             settings.setGeminiApiKey(geminiInput)
                             app.backendAuthManager.invalidateToken()
@@ -735,6 +906,28 @@ fun SettingsScreen(
                 )
             }
         }
+
+            tourStep?.let { step ->
+                SettingsTourSpotlightOverlay(
+                    highlightRect = tourTargetBounds,
+                    stepIndex = step,
+                    steps = tourSteps,
+                    onNext = {
+                        if (step >= tourSteps.lastIndex) {
+                            tourStep = null
+                            scope.launch { settings.setSettingsTourCompleted(true) }
+                            onBack()
+                        } else {
+                            tourStep = step + 1
+                        }
+                    },
+                    onSkip = {
+                        tourStep = null
+                        scope.launch { settings.setSettingsTourCompleted(true) }
+                    },
+                )
+            }
+        }
     }
 }
 
@@ -743,11 +936,30 @@ private fun CollapsibleSettingsSection(
     title: String,
     summary: String,
     initiallyExpanded: Boolean = false,
+    tourHighlight: Boolean = false,
+    forceExpanded: Boolean = false,
+    tourActive: Boolean = false,
+    onTourLayout: ((LayoutCoordinates) -> Unit)? = null,
     content: @Composable ColumnScope.() -> Unit,
 ) {
-    var expanded by remember { mutableStateOf(initiallyExpanded) }
+    var expanded by remember { mutableStateOf(initiallyExpanded || forceExpanded) }
+    LaunchedEffect(forceExpanded) {
+        if (forceExpanded) expanded = true
+    }
 
-    GlassCard {
+    GlassCard(
+        modifier = Modifier
+            .settingsTourHighlight(tourHighlight)
+            .then(
+                if (onTourLayout != null) {
+                    Modifier.onGloballyPositioned { coords ->
+                        if (tourActive) onTourLayout(coords)
+                    }
+                } else {
+                    Modifier
+                },
+            ),
+    ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()

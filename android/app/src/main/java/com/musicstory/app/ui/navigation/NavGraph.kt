@@ -5,10 +5,14 @@ import androidx.compose.ui.Modifier
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
+import androidx.compose.runtime.rememberCoroutineScope
+import com.musicstory.app.MusicStoryApp
 import com.musicstory.app.ui.screens.HistoryScreen
 import com.musicstory.app.ui.screens.HomeScreen
 import com.musicstory.app.ui.screens.OnboardingScreen
 import com.musicstory.app.ui.screens.SettingsScreen
+import androidx.compose.ui.platform.LocalContext
+import kotlinx.coroutines.launch
 
 object Routes {
     const val ONBOARDING = "onboarding"
@@ -31,10 +35,16 @@ fun MusicStoryNavGraph(
         modifier = modifier,
     ) {
         composable(Routes.ONBOARDING) {
+            val context = LocalContext.current
+            val app = context.applicationContext as MusicStoryApp
+            val scope = rememberCoroutineScope()
             OnboardingScreen(
                 onAccessGranted = {
                     onNotificationAccessChanged()
-                    navController.navigate(Routes.HOME) {
+                    scope.launch {
+                        app.settingsDataStore.setSettingsTourPending(true)
+                    }
+                    navController.navigate(Routes.SETTINGS) {
                         popUpTo(Routes.ONBOARDING) { inclusive = true }
                     }
                 },
@@ -50,7 +60,15 @@ fun MusicStoryNavGraph(
             )
         }
         composable(Routes.SETTINGS) {
-            SettingsScreen(onBack = { navController.popBackStack() })
+            SettingsScreen(
+                onBack = {
+                    if (!navController.popBackStack()) {
+                        navController.navigate(Routes.HOME) {
+                            launchSingleTop = true
+                        }
+                    }
+                },
+            )
         }
         composable(Routes.HISTORY) {
             HistoryScreen(onBack = { navController.popBackStack() })

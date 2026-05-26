@@ -152,20 +152,32 @@ class StoryRepository(
             LlmProvider.GROQ -> groqKey
             LlmProvider.GEMINI -> geminiKey
         }
+        val fallbackProvider = when (llmProvider) {
+            LlmProvider.GROQ -> LlmProvider.GEMINI
+            LlmProvider.GEMINI -> LlmProvider.GROQ
+        }
+        val fallbackKey = when (fallbackProvider) {
+            LlmProvider.GROQ -> groqKey
+            LlmProvider.GEMINI -> geminiKey
+        }
+        val alternateProvider = when (llmProvider) {
+            LlmProvider.GROQ -> LlmProvider.GEMINI
+            LlmProvider.GEMINI -> LlmProvider.GROQ
+        }
 
         StoryLog.i(
             "fetchStory ${track.artist} — ${track.title}: provider=${llmProvider.id}, " +
                 "ownKey=${directApiKey.isNotEmpty()}, backend=$useBackend",
         )
 
-        if (llmProvider == LlmProvider.GEMINI && geminiKey.isEmpty()) {
+        if (llmProvider == LlmProvider.GEMINI && geminiKey.isEmpty() && !useBackend) {
             return Result.failure(
                 IOException(
                     "Выбран Gemini, но API-ключ не сохранён. Вставь ключ в Настройки → AI и нажми «Сохранить».",
                 ),
             )
         }
-        if (llmProvider == LlmProvider.GROQ && groqKey.isEmpty() && !useBackend) {
+        if (llmProvider == LlmProvider.GROQ && groqKey.isEmpty() && !useBackend && fallbackKey.isEmpty()) {
             return Result.failure(
                 IOException(
                     "Выбран Groq, но API-ключ не сохранён и сервер не настроен.",
@@ -202,6 +214,36 @@ class StoryRepository(
                     }
                 }
             }
+
+            // Если выбранный провайдер упёрся в лимит/ошибку, пробуем второй на этом же Railway.
+            if (
+                backendError != null &&
+                (rateLimitHit || backendGroqDown || backendError!!.contains("rate", ignoreCase = true))
+            ) {
+                StoryLog.w(
+                    "Primary backend provider failed (${llmProvider.id}), retry with ${alternateProvider.id}",
+                )
+                when (val fallbackBackendResult = tryBackendStory(
+                    backendUrl = backendUrl,
+                    track = track,
+                    trackKey = trackKey,
+                    previousScripts = previousScripts,
+                    narratorTag = narratorTag,
+                    storyLength = storyLength,
+                    storyNarrator = storyNarrator,
+                    ttsVoice = ttsVoice,
+                    ttsSpeed = ttsSpeed,
+                    ttsEmotion = ttsEmotion,
+                    llmProvider = alternateProvider,
+                    geminiModel = geminiModel,
+                )) {
+                    is StoryAttemptResult.Success -> return Result.success(fallbackBackendResult.response)
+                    is StoryAttemptResult.TemplateRejected -> templateRejected = true
+                    is StoryAttemptResult.Failed -> {
+                        backendError = "${backendError} | ${alternateProvider.labelRu}: ${fallbackBackendResult.reason}"
+                    }
+                }
+            }
         } else {
             StoryLog.w("Backend skipped (url=$backendUrl)")
         }
@@ -209,6 +251,103 @@ class StoryRepository(
         // Свой ключ — только если сервер не дал историю (без Yandex-озвучки на Groq с телефона).
         if (directApiKey.isNotEmpty()) {
             when (llmProvider) {
+                LlmProvider.GEMINI -> when (val geminiResult = tryDirectGemini(
+                    geminiKey = geminiKey,
+                    geminiModel = geminiModel,
+                    track = track,
+                    trackKey = trackKey,
+                    year = year,
+                    genre = genre,
+                    countryCode = countryCode,
+                    previousScripts = previousScripts,
+                    narratorTag = narratorTag,
+                    storyLength = storyLength,
+                    storyNarrator = storyNarrator,
+                    referenceFacts = referenceFacts,
+                    selectedFact = selectedFact,
+                )) {
+                    is StoryAttemptResult.Success -> return Result.success(geminiResult.response)
+                    is StoryAttemptResult.TemplateRejected -> templateRejected = true
+                    is StoryAttemptResult.Failed -> {
+                        llmError = geminiResult.reason
+                        if (shouldTryAlternateProvider(geminiResult.reason) && groqKey.isNotEmpty()) {
+                            StoryLog.w("Direct Gemini limited, retry with Groq key")
+                            when (val groqFallback = tryDirectGroq(
+                                groqKey = groqKey,
+                                track = track,
+                                trackKey = trackKey,
+                                year = year,
+                                genre = genre,
+                                countryCode = countryCode,
+                                previousScripts = previousScripts,
+                                narratorTag = narratorTag,
+                                storyLength = storyLength,
+                                storyNarrator = storyNarrator,
+                                referenceFacts = referenceFacts,
+                                selectedFact = selectedFact,
+                            )) {
+                                is StoryAttemptResult.Success -> {
+                                    StoryLog.w("Direct Groq fallback text OK but no Yandex audio — Railway required")
+                                    llmError = "Озвучка только с сервера Railway. Убери Groq-ключ из настроек телефона."
+                                }
+                                is StoryAttemptResult.TemplateRejected -> templateRejected = true
+                                is StoryAttemptResult.Failed -> llmError =
+                                    "${geminiResult.reason} | Groq: ${groqFallback.reason}"
+                            }
+                        }
+                    }
+                }
+                LlmProvider.GROQ -> when (val groqResult = tryDirectGroq(
+                    groqKey = groqKey,
+                    track = track,
+                    trackKey = trackKey,
+                    year = year,
+                    genre = genre,
+                    countryCode = countryCode,
+                    previousScripts = previousScripts,
+                    narratorTag = narratorTag,
+                    storyLength = storyLength,
+                    storyNarrator = storyNarrator,
+                    referenceFacts = referenceFacts,
+                    selectedFact = selectedFact,
+                )) {
+                    is StoryAttemptResult.Success -> {
+                        StoryLog.w("Direct Groq text OK but no Yandex audio — Railway required")
+                        llmError = "Озвучка только с сервера Railway. Убери Groq-ключ из настроек телефона."
+                    }
+                    is StoryAttemptResult.TemplateRejected -> templateRejected = true
+                    is StoryAttemptResult.Failed -> {
+                        llmError = groqResult.reason
+                        if (shouldTryAlternateProvider(groqResult.reason) && geminiKey.isNotEmpty()) {
+                            StoryLog.w("Direct Groq limited, retry with Gemini key")
+                            when (val geminiFallback = tryDirectGemini(
+                                geminiKey = geminiKey,
+                                geminiModel = geminiModel,
+                                track = track,
+                                trackKey = trackKey,
+                                year = year,
+                                genre = genre,
+                                countryCode = countryCode,
+                                previousScripts = previousScripts,
+                                narratorTag = narratorTag,
+                                storyLength = storyLength,
+                                storyNarrator = storyNarrator,
+                                referenceFacts = referenceFacts,
+                                selectedFact = selectedFact,
+                            )) {
+                                is StoryAttemptResult.Success -> return Result.success(geminiFallback.response)
+                                is StoryAttemptResult.TemplateRejected -> templateRejected = true
+                                is StoryAttemptResult.Failed -> llmError =
+                                    "${groqResult.reason} | Gemini: ${geminiFallback.reason}"
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        if (directApiKey.isEmpty() && fallbackKey.isNotEmpty() && !useBackend) {
+            StoryLog.w("Primary key missing for ${llmProvider.id}, trying fallback ${fallbackProvider.id}")
+            when (fallbackProvider) {
                 LlmProvider.GEMINI -> when (val geminiResult = tryDirectGemini(
                     geminiKey = geminiKey,
                     geminiModel = geminiModel,
@@ -243,7 +382,7 @@ class StoryRepository(
                     selectedFact = selectedFact,
                 )) {
                     is StoryAttemptResult.Success -> {
-                        StoryLog.w("Direct Groq text OK but no Yandex audio — Railway required")
+                        StoryLog.w("Direct Groq fallback text OK but no Yandex audio — Railway required")
                         llmError = "Озвучка только с сервера Railway. Убери Groq-ключ из настроек телефона."
                     }
                     is StoryAttemptResult.TemplateRejected -> templateRejected = true
@@ -683,6 +822,16 @@ class StoryRepository(
         if (url.isBlank()) return false
         if (url.contains("10.0.2.2") && !isEmulator()) return false
         return true
+    }
+
+    private fun shouldTryAlternateProvider(reason: String?): Boolean {
+        val lower = reason?.lowercase().orEmpty()
+        if (lower.isBlank()) return false
+        return lower.contains("429") ||
+            lower.contains("rate limit") ||
+            lower.contains("resource_exhausted") ||
+            lower.contains("лимит") ||
+            lower.contains("quota")
     }
 
     private fun isEmulator(): Boolean {

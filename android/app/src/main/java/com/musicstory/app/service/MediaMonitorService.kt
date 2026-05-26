@@ -77,7 +77,8 @@ class MediaMonitorService : Service() {
             ) { sessionKey, notificationKey, _ -> sessionKey ?: notificationKey }
                 .distinctUntilChanged()
                 .collect { key ->
-                    val track = app.mediaControllerManager.effectiveNowPlaying.value
+                    val track = app.mediaControllerManager.resolveNowPlayingTrack()
+                        ?: app.mediaControllerManager.effectiveNowPlaying.value
                     if (track != null && track.isValid() && key != null && key != lastTrackKey) {
                         lastTrackKey = key
                         onNewTrack(app, track)

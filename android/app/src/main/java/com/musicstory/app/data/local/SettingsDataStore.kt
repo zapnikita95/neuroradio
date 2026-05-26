@@ -5,6 +5,7 @@ import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.floatPreferencesKey
 import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
@@ -12,6 +13,7 @@ import androidx.datastore.preferences.core.stringSetPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import com.musicstory.app.domain.GeminiModel
 import com.musicstory.app.domain.LlmProvider
+import com.musicstory.app.domain.MusicInterruptionMode
 import com.musicstory.app.domain.StoryLength
 import com.musicstory.app.domain.StoryNarrator
 import com.musicstory.app.domain.TtsEmotion
@@ -38,6 +40,18 @@ class SettingsDataStore(private val context: Context) {
 
     val tracksSinceLastStory: Flow<Int> = context.settingsDataStore.data.map { prefs ->
         prefs[KEY_TRACKS_SINCE_LAST_STORY] ?: 0
+    }
+
+    val firstAutoStoryCompleted: Flow<Boolean> = context.settingsDataStore.data.map { prefs ->
+        prefs[KEY_FIRST_AUTO_STORY_COMPLETED] ?: false
+    }
+
+    val settingsTourPending: Flow<Boolean> = context.settingsDataStore.data.map { prefs ->
+        prefs[KEY_SETTINGS_TOUR_PENDING] ?: false
+    }
+
+    val settingsTourCompleted: Flow<Boolean> = context.settingsDataStore.data.map { prefs ->
+        prefs[KEY_SETTINGS_TOUR_COMPLETED] ?: false
     }
 
     val backendUrl: Flow<String> = context.settingsDataStore.data.map { prefs ->
@@ -123,6 +137,14 @@ class SettingsDataStore(private val context: Context) {
         prefs[KEY_MONITOR_PAUSED_BY_USER] ?: false
     }
 
+    val musicInterruptionMode: Flow<MusicInterruptionMode> = context.settingsDataStore.data.map { prefs ->
+        MusicInterruptionMode.fromId(prefs[KEY_MUSIC_INTERRUPTION_MODE])
+    }
+
+    val musicFadeSeconds: Flow<Float> = context.settingsDataStore.data.map { prefs ->
+        (prefs[KEY_MUSIC_FADE_SECONDS] ?: DEFAULT_MUSIC_FADE_SECONDS).coerceIn(0.5f, 8f)
+    }
+
     suspend fun setAutoIntercept(enabled: Boolean) {
         context.settingsDataStore.edit { it[KEY_AUTO_INTERCEPT] = enabled }
     }
@@ -134,6 +156,21 @@ class SettingsDataStore(private val context: Context) {
     suspend fun setTracksSinceLastStory(count: Int) {
         context.settingsDataStore.edit {
             it[KEY_TRACKS_SINCE_LAST_STORY] = count.coerceAtLeast(0)
+        }
+    }
+
+    suspend fun setFirstAutoStoryCompleted(completed: Boolean) {
+        context.settingsDataStore.edit { it[KEY_FIRST_AUTO_STORY_COMPLETED] = completed }
+    }
+
+    suspend fun setSettingsTourPending(pending: Boolean) {
+        context.settingsDataStore.edit { it[KEY_SETTINGS_TOUR_PENDING] = pending }
+    }
+
+    suspend fun setSettingsTourCompleted(completed: Boolean) {
+        context.settingsDataStore.edit {
+            it[KEY_SETTINGS_TOUR_COMPLETED] = completed
+            if (completed) it[KEY_SETTINGS_TOUR_PENDING] = false
         }
     }
 
@@ -234,6 +271,14 @@ class SettingsDataStore(private val context: Context) {
         context.settingsDataStore.edit { it[KEY_MONITOR_PAUSED_BY_USER] = paused }
     }
 
+    suspend fun setMusicInterruptionMode(mode: MusicInterruptionMode) {
+        context.settingsDataStore.edit { it[KEY_MUSIC_INTERRUPTION_MODE] = mode.id }
+    }
+
+    suspend fun setMusicFadeSeconds(seconds: Float) {
+        context.settingsDataStore.edit { it[KEY_MUSIC_FADE_SECONDS] = seconds.coerceIn(0.5f, 8f) }
+    }
+
     suspend fun isMonitorPausedByUser(): Boolean = monitorPausedByUser.first()
 
     companion object {
@@ -241,10 +286,14 @@ class SettingsDataStore(private val context: Context) {
         const val DEFAULT_EVERY_N_TRACKS = 10
         const val DEFAULT_SAME_TRACK_STORY_EVERY_N = 3
         const val DEFAULT_AUTO_INTERCEPT = true
+        const val DEFAULT_MUSIC_FADE_SECONDS = 1.5f
 
         private val KEY_AUTO_INTERCEPT = booleanPreferencesKey("auto_intercept")
         private val KEY_EVERY_N_TRACKS = intPreferencesKey("every_n_tracks")
         private val KEY_TRACKS_SINCE_LAST_STORY = intPreferencesKey("tracks_since_last_story")
+        private val KEY_FIRST_AUTO_STORY_COMPLETED = booleanPreferencesKey("first_auto_story_completed")
+        private val KEY_SETTINGS_TOUR_PENDING = booleanPreferencesKey("settings_tour_pending")
+        private val KEY_SETTINGS_TOUR_COMPLETED = booleanPreferencesKey("settings_tour_completed")
         private val KEY_BACKEND_URL = stringPreferencesKey("backend_url")
         private val KEY_AUTH_INSTALL_ID = stringPreferencesKey("auth_install_id")
         private val KEY_AUTH_ACCESS_TOKEN = stringPreferencesKey("auth_access_token")
@@ -264,6 +313,8 @@ class SettingsDataStore(private val context: Context) {
         private val KEY_TTS_SPEED = stringPreferencesKey("tts_speed")
         private val KEY_TTS_EMOTION = stringPreferencesKey("tts_emotion")
         private val KEY_MONITOR_PAUSED_BY_USER = booleanPreferencesKey("monitor_paused_by_user")
+        private val KEY_MUSIC_INTERRUPTION_MODE = stringPreferencesKey("music_interruption_mode")
+        private val KEY_MUSIC_FADE_SECONDS = floatPreferencesKey("music_fade_seconds")
         private val KEY_SYNC_CODE = stringPreferencesKey("sync_code")
         private val KEY_ACCOUNT_LINKED = booleanPreferencesKey("account_linked")
     }

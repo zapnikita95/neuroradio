@@ -2,10 +2,16 @@ package com.musicstory.app.ui.components
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
@@ -29,22 +35,39 @@ fun PrimaryStoryButton(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
+    loading: Boolean = false,
 ) {
+    val interactive = enabled && !loading
     Box(
         modifier = modifier
             .fillMaxWidth()
             .height(56.dp)
-            .alpha(if (enabled) 1f else 0.45f)
+            .alpha(if (interactive) 1f else if (loading) 0.92f else 0.45f)
             .clip(RoundedCornerShape(18.dp))
             .background(
                 Brush.horizontalGradient(
                     colors = listOf(GoldWarm, GoldBright, Copper.copy(alpha = 0.85f)),
                 ),
             )
-            .then(if (enabled) Modifier.clickable(onClick = onClick) else Modifier),
+            .then(if (interactive) Modifier.clickable(onClick = onClick) else Modifier),
         contentAlignment = Alignment.Center,
     ) {
-        Text(text = text, color = DeepVoid, fontWeight = FontWeight.Bold)
+        if (loading) {
+            Row(
+                horizontalArrangement = Arrangement.Center,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(22.dp),
+                    color = DeepVoid,
+                    strokeWidth = 2.dp,
+                )
+                Spacer(modifier = Modifier.width(10.dp))
+                Text(text = text, color = DeepVoid, fontWeight = FontWeight.Bold)
+            }
+        } else {
+            Text(text = text, color = DeepVoid, fontWeight = FontWeight.Bold)
+        }
     }
 }
 

@@ -63,6 +63,7 @@ class TriggerEngine {
         trackKey: String,
         trackArtist: String,
         trackGenre: String?,
+        firstTrackBonus: Boolean = false,
     ): Boolean {
         registerSameTrackPlay(trackKey)
 
@@ -74,8 +75,12 @@ class TriggerEngine {
             TriggerMode.ALWAYS -> true
             TriggerMode.NEVER -> false
             TriggerMode.EVERY_N_TRACKS -> {
-                tracksSinceLastStory++
-                tracksSinceLastStory >= settings.everyNTracks
+                if (firstTrackBonus) {
+                    true
+                } else {
+                    tracksSinceLastStory++
+                    tracksSinceLastStory >= settings.everyNTracks
+                }
             }
             TriggerMode.SPECIFIC_ARTISTS ->
                 settings.specificArtists.any { selected ->
