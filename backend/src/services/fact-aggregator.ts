@@ -132,7 +132,9 @@ async function fetchMusicBrainzAnnotations(entity: 'recording' | 'artist', mbid?
         await new Promise((r) => setTimeout(r, 400));
         continue;
       }
-      console.warn(`MusicBrainz annotations failed (${entity}):`, err);
+      console.warn(
+        `MusicBrainz annotations failed (${entity}): ${err instanceof Error ? err.message : err}`,
+      );
     }
   }
   return [];

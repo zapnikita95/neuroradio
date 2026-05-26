@@ -42,6 +42,32 @@ export const YANDEX_VOICE_PRESETS: YandexVoicePreset[] = [
 
 export const ALL_VOICES: YandexVoiceId[] = YANDEX_VOICE_PRESETS.map((v) => v.id);
 
+/** Voices supported by SpeechKit REST `tts:synthesize` v1 (folder API key). */
+const SPEECHKIT_V1_VOICES = new Set<YandexVoiceId>([
+  'alena',
+  'filipp',
+  'ermil',
+  'jane',
+  'omazh',
+  'zahar',
+  'marina',
+]);
+
+/** Newer catalog IDs — map to closest v1 voice so TTS does not 400. */
+const V1_VOICE_FALLBACK: Partial<Record<YandexVoiceId, YandexVoiceId>> = {
+  kirill: 'zahar',
+  dasha: 'alena',
+  julia: 'jane',
+  masha: 'marina',
+  alexander: 'filipp',
+  lera: 'alena',
+};
+
+export function coerceVoiceForSpeechKit(voiceId: YandexVoiceId): YandexVoiceId {
+  if (SPEECHKIT_V1_VOICES.has(voiceId)) return voiceId;
+  return V1_VOICE_FALLBACK[voiceId] ?? 'zahar';
+}
+
 const VOICE_BY_DECADE: { maxYear: number; voice: YandexVoiceId }[] = [
   { maxYear: 1969, voice: 'zahar' },
   { maxYear: 1979, voice: 'ermil' },

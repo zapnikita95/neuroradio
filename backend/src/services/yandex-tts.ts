@@ -2,7 +2,12 @@ import fetch from 'node-fetch';
 import { writeFile, mkdir } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { voiceSupportsEmotion, voiceSupportsEvilEmotion, YandexVoiceId } from './voices.js';
+import {
+  coerceVoiceForSpeechKit,
+  voiceSupportsEmotion,
+  voiceSupportsEvilEmotion,
+  YandexVoiceId,
+} from './voices.js';
 import {
   DEFAULT_TTS_EMOTION,
   DEFAULT_TTS_SPEED,
@@ -57,6 +62,20 @@ function buildTtsParams(
 /**
  * Synthesizes Russian speech via Yandex SpeechKit and saves OGG Opus to audio/.
  */
+const TTS_FALLBACK_CHAIN: YandexVoiceId[] = ['zahar', 'alena', 'filipp', 'marina'];
+
+function isUnsupportedVoiceError(status: number, body: string): boolean {
+  return status === 400 && /unsupported voice/i.test(body);
+}
+
+async function requestTts(apiKey: string, params: URLSearchParams) {
+  return fetch(`${TTS_URL}?${params.toString()}`, {
+    method: 'POST',
+    headers: { Authorization: `Api-Key ${apiKey}` },
+    signal: AbortSignal.timeout(45000),
+  });
+}
+
 export async function synthesizeSpeech(
   text: string,
   voiceId: YandexVoiceId,
@@ -83,38 +102,46 @@ export async function synthesizeSpeech(
 
   await mkdir(AUDIO_DIR, { recursive: true });
 
-  let params = buildTtsParams(markedText, voiceId, folderId, ttsOptions);
-  let response = await fetch(`${TTS_URL}?${params.toString()}`, {
-    method: 'POST',
-    headers: { Authorization: `Api-Key ${apiKey}` },
-    signal: AbortSignal.timeout(45000),
-  });
+  const primaryVoice = coerceVoiceForSpeechKit(voiceId);
+  const voicesToTry = [
+    primaryVoice,
+    ...TTS_FALLBACK_CHAIN.filter((v) => v !== primaryVoice),
+  ];
 
-  if (!response.ok && params.has('emotion') && ttsOptions.emotion !== 'neutral') {
-    params = buildTtsParams(markedText, voiceId, folderId, { ...ttsOptions, emotion: 'neutral' });
-    response = await fetch(`${TTS_URL}?${params.toString()}`, {
-      method: 'POST',
-      headers: { Authorization: `Api-Key ${apiKey}` },
-      signal: AbortSignal.timeout(45000),
-    });
-  }
+  let lastError = 'Yandex TTS failed';
+  for (const tryVoice of voicesToTry) {
+    let params = buildTtsParams(markedText, tryVoice, folderId, ttsOptions);
+    let response = await requestTts(apiKey, params);
 
-  if (!response.ok) {
+    if (!response.ok && params.has('emotion') && ttsOptions.emotion !== 'neutral') {
+      params = buildTtsParams(markedText, tryVoice, folderId, { ...ttsOptions, emotion: 'neutral' });
+      response = await requestTts(apiKey, params);
+    }
+
+    if (response.ok) {
+      if (tryVoice !== voiceId) {
+        console.warn(`[tts] voice ${voiceId} → ${tryVoice} (SpeechKit v1)`);
+      }
+      const buffer = Buffer.from(await response.arrayBuffer());
+      const safeName = fileName.endsWith('.ogg') ? fileName : `${fileName}.ogg`;
+      const filePath = path.join(AUDIO_DIR, safeName);
+      await writeFile(filePath, buffer);
+      return {
+        fileName: safeName,
+        filePath,
+        audioUrl: `/audio/${safeName}`,
+      };
+    }
+
     const body = await response.text();
-    throw new Error(`Yandex TTS error ${response.status}: ${body}`);
+    lastError = `Yandex TTS error ${response.status}: ${body}`;
+    if (!isUnsupportedVoiceError(response.status, body)) {
+      throw new Error(lastError);
+    }
+    console.warn(`[tts] unsupported voice ${tryVoice}, trying fallback`);
   }
 
-  const buffer = Buffer.from(await response.arrayBuffer());
-  const safeName = fileName.endsWith('.ogg') ? fileName : `${fileName}.ogg`;
-  const filePath = path.join(AUDIO_DIR, safeName);
-
-  await writeFile(filePath, buffer);
-
-  return {
-    fileName: safeName,
-    filePath,
-    audioUrl: `/audio/${safeName}`,
-  };
+  throw new Error(lastError);
 }
 
 export type { TtsEmotion, TtsOptions };

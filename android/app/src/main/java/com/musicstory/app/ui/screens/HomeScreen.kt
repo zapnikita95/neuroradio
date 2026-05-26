@@ -45,7 +45,6 @@ import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import com.musicstory.app.MusicStoryApp
 import com.musicstory.app.R
-import com.musicstory.app.domain.OrchestratorMode
 import com.musicstory.app.domain.OrchestratorState
 import com.musicstory.app.domain.StoryNarrator
 import com.musicstory.app.ui.components.GenerationStoryPreview
@@ -206,7 +205,6 @@ fun HomeScreen(
                 Spacer(modifier = Modifier.height(20.dp))
 
                 OrchestratorStatusLine(
-                    mode = uiState.mode,
                     narratorLabel = storyNarrator.labelRu,
                     state = uiState.state,
                     tracksUntilNext = uiState.tracksUntilNext,
@@ -380,16 +378,11 @@ private fun NowPlayingSection(
 
 @Composable
 private fun OrchestratorStatusLine(
-    mode: OrchestratorMode,
     narratorLabel: String,
     state: OrchestratorState,
     tracksUntilNext: Int?,
 ) {
     val context = LocalContext.current
-    val modeLabel = when (mode) {
-        OrchestratorMode.AUTO -> context.getString(R.string.mode_auto)
-        OrchestratorMode.MANUAL -> context.getString(R.string.mode_manual)
-    }
     val stateLabel = when (state) {
         OrchestratorState.FETCHING_STORY,
         OrchestratorState.PREPARING_PLAYBACK,
@@ -402,12 +395,6 @@ private fun OrchestratorStatusLine(
             text = narratorLabel,
             style = MaterialTheme.typography.labelLarge,
             color = MutedLavender,
-        )
-        Spacer(modifier = Modifier.height(2.dp))
-        Text(
-            text = modeLabel,
-            style = MaterialTheme.typography.bodySmall,
-            color = MutedLavender.copy(alpha = 0.85f),
         )
         if (stateLabel != null) {
             Spacer(modifier = Modifier.height(4.dp))

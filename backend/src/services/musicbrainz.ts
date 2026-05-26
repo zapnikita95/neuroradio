@@ -88,7 +88,6 @@ async function fetchRecordingSearch(artist: string, title: string): Promise<Musi
   const query = encodeURIComponent(`artist:"${artist}" AND recording:"${title}"`);
   const url = `${MUSICBRAINZ_BASE}/recording?query=${query}&fmt=json&limit=5&inc=artist-credits`;
 
-  let lastError: unknown;
   for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
     try {
       const response = await fetch(url, {
@@ -104,16 +103,19 @@ async function fetchRecordingSearch(artist: string, title: string): Promise<Musi
       const data = (await response.json()) as MusicBrainzSearchResponse;
       return data.recordings?.[0] ?? null;
     } catch (err) {
-      lastError = err;
       if (attempt < MAX_RETRIES - 1 && isRetryableNetworkError(err)) {
         await new Promise((resolve) => setTimeout(resolve, 400 * (attempt + 1)));
         continue;
       }
-      throw err;
+      console.warn(
+        `MusicBrainz lookup failed for ${artist} — ${title}: ${err instanceof Error ? err.message : err}`,
+      );
+      return null;
     }
   }
 
-  throw lastError ?? new Error('MusicBrainz lookup failed');
+  console.warn(`MusicBrainz lookup failed for ${artist} — ${title}`);
+  return null;
 }
 
 /**
@@ -140,7 +142,9 @@ export async function enrichTrackMetadata(
       artistMbid: pickArtistMbid(recording),
     };
   } catch (err) {
-    console.warn('MusicBrainz lookup failed:', err);
+    console.warn(
+      `MusicBrainz enrich failed: ${err instanceof Error ? err.message : err}`,
+    );
     return base;
   }
 }

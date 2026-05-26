@@ -9,7 +9,7 @@ import { hasLlmKeyForProvider, resolveLlmProvider } from '../services/llm-provid
 import { generateStoryWithFallback } from '../services/story-llm-router.js';
 import { setLogDetail } from '../middleware/request-logger.js';
 import { synthesizeSpeech, hasYandexCredentials } from '../services/yandex-tts.js';
-import { resolveVoiceForStory } from '../services/voices.js';
+import { coerceVoiceForSpeechKit, resolveVoiceForStory } from '../services/voices.js';
 import { signAudioAccess } from '../services/audio-token.js';
 import { isUnlimitedInstall } from '../config/security.js';
 import { attachStoryQuotaHeaders, getDailyStoryQuota, recordStoryGeneration } from '../middleware/rate-limit.js';
@@ -84,7 +84,9 @@ router.post('/full', validateStoryFullBody, async (req: Request, res: Response) 
 
   try {
     const metadata = await enrichTrackMetadata(artist, title);
-    const voiceId = resolveVoiceForStory(ttsVoice, metadata.year, metadata.genre);
+    const voiceId = coerceVoiceForSpeechKit(
+      resolveVoiceForStory(ttsVoice, metadata.year, metadata.genre),
+    );
 
     const previousScripts = Array.isArray(previousScriptsRaw)
       ? previousScriptsRaw.filter((s): s is string => typeof s === 'string' && s.trim().length > 0)
@@ -154,7 +156,7 @@ router.post('/full', validateStoryFullBody, async (req: Request, res: Response) 
       mbid: metadata.mbid ?? null,
       script: story.script,
       word_count: story.word_count,
-      voiceId: story.voiceId,
+      voiceId,
       demo: false,
       quota: getDailyStoryQuota(req.installId ?? 'unknown'),
       sources: {
@@ -171,7 +173,7 @@ router.post('/full', validateStoryFullBody, async (req: Request, res: Response) 
 
     if (hasYandexCredentials()) {
       const id = uuidv4();
-      const audio = await synthesizeSpeech(story.script, story.voiceId, `${id}.ogg`, {
+      const audio = await synthesizeSpeech(story.script, voiceId, `${id}.ogg`, {
         speed: ttsSpeed,
         emotion: ttsEmotion,
         artist: metadata.artist,

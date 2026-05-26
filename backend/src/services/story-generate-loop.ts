@@ -56,7 +56,7 @@ export function finalizeAfterQualityLoop<T extends { script: string }>(
     console.warn(`[story] last script rejected as water: ${water}`);
     return null;
   }
-  if (wordCount < 38) {
+  if (wordCount < 28) {
     console.warn(`[story] last script rejected as too short after retries: ${wordCount} words`);
     return null;
   }
