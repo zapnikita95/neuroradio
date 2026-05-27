@@ -37,6 +37,9 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlin.coroutines.coroutineContext
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeout
@@ -113,10 +116,14 @@ class StoryRepository(
             withTimeout(METADATA_TIMEOUT_MS) {
                 metadataCache.getOrFetch(track.artist, track.title)
             }
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             StoryLog.w("MusicBrainz enrich failed: ${e.message}")
             com.musicstory.app.data.remote.TrackMetadata()
         }
+
+        coroutineContext.ensureActive()
 
         val year = metadata.year
         val genre = metadata.genre
@@ -185,6 +192,8 @@ class StoryRepository(
             )
         }
 
+        coroutineContext.ensureActive()
+
         // Railway first: Groq/Gemini + Yandex TTS (озвучка только с сервера).
         if (useBackend) {
             when (val backendResult = tryBackendStory(
@@ -214,6 +223,8 @@ class StoryRepository(
                     }
                 }
             }
+
+            coroutineContext.ensureActive()
 
             // Если выбранный провайдер упёрся в лимит/ошибку, пробуем второй на этом же Railway.
             if (
@@ -247,6 +258,8 @@ class StoryRepository(
         } else {
             StoryLog.w("Backend skipped (url=$backendUrl)")
         }
+
+        coroutineContext.ensureActive()
 
         // Свой ключ — только если сервер не дал историю (без Yandex-озвучки на Groq с телефона).
         if (directApiKey.isNotEmpty()) {
@@ -588,6 +601,8 @@ class StoryRepository(
                     StoryAttemptResult.Success(response)
                 }
             }
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             if (e is HttpException && e.code() == 429) {
                 val parsed = parseServerRateLimit(e)
