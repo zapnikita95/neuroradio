@@ -19,7 +19,15 @@ const TRACK = {
 };
 
 const LENGTHS = ['30s', '60s', 'unlimited'];
-const NARRATORS = ['contemporary', 'night_dj', 'expert', 'fan'];
+const NARRATORS = [
+  'auto',
+  'radio_host',
+  'contemporary',
+  'expert',
+  'fan',
+  'backstage',
+  'night_dj',
+];
 
 const rimmelFact =
   'The song appeared in a Rimmel London advert, in the film Live Free or Die Hard, and on the soundtracks of EA Sports FIFA Street 2 and Rugby 06.';

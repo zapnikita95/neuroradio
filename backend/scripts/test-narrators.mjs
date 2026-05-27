@@ -11,6 +11,7 @@ import {
   listNarratorOptions,
 } from '../dist/services/story-narrator.js';
 import { buildSystemPrompt, buildStoryUserPrompt } from '../dist/services/prompts.js';
+import { FACT_HUNT_LLM_PROMPT_BLOCK } from '../dist/services/story-fact-hunt.js';
 import { getStoryLengthPreset } from '../dist/services/story-length.js';
 
 const SAMPLE = {
@@ -96,6 +97,19 @@ for (const id of ['auto', ...Object.keys(STORY_NARRATOR_PRESETS)]) {
   }
 }
 if (failed === 0) ok('System/user prompts built for all narrators');
+
+console.log('\n=== Fact-hunt LLM prompt (no narrator) ===');
+if (/РАДИОВЕДУЩИЙ|НОЧНОЙ ДИДЖЕЙ|ФАНАТ-КОЛЛЕКЦИОНЕР/i.test(FACT_HUNT_LLM_PROMPT_BLOCK)) {
+  fail('FACT_HUNT_LLM must not include narrator presets');
+} else if (
+  /ТЕСТ.*разорв/i.test(FACT_HUNT_LLM_PROMPT_BLOCK) ||
+  (/разорв.*кабин/i.test(FACT_HUNT_LLM_PROMPT_BLOCK) &&
+    !/ЗАПРЕЩЕНО.*разорв/i.test(FACT_HUNT_LLM_PROMPT_BLOCK))
+) {
+  fail('FACT_HUNT_LLM must not instruct cabin metaphor');
+} else {
+  ok('FACT_HUNT_LLM is narrator-neutral');
+}
 
 console.log('\n=== Summary ===');
 if (failed > 0) {

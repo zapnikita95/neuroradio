@@ -83,3 +83,27 @@ On successful story generation, backend logs:
 - `[story-script-begin] ... [story-script-end]` final text block
 
 This makes fact choice and output auditable from logs without local debugging.
+
+## 9) Stage 1 — LLM fact hunt (when picker is empty or weak)
+
+Triggered when `LLM_FACT_HUNT_MODE=weak_or_empty` (default) and `rawSnippets.length > 0`:
+
+- `pickReferenceFact` returned `null`, **or**
+- `interestScore(selected) < MIN_PICK_INTEREST_SCORE` (6)
+
+Flow:
+
+1. `fetchAggregatedFactContext()` collects **rawSnippets** (Wikipedia + DDG + Wikidata + MB) before strict relevance filters.
+2. Stronger model (`GROQ_FACT_MODEL` / `GEMINI_FACT_MODEL`) extracts one Russian seed **only** from numbered snippets.
+3. Code verifies `evidenceQuote` is grounded in the chosen snippet (substring or ≥3 shared tokens).
+4. Rejects boring facts, foreign entities, invented social themes (racism without snippet support).
+5. On failure → alternate LLM provider once → else `NO_REFERENCE_FACTS` (503).
+
+Logs:
+
+- `[fact-hunt-llm] start …`
+- `[fact-hunt-evidence] ok snippet=N quote="…"`
+- `[story-seed] … | llm-hunt | …`
+- `[story-seed-why] … source=llm-fact-hunt …`
+
+Stage 2 (story + ampoule) is unchanged: one seed, narrator affects tone only.

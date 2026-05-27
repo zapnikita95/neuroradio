@@ -6,6 +6,16 @@ import { buildFactHuntSearchQueries } from './story-fact-hunt.js';
 import { fetchReferenceFactBundle as fetchWikipediaBundle } from './wikipedia-facts.js';
 
 const USER_AGENT = 'MusicStoryBFF/1.0 (contact@example.com)';
+const RAW_SNIPPET_MIN_LEN = 35;
+const RAW_SNIPPET_MAX = 12;
+
+export type SnippetSource = 'wiki' | 'ddg' | 'wikidata' | 'mb';
+
+export interface AggregatedFactContext {
+  bundle: ReferenceFactBundle;
+  rawSnippets: string[];
+  snippetSources: SnippetSource[];
+}
 
 function normalize(text: string): string {
   return text.toLowerCase().replace(/[^\p{L}\p{N}\s]/gu, ' ').replace(/\s+/g, ' ').trim();
@@ -36,7 +46,28 @@ function factsAboutTrackOrArtist(facts: string[], artist: string, title: string)
   );
 }
 
-async function fetchDuckDuckGo(artist: string, title: string): Promise<string[]> {
+function pushRaw(
+  collected: string[],
+  sources: SnippetSource[],
+  text: string,
+  source: SnippetSource,
+): void {
+  const trimmed = text.trim();
+  if (trimmed.length < RAW_SNIPPET_MIN_LEN) return;
+  const norm = normalize(trimmed);
+  if (collected.some((s) => normalize(s) === norm)) return;
+  collected.push(trimmed.slice(0, 480));
+  sources.push(source);
+}
+
+function capRaw(collected: string[], sources: SnippetSource[]): void {
+  while (collected.length > RAW_SNIPPET_MAX) {
+    collected.pop();
+    sources.pop();
+  }
+}
+
+async function fetchDuckDuckGoUnfiltered(artist: string, title: string): Promise<string[]> {
   const queries = [
     `${artist} ${title} song`,
     `${artist} musician biography`,
@@ -57,23 +88,27 @@ async function fetchDuckDuckGo(artist: string, title: string): Promise<string[]>
         RelatedTopics?: Array<{ Text?: string; Topics?: Array<{ Text?: string }> }>;
       };
       for (const text of [data.AbstractText, data.Abstract]) {
-        if (text && text.trim().length >= 35) collected.push(text.trim());
+        if (text?.trim()) collected.push(text.trim());
       }
       for (const topic of data.RelatedTopics ?? []) {
-        if (topic.Text && topic.Text.length >= 35) collected.push(topic.Text);
+        if (topic.Text?.trim()) collected.push(topic.Text.trim());
         for (const nested of topic.Topics ?? []) {
-          if (nested.Text && nested.Text.length >= 35) collected.push(nested.Text);
+          if (nested.Text?.trim()) collected.push(nested.Text.trim());
         }
       }
     } catch {
       // skip source
     }
-    if (collected.length >= 6) break;
+    if (collected.length >= 10) break;
   }
-  return filterAndRankFacts(collected, 6);
+  return collected;
 }
 
-async function fetchWikidata(artist: string, title: string, countryCode?: string): Promise<string[]> {
+async function fetchDuckDuckGo(artist: string, title: string): Promise<string[]> {
+  return filterAndRankFacts(await fetchDuckDuckGoUnfiltered(artist, title), 6);
+}
+
+async function fetchWikidataUnfiltered(artist: string, title: string, countryCode?: string): Promise<string[]> {
   const lang = countryCode === 'RU' ? 'ru' : 'en';
   const queries = [`${title} ${artist} song`, artist];
   const results: string[] = [];
@@ -100,10 +135,17 @@ async function fetchWikidata(artist: string, title: string, countryCode?: string
       // skip
     }
   }
-  return filterAndRankFacts(results, 5);
+  return results;
 }
 
-async function fetchMusicBrainzAnnotations(entity: 'recording' | 'artist', mbid?: string): Promise<string[]> {
+async function fetchWikidata(artist: string, title: string, countryCode?: string): Promise<string[]> {
+  return filterAndRankFacts(await fetchWikidataUnfiltered(artist, title, countryCode), 5);
+}
+
+async function fetchMusicBrainzAnnotationsUnfiltered(
+  entity: 'recording' | 'artist',
+  mbid?: string,
+): Promise<string[]> {
   const id = mbid?.trim();
   if (!id) return [];
   const url = `https://musicbrainz.org/ws/2/${entity}/${id}?inc=annotations&fmt=json`;
@@ -126,7 +168,7 @@ async function fetchMusicBrainzAnnotations(entity: 'recording' | 'artist', mbid?
             .filter((s) => s.length >= 35 && s.length <= 240),
         );
       }
-      return filterAndRankFacts(texts, 4);
+      return texts;
     } catch (err) {
       if (attempt === 0) {
         await new Promise((r) => setTimeout(r, 400));
@@ -140,6 +182,95 @@ async function fetchMusicBrainzAnnotations(entity: 'recording' | 'artist', mbid?
   return [];
 }
 
+async function fetchMusicBrainzAnnotations(entity: 'recording' | 'artist', mbid?: string): Promise<string[]> {
+  return filterAndRankFacts(await fetchMusicBrainzAnnotationsUnfiltered(entity, mbid), 4);
+}
+
+function buildRawSnippets(
+  wiki: ReferenceFactBundle,
+  ddgRaw: string[],
+  wdRaw: string[],
+  mbTrackRaw: string[],
+  mbArtistRaw: string[],
+): { rawSnippets: string[]; snippetSources: SnippetSource[] } {
+  const rawSnippets: string[] = [];
+  const snippetSources: SnippetSource[] = [];
+
+  for (const fact of [...wiki.trackFacts, ...wiki.artistFacts]) {
+    pushRaw(rawSnippets, snippetSources, fact, 'wiki');
+    capRaw(rawSnippets, snippetSources);
+  }
+  for (const text of ddgRaw) {
+    pushRaw(rawSnippets, snippetSources, text, 'ddg');
+    capRaw(rawSnippets, snippetSources);
+  }
+  for (const text of wdRaw) {
+    pushRaw(rawSnippets, snippetSources, text, 'wikidata');
+    capRaw(rawSnippets, snippetSources);
+  }
+  for (const text of [...mbTrackRaw, ...mbArtistRaw]) {
+    pushRaw(rawSnippets, snippetSources, text, 'mb');
+    capRaw(rawSnippets, snippetSources);
+  }
+
+  return { rawSnippets, snippetSources };
+}
+
+export async function fetchAggregatedFactContext(
+  artist: string,
+  title: string,
+  countryCode?: string,
+  recordingMbid?: string,
+  artistMbid?: string,
+): Promise<AggregatedFactContext> {
+  const wiki = await fetchWikipediaBundle(artist, title, countryCode);
+  const [ddgUnfiltered, wdUnfiltered, mbTrackRaw, mbArtistRaw] = await Promise.all([
+    fetchDuckDuckGoUnfiltered(artist, title),
+    fetchWikidataUnfiltered(artist, title, countryCode),
+    fetchMusicBrainzAnnotationsUnfiltered('recording', recordingMbid),
+    fetchMusicBrainzAnnotationsUnfiltered('artist', artistMbid),
+  ]);
+
+  const ddg = filterAndRankFacts(ddgUnfiltered, 6);
+  const wikidata = filterAndRankFacts(wdUnfiltered, 5);
+  const mbTrack = filterAndRankFacts(mbTrackRaw, 4);
+  const mbArtist = filterAndRankFacts(mbArtistRaw, 4);
+
+  const ddgFiltered = factsAboutTrackOrArtist(ddg, artist, title);
+  const wdFiltered = factsAboutTrackOrArtist(wikidata, artist, title);
+  const ddgSplit = splitByMention(ddgFiltered, title, artist);
+  const wdSplit = splitByMention(wdFiltered, title, artist);
+
+  let trackFacts = mergeFacts(wiki.trackFacts, ddgSplit.track, wdSplit.track, mbTrack);
+  let artistFacts = mergeFacts(wiki.artistFacts, ddgSplit.artist, wdSplit.artist, mbArtist);
+
+  if (trackFacts.length + artistFacts.length === 0) {
+    const ddgRelaxed = filterAndRankFacts(ddgUnfiltered, 5);
+    if (ddgRelaxed.length > 0) {
+      const relaxedSplit = splitByMention(ddgRelaxed, title, artist);
+      console.warn(
+        `[facts] relaxed DDG fallback for "${artist}" — "${title}" (${ddgRelaxed.length} snippets)`,
+      );
+      trackFacts =
+        relaxedSplit.track.length > 0 ? relaxedSplit.track : ddgRelaxed.slice(0, 2);
+      artistFacts =
+        relaxedSplit.artist.length > 0 ? relaxedSplit.artist : ddgRelaxed.slice(0, 4);
+    }
+  }
+
+  const bundle: ReferenceFactBundle = { trackFacts, artistFacts };
+  const { rawSnippets, snippetSources } = buildRawSnippets(
+    wiki,
+    ddgUnfiltered,
+    wdUnfiltered,
+    mbTrackRaw,
+    mbArtistRaw,
+  );
+
+  return { bundle, rawSnippets, snippetSources };
+}
+
+/** @deprecated use fetchAggregatedFactContext */
 export async function fetchAggregatedFactBundle(
   artist: string,
   title: string,
@@ -147,38 +278,6 @@ export async function fetchAggregatedFactBundle(
   recordingMbid?: string,
   artistMbid?: string,
 ): Promise<ReferenceFactBundle> {
-  const wiki = await fetchWikipediaBundle(artist, title, countryCode);
-  const [ddg, wikidata, mbTrack, mbArtist] = await Promise.all([
-    fetchDuckDuckGo(artist, title),
-    fetchWikidata(artist, title, countryCode),
-    fetchMusicBrainzAnnotations('recording', recordingMbid),
-    fetchMusicBrainzAnnotations('artist', artistMbid),
-  ]);
-
-  const ddgFiltered = factsAboutTrackOrArtist(ddg, artist, title);
-  const wdFiltered = factsAboutTrackOrArtist(wikidata, artist, title);
-  const ddgSplit = splitByMention(ddgFiltered, title, artist);
-  const wdSplit = splitByMention(wdFiltered, title, artist);
-
-  const trackFacts = mergeFacts(wiki.trackFacts, ddgSplit.track, wdSplit.track, mbTrack);
-  const artistFacts = mergeFacts(wiki.artistFacts, ddgSplit.artist, wdSplit.artist, mbArtist);
-
-  if (trackFacts.length + artistFacts.length > 0) {
-    return { trackFacts, artistFacts };
-  }
-
-  // Last resort: DDG abstracts often mention the artist even when strict relevance filter drops them.
-  const ddgRelaxed = filterAndRankFacts(await fetchDuckDuckGo(artist, title), 5);
-  if (ddgRelaxed.length === 0) {
-    return { trackFacts: [], artistFacts: [] };
-  }
-  const relaxedSplit = splitByMention(ddgRelaxed, title, artist);
-  console.warn(
-    `[facts] relaxed DDG fallback for "${artist}" — "${title}" (${ddgRelaxed.length} snippets)`,
-  );
-  return {
-    trackFacts: relaxedSplit.track.length > 0 ? relaxedSplit.track : ddgRelaxed.slice(0, 2),
-    artistFacts:
-      relaxedSplit.artist.length > 0 ? relaxedSplit.artist : ddgRelaxed.slice(2, 4),
-  };
+  const ctx = await fetchAggregatedFactContext(artist, title, countryCode, recordingMbid, artistMbid);
+  return ctx.bundle;
 }
