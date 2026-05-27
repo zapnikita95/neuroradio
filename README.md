@@ -1,16 +1,52 @@
-# Music Story
+# Нейрорадио
 
-«Нейрорадио» для стриминговых плееров: определяет текущий трек, запрашивает короткую (~30 сек) русскую справку у бэкенда и озвучивает её.
+Персональный радиоведущий для музыки, которая играет прямо сейчас.
 
-**Платформы:** Android (Kotlin) · iOS (SwiftUI, iOS 17+) · **Windows Desktop** (Tauri виджет)
+Нейрорадио слушает текущий трек в Spotify, Яндекс Музыке, YouTube Music и других плеерах, находит контекст про песню и через несколько секунд рассказывает короткую историю голосом. Это ощущается как маленькая вставка на хорошем радио: кто записал трек, чем он интересен, почему за ним стоит больше, чем просто строчка в плейлисте.
 
-## Быстрый старт
+Главная боль простая: в потоке даже любимая музыка часто становится плоской. Треки сменяют друг друга, а история, настроение эпохи, случайности записи и человеческие детали остаются где-то за кадром. Нейрорадио добавляет этому прослушиванию объёма, чтобы знакомые песни открывались глубже, а новые быстрее цепляли.
 
-### Готовый APK
+Основной сценарий сделан под Android. Приложение само видит трек, ставит музыку на паузу, проигрывает историю и возвращает воспроизведение. Бэкенд берёт на себя всё тяжёлое: факты, генерацию текста, озвучку и защищённую выдачу аудио.
 
-Собранный debug-APK лежит в корне проекта:
+## Что умеет
 
+- Определяет текущий трек через Android MediaSession и уведомления музыкальных приложений.
+- Работает со Spotify, Яндекс Музыкой, YouTube Music, Apple Music и другими плеерами, которые отдают метаданные системе.
+- Генерирует короткие русские истории про песню, артиста, релиз, эпоху или любопытный факт вокруг трека.
+- Озвучивает текст на сервере через Yandex SpeechKit и отдаёт готовый OGG-файл в приложение.
+- Умеет включаться автоматически через заданное число треков или запускаться вручную кнопкой.
+- Хранит историю прослушиваний и уже созданные рассказы локально.
+- Поддерживает Android-приложение, iOS-прототип и Windows desktop-виджет.
+
+## Как это работает
+
+1. На телефоне играет трек.
+2. Android-приложение получает артиста и название из системной медиасессии.
+3. Приложение отправляет запрос в BFF-бэкенд.
+4. Бэкенд уточняет данные через MusicBrainz и дополнительные источники фактов.
+5. LLM собирает короткий сценарий в стиле живой радиовставки.
+6. Yandex SpeechKit превращает сценарий в аудио.
+7. Приложение получает ссылку на файл, проигрывает историю через ExoPlayer и возвращает музыку.
+
+```text
+Music app -> Android app -> Backend -> facts + LLM + Yandex TTS -> audio story -> Android app
 ```
+
+## Почему это цепляет
+
+Обычный плейлист быстро превращается в фон. Нейрорадио добавляет к музыке контекст: внезапную деталь о записи, историю релиза, связь с эпохой, артистом или сценой. Песня остаётся главной, а вокруг неё появляется воздух, глубина и повод услышать её внимательнее.
+
+Проект хорошо ложится на прогулки, поездки, домашние прослушивания, вечеринки и любые ситуации, где музыка уже играет, а доставать телефон и искать факты руками лень.
+
+## Платформы
+
+### Android
+
+Основная платформа проекта: Kotlin, Jetpack Compose, Room, ExoPlayer, foreground service, NotificationListener и MediaSession.
+
+Готовый debug APK после сборки лежит в корне репозитория:
+
+```text
 MusicStory.apk
 ```
 
@@ -20,52 +56,18 @@ MusicStory.apk
 adb install -r MusicStory.apk
 ```
 
-### Сборка из исходников
+Сборка из исходников:
 
 ```bash
 cd android
 ./gradlew assembleDebug
 ```
 
-APK автоматически копируется в корень: **`MusicStory.apk`**
+APK автоматически копируется в корень проекта как `MusicStory.apk`.
 
-**Требования:** JDK 17, Android SDK (API 35), Gradle wrapper в `android/`.
+### Backend
 
-### iOS (SwiftUI)
-
-Сборка **только на macOS** (Xcode). Проект уже в репозитории — XcodeGen не нужен.
-
-```bash
-git clone https://github.com/zapnikita95/music-story.git
-cd music-story/ios
-open MusicStory.xcodeproj
-```
-
-В Xcode: **Signing & Capabilities** → Team → **Run** (⌘R).
-
-Подробная инструкция: [ios/README.md](ios/README.md) · [PLAN-06](docs/PLAN-06-ios.md)
-
-### Windows Desktop (виджет)
-
-Круглый always-on-top виджет: Spotify / Яндекс / браузер через Windows SMTC.
-
-```bash
-cd desktop
-npm install
-npm run tauri build
-```
-
-Exe: `desktop/src-tauri/target/release/music-story-desktop.exe`
-
-Подробнее: [desktop/README.md](desktop/README.md)
-
-| iOS | Android |
-|-----|---------|
-| Spotify App Remote + Apple Music (авто) | MediaSession (авто) |
-| ShazamKit / ручной ввод (Яндекс и др.) | NotificationListener |
-| Локальное уведомление + виджет | Persistent notification |
-
-### Бэкенд (BFF)
+Node.js/Express BFF для генерации историй, обогащения фактов и серверной озвучки.
 
 ```bash
 cd backend
@@ -74,77 +76,83 @@ cp .env.example .env
 npm run dev
 ```
 
-Сервер: `http://localhost:3000`. Без API-ключей работает demo-режим (готовый текст + локальный TTS на телефоне).
+Локальный сервер поднимается на `http://localhost:3000`.
 
-## Возможности
+Для полного сценария нужны переменные:
 
-| Компонент | Описание |
-|-----------|----------|
-| **Media detection** | Spotify, Яндекс Музыка, YT Music, Apple Music через NotificationListener + MediaSession |
-| **StoryOrchestrator** | Автоперехват (pause → история → resume) и ручной режим |
-| **TriggerEngine** | Каждые N треков, whitelist артистов/жанров/треков, always/never |
-| **Scrobbling** | Локальная история прослушиваний (Room), кэш историй offline |
-| **UI** | Compose: онбординг, главная, настройки, история, плеер справки |
-| **Backend BFF** | MusicBrainz, GROQ LLM, Yandex SpeechKit TTS |
+- `GROQ_API_KEY` или другой настроенный LLM-провайдер для текста.
+- `YANDEX_API_KEY` и `YANDEX_FOLDER_ID` для озвучки через Yandex SpeechKit.
+- `AUTH_JWT_SECRET` при необходимости задать отдельный секрет для авторизации приложения.
 
-## Структура
+### iOS
 
-```
-Music story/
-├── android/              # Kotlin + Jetpack Compose
-├── desktop/              # Tauri 2 + React (Windows виджет)
-├── ios/                  # SwiftUI (iOS 17+)
-├── backend/              # Node.js Express BFF
-├── docs/                 # Подробная документация и планы подсистем
-├── .env.example          # Шаблон секретов бэкенда
-└── MusicStory.apk        # Собранный APK (копируется сюда автоматически)
+В репозитории есть SwiftUI-проект для iOS 17+:
+
+```bash
+git clone https://github.com/zapnikita95/music-story.git
+cd music-story/ios
+open MusicStory.xcodeproj
 ```
 
-## Настройка на устройстве
+Дальше в Xcode нужно выбрать Team в Signing & Capabilities и запустить проект.
 
-1. Установите APK и откройте приложение.
-2. Выдайте **доступ к уведомлениям** (онбординг → Настройки Android).
-3. В **Настройки → URL бэкенда** укажите адрес сервера:
-   - Эмулятор: `http://10.0.2.2:3000`
-   - Реальное устройство: `http://<IP_ПК>:3000`
-4. Запустите Spotify или Яндекс Музыку — на главном экране появятся артист и название.
+### Windows Desktop
+
+Tauri-виджет для Windows: компактное окно поверх экрана, работа с системными медиаданными через Windows SMTC.
+
+```bash
+cd desktop
+npm install
+npm run tauri build
+```
+
+Собранный exe: `desktop/src-tauri/target/release/music-story-desktop.exe`.
+
+## Структура проекта
+
+```text
+music-story/
+├── android/       # Android-приложение
+├── backend/       # Express BFF, факты, LLM, Yandex SpeechKit
+├── desktop/       # Tauri + React виджет для Windows
+├── ios/           # SwiftUI-проект
+├── docs/          # Технические заметки и планы
+└── MusicStory.apk # Debug APK после сборки Android
+```
+
+## Настройка на телефоне
+
+1. Установите `MusicStory.apk`.
+2. Откройте приложение и выдайте доступ к уведомлениям.
+3. В настройках укажите URL бэкенда:
+   - эмулятор: `http://10.0.2.2:3000`
+   - реальное устройство: `http://<IP_ПК>:3000`
+4. Запустите музыку в любимом плеере.
+5. Нажмите «Рассказать историю» или дождитесь автоматического запуска.
+
+## Технологии
+
+- Android: Kotlin, Jetpack Compose, Room, ExoPlayer, MediaSession, NotificationListener.
+- Backend: Node.js, Express, TypeScript, JWT, signed audio URLs.
+- Источники данных: MusicBrainz, Wikipedia/fact providers, LLM-провайдеры.
+- Озвучка: Yandex Cloud SpeechKit.
+- Desktop: Tauri 2, React, TypeScript.
+- iOS: SwiftUI, WidgetKit, Spotify App Remote, Apple Music.
 
 ## Документация
 
-- [Полная инструкция по запуску и тестированию](docs/README.md)
-- [PLAN-01: Media detection](docs/PLAN-01-media-detection.md)
-- [PLAN-02: Backend API](docs/PLAN-02-backend-api.md)
-- [PLAN-03: AI prompts](docs/PLAN-03-ai-prompts.md)
-- [PLAN-04: Triggers & scrobbling](docs/PLAN-04-triggers-scrobbling.md)
-- [PLAN-05: Testing & release](docs/PLAN-05-testing-release.md)
-- [PLAN-06: iOS](docs/PLAN-06-ios.md)
+- [Инструкция по запуску и тестированию](docs/README.md)
 - [Backend README](backend/README.md)
+- [Railway deploy](backend/RAILWAY.md)
+- [iOS README](ios/README.md)
+- [Desktop README](desktop/README.md)
 
-## GitHub и Railway
+## Репозиторий и деплой
 
-- **Репозиторий:** https://github.com/zapnikita95/music-story
-- **Деплой бэкенда:** Railway → GitHub repo `music-story` → сборка через корневой **`Dockerfile`** (Root Directory = пусто)
-- **Секреты:** только в Railway Variables и локальном `backend/.env` — **не коммитить** (см. `.gitignore`)
+GitHub: `zapnikita95/music-story`
 
-Подробно: [backend/RAILWAY.md](backend/RAILWAY.md)
+Бэкенд разворачивается на Railway из корневого `Dockerfile`. Секреты хранятся в Railway Variables или локальном `backend/.env`; в репозиторий попадают только шаблоны `.env.example`.
 
-## Секреты (опционально)
+## Статус
 
-**Файл `backend/.env` в git не попадает.** В репозитории только шаблоны `.env.example`.
-
-Для локального сервера или Railway Variables:
-
-| Переменная | Назначение |
-|------------|------------|
-| `GROQ_API_KEY` | Генерация текста (Groq) + автоматический JWT для APK |
-| `AUTH_JWT_SECRET` | *(опционально)* свой JWT-секрет; иначе выводится из `GROQ_API_KEY` |
-| `ALLOWED_CERT_SHA256` | *(опционально)* release fingerprint для Play Store |
-| `ALLOWED_IOS_TEAM_ID` | *(опционально)* Apple Team ID для iOS-приложения |
-| `DESKTOP_AUTH_SECRET` | *(опционально)* секрет для desktop-клиента (`client_type: desktop`) |
-| `ALLOW_DESKTOP_AUTH` | *(dev)* `true` — desktop-токены без секрета |
-| `YANDEX_API_KEY` | Yandex SpeechKit |
-| `YANDEX_FOLDER_ID` | Каталог Yandex Cloud |
-
-## Лицензия
-
-MVP / внутреннее использование. Play Store prep — см. `docs/PLAN-05-testing-release.md`.
+Проект находится в активной разработке. Android-сценарий с серверной генерацией и озвучкой является основным фокусом.
