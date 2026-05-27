@@ -8,17 +8,22 @@ import syncRouter from './routes/sync.js';
 import { isAppAuthEnabled } from './services/jwt.js';
 import { AUDIO_DIR } from './services/yandex-tts.js';
 import { hasGroqApiKey } from './services/groq.js';
+import { hasOpenRouterApiKey } from './services/openrouter.js';
 import { hasGeminiApiKey } from './services/gemini.js';
 import { resolveLlmProvider } from './services/llm-provider.js';
 import { hasYandexCredentials } from './services/yandex-tts.js';
 import { securityHeaders } from './middleware/security-headers.js';
 import { requireSignedAudioAccess } from './middleware/audio-auth.js';
 import { requestLogger } from './middleware/request-logger.js';
-import { isProduction } from './config/security.js';
 import { SECURITY } from './config/security.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PORT = parseInt(process.env.PORT ?? '3000', 10);
+const BUILD_ID =
+  process.env.RAILWAY_GIT_COMMIT_SHA?.slice(0, 7) ||
+  process.env.GIT_COMMIT_SHA?.slice(0, 7) ||
+  process.env.SOURCE_VERSION?.slice(0, 7) ||
+  'local';
 
 const app = express();
 
@@ -43,15 +48,14 @@ app.use('/audio', requireSignedAudioAccess, express.static(AUDIO_DIR, {
 }));
 
 app.get('/health', (_req, res) => {
-  if (isProduction()) {
-    res.json({ status: 'ok' });
-    return;
-  }
   res.json({
     status: 'ok',
     service: 'music-story-bff',
+    build: BUILD_ID,
+    nodeEnv: process.env.NODE_ENV ?? 'unknown',
     llmProvider: resolveLlmProvider(),
     groq: hasGroqApiKey(),
+    openrouter: hasOpenRouterApiKey(),
     gemini: hasGeminiApiKey(),
     yandexTts: hasYandexCredentials(),
     appAuthRequired: isAppAuthEnabled(),
@@ -68,7 +72,9 @@ app.use((_req, res) => {
 
 const server = app.listen(PORT, '0.0.0.0', () => {
   console.log(`Music Story BFF listening on http://0.0.0.0:${PORT}`);
-  console.log(`[boot] llm=${resolveLlmProvider()} groq=${hasGroqApiKey()} gemini=${hasGeminiApiKey()} yandexTts=${hasYandexCredentials()} auth=${isAppAuthEnabled()}`);
+  console.log(
+    `[boot] build=${BUILD_ID} llm=${resolveLlmProvider()} openrouter=${hasOpenRouterApiKey()} groq=${hasGroqApiKey()} gemini=${hasGeminiApiKey()} yandexTts=${hasYandexCredentials()} auth=${isAppAuthEnabled()}`,
+  );
   console.log(`  POST /v1/auth/token — app JWT`);
   console.log(`  GET  /v1/sync/* — linked account settings & history`);
   console.log(`  POST /v1/story/full — story + optional Yandex TTS`);

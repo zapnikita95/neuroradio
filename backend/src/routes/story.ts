@@ -80,6 +80,7 @@ router.get('/quota', (req: Request, res: Response) => {
 });
 
 router.post('/full', validateStoryFullBody, async (req: Request, res: Response) => {
+  const requestedProviderRaw = (req.body as StoryFullBody).llm_provider;
   const llmProvider = resolveLlmProvider((req.body as StoryFullBody).llm_provider);
   if (!hasLlmKeyForProvider(llmProvider)) {
     res.status(503).json({
@@ -109,7 +110,7 @@ router.post('/full', validateStoryFullBody, async (req: Request, res: Response) 
   const installId = req.installId ?? 'unknown';
 
   console.log(
-    `[story] start install=${installId.slice(0, 8)} llm=${llmProvider}` +
+    `[story] start install=${installId.slice(0, 8)} requested_llm=${requestedProviderRaw ?? 'missing'} llm=${llmProvider}` +
       (llmProvider === 'gemini' ? ` model=${geminiModel ?? 'default'}` : '') +
       ` artist="${artist}" title="${title}"`,
   );
