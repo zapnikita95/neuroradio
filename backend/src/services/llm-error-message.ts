@@ -14,11 +14,22 @@ export function classifyStoryLlmError(
   const rawMessage = err instanceof Error ? err.message : String(err);
   const status = (err as { status?: number }).status;
   const lower = rawMessage.toLowerCase();
-  const label = llmProvider === 'gemini' ? 'Gemini' : 'Groq';
+  const label =
+    llmProvider === 'gemini'
+      ? 'Gemini'
+      : llmProvider === 'openrouter'
+        ? 'OpenRouter'
+        : 'Groq';
 
   if (/invalid_api_key|invalid api key|\b401\b.*invalid/i.test(lower)) {
+    const code =
+      llmProvider === 'gemini'
+        ? 'GEMINI_INVALID_KEY'
+        : llmProvider === 'openrouter'
+          ? 'OPENROUTER_INVALID_KEY'
+          : 'GROQ_INVALID_KEY';
     return {
-      code: llmProvider === 'gemini' ? 'GEMINI_INVALID_KEY' : 'GROQ_INVALID_KEY',
+      code,
       message: `${label} API-ключ на сервере недействителен.`,
       httpStatus: 503,
     };
@@ -60,8 +71,14 @@ export function classifyStoryLlmError(
   }
 
   if (isRateLimit) {
+    const code =
+      llmProvider === 'gemini'
+        ? 'GEMINI_RATE_LIMIT'
+        : llmProvider === 'openrouter'
+          ? 'OPENROUTER_RATE_LIMIT'
+          : 'GROQ_RATE_LIMIT';
     return {
-      code: llmProvider === 'gemini' ? 'GEMINI_RATE_LIMIT' : 'GROQ_RATE_LIMIT',
+      code,
       message:
         `${label}: слишком много запросов в минуту (RPM). Подожди 1–2 минуты — не жми «Рассказать» подряд на каждом треке.`,
       httpStatus: 503,
@@ -69,12 +86,20 @@ export function classifyStoryLlmError(
   }
 
   const llmUnavailable =
-    /groq api error|gemini api error|groq http|gemini http/i.test(lower) ||
+    /groq api error|gemini api error|openrouter api error|groq http|gemini http|openrouter http/i.test(
+      lower,
+    ) ||
     status === 403;
 
   if (llmUnavailable) {
+    const code =
+      llmProvider === 'gemini'
+        ? 'GEMINI_FAILED'
+        : llmProvider === 'openrouter'
+          ? 'OPENROUTER_FAILED'
+          : 'GROQ_FAILED';
     return {
-      code: llmProvider === 'gemini' ? 'GEMINI_FAILED' : 'GROQ_FAILED',
+      code,
       message: `${label} не ответил — попробуй через минуту или свой ключ в настройках.`,
       httpStatus: 503,
     };

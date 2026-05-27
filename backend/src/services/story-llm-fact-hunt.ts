@@ -7,8 +7,8 @@ import { FACT_HUNT_LLM_PROMPT_BLOCK } from './story-fact-hunt.js';
 import { resolveGroqModelOrder } from './groq-models.js';
 import { resolveGeminiModel, DEFAULT_GEMINI_MODEL } from './gemini-models.js';
 import { GroqApiError } from './groq.js';
-import { hasGeminiApiKey } from './gemini.js';
-import { hasGroqApiKey } from './groq.js';
+import { callOpenAiChatCompletion } from './llm-openai-chat.js';
+import { resolveOpenRouterModel } from './openrouter-models.js';
 import type { LlmProviderId } from './llm-provider.js';
 import { hasLlmKeyForProvider } from './llm-provider.js';
 
@@ -52,7 +52,7 @@ export function resolveFactHuntMode(): FactHuntMode {
 
 export function resolveFactHuntProvider(preferred: LlmProviderId): LlmProviderId {
   const env = process.env.LLM_FACT_PROVIDER?.trim().toLowerCase();
-  if (env === 'groq' || env === 'gemini') return env;
+  if (env === 'groq' || env === 'gemini' || env === 'openrouter') return env;
   return preferred;
 }
 
@@ -196,6 +196,29 @@ async function callGroqFactHunt(system: string, user: string): Promise<string> {
   return content;
 }
 
+async function callOpenRouterFactHunt(system: string, user: string): Promise<string> {
+  const apiKey = process.env.OPEN_ROUTER_API_KEY?.trim();
+  if (!apiKey) throw new Error('OPEN_ROUTER_API_KEY is not configured');
+  const model = resolveOpenRouterModel(process.env.OPENROUTER_FACT_MODEL, 'fact');
+  const content = await callOpenAiChatCompletion({
+    url: 'https://openrouter.ai/api/v1/chat/completions',
+    apiKey,
+    model,
+    systemPrompt: system,
+    userPrompt: user,
+    maxTokens: 512,
+    temperature: 0.22,
+    useJsonMode: true,
+    extraHeaders: {
+      'HTTP-Referer': process.env.OPENROUTER_HTTP_REFERER?.trim() || 'https://music-story.app',
+      'X-Title': 'Music Story',
+    },
+    label: 'OpenRouter',
+  });
+  console.log(`[fact-hunt-llm] openrouter model=${model}`);
+  return content;
+}
+
 async function callGeminiFactHunt(system: string, user: string): Promise<string> {
   const apiKey = process.env.GEMINI_API_KEY?.trim();
   if (!apiKey) throw new Error('GEMINI_API_KEY is not configured');
@@ -239,7 +262,9 @@ async function huntWithProvider(
   const raw =
     provider === 'gemini'
       ? await callGeminiFactHunt(system, user)
-      : await callGroqFactHunt(system, user);
+      : provider === 'openrouter'
+        ? await callOpenRouterFactHunt(system, user)
+        : await callGroqFactHunt(system, user);
 
   const parsed = parseFactHuntJson(raw);
   if (!parsed) return null;
@@ -288,18 +313,6 @@ export async function huntReferenceFactWithLlm(
     } catch (err) {
       lastReason = err instanceof Error ? err.message.slice(0, 120) : String(err);
       console.warn(`[fact-hunt-llm] ${primary} attempt ${attempt + 1}: ${lastReason}`);
-    }
-  }
-
-  const alternate: LlmProviderId = primary === 'gemini' ? 'groq' : 'gemini';
-  if (alternate !== primary && hasLlmKeyForProvider(alternate)) {
-    try {
-      const result = await huntWithProvider(alternate, input, lastReason);
-      if (result) return result;
-    } catch (err) {
-      console.warn(
-        `[fact-hunt-llm] ${alternate} fallback failed: ${err instanceof Error ? err.message.slice(0, 120) : err}`,
-      );
     }
   }
 

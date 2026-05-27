@@ -18,6 +18,8 @@ data class StoryRequest(
     @SerializedName("tts_emotion") val ttsEmotion: String = TtsEmotion.LIVELY.id,
     @SerializedName("llm_provider") val llmProvider: String? = null,
     @SerializedName("gemini_model") val geminiModel: String? = null,
+    @SerializedName("groq_model") val groqModel: String? = null,
+    @SerializedName("openrouter_model") val openRouterModel: String? = null,
 )
 
 data class StoryResponse(

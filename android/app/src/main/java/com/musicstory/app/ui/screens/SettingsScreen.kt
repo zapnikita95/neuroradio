@@ -56,20 +56,24 @@ import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.layout.onGloballyPositioned
-import androidx.compose.ui.layout.positionInParent
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
 import android.content.Intent
 import android.net.Uri
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.musicstory.app.MusicStoryApp
 import com.musicstory.app.R
 import com.musicstory.app.data.local.SettingsDataStore
 import com.musicstory.app.data.remote.ConnectionCheckResult
 import com.musicstory.app.domain.GeminiModel
+import com.musicstory.app.domain.GroqModel
 import com.musicstory.app.domain.LlmProvider
+import com.musicstory.app.domain.OpenRouterModel
 import com.musicstory.app.domain.MusicInterruptionMode
 import com.musicstory.app.domain.StoryLength
 import com.musicstory.app.domain.StoryNarrator
@@ -97,6 +101,7 @@ import com.musicstory.app.ui.theme.SurfaceGlass
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import kotlin.math.abs
 import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -115,8 +120,13 @@ fun SettingsScreen(
     val everyN by settings.everyNTracks.collectAsState(initial = SettingsDataStore.DEFAULT_EVERY_N_TRACKS)
     val groqApiKey by settings.groqApiKey.collectAsState(initial = "")
     val geminiApiKey by settings.geminiApiKey.collectAsState(initial = "")
-    val llmProvider by settings.llmProvider.collectAsState(initial = LlmProvider.GROQ)
+    val openRouterApiKey by settings.openRouterApiKey.collectAsState(initial = "")
+    val llmProvider by settings.llmProvider.collectAsState(initial = LlmProvider.OPENROUTER)
     val geminiModel by settings.geminiModel.collectAsState(initial = GeminiModel.defaultRecommended)
+    val groqModel by settings.groqModel.collectAsState(initial = GroqModel.defaultRecommended)
+    val groqCustomModelId by settings.groqCustomModelId.collectAsState(initial = "")
+    val openRouterModel by settings.openRouterModel.collectAsState(initial = OpenRouterModel.defaultRecommended)
+    val openRouterCustomModelId by settings.openRouterCustomModelId.collectAsState(initial = "")
     val sameTrackEveryN by settings.sameTrackStoryEveryN.collectAsState(
         initial = SettingsDataStore.DEFAULT_SAME_TRACK_STORY_EVERY_N,
     )
@@ -137,7 +147,14 @@ fun SettingsScreen(
 
     var tourStep by remember { mutableStateOf<Int?>(null) }
     var tourTargetBounds by remember { mutableStateOf<Rect?>(null) }
+    var tourSectionCoords by remember { mutableStateOf<LayoutCoordinates?>(null) }
     val density = LocalDensity.current
+    val screenHeightPx = with(density) { LocalConfiguration.current.screenHeightDp.dp.toPx() }
+    val tourTallSteps = remember { setOf(3, 4, 6) }
+    val tourMaxCardHeightPx = remember(screenHeightPx) {
+        (screenHeightPx * 0.42f).coerceAtLeast(with(density) { 180.dp.toPx() })
+    }
+    val tourMaxCardHeight = tourMaxCardHeightPx?.let { with(density) { it.toDp() } }
     val tourSteps = remember {
         listOf(
             SettingsTourStep(context.getString(R.string.tour_step_mode_title), context.getString(R.string.tour_step_mode_body)),
@@ -156,27 +173,59 @@ fun SettingsScreen(
     }
 
     LaunchedEffect(tourStep) {
-        tourTargetBounds = null
+        if (tourStep == null) {
+            tourTargetBounds = null
+            tourSectionCoords = null
+        } else {
+            tourSectionCoords = null
+        }
+    }
+
+    fun updateTourBounds(coords: LayoutCoordinates) {
+        tourSectionCoords = coords
+        tourTargetBounds = coords.boundsInRoot()
+    }
+
+    suspend fun centerTourSection(coords: LayoutCoordinates) {
+        val rect = coords.boundsInRoot()
+        val safeTop = with(density) { 76.dp.toPx() }
+        val safeBottom = screenHeightPx - with(density) { 220.dp.toPx() }
+        val targetCenter = (safeTop + safeBottom) / 2f
+        val delta = rect.center.y - targetCenter
+        if (abs(delta) > 2f) {
+            scrollState.animateScrollBy(delta)
+            delay(320)
+        }
+        tourSectionCoords?.let { updateTourBounds(it) }
     }
 
     fun tourLayoutHandler(stepIndex: Int): ((LayoutCoordinates) -> Unit)? {
         if (tourStep != stepIndex) return null
         return { coords ->
-            tourTargetBounds = coords.boundsInRoot()
+            updateTourBounds(coords)
             scope.launch {
-                delay(80)
-                val topPad = with(density) { if (stepIndex >= 3) 48.dp.toPx() else 96.dp.toPx() }
-                val targetScroll = (coords.positionInParent().y - topPad)
-                    .toInt()
-                    .coerceIn(0, scrollState.maxValue)
-                val delta = targetScroll - scrollState.value
-                if (delta != 0) scrollState.animateScrollBy(delta.toFloat())
+                centerTourSection(coords)
+                updateTourBounds(tourSectionCoords ?: coords)
             }
+        }
+    }
+
+    LaunchedEffect(tourStep) {
+        val step = tourStep ?: return@LaunchedEffect
+        repeat(4) { attempt ->
+            delay(if (attempt == 0) 80L else 180L)
+            val coords = tourSectionCoords ?: return@repeat
+            centerTourSection(coords)
+            updateTourBounds(coords)
+            if (tourTargetBounds != null && tourTargetBounds!!.height >= 4f) return@LaunchedEffect
         }
     }
 
     var groqInput by remember(groqApiKey) { mutableStateOf(groqApiKey) }
     var geminiInput by remember(geminiApiKey) { mutableStateOf(geminiApiKey) }
+    var openRouterInput by remember(openRouterApiKey) { mutableStateOf(openRouterApiKey) }
+    var groqCustomInput by remember(groqCustomModelId) { mutableStateOf(groqCustomModelId) }
+    var openRouterCustomInput by remember(openRouterCustomModelId) { mutableStateOf(openRouterCustomModelId) }
     var nInput by remember(everyN) { mutableStateOf(everyN.toString()) }
     var sameTrackInput by remember(sameTrackEveryN) { mutableStateOf(sameTrackEveryN.toString()) }
     var musicFadeInput by remember(musicFadeSeconds) {
@@ -198,10 +247,12 @@ fun SettingsScreen(
     val activeApiKey = when (llmProvider) {
         LlmProvider.GROQ -> groqApiKey
         LlmProvider.GEMINI -> geminiApiKey
+        LlmProvider.OPENROUTER -> openRouterApiKey
     }
     val activeApiInput = when (llmProvider) {
         LlmProvider.GROQ -> groqInput
         LlmProvider.GEMINI -> geminiInput
+        LlmProvider.OPENROUTER -> openRouterInput
     }
 
     val hasPendingChanges = remember(
@@ -225,10 +276,11 @@ fun SettingsScreen(
             (triggerMode == TriggerMode.EVERY_N_TRACKS && nInput.toIntOrNull() != everyN)
     }
 
-    LaunchedEffect(groqApiKey, geminiApiKey, llmProvider) {
+    LaunchedEffect(groqApiKey, geminiApiKey, openRouterApiKey, llmProvider) {
         val hasOwnKey = when (llmProvider) {
             LlmProvider.GROQ -> groqApiKey.isNotBlank()
             LlmProvider.GEMINI -> geminiApiKey.isNotBlank()
+            LlmProvider.OPENROUTER -> openRouterApiKey.isNotBlank()
         }
         if (!hasOwnKey) {
             app.storyRepository.refreshQuota()
@@ -422,9 +474,9 @@ fun SettingsScreen(
                 CollapsibleSettingsSection(
                     title = context.getString(R.string.settings_narrator_section),
                     summary = storyNarrator.labelRu,
-                    tourHighlight = tourStep == 3,
                     forceExpanded = tourStep == 3,
                     tourActive = tourStep == 3,
+                    tourMaxHeight = if (tourStep == 3) tourMaxCardHeight else null,
                     onTourLayout = tourLayoutHandler(3),
                 ) {
                     StoryNarrator.entries.forEach { narrator ->
@@ -440,9 +492,9 @@ fun SettingsScreen(
                 CollapsibleSettingsSection(
                     title = context.getString(R.string.settings_voice_section),
                     summary = "${ttsVoice.labelRu} · ${ttsSpeed.labelRu} · ${storyLength.labelRu}",
-                    tourHighlight = tourStep == 4,
                     forceExpanded = tourStep == 4,
                     tourActive = tourStep == 4,
+                    tourMaxHeight = if (tourStep == 4) tourMaxCardHeight else null,
                     onTourLayout = tourLayoutHandler(4),
                 ) {
                     Text(
@@ -595,7 +647,8 @@ fun SettingsScreen(
                 val aiSummary = if (activeApiKey.isNotBlank()) {
                     when (llmProvider) {
                         LlmProvider.GEMINI -> "${llmProvider.labelRu}: ${geminiModel.settingsLabelRu}"
-                        LlmProvider.GROQ -> "${llmProvider.labelRu}: ${context.getString(R.string.settings_groq_status_ok)}"
+                        LlmProvider.GROQ -> "${llmProvider.labelRu}: ${groqModel.settingsLabelRu}"
+                        LlmProvider.OPENROUTER -> "${llmProvider.labelRu}: ${openRouterModel.settingsLabelRu}"
                     }
                 } else {
                     dailyQuota?.let { quota ->
@@ -610,10 +663,13 @@ fun SettingsScreen(
                     tourHighlight = tourStep == 6,
                     forceExpanded = tourStep == 6,
                     tourActive = tourStep == 6,
+                    tourMaxHeight = if (tourStep == 6) tourMaxCardHeight else null,
                     onTourLayout = tourLayoutHandler(6),
                 ) {
                     var providerMenuExpanded by remember { mutableStateOf(false) }
                     var geminiModelMenuExpanded by remember { mutableStateOf(false) }
+                    var groqModelMenuExpanded by remember { mutableStateOf(false) }
+                    var openRouterModelMenuExpanded by remember { mutableStateOf(false) }
 
                     Text(
                         text = context.getString(R.string.settings_llm_provider_hint),
@@ -661,6 +717,132 @@ fun SettingsScreen(
                         style = MaterialTheme.typography.labelMedium,
                         color = GoldBright,
                     )
+                    if (llmProvider == LlmProvider.OPENROUTER) {
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Text(
+                            text = context.getString(R.string.settings_openrouter_model_hint),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MutedLavender,
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        ExposedDropdownMenuBox(
+                            expanded = openRouterModelMenuExpanded,
+                            onExpandedChange = { openRouterModelMenuExpanded = it },
+                            modifier = Modifier.fillMaxWidth(),
+                        ) {
+                            OutlinedTextField(
+                                value = openRouterModel.settingsLabelRu,
+                                onValueChange = {},
+                                readOnly = true,
+                                label = { Text(context.getString(R.string.settings_openrouter_model)) },
+                                trailingIcon = {
+                                    ExposedDropdownMenuDefaults.TrailingIcon(expanded = openRouterModelMenuExpanded)
+                                },
+                                modifier = Modifier.menuAnchor().fillMaxWidth(),
+                                colors = fieldColors,
+                                shape = RoundedCornerShape(14.dp),
+                            )
+                            DropdownMenu(
+                                expanded = openRouterModelMenuExpanded,
+                                onDismissRequest = { openRouterModelMenuExpanded = false },
+                            ) {
+                                OpenRouterModel.entries.forEach { model ->
+                                    DropdownMenuItem(
+                                        text = {
+                                            Column {
+                                                Text(model.settingsLabelRu, color = CreamText)
+                                                Text(
+                                                    model.descriptionRu,
+                                                    style = MaterialTheme.typography.bodySmall,
+                                                    color = MutedLavender,
+                                                )
+                                            }
+                                        },
+                                        onClick = {
+                                            openRouterModelMenuExpanded = false
+                                            scope.launch { settings.setOpenRouterModel(model) }
+                                        },
+                                    )
+                                }
+                            }
+                        }
+                        if (openRouterModel == OpenRouterModel.CUSTOM) {
+                            Spacer(modifier = Modifier.height(8.dp))
+                            OutlinedTextField(
+                                value = openRouterCustomInput,
+                                onValueChange = { openRouterCustomInput = it },
+                                label = { Text(context.getString(R.string.settings_openrouter_custom_model)) },
+                                placeholder = { Text(context.getString(R.string.settings_openrouter_custom_hint)) },
+                                modifier = Modifier.fillMaxWidth(),
+                                singleLine = true,
+                                colors = fieldColors,
+                                shape = RoundedCornerShape(14.dp),
+                            )
+                        }
+                    }
+                    if (llmProvider == LlmProvider.GROQ) {
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Text(
+                            text = context.getString(R.string.settings_groq_model_hint),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MutedLavender,
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        ExposedDropdownMenuBox(
+                            expanded = groqModelMenuExpanded,
+                            onExpandedChange = { groqModelMenuExpanded = it },
+                            modifier = Modifier.fillMaxWidth(),
+                        ) {
+                            OutlinedTextField(
+                                value = groqModel.settingsLabelRu,
+                                onValueChange = {},
+                                readOnly = true,
+                                label = { Text(context.getString(R.string.settings_groq_model)) },
+                                trailingIcon = {
+                                    ExposedDropdownMenuDefaults.TrailingIcon(expanded = groqModelMenuExpanded)
+                                },
+                                modifier = Modifier.menuAnchor().fillMaxWidth(),
+                                colors = fieldColors,
+                                shape = RoundedCornerShape(14.dp),
+                            )
+                            DropdownMenu(
+                                expanded = groqModelMenuExpanded,
+                                onDismissRequest = { groqModelMenuExpanded = false },
+                            ) {
+                                GroqModel.entries.forEach { model ->
+                                    DropdownMenuItem(
+                                        text = {
+                                            Column {
+                                                Text(model.settingsLabelRu, color = CreamText)
+                                                Text(
+                                                    model.descriptionRu,
+                                                    style = MaterialTheme.typography.bodySmall,
+                                                    color = MutedLavender,
+                                                )
+                                            }
+                                        },
+                                        onClick = {
+                                            groqModelMenuExpanded = false
+                                            scope.launch { settings.setGroqModel(model) }
+                                        },
+                                    )
+                                }
+                            }
+                        }
+                        if (groqModel == GroqModel.CUSTOM) {
+                            Spacer(modifier = Modifier.height(8.dp))
+                            OutlinedTextField(
+                                value = groqCustomInput,
+                                onValueChange = { groqCustomInput = it },
+                                label = { Text(context.getString(R.string.settings_groq_custom_model)) },
+                                placeholder = { Text(context.getString(R.string.settings_groq_custom_hint)) },
+                                modifier = Modifier.fillMaxWidth(),
+                                singleLine = true,
+                                colors = fieldColors,
+                                shape = RoundedCornerShape(14.dp),
+                            )
+                        }
+                    }
                     if (llmProvider == LlmProvider.GEMINI) {
                         Spacer(modifier = Modifier.height(12.dp))
                         Text(
@@ -773,6 +955,7 @@ fun SettingsScreen(
                             when (llmProvider) {
                                 LlmProvider.GROQ -> groqInput = value
                                 LlmProvider.GEMINI -> geminiInput = value
+                                LlmProvider.OPENROUTER -> openRouterInput = value
                             }
                         },
                         label = { Text(context.getString(R.string.settings_api_key)) },
@@ -788,6 +971,7 @@ fun SettingsScreen(
                                         when (llmProvider) {
                                             LlmProvider.GROQ -> groqInput = ""
                                             LlmProvider.GEMINI -> geminiInput = ""
+                                            LlmProvider.OPENROUTER -> openRouterInput = ""
                                         }
                                     },
                                 ) {
@@ -816,6 +1000,9 @@ fun SettingsScreen(
                                 checkSummary = null
                                 settings.setGroqApiKey(groqInput)
                                 settings.setGeminiApiKey(geminiInput)
+                                settings.setOpenRouterApiKey(openRouterInput)
+                                settings.setGroqCustomModelId(groqCustomInput)
+                                settings.setOpenRouterCustomModelId(openRouterCustomInput)
                                 val backendUrl = settings.backendUrl.first()
                                 app.backendAuthManager.invalidateToken()
                                 app.apiClient.invalidateCache()
@@ -823,13 +1010,19 @@ fun SettingsScreen(
                                     llmProvider = llmProvider,
                                     groqApiKey = groqInput,
                                     geminiApiKey = geminiInput,
+                                    openRouterApiKey = openRouterInput,
                                     geminiModel = geminiModel,
+                                    groqModel = groqModel,
+                                    groqCustomModelId = groqCustomInput,
+                                    openRouterModel = openRouterModel,
+                                    openRouterCustomModelId = openRouterCustomInput,
                                     backendUrl = backendUrl,
                                 )
                                 checkResult = result
                                 val checkedKey = when (llmProvider) {
                                     LlmProvider.GROQ -> groqInput.trim()
                                     LlmProvider.GEMINI -> geminiInput.trim()
+                                    LlmProvider.OPENROUTER -> openRouterInput.trim()
                                 }
                                 checkSummary = when {
                                     checkedKey.isNotBlank() && result.llmOk == true ->
@@ -863,11 +1056,13 @@ fun SettingsScreen(
                         text = when (llmProvider) {
                             LlmProvider.GROQ -> context.getString(R.string.settings_groq_get_key)
                             LlmProvider.GEMINI -> context.getString(R.string.settings_gemini_get_key)
+                            LlmProvider.OPENROUTER -> context.getString(R.string.settings_openrouter_get_key)
                         },
                         onClick = {
                             val url = when (llmProvider) {
                                 LlmProvider.GROQ -> "https://console.groq.com/keys"
                                 LlmProvider.GEMINI -> "https://aistudio.google.com/apikey"
+                                LlmProvider.OPENROUTER -> "https://openrouter.ai/keys"
                             }
                             context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
                         },
@@ -891,6 +1086,9 @@ fun SettingsScreen(
                             musicFadeInput.toFloatOrNull()?.let { settings.setMusicFadeSeconds(it) }
                             settings.setGroqApiKey(groqInput)
                             settings.setGeminiApiKey(geminiInput)
+                            settings.setOpenRouterApiKey(openRouterInput)
+                            settings.setGroqCustomModelId(groqCustomInput)
+                            settings.setOpenRouterCustomModelId(openRouterCustomInput)
                             app.backendAuthManager.invalidateToken()
                             app.apiClient.invalidateCache()
                             app.triggerEngine.resetCounter()
@@ -912,6 +1110,7 @@ fun SettingsScreen(
                     highlightRect = tourTargetBounds,
                     stepIndex = step,
                     steps = tourSteps,
+                    onControlsBottomChanged = {},
                     onNext = {
                         if (step >= tourSteps.lastIndex) {
                             tourStep = null
@@ -939,6 +1138,7 @@ private fun CollapsibleSettingsSection(
     tourHighlight: Boolean = false,
     forceExpanded: Boolean = false,
     tourActive: Boolean = false,
+    tourMaxHeight: Dp? = null,
     onTourLayout: ((LayoutCoordinates) -> Unit)? = null,
     content: @Composable ColumnScope.() -> Unit,
 ) {
@@ -946,13 +1146,33 @@ private fun CollapsibleSettingsSection(
     LaunchedEffect(forceExpanded) {
         if (forceExpanded) expanded = true
     }
+    val tourContentScroll = rememberScrollState()
+    val useTourScroll = tourMaxHeight != null
+    val headerReserve = 52.dp
+    val scrollableMax = tourMaxHeight?.let { (it - headerReserve).coerceAtLeast(80.dp) }
+    var sectionCoords by remember { mutableStateOf<LayoutCoordinates?>(null) }
+
+    LaunchedEffect(tourActive) {
+        if (tourActive && onTourLayout != null) {
+            delay(50)
+            sectionCoords?.let { onTourLayout(it) }
+        }
+    }
 
     GlassCard(
         modifier = Modifier
-            .settingsTourHighlight(tourHighlight)
+            .fillMaxWidth()
+            .then(
+                if (tourMaxHeight != null) {
+                    Modifier.heightIn(max = tourMaxHeight)
+                } else {
+                    Modifier
+                },
+            )
             .then(
                 if (onTourLayout != null) {
                     Modifier.onGloballyPositioned { coords ->
+                        sectionCoords = coords
                         if (tourActive) onTourLayout(coords)
                     }
                 } else {
@@ -963,7 +1183,7 @@ private fun CollapsibleSettingsSection(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .clickable { expanded = !expanded }
+                .clickable(enabled = !tourActive) { expanded = !expanded }
                 .padding(vertical = 2.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
@@ -978,15 +1198,17 @@ private fun CollapsibleSettingsSection(
                     )
                 }
             }
-            Icon(
-                imageVector = if (expanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
-                contentDescription = if (expanded) {
-                    LocalContext.current.getString(R.string.history_collapse)
-                } else {
-                    LocalContext.current.getString(R.string.history_expand)
-                },
-                tint = GoldBright,
-            )
+            if (!tourActive) {
+                Icon(
+                    imageVector = if (expanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                    contentDescription = if (expanded) {
+                        LocalContext.current.getString(R.string.history_collapse)
+                    } else {
+                        LocalContext.current.getString(R.string.history_expand)
+                    },
+                    tint = GoldBright,
+                )
+            }
         }
 
         AnimatedVisibility(
@@ -994,7 +1216,19 @@ private fun CollapsibleSettingsSection(
             enter = expandVertically(),
             exit = shrinkVertically(),
         ) {
-            Column {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .then(
+                        if (useTourScroll && scrollableMax != null) {
+                            Modifier
+                                .heightIn(max = scrollableMax)
+                                .verticalScroll(tourContentScroll)
+                        } else {
+                            Modifier
+                        },
+                    ),
+            ) {
                 Spacer(modifier = Modifier.height(8.dp))
                 content()
             }

@@ -37,14 +37,14 @@ class ConnectionChecker(
         .build(),
 ) {
 
-    suspend fun testGroqKey(apiKey: String): Pair<Boolean, String> = withContext(Dispatchers.IO) {
+    suspend fun testGroqKey(apiKey: String, modelId: String = "llama-3.3-70b-versatile"): Pair<Boolean, String> = withContext(Dispatchers.IO) {
         val key = apiKey.trim()
         if (key.isEmpty()) {
             return@withContext false to "Ключ пустой"
         }
 
         val body = org.json.JSONObject().apply {
-            put("model", "llama-3.3-70b-versatile")
+            put("model", modelId)
             put("max_tokens", 8)
             put("messages", org.json.JSONArray().apply {
                 put(org.json.JSONObject().put("role", "user").put("content", "ok"))
@@ -68,6 +68,46 @@ class ConnectionChecker(
             }
         }.getOrElse { e ->
             StoryLog.w("Groq test failed: ${e.message}")
+            false to (e.message ?: "Нет сети")
+        }
+    }
+
+    suspend fun testOpenRouterKey(
+        apiKey: String,
+        modelId: String = "qwen/qwen3-4b:free",
+    ): Pair<Boolean, String> = withContext(Dispatchers.IO) {
+        val key = apiKey.trim()
+        if (key.isEmpty()) {
+            return@withContext false to "Ключ пустой"
+        }
+
+        val body = org.json.JSONObject().apply {
+            put("model", modelId)
+            put("max_tokens", 8)
+            put("messages", org.json.JSONArray().apply {
+                put(org.json.JSONObject().put("role", "user").put("content", "ok"))
+            })
+        }
+
+        val request = Request.Builder()
+            .url("https://openrouter.ai/api/v1/chat/completions")
+            .header("Content-Type", "application/json")
+            .header("Authorization", "Bearer $key")
+            .header("HTTP-Referer", "https://music-story.app")
+            .header("X-Title", "Music Story")
+            .post(body.toString().toRequestBody("application/json".toMediaType()))
+            .build()
+
+        runCatching {
+            client.newCall(request).execute().use { response ->
+                val errorBody = response.body?.string().orEmpty()
+                when {
+                    response.isSuccessful -> true to "OpenRouter работает — модель $modelId"
+                    else -> false to GroqApiErrorParser.parse(response.code, errorBody)
+                }
+            }
+        }.getOrElse { e ->
+            StoryLog.w("OpenRouter test failed: ${e.message}")
             false to (e.message ?: "Нет сети")
         }
     }
@@ -120,10 +160,11 @@ class ConnectionChecker(
         runCatching {
             val health = apiClient.fetchHealth(backendUrl)
             val groq = health["groq"] as? Boolean ?: false
+            val openrouter = health["openrouter"] as? Boolean ?: false
             val yandex = health["yandexTts"] as? Boolean ?: false
             when {
-                groq && yandex -> true to "Сервер работает"
-                groq -> true to "Сервер работает"
+                (groq || openrouter) && yandex -> true to "Сервер работает"
+                groq || openrouter -> true to "Сервер работает (LLM)"
                 else -> true to "Сервер доступен"
             }
         }.getOrElse { e ->
@@ -147,16 +188,21 @@ class ConnectionChecker(
         llmProvider: LlmProvider,
         groqApiKey: String,
         geminiApiKey: String,
+        openRouterApiKey: String,
         geminiModelId: String,
+        groqModelId: String,
+        openRouterModelId: String,
     ): ConnectionCheckResult {
         val activeKey = when (llmProvider) {
             LlmProvider.GROQ -> groqApiKey
             LlmProvider.GEMINI -> geminiApiKey
+            LlmProvider.OPENROUTER -> openRouterApiKey
         }
         val llmResult = if (activeKey.isNotBlank()) {
             when (llmProvider) {
-                LlmProvider.GROQ -> testGroqKey(activeKey)
+                LlmProvider.GROQ -> testGroqKey(activeKey, groqModelId)
                 LlmProvider.GEMINI -> testGeminiKey(activeKey, geminiModelId)
+                LlmProvider.OPENROUTER -> testOpenRouterKey(activeKey, openRouterModelId)
             }
         } else {
             null
@@ -181,6 +227,7 @@ class ConnectionChecker(
 
 data class QuotaResponse(
     val tier: String? = null,
+    val premium: Boolean? = null,
     val quota: StoryQuotaInfo? = null,
     val hint: String? = null,
 )

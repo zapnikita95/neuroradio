@@ -21,7 +21,9 @@ import com.musicstory.app.data.remote.ServerRateLimitParser
 import com.musicstory.app.data.model.StoryQuotaInfo
 import com.google.gson.Gson
 import com.musicstory.app.domain.GeminiModel
+import com.musicstory.app.domain.GroqModel
 import com.musicstory.app.domain.LlmProvider
+import com.musicstory.app.domain.OpenRouterModel
 import com.musicstory.app.domain.ReferenceFactPicker
 import com.musicstory.app.domain.SelectedReferenceFact
 import com.musicstory.app.domain.StoryLength
@@ -78,7 +80,12 @@ class StoryRepository(
         llmProvider: LlmProvider,
         groqApiKey: String,
         geminiApiKey: String,
+        openRouterApiKey: String,
         geminiModel: GeminiModel,
+        groqModel: GroqModel,
+        groqCustomModelId: String,
+        openRouterModel: OpenRouterModel,
+        openRouterCustomModelId: String,
         backendUrl: String,
     ): ConnectionCheckResult {
         val result = connectionChecker.runFullCheck(
@@ -87,7 +94,10 @@ class StoryRepository(
             llmProvider,
             groqApiKey.trim(),
             geminiApiKey.trim(),
+            openRouterApiKey.trim(),
             geminiModel.id,
+            groqModel.resolveApiModelId(groqCustomModelId) ?: groqModel.id,
+            openRouterModel.resolveApiModelId(openRouterCustomModelId) ?: openRouterModel.id,
         )
         result.quota?.let { _dailyQuota.value = it }
         return result
@@ -138,6 +148,11 @@ class StoryRepository(
         val llmProvider = settingsDataStore.llmProvider.first()
         val groqKey = settingsDataStore.groqApiKey.first().trim()
         val geminiKey = settingsDataStore.geminiApiKey.first().trim()
+        val openRouterKey = settingsDataStore.openRouterApiKey.first().trim()
+        val groqModel = settingsDataStore.groqModel.first()
+        val groqCustomModelId = settingsDataStore.groqCustomModelId.first()
+        val openRouterModel = settingsDataStore.openRouterModel.first()
+        val openRouterCustomModelId = settingsDataStore.openRouterCustomModelId.first()
         val storyLength = settingsDataStore.storyLength.first()
         val storyNarrator = settingsDataStore.storyNarrator.first()
         val ttsVoice = settingsDataStore.ttsVoice.first()
@@ -155,23 +170,7 @@ class StoryRepository(
         var llmError: String? = null
         var backendError: String? = null
 
-        val directApiKey = when (llmProvider) {
-            LlmProvider.GROQ -> groqKey
-            LlmProvider.GEMINI -> geminiKey
-        }
-        val fallbackProvider = when (llmProvider) {
-            LlmProvider.GROQ -> LlmProvider.GEMINI
-            LlmProvider.GEMINI -> LlmProvider.GROQ
-        }
-        val fallbackKey = when (fallbackProvider) {
-            LlmProvider.GROQ -> groqKey
-            LlmProvider.GEMINI -> geminiKey
-        }
-        val alternateProvider = when (llmProvider) {
-            LlmProvider.GROQ -> LlmProvider.GEMINI
-            LlmProvider.GEMINI -> LlmProvider.GROQ
-        }
-
+        val directApiKey = apiKeyForProvider(llmProvider, groqKey, geminiKey, openRouterKey)
         StoryLog.i(
             "fetchStory ${track.artist} — ${track.title}: provider=${llmProvider.id}, " +
                 "ownKey=${directApiKey.isNotEmpty()}, backend=$useBackend",
@@ -184,7 +183,14 @@ class StoryRepository(
                 ),
             )
         }
-        if (llmProvider == LlmProvider.GROQ && groqKey.isEmpty() && !useBackend && fallbackKey.isEmpty()) {
+        if (llmProvider == LlmProvider.OPENROUTER && openRouterKey.isEmpty() && !useBackend) {
+            return Result.failure(
+                IOException(
+                    "Выбран OpenRouter, но ключ не сохранён. Добавь OPEN_ROUTER_API_KEY на Railway или свой ключ в настройках.",
+                ),
+            )
+        }
+        if (llmProvider == LlmProvider.GROQ && groqKey.isEmpty() && !useBackend) {
             return Result.failure(
                 IOException(
                     "Выбран Groq, но API-ключ не сохранён и сервер не настроен.",
@@ -209,6 +215,10 @@ class StoryRepository(
                 ttsEmotion = ttsEmotion,
                 llmProvider = llmProvider,
                 geminiModel = geminiModel,
+                groqModel = groqModel,
+                groqCustomModelId = groqCustomModelId,
+                openRouterModel = openRouterModel,
+                openRouterCustomModelId = openRouterCustomModelId,
             )) {
                 is StoryAttemptResult.Success -> return Result.success(backendResult.response)
                 is StoryAttemptResult.TemplateRejected -> templateRejected = true
@@ -223,38 +233,6 @@ class StoryRepository(
                     }
                 }
             }
-
-            coroutineContext.ensureActive()
-
-            // Если выбранный провайдер упёрся в лимит/ошибку, пробуем второй на этом же Railway.
-            if (
-                backendError != null &&
-                (rateLimitHit || backendGroqDown || backendError!!.contains("rate", ignoreCase = true))
-            ) {
-                StoryLog.w(
-                    "Primary backend provider failed (${llmProvider.id}), retry with ${alternateProvider.id}",
-                )
-                when (val fallbackBackendResult = tryBackendStory(
-                    backendUrl = backendUrl,
-                    track = track,
-                    trackKey = trackKey,
-                    previousScripts = previousScripts,
-                    narratorTag = narratorTag,
-                    storyLength = storyLength,
-                    storyNarrator = storyNarrator,
-                    ttsVoice = ttsVoice,
-                    ttsSpeed = ttsSpeed,
-                    ttsEmotion = ttsEmotion,
-                    llmProvider = alternateProvider,
-                    geminiModel = geminiModel,
-                )) {
-                    is StoryAttemptResult.Success -> return Result.success(fallbackBackendResult.response)
-                    is StoryAttemptResult.TemplateRejected -> templateRejected = true
-                    is StoryAttemptResult.Failed -> {
-                        backendError = "${backendError} | ${alternateProvider.labelRu}: ${fallbackBackendResult.reason}"
-                    }
-                }
-            }
         } else {
             StoryLog.w("Backend skipped (url=$backendUrl)")
         }
@@ -264,6 +242,9 @@ class StoryRepository(
         // Свой ключ — только если сервер не дал историю (без Yandex-озвучки на Groq с телефона).
         if (directApiKey.isNotEmpty()) {
             when (llmProvider) {
+                LlmProvider.OPENROUTER -> {
+                    StoryLog.w("OpenRouter на телефоне не поддерживается — нужен Railway с OPEN_ROUTER_API_KEY")
+                }
                 LlmProvider.GEMINI -> when (val geminiResult = tryDirectGemini(
                     geminiKey = geminiKey,
                     geminiModel = geminiModel,
@@ -283,31 +264,6 @@ class StoryRepository(
                     is StoryAttemptResult.TemplateRejected -> templateRejected = true
                     is StoryAttemptResult.Failed -> {
                         llmError = geminiResult.reason
-                        if (shouldTryAlternateProvider(geminiResult.reason) && groqKey.isNotEmpty()) {
-                            StoryLog.w("Direct Gemini limited, retry with Groq key")
-                            when (val groqFallback = tryDirectGroq(
-                                groqKey = groqKey,
-                                track = track,
-                                trackKey = trackKey,
-                                year = year,
-                                genre = genre,
-                                countryCode = countryCode,
-                                previousScripts = previousScripts,
-                                narratorTag = narratorTag,
-                                storyLength = storyLength,
-                                storyNarrator = storyNarrator,
-                                referenceFacts = referenceFacts,
-                                selectedFact = selectedFact,
-                            )) {
-                                is StoryAttemptResult.Success -> {
-                                    StoryLog.w("Direct Groq fallback text OK but no Yandex audio — Railway required")
-                                    llmError = "Озвучка только с сервера Railway. Убери Groq-ключ из настроек телефона."
-                                }
-                                is StoryAttemptResult.TemplateRejected -> templateRejected = true
-                                is StoryAttemptResult.Failed -> llmError =
-                                    "${geminiResult.reason} | Groq: ${groqFallback.reason}"
-                            }
-                        }
                     }
                 }
                 LlmProvider.GROQ -> when (val groqResult = tryDirectGroq(
@@ -331,75 +287,7 @@ class StoryRepository(
                     is StoryAttemptResult.TemplateRejected -> templateRejected = true
                     is StoryAttemptResult.Failed -> {
                         llmError = groqResult.reason
-                        if (shouldTryAlternateProvider(groqResult.reason) && geminiKey.isNotEmpty()) {
-                            StoryLog.w("Direct Groq limited, retry with Gemini key")
-                            when (val geminiFallback = tryDirectGemini(
-                                geminiKey = geminiKey,
-                                geminiModel = geminiModel,
-                                track = track,
-                                trackKey = trackKey,
-                                year = year,
-                                genre = genre,
-                                countryCode = countryCode,
-                                previousScripts = previousScripts,
-                                narratorTag = narratorTag,
-                                storyLength = storyLength,
-                                storyNarrator = storyNarrator,
-                                referenceFacts = referenceFacts,
-                                selectedFact = selectedFact,
-                            )) {
-                                is StoryAttemptResult.Success -> return Result.success(geminiFallback.response)
-                                is StoryAttemptResult.TemplateRejected -> templateRejected = true
-                                is StoryAttemptResult.Failed -> llmError =
-                                    "${groqResult.reason} | Gemini: ${geminiFallback.reason}"
-                            }
-                        }
                     }
-                }
-            }
-        }
-        if (directApiKey.isEmpty() && fallbackKey.isNotEmpty() && !useBackend) {
-            StoryLog.w("Primary key missing for ${llmProvider.id}, trying fallback ${fallbackProvider.id}")
-            when (fallbackProvider) {
-                LlmProvider.GEMINI -> when (val geminiResult = tryDirectGemini(
-                    geminiKey = geminiKey,
-                    geminiModel = geminiModel,
-                    track = track,
-                    trackKey = trackKey,
-                    year = year,
-                    genre = genre,
-                    countryCode = countryCode,
-                    previousScripts = previousScripts,
-                    narratorTag = narratorTag,
-                    storyLength = storyLength,
-                    storyNarrator = storyNarrator,
-                    referenceFacts = referenceFacts,
-                    selectedFact = selectedFact,
-                )) {
-                    is StoryAttemptResult.Success -> return Result.success(geminiResult.response)
-                    is StoryAttemptResult.TemplateRejected -> templateRejected = true
-                    is StoryAttemptResult.Failed -> llmError = geminiResult.reason
-                }
-                LlmProvider.GROQ -> when (val groqResult = tryDirectGroq(
-                    groqKey = groqKey,
-                    track = track,
-                    trackKey = trackKey,
-                    year = year,
-                    genre = genre,
-                    countryCode = countryCode,
-                    previousScripts = previousScripts,
-                    narratorTag = narratorTag,
-                    storyLength = storyLength,
-                    storyNarrator = storyNarrator,
-                    referenceFacts = referenceFacts,
-                    selectedFact = selectedFact,
-                )) {
-                    is StoryAttemptResult.Success -> {
-                        StoryLog.w("Direct Groq fallback text OK but no Yandex audio — Railway required")
-                        llmError = "Озвучка только с сервера Railway. Убери Groq-ключ из настроек телефона."
-                    }
-                    is StoryAttemptResult.TemplateRejected -> templateRejected = true
-                    is StoryAttemptResult.Failed -> llmError = groqResult.reason
                 }
             }
         }
@@ -559,9 +447,15 @@ class StoryRepository(
         ttsEmotion: TtsEmotion,
         llmProvider: LlmProvider,
         geminiModel: GeminiModel,
+        groqModel: GroqModel,
+        groqCustomModelId: String,
+        openRouterModel: OpenRouterModel,
+        openRouterCustomModelId: String,
     ): StoryAttemptResult {
         return try {
-            StoryLog.i("Fetching story from backend: $backendUrl (llm=${llmProvider.id}, gemini=${geminiModel.id})")
+            StoryLog.i(
+                "Fetching story from backend: $backendUrl (llm=${llmProvider.id})",
+            )
             val response = withTimeout(BACKEND_TIMEOUT_MS) {
                 apiClient.fetchFullStory(
                     backendUrl,
@@ -575,7 +469,9 @@ class StoryRepository(
                         ttsSpeed = ttsSpeed.yandexSpeed,
                         ttsEmotion = ttsEmotion.id,
                         llmProvider = llmProvider.id,
-                        geminiModel = if (llmProvider == LlmProvider.GEMINI) geminiModel.id else null,
+                        geminiModel = geminiModel.id,
+                        groqModel = groqModel.resolveApiModelId(groqCustomModelId),
+                        openRouterModel = openRouterModel.resolveApiModelId(openRouterCustomModelId),
                     ),
                 )
             }
@@ -833,20 +729,21 @@ class StoryRepository(
         return intersection.toDouble() / maxOf(wordsA.size, wordsB.size)
     }
 
+    private fun apiKeyForProvider(
+        provider: LlmProvider,
+        groqKey: String,
+        geminiKey: String,
+        openRouterKey: String,
+    ): String = when (provider) {
+        LlmProvider.GROQ -> groqKey
+        LlmProvider.GEMINI -> geminiKey
+        LlmProvider.OPENROUTER -> openRouterKey
+    }
+
     private fun shouldTryBackend(url: String): Boolean {
         if (url.isBlank()) return false
         if (url.contains("10.0.2.2") && !isEmulator()) return false
         return true
-    }
-
-    private fun shouldTryAlternateProvider(reason: String?): Boolean {
-        val lower = reason?.lowercase().orEmpty()
-        if (lower.isBlank()) return false
-        return lower.contains("429") ||
-            lower.contains("rate limit") ||
-            lower.contains("resource_exhausted") ||
-            lower.contains("лимит") ||
-            lower.contains("quota")
     }
 
     private fun isEmulator(): Boolean {

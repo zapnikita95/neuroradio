@@ -54,6 +54,9 @@ export interface GenerateStoryInput {
   previousScripts?: string[];
   referenceFacts?: string[];
   selectedReferenceFact?: { fact: string; scope: 'artist' | 'track'; scopeLabelRu: string };
+  groqModel?: string;
+  openRouterModel?: string;
+  geminiModel?: string;
 }
 
 export class GroqApiError extends Error {
@@ -163,11 +166,12 @@ async function callGroq(
   userPrompt: string,
   maxTokens: number,
   modelIndex = 0,
+  preferredModel?: string,
 ): Promise<{ content: string; model: string }> {
   const apiKey = process.env.GROQ_API_KEY;
   if (!apiKey) throw new Error('GROQ_API_KEY is not configured');
 
-  const models = resolveGroqModelOrder();
+  const models = resolveGroqModelOrder(preferredModel);
   const model = models[modelIndex];
   if (!model) throw new Error('All Groq models failed');
 
@@ -244,12 +248,18 @@ export async function generateStoryScript(
 
     let content: string;
     try {
-      const result = await callGroq(systemPrompt, userPrompt, lengthPreset.maxTokens, groqModelIndex);
+      const result = await callGroq(
+        systemPrompt,
+        userPrompt,
+        lengthPreset.maxTokens,
+        groqModelIndex,
+        input.groqModel,
+      );
       content = result.content;
-      const idx = resolveGroqModelOrder().indexOf(result.model);
+      const idx = resolveGroqModelOrder(input.groqModel).indexOf(result.model);
       if (idx >= 0) groqModelIndex = idx;
     } catch (err) {
-      const models = resolveGroqModelOrder();
+      const models = resolveGroqModelOrder(input.groqModel);
       if (isGroqModelDecommissioned(err) && groqModelIndex + 1 < models.length) {
         groqModelIndex += 1;
         console.warn(`[groq] decommissioned model — skip to index ${groqModelIndex} (${models[groqModelIndex]})`);

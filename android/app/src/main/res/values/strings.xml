@@ -42,7 +42,7 @@
     <string name="tour_step_music_title">Музыка во время истории</string>
     <string name="tour_step_music_body">Пауза ставится, когда начинается озвучка, не раньше. Затухание — плавное приглушение перед речью.</string>
     <string name="tour_step_ai_title">Нейросеть</string>
-    <string name="tour_step_ai_body">Groq или Gemini. Для Gemini на free tier лучше 2.0 Flash-Lite. Свой ключ снимает лимит сервера.</string>
+    <string name="tour_step_ai_body">OpenRouter, Groq или Gemini — модель выбираешь здесь (бесплатные :free или своя). Свой ключ снимает лимит сервера.</string>
 
     <string name="status_no_access">Нет доступа к уведомлениям</string>
     <string name="status_monitoring">Музыка играет</string>
@@ -65,6 +65,7 @@
 
     <string name="label_now_playing">Сейчас играет</string>
     <string name="label_no_track">Трек не определён</string>
+    <string name="hint_no_track_for_story">Включи трек в Spotify или Яндекс Музыке — тогда нажми «Рассказать историю»</string>
     <string name="label_source">Источник: %1$s</string>
     <string name="label_orchestrator">Режим работы</string>
     <string name="label_tracks_until_story">До следующей истории: %1$d трек(ов)</string>
@@ -76,6 +77,7 @@
     <string name="state_idle">Ожидание</string>
     <string name="state_listening">Слушаем музыку</string>
     <string name="state_fetching">Готовим историю…</string>
+    <string name="state_generating_hint">Сейчас готовим историю — счётчик треков обновится после</string>
     <string name="state_preparing">Готовим озвучку…</string>
     <string name="state_playing">Воспроизводим историю</string>
     <string name="state_error">Ошибка</string>
@@ -101,7 +103,16 @@
     <string name="settings_music_fade_hint">Используется только в режиме «Плавное затемнение»</string>
     <string name="settings_ai_section">AI</string>
     <string name="settings_llm_provider">Провайдер AI</string>
-    <string name="settings_llm_provider_hint">Groq или Gemini — переключается здесь. Если один уперся в лимит, приложение попробует второй при сохраненном ключе.</string>
+    <string name="settings_llm_provider_hint">OpenRouter, Groq или Gemini. При лимите сервер попробует другой провайдер, если ключи настроены.</string>
+    <string name="settings_openrouter_model">Модель OpenRouter</string>
+    <string name="settings_openrouter_model_hint">Бесплатные модели с суффиксом :free. Можно указать свою с openrouter.ai/models</string>
+    <string name="settings_openrouter_custom_model">Своя модель OpenRouter</string>
+    <string name="settings_openrouter_custom_hint">Например meta-llama/llama-3.3-70b-instruct:free</string>
+    <string name="settings_openrouter_get_key">Получить ключ OpenRouter</string>
+    <string name="settings_groq_model">Модель Groq</string>
+    <string name="settings_groq_model_hint">Пресеты или своя модель с console.groq.com/docs/models</string>
+    <string name="settings_groq_custom_model">Своя модель Groq</string>
+    <string name="settings_groq_custom_hint">Например llama-3.3-70b-versatile</string>
     <string name="settings_llm_active">Сейчас: %1$s</string>
     <string name="settings_api_key">API-ключ</string>
     <string name="settings_api_key_clear">Очистить ключ</string>

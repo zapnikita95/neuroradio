@@ -12,7 +12,9 @@ import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.core.stringSetPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import com.musicstory.app.domain.GeminiModel
+import com.musicstory.app.domain.GroqModel
 import com.musicstory.app.domain.LlmProvider
+import com.musicstory.app.domain.OpenRouterModel
 import com.musicstory.app.domain.MusicInterruptionMode
 import com.musicstory.app.domain.StoryLength
 import com.musicstory.app.domain.StoryNarrator
@@ -101,12 +103,38 @@ class SettingsDataStore(private val context: Context) {
         prefs[KEY_GEMINI_API_KEY] ?: ""
     }
 
+    val openRouterApiKey: Flow<String> = context.settingsDataStore.data.map { prefs ->
+        prefs[KEY_OPENROUTER_API_KEY] ?: ""
+    }
+
     val llmProvider: Flow<LlmProvider> = context.settingsDataStore.data.map { prefs ->
-        LlmProvider.fromId(prefs[KEY_LLM_PROVIDER])
+        LlmProvider.fromId(prefs[KEY_LLM_PROVIDER]).let { saved ->
+            if (prefs[KEY_LLM_PROVIDER_DEFAULTED_TO_OPENROUTER] == true) {
+                saved
+            } else {
+                LlmProvider.OPENROUTER
+            }
+        }
     }
 
     val geminiModel: Flow<GeminiModel> = context.settingsDataStore.data.map { prefs ->
         GeminiModel.fromId(prefs[KEY_GEMINI_MODEL])
+    }
+
+    val groqModel: Flow<GroqModel> = context.settingsDataStore.data.map { prefs ->
+        GroqModel.fromId(prefs[KEY_GROQ_MODEL])
+    }
+
+    val groqCustomModelId: Flow<String> = context.settingsDataStore.data.map { prefs ->
+        prefs[KEY_GROQ_CUSTOM_MODEL] ?: ""
+    }
+
+    val openRouterModel: Flow<OpenRouterModel> = context.settingsDataStore.data.map { prefs ->
+        OpenRouterModel.fromId(prefs[KEY_OPENROUTER_MODEL])
+    }
+
+    val openRouterCustomModelId: Flow<String> = context.settingsDataStore.data.map { prefs ->
+        prefs[KEY_OPENROUTER_CUSTOM_MODEL] ?: ""
     }
 
     val sameTrackStoryEveryN: Flow<Int> = context.settingsDataStore.data.map { prefs ->
@@ -233,12 +261,35 @@ class SettingsDataStore(private val context: Context) {
         context.settingsDataStore.edit { it[KEY_GEMINI_API_KEY] = key.trim() }
     }
 
+    suspend fun setOpenRouterApiKey(key: String) {
+        context.settingsDataStore.edit { it[KEY_OPENROUTER_API_KEY] = key.trim() }
+    }
+
     suspend fun setLlmProvider(provider: LlmProvider) {
-        context.settingsDataStore.edit { it[KEY_LLM_PROVIDER] = provider.id }
+        context.settingsDataStore.edit {
+            it[KEY_LLM_PROVIDER] = provider.id
+            it[KEY_LLM_PROVIDER_DEFAULTED_TO_OPENROUTER] = true
+        }
     }
 
     suspend fun setGeminiModel(model: GeminiModel) {
         context.settingsDataStore.edit { it[KEY_GEMINI_MODEL] = model.id }
+    }
+
+    suspend fun setGroqModel(model: GroqModel) {
+        context.settingsDataStore.edit { it[KEY_GROQ_MODEL] = model.id }
+    }
+
+    suspend fun setGroqCustomModelId(modelId: String) {
+        context.settingsDataStore.edit { it[KEY_GROQ_CUSTOM_MODEL] = modelId.trim() }
+    }
+
+    suspend fun setOpenRouterModel(model: OpenRouterModel) {
+        context.settingsDataStore.edit { it[KEY_OPENROUTER_MODEL] = model.id }
+    }
+
+    suspend fun setOpenRouterCustomModelId(modelId: String) {
+        context.settingsDataStore.edit { it[KEY_OPENROUTER_CUSTOM_MODEL] = modelId.trim() }
     }
 
     suspend fun setSameTrackStoryEveryN(n: Int) {
@@ -304,8 +355,14 @@ class SettingsDataStore(private val context: Context) {
         private val KEY_MANUAL_MODE = booleanPreferencesKey("manual_mode")
         private val KEY_GROQ_API_KEY = stringPreferencesKey("groq_api_key")
         private val KEY_GEMINI_API_KEY = stringPreferencesKey("gemini_api_key")
+        private val KEY_OPENROUTER_API_KEY = stringPreferencesKey("openrouter_api_key")
         private val KEY_LLM_PROVIDER = stringPreferencesKey("llm_provider")
+        private val KEY_LLM_PROVIDER_DEFAULTED_TO_OPENROUTER = booleanPreferencesKey("llm_provider_defaulted_to_openrouter")
         private val KEY_GEMINI_MODEL = stringPreferencesKey("gemini_model")
+        private val KEY_GROQ_MODEL = stringPreferencesKey("groq_model")
+        private val KEY_GROQ_CUSTOM_MODEL = stringPreferencesKey("groq_custom_model")
+        private val KEY_OPENROUTER_MODEL = stringPreferencesKey("openrouter_model")
+        private val KEY_OPENROUTER_CUSTOM_MODEL = stringPreferencesKey("openrouter_custom_model")
         private val KEY_SAME_TRACK_STORY_EVERY_N = intPreferencesKey("same_track_story_every_n")
         private val KEY_STORY_LENGTH = stringPreferencesKey("story_length")
         private val KEY_STORY_NARRATOR = stringPreferencesKey("story_narrator")
