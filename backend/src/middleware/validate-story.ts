@@ -6,6 +6,8 @@ import { resolveTtsVoice, TtsVoiceSetting } from '../services/voices.js';
 import { resolveTtsEmotion, resolveTtsSpeed, TtsEmotion } from '../services/tts-options.js';
 import { resolveLlmProvider } from '../services/llm-provider.js';
 import { resolveGeminiModel } from '../services/gemini-models.js';
+import { resolveTtsVoiceStyle, type TtsVoiceStyleId } from '../services/tts-voice-profiles.js';
+import type { TtsProviderId, VoiceTier } from '../services/tts-router.js';
 
 interface StoryFullBody {
   artist?: unknown;
@@ -16,14 +18,43 @@ interface StoryFullBody {
   tts_voice?: unknown;
   tts_speed?: unknown;
   tts_emotion?: unknown;
+  tts_style?: unknown;
+  voice_tier?: unknown;
+  tts_provider?: unknown;
   llm_provider?: unknown;
   gemini_model?: unknown;
+  groq_model?: unknown;
+  openrouter_model?: unknown;
+}
+
+const VALID_VOICE_TIERS = new Set<string>(['default', 'premium']);
+const VALID_TTS_PROVIDERS = new Set<string>(['auto', 'yandex', 'azure', 'elevenlabs']);
+
+function resolveVoiceTier(value: unknown): VoiceTier {
+  if (typeof value === 'string' && VALID_VOICE_TIERS.has(value)) {
+    return value as VoiceTier;
+  }
+  return 'default';
+}
+
+function resolveTtsProvider(value: unknown): TtsProviderId {
+  if (typeof value === 'string' && VALID_TTS_PROVIDERS.has(value)) {
+    return value as TtsProviderId;
+  }
+  return 'auto';
 }
 
 function asTrimmedString(value: unknown, maxLen: number): string | null {
   if (typeof value !== 'string') return null;
   const trimmed = value.trim();
   if (!trimmed || trimmed.length > maxLen) return null;
+  return trimmed;
+}
+
+function asOptionalModelId(value: unknown, maxLen = 128): string | undefined {
+  if (typeof value !== 'string') return undefined;
+  const trimmed = value.trim();
+  if (!trimmed || trimmed.length > maxLen) return undefined;
   return trimmed;
 }
 
@@ -65,8 +96,13 @@ export function validateStoryFullBody(req: Request, res: Response, next: NextFun
     typeof body.tts_speed === 'number' ? body.tts_speed : Number(body.tts_speed),
   );
   const ttsEmotion: TtsEmotion = resolveTtsEmotion(body.tts_emotion);
+  const ttsStyle: TtsVoiceStyleId = resolveTtsVoiceStyle(body.tts_style);
+  const voiceTier = resolveVoiceTier(body.voice_tier);
+  const ttsProvider = resolveTtsProvider(body.tts_provider);
   const llmProvider = resolveLlmProvider(body.llm_provider);
   const geminiModel = resolveGeminiModel(body.gemini_model);
+  const groqModel = asOptionalModelId(body.groq_model);
+  const openrouterModel = asOptionalModelId(body.openrouter_model);
 
   req.body = {
     artist,
@@ -77,8 +113,13 @@ export function validateStoryFullBody(req: Request, res: Response, next: NextFun
     tts_voice: ttsVoice,
     tts_speed: ttsSpeed,
     tts_emotion: ttsEmotion,
+    tts_style: ttsStyle,
+    voice_tier: voiceTier,
+    tts_provider: ttsProvider,
     llm_provider: llmProvider,
     gemini_model: geminiModel,
+    groq_model: groqModel,
+    openrouter_model: openrouterModel,
   };
   next();
 }

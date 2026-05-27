@@ -15,6 +15,7 @@ import {
   TtsOptions,
 } from './tts-options.js';
 import { prepareYandexTtsText } from './tts-markup.js';
+import type { TtsPauseProfile } from './tts-voice-profiles.js';
 
 const TTS_URL = 'https://tts.api.cloud.yandex.net/speech/v1/tts:synthesize';
 
@@ -134,7 +135,12 @@ export async function synthesizeSpeech(
   text: string,
   voiceId: YandexVoiceId,
   fileName: string,
-  options: Partial<TtsOptions> & { artist?: string; title?: string; logContext?: YandexTtsLogContext } = {},
+  options: Partial<TtsOptions> & {
+    artist?: string;
+    title?: string;
+    pauseProfile?: TtsPauseProfile;
+    logContext?: YandexTtsLogContext;
+  } = {},
 ): Promise<SynthesisResult> {
   const apiKey = process.env.YANDEX_API_KEY;
   const folderId = process.env.YANDEX_FOLDER_ID;
@@ -161,6 +167,7 @@ export async function synthesizeSpeech(
     artist: artist ?? logContext?.artist,
     title: title ?? logContext?.title,
     sentencePauses: true,
+    pauseProfile: options.pauseProfile ?? 'natural',
   });
 
   const primaryVoice = coerceVoiceForSpeechKit(voiceId);

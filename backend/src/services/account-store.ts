@@ -1,4 +1,6 @@
 import crypto from 'node:crypto';
+
+const PREMIUM_PRODUCT_MONTHLY = 'premium_voice_monthly';
 import fs from 'node:fs';
 import path from 'node:path';
 
@@ -28,6 +30,15 @@ export interface SyncHistoryEntry {
   playedAt: number;
 }
 
+export type AccountPlan = 'free' | 'premium';
+
+export interface AccountEntitlement {
+  plan: AccountPlan;
+  premiumUntil: number;
+  premiumProductId: string | null;
+  purchaseTokenHash: string | null;
+}
+
 interface AccountRecord {
   accountId: string;
   syncCode: string;
@@ -36,6 +47,10 @@ interface AccountRecord {
   settings: SyncSettings;
   history: SyncHistoryEntry[];
   createdAt: number;
+  plan?: AccountPlan;
+  premiumUntil?: number;
+  premiumProductId?: string | null;
+  purchaseTokenHash?: string | null;
 }
 
 interface StoreFile {
@@ -245,4 +260,81 @@ export function pullHistory(installId: string, since = 0): SyncHistoryEntry[] | 
   const history = store.accountsById[accountId]?.history ?? [];
   if (since <= 0) return history;
   return history.filter((h) => h.playedAt > since);
+}
+
+function entitlementFromAccount(account: AccountRecord | undefined): AccountEntitlement {
+  return {
+    plan: account?.plan ?? 'free',
+    premiumUntil: account?.premiumUntil ?? 0,
+    premiumProductId: account?.premiumProductId ?? null,
+    purchaseTokenHash: account?.purchaseTokenHash ?? null,
+  };
+}
+
+/** Entitlement for install (linked account or standalone free). */
+export function getEntitlementForInstall(installId: string): AccountEntitlement {
+  const store = loadStore();
+  const normalized = installId.trim().toLowerCase();
+  const accountId = store.installToAccount[normalized];
+  if (!accountId) {
+    return {
+      plan: 'free',
+      premiumUntil: 0,
+      premiumProductId: null,
+      purchaseTokenHash: null,
+    };
+  }
+  return entitlementFromAccount(store.accountsById[accountId]);
+}
+
+const PREMIUM_MS_MONTH = 31 * 24 * 60 * 60 * 1000;
+
+/**
+ * Grant or extend premium on the install's linked account (creates account if needed).
+ * Used by billing scaffold until Play Billing verify is wired.
+ */
+export function grantPremiumSubscription(
+  installId: string,
+  options: { months?: number; productId?: string; purchaseToken?: string } = {},
+): AccountEntitlement {
+  const months = Math.max(1, options.months ?? 1);
+  const store = loadStore();
+  const normalized = installId.trim().toLowerCase();
+  let accountId = store.installToAccount[normalized];
+  if (!accountId) {
+    const created = createAccount(installId);
+    accountId = created.accountId;
+    const reloaded = loadStore();
+    const account = reloaded.accountsById[accountId];
+    if (!account) {
+      return getEntitlementForInstall(installId);
+    }
+    account.plan = 'premium';
+    account.premiumUntil = Date.now() + months * PREMIUM_MS_MONTH;
+    account.premiumProductId = options.productId ?? PREMIUM_PRODUCT_MONTHLY;
+    if (options.purchaseToken) {
+      account.purchaseTokenHash = crypto
+        .createHash('sha256')
+        .update(options.purchaseToken)
+        .digest('hex');
+    }
+    saveStore(reloaded);
+    return entitlementFromAccount(account);
+  }
+
+  const account = store.accountsById[accountId];
+  if (!account) return getEntitlementForInstall(installId);
+
+  const base = Math.max(Date.now(), account.premiumUntil ?? 0);
+  account.plan = 'premium';
+  account.premiumUntil = base + months * PREMIUM_MS_MONTH;
+  account.premiumProductId = options.productId ?? PREMIUM_PRODUCT_MONTHLY;
+  if (options.purchaseToken) {
+    account.purchaseTokenHash = crypto
+      .createHash('sha256')
+      .update(options.purchaseToken)
+      .digest('hex');
+  }
+  saveStore(store);
+  return entitlementFromAccount(account);
 }
