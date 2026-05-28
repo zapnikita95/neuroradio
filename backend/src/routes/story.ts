@@ -11,7 +11,6 @@ import {
   shouldRunLlmFactHunt,
 } from '../services/story-llm-fact-hunt.js';
 import { hasLlmKeyForProvider, resolveLlmProvider } from '../services/llm-provider.js';
-import { hasOpenRouterApiKey } from '../services/openrouter.js';
 import { generateStoryWithFallback } from '../services/story-llm-router.js';
 import { setLogDetail } from '../middleware/request-logger.js';
 import { hasYandexCredentials } from '../services/yandex-tts.js';
@@ -84,13 +83,7 @@ router.get('/quota', (req: Request, res: Response) => {
 
 router.post('/full', validateStoryFullBody, async (req: Request, res: Response) => {
   const requestedProviderRaw = (req.body as StoryFullBody).llm_provider;
-  let llmProvider = resolveLlmProvider((req.body as StoryFullBody).llm_provider);
-  if (llmProvider === 'groq' && hasOpenRouterApiKey()) {
-    console.warn(
-      `[story] overriding legacy client llm=groq to openrouter install=${(req.installId ?? 'unknown').slice(0, 8)}`,
-    );
-    llmProvider = 'openrouter';
-  }
+  const llmProvider = resolveLlmProvider((req.body as StoryFullBody).llm_provider);
   if (!hasLlmKeyForProvider(llmProvider)) {
     const code =
       llmProvider === 'gemini'

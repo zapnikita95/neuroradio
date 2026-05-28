@@ -11,6 +11,6 @@ enum class LlmProvider(
 
     companion object {
         fun fromId(id: String?): LlmProvider =
-            entries.firstOrNull { it.id == id?.trim()?.lowercase() } ?: OPENROUTER
+            entries.firstOrNull { it.id == id?.trim()?.lowercase() } ?: GROQ
     }
 }

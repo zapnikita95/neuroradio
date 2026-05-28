@@ -108,13 +108,7 @@ class SettingsDataStore(private val context: Context) {
     }
 
     val llmProvider: Flow<LlmProvider> = context.settingsDataStore.data.map { prefs ->
-        LlmProvider.fromId(prefs[KEY_LLM_PROVIDER]).let { saved ->
-            if (prefs[KEY_LLM_PROVIDER_DEFAULTED_TO_OPENROUTER] == true) {
-                saved
-            } else {
-                LlmProvider.OPENROUTER
-            }
-        }
+        LlmProvider.fromId(prefs[KEY_LLM_PROVIDER])
     }
 
     val geminiModel: Flow<GeminiModel> = context.settingsDataStore.data.map { prefs ->
@@ -268,18 +262,6 @@ class SettingsDataStore(private val context: Context) {
     suspend fun setLlmProvider(provider: LlmProvider) {
         context.settingsDataStore.edit {
             it[KEY_LLM_PROVIDER] = provider.id
-            it[KEY_LLM_PROVIDER_DEFAULTED_TO_OPENROUTER] = true
-        }
-    }
-
-    suspend fun forceOpenRouterForThisBuild() {
-        context.settingsDataStore.edit {
-            if (it[KEY_OPENROUTER_FORCE_VERSION] != OPENROUTER_FORCE_VERSION) {
-                it[KEY_LLM_PROVIDER] = LlmProvider.OPENROUTER.id
-                it[KEY_LLM_PROVIDER_DEFAULTED_TO_OPENROUTER] = true
-                it[KEY_OPENROUTER_MODEL] = OpenRouterModel.LIQUID_LFM.id
-                it[KEY_OPENROUTER_FORCE_VERSION] = OPENROUTER_FORCE_VERSION
-            }
         }
     }
 
