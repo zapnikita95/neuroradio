@@ -49,12 +49,6 @@ if (!apiKey) {
 /** Fallback if dist not built — keep in sync with openrouter-models.ts */
 const FALLBACK_MODELS = [
   'liquid/lfm-2.5-1.2b-instruct:free',
-  'openrouter/free',
-  'deepseek/deepseek-v4-flash:free',
-  'qwen/qwen3-next-80b-a3b-instruct:free',
-  'google/gemma-4-26b-a4b-it:free',
-  'nvidia/nemotron-nano-9b-v2:free',
-  'openai/gpt-oss-120b:free',
 ];
 
 async function loadPresetModels() {

@@ -11,7 +11,8 @@
     "typecheck": "tsc --noEmit",
     "test:gemini": "npm run build && node scripts/test-live-gemini-story.mjs",
     "test:gemini:prod": "node scripts/test-production-gemini.mjs",
-    "test:quality": "npm run build && node scripts/test-story-quality.mjs"
+    "test:quality": "npm run build && node scripts/test-story-quality.mjs",
+    "test:tts": "npm run build && node scripts/test-tts-pipeline.mjs"
   },
   "keywords": ["music", "story", "bff", "express"],
   "license": "MIT",

@@ -22,6 +22,7 @@ import {
   qualityOptionsForAttempt,
   validateGeneratedStory,
 } from './story-generate-loop.js';
+import { logRejectedScript } from './story-reject-log.js';
 
 const GROQ_API_URL = 'https://api.groq.com/openai/v1/chat/completions';
 /** Fewer LLM calls — shared Groq RPM is tight on free tier. */
@@ -57,6 +58,10 @@ export interface GenerateStoryInput {
   groqModel?: string;
   openRouterModel?: string;
   geminiModel?: string;
+  /** User's key from the app — overrides server GROQ_API_KEY when set. */
+  clientGroqApiKey?: string;
+  clientGeminiApiKey?: string;
+  clientOpenRouterApiKey?: string;
 }
 
 export class GroqApiError extends Error {
@@ -167,8 +172,9 @@ async function callGroq(
   maxTokens: number,
   modelIndex = 0,
   preferredModel?: string,
+  apiKeyOverride?: string,
 ): Promise<{ content: string; model: string }> {
-  const apiKey = process.env.GROQ_API_KEY;
+  const apiKey = apiKeyOverride?.trim() || process.env.GROQ_API_KEY;
   if (!apiKey) throw new Error('GROQ_API_KEY is not configured');
 
   const models = resolveGroqModelOrder(preferredModel);
@@ -209,8 +215,8 @@ function finalizeStory(
   };
 }
 
-export function hasGroqApiKey(): boolean {
-  return Boolean(process.env.GROQ_API_KEY?.trim());
+export function hasGroqApiKey(clientKey?: string): boolean {
+  return Boolean(clientKey?.trim() || process.env.GROQ_API_KEY?.trim());
 }
 
 export async function generateStoryScript(
@@ -235,6 +241,8 @@ export async function generateStoryScript(
   let retryReason: string | undefined;
   let groqModelIndex = 0;
   let lastCandidate: StoryScript | null = null;
+  const clientKey = input.clientGroqApiKey?.trim();
+  const models = resolveGroqModelOrder(input.groqModel);
 
   for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
     const userPrompt = buildStoryUserPrompt({
@@ -247,34 +255,40 @@ export async function generateStoryScript(
     });
 
     let content: string;
-    try {
-      const result = await callGroq(
-        systemPrompt,
-        userPrompt,
-        lengthPreset.maxTokens,
-        groqModelIndex,
-        input.groqModel,
-      );
-      content = result.content;
-      const idx = resolveGroqModelOrder(input.groqModel).indexOf(result.model);
-      if (idx >= 0) groqModelIndex = idx;
-    } catch (err) {
-      const models = resolveGroqModelOrder(input.groqModel);
-      if (isGroqModelDecommissioned(err) && groqModelIndex + 1 < models.length) {
-        groqModelIndex += 1;
-        console.warn(`[groq] decommissioned model — skip to index ${groqModelIndex} (${models[groqModelIndex]})`);
-        continue;
-      }
-      if (err instanceof GroqApiError && err.status === 429 && groqModelIndex + 1 < models.length) {
-        groqModelIndex += 1;
-        const waitMs = 1500 + attempt * 800;
-        console.warn(
-          `[groq] 429 on ${models[groqModelIndex - 1]} — wait ${waitMs}ms, try ${models[groqModelIndex]} (attempt ${attempt + 1})`,
+    let rateRetries = 0;
+    while (true) {
+      try {
+        const result = await callGroq(
+          systemPrompt,
+          userPrompt,
+          lengthPreset.maxTokens,
+          groqModelIndex,
+          input.groqModel,
+          clientKey,
         );
-        await sleep(waitMs);
-        continue;
+        content = result.content;
+        const idx = models.indexOf(result.model);
+        if (idx >= 0) groqModelIndex = idx;
+        break;
+      } catch (err) {
+        if (err instanceof GroqApiError && err.status === 429 && rateRetries < 2) {
+          rateRetries += 1;
+          const waitMs = 2000 + rateRetries * 1500;
+          console.warn(
+            `[groq] 429 on ${models[groqModelIndex]} — wait ${waitMs}ms, retry same model (${rateRetries}/2)`,
+          );
+          await sleep(waitMs);
+          continue;
+        }
+        if (isGroqModelDecommissioned(err) && groqModelIndex + 1 < models.length) {
+          groqModelIndex += 1;
+          console.warn(
+            `[groq] decommissioned model — skip to index ${groqModelIndex} (${models[groqModelIndex]})`,
+          );
+          continue;
+        }
+        throw err;
       }
-      throw err;
     }
     const story = parseStoryJson(content);
     if (!story) {
@@ -312,7 +326,7 @@ export async function generateStoryScript(
 
     lastCandidate = { ...story, script: sanitized };
     retryReason = sanitizedQuality.reason ?? quality.reason;
-    console.warn(`Story quality reject (attempt ${attempt + 1}): ${retryReason}`);
+    logRejectedScript(`quality reject (attempt ${attempt + 1})`, sanitized, retryReason ?? 'quality');
   }
 
   const fallback = finalizeAfterQualityLoop(

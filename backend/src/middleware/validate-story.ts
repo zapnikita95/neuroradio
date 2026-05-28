@@ -25,10 +25,13 @@ interface StoryFullBody {
   gemini_model?: unknown;
   groq_model?: unknown;
   openrouter_model?: unknown;
+  groq_api_key?: unknown;
+  gemini_api_key?: unknown;
+  openrouter_api_key?: unknown;
 }
 
 const VALID_VOICE_TIERS = new Set<string>(['default', 'premium']);
-const VALID_TTS_PROVIDERS = new Set<string>(['auto', 'yandex', 'azure', 'elevenlabs']);
+const VALID_TTS_PROVIDERS = new Set<string>(['auto', 'yandex', 'sber', 'azure', 'elevenlabs']);
 
 function resolveVoiceTier(value: unknown): VoiceTier {
   if (typeof value === 'string' && VALID_VOICE_TIERS.has(value)) {
@@ -55,6 +58,13 @@ function asOptionalModelId(value: unknown, maxLen = 128): string | undefined {
   if (typeof value !== 'string') return undefined;
   const trimmed = value.trim();
   if (!trimmed || trimmed.length > maxLen) return undefined;
+  return trimmed;
+}
+
+function asOptionalApiKey(value: unknown): string | undefined {
+  if (typeof value !== 'string') return undefined;
+  const trimmed = value.replace(/[\s\n\r]+/g, '').trim();
+  if (!trimmed || trimmed.length > 256) return undefined;
   return trimmed;
 }
 
@@ -103,6 +113,9 @@ export function validateStoryFullBody(req: Request, res: Response, next: NextFun
   const geminiModel = resolveGeminiModel(body.gemini_model);
   const groqModel = asOptionalModelId(body.groq_model);
   const openrouterModel = asOptionalModelId(body.openrouter_model);
+  const groqApiKey = asOptionalApiKey(body.groq_api_key);
+  const geminiApiKey = asOptionalApiKey(body.gemini_api_key);
+  const openrouterApiKey = asOptionalApiKey(body.openrouter_api_key);
 
   req.body = {
     artist,
@@ -120,6 +133,9 @@ export function validateStoryFullBody(req: Request, res: Response, next: NextFun
     gemini_model: geminiModel,
     groq_model: groqModel,
     openrouter_model: openrouterModel,
+    groq_api_key: groqApiKey,
+    gemini_api_key: geminiApiKey,
+    openrouter_api_key: openrouterApiKey,
   };
   next();
 }

@@ -54,6 +54,7 @@ export interface GenerateStoryInput {
   referenceFacts?: string[];
   selectedReferenceFact?: { fact: string; scope: 'artist' | 'track'; scopeLabelRu: string };
   geminiModel?: string;
+  clientGeminiApiKey?: string;
 }
 
 function parseStoryJson(raw: string): StoryScript | null {
@@ -213,8 +214,9 @@ async function callGemini(
   maxTokens: number,
   geminiModel: string | undefined,
   modelIndex = 0,
+  apiKeyOverride?: string,
 ): Promise<{ content: string; model: string }> {
-  const apiKey = process.env.GEMINI_API_KEY;
+  const apiKey = apiKeyOverride?.trim() || process.env.GEMINI_API_KEY;
   if (!apiKey) throw new Error('GEMINI_API_KEY is not configured');
 
   const models = geminiModelsToTry(geminiModel);
@@ -290,8 +292,8 @@ function validateGeminiGracefulFallback(
   });
 }
 
-export function hasGeminiApiKey(): boolean {
-  return Boolean(process.env.GEMINI_API_KEY?.trim());
+export function hasGeminiApiKey(clientKey?: string): boolean {
+  return Boolean(clientKey?.trim() || process.env.GEMINI_API_KEY?.trim());
 }
 
 export async function generateStoryScript(
@@ -339,6 +341,7 @@ export async function generateStoryScript(
         lengthPreset.maxTokens,
         input.geminiModel,
         geminiModelIndex,
+        input.clientGeminiApiKey,
       );
       content = result.content;
       const idx = geminiModelsToTry(input.geminiModel).indexOf(result.model);

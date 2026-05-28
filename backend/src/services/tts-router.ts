@@ -1,15 +1,22 @@
 import { postprocessOggFile } from './audio-postprocess.js';
 import {
   synthesizeSpeechAzure,
-  hasAzureSpeechCredentials,
   canUseAzureSpeechProduction,
+  hasAzureSpeechCredentials,
 } from './azure-tts.js';
 import { preparePlainSpeechText } from './tts-azure-ssml.js';
-import { hasPremiumEntitlement, isElevenLabsEnabled } from './entitlements.js';
+import {
+  hasPremiumEntitlement,
+  isElevenLabsEnabled,
+} from './entitlements.js';
 import { hasElevenLabsCredentials, synthesizeSpeechElevenLabs } from './elevenlabs-tts.js';
+import {
+  synthesizeSpeechSalute,
+  canUseSaluteSpeechProduction,
+  hasSaluteSpeechCredentials,
+} from './salute-tts.js';
 import type { TtsEmotion } from './tts-options.js';
-import type { TtsPauseProfile } from './tts-voice-profiles.js';
-import type { TtsVoiceStyleId } from './tts-voice-profiles.js';
+import type { TtsPauseProfile, TtsVoiceStyleId } from './tts-voice-profiles.js';
 import {
   synthesizeSpeech as synthesizeYandex,
   type SynthesisResult,
@@ -18,8 +25,8 @@ import {
 import type { YandexVoiceId } from './voices.js';
 import type { StoryNarratorId } from './story-narrator.js';
 
-export type TtsProviderId = 'auto' | 'yandex' | 'azure' | 'elevenlabs';
-export type EffectiveTtsProvider = 'yandex' | 'azure' | 'elevenlabs';
+export type TtsProviderId = 'auto' | 'yandex' | 'sber' | 'azure' | 'elevenlabs';
+export type EffectiveTtsProvider = 'yandex' | 'sber' | 'azure' | 'elevenlabs';
 export type VoiceTier = 'default' | 'premium';
 
 export interface TtsRouteRequest {
@@ -57,9 +64,9 @@ function canUseElevenLabs(): boolean {
   return hasElevenLabsCredentials() && isElevenLabsEnabled();
 }
 
-/** Premium default: Azure ru-RU Neural (clean RU), then enhanced Yandex. ElevenLabs only if explicitly requested. */
+/** Premium для РФ: SaluteSpeech → улучшенный Yandex. Azure/ElevenLabs — только явный запрос. */
 function pickPremiumAutoProvider(): EffectiveTtsProvider {
-  if (canUseAzureSpeechProduction()) return 'azure';
+  if (canUseSaluteSpeechProduction()) return 'sber';
   return 'yandex';
 }
 
@@ -78,24 +85,28 @@ export function resolveEffectiveTtsProvider(
     return 'yandex';
   }
 
+  if (request.ttsProvider === 'sber') {
+    requirePremium();
+    if (canUseSaluteSpeechProduction()) return 'sber';
+    console.warn('[tts-router] sber requested but not configured — fallback to Yandex');
+    return 'yandex';
+  }
+
   if (request.ttsProvider === 'azure') {
     requirePremium();
     if (canUseAzureSpeechProduction()) return 'azure';
-    console.warn('[tts-router] azure requested but not configured — fallback to Yandex');
+    if (canUseSaluteSpeechProduction()) return 'sber';
     return 'yandex';
   }
 
   if (request.ttsProvider === 'elevenlabs') {
     requirePremium();
     if (canUseElevenLabs()) return 'elevenlabs';
-    if (canUseAzureSpeechProduction()) {
-      console.warn('[tts-router] elevenlabs unavailable — fallback to Azure ru-RU');
-      return 'azure';
-    }
+    if (canUseSaluteSpeechProduction()) return 'sber';
+    if (canUseAzureSpeechProduction()) return 'azure';
     return 'yandex';
   }
 
-  // auto
   if (request.voiceTier === 'premium') {
     requirePremium();
     return pickPremiumAutoProvider();
@@ -108,7 +119,16 @@ export async function synthesizeStoryAudio(request: TtsRouteRequest): Promise<Tt
   const provider = resolveEffectiveTtsProvider(request);
 
   let result: SynthesisResult;
-  if (provider === 'azure') {
+  if (provider === 'sber') {
+    result = await synthesizeSpeechSalute(request.script, request.fileName, {
+      artist: request.artist,
+      title: request.title,
+      speed: request.speed,
+      pauseProfile: request.pauseProfile,
+      styleId: request.ttsStyle,
+      storyNarrator: request.storyNarrator,
+    });
+  } else if (provider === 'azure') {
     result = await synthesizeSpeechAzure(request.script, request.fileName, {
       artist: request.artist,
       title: request.title,
@@ -147,4 +167,9 @@ export async function synthesizeStoryAudio(request: TtsRouteRequest): Promise<Tt
   };
 }
 
-export { hasAzureSpeechCredentials, canUseAzureSpeechProduction };
+export {
+  hasAzureSpeechCredentials,
+  canUseAzureSpeechProduction,
+  hasSaluteSpeechCredentials,
+  canUseSaluteSpeechProduction,
+};

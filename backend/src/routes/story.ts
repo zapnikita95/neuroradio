@@ -10,7 +10,7 @@ import {
   huntReferenceFactWithLlm,
   shouldRunLlmFactHunt,
 } from '../services/story-llm-fact-hunt.js';
-import { hasLlmKeyForProvider, resolveLlmProvider } from '../services/llm-provider.js';
+import { hasLlmKeyForProvider, resolveLlmProvider, clientKeyForProvider, type ClientLlmKeys } from '../services/llm-provider.js';
 import { generateStoryWithFallback } from '../services/story-llm-router.js';
 import { setLogDetail } from '../middleware/request-logger.js';
 import { hasYandexCredentials } from '../services/yandex-tts.js';
@@ -59,6 +59,9 @@ interface StoryFullBody {
   gemini_model?: string;
   groq_model?: string;
   openrouter_model?: string;
+  groq_api_key?: string;
+  gemini_api_key?: string;
+  openrouter_api_key?: string;
 }
 
 router.get('/quota', (req: Request, res: Response) => {
@@ -84,7 +87,13 @@ router.get('/quota', (req: Request, res: Response) => {
 router.post('/full', validateStoryFullBody, async (req: Request, res: Response) => {
   const requestedProviderRaw = (req.body as StoryFullBody).llm_provider;
   const llmProvider = resolveLlmProvider((req.body as StoryFullBody).llm_provider);
-  if (!hasLlmKeyForProvider(llmProvider)) {
+  const clientLlmKeys: ClientLlmKeys = {
+    groq: (req.body as StoryFullBody).groq_api_key,
+    gemini: (req.body as StoryFullBody).gemini_api_key,
+    openrouter: (req.body as StoryFullBody).openrouter_api_key,
+  };
+  const ownLlmKey = Boolean(clientKeyForProvider(llmProvider, clientLlmKeys));
+  if (!hasLlmKeyForProvider(llmProvider, clientLlmKeys)) {
     const code =
       llmProvider === 'gemini'
         ? 'GEMINI_NOT_CONFIGURED'
@@ -133,7 +142,7 @@ router.post('/full', validateStoryFullBody, async (req: Request, res: Response) 
           : '';
 
   console.log(
-    `[settings] install=${installId.slice(0, 8)} user_llm=${requestedProviderRaw ?? 'missing'} active_llm=${llmProvider}${modelLog}`,
+    `[settings] install=${installId.slice(0, 8)} user_llm=${requestedProviderRaw ?? 'missing'} active_llm=${llmProvider}${modelLog} own_key=${ownLlmKey}`,
   );
   console.log(
     `[story] start install=${installId.slice(0, 8)} requested_llm=${requestedProviderRaw ?? 'missing'} llm=${llmProvider}${modelLog}` +
@@ -252,6 +261,9 @@ router.post('/full', validateStoryFullBody, async (req: Request, res: Response) 
       geminiModel,
       groqModel,
       openRouterModel: openrouterModel,
+      clientGroqApiKey: clientLlmKeys.groq,
+      clientGeminiApiKey: clientLlmKeys.gemini,
+      clientOpenRouterApiKey: clientLlmKeys.openrouter,
     };
 
     const { story, llmUsed } = await generateStoryWithFallback(storyInput, llmProvider);

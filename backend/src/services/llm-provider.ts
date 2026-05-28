@@ -4,6 +4,22 @@ import { hasOpenRouterApiKey } from './openrouter.js';
 
 export type LlmProviderId = 'openrouter' | 'groq' | 'gemini';
 
+export interface ClientLlmKeys {
+  groq?: string;
+  gemini?: string;
+  openrouter?: string;
+}
+
+export function clientKeyForProvider(
+  provider: LlmProviderId,
+  keys?: ClientLlmKeys,
+): string | undefined {
+  if (!keys) return undefined;
+  if (provider === 'gemini') return keys.gemini?.trim() || undefined;
+  if (provider === 'openrouter') return keys.openrouter?.trim() || undefined;
+  return keys.groq?.trim() || undefined;
+}
+
 export const LLM_PROVIDER_ORDER: LlmProviderId[] = ['openrouter', 'groq', 'gemini'];
 
 function isKnownProvider(raw: string): raw is LlmProviderId {
@@ -21,12 +37,18 @@ export function resolveLlmProvider(override?: unknown): LlmProviderId {
   return 'openrouter';
 }
 
-export function hasLlmKeyForProvider(provider: LlmProviderId): boolean {
-  if (provider === 'gemini') return hasGeminiApiKey();
-  if (provider === 'openrouter') return hasOpenRouterApiKey();
-  return hasGroqApiKey();
+export function hasLlmKeyForProvider(provider: LlmProviderId, clientKeys?: ClientLlmKeys): boolean {
+  const client = clientKeyForProvider(provider, clientKeys);
+  if (provider === 'gemini') return hasGeminiApiKey(client);
+  if (provider === 'openrouter') return hasOpenRouterApiKey(client);
+  return hasGroqApiKey(client);
 }
 
-export function alternateLlmProviders(preferred: LlmProviderId): LlmProviderId[] {
-  return LLM_PROVIDER_ORDER.filter((p) => p !== preferred && hasLlmKeyForProvider(p));
+export function alternateLlmProviders(
+  preferred: LlmProviderId,
+  clientKeys?: ClientLlmKeys,
+): LlmProviderId[] {
+  return LLM_PROVIDER_ORDER.filter(
+    (p) => p !== preferred && hasLlmKeyForProvider(p, clientKeys),
+  );
 }

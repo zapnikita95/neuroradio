@@ -25,48 +25,6 @@ export const OPENROUTER_FREE_MODELS: OpenRouterModelOption[] = [
     recommended: true,
     slot: 'both',
   },
-  {
-    id: 'openrouter/free',
-    labelRu: 'OpenRouter Free (авто)',
-    descriptionRu: 'Роутер OpenRouter — часто 429, нестабильно',
-    stable: false,
-    slot: 'both',
-  },
-  {
-    id: 'deepseek/deepseek-v4-flash:free',
-    labelRu: 'DeepSeek V4 Flash',
-    descriptionRu: 'Часто rate-limit — нестабильно',
-    stable: false,
-    slot: 'story',
-  },
-  {
-    id: 'qwen/qwen3-next-80b-a3b-instruct:free',
-    labelRu: 'Qwen3 Next 80B',
-    descriptionRu: 'Сильнее, но free часто 429',
-    stable: false,
-    slot: 'fact',
-  },
-  {
-    id: 'google/gemma-4-26b-a4b-it:free',
-    labelRu: 'Gemma 4 26B',
-    descriptionRu: 'Баланс скорости и качества',
-    stable: false,
-    slot: 'both',
-  },
-  {
-    id: 'nvidia/nemotron-nano-9b-v2:free',
-    labelRu: 'Nemotron Nano 9B',
-    descriptionRu: 'Компактная free от NVIDIA',
-    stable: false,
-    slot: 'both',
-  },
-  {
-    id: 'openai/gpt-oss-120b:free',
-    labelRu: 'GPT-OSS 120B',
-    descriptionRu: 'Крупная free — может быть медленнее или 429',
-    stable: false,
-    slot: 'fact',
-  },
 ];
 
 /** Presets verified by test-all-openrouter-models.mjs */

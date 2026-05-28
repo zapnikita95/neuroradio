@@ -58,10 +58,21 @@ export function isAzureSpeechEnabled(): boolean {
   );
 }
 
+/** SaluteSpeech (Сбер) — рекомендуемый premium TTS для РФ. */
+export function isSaluteSpeechEnabled(): boolean {
+  const flag = process.env.SALUTE_SPEECH_ENABLED?.trim().toLowerCase();
+  if (flag === 'false' || flag === '0' || flag === 'off') return false;
+  if (flag === 'true' || flag === '1' || flag === 'on') return true;
+  const authKey = process.env.SALUTE_SPEECH_AUTH_KEY?.trim();
+  const id = process.env.SALUTE_SPEECH_CLIENT_ID?.trim();
+  const secret = process.env.SALUTE_SPEECH_CLIENT_SECRET?.trim();
+  return Boolean(authKey || (id && secret));
+}
+
 export function premiumUpsellHintRu(tier: UserTier): string {
   if (tier === 'premium' || tier === 'unlimited') {
-    return 'Премиум-голос (Azure Neural ru-RU) активен.';
+    return 'Премиум-голос (SaluteSpeech, Сбер) активен.';
   }
-  return `Профессиональный голос радиоведущего (чистый русский, Azure Neural) — ${PREMIUM_PRICE_RUB_MONTHLY} ₽/мес (${PREMIUM_PRODUCT_MONTHLY}).`;
+  return `Профессиональный голос радиоведущего (SaluteSpeech, чистый русский) — ${PREMIUM_PRICE_RUB_MONTHLY} ₽/мес (${PREMIUM_PRODUCT_MONTHLY}).`;
 }
 

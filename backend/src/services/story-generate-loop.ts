@@ -6,6 +6,7 @@ import {
   sanitizeScriptForTts,
   validateStoryScript,
 } from './story-quality.js';
+import { logRejectedScript } from './story-reject-log.js';
 
 export interface StoryQualityAttemptOptions {
   strictLength?: boolean;
@@ -80,18 +81,18 @@ export function finalizeAfterQualityLoop<T extends { script: string }>(
   if (!relax) {
     const water = findWateryContent(sanitized, input.artist, input.title);
     if (water) {
-      console.warn(`[story] last script rejected as water: ${water}`);
+      logRejectedScript('last script rejected as water', sanitized, water);
       return null;
     }
   }
   for (const pattern of BANNED_SCRIPT_PATTERNS) {
     if (pattern.test(sanitized)) {
-      console.warn(`[story] last script rejected as banned: ${pattern.source}`);
+      logRejectedScript('last script rejected as banned', sanitized, pattern.source);
       return null;
     }
   }
   if (referenceFacts.length === 0) {
-    console.warn('[story] last script rejected: no reference facts');
+    logRejectedScript('last script rejected', sanitized, 'no reference facts');
     return null;
   }
   const anchorCheck = validateStoryScript(sanitized, '60s', input.artist, input.title, {
@@ -104,7 +105,7 @@ export function finalizeAfterQualityLoop<T extends { script: string }>(
     skipFirstSentenceAnchor: true,
   });
   if (!anchorCheck.ok && !relax) {
-    console.warn(`[story] last script rejected on finalize: ${anchorCheck.reason}`);
+    logRejectedScript('last script rejected on finalize', sanitized, anchorCheck.reason ?? 'quality');
     return null;
   }
   if (!anchorCheck.ok && relax) {
@@ -113,13 +114,13 @@ export function finalizeAfterQualityLoop<T extends { script: string }>(
       artistNorm.length >= 3 &&
       sanitized.toLowerCase().includes(artistNorm.split(/\s+/)[0] ?? '');
     if (!mentionsArtist && wordCount < 28) {
-      console.warn(`[story] last script rejected on finalize (weak llm): ${anchorCheck.reason}`);
+      logRejectedScript('last script rejected on finalize (weak llm)', sanitized, anchorCheck.reason ?? 'quality');
       return null;
     }
     console.warn(`[story] weak-llm finalize: accepting despite ${anchorCheck.reason}`);
   }
   if (wordCount < 28) {
-    console.warn(`[story] last script rejected as too short after retries: ${wordCount} words`);
+    logRejectedScript('last script rejected as too short after retries', sanitized, `${wordCount} words`);
     return null;
   }
   const story = { ...lastCandidate, script: sanitized };

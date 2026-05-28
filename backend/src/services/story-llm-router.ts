@@ -36,7 +36,12 @@ export async function generateStoryWithFallback(
   input: GenerateStoryInput,
   preferred: LlmProviderId,
 ): Promise<StoryGenerationResult> {
-  if (!LLM_PROVIDER_ORDER.some(hasLlmKeyForProvider)) {
+  const clientKeys = {
+    groq: input.clientGroqApiKey,
+    gemini: input.clientGeminiApiKey,
+    openrouter: input.clientOpenRouterApiKey,
+  };
+  if (!LLM_PROVIDER_ORDER.some((p) => hasLlmKeyForProvider(p, clientKeys))) {
     throw new Error('No LLM API keys configured on server');
   }
 

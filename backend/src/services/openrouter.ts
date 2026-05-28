@@ -23,6 +23,7 @@ import {
   validateGeneratedStory,
 } from './story-generate-loop.js';
 import type { GenerateStoryInput, StoryScript } from './groq.js';
+import { logRejectedScript } from './story-reject-log.js';
 
 const OPENROUTER_API_URL = 'https://openrouter.ai/api/v1/chat/completions';
 const MAX_ATTEMPTS = 3;
@@ -38,8 +39,8 @@ function openRouterHeaders(): Record<string, string> {
   };
 }
 
-export function hasOpenRouterApiKey(): boolean {
-  return Boolean(process.env.OPEN_ROUTER_API_KEY?.trim());
+export function hasOpenRouterApiKey(clientKey?: string): boolean {
+  return Boolean(clientKey?.trim() || process.env.OPEN_ROUTER_API_KEY?.trim());
 }
 
 export function isOpenRouterRateLimitError(err: unknown): boolean {
@@ -84,8 +85,9 @@ async function callOpenRouter(
   userPrompt: string,
   maxTokens: number,
   model: string,
+  apiKeyOverride?: string,
 ): Promise<string> {
-  const apiKey = process.env.OPEN_ROUTER_API_KEY?.trim();
+  const apiKey = apiKeyOverride?.trim() || process.env.OPEN_ROUTER_API_KEY?.trim();
   if (!apiKey) throw new Error('OPEN_ROUTER_API_KEY is not configured');
 
   return callOpenAiChatCompletion({
@@ -138,7 +140,13 @@ export async function generateStoryScript(
 
     let content: string;
     try {
-      content = await callOpenRouter(systemPrompt, userPrompt, lengthPreset.maxTokens, model);
+      content = await callOpenRouter(
+        systemPrompt,
+        userPrompt,
+        lengthPreset.maxTokens,
+        model,
+        input.clientOpenRouterApiKey,
+      );
       console.log(`[openrouter] story model=${model} attempt=${attempt + 1}`);
     } catch (err) {
       if (isOpenRouterRateLimitError(err) && attempt + 1 < MAX_ATTEMPTS) {
@@ -186,7 +194,7 @@ export async function generateStoryScript(
 
     lastCandidate = { ...story, script: sanitized };
     retryReason = sanitizedQuality.reason ?? quality.reason;
-    console.warn(`OpenRouter story quality reject (attempt ${attempt + 1}): ${retryReason}`);
+    logRejectedScript(`OpenRouter quality reject (attempt ${attempt + 1})`, sanitized, retryReason ?? 'quality');
   }
 
   const fallback = finalizeAfterQualityLoop(

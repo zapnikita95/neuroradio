@@ -77,14 +77,15 @@ export function classifyStoryLlmError(
         : llmProvider === 'openrouter'
           ? 'OPENROUTER_RATE_LIMIT'
           : 'GROQ_RATE_LIMIT';
-    const dailyFree =
-      llmProvider === 'openrouter' &&
-      /free-models-per-day|free model requests per day/i.test(lower);
+    const apiSnippet = extractLlmApiSnippet(rawMessage);
+    const dailyLimit = /free-models-per-day|free model requests per day|tokens per day|per day| tpd/i.test(
+      lower,
+    );
     return {
       code,
-      message: dailyFree
-        ? 'OpenRouter: дневной лимит бесплатных моделей исчерпан. Подожди до завтра или добавь кредиты на openrouter.ai — в приложении выбрана одна модель, без перебора.'
-        : `${label}: слишком много запросов в минуту (RPM). Подожди 1–2 минуты — не жми «Рассказать» подряд на каждом треке.`,
+      message: dailyLimit
+        ? `${label} (дневной лимит): ${apiSnippet}`
+        : `${label}: ${apiSnippet}`,
       httpStatus: 503,
     };
   }
@@ -148,4 +149,22 @@ export function classifyStoryLlmError(
     message: rawMessage.slice(0, 200) || 'Story generation failed',
     httpStatus: 500,
   };
+}
+
+function extractLlmApiSnippet(rawMessage: string): string {
+  const jsonMatch = rawMessage.match(/"message"\s*:\s*"((?:\\.|[^"\\])*)"/);
+  if (jsonMatch?.[1]) {
+    return jsonMatch[1].replace(/\\"/g, '"').replace(/\\n/g, ' ').slice(0, 220);
+  }
+  const afterColon = rawMessage.match(/(?:API error \d+:\s*)([\s\S]+)/i);
+  if (afterColon?.[1]) {
+    try {
+      const parsed = JSON.parse(afterColon[1]) as { error?: { message?: string } };
+      const msg = parsed.error?.message?.trim();
+      if (msg) return msg.slice(0, 220);
+    } catch {
+      return afterColon[1].slice(0, 220);
+    }
+  }
+  return rawMessage.slice(0, 220);
 }
