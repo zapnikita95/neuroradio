@@ -133,6 +133,9 @@ router.post('/full', validateStoryFullBody, async (req: Request, res: Response) 
           : '';
 
   console.log(
+    `[settings] install=${installId.slice(0, 8)} user_llm=${requestedProviderRaw ?? 'missing'} active_llm=${llmProvider}${modelLog}`,
+  );
+  console.log(
     `[story] start install=${installId.slice(0, 8)} requested_llm=${requestedProviderRaw ?? 'missing'} llm=${llmProvider}${modelLog}` +
       ` narrator=${storyNarrator} artist="${artist}" title="${title}"`,
   );

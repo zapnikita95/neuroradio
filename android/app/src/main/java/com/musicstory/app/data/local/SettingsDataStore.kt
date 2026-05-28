@@ -22,6 +22,7 @@ import com.musicstory.app.domain.TtsEmotion
 import com.musicstory.app.domain.TtsSpeed
 import com.musicstory.app.domain.TtsVoice
 import com.musicstory.app.domain.TriggerMode
+import com.musicstory.app.util.StoryLog
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
@@ -260,8 +261,21 @@ class SettingsDataStore(private val context: Context) {
     }
 
     suspend fun setLlmProvider(provider: LlmProvider) {
+        val prefs = context.settingsDataStore.data.first()
+        val previous = LlmProvider.fromId(prefs[KEY_LLM_PROVIDER])
+        val installId = prefs[KEY_AUTH_INSTALL_ID].orEmpty().take(8).ifBlank { "no-install" }
         context.settingsDataStore.edit {
             it[KEY_LLM_PROVIDER] = provider.id
+        }
+        if (previous != provider) {
+            StoryLog.i(
+                "SETTINGS install=$installId LLM provider changed: " +
+                    "${previous.id} (${previous.labelRu}) -> ${provider.id} (${provider.labelRu})",
+            )
+        } else {
+            StoryLog.i(
+                "SETTINGS install=$installId LLM provider confirmed: ${provider.id} (${provider.labelRu})",
+            )
         }
     }
 

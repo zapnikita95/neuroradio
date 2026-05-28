@@ -67,6 +67,7 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.musicstory.app.MusicStoryApp
+import com.musicstory.app.util.StoryLog
 import com.musicstory.app.R
 import com.musicstory.app.data.local.SettingsDataStore
 import com.musicstory.app.data.remote.ConnectionCheckResult
@@ -705,7 +706,12 @@ fun SettingsScreen(
                                     text = { Text(provider.labelRu, color = CreamText) },
                                     onClick = {
                                         providerMenuExpanded = false
-                                        scope.launch { settings.setLlmProvider(provider) }
+                                        scope.launch {
+                                            StoryLog.i(
+                                                "SETTINGS UI: user tapped LLM provider -> ${provider.labelRu} (${provider.id})",
+                                            )
+                                            settings.setLlmProvider(provider)
+                                        }
                                     },
                                 )
                             }
