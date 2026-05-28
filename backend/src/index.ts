@@ -1,4 +1,4 @@
-import 'dotenv/config';
+import './load-env.js';
 import express from 'express';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -48,16 +48,24 @@ app.use('/audio', requireSignedAudioAccess, express.static(AUDIO_DIR, {
 }));
 
 app.get('/health', (_req, res) => {
+  const llm = resolveLlmProvider();
+  const openrouter = hasOpenRouterApiKey();
+  const groq = hasGroqApiKey();
+  const gemini = hasGeminiApiKey();
+  const yandexTts = hasYandexCredentials();
+  console.log(
+    `[health] llm=${llm} openrouter=${openrouter} groq=${groq} gemini=${gemini} yandexTts=${yandexTts}`,
+  );
   res.json({
     status: 'ok',
     service: 'music-story-bff',
     build: BUILD_ID,
     nodeEnv: process.env.NODE_ENV ?? 'unknown',
-    llmProvider: resolveLlmProvider(),
-    groq: hasGroqApiKey(),
-    openrouter: hasOpenRouterApiKey(),
-    gemini: hasGeminiApiKey(),
-    yandexTts: hasYandexCredentials(),
+    llmProvider: llm,
+    groq,
+    openrouter,
+    gemini,
+    yandexTts,
     appAuthRequired: isAppAuthEnabled(),
   });
 });

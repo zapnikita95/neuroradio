@@ -272,6 +272,17 @@ class SettingsDataStore(private val context: Context) {
         }
     }
 
+    suspend fun forceOpenRouterForThisBuild() {
+        context.settingsDataStore.edit {
+            if (it[KEY_OPENROUTER_FORCE_VERSION] != OPENROUTER_FORCE_VERSION) {
+                it[KEY_LLM_PROVIDER] = LlmProvider.OPENROUTER.id
+                it[KEY_LLM_PROVIDER_DEFAULTED_TO_OPENROUTER] = true
+                it[KEY_OPENROUTER_MODEL] = OpenRouterModel.LIQUID_LFM.id
+                it[KEY_OPENROUTER_FORCE_VERSION] = OPENROUTER_FORCE_VERSION
+            }
+        }
+    }
+
     suspend fun setGeminiModel(model: GeminiModel) {
         context.settingsDataStore.edit { it[KEY_GEMINI_MODEL] = model.id }
     }
@@ -358,6 +369,7 @@ class SettingsDataStore(private val context: Context) {
         private val KEY_OPENROUTER_API_KEY = stringPreferencesKey("openrouter_api_key")
         private val KEY_LLM_PROVIDER = stringPreferencesKey("llm_provider")
         private val KEY_LLM_PROVIDER_DEFAULTED_TO_OPENROUTER = booleanPreferencesKey("llm_provider_defaulted_to_openrouter")
+        private val KEY_OPENROUTER_FORCE_VERSION = intPreferencesKey("openrouter_force_version")
         private val KEY_GEMINI_MODEL = stringPreferencesKey("gemini_model")
         private val KEY_GROQ_MODEL = stringPreferencesKey("groq_model")
         private val KEY_GROQ_CUSTOM_MODEL = stringPreferencesKey("groq_custom_model")
@@ -374,6 +386,7 @@ class SettingsDataStore(private val context: Context) {
         private val KEY_MUSIC_FADE_SECONDS = floatPreferencesKey("music_fade_seconds")
         private val KEY_SYNC_CODE = stringPreferencesKey("sync_code")
         private val KEY_ACCOUNT_LINKED = booleanPreferencesKey("account_linked")
+        private const val OPENROUTER_FORCE_VERSION = 2
     }
 }
 

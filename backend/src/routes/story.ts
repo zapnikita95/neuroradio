@@ -11,6 +11,7 @@ import {
   shouldRunLlmFactHunt,
 } from '../services/story-llm-fact-hunt.js';
 import { hasLlmKeyForProvider, resolveLlmProvider } from '../services/llm-provider.js';
+import { hasOpenRouterApiKey } from '../services/openrouter.js';
 import { generateStoryWithFallback } from '../services/story-llm-router.js';
 import { setLogDetail } from '../middleware/request-logger.js';
 import { hasYandexCredentials } from '../services/yandex-tts.js';
@@ -57,6 +58,8 @@ interface StoryFullBody {
   tts_provider: TtsProviderId;
   llm_provider?: string;
   gemini_model?: string;
+  groq_model?: string;
+  openrouter_model?: string;
 }
 
 router.get('/quota', (req: Request, res: Response) => {
@@ -81,14 +84,30 @@ router.get('/quota', (req: Request, res: Response) => {
 
 router.post('/full', validateStoryFullBody, async (req: Request, res: Response) => {
   const requestedProviderRaw = (req.body as StoryFullBody).llm_provider;
-  const llmProvider = resolveLlmProvider((req.body as StoryFullBody).llm_provider);
+  let llmProvider = resolveLlmProvider((req.body as StoryFullBody).llm_provider);
+  if (llmProvider === 'groq' && hasOpenRouterApiKey()) {
+    console.warn(
+      `[story] overriding legacy client llm=groq to openrouter install=${(req.installId ?? 'unknown').slice(0, 8)}`,
+    );
+    llmProvider = 'openrouter';
+  }
   if (!hasLlmKeyForProvider(llmProvider)) {
+    const code =
+      llmProvider === 'gemini'
+        ? 'GEMINI_NOT_CONFIGURED'
+        : llmProvider === 'openrouter'
+          ? 'OPENROUTER_NOT_CONFIGURED'
+          : 'GROQ_NOT_CONFIGURED';
+    const message =
+      llmProvider === 'gemini'
+        ? 'Gemini не настроен на сервере. Добавь GEMINI_API_KEY или свой ключ в настройках приложения.'
+        : llmProvider === 'openrouter'
+          ? 'OpenRouter не настроен на сервере. Добавь OPEN_ROUTER_API_KEY на Railway или свой ключ в приложении.'
+          : 'Groq не настроен на сервере. Добавь GROQ_API_KEY или свой ключ в настройках приложения.';
     res.status(503).json({
       error: 'Story generation unavailable',
-      code: llmProvider === 'gemini' ? 'GEMINI_NOT_CONFIGURED' : 'GROQ_NOT_CONFIGURED',
-      message: llmProvider === 'gemini'
-        ? 'Gemini не настроен на сервере. Добавь GEMINI_API_KEY или свой ключ в настройках приложения.'
-        : 'Groq не настроен на сервере. Добавь GROQ_API_KEY или свой ключ в настройках приложения.',
+      code,
+      message,
     });
     return;
   }
@@ -107,12 +126,22 @@ router.post('/full', validateStoryFullBody, async (req: Request, res: Response) 
     tts_provider: ttsProvider,
   } = req.body as StoryFullBody;
   const geminiModel = (req.body as StoryFullBody).gemini_model;
+  const groqModel = (req.body as StoryFullBody).groq_model;
+  const openrouterModel = (req.body as StoryFullBody).openrouter_model;
   const installId = req.installId ?? 'unknown';
 
+  const modelLog =
+    llmProvider === 'gemini'
+      ? ` model=${geminiModel ?? 'default'}`
+      : llmProvider === 'groq'
+        ? ` model=${groqModel ?? 'default'}`
+        : llmProvider === 'openrouter'
+          ? ` model=${openrouterModel ?? 'default'}`
+          : '';
+
   console.log(
-    `[story] start install=${installId.slice(0, 8)} requested_llm=${requestedProviderRaw ?? 'missing'} llm=${llmProvider}` +
-      (llmProvider === 'gemini' ? ` model=${geminiModel ?? 'default'}` : '') +
-      ` artist="${artist}" title="${title}"`,
+    `[story] start install=${installId.slice(0, 8)} requested_llm=${requestedProviderRaw ?? 'missing'} llm=${llmProvider}${modelLog}` +
+      ` narrator=${storyNarrator} artist="${artist}" title="${title}"`,
   );
 
   try {
@@ -182,6 +211,7 @@ router.post('/full', validateStoryFullBody, async (req: Request, res: Response) 
         genre: metadata.genre,
         rawSnippets: factCtx.rawSnippets,
         preferredProvider: llmProvider,
+        openRouterModel: openrouterModel,
       });
       if (hunted) {
         selectedFact = hunted;
@@ -213,7 +243,9 @@ router.post('/full', validateStoryFullBody, async (req: Request, res: Response) 
       previousScripts,
       referenceFacts,
       selectedReferenceFact: selectedFact ?? undefined,
-      ...(llmProvider === 'gemini' ? { geminiModel } : {}),
+      geminiModel,
+      groqModel,
+      openRouterModel: openrouterModel,
     };
 
     const { story, llmUsed } = await generateStoryWithFallback(storyInput, llmProvider);
@@ -259,6 +291,7 @@ router.post('/full', validateStoryFullBody, async (req: Request, res: Response) 
         musicbrainz: Boolean(metadata.year || metadata.genre || metadata.mbid),
         groq: llmUsed === 'groq',
         gemini: llmUsed === 'gemini',
+        openrouter: llmUsed === 'openrouter',
         yandexTts: hasYandexCredentials(),
         azureTts: canUseAzureSpeechProduction(),
       },

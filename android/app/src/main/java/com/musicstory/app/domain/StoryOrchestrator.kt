@@ -15,8 +15,10 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeout
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -45,6 +47,7 @@ data class OrchestratorUiState(
     val state: OrchestratorState = OrchestratorState.IDLE,
     val currentTrack: TrackInfo? = null,
     val errorMessage: String? = null,
+    val hintMessage: String? = null,
     val tracksUntilNext: Int? = null,
     val isServiceRunning: Boolean = false,
     val generationPreview: GenerationPreviewState = GenerationPreviewState(),
@@ -81,6 +84,9 @@ class StoryOrchestrator(
     private val _errorMessage = MutableStateFlow<String?>(null)
     val errorMessage: StateFlow<String?> = _errorMessage.asStateFlow()
 
+    private val _hintMessage = MutableStateFlow<String?>(null)
+    val hintMessage: StateFlow<String?> = _hintMessage.asStateFlow()
+
     private val _tracksUntilNext = MutableStateFlow<Int?>(null)
     val tracksUntilNext: StateFlow<Int?> = _tracksUntilNext.asStateFlow()
 
@@ -107,6 +113,7 @@ class StoryOrchestrator(
             state = _state.value,
             currentTrack = mediaControllerManager.effectiveNowPlaying.value,
             errorMessage = _errorMessage.value,
+            hintMessage = _hintMessage.value,
             tracksUntilNext = _tracksUntilNext.value,
             isServiceRunning = _serviceRunning.value,
             generationPreview = _generationPreview.value,
@@ -136,6 +143,7 @@ class StoryOrchestrator(
                         )
                 ) {
                     _errorMessage.value = "Не удалось воспроизвести историю"
+                    _hintMessage.value = null
                     _state.value = OrchestratorState.ERROR
                     publishUiState()
                 }
@@ -165,9 +173,11 @@ class StoryOrchestrator(
             triggerEngine.restoreTracksSinceLastStory(settingsDataStore.tracksSinceLastStory.first())
             _tracksUntilNext.value = triggerEngine.tracksUntilNext(settings)
             publishUiState()
-            val firstTrackBonus = !settingsDataStore.firstAutoStoryCompleted.first()
-            if (firstTrackBonus || triggerEngine.currentTracksSinceLastStory() >= settings.everyNTracks) {
+            val counter = triggerEngine.currentTracksSinceLastStory()
+            val firstPending = !settingsDataStore.firstAutoStoryCompleted.first() && counter == 0
+            if (counter >= settings.everyNTracks || firstPending) {
                 StoryLog.i("Auto story overdue — triggering for ${track.artist} — ${track.title}")
+                _tracksUntilNext.value = null
                 playStoryForTrack(track, manual = false)
             }
         }
@@ -182,7 +192,9 @@ class StoryOrchestrator(
     suspend fun onTrackChanged(track: TrackInfo) {
         if (!track.isValid()) return
 
-        cancelStaleGenerationForNewTrack(track, "track changed")
+        _hintMessage.value = null
+
+        cancelStaleGenerationForNewTrack(track, reason = "track changed")
 
         triggerEngine.restoreTracksSinceLastStory(settingsDataStore.tracksSinceLastStory.first())
 
@@ -207,6 +219,7 @@ class StoryOrchestrator(
         if (shouldTrigger) {
             StoryLog.i("Auto story trigger: ${track.artist} — ${track.title}")
             scrobbleRepository.markStoryTriggered(track)
+            _tracksUntilNext.value = null
             playStoryForTrack(track, manual = false)
         } else if (_state.value != OrchestratorState.PLAYING_STORY &&
             _state.value != OrchestratorState.PREPARING_PLAYBACK &&
@@ -220,37 +233,83 @@ class StoryOrchestrator(
     fun requestManualStory() {
         val track = mediaControllerManager.effectiveNowPlaying.value
         if (track == null || !track.isValid()) {
-            _errorMessage.value = "Нет активного трека для истории"
-            _state.value = OrchestratorState.ERROR
-            publishUiState()
+            showNoTrackHint()
             return
         }
         playStoryForTrack(track, manual = true)
     }
 
+    private fun showNoTrackHint() {
+        _errorMessage.value = null
+        _hintMessage.value = context.getString(R.string.hint_no_track_for_story)
+        _state.value = OrchestratorState.LISTENING
+        publishUiState()
+    }
+
     private fun playStoryForTrack(requestedTrack: TrackInfo, manual: Boolean) {
-        cancelInFlightGeneration("superseded", rollbackAutoTrigger = false)
+        cancelInFlightGenerationImmediate("superseded")
         val session = ++playbackSession
         inFlightTrackKey = requestedTrack.displayKey
         cancelGenerationPreview()
+        _tracksUntilNext.value = null
         _state.value = OrchestratorState.FETCHING_STORY
         _errorMessage.value = null
+        _hintMessage.value = null
         publishUiState()
 
         activeStoryJob = scope.launch {
             try {
                 executeStoryPipeline(session, requestedTrack, manual)
             } catch (e: CancellationException) {
-                StoryLog.i("Story pipeline cancelled: ${e.message}")
-            } finally {
-                if (inFlightTrackKey == requestedTrack.displayKey &&
-                    _state.value == OrchestratorState.FETCHING_STORY
-                ) {
-                    _state.value = OrchestratorState.LISTENING
+                if (e is TimeoutCancellationException) {
+                    StoryLog.e("Story pipeline timeout after ${STORY_FETCH_TIMEOUT_MS}ms", e)
+                    _errorMessage.value =
+                        "Слишком долго ждём ответ сервера. Проверь интернет, Railway и OPEN_ROUTER_API_KEY."
+                    _state.value = OrchestratorState.ERROR
                     publishUiState()
+                } else {
+                    StoryLog.i("Story pipeline cancelled: ${e.message}")
+                }
+            } catch (e: Exception) {
+                StoryLog.e("Story pipeline failed: ${e.message}", e)
+                abortGeneration(session, manual, rollbackAutoTrigger = !manual)
+                _errorMessage.value = e.message ?: "Не удалось получить историю"
+                _state.value = OrchestratorState.ERROR
+                publishUiState()
+            } finally {
+                inFlightTrackKey = null
+                if (_state.value == OrchestratorState.FETCHING_STORY) {
+                    scope.launch { abortGeneration(session, manual, rollbackAutoTrigger = !manual) }
                 }
             }
         }
+    }
+
+    /** Generation aborted (track changed, stale result, timeout) — return to listening. */
+    private suspend fun abortGeneration(
+        session: Int,
+        manual: Boolean,
+        rollbackAutoTrigger: Boolean,
+    ) {
+        if (!isSessionCurrent(session)) return
+        cancelGenerationPreview()
+        if (rollbackAutoTrigger && !manual) {
+            val everyN = settingsDataStore.everyNTracks.first()
+            triggerEngine.rollbackFailedStoryTrigger(everyN)
+            settingsDataStore.setTracksSinceLastStory(triggerEngine.currentTracksSinceLastStory())
+        }
+        _state.value = OrchestratorState.LISTENING
+        refreshTracksUntilNext()
+        publishUiState()
+    }
+
+    private suspend fun refreshTracksUntilNext() {
+        if (_mode.value != OrchestratorMode.AUTO) {
+            _tracksUntilNext.value = null
+            return
+        }
+        triggerEngine.restoreTracksSinceLastStory(settingsDataStore.tracksSinceLastStory.first())
+        _tracksUntilNext.value = triggerEngine.tracksUntilNext(loadTriggerSettings())
     }
 
     private suspend fun executeStoryPipeline(
@@ -265,20 +324,27 @@ class StoryOrchestrator(
         val fadeSeconds = settingsDataStore.musicFadeSeconds.first()
 
         var track = resolveTrackForGeneration(requestedTrack) ?: run {
-            _errorMessage.value = "Нет активного трека для истории"
-            _state.value = OrchestratorState.ERROR
-            publishUiState()
+            if (manual) {
+                showNoTrackHint()
+            } else {
+                _state.value = OrchestratorState.LISTENING
+                publishUiState()
+            }
             return
         }
 
         if (!manual && !isTrackStillCurrent(session, track)) {
             StoryLog.i("Track changed before fetch — abort ${track.artist}")
+            abortGeneration(session, manual, rollbackAutoTrigger = true)
             return
         }
 
-        val result = storyRepository.fetchStory(track, forceRefresh = manual)
+        val result = withTimeout(STORY_FETCH_TIMEOUT_MS) {
+            storyRepository.fetchStory(track, forceRefresh = true)
+        }
         if (!isSessionCurrent(session) || !isTrackStillCurrent(session, track)) {
             StoryLog.i("Track changed during fetch — discard ${track.artist}")
+            abortGeneration(session, manual, rollbackAutoTrigger = true)
             return
         }
 
@@ -287,6 +353,7 @@ class StoryOrchestrator(
             onSuccess = { response ->
                 if (!isSessionCurrent(session) || !isTrackStillCurrent(session, track)) {
                     StoryLog.w("Track changed after fetch — skip stale story for ${track.artist}")
+                    abortGeneration(session, manual, rollbackAutoTrigger = !manual)
                     return@fold
                 }
 
@@ -331,6 +398,7 @@ class StoryOrchestrator(
                                     triggerEngine.onStoryPlaybackStarted()
                                     settingsDataStore.setTracksSinceLastStory(0)
                                     settingsDataStore.setFirstAutoStoryCompleted(true)
+                                    refreshTracksUntilNext()
                                 }
                             }
                             _state.value = OrchestratorState.PLAYING_STORY
@@ -344,6 +412,7 @@ class StoryOrchestrator(
                             }
                             _errorMessage.value = null
                             _state.value = OrchestratorState.LISTENING
+                            scope.launch { refreshTracksUntilNext() }
                             publishUiState()
                         },
                         onError = {
@@ -359,6 +428,7 @@ class StoryOrchestrator(
                                 }
                             }
                             _errorMessage.value = context.getString(R.string.server_audio_error_message)
+                            _hintMessage.value = null
                             _state.value = OrchestratorState.ERROR
                             if (musicPausedForStory.get()) {
                                 mediaControllerManager.resumeMusic()
@@ -381,23 +451,43 @@ class StoryOrchestrator(
                     )
                 }
                 _errorMessage.value = error.message ?: "Не удалось получить историю"
+                _hintMessage.value = null
                 _state.value = OrchestratorState.ERROR
                 publishUiState()
             },
         )
     }
 
-    private fun cancelStaleGenerationForNewTrack(track: TrackInfo, reason: String) {
+    private suspend fun cancelStaleGenerationForNewTrack(track: TrackInfo, reason: String) {
         val inFlight = inFlightTrackKey
         val generating = activeStoryJob?.isActive == true ||
             _state.value == OrchestratorState.FETCHING_STORY ||
             _state.value == OrchestratorState.PREPARING_PLAYBACK
         if (!generating) return
-        if (inFlight == null || inFlight == track.displayKey) return
+        if (inFlight != null && inFlight == track.displayKey) return
         cancelInFlightGeneration(reason, rollbackAutoTrigger = true)
     }
 
-    private fun cancelInFlightGeneration(reason: String, rollbackAutoTrigger: Boolean) {
+    private fun cancelInFlightGenerationImmediate(reason: String) {
+        val wasFetching = _state.value == OrchestratorState.FETCHING_STORY ||
+            _state.value == OrchestratorState.PREPARING_PLAYBACK
+        playbackSession++
+        activeStoryJob?.cancel(CancellationException(reason))
+        activeStoryJob = null
+        inFlightTrackKey = null
+        cancelGenerationPreview()
+        if (MonitorNotificationState.preparingStory.value) {
+            MonitorNotificationState.setPreparing(false)
+            MediaMonitorService.refreshNotification(context)
+        }
+        if (wasFetching) {
+            _state.value = OrchestratorState.LISTENING
+        }
+        StoryLog.i("Story generation cancelled: $reason")
+        publishUiState()
+    }
+
+    private suspend fun cancelInFlightGeneration(reason: String, rollbackAutoTrigger: Boolean) {
         val wasFetching = _state.value == OrchestratorState.FETCHING_STORY ||
             _state.value == OrchestratorState.PREPARING_PLAYBACK
         playbackSession++
@@ -412,14 +502,13 @@ class StoryOrchestrator(
         if (wasFetching) {
             _state.value = OrchestratorState.LISTENING
             if (rollbackAutoTrigger) {
-                scope.launch {
-                    val everyN = settingsDataStore.everyNTracks.first()
-                    triggerEngine.rollbackFailedStoryTrigger(everyN)
-                    settingsDataStore.setTracksSinceLastStory(
-                        triggerEngine.currentTracksSinceLastStory(),
-                    )
-                }
+                val everyN = settingsDataStore.everyNTracks.first()
+                triggerEngine.rollbackFailedStoryTrigger(everyN)
+                settingsDataStore.setTracksSinceLastStory(
+                    triggerEngine.currentTracksSinceLastStory(),
+                )
             }
+            refreshTracksUntilNext()
         }
         StoryLog.i("Story generation cancelled: $reason")
         publishUiState()
@@ -459,6 +548,7 @@ class StoryOrchestrator(
             triggerEngine.rollbackFailedStoryTrigger(everyN)
             settingsDataStore.setTracksSinceLastStory(triggerEngine.currentTracksSinceLastStory())
             _errorMessage.value = context.getString(R.string.server_audio_error_message)
+            _hintMessage.value = null
             _state.value = OrchestratorState.ERROR
             if (musicPausedForStory.get()) {
                 mediaControllerManager.resumeMusic()
@@ -468,7 +558,7 @@ class StoryOrchestrator(
     }
 
     fun stopStory() {
-        cancelInFlightGeneration("stopped by user", rollbackAutoTrigger = false)
+        cancelInFlightGenerationImmediate("stopped by user")
         storyPlayer.stop()
         mediaControllerManager.resumeMusic()
         _state.value = OrchestratorState.LISTENING
@@ -486,11 +576,14 @@ class StoryOrchestrator(
     private fun clearTransientState() {
         cancelGenerationPreview()
         _errorMessage.value = null
+        _hintMessage.value = null
         if (_state.value == OrchestratorState.ERROR ||
+            _state.value == OrchestratorState.FETCHING_STORY ||
             _state.value == OrchestratorState.PLAYING_STORY ||
             _state.value == OrchestratorState.PREPARING_PLAYBACK
         ) {
             _state.value = OrchestratorState.LISTENING
+            scope.launch { refreshTracksUntilNext() }
         }
         publishUiState()
     }
@@ -553,6 +646,8 @@ class StoryOrchestrator(
 
     companion object {
         private const val PLAYBACK_START_TIMEOUT_MS = 25_000L
+        /** Metadata + backend /v1/story/full — must not leave UI stuck in FETCHING. */
+        private const val STORY_FETCH_TIMEOUT_MS = 90_000L
         private const val PREVIEW_REVEAL_MAX_MS = 7_000L
         private const val PREVIEW_HOLD_MS = 7_000L
     }

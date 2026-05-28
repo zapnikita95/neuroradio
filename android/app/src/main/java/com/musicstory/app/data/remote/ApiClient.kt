@@ -1,6 +1,5 @@
 package com.musicstory.app.data.remote
 
-import com.musicstory.app.BuildConfig
 import com.musicstory.app.data.local.SettingsDataStore
 import com.musicstory.app.util.StoryLog
 import com.musicstory.app.data.model.StoryRequest
@@ -19,13 +18,9 @@ class ApiClient(
 ) {
 
     private val loggingInterceptor = HttpLoggingInterceptor { message ->
-        StoryLog.d(message)
+        StoryLog.i("HTTP $message")
     }.apply {
-        level = if (BuildConfig.DEBUG) {
-            HttpLoggingInterceptor.Level.BASIC
-        } else {
-            HttpLoggingInterceptor.Level.NONE
-        }
+        level = HttpLoggingInterceptor.Level.BASIC
     }
 
     private val baseOkHttpClient: OkHttpClient = OkHttpClient.Builder()
@@ -43,8 +38,13 @@ class ApiClient(
 
     suspend fun fetchFullStory(baseUrl: String, request: StoryRequest): StoryResponse {
         val api = getApi(baseUrl)
+        StoryLog.i("POST /v1/story/full llm=${request.llmProvider} ${request.artist} — ${request.title}")
         return try {
-            api.fetchFullStory(request)
+            val response = api.fetchFullStory(request)
+            StoryLog.i(
+                "POST /v1/story/full OK words=${response.wordCount} audio=${!response.audioUrl.isNullOrBlank()}",
+            )
+            response
         } catch (first: Exception) {
             StoryLog.w("Story fetch retry after: ${first.message}")
             authManager.invalidateToken()

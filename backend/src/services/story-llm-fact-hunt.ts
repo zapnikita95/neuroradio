@@ -24,6 +24,8 @@ export interface LlmFactHuntInput {
   genre?: string;
   rawSnippets: string[];
   preferredProvider: LlmProviderId;
+  /** Same model id as story generation (OpenRouter one-model-only). */
+  openRouterModel?: string;
 }
 
 interface LlmFactHuntJson {
@@ -62,6 +64,10 @@ export function shouldRunLlmFactHunt(
   bundleFactCount: number,
 ): boolean {
   if (rawSnippetCount === 0) return false;
+  // Уже есть факт из Wiki/MB — не тратим OpenRouter free на hunt (частые 429).
+  if (selected !== null && bundleFactCount > 0) {
+    return false;
+  }
   const mode = resolveFactHuntMode();
   if (mode === 'empty_only') {
     return bundleFactCount === 0 || selected === null;
@@ -196,10 +202,17 @@ async function callGroqFactHunt(system: string, user: string): Promise<string> {
   return content;
 }
 
-async function callOpenRouterFactHunt(system: string, user: string): Promise<string> {
+async function callOpenRouterFactHunt(
+  system: string,
+  user: string,
+  openRouterModel?: string,
+): Promise<string> {
   const apiKey = process.env.OPEN_ROUTER_API_KEY?.trim();
   if (!apiKey) throw new Error('OPEN_ROUTER_API_KEY is not configured');
-  const model = resolveOpenRouterModel(process.env.OPENROUTER_FACT_MODEL, 'fact');
+  const model = resolveOpenRouterModel(
+    openRouterModel ?? process.env.OPENROUTER_FACT_MODEL,
+    'story',
+  );
   const content = await callOpenAiChatCompletion({
     url: 'https://openrouter.ai/api/v1/chat/completions',
     apiKey,
@@ -263,7 +276,7 @@ async function huntWithProvider(
     provider === 'gemini'
       ? await callGeminiFactHunt(system, user)
       : provider === 'openrouter'
-        ? await callOpenRouterFactHunt(system, user)
+        ? await callOpenRouterFactHunt(system, user, input.openRouterModel)
         : await callGroqFactHunt(system, user);
 
   const parsed = parseFactHuntJson(raw);

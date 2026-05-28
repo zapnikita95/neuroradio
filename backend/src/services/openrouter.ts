@@ -15,7 +15,7 @@ import {
   getStoryLengthPreset,
   StoryLengthId,
 } from './story-length.js';
-import { resolveOpenRouterModelOrder } from './openrouter-models.js';
+import { resolveOpenRouterModel } from './openrouter-models.js';
 import { callOpenAiChatCompletion, OpenAiChatError } from './llm-openai-chat.js';
 import {
   finalizeAfterQualityLoop,
@@ -121,8 +121,8 @@ export async function generateStoryScript(
   const systemPrompt = buildSystemPrompt(persona, lengthPreset);
   const voiceId = input.voiceId ?? voiceForYear(input.year, input.genre);
 
-  const models = resolveOpenRouterModelOrder(input.openRouterModel, 'story');
-  let modelIndex = 0;
+  const model = resolveOpenRouterModel(input.openRouterModel, 'story');
+  if (!model) throw new Error('No OpenRouter model configured');
   let retryReason: string | undefined;
   let lastCandidate: StoryScript | null = null;
 
@@ -138,17 +138,12 @@ export async function generateStoryScript(
 
     let content: string;
     try {
-      const model = models[modelIndex] ?? models[0];
-      if (!model) throw new Error('No OpenRouter model configured');
       content = await callOpenRouter(systemPrompt, userPrompt, lengthPreset.maxTokens, model);
-      console.log(`[openrouter] story model=${model}`);
+      console.log(`[openrouter] story model=${model} attempt=${attempt + 1}`);
     } catch (err) {
-      if (isOpenRouterRateLimitError(err) && modelIndex + 1 < models.length) {
-        modelIndex += 1;
-        const waitMs = 1500 + attempt * 800;
-        console.warn(
-          `[openrouter] 429 on ${models[modelIndex - 1]} — wait ${waitMs}ms, try ${models[modelIndex]}`,
-        );
+      if (isOpenRouterRateLimitError(err) && attempt + 1 < MAX_ATTEMPTS) {
+        const waitMs = 2500 * (attempt + 1);
+        console.warn(`[openrouter] 429 on ${model} — retry same model in ${waitMs}ms`);
         await sleep(waitMs);
         continue;
       }
