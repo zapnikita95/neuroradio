@@ -19,7 +19,7 @@ import { resolveOpenRouterModel } from './openrouter-models.js';
 import { callOpenAiChatCompletion, OpenAiChatError } from './llm-openai-chat.js';
 import {
   finalizeAfterQualityLoop,
-  qualityOptionsForAttempt,
+  qualityOptionsForOpenRouterAttempt,
   validateGeneratedStory,
 } from './story-generate-loop.js';
 import type { GenerateStoryInput, StoryScript } from './groq.js';
@@ -158,7 +158,7 @@ export async function generateStoryScript(
 
     story.voiceId = voiceId;
     story.word_count = countWords(story.script);
-    const qOpts = qualityOptionsForAttempt(attempt, MAX_ATTEMPTS, referenceFacts);
+    const qOpts = qualityOptionsForOpenRouterAttempt(attempt, MAX_ATTEMPTS, referenceFacts);
 
     const quality = validateGeneratedStory(
       story.script,
@@ -194,6 +194,7 @@ export async function generateStoryScript(
     { artist: input.artist, title: input.title },
     (s) => finalizeStory(s, { ...input, voiceId }, storyLength),
     referenceFacts,
+    { relaxForWeakLlm: true },
   );
   if (fallback) return fallback;
 

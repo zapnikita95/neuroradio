@@ -227,6 +227,16 @@ router.post('/full', validateStoryFullBody, async (req: Request, res: Response) 
       ? [selectedFact.fact]
       : [...factBundle.trackFacts, ...factBundle.artistFacts].slice(0, 4);
 
+    if (!selectedFact && referenceFacts.length > 0) {
+      const scope: 'track' | 'artist' = trackFactCount > 0 ? 'track' : 'artist';
+      selectedFact = {
+        fact: referenceFacts[0]!,
+        scope,
+        scopeLabelRu: scope === 'track' ? 'трек' : 'группа/артист',
+      };
+      console.log(`[facts] fallback seed from bundle scope=${scope}`);
+    }
+
     if (referenceFacts.length === 0) {
       throw new NoReferenceFactsError(metadata.artist, metadata.title);
     }

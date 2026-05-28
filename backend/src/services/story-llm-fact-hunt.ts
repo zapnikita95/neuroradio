@@ -64,10 +64,8 @@ export function shouldRunLlmFactHunt(
   bundleFactCount: number,
 ): boolean {
   if (rawSnippetCount === 0) return false;
-  // Уже есть факт из Wiki/MB — не тратим OpenRouter free на hunt (частые 429).
-  if (selected !== null && bundleFactCount > 0) {
-    return false;
-  }
+  // Есть факты из Wiki/MB — не тратим LLM на hunt (слабые модели ломают index/429).
+  if (bundleFactCount > 0) return false;
   const mode = resolveFactHuntMode();
   if (mode === 'empty_only') {
     return bundleFactCount === 0 || selected === null;

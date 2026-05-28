@@ -77,10 +77,14 @@ export function classifyStoryLlmError(
         : llmProvider === 'openrouter'
           ? 'OPENROUTER_RATE_LIMIT'
           : 'GROQ_RATE_LIMIT';
+    const dailyFree =
+      llmProvider === 'openrouter' &&
+      /free-models-per-day|free model requests per day/i.test(lower);
     return {
       code,
-      message:
-        `${label}: слишком много запросов в минуту (RPM). Подожди 1–2 минуты — не жми «Рассказать» подряд на каждом треке.`,
+      message: dailyFree
+        ? 'OpenRouter: дневной лимит бесплатных моделей исчерпан. Подожди до завтра или добавь кредиты на openrouter.ai — в приложении выбрана одна модель, без перебора.'
+        : `${label}: слишком много запросов в минуту (RPM). Подожди 1–2 минуты — не жми «Рассказать» подряд на каждом треке.`,
       httpStatus: 503,
     };
   }

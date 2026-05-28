@@ -12,6 +12,7 @@ export interface StoryQualityAttemptOptions {
   skipWatery?: boolean;
   referenceFacts?: string[];
   skipReferenceAnchor?: boolean;
+  skipFirstSentenceAnchor?: boolean;
   skipBannedPatterns?: boolean;
   skipEnglishCheck?: boolean;
 }
@@ -27,8 +28,29 @@ export function qualityOptionsForAttempt(
     strictLength: !isLast,
     skipWatery: false,
     skipReferenceAnchor: !hasFacts,
+    skipFirstSentenceAnchor: false,
     skipBannedPatterns: false,
     skipEnglishCheck: false,
+    referenceFacts: hasFacts ? referenceFacts : [],
+  };
+}
+
+/** Слабые free-модели (Liquid LFM): постепенно ослабляем якорь, но не карусель моделей. */
+export function qualityOptionsForOpenRouterAttempt(
+  attempt: number,
+  maxAttempts: number,
+  referenceFacts: string[],
+): StoryQualityAttemptOptions {
+  const isLast = attempt >= maxAttempts - 1;
+  const isMid = attempt >= 1;
+  const hasFacts = referenceFacts.length > 0;
+  return {
+    strictLength: !isLast,
+    skipWatery: isLast,
+    skipReferenceAnchor: isLast,
+    skipFirstSentenceAnchor: isMid || isLast,
+    skipBannedPatterns: false,
+    skipEnglishCheck: isLast,
     referenceFacts: hasFacts ? referenceFacts : [],
   };
 }
@@ -49,14 +71,18 @@ export function finalizeAfterQualityLoop<T extends { script: string }>(
   input: { artist: string; title: string },
   finalize: (story: T) => T,
   referenceFacts: string[] = [],
+  options: { relaxForWeakLlm?: boolean } = {},
 ): T | null {
   if (!lastCandidate?.script?.trim()) return null;
   const sanitized = sanitizeScriptForTts(lastCandidate.script, input.artist, input.title);
   const wordCount = countWords(sanitized);
-  const water = findWateryContent(sanitized, input.artist, input.title);
-  if (water) {
-    console.warn(`[story] last script rejected as water: ${water}`);
-    return null;
+  const relax = options.relaxForWeakLlm ?? false;
+  if (!relax) {
+    const water = findWateryContent(sanitized, input.artist, input.title);
+    if (water) {
+      console.warn(`[story] last script rejected as water: ${water}`);
+      return null;
+    }
   }
   for (const pattern of BANNED_SCRIPT_PATTERNS) {
     if (pattern.test(sanitized)) {
@@ -71,14 +97,26 @@ export function finalizeAfterQualityLoop<T extends { script: string }>(
   const anchorCheck = validateStoryScript(sanitized, '60s', input.artist, input.title, {
     strictLength: false,
     referenceFacts,
-    skipBannedPatterns: false,
-    skipEnglishCheck: false,
-    skipWatery: false,
-    skipReferenceAnchor: false,
+    skipBannedPatterns: true,
+    skipEnglishCheck: relax,
+    skipWatery: relax,
+    skipReferenceAnchor: relax,
+    skipFirstSentenceAnchor: true,
   });
-  if (!anchorCheck.ok) {
+  if (!anchorCheck.ok && !relax) {
     console.warn(`[story] last script rejected on finalize: ${anchorCheck.reason}`);
     return null;
+  }
+  if (!anchorCheck.ok && relax) {
+    const artistNorm = input.artist.trim().toLowerCase();
+    const mentionsArtist =
+      artistNorm.length >= 3 &&
+      sanitized.toLowerCase().includes(artistNorm.split(/\s+/)[0] ?? '');
+    if (!mentionsArtist && wordCount < 28) {
+      console.warn(`[story] last script rejected on finalize (weak llm): ${anchorCheck.reason}`);
+      return null;
+    }
+    console.warn(`[story] weak-llm finalize: accepting despite ${anchorCheck.reason}`);
   }
   if (wordCount < 28) {
     console.warn(`[story] last script rejected as too short after retries: ${wordCount} words`);

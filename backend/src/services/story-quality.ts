@@ -6,6 +6,7 @@ import {
 } from './story-length.js';
 import { factNamesForeignEntity } from './fact-relevance.js';
 import { hasEnglishLeak } from './story-russian-language.js';
+import { collectLatinTokens } from './tts-en-normalize.js';
 
 export { DEFAULT_STORY_LENGTH, getStoryLengthPreset };
 export type { StoryLengthId, StoryLengthPreset };
@@ -93,17 +94,7 @@ function allowedDigitSequences(artist: string, title: string): Set<string> {
 }
 
 function allowedLatinNameTokens(artist: string, title: string): Set<string> {
-  const tokens = new Set<string>();
-  const collect = (value: string) => {
-    value
-      .split(/[^\p{L}\p{N}]+/u)
-      .map((part) => part.trim())
-      .filter((part) => part.length >= 2 && /[a-z]/i.test(part))
-      .forEach((part) => tokens.add(part.toLowerCase()));
-  };
-  collect(artist);
-  collect(title);
-  return tokens;
+  return collectLatinTokens(artist, title);
 }
 
 export function findForbiddenNumbers(
@@ -210,6 +201,9 @@ const CONCEPT_BRIDGES: Array<{ factPattern: RegExp; scriptTokens: string[] }> = 
   { factPattern: /mozambique|african musician|iron curtain/i, scriptTokens: ['мозамб', 'африк', 'афр'] },
   { factPattern: /bossa nova|jorge ben|mas que nada|samba/i, scriptTokens: ['босса', 'самба', 'жорж', 'бен', 'ритм', 'удар'] },
   { factPattern: /instrumental|wordless|no lyrics/i, scriptTokens: ['без слов', 'инструмент', 'свист', 'крик'] },
+  { factPattern: /protest|controvers|prison|police brutality|don't care about us/i, scriptTokens: ['протест', 'тюрьм', 'полиц', 'скандал', 'обществ'] },
+  { factPattern: /history album|histrory|anti-?semit|nazi/i, scriptTokens: ['history', 'истори', 'альбом', 'скандал', 'клип'] },
+  { factPattern: /jackson|michael/i, scriptTokens: ['джексон', 'мichael', 'king of pop', 'поп'] },
 ];
 
 function matchesConceptBridge(fact: string, scriptWords: Set<string>): boolean {
@@ -246,6 +240,7 @@ export function validateStoryScript(
     skipWatery?: boolean;
     referenceFacts?: string[];
     skipReferenceAnchor?: boolean;
+    skipFirstSentenceAnchor?: boolean;
     skipBannedPatterns?: boolean;
     skipEnglishCheck?: boolean;
   } = {},
@@ -254,6 +249,7 @@ export function validateStoryScript(
   const strictLength = options.strictLength ?? true;
   const skipWatery = options.skipWatery ?? false;
   const skipReferenceAnchor = options.skipReferenceAnchor ?? false;
+  const skipFirstSentenceAnchor = options.skipFirstSentenceAnchor ?? false;
   const skipBannedPatterns = options.skipBannedPatterns ?? false;
   const skipEnglishCheck = options.skipEnglishCheck ?? false;
   const referenceFacts = options.referenceFacts ?? [];
@@ -307,7 +303,7 @@ export function validateStoryScript(
   ) {
     return { ok: false, reason: 'story ignores Wikipedia reference facts' };
   }
-  if (referenceFacts.length > 0 && !firstSentenceAnchoredToFact(trimmed, referenceFacts)) {
+  if (referenceFacts.length > 0 && !skipFirstSentenceAnchor && !firstSentenceAnchoredToFact(trimmed, referenceFacts)) {
     return { ok: false, reason: 'first sentence is not anchored to seed fact' };
   }
 
