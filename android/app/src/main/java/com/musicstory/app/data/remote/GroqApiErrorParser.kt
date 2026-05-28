@@ -2,10 +2,6 @@ package com.musicstory.app.data.remote
 
 import org.json.JSONObject
 
-/**
- * Groq returns code `rate_limit_exceeded` for RPM/TPM bursts too — not only daily quota.
- * Never invent "лимит исчерпан на сегодня" unless the API message says so explicitly.
- */
 object GroqApiErrorParser {
 
     fun parse(httpCode: Int, body: String): String {
@@ -15,11 +11,11 @@ object GroqApiErrorParser {
         val lower = text.lowercase()
 
         if (httpCode == 401 || isAuthError(body, lower)) {
-            return "Неверный Groq API-ключ. Скопируй заново с console.groq.com/keys"
+            return "Неверный Groq API-ключ. Скопируйте ключ заново с console.groq.com/keys"
         }
 
         if (httpCode == 403 || lower.contains("forbidden")) {
-            return "Groq отклонил запрос (403). Из РФ с телефона Groq часто недоступен — выбери Gemini или сервер Railway."
+            return "Groq отклонил запрос. Из РФ Groq с телефона часто недоступен — попробуйте Gemini или сервер Railway."
         }
 
         if (httpCode == 429 || errorCode == "rate_limit_exceeded" || lower.contains("rate limit")) {
@@ -27,7 +23,7 @@ object GroqApiErrorParser {
         }
 
         if (httpCode == 400 && (errorCode == "model_decommissioned" || lower.contains("decommissioned"))) {
-            return "Groq: модель на сервере устарела — обнови приложение или подожди деплой Railway."
+            return "Выбранная модель Groq больше не поддерживается. Обновите приложение или выберите другую модель."
         }
 
         if (httpCode == 400 && lower.contains("json_validate_failed")) {
@@ -35,21 +31,25 @@ object GroqApiErrorParser {
         }
 
         if (text.isNotBlank()) {
-            return "Groq: ${text.take(200)}"
+            return "Groq: ${text.take(220)}"
         }
 
-        return "Groq HTTP $httpCode"
+        return "Groq: ошибка сервиса (HTTP $httpCode)"
     }
 
     private fun formatRateLimit(text: String, lower: String): String {
-        if (lower.contains("per day") || lower.contains("tokens per day") || lower.contains(" tpd")) {
-            return "Groq (дневной лимит): ${text.take(200)}"
+        if (text.isNotBlank()) {
+            return if (
+                lower.contains("free-models-per-day") ||
+                lower.contains("per day") ||
+                lower.contains("tokens per day")
+            ) {
+                "Groq (дневной лимит): ${text.take(220)}"
+            } else {
+                "Groq: ${text.take(220)}"
+            }
         }
-        if (lower.contains("per minute") || lower.contains(" tpm") || lower.contains(" rpm")) {
-            return "Groq: слишком много запросов в минуту — подожди 30–60 сек и попробуй снова."
-        }
-        // Unknown rate limit — show API text, do NOT claim daily exhaustion
-        return "Groq: ${text.take(200)}"
+        return "Groq: превышен лимит запросов (429)"
     }
 
     fun extractApiMessage(body: String): String? {

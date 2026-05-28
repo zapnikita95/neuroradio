@@ -51,7 +51,7 @@ export function classifyStoryLlmError(
     return {
       code: 'GEMINI_MODEL_UNAVAILABLE',
       message:
-        'Модель Gemini без бесплатной квоты (limit: 0) — выбери Gemini 2.0 Flash-Lite. Это не «ты всё потратил за день».',
+        'Google не выдал бесплатную квоту для выбранной модели Gemini. Выберите Gemini 2.0 Flash-Lite в настройках или попробуйте Groq.',
       httpStatus: 503,
     };
   }

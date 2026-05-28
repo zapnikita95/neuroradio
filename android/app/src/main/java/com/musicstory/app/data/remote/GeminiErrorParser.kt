@@ -2,50 +2,51 @@ package com.musicstory.app.data.remote
 
 import org.json.JSONObject
 
-/**
- * Gemini API returns 429 for RPM bursts, geo blocks, and free-tier quota = 0 — not only daily exhaustion.
- * Show the API message; never invent "лимит исчерпан".
- */
 object GeminiErrorParser {
 
-    fun parse(httpCode: Int, body: String): String {
+    fun parse(httpCode: Int, body: String, modelId: String? = null): String {
         val apiMessage = extractApiMessage(body)?.trim().orEmpty()
         val lower = (apiMessage.ifBlank { body }).lowercase()
+        val modelLabel = modelLabel(modelId)
 
         if (httpCode == 400 && lower.contains("api_key_invalid")) {
-            return "Неверный Gemini-ключ. Скопируй заново с aistudio.google.com/apikey"
+            return "Неверный Gemini-ключ. Скопируйте ключ заново с aistudio.google.com/apikey"
         }
 
         if (httpCode == 401 || httpCode == 403) {
-            return "Неверный Gemini-ключ. Скопируй заново с aistudio.google.com/apikey"
+            return "Неверный Gemini-ключ. Скопируйте ключ заново с aistudio.google.com/apikey"
         }
 
         if (lower.contains("user location is not supported") ||
             lower.contains("location is not supported")
         ) {
-            return "Gemini с телефона недоступен из твоей страны. Попробуй Gemini 2.0 Flash-Lite или генерацию через сервер Railway."
-        }
-
-        if (isFreeTierUnavailable(lower)) {
-            return "Gemini: бесплатная квота для этой модели = 0 (не «ты всё потратил»). Смени модель на 2.0 Flash-Lite."
-        }
-
-        if (httpCode == 429) {
-            if (apiMessage.isNotBlank()) {
-                return "Gemini (RPM/минутный лимит, не обязательно «день кончился»): ${apiMessage.take(180)}"
-            }
-            return "Gemini: лимит запросов в минуту (RPM) — подожди 1–2 мин."
+            return "Gemini недоступен из вашего региона. Попробуйте Groq или генерацию через сервер Railway."
         }
 
         if (httpCode == 404 || lower.contains("not found")) {
-            return "Модель Gemini недоступна. Выбери Gemini 2.0 Flash-Lite в настройках."
+            return "Модель $modelLabel недоступна. Выберите Gemini 2.0 Flash-Lite в настройках."
         }
 
         if (apiMessage.isNotBlank()) {
-            return "Gemini: ${apiMessage.take(200)}"
+            if (isFreeTierUnavailable(lower)) {
+                return if (isFlashLite(modelId)) {
+                    "Не удалось подключиться к Gemini ($modelLabel): $apiMessage. " +
+                        "Проверьте ключ на aistudio.google.com. Из РФ Gemini с телефона часто недоступен — попробуйте Groq."
+                } else {
+                    "Gemini: $apiMessage. Рекомендуем модель Gemini 2.0 Flash-Lite в настройках."
+                }
+            }
+            if (httpCode == 429) {
+                return "Gemini: $apiMessage"
+            }
+            return "Gemini: ${apiMessage.take(220)}"
         }
 
-        return "Gemini HTTP $httpCode"
+        if (httpCode == 429) {
+            return "Слишком много запросов к Gemini. Подождите минуту и попробуйте снова."
+        }
+
+        return "Gemini: ошибка сервиса (HTTP $httpCode)"
     }
 
     fun isFreeTierUnavailable(body: String): Boolean {
@@ -64,5 +65,15 @@ object GeminiErrorParser {
                 .find(body)?.groupValues?.get(1)
                 ?.replace("\\\"", "\"")
                 ?.takeIf { it.isNotBlank() }
+    }
+
+    private fun isFlashLite(modelId: String?): Boolean {
+        val id = modelId?.lowercase().orEmpty()
+        return id.contains("flash-lite")
+    }
+
+    private fun modelLabel(modelId: String?): String {
+        if (modelId.isNullOrBlank()) return "Gemini"
+        return modelId.removePrefix("gemini-").replace("-", " ")
     }
 }

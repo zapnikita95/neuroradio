@@ -31,10 +31,10 @@ export function resolveLlmProvider(override?: unknown): LlmProviderId {
   if (isKnownProvider(raw)) return raw;
   const fromEnv = process.env.LLM_PROVIDER?.trim().toLowerCase();
   if (fromEnv && isKnownProvider(fromEnv)) return fromEnv;
-  if (hasOpenRouterApiKey()) return 'openrouter';
   if (hasGroqApiKey()) return 'groq';
   if (hasGeminiApiKey()) return 'gemini';
-  return 'openrouter';
+  if (hasOpenRouterApiKey()) return 'openrouter';
+  return 'groq';
 }
 
 export function hasLlmKeyForProvider(provider: LlmProviderId, clientKeys?: ClientLlmKeys): boolean {

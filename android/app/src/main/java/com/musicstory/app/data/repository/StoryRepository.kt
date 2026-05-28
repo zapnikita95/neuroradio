@@ -35,6 +35,7 @@ import com.musicstory.app.domain.TtsEmotion
 import com.musicstory.app.domain.TtsSpeed
 import com.musicstory.app.domain.TtsVoice
 import com.musicstory.app.util.StoryLog
+import com.musicstory.app.util.ApiKeySanitizer
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -76,6 +77,17 @@ class StoryRepository(
         }
     }
 
+    /** Stories are blocked until the user saves a key for the selected LLM provider. */
+    suspend fun hasOwnApiKeyConfigured(): Boolean {
+        val provider = settingsDataStore.llmProvider.first()
+        return apiKeyForProvider(
+            provider,
+            ApiKeySanitizer.clean(settingsDataStore.groqApiKey.first()),
+            ApiKeySanitizer.clean(settingsDataStore.geminiApiKey.first()),
+            ApiKeySanitizer.clean(settingsDataStore.openRouterApiKey.first()),
+        ).isNotBlank()
+    }
+
     suspend fun checkConnections(
         llmProvider: LlmProvider,
         groqApiKey: String,
@@ -92,9 +104,9 @@ class StoryRepository(
             apiClient,
             backendUrl.trim(),
             llmProvider,
-            groqApiKey.trim(),
-            geminiApiKey.trim(),
-            openRouterApiKey.trim(),
+            groqApiKey = ApiKeySanitizer.clean(groqApiKey),
+            geminiApiKey = ApiKeySanitizer.clean(geminiApiKey),
+            openRouterApiKey = ApiKeySanitizer.clean(openRouterApiKey),
             geminiModel.id,
             groqModel.resolveApiModelId(groqCustomModelId) ?: groqModel.id,
             openRouterModel.resolveApiModelId(openRouterCustomModelId) ?: openRouterModel.id,
@@ -146,9 +158,9 @@ class StoryRepository(
 
         val backendUrl = settingsDataStore.backendUrl.first().trim()
         val llmProvider = settingsDataStore.llmProvider.first()
-        val groqKey = settingsDataStore.groqApiKey.first().trim()
-        val geminiKey = settingsDataStore.geminiApiKey.first().trim()
-        val openRouterKey = settingsDataStore.openRouterApiKey.first().trim()
+        val groqKey = ApiKeySanitizer.clean(settingsDataStore.groqApiKey.first())
+        val geminiKey = ApiKeySanitizer.clean(settingsDataStore.geminiApiKey.first())
+        val openRouterKey = ApiKeySanitizer.clean(settingsDataStore.openRouterApiKey.first())
         val groqModel = settingsDataStore.groqModel.first()
         val groqCustomModelId = settingsDataStore.groqCustomModelId.first()
         val openRouterModel = settingsDataStore.openRouterModel.first()
@@ -219,6 +231,9 @@ class StoryRepository(
                 groqCustomModelId = groqCustomModelId,
                 openRouterModel = openRouterModel,
                 openRouterCustomModelId = openRouterCustomModelId,
+                groqApiKey = groqKey,
+                geminiApiKey = geminiKey,
+                openRouterApiKey = openRouterKey,
             )) {
                 is StoryAttemptResult.Success -> return Result.success(backendResult.response)
                 is StoryAttemptResult.TemplateRejected -> templateRejected = true
@@ -451,10 +466,19 @@ class StoryRepository(
         groqCustomModelId: String,
         openRouterModel: OpenRouterModel,
         openRouterCustomModelId: String,
+        groqApiKey: String = "",
+        geminiApiKey: String = "",
+        openRouterApiKey: String = "",
     ): StoryAttemptResult {
         return try {
             StoryLog.i(
-                "Fetching story from backend: $backendUrl (llm=${llmProvider.id})",
+                "Fetching story from backend: $backendUrl (llm=${llmProvider.id}, ownKey=${
+                    when (llmProvider) {
+                        LlmProvider.GROQ -> groqApiKey.isNotBlank()
+                        LlmProvider.GEMINI -> geminiApiKey.isNotBlank()
+                        LlmProvider.OPENROUTER -> openRouterApiKey.isNotBlank()
+                    }
+                })",
             )
             val response = withTimeout(BACKEND_TIMEOUT_MS) {
                 apiClient.fetchFullStory(
@@ -472,6 +496,9 @@ class StoryRepository(
                         geminiModel = geminiModel.id,
                         groqModel = groqModel.resolveApiModelId(groqCustomModelId),
                         openRouterModel = openRouterModel.resolveApiModelId(openRouterCustomModelId),
+                        groqApiKey = groqApiKey.takeIf { it.isNotBlank() },
+                        geminiApiKey = geminiApiKey.takeIf { it.isNotBlank() },
+                        openRouterApiKey = openRouterApiKey.takeIf { it.isNotBlank() },
                     ),
                 )
             }
@@ -605,9 +632,9 @@ class StoryRepository(
                         code == "GROQ_NOT_CONFIGURED" ||
                         message.contains("Groq", ignoreCase = true)
                     ) ->
-                    "Сервер ещё на старом Groq-бэкенде. Добавь свой Gemini-ключ или задеплой новый бэкенд на Railway."
+                    "Сервер использовал Groq вместо Gemini. Сохраните Gemini-ключ и нажмите «Сохранить и проверить»."
                 GroqErrorParser.isAuthError(message) ->
-                    "Неверный API-ключ на сервере — добавь свой ${llmProvider.labelRu}-ключ в настройках."
+                    "Неверный API-ключ ${llmProvider.labelRu}. Проверьте ключ в настройках."
                 else -> message.take(200)
             }
         }.getOrNull()
@@ -616,13 +643,8 @@ class StoryRepository(
     private fun sanitizeBackendError(message: String?, llmProvider: LlmProvider): String? {
         if (message.isNullOrBlank()) return null
         if (llmProvider != LlmProvider.GEMINI) return message
-        if (message.contains("Groq", ignoreCase = true) &&
-            (message.contains("лимит", ignoreCase = true) || message.contains("limit", ignoreCase = true))
-        ) {
-            return "Ошибка сервера (Groq), а у тебя выбран Gemini. Сохрани Gemini-ключ в настройках — истории пойдут с телефона, минуя сервер."
-        }
         if (message.contains("Groq", ignoreCase = true)) {
-            return "Сервер ответил про Groq, хотя выбран Gemini. Сохрани Gemini-ключ или обнови бэкенд на Railway."
+            return "Сервер ответил про Groq, хотя выбран Gemini. Сохраните Gemini-ключ в настройках."
         }
         return message
     }

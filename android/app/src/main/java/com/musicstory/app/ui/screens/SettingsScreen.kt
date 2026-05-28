@@ -68,6 +68,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.musicstory.app.MusicStoryApp
 import com.musicstory.app.util.StoryLog
+import com.musicstory.app.util.ApiKeySanitizer
 import com.musicstory.app.R
 import com.musicstory.app.data.local.SettingsDataStore
 import com.musicstory.app.data.remote.ConnectionCheckResult
@@ -122,7 +123,7 @@ fun SettingsScreen(
     val groqApiKey by settings.groqApiKey.collectAsState(initial = "")
     val geminiApiKey by settings.geminiApiKey.collectAsState(initial = "")
     val openRouterApiKey by settings.openRouterApiKey.collectAsState(initial = "")
-    val llmProvider by settings.llmProvider.collectAsState(initial = LlmProvider.OPENROUTER)
+    val llmProvider by settings.llmProvider.collectAsState(initial = LlmProvider.GROQ)
     val geminiModel by settings.geminiModel.collectAsState(initial = GeminiModel.defaultRecommended)
     val groqModel by settings.groqModel.collectAsState(initial = GroqModel.defaultRecommended)
     val groqCustomModelId by settings.groqCustomModelId.collectAsState(initial = "")
@@ -261,6 +262,8 @@ fun SettingsScreen(
         groqApiKey,
         geminiInput,
         geminiApiKey,
+        openRouterInput,
+        openRouterApiKey,
         llmProvider,
         nInput,
         everyN,
@@ -270,22 +273,17 @@ fun SettingsScreen(
         musicFadeInput,
         musicFadeSeconds,
     ) {
-        groqInput.trim() != groqApiKey.trim() ||
-            geminiInput.trim() != geminiApiKey.trim() ||
+        ApiKeySanitizer.clean(groqInput) != ApiKeySanitizer.clean(groqApiKey) ||
+            ApiKeySanitizer.clean(geminiInput) != ApiKeySanitizer.clean(geminiApiKey) ||
+            ApiKeySanitizer.clean(openRouterInput) != ApiKeySanitizer.clean(openRouterApiKey) ||
             sameTrackInput.toIntOrNull() != sameTrackEveryN ||
             musicFadeInput.toFloatOrNull()?.coerceIn(0.5f, 8f) != musicFadeSeconds ||
             (triggerMode == TriggerMode.EVERY_N_TRACKS && nInput.toIntOrNull() != everyN)
     }
 
-    LaunchedEffect(groqApiKey, geminiApiKey, openRouterApiKey, llmProvider) {
-        val hasOwnKey = when (llmProvider) {
-            LlmProvider.GROQ -> groqApiKey.isNotBlank()
-            LlmProvider.GEMINI -> geminiApiKey.isNotBlank()
-            LlmProvider.OPENROUTER -> openRouterApiKey.isNotBlank()
-        }
-        if (!hasOwnKey) {
-            app.storyRepository.refreshQuota()
-        }
+    LaunchedEffect(activeApiInput, llmProvider) {
+        checkSummary = null
+        checkResult = null
     }
 
     val fieldColors = OutlinedTextFieldDefaults.colors(
@@ -979,6 +977,8 @@ fun SettingsScreen(
                                             LlmProvider.GEMINI -> geminiInput = ""
                                             LlmProvider.OPENROUTER -> openRouterInput = ""
                                         }
+                                        checkSummary = null
+                                        checkResult = null
                                     },
                                 ) {
                                     Icon(
@@ -1004,53 +1004,71 @@ fun SettingsScreen(
                                 isChecking = true
                                 checkResult = null
                                 checkSummary = null
-                                settings.setGroqApiKey(groqInput)
-                                settings.setGeminiApiKey(geminiInput)
-                                settings.setOpenRouterApiKey(openRouterInput)
-                                settings.setGroqCustomModelId(groqCustomInput)
-                                settings.setOpenRouterCustomModelId(openRouterCustomInput)
-                                val backendUrl = settings.backendUrl.first()
-                                app.backendAuthManager.invalidateToken()
-                                app.apiClient.invalidateCache()
-                                val result = app.storyRepository.checkConnections(
-                                    llmProvider = llmProvider,
-                                    groqApiKey = groqInput,
-                                    geminiApiKey = geminiInput,
-                                    openRouterApiKey = openRouterInput,
-                                    geminiModel = geminiModel,
-                                    groqModel = groqModel,
-                                    groqCustomModelId = groqCustomInput,
-                                    openRouterModel = openRouterModel,
-                                    openRouterCustomModelId = openRouterCustomInput,
-                                    backendUrl = backendUrl,
-                                )
-                                checkResult = result
-                                val checkedKey = when (llmProvider) {
-                                    LlmProvider.GROQ -> groqInput.trim()
-                                    LlmProvider.GEMINI -> geminiInput.trim()
-                                    LlmProvider.OPENROUTER -> openRouterInput.trim()
+                                try {
+                                    val cleanGroq = ApiKeySanitizer.clean(groqInput)
+                                    val cleanGemini = ApiKeySanitizer.clean(geminiInput)
+                                    val cleanOpenRouter = ApiKeySanitizer.clean(openRouterInput)
+                                    groqInput = cleanGroq
+                                    geminiInput = cleanGemini
+                                    openRouterInput = cleanOpenRouter
+                                    settings.setGroqApiKey(cleanGroq)
+                                    settings.setGeminiApiKey(cleanGemini)
+                                    settings.setOpenRouterApiKey(cleanOpenRouter)
+                                    settings.setGroqCustomModelId(groqCustomInput)
+                                    settings.setOpenRouterCustomModelId(openRouterCustomInput)
+
+                                    val checkedKey = when (llmProvider) {
+                                        LlmProvider.GROQ -> cleanGroq
+                                        LlmProvider.GEMINI -> cleanGemini
+                                        LlmProvider.OPENROUTER -> cleanOpenRouter
+                                    }
+                                    if (checkedKey.isBlank()) {
+                                        checkSummary =
+                                            "Сначала вставь API-ключ, потом нажми «Сохранить и проверить»"
+                                        StoryLog.i("SETTINGS API test skipped: no key for ${llmProvider.id}")
+                                        return@launch
+                                    }
+
+                                    StoryLog.i("SETTINGS API test start provider=${llmProvider.id}")
+                                    val backendUrl = settings.backendUrl.first()
+                                    app.backendAuthManager.invalidateToken()
+                                    app.apiClient.invalidateCache()
+                                    val result = app.storyRepository.checkConnections(
+                                        llmProvider = llmProvider,
+                                        groqApiKey = cleanGroq,
+                                        geminiApiKey = cleanGemini,
+                                        openRouterApiKey = cleanOpenRouter,
+                                        geminiModel = geminiModel,
+                                        groqModel = groqModel,
+                                        groqCustomModelId = groqCustomInput,
+                                        openRouterModel = openRouterModel,
+                                        openRouterCustomModelId = openRouterCustomInput,
+                                        backendUrl = backendUrl,
+                                    )
+                                    checkResult = result
+                                    checkSummary = when {
+                                        result.llmOk == true ->
+                                            result.llmMessage ?: context.getString(R.string.settings_groq_test_ok)
+                                        result.llmOk == false ->
+                                            result.llmMessage ?: context.getString(R.string.settings_groq_test_fail)
+                                        result.backendOk ->
+                                            result.backendMessage ?: context.getString(R.string.settings_groq_test_ok)
+                                        else ->
+                                            result.llmMessage ?: result.backendMessage
+                                                ?: context.getString(R.string.settings_groq_test_fail)
+                                    }
+                                } catch (e: Exception) {
+                                    StoryLog.e("SETTINGS API test failed: ${e.message}", e)
+                                    checkSummary = e.message ?: context.getString(R.string.settings_groq_test_fail)
+                                } finally {
+                                    isChecking = false
                                 }
-                                checkSummary = when {
-                                    checkedKey.isNotBlank() && result.llmOk == true ->
-                                        result.llmMessage ?: context.getString(R.string.settings_groq_test_ok)
-                                    checkedKey.isBlank() && result.backendOk ->
-                                        context.getString(R.string.settings_groq_test_ok)
-                                    checkedKey.isNotBlank() && result.llmOk == false ->
-                                        result.llmMessage ?: context.getString(R.string.settings_groq_test_fail)
-                                    result.backendOk ->
-                                        result.backendMessage ?: context.getString(R.string.settings_groq_test_ok)
-                                    else ->
-                                        result.llmMessage ?: result.backendMessage
-                                            ?: context.getString(R.string.settings_groq_test_fail)
-                                }
-                                isChecking = false
                             }
                         },
                     )
                     checkSummary?.let { summary ->
                         Spacer(modifier = Modifier.height(8.dp))
-                        val checkOk = checkResult?.llmOk == true ||
-                            (activeApiInput.isBlank() && checkResult?.backendOk == true)
+                        val checkOk = checkResult?.llmOk == true
                         Text(
                             text = summary,
                             style = MaterialTheme.typography.labelMedium,
@@ -1086,24 +1104,34 @@ fun SettingsScreen(
                         scope.launch {
                             isSaving = true
                             saveFeedback = null
-                            nInput.toIntOrNull()?.let { settings.setEveryNTracks(it) }
-                            sameTrackInput.toIntOrNull()?.let { settings.setSameTrackStoryEveryN(it) }
-                            settings.setMusicInterruptionMode(musicInterruptionMode)
-                            musicFadeInput.toFloatOrNull()?.let { settings.setMusicFadeSeconds(it) }
-                            settings.setGroqApiKey(groqInput)
-                            settings.setGeminiApiKey(geminiInput)
-                            settings.setOpenRouterApiKey(openRouterInput)
-                            settings.setGroqCustomModelId(groqCustomInput)
-                            settings.setOpenRouterCustomModelId(openRouterCustomInput)
-                            app.backendAuthManager.invalidateToken()
-                            app.apiClient.invalidateCache()
-                            app.triggerEngine.resetCounter()
-                            app.storyRepository.refreshQuota()
-                            isSaving = false
-                            saveFeedback = context.getString(R.string.settings_saved)
-                            delay(2500)
-                            if (saveFeedback == context.getString(R.string.settings_saved)) {
-                                saveFeedback = null
+                            try {
+                                nInput.toIntOrNull()?.let { settings.setEveryNTracks(it) }
+                                sameTrackInput.toIntOrNull()?.let { settings.setSameTrackStoryEveryN(it) }
+                                settings.setMusicInterruptionMode(musicInterruptionMode)
+                                musicFadeInput.toFloatOrNull()?.let { settings.setMusicFadeSeconds(it) }
+                                val cleanGroq = ApiKeySanitizer.clean(groqInput)
+                                val cleanGemini = ApiKeySanitizer.clean(geminiInput)
+                                val cleanOpenRouter = ApiKeySanitizer.clean(openRouterInput)
+                                groqInput = cleanGroq
+                                geminiInput = cleanGemini
+                                openRouterInput = cleanOpenRouter
+                                settings.setGroqApiKey(cleanGroq)
+                                settings.setGeminiApiKey(cleanGemini)
+                                settings.setOpenRouterApiKey(cleanOpenRouter)
+                                settings.setGroqCustomModelId(groqCustomInput)
+                                settings.setOpenRouterCustomModelId(openRouterCustomInput)
+                                app.triggerEngine.resetCounter()
+                                StoryLog.i("SETTINGS saved (no auto API test)")
+                                saveFeedback = context.getString(R.string.settings_saved)
+                                delay(2500)
+                                if (saveFeedback == context.getString(R.string.settings_saved)) {
+                                    saveFeedback = null
+                                }
+                            } catch (e: Exception) {
+                                StoryLog.e("SETTINGS save failed: ${e.message}", e)
+                                saveFeedback = e.message ?: context.getString(R.string.settings_groq_test_fail)
+                            } finally {
+                                isSaving = false
                             }
                         }
                     },
