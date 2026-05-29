@@ -98,7 +98,7 @@ export function finalizeAfterQualityLoop<T extends { script: string }>(
   const wordCount = countWords(sanitized);
   const relax = options.relaxForWeakLlm ?? false;
   if (!relax) {
-    const water = findWateryContent(sanitized, input.artist, input.title);
+    const water = findWateryContent(sanitized, input.artist, input.title, referenceFacts);
     if (water) {
       logRejectedScript('last script rejected as water', sanitized, water);
       return null;

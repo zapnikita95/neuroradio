@@ -290,7 +290,7 @@ export function validateStoryScript(
     if (ungrounded) {
       return { ok: false, reason: ungrounded };
     }
-    const waterIssue = findWateryContent(trimmed, artist, title);
+    const waterIssue = findWateryContent(trimmed, artist, title, referenceFacts);
     if (waterIssue) {
       return { ok: false, reason: waterIssue };
     }
@@ -449,7 +449,12 @@ export function findClicheFiller(script: string): string | null {
 }
 
 /** Reject generic filler — artist name alone is not enough. */
-export function findWateryContent(script: string, artist = '', title = ''): string | null {
+export function findWateryContent(
+  script: string,
+  artist = '',
+  title = '',
+  referenceFacts: string[] = [],
+): string | null {
   const fiction = findGenericFiction(script);
   if (fiction) return fiction;
 
@@ -464,6 +469,15 @@ export function findWateryContent(script: string, artist = '', title = ''): stri
   }
   if (findClicheFiller(stripped)) {
     return 'only artist/title with cliche filler';
+  }
+
+  if (referenceFacts.length > 0 && anchorsReferenceFact(script, referenceFacts)) {
+    return null;
+  }
+
+  const words = countWords(script);
+  if (words >= 65 && hasConcreteFact(script, artist, title)) {
+    return null;
   }
 
   if (hasConcreteFact(stripped, '', '')) return null;

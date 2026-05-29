@@ -149,13 +149,19 @@ async function fetchMusicBrainzAnnotationsUnfiltered(
   const id = mbid?.trim();
   if (!id) return [];
   const url = `https://musicbrainz.org/ws/2/${entity}/${id}?inc=annotations&fmt=json`;
-  for (let attempt = 0; attempt < 2; attempt++) {
+  for (let attempt = 0; attempt < 4; attempt++) {
     try {
       const response = await fetch(url, {
         headers: { 'User-Agent': USER_AGENT, Accept: 'application/json' },
-        signal: AbortSignal.timeout(8000),
+        signal: AbortSignal.timeout(15_000),
       });
-      if (!response.ok) return [];
+      if (!response.ok) {
+        if (response.status >= 500 && attempt < 3) {
+          await new Promise((r) => setTimeout(r, 600 * (attempt + 1)));
+          continue;
+        }
+        return [];
+      }
       const data = (await response.json()) as { annotations?: Array<{ annotation?: string }> };
       const texts: string[] = [];
       for (const item of data.annotations ?? []) {
@@ -170,8 +176,8 @@ async function fetchMusicBrainzAnnotationsUnfiltered(
       }
       return texts;
     } catch (err) {
-      if (attempt === 0) {
-        await new Promise((r) => setTimeout(r, 400));
+      if (attempt < 3) {
+        await new Promise((r) => setTimeout(r, 600 * (attempt + 1)));
         continue;
       }
       console.warn(
@@ -223,7 +229,14 @@ export async function fetchAggregatedFactContext(
   recordingMbid?: string,
   artistMbid?: string,
 ): Promise<AggregatedFactContext> {
-  const wiki = await fetchWikipediaBundle(artist, title, countryCode);
+  let wiki = await fetchWikipediaBundle(artist, title, countryCode);
+  if (wiki.trackFacts.length < 2) {
+    const wikiEn = await fetchWikipediaBundle(artist, title, 'US');
+    wiki = {
+      trackFacts: mergeFacts(wiki.trackFacts, wikiEn.trackFacts),
+      artistFacts: mergeFacts(wiki.artistFacts, wikiEn.artistFacts),
+    };
+  }
   const [ddgUnfiltered, wdUnfiltered, mbTrackRaw, mbArtistRaw] = await Promise.all([
     fetchDuckDuckGoUnfiltered(artist, title),
     fetchWikidataUnfiltered(artist, title, countryCode),

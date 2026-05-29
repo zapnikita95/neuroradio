@@ -392,6 +392,7 @@ export async function generateStoryScript(
     { artist: input.artist, title: input.title },
     (s) => finalizeStory(s, { ...input, voiceId }, storyLength),
     referenceFacts,
+    { relaxForWeakLlm: true },
   );
   if (fallback) {
     const hard = validateGeminiHardQuality(fallback.script, input, storyLength, referenceFacts);
