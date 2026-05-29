@@ -19,6 +19,10 @@ export function requestLogger(req: Request, res: Response, next: NextFunction): 
   const method = req.method;
   const path = req.originalUrl;
 
+  const install = req.installId?.slice(0, 8) ?? '-';
+  const ip = req.ip ?? req.socket.remoteAddress ?? '?';
+  console.log(`[http] --> ${method} ${path} from=${ip} install=${install}`);
+
   res.on('finish', () => {
     const ms = Date.now() - started;
     const install = req.installId?.slice(0, 8) ?? '-';

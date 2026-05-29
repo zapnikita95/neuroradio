@@ -25,18 +25,21 @@ function bearerToken(req: Request): string | null {
 export function requireAppAuth(req: Request, res: Response, next: NextFunction): void {
   const jwtSecret = getAuthJwtSecret();
   if (!jwtSecret) {
+    console.warn(`[auth] 503 no JWT secret path=${req.originalUrl}`);
     res.status(503).json({ error: 'Server auth is not configured' });
     return;
   }
 
   const token = bearerToken(req);
   if (!token) {
+    console.warn(`[auth] 401 no token path=${req.originalUrl} ip=${req.ip}`);
     res.status(401).json({ error: 'Unauthorized' });
     return;
   }
 
   const payload = verifyJwt(token, jwtSecret);
   if (!payload) {
+    console.warn(`[auth] 401 bad token path=${req.originalUrl} ip=${req.ip}`);
     res.status(401).json({ error: 'Unauthorized' });
     return;
   }

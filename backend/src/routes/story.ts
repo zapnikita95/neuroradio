@@ -80,7 +80,7 @@ router.get('/quota', (req: Request, res: Response) => {
         ? 'Без лимитов на этом устройстве.'
         : tier === 'premium'
           ? premiumUpsellHintRu(tier)
-          : `${premiumUpsellHintRu(tier)} Свой Groq-ключ в приложении — без дневного лимита на сервере (Groq с телефона).`,
+          : `${premiumUpsellHintRu(tier)} Свой API-ключ в приложении — без дневного лимита (запросы идут через Railway).`,
     premiumTtsReady: canUseAzureSpeechProduction(),
     azureSpeech: hasAzureSpeechCredentials() && isAzureSpeechEnabled(),
   });

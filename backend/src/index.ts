@@ -1,8 +1,10 @@
+import './bootstrap-logs.js';
 import './load-env.js';
 import express from 'express';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import storyRouter from './routes/story.js';
+import llmProbeRouter from './routes/llm-probe.js';
 import authRouter from './routes/auth.js';
 import syncRouter from './routes/sync.js';
 import { isAppAuthEnabled } from './services/jwt.js';
@@ -10,7 +12,13 @@ import { AUDIO_DIR } from './services/yandex-tts.js';
 import { hasGroqApiKey } from './services/groq.js';
 import { hasOpenRouterApiKey } from './services/openrouter.js';
 import { hasGeminiApiKey } from './services/gemini.js';
-import { hasLocalOllamaConfigured } from './services/local-ollama.js';
+import {
+  checkOllamaHealth,
+  hasLocalOllamaConfigured,
+  resolveLocalOllamaBaseUrl,
+  resolveLocalOllamaModel,
+  testOllamaChat,
+} from './services/local-ollama.js';
 import { resolveLlmProvider } from './services/llm-provider.js';
 import { hasYandexCredentials } from './services/yandex-tts.js';
 import { securityHeaders } from './middleware/security-headers.js';
@@ -48,6 +56,58 @@ app.use('/audio', requireSignedAudioAccess, express.static(AUDIO_DIR, {
   maxAge: 0,
 }));
 
+/** Probe Ollama from BFF host (phone cannot reach LAN Ollama directly). */
+app.get('/health/ollama', async (req, res) => {
+  const urlParam = typeof req.query.url === 'string' ? req.query.url : undefined;
+  const modelParam = typeof req.query.model === 'string' ? req.query.model : undefined;
+  const baseUrl = resolveLocalOllamaBaseUrl(urlParam);
+  const model = resolveLocalOllamaModel(modelParam);
+  const tags = await checkOllamaHealth(baseUrl);
+  if (!tags.ok) {
+    res.status(503).json({
+      ok: false,
+      baseUrl,
+      model,
+      models: tags.models,
+      message: tags.message,
+    });
+    return;
+  }
+  const modelFound =
+    tags.models.includes(model) ||
+    tags.models.some((m) => m.startsWith(`${model}:`) || m === model);
+  if (!modelFound) {
+    res.status(503).json({
+      ok: false,
+      baseUrl,
+      model,
+      models: tags.models,
+      message: `Model not found: ${model}`,
+    });
+    return;
+  }
+  try {
+    const sample = await testOllamaChat(baseUrl, model);
+    res.json({
+      ok: true,
+      baseUrl,
+      model,
+      models: tags.models,
+      message: `Ollama OK — ${model}`,
+      sample: sample.slice(0, 40),
+    });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    res.status(503).json({
+      ok: false,
+      baseUrl,
+      model,
+      models: tags.models,
+      message,
+    });
+  }
+});
+
 app.get('/health', (_req, res) => {
   const llm = resolveLlmProvider();
   const openrouter = hasOpenRouterApiKey();
@@ -75,6 +135,7 @@ app.get('/health', (_req, res) => {
 
 app.use('/v1/auth', authRouter);
 app.use('/v1/sync', syncRouter);
+app.use('/v1/llm', llmProbeRouter);
 app.use('/v1/story', storyRouter);
 
 app.use((_req, res) => {
@@ -83,14 +144,22 @@ app.use((_req, res) => {
 
 const server = app.listen(PORT, '0.0.0.0', () => {
   console.log(`Music Story BFF listening on http://0.0.0.0:${PORT}`);
+  console.log(`[boot] log file: ${process.env.LOCAL_LOG_FILE ?? '(console only)'}`);
   console.log(
     `[boot] build=${BUILD_ID} llm=${resolveLlmProvider()} openrouter=${hasOpenRouterApiKey()} groq=${hasGroqApiKey()} gemini=${hasGeminiApiKey()} yandexTts=${hasYandexCredentials()} auth=${isAppAuthEnabled()}`,
   );
   console.log(`  POST /v1/auth/token — app JWT`);
   console.log(`  GET  /v1/sync/* — linked account settings & history`);
+  console.log(`  POST /v1/llm/probe — test LLM key via BFF (no key logging)`);
   console.log(`  POST /v1/story/full — story + optional Yandex TTS`);
   console.log(`  GET  /health — health check`);
   console.log(`  GET  /audio/* — signed audio only`);
+  console.log(`[boot] phone backend URL must be http://YOUR_PC_IP:${PORT} (not Railway)`);
+});
+
+server.on('connection', (socket) => {
+  const peer = `${socket.remoteAddress ?? '?'}:${socket.remotePort ?? '?'}`;
+  console.log(`[tcp] connect ${peer}`);
 });
 
 function shutdown(signal: string): void {

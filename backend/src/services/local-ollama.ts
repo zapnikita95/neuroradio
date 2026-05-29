@@ -1,6 +1,7 @@
 import fetch from 'node-fetch';
 
-export const DEFAULT_LOCAL_OLLAMA_BASE_URL = 'http://10.196.221.190:11435';
+/** As seen from BFF host (same PC as start-local-bff.bat). Override via env or app body. */
+export const DEFAULT_LOCAL_OLLAMA_BASE_URL = 'http://127.0.0.1:11435';
 export const DEFAULT_LOCAL_OLLAMA_MODEL = 'qwen3.6:35b-a3b-q4_K_M';
 
 export class LocalOllamaError extends Error {

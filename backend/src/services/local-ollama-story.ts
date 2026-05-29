@@ -70,7 +70,7 @@ import {
 
 
 
-const MAX_NARRATOR_ATTEMPTS = 8;
+const MAX_NARRATOR_ATTEMPTS = 5;
 
 
 
