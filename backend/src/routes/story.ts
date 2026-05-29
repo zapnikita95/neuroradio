@@ -87,16 +87,23 @@ router.get('/quota', (req: Request, res: Response) => {
 });
 
 router.post('/full', validateStoryFullBody, async (req: Request, res: Response) => {
-  const requestedProviderRaw = (req.body as StoryFullBody).llm_provider;
-  const llmProvider = resolveLlmProvider((req.body as StoryFullBody).llm_provider);
+  const installId = req.installId ?? 'unknown';
+  const body = req.body as StoryFullBody;
+  console.log(
+    `[story] <<< request install=${installId.slice(0, 8)} llm=${body.llm_provider ?? 'missing'} ` +
+      `artist="${body.artist}" title="${body.title}"`,
+  );
+
+  const requestedProviderRaw = body.llm_provider;
+  const llmProvider = resolveLlmProvider(body.llm_provider);
   const clientLlmKeys: ClientLlmKeys = {
-    groq: (req.body as StoryFullBody).groq_api_key,
-    gemini: (req.body as StoryFullBody).gemini_api_key,
-    openrouter: (req.body as StoryFullBody).openrouter_api_key,
+    groq: body.groq_api_key,
+    gemini: body.gemini_api_key,
+    openrouter: body.openrouter_api_key,
   };
   const clientLocal: ClientLocalOllama = {
-    baseUrl: (req.body as StoryFullBody).local_ollama_url,
-    model: (req.body as StoryFullBody).local_ollama_model,
+    baseUrl: body.local_ollama_url,
+    model: body.local_ollama_model,
   };
   const ownLlmKey = llmProvider === 'local'
     ? Boolean(clientLocal.baseUrl?.trim())
@@ -142,7 +149,6 @@ router.post('/full', validateStoryFullBody, async (req: Request, res: Response) 
   const geminiModel = (req.body as StoryFullBody).gemini_model;
   const groqModel = (req.body as StoryFullBody).groq_model;
   const openrouterModel = (req.body as StoryFullBody).openrouter_model;
-  const installId = req.installId ?? 'unknown';
 
   const modelLog =
     llmProvider === 'local'
@@ -272,6 +278,10 @@ router.post('/full', validateStoryFullBody, async (req: Request, res: Response) 
       previousScripts,
       referenceFacts,
       selectedReferenceFact: selectedFact ?? undefined,
+      rawSnippets:
+        referenceFacts.length <= 1 && factCtx.rawSnippets.length > 0
+          ? factCtx.rawSnippets
+          : undefined,
       geminiModel,
       groqModel,
       openRouterModel: openrouterModel,

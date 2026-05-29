@@ -28,7 +28,7 @@ import {
 } from './story-generate-loop.js';
 
 const GEMINI_API_BASE = 'https://generativelanguage.googleapis.com/v1beta/models';
-const MAX_ATTEMPTS = 3;
+const MAX_ATTEMPTS = 1;
 const GEMINI_FALLBACK_MODEL = 'gemini-2.0-flash-lite';
 
 function sleep(ms: number): Promise<void> {
@@ -53,6 +53,7 @@ export interface GenerateStoryInput {
   previousScripts?: string[];
   referenceFacts?: string[];
   selectedReferenceFact?: { fact: string; scope: 'artist' | 'track'; scopeLabelRu: string };
+  rawSnippets?: string[];
   geminiModel?: string;
   clientGeminiApiKey?: string;
 }
@@ -315,75 +316,38 @@ export async function generateStoryScript(
   const systemPrompt = buildSystemPrompt(persona, lengthPreset);
   const voiceId = input.voiceId ?? voiceForYear(input.year, input.genre);
 
-  let retryReason: string | undefined;
-  let geminiModelIndex = 0;
   let lastCandidate: StoryScript | null = null;
+  const geminiModelIndex = 0;
 
   for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
-    const basePrompt = buildStoryUserPrompt({
+    const userPrompt = buildStoryUserPrompt({
       ...input,
       voiceId,
       storyLength,
       previousScripts,
-      retryReason,
       selectedReferenceFact: input.selectedReferenceFact,
     });
-    const retryDirective = buildRetryDirective(retryReason, lengthPreset.wordsMin);
-    const userPrompt = retryDirective
-      ? `${basePrompt}\n\nКРИТИЧЕСКАЯ ПРАВКА:\n${retryDirective}`
-      : basePrompt;
 
-    let content: string;
-    try {
-      const result = await callGemini(
-        systemPrompt,
-        userPrompt,
-        lengthPreset.maxTokens,
-        input.geminiModel,
-        geminiModelIndex,
-        input.clientGeminiApiKey,
-      );
-      content = result.content;
-      const idx = geminiModelsToTry(input.geminiModel).indexOf(result.model);
-      if (idx >= 0) geminiModelIndex = idx;
-    } catch (err) {
-      const status = (err as { status?: number }).status;
-      const tryNext = (err as { tryNextModel?: boolean }).tryNextModel;
-      const models = geminiModelsToTry(input.geminiModel);
-
-      if (status === 429) {
-        const waitMs = 2000 + attempt * 1200;
-        if (attempt < MAX_ATTEMPTS - 1) {
-          console.warn(`[gemini] 429 on ${models[geminiModelIndex]} — wait ${waitMs}ms, retry same model`);
-          await sleep(waitMs);
-          continue;
-        }
-        throw err;
-      }
-
-      if (tryNext && geminiModelIndex + 1 < models.length) {
-        geminiModelIndex += 1;
-        console.warn(
-          `[gemini] model unavailable — fallback ${models[geminiModelIndex]} (attempt ${attempt + 1})`,
-        );
-        continue;
-      }
-      throw err;
-    }
+    const result = await callGemini(
+      systemPrompt,
+      userPrompt,
+      lengthPreset.maxTokens,
+      input.geminiModel,
+      geminiModelIndex,
+      input.clientGeminiApiKey,
+    );
+    console.log(`[gemini] single-shot story model=${result.model}`);
+    const content = result.content;
     const story = parseStoryJson(content);
     if (!story) {
-      retryReason = 'invalid JSON';
-      continue;
+      throw new Error('Gemini returned invalid story JSON');
     }
 
     story.voiceId = voiceId;
     story.word_count = countWords(story.script);
 
     const qOpts = qualityOptionsForAttempt(attempt, MAX_ATTEMPTS, referenceFacts);
-    if (attempt >= MAX_ATTEMPTS - 1) {
-      // Last Gemini attempt: avoid hard 500 on anchor-parsing edge cases.
-      qOpts.skipReferenceAnchor = true;
-    }
+    qOpts.skipReferenceAnchor = true;
 
     const quality = validateGeneratedStory(
       story.script,
@@ -397,35 +361,30 @@ export async function generateStoryScript(
       if (hard.ok) {
         return finalizeStory(story, { ...input, voiceId }, storyLength);
       }
-      retryReason = hard.reason;
       lastCandidate = story;
-      console.warn(`Gemini hard-quality reject (attempt ${attempt + 1}): ${retryReason}`);
-      continue;
-    }
-
-    const sanitized = sanitizeScriptForTts(story.script, input.artist, input.title);
-    const sanitizedQuality = validateGeneratedStory(
-      sanitized,
-      storyLength,
-      input.artist,
-      input.title,
-      qOpts,
-    );
-    if (sanitizedQuality.ok) {
-      const hard = validateGeminiHardQuality(sanitized, input, storyLength, referenceFacts);
-      if (hard.ok) {
-        console.warn(`Gemini story sanitized after attempt ${attempt + 1}: ${quality.reason}`);
-        return finalizeStory({ ...story, script: sanitized }, { ...input, voiceId }, storyLength);
+      console.warn(`Gemini hard-quality reject (single-shot): ${hard.reason}`);
+    } else {
+      const sanitized = sanitizeScriptForTts(story.script, input.artist, input.title);
+      const sanitizedQuality = validateGeneratedStory(
+        sanitized,
+        storyLength,
+        input.artist,
+        input.title,
+        qOpts,
+      );
+      if (sanitizedQuality.ok) {
+        const hard = validateGeminiHardQuality(sanitized, input, storyLength, referenceFacts);
+        if (hard.ok) {
+          console.warn(`Gemini story sanitized (single-shot): ${quality.reason}`);
+          return finalizeStory({ ...story, script: sanitized }, { ...input, voiceId }, storyLength);
+        }
+        lastCandidate = { ...story, script: sanitized };
+        console.warn(`Gemini hard-quality reject (single-shot): ${hard.reason}`);
+      } else {
+        lastCandidate = { ...story, script: sanitized };
+        console.warn(`Gemini story quality reject (single-shot): ${sanitizedQuality.reason ?? quality.reason}`);
       }
-      retryReason = hard.reason;
-      lastCandidate = { ...story, script: sanitized };
-      console.warn(`Gemini hard-quality reject (attempt ${attempt + 1}): ${retryReason}`);
-      continue;
     }
-
-    lastCandidate = { ...story, script: sanitized };
-    retryReason = sanitizedQuality.reason ?? quality.reason;
-    console.warn(`Gemini story quality reject (attempt ${attempt + 1}): ${retryReason}`);
   }
 
   const fallback = finalizeAfterQualityLoop(

@@ -26,7 +26,7 @@ import type { GenerateStoryInput, StoryScript } from './groq.js';
 import { logRejectedScript } from './story-reject-log.js';
 
 const OPENROUTER_API_URL = 'https://openrouter.ai/api/v1/chat/completions';
-const MAX_ATTEMPTS = 3;
+const MAX_ATTEMPTS = 1;
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -125,7 +125,6 @@ export async function generateStoryScript(
 
   const model = resolveOpenRouterModel(input.openRouterModel, 'story');
   if (!model) throw new Error('No OpenRouter model configured');
-  let retryReason: string | undefined;
   let lastCandidate: StoryScript | null = null;
 
   for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
@@ -134,34 +133,21 @@ export async function generateStoryScript(
       voiceId,
       storyLength,
       previousScripts,
-      retryReason,
       selectedReferenceFact: input.selectedReferenceFact,
     });
 
-    let content: string;
-    try {
-      content = await callOpenRouter(
-        systemPrompt,
-        userPrompt,
-        lengthPreset.maxTokens,
-        model,
-        input.clientOpenRouterApiKey,
-      );
-      console.log(`[openrouter] story model=${model} attempt=${attempt + 1}`);
-    } catch (err) {
-      if (isOpenRouterRateLimitError(err) && attempt + 1 < MAX_ATTEMPTS) {
-        const waitMs = 2500 * (attempt + 1);
-        console.warn(`[openrouter] 429 on ${model} — retry same model in ${waitMs}ms`);
-        await sleep(waitMs);
-        continue;
-      }
-      throw err;
-    }
+    const content = await callOpenRouter(
+      systemPrompt,
+      userPrompt,
+      lengthPreset.maxTokens,
+      model,
+      input.clientOpenRouterApiKey,
+    );
+    console.log(`[openrouter] single-shot story model=${model}`);
 
     const story = parseStoryJson(content);
     if (!story) {
-      retryReason = 'invalid JSON';
-      continue;
+      throw new Error('OpenRouter returned invalid story JSON');
     }
 
     story.voiceId = voiceId;
@@ -193,8 +179,7 @@ export async function generateStoryScript(
     }
 
     lastCandidate = { ...story, script: sanitized };
-    retryReason = sanitizedQuality.reason ?? quality.reason;
-    logRejectedScript(`OpenRouter quality reject (attempt ${attempt + 1})`, sanitized, retryReason ?? 'quality');
+    logRejectedScript('OpenRouter quality reject (single-shot)', sanitized, sanitizedQuality.reason ?? quality.reason ?? 'quality');
   }
 
   const fallback = finalizeAfterQualityLoop(

@@ -265,6 +265,7 @@ export function buildStoryUserPrompt(params: {
   retryReason?: string;
   referenceFacts?: string[];
   selectedReferenceFact?: { fact: string; scope: 'artist' | 'track'; scopeLabelRu: string };
+  rawSnippets?: string[];
 }): string {
   const narratorId = resolveStoryNarrator(params.storyNarrator);
   const locale = resolveTrackLocale({
@@ -345,6 +346,20 @@ export function buildStoryUserPrompt(params: {
     lines.push('');
     lines.push('СЕМЕНА ИСТОРИЙ (выбери ОДНО с максимальным контрастом — не рекламу и не дискографию):');
     facts.forEach((fact, i) => lines.push(`${i + 1}. ${fact}`));
+  } else if ((params.rawSnippets?.length ?? 0) > 0) {
+    lines.push('');
+    lines.push(FACT_HUNT_PROMPT_BLOCK);
+    lines.push('');
+    lines.push(
+      'СЫРЫЕ СНИППЕТЫ ИЗ ИСТОЧНИКОВ (Wikipedia, MusicBrainz, DuckDuckGo). В ЭТОМ ЖЕ ОТВЕТЕ:',
+    );
+    lines.push('1) выбери ОДНО проверяемое семя с контрастом (только из сниппетов, без выдумки);');
+    lines.push('2) напиши историю, жёстко привязанную к этому семени.');
+    const snippets = params.rawSnippets!.slice(0, 14);
+    snippets.forEach((s, i) => {
+      const trimmed = s.length > 420 ? `${s.slice(0, 420)}…` : s;
+      lines.push(`${i}. ${trimmed}`);
+    });
   } else {
     lines.push('');
     lines.push(FACT_HUNT_PROMPT_BLOCK);

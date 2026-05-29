@@ -25,8 +25,8 @@ import {
 import { logRejectedScript } from './story-reject-log.js';
 
 const GROQ_API_URL = 'https://api.groq.com/openai/v1/chat/completions';
-/** Fewer LLM calls — shared Groq RPM is tight on free tier. */
-const MAX_ATTEMPTS = 3;
+/** One LLM HTTP call per story — no quality-retry spam (429 on shared Groq RPM). */
+const MAX_ATTEMPTS = 1;
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -55,6 +55,8 @@ export interface GenerateStoryInput {
   previousScripts?: string[];
   referenceFacts?: string[];
   selectedReferenceFact?: { fact: string; scope: 'artist' | 'track'; scopeLabelRu: string };
+  /** Raw source snippets — model picks seed + writes story in one shot (no separate fact-hunt). */
+  rawSnippets?: string[];
   groqModel?: string;
   openRouterModel?: string;
   geminiModel?: string;
@@ -241,11 +243,10 @@ export async function generateStoryScript(
   const systemPrompt = buildSystemPrompt(persona, lengthPreset);
   const voiceId = input.voiceId ?? voiceForYear(input.year, input.genre);
 
-  let retryReason: string | undefined;
-  let groqModelIndex = 0;
   let lastCandidate: StoryScript | null = null;
   const clientKey = input.clientGroqApiKey?.trim();
   const models = resolveGroqModelOrder(input.groqModel);
+  const groqModelIndex = 0;
 
   for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
     const userPrompt = buildStoryUserPrompt({
@@ -253,50 +254,22 @@ export async function generateStoryScript(
       voiceId,
       storyLength,
       previousScripts,
-      retryReason,
       selectedReferenceFact: input.selectedReferenceFact,
     });
 
-    let content: string;
-    let rateRetries = 0;
-    while (true) {
-      try {
-        const result = await callGroq(
-          systemPrompt,
-          userPrompt,
-          lengthPreset.maxTokens,
-          groqModelIndex,
-          input.groqModel,
-          clientKey,
-        );
-        content = result.content;
-        const idx = models.indexOf(result.model);
-        if (idx >= 0) groqModelIndex = idx;
-        break;
-      } catch (err) {
-        if (err instanceof GroqApiError && err.status === 429 && rateRetries < 2) {
-          rateRetries += 1;
-          const waitMs = 2000 + rateRetries * 1500;
-          console.warn(
-            `[groq] 429 on ${models[groqModelIndex]} — wait ${waitMs}ms, retry same model (${rateRetries}/2)`,
-          );
-          await sleep(waitMs);
-          continue;
-        }
-        if (isGroqModelDecommissioned(err) && groqModelIndex + 1 < models.length) {
-          groqModelIndex += 1;
-          console.warn(
-            `[groq] decommissioned model — skip to index ${groqModelIndex} (${models[groqModelIndex]})`,
-          );
-          continue;
-        }
-        throw err;
-      }
-    }
+    const result = await callGroq(
+      systemPrompt,
+      userPrompt,
+      lengthPreset.maxTokens,
+      groqModelIndex,
+      input.groqModel,
+      clientKey,
+    );
+    console.log(`[groq] single-shot story model=${result.model}`);
+    const content = result.content;
     const story = parseStoryJson(content);
     if (!story) {
-      retryReason = 'invalid JSON';
-      continue;
+      throw new Error('Groq returned invalid story JSON');
     }
 
     story.voiceId = voiceId;
@@ -328,8 +301,7 @@ export async function generateStoryScript(
     }
 
     lastCandidate = { ...story, script: sanitized };
-    retryReason = sanitizedQuality.reason ?? quality.reason;
-    logRejectedScript(`quality reject (attempt ${attempt + 1})`, sanitized, retryReason ?? 'quality');
+    logRejectedScript('quality reject (single-shot)', sanitized, sanitizedQuality.reason ?? quality.reason ?? 'quality');
   }
 
   const fallback = finalizeAfterQualityLoop(

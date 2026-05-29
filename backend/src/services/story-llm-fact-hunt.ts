@@ -67,15 +67,11 @@ export function shouldRunLlmFactHunt(
   rawSnippetCount: number,
   bundleFactCount: number,
 ): boolean {
-  if (rawSnippetCount === 0) return false;
-  // Есть факты из Wiki/MB — не тратим LLM на hunt (слабые модели ломают index/429).
-  if (bundleFactCount > 0) return false;
-  const mode = resolveFactHuntMode();
-  if (mode === 'empty_only') {
-    return bundleFactCount === 0 || selected === null;
-  }
-  if (!selected) return true;
-  return interestScore(selected.fact) < MIN_PICK_INTEREST_SCORE;
+  // Fact-hunt is a separate LLM call — disabled; snippets go into the single story prompt.
+  void selected;
+  void rawSnippetCount;
+  void bundleFactCount;
+  return false;
 }
 
 /** Evidence quote must appear in snippet (fuzzy: 3+ shared tokens of length >= 4). */
