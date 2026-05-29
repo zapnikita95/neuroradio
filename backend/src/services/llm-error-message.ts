@@ -19,7 +19,9 @@ export function classifyStoryLlmError(
       ? 'Gemini'
       : llmProvider === 'openrouter'
         ? 'OpenRouter'
-        : 'Groq';
+        : llmProvider === 'local'
+          ? 'Ollama'
+          : 'Groq';
 
   if (/invalid_api_key|invalid api key|\b401\b.*invalid/i.test(lower)) {
     const code =
@@ -86,6 +88,15 @@ export function classifyStoryLlmError(
       message: dailyLimit
         ? `${label} (дневной лимит): ${apiSnippet}`
         : `${label}: ${apiSnippet}`,
+      httpStatus: 503,
+    };
+  }
+
+  if (/ollama error|local ollama|econnrefused|fetch failed/i.test(lower)) {
+    return {
+      code: 'LOCAL_OLLAMA_FAILED',
+      message:
+        'Локальный Ollama недоступен. Проверь ZeroTier, что Ollama слушает на 11435 и URL в настройках (http://10.196.221.190:11435).',
       httpStatus: 503,
     };
   }

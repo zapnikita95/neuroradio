@@ -10,6 +10,7 @@ import { AUDIO_DIR } from './services/yandex-tts.js';
 import { hasGroqApiKey } from './services/groq.js';
 import { hasOpenRouterApiKey } from './services/openrouter.js';
 import { hasGeminiApiKey } from './services/gemini.js';
+import { hasLocalOllamaConfigured } from './services/local-ollama.js';
 import { resolveLlmProvider } from './services/llm-provider.js';
 import { hasYandexCredentials } from './services/yandex-tts.js';
 import { securityHeaders } from './middleware/security-headers.js';
@@ -52,9 +53,10 @@ app.get('/health', (_req, res) => {
   const openrouter = hasOpenRouterApiKey();
   const groq = hasGroqApiKey();
   const gemini = hasGeminiApiKey();
+  const localOllama = hasLocalOllamaConfigured();
   const yandexTts = hasYandexCredentials();
   console.log(
-    `[health] llm=${llm} openrouter=${openrouter} groq=${groq} gemini=${gemini} yandexTts=${yandexTts}`,
+    `[health] llm=${llm} openrouter=${openrouter} groq=${groq} gemini=${gemini} localOllama=${localOllama} yandexTts=${yandexTts}`,
   );
   res.json({
     status: 'ok',
@@ -65,6 +67,7 @@ app.get('/health', (_req, res) => {
     groq,
     openrouter,
     gemini,
+    localOllama,
     yandexTts,
     appAuthRequired: isAppAuthEnabled(),
   });

@@ -36,6 +36,25 @@ export function qualityOptionsForAttempt(
   };
 }
 
+/** Local Ollama: never relax fiction/anchor checks — bad story is worse than no story. */
+export function qualityOptionsForLocalAttempt(
+  attempt: number,
+  maxAttempts: number,
+  referenceFacts: string[],
+): StoryQualityAttemptOptions {
+  const isLast = attempt >= maxAttempts - 1;
+  const hasFacts = referenceFacts.length > 0;
+  return {
+    strictLength: !isLast,
+    skipWatery: false,
+    skipReferenceAnchor: false,
+    skipFirstSentenceAnchor: false,
+    skipBannedPatterns: false,
+    skipEnglishCheck: false,
+    referenceFacts: hasFacts ? referenceFacts : [],
+  };
+}
+
 /** Слабые free-модели (Liquid LFM): постепенно ослабляем якорь, но не карусель моделей. */
 export function qualityOptionsForOpenRouterAttempt(
   attempt: number,

@@ -55,7 +55,11 @@ export function resolveFactHuntMode(): FactHuntMode {
 export function resolveFactHuntProvider(preferred: LlmProviderId): LlmProviderId {
   const env = process.env.LLM_FACT_PROVIDER?.trim().toLowerCase();
   if (env === 'groq' || env === 'gemini' || env === 'openrouter') return env;
-  return preferred;
+  if (preferred !== 'local') return preferred;
+  if (hasLlmKeyForProvider('groq')) return 'groq';
+  if (hasLlmKeyForProvider('gemini')) return 'gemini';
+  if (hasLlmKeyForProvider('openrouter')) return 'openrouter';
+  return 'groq';
 }
 
 export function shouldRunLlmFactHunt(

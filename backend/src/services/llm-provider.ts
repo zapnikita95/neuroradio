@@ -1,13 +1,19 @@
 import { hasGeminiApiKey } from './gemini.js';
 import { hasGroqApiKey } from './groq.js';
 import { hasOpenRouterApiKey } from './openrouter.js';
+import { hasLocalOllamaConfigured } from './local-ollama.js';
 
-export type LlmProviderId = 'openrouter' | 'groq' | 'gemini';
+export type LlmProviderId = 'openrouter' | 'groq' | 'gemini' | 'local';
 
 export interface ClientLlmKeys {
   groq?: string;
   gemini?: string;
   openrouter?: string;
+}
+
+export interface ClientLocalOllama {
+  baseUrl?: string;
+  model?: string;
 }
 
 export function clientKeyForProvider(
@@ -17,13 +23,14 @@ export function clientKeyForProvider(
   if (!keys) return undefined;
   if (provider === 'gemini') return keys.gemini?.trim() || undefined;
   if (provider === 'openrouter') return keys.openrouter?.trim() || undefined;
+  if (provider === 'local') return undefined;
   return keys.groq?.trim() || undefined;
 }
 
-export const LLM_PROVIDER_ORDER: LlmProviderId[] = ['openrouter', 'groq', 'gemini'];
+export const LLM_PROVIDER_ORDER: LlmProviderId[] = ['openrouter', 'groq', 'gemini', 'local'];
 
 function isKnownProvider(raw: string): raw is LlmProviderId {
-  return raw === 'openrouter' || raw === 'groq' || raw === 'gemini';
+  return raw === 'openrouter' || raw === 'groq' || raw === 'gemini' || raw === 'local';
 }
 
 export function resolveLlmProvider(override?: unknown): LlmProviderId {
@@ -34,10 +41,18 @@ export function resolveLlmProvider(override?: unknown): LlmProviderId {
   if (hasGroqApiKey()) return 'groq';
   if (hasGeminiApiKey()) return 'gemini';
   if (hasOpenRouterApiKey()) return 'openrouter';
+  if (hasLocalOllamaConfigured()) return 'local';
   return 'groq';
 }
 
-export function hasLlmKeyForProvider(provider: LlmProviderId, clientKeys?: ClientLlmKeys): boolean {
+export function hasLlmKeyForProvider(
+  provider: LlmProviderId,
+  clientKeys?: ClientLlmKeys,
+  clientLocal?: ClientLocalOllama,
+): boolean {
+  if (provider === 'local') {
+    return hasLocalOllamaConfigured(clientLocal?.baseUrl);
+  }
   const client = clientKeyForProvider(provider, clientKeys);
   if (provider === 'gemini') return hasGeminiApiKey(client);
   if (provider === 'openrouter') return hasOpenRouterApiKey(client);
@@ -47,8 +62,9 @@ export function hasLlmKeyForProvider(provider: LlmProviderId, clientKeys?: Clien
 export function alternateLlmProviders(
   preferred: LlmProviderId,
   clientKeys?: ClientLlmKeys,
+  clientLocal?: ClientLocalOllama,
 ): LlmProviderId[] {
   return LLM_PROVIDER_ORDER.filter(
-    (p) => p !== preferred && hasLlmKeyForProvider(p, clientKeys),
+    (p) => p !== preferred && hasLlmKeyForProvider(p, clientKeys, clientLocal),
   );
 }

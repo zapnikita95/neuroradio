@@ -10,7 +10,7 @@ import {
   huntReferenceFactWithLlm,
   shouldRunLlmFactHunt,
 } from '../services/story-llm-fact-hunt.js';
-import { hasLlmKeyForProvider, resolveLlmProvider, clientKeyForProvider, type ClientLlmKeys } from '../services/llm-provider.js';
+import { hasLlmKeyForProvider, resolveLlmProvider, clientKeyForProvider, type ClientLlmKeys, type ClientLocalOllama } from '../services/llm-provider.js';
 import { generateStoryWithFallback } from '../services/story-llm-router.js';
 import { setLogDetail } from '../middleware/request-logger.js';
 import { hasYandexCredentials } from '../services/yandex-tts.js';
@@ -62,6 +62,8 @@ interface StoryFullBody {
   groq_api_key?: string;
   gemini_api_key?: string;
   openrouter_api_key?: string;
+  local_ollama_url?: string;
+  local_ollama_model?: string;
 }
 
 router.get('/quota', (req: Request, res: Response) => {
@@ -92,16 +94,26 @@ router.post('/full', validateStoryFullBody, async (req: Request, res: Response) 
     gemini: (req.body as StoryFullBody).gemini_api_key,
     openrouter: (req.body as StoryFullBody).openrouter_api_key,
   };
-  const ownLlmKey = Boolean(clientKeyForProvider(llmProvider, clientLlmKeys));
-  if (!hasLlmKeyForProvider(llmProvider, clientLlmKeys)) {
+  const clientLocal: ClientLocalOllama = {
+    baseUrl: (req.body as StoryFullBody).local_ollama_url,
+    model: (req.body as StoryFullBody).local_ollama_model,
+  };
+  const ownLlmKey = llmProvider === 'local'
+    ? Boolean(clientLocal.baseUrl?.trim())
+    : Boolean(clientKeyForProvider(llmProvider, clientLlmKeys));
+  if (!hasLlmKeyForProvider(llmProvider, clientLlmKeys, clientLocal)) {
     const code =
-      llmProvider === 'gemini'
+      llmProvider === 'local'
+        ? 'LOCAL_OLLAMA_NOT_CONFIGURED'
+        : llmProvider === 'gemini'
         ? 'GEMINI_NOT_CONFIGURED'
         : llmProvider === 'openrouter'
           ? 'OPENROUTER_NOT_CONFIGURED'
           : 'GROQ_NOT_CONFIGURED';
     const message =
-      llmProvider === 'gemini'
+      llmProvider === 'local'
+        ? 'Локальный Ollama не настроен. Укажи URL (ZeroTier) в настройках приложения или LOCAL_OLLAMA_BASE_URL на сервере.'
+        : llmProvider === 'gemini'
         ? 'Gemini не настроен на сервере. Добавь GEMINI_API_KEY или свой ключ в настройках приложения.'
         : llmProvider === 'openrouter'
           ? 'OpenRouter не настроен на сервере. Добавь OPEN_ROUTER_API_KEY на Railway или свой ключ в приложении.'
@@ -133,7 +145,9 @@ router.post('/full', validateStoryFullBody, async (req: Request, res: Response) 
   const installId = req.installId ?? 'unknown';
 
   const modelLog =
-    llmProvider === 'gemini'
+    llmProvider === 'local'
+      ? ` ollama=${clientLocal.baseUrl ?? 'default'} model=${clientLocal.model ?? 'default'}`
+      : llmProvider === 'gemini'
       ? ` model=${geminiModel ?? 'default'}`
       : llmProvider === 'groq'
         ? ` model=${groqModel ?? 'default'}`
@@ -264,6 +278,8 @@ router.post('/full', validateStoryFullBody, async (req: Request, res: Response) 
       clientGroqApiKey: clientLlmKeys.groq,
       clientGeminiApiKey: clientLlmKeys.gemini,
       clientOpenRouterApiKey: clientLlmKeys.openrouter,
+      localOllamaBaseUrl: clientLocal.baseUrl,
+      localOllamaModel: clientLocal.model,
     };
 
     const { story, llmUsed } = await generateStoryWithFallback(storyInput, llmProvider);
@@ -310,6 +326,7 @@ router.post('/full', validateStoryFullBody, async (req: Request, res: Response) 
         groq: llmUsed === 'groq',
         gemini: llmUsed === 'gemini',
         openrouter: llmUsed === 'openrouter',
+        local: llmUsed === 'local',
         yandexTts: hasYandexCredentials(),
         azureTts: canUseAzureSpeechProduction(),
       },

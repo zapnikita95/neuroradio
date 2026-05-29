@@ -62,6 +62,9 @@ export interface GenerateStoryInput {
   clientGroqApiKey?: string;
   clientGeminiApiKey?: string;
   clientOpenRouterApiKey?: string;
+  /** Local Ollama over ZeroTier / LAN — from app or LOCAL_OLLAMA_BASE_URL on server. */
+  localOllamaBaseUrl?: string;
+  localOllamaModel?: string;
 }
 
 export class GroqApiError extends Error {

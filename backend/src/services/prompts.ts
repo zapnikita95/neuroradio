@@ -10,6 +10,7 @@ import {
 import {
   buildPersonaForNarrator,
   getNarratorPreset,
+  PERSONA_STYLE_DISCIPLINE,
   resolveStoryNarrator,
   StoryNarratorId,
 } from './story-narrator.js';
@@ -93,17 +94,17 @@ export function personaForTrack(
 
   if (a.includes('james brown') || g.includes('funk')) {
     return personaForYear(
-      'парень из Гарлема, soul/funk, ходит в Apollo и знает каждый крик Brown',
-      'короткие рваные фразы, «слушай», «тогда», «та ночь», энергия сцены',
-      `${era}. Apollo Theater, один дубль, номер с плащом`,
+      'меломан soul/funk, знает сцену Apollo и живые выступления Brown',
+      'короткие рваные фразы, высокая энергия, уличная разговорная интонация',
+      `${era}. Apollo Theater, живые дубли, сценические номера`,
     );
   }
 
   if (a.includes('elvis')) {
     return personaForYear(
-      "фанат rock'n'roll, собирает синглы Elvis",
-      '«помню», «тогда», «Король», без современного сленга',
-      `${era}. студия RCA, телеспецвыпуски, реакция зала`,
+      "коллекционер синглов rock'n'roll эпохи Elvis",
+      'ностальгический тон, прошедшее время, без современного сленга',
+      `${era}. студия RCA, телеспецвыпуски, радиоэфир`,
     );
   }
 
@@ -114,24 +115,24 @@ export function personaForTrack(
     (year !== undefined && year >= 1935 && year <= 1965 && (g.includes('blues') || !g))
   ) {
     return personaForYear(
-      'джазмен, одержим свингом и бибопом',
-      '«брат», «слушай сюда», джем-сейшены, импровизация',
+      'меломан джаза и свинга',
+      'свободный ритм фраз, жаргон джем-сейшенов, импровизационная подача',
       `${era}. винил, живое радио, ночные клубы`,
     );
   }
 
   if (g.includes('blues') || g.includes('soul')) {
     return personaForYear(
-      'блюзовый меломан с юга или из клуба',
-      '«дитя», «та ночь», исповедь, гитара, пот на сцене',
+      'меломан блюза и соула',
+      'исповедальный тон, короткие образные фразы, интонация клубной сцены',
       `${era}. ночной клуб, юг США`,
     );
   }
 
   if (g.includes('rock') || g.includes('metal') || g.includes('punk')) {
     return personaForYear(
-      'рок-фанат, был на концертах',
-      '«тот концерт», «мы были», громкость, бунт',
+      'рок-меломан, ходил на концерты',
+      'разговорный напор, воспоминания о живых выступлениях, громкая подача',
       `${era}. гаражи, фестивали`,
     );
   }
@@ -139,42 +140,42 @@ export function personaForTrack(
   if (g.includes('electronic') || g.includes('house') || g.includes('techno') || g.includes('dance')) {
     return personaForYear(
       'клубный меломан',
-      'брейк, сэмпл, бас, склад, ночь',
-      `${era}. диджейские стыки, новая музыка из старых пластинок`,
+      'ритмичные короткие фразы, лексика диджейской культуры, ночная интонация',
+      `${era}. диджейские стыки, сэмплы, клубная сцена`,
     );
   }
 
   if (g.includes('hip hop') || g.includes('rap')) {
     return personaForYear(
-      locale.countryCode === 'RU' ? 'фанат российского рэпа' : 'фанат хип-хопа с блока',
+      locale.countryCode === 'RU' ? 'фанат российского рэпа' : 'фанат хип-хоп культуры',
       locale.countryCode === 'RU'
-        ? 'поток, площадки, студии, честная уличная речь'
-        : 'поток, вечеринка на блоке, уличная честность',
+        ? 'потоковая речь, студийный и уличный контекст, прямой тон'
+        : 'потоковая речь, уличный контекст, прямой тон',
       era,
     );
   }
 
   if (g.includes('country') || title.toLowerCase().includes('кантри')) {
     return personaForYear(
-      locale.countryCode === 'RU' ? `фанат ${artist}, российская кантри-сцена` : `фанат ${artist}`,
+      locale.countryCode === 'RU' ? `меломан ${artist}, российская кантри-сцена` : `меломан ${artist}`,
       locale.countryCode === 'RU'
-        ? 'живая речь, российские студии и площадки, без Nashville-клише'
-        : 'живая речь, уважение к эпохе трека',
+        ? 'живая разговорная речь, российские студии и площадки'
+        : 'живая разговорная речь, уважение к эпохе трека',
       era,
     );
   }
 
   if (g.includes('pop') || a.includes('beatles') || a.includes('abba')) {
     return personaForYear(
-      'обожатель поп-культуры',
-      '«то лето», «по радио», телевизор и магнитофоны',
+      'меломан поп-культуры',
+      'ностальгический тон, контекст радио и телевидения эпохи',
       `${era}. телевидение, магнитофоны, кассеты`,
     );
   }
 
   return personaForYear(
-    `фанат ${artist}`,
-    'живая речь, уважение к эпохе трека, без энциклопедичности',
+    `меломан ${artist}`,
+    'живая разговорная речь, уважение к эпохе трека, без энциклопедичности',
     era,
   );
 }
@@ -186,11 +187,11 @@ export function buildSystemPrompt(persona: StoryPersona, length: StoryLengthPres
 
   const formatBlock = persona.formatRules
     ? persona.formatRules
-    : 'Рассказываешь другу за барной стойкой: факт + метафора + ударная строка.';
+    : 'Факт из семени → одна живая деталь → короткий вывод. Без шаблонных зачинов.';
 
   const focusBlock = persona.contentFocus
     ? `ФОКУС: ${persona.contentFocus}`
-    : 'Драма и контраст — не сухая статья Wikipedia';
+    : 'Контраст и интерес — через конкретику из семени, не через воду';
 
   const lengthPlan = buildLengthStructurePlan(length);
   const narratorBlock = persona.narratorAddendum
@@ -221,7 +222,7 @@ ${FACT_HUNT_PROMPT_BLOCK}
 
 ${lengthPlan}
 
-СТИЛЬ: друг за барной стойкой. Можно «слушай», «чувак», «брат». Не Wikipedia.
+${PERSONA_STYLE_DISCIPLINE}
 
 КАТЕГОРИЧЕСКИ НЕЛЬЗЯ:
 - «изначально называлась», «группа из…», состав, дискография.
@@ -375,5 +376,119 @@ export function buildStoryUserPrompt(params: {
   lines.push(`Голос (voiceId): ${params.voiceId}`);
   lines.push('Ответ в JSON.');
 
+  return lines.join('\n');
+}
+
+const LOCAL_FACT_GROUNDING = `ФАКТЫ (жёстко, локальная модель):
+- Содержание — ТОЛЬКО из списка «Проверенные факты». Не добавляй события, людей и детали.
+- Амплуа меняет тон, ритм и структуру фраз — НЕ содержание факта.
+- ЗАПРЕЩЕНО (вода/выдумка): бунт, легенда, шедевр, безумие, взрыв, «не просто трек/песня/рок», «вызов правилам», «сломал правила», «мы на концерте», «представь себе», «сотни дублей», «запретили эфир», «чистая эмоция», «изменил музыку навсегда».
+- Не выдумывай студию, драму, реакцию зала, если этого нет в фактах.`;
+
+export function buildLocalSystemPrompt(persona: StoryPersona, length: StoryLengthPreset): string {
+  const durationHint = length.targetSeconds
+    ? `~${length.targetSeconds} секунд речи`
+    : 'развёрнутый рассказ';
+
+  const formatBlock = persona.formatRules ?? 'Факт из списка → живая подача в стиле персонажа → короткий вывод.';
+  const focusBlock = persona.contentFocus ? `ФОКУС: ${persona.contentFocus}` : '';
+  const narratorBlock = persona.narratorAddendum ? `\n${persona.narratorAddendum}\n` : '';
+
+  return `Ты пишешь текст для ОЗВУЧКИ — локальная модель Ollama: проверенные факты + амплуа персонажа.
+
+РОЛЬ: ${persona.roleTitle}
+ЭПОХА: ${persona.eraHint}
+ГОЛОС: ${persona.speechStyle}
+${focusBlock}
+${narratorBlock}
+${PERSONA_STYLE_DISCIPLINE}
+
+ФОРМАТ: ${formatBlock}
+
+${LOCAL_FACT_GROUNDING}
+
+${RUSSIAN_LANGUAGE_PROMPT_BLOCK}
+
+ЧИСЛА: без арабских цифр в script (кроме цифр в имени/названии). Длительность и год — словами, если есть в фактах.
+
+ЖЁСТКИЙ ОБЪЁМ: ${length.wordsMin}–${length.wordsMax} слов (${durationHint}). ${length.sentenceHint}.
+- word_count в JSON — строго в этом диапазоне.
+
+JSON: {"script":"...", "word_count": число, "voiceId": "alena | filipp | ermil | jane | omazh | zahar | marina | dasha | julia | kirill | masha | alexander | lera"}`;
+}
+
+export function buildLocalStoryUserPrompt(params: {
+  artist: string;
+  title: string;
+  year?: number;
+  genre?: string;
+  countryCode?: string;
+  voiceId: string;
+  storyLength: StoryLengthId;
+  storyNarrator?: StoryNarratorId;
+  previousScripts?: string[];
+  retryReason?: string;
+  referenceFacts?: string[];
+  selectedReferenceFact?: { fact: string; scope: 'artist' | 'track'; scopeLabelRu: string };
+}): string {
+  const narratorId = resolveStoryNarrator(params.storyNarrator);
+  const persona = buildPersonaForNarrator(
+    narratorId,
+    params.year,
+    params.genre,
+    params.artist,
+    params.title,
+    params.countryCode,
+  );
+  const length = getStoryLengthPreset(params.storyLength);
+  const lines: string[] = [
+    `Артист: ${params.artist}`,
+    `Трек: ${params.title}`,
+  ];
+  if (params.genre) lines.push(`Жанр: ${params.genre}`);
+  if (params.year) lines.push(`Год релиза (для контекста, в script — словами): ${params.year}`);
+  lines.push('');
+  lines.push(`Ты — ${persona.roleTitle}. Говоришь так: ${persona.speechStyle}`);
+  if (narratorId !== 'auto') {
+    const preset = getNarratorPreset(narratorId);
+    if (preset) {
+      lines.push(`РАССКАЗЧИК (АМПЛУА): ${preset.labelRu} — ${preset.descriptionRu}`);
+      lines.push(preset.promptAddendum);
+    }
+  }
+  lines.push('Амплуа = тон и подача. СОДЕРЖАНИЕ — строго из списка фактов.');
+  lines.push(`Длина: ${length.wordsMin}–${length.wordsMax} слов.`);
+
+  const facts = params.referenceFacts?.filter(Boolean) ?? [];
+  const selected = params.selectedReferenceFact;
+  if (selected) {
+    lines.push('');
+    lines.push(`Главный факт (${selected.scopeLabelRu}): ${selected.fact}`);
+  }
+  if (facts.length > 0) {
+    lines.push('');
+    lines.push('Проверенные факты (используй ТОЛЬКО их, по одному на предложение):');
+    facts.forEach((fact, i) => lines.push(`${i + 1}. ${fact}`));
+  }
+
+  if (params.retryReason) {
+    lines.push('');
+    lines.push(`ПРЕДЫДУЩИЙ ОТВЕТ ОТКЛОНЁН: ${params.retryReason}`);
+    lines.push('Перепиши полностью: только факты из списка, без драмы и без запрещённых слов.');
+  }
+
+  const prev = params.previousScripts?.filter(Boolean) ?? [];
+  if (prev.length > 0) {
+    lines.push('');
+    lines.push('Уже рассказано — другой факт из списка:');
+    prev.slice(0, 5).forEach((s, i) => {
+      const snippet = s.length > 200 ? `${s.slice(0, 200)}…` : s;
+      lines.push(`${i + 1}. ${snippet}`);
+    });
+  }
+
+  lines.push('');
+  lines.push(`Голос (voiceId): ${params.voiceId}`);
+  lines.push('Ответ в JSON.');
   return lines.join('\n');
 }

@@ -28,6 +28,8 @@ interface StoryFullBody {
   groq_api_key?: unknown;
   gemini_api_key?: unknown;
   openrouter_api_key?: unknown;
+  local_ollama_url?: unknown;
+  local_ollama_model?: unknown;
 }
 
 const VALID_VOICE_TIERS = new Set<string>(['default', 'premium']);
@@ -58,6 +60,14 @@ function asOptionalModelId(value: unknown, maxLen = 128): string | undefined {
   if (typeof value !== 'string') return undefined;
   const trimmed = value.trim();
   if (!trimmed || trimmed.length > maxLen) return undefined;
+  return trimmed;
+}
+
+function asOptionalOllamaUrl(value: unknown): string | undefined {
+  if (typeof value !== 'string') return undefined;
+  const trimmed = value.trim().replace(/\/+$/, '');
+  if (!trimmed || trimmed.length > 256) return undefined;
+  if (!/^https?:\/\//i.test(trimmed)) return undefined;
   return trimmed;
 }
 
@@ -116,6 +126,8 @@ export function validateStoryFullBody(req: Request, res: Response, next: NextFun
   const groqApiKey = asOptionalApiKey(body.groq_api_key);
   const geminiApiKey = asOptionalApiKey(body.gemini_api_key);
   const openrouterApiKey = asOptionalApiKey(body.openrouter_api_key);
+  const localOllamaUrl = asOptionalOllamaUrl(body.local_ollama_url);
+  const localOllamaModel = asOptionalModelId(body.local_ollama_model, 128);
 
   req.body = {
     artist,
@@ -136,6 +148,8 @@ export function validateStoryFullBody(req: Request, res: Response, next: NextFun
     groq_api_key: groqApiKey,
     gemini_api_key: geminiApiKey,
     openrouter_api_key: openrouterApiKey,
+    local_ollama_url: localOllamaUrl,
+    local_ollama_model: localOllamaModel,
   };
   next();
 }

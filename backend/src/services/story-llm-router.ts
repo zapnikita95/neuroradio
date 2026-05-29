@@ -12,6 +12,7 @@ import {
   generateStoryScript as generateOpenRouterStory,
   hasOpenRouterApiKey,
 } from './openrouter.js';
+import { generateStoryScriptLocal } from './local-ollama-story.js';
 import {
   hasLlmKeyForProvider,
   LLM_PROVIDER_ORDER,
@@ -27,6 +28,7 @@ async function generateForProvider(
   provider: LlmProviderId,
   input: GenerateStoryInput,
 ): Promise<StoryScript> {
+  if (provider === 'local') return generateStoryScriptLocal(input);
   if (provider === 'gemini') return generateGeminiStory(input);
   if (provider === 'openrouter') return generateOpenRouterStory(input);
   return generateGroqStory(input);
@@ -41,7 +43,11 @@ export async function generateStoryWithFallback(
     gemini: input.clientGeminiApiKey,
     openrouter: input.clientOpenRouterApiKey,
   };
-  if (!LLM_PROVIDER_ORDER.some((p) => hasLlmKeyForProvider(p, clientKeys))) {
+  const clientLocal = {
+    baseUrl: input.localOllamaBaseUrl,
+    model: input.localOllamaModel,
+  };
+  if (!LLM_PROVIDER_ORDER.some((p) => hasLlmKeyForProvider(p, clientKeys, clientLocal))) {
     throw new Error('No LLM API keys configured on server');
   }
 

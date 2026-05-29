@@ -15,10 +15,10 @@ object StoryPrompts {
             length.labelRu
         }
         val formatBlock = persona.formatRules?.takeIf { it.isNotBlank() }
-            ?: "Рассказываешь другу за барной стойкой: факт + метафора + ударная строка."
+            ?: "Факт из семени → одна живая деталь → короткий вывод. Без шаблонных зачинов."
         val focusBlock = persona.contentFocus?.takeIf { it.isNotBlank() }
             ?.let { "ФОКУС: $it" }
-            ?: "Драма и контраст — не сухая статья Wikipedia"
+            ?: "Контраст и интерес — через конкретику из семени, не через воду"
         val narratorBlock = persona.narratorAddendum?.takeIf { it.isNotBlank() }?.let { "\n$it\n" }.orEmpty()
         val lengthPlan = StoryLengthPlan.structurePlan(length)
 
@@ -47,7 +47,10 @@ ${StoryFactHunt.PROMPT_BLOCK}
 
 $lengthPlan
 
-СТИЛЬ: друг за барной стойкой. Можно «слушай», «чувак», «брат». Не Wikipedia.
+СТИЛЬ ПЕРСОНАЖА:
+- Амплуа = ритм фраз, длина предложений, лексика — НЕ набор одинаковых слов-маркеров.
+- НЕ начинай каждый рассказ одним и тем же словом или оборотом.
+- Разные треки — разный зачин; персонаж узнаётся по подаче в целом, не по штампу.
 
 КАТЕГОРИЧЕСКИ НЕЛЬЗЯ:
 - «изначально называлась», «группа из…», состав, дискография.
