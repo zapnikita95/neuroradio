@@ -15,6 +15,10 @@ import {
 } from '../services/story-llm-fact-hunt.js';
 import { hasLlmKeyForProvider, resolveLlmProvider, clientKeyForProvider, type ClientLlmKeys, type ClientLocalOllama } from '../services/llm-provider.js';
 import { generateStoryWithFallback } from '../services/story-llm-router.js';
+import { fetchArtistWikiLead } from '../services/wikipedia-lead.js';
+import { translateWikiLeadToStory } from '../services/indie-wiki-story.js';
+import { countWords } from '../services/story-quality.js';
+import type { StoryScript } from '../services/groq.js';
 import { setLogDetail } from '../middleware/request-logger.js';
 import { hasYandexCredentials } from '../services/yandex-tts.js';
 import { coerceVoiceForSpeechKit } from '../services/voices.js';
@@ -330,7 +334,42 @@ router.post('/full', validateStoryFullBody, async (req: Request, res: Response) 
       localOllamaModel: clientLocal.model,
     };
 
-    const { story, llmUsed } = await generateStoryWithFallback(storyInput, llmProvider);
+    const { story, llmUsed } = await (async () => {
+      if (artistTier === 'indie') {
+        const wikiLead = await fetchArtistWikiLead(metadata.artist);
+        if (wikiLead) {
+          console.log(
+            `[indie-wiki] lead lang=${wikiLead.lang} chars=${wikiLead.text.length} artist="${metadata.artist}"`,
+          );
+          const wikiScript = await translateWikiLeadToStory({
+            artist: metadata.artist,
+            title: metadata.title,
+            wikiLead: wikiLead.text,
+            wikiLang: wikiLead.lang,
+            llmProvider,
+            clientGroqApiKey: clientLlmKeys.groq,
+            clientGeminiApiKey: clientLlmKeys.gemini,
+            clientOpenRouterApiKey: clientLlmKeys.openrouter,
+            openRouterModel: openrouterModel,
+          });
+          if (wikiScript) {
+            selectedFact = {
+              fact: wikiLead.text,
+              scope: 'artist',
+              scopeLabelRu: 'группа/артист',
+            };
+            const scripted: StoryScript = {
+              script: wikiScript,
+              word_count: countWords(wikiScript),
+              voiceId,
+            };
+            return { story: scripted, llmUsed: `${llmProvider}+wiki` };
+          }
+          console.warn(`[indie-wiki] translate failed for "${metadata.artist}" — fallback to story LLM`);
+        }
+      }
+      return generateStoryWithFallback(storyInput, llmProvider);
+    })();
 
     // Copy-friendly Railway logs: seed + final script with clear block markers.
     if (selectedFact?.fact) {

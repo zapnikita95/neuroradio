@@ -31,6 +31,11 @@ const NON_ACT_PHRASES = new Set(
     'wikipedia',
     'american gangster',
     'cash box',
+    'warner music',
+    'sony music',
+    'universal music',
+    'warner latina',
+    'warner argentina',
   ].map(normalize),
 );
 
@@ -120,10 +125,16 @@ export function entityMatchesArtist(entity: string, artist: string, title: strin
 }
 
 /** Another act is named in the fact — not the requested artist/title. */
-export function factNamesForeignEntity(fact: string, artist: string, title: string): boolean {
+export function factNamesForeignEntity(
+  fact: string,
+  artist: string,
+  title: string,
+  allowedContext = '',
+): boolean {
   const artistNorm = normalize(artist);
   const titleNorm = normalize(title.replace(/\s*\([^)]*\)\s*/g, ' '));
   const norm = normalize(fact);
+  const allowedNorm = normalize(allowedContext);
 
   for (const entity of extractNamedEntities(fact)) {
     if (isNonActEntity(entity)) continue;
@@ -132,6 +143,7 @@ export function factNamesForeignEntity(fact: string, artist: string, title: stri
 
     const eNorm = normalize(entity);
     if (eNorm.length < 3) continue;
+    if (allowedNorm.length >= 8 && allowedNorm.includes(eNorm)) continue;
 
     if (eNorm.includes('-') || eNorm.split(' ').length >= 2) return true;
 
@@ -141,10 +153,11 @@ export function factNamesForeignEntity(fact: string, artist: string, title: stri
 
   // Normalized multi-word phrases: «jay z» when artist is «will jay».
   const words = norm.split(' ').filter(Boolean);
+  const titleNormFull = titleNorm;
   for (let i = 0; i < words.length - 1; i++) {
     const phrase = `${words[i]} ${words[i + 1]}`;
     if (phrase.length < 5) continue;
-    if (artistNorm.includes(phrase) || titleNorm.includes(phrase)) continue;
+    if (artistNorm.includes(phrase) || titleNormFull.includes(phrase)) continue;
     if (entityMatchesArtist(phrase, artist, title)) continue;
     const aTok = artistTokens(artist);
     if (aTok.length >= 2 && aTok.includes(words[i]) && !aTok.includes(words[i + 1])) {

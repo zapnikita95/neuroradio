@@ -276,7 +276,7 @@ export function validateStoryScript(
     return { ok: false, reason: 'no reference facts — story must be grounded in sources' };
   }
 
-  if (factNamesForeignEntity(trimmed, artist, title)) {
+  if (factNamesForeignEntity(trimmed, artist, title, referenceFacts.join('\n'))) {
     return { ok: false, reason: 'story names a different artist than the track' };
   }
 

@@ -7,7 +7,7 @@
   "scripts": {
     "dev": "tsx watch src/index.ts",
     "start": "node dist/index.js",
-    "build": "tsc",
+    "build": "tsc && node -e \"const fs=require('fs'); fs.mkdirSync('dist/data',{recursive:true}); if(fs.existsSync('src/data/known-artists.json')) fs.copyFileSync('src/data/known-artists.json','dist/data/known-artists.json');\"",
     "typecheck": "tsc --noEmit",
     "test:gemini": "npm run build && node scripts/test-live-gemini-story.mjs",
     "test:gemini:prod": "node scripts/test-production-gemini.mjs",
