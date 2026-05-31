@@ -297,6 +297,7 @@ class StoryOrchestrator(
     /** Counter already at N (e.g. restored) but story never fired — trigger on current track. */
     private fun checkOverdueAutoTrigger() {
         scope.launch {
+            if (settingsDataStore.appPowerMode.first() != AppPowerMode.ON) return@launch
             if (_mode.value != OrchestratorMode.AUTO || isStorySessionActive()) return@launch
             if (!storyRepository.hasOwnApiKeyConfigured()) return@launch
             val track = mediaControllerManager.effectiveNowPlaying.value ?: return@launch
@@ -335,7 +336,9 @@ class StoryOrchestrator(
         val trackGenre = scrobbleRepository.lookupGenre(track.artist, track.title)
         val firstTrackBonus = !settingsDataStore.firstAutoStoryCompleted.first() &&
             settings.mode == TriggerMode.EVERY_N_TRACKS
-        val shouldTrigger = _mode.value == OrchestratorMode.AUTO &&
+        val autoStoriesEnabled = settingsDataStore.appPowerMode.first() == AppPowerMode.ON
+        val shouldTrigger = autoStoriesEnabled &&
+            _mode.value == OrchestratorMode.AUTO &&
             settings.autoIntercept &&
             !isStorySessionActive() &&
             triggerEngine.onTrackPlayed(
@@ -365,6 +368,13 @@ class StoryOrchestrator(
 
     fun requestManualStory(fromNotification: Boolean = false) {
         scope.launch {
+            if (settingsDataStore.appPowerMode.first() == AppPowerMode.OFF) {
+                showManualStoryBlocked(
+                    context.getString(R.string.hint_app_power_off),
+                    fromNotification,
+                )
+                return@launch
+            }
             val gate = evaluateManualStoryGate()
             if (!gate.allowed) {
                 gate.userMessage?.let { showManualStoryBlocked(it, fromNotification) }

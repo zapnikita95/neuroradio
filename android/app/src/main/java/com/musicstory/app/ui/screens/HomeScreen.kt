@@ -20,7 +20,10 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Headphones
 import androidx.compose.material.icons.filled.History
+import androidx.compose.material.icons.filled.Power
+import androidx.compose.material.icons.filled.PowerOff
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -46,6 +49,7 @@ import androidx.core.content.ContextCompat
 import com.musicstory.app.MusicStoryApp
 import com.musicstory.app.R
 import com.musicstory.app.data.local.SettingsDataStore
+import com.musicstory.app.domain.AppPowerMode
 import com.musicstory.app.domain.LlmProvider
 import com.musicstory.app.domain.OrchestratorState
 import com.musicstory.app.domain.StoryNarrator
@@ -77,7 +81,7 @@ fun HomeScreen(
     val uiState by app.storyOrchestrator.uiState.collectAsState()
     val hasAccess = app.mediaControllerManager.hasNotificationAccess()
     val isPlaying = app.mediaControllerManager.isPlaying.collectAsState().value
-    val monitorPaused by app.settingsDataStore.monitorPausedByUser.collectAsState(initial = false)
+    val powerMode by app.settingsDataStore.appPowerMode.collectAsState(initial = AppPowerMode.ON)
     val storyNarrator by app.settingsDataStore.storyNarrator.collectAsState(initial = StoryNarrator.AUTO)
     val llmProvider by app.settingsDataStore.llmProvider.collectAsState(initial = LlmProvider.GROQ)
     val groqApiKey by app.settingsDataStore.groqApiKey.collectAsState(initial = "")
@@ -111,7 +115,7 @@ fun HomeScreen(
         }
     }
 
-    LaunchedEffect(hasAccess, monitorPaused) {
+    LaunchedEffect(hasAccess, powerMode) {
         if (!hasAccess) {
             app.storyOrchestrator.setServiceRunning(false)
             return@LaunchedEffect
@@ -126,11 +130,10 @@ fun HomeScreen(
                 return@LaunchedEffect
             }
         }
-        if (monitorPaused) {
-            app.storyOrchestrator.setServiceRunning(false)
-            return@LaunchedEffect
+        when (powerMode) {
+            AppPowerMode.OFF -> app.storyOrchestrator.setServiceRunning(false)
+            AppPowerMode.PARSE_ONLY, AppPowerMode.ON -> app.monitorLifecycle.ensureListening()
         }
-        app.monitorLifecycle.ensureListening()
     }
 
     if (!hasAccess) {
@@ -140,7 +143,7 @@ fun HomeScreen(
         return
     }
 
-    val isListening = hasAccess && !monitorPaused
+    val isListening = hasAccess && powerMode != AppPowerMode.OFF
     val isSpinning = isListening &&
         uiState.currentTrack != null &&
         (
@@ -170,6 +173,10 @@ fun HomeScreen(
                     titleContentColor = CreamText,
                 ),
                 actions = {
+                    PowerModeToggle(
+                        mode = powerMode,
+                        onClick = { scope.launch { app.monitorLifecycle.cycleAppPowerMode() } },
+                    )
                     IconButton(onClick = onOpenHistory) {
                         Icon(
                             Icons.Default.History,
@@ -207,7 +214,7 @@ fun HomeScreen(
 
                 ServiceStatusRow(
                     hasAccess = hasAccess,
-                    monitorPaused = monitorPaused,
+                    powerMode = powerMode,
                     notificationVisible = uiState.isServiceRunning,
                 )
 
@@ -225,10 +232,10 @@ fun HomeScreen(
                     narratorLabel = storyNarrator.labelRu,
                     state = uiState.state,
                     isBackendFetching = uiState.isBackendFetching,
-                    tracksUntilNext = when (uiState.state) {
-                        OrchestratorState.PREPARING_PLAYBACK,
-                        OrchestratorState.PLAYING_STORY,
-                        -> null
+                    tracksUntilNext = when {
+                        powerMode != AppPowerMode.ON -> null
+                        uiState.state == OrchestratorState.PREPARING_PLAYBACK ||
+                            uiState.state == OrchestratorState.PLAYING_STORY -> null
                         else -> uiState.tracksUntilNext
                     },
                 )
@@ -250,7 +257,12 @@ fun HomeScreen(
                     }
                 }
 
-                if (!hasApiKey && isListening) {
+                if (powerMode == AppPowerMode.PARSE_ONLY && isListening) {
+                    Spacer(modifier = Modifier.height(12.dp))
+                    HintBanner(message = context.getString(R.string.hint_power_mode_parse_only))
+                }
+
+                if (!hasApiKey && isListening && powerMode == AppPowerMode.ON) {
                     Spacer(modifier = Modifier.height(12.dp))
                     HintBanner(message = context.getString(R.string.hint_api_key_missing_banner))
                 }
@@ -307,19 +319,12 @@ fun HomeScreen(
                     )
                 }
 
-                if (hasAccess && monitorPaused && !uiState.isServiceRunning) {
-                    SecondaryStoryButton(
-                        text = context.getString(R.string.action_resume_monitor),
-                        onClick = {
-                            scope.launch { app.monitorLifecycle.resume() }
-                        },
-                    )
-                }
-
                 PrimaryStoryButton(
                     text = context.getString(R.string.action_manual_story),
                     onClick = { app.storyOrchestrator.requestManualStory() },
-                    enabled = uiState.canRequestManualStory && !uiState.isBackendFetching,
+                    enabled = powerMode != AppPowerMode.OFF &&
+                        uiState.canRequestManualStory &&
+                        !uiState.isBackendFetching,
                 )
 
                 if (uiState.isGenerationActive) {
@@ -338,16 +343,38 @@ fun HomeScreen(
 }
 
 @Composable
+private fun PowerModeToggle(
+    mode: AppPowerMode,
+    onClick: () -> Unit,
+) {
+    val context = LocalContext.current
+    val (icon, labelRes, tint) = when (mode) {
+        AppPowerMode.ON -> Triple(Icons.Default.Power, R.string.power_mode_on, LiveGreen)
+        AppPowerMode.PARSE_ONLY -> Triple(Icons.Default.Headphones, R.string.power_mode_parse, GoldBright)
+        AppPowerMode.OFF -> Triple(Icons.Default.PowerOff, R.string.power_mode_off, MutedLavender)
+    }
+    IconButton(onClick = onClick) {
+        Icon(
+            imageVector = icon,
+            contentDescription = context.getString(labelRes),
+            tint = tint,
+            modifier = Modifier.size(26.dp),
+        )
+    }
+}
+
+@Composable
 private fun ServiceStatusRow(
     hasAccess: Boolean,
-    monitorPaused: Boolean,
+    powerMode: AppPowerMode,
     notificationVisible: Boolean,
 ) {
     val context = LocalContext.current
-    val isListening = hasAccess && !monitorPaused
+    val isListening = hasAccess && powerMode != AppPowerMode.OFF
     val dotColor = when {
         !hasAccess -> ErrorCoral
-        monitorPaused -> GoldBright
+        powerMode == AppPowerMode.OFF -> MutedLavender
+        powerMode == AppPowerMode.PARSE_ONLY -> GoldBright
         notificationVisible -> LiveGreen
         isListening -> GoldBright
         else -> MutedLavender
@@ -358,7 +385,8 @@ private fun ServiceStatusRow(
             Text(
                 text = when {
                     !hasAccess -> context.getString(R.string.status_no_access)
-                    monitorPaused -> context.getString(R.string.status_monitoring_paused)
+                    powerMode == AppPowerMode.OFF -> context.getString(R.string.status_power_off)
+                    powerMode == AppPowerMode.PARSE_ONLY -> context.getString(R.string.status_power_parse_only)
                     notificationVisible -> context.getString(R.string.status_monitoring)
                     isListening -> context.getString(R.string.status_waiting_music)
                     else -> context.getString(R.string.status_stopped)
@@ -367,9 +395,16 @@ private fun ServiceStatusRow(
                 color = CreamText,
             )
             when {
-                monitorPaused && hasAccess -> {
+                powerMode == AppPowerMode.OFF && hasAccess -> {
                     Text(
-                        text = context.getString(R.string.status_monitoring_paused_hint),
+                        text = context.getString(R.string.status_power_off_hint),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MutedLavender,
+                    )
+                }
+                powerMode == AppPowerMode.PARSE_ONLY && hasAccess -> {
+                    Text(
+                        text = context.getString(R.string.status_power_parse_only_hint),
                         style = MaterialTheme.typography.bodySmall,
                         color = MutedLavender,
                     )

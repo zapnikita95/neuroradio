@@ -1,257 +1,148 @@
 package com.musicstory.app.domain
 
-
-
 import android.content.Context
-
 import com.musicstory.app.data.local.SettingsDataStore
-
 import com.musicstory.app.media.MediaControllerManager
-
 import com.musicstory.app.media.MediaSessionSelector
-
 import com.musicstory.app.service.MediaMonitorService
-
 import kotlinx.coroutines.CoroutineScope
-
 import kotlinx.coroutines.Job
-
 import kotlinx.coroutines.delay
-
 import kotlinx.coroutines.flow.Flow
-
 import kotlinx.coroutines.flow.combine
-
 import kotlinx.coroutines.flow.distinctUntilChanged
-
 import kotlinx.coroutines.flow.first
-
 import kotlinx.coroutines.launch
 
-
-
 class MonitorLifecycle(
-
     private val context: Context,
-
     private val settingsDataStore: SettingsDataStore,
-
     private val mediaControllerManager: MediaControllerManager,
-
     private val storyOrchestrator: StoryOrchestrator,
-
     private val scope: CoroutineScope,
-
 ) {
 
+    val appPowerMode: Flow<AppPowerMode> = settingsDataStore.appPowerMode
     val monitorPausedByUser: Flow<Boolean> = settingsDataStore.monitorPausedByUser
-
-
 
     private var idleStopJob: Job? = null
 
-
-
     init {
-
         scope.launch {
-
             combine(
-
                 mediaControllerManager.isPlaying,
-
                 mediaControllerManager.activePackage,
-
                 storyOrchestrator.state,
-
-            ) { playing, pkg, orchState ->
-
-                Triple(playing, pkg, orchState)
-
+                settingsDataStore.appPowerMode,
+            ) { playing, pkg, orchState, powerMode ->
+                Triple(playing, pkg, orchState) to powerMode
             }
-
                 .distinctUntilChanged()
-
                 .collect { syncMonitorWithMedia() }
-
         }
-
     }
-
-
 
     fun hasActiveMusicMedia(): Boolean {
-
         val pkg = mediaControllerManager.activePackage.value
-
         if (!MediaSessionSelector.isPreferredPackage(pkg)) return false
-
         if (mediaControllerManager.isPlaying.value) return true
-        // Some OEM builds keep playback state stale; valid metadata is enough to keep monitor awake.
         return mediaControllerManager.effectiveNowPlaying.value?.isValid() == true
-
     }
-
-
 
     private fun shouldShowNotification(): Boolean {
-
         if (storyOrchestrator.isStorySessionActive()) return true
-
         return hasActiveMusicMedia()
-
     }
-
-
 
     suspend fun syncMonitorWithMedia() {
-
-        if (settingsDataStore.monitorPausedByUser.first()) return
-
-
+        when (settingsDataStore.appPowerMode.first()) {
+            AppPowerMode.OFF -> return
+            AppPowerMode.PARSE_ONLY, AppPowerMode.ON -> Unit
+        }
 
         if (shouldShowNotification()) {
-
             idleStopJob?.cancel()
-
             idleStopJob = null
-
             startMonitorServiceIfNeeded()
-
         } else {
-
             scheduleStopWhenIdle()
-
         }
-
     }
-
-
 
     fun ensureListening() {
-
         if (!mediaControllerManager.hasNotificationAccess()) return
-
-        mediaControllerManager.start()
-
-        scope.launch { syncMonitorWithMedia() }
-
+        scope.launch {
+            when (settingsDataStore.appPowerMode.first()) {
+                AppPowerMode.OFF -> return@launch
+                AppPowerMode.PARSE_ONLY, AppPowerMode.ON -> {
+                    mediaControllerManager.start()
+                    syncMonitorWithMedia()
+                }
+            }
+        }
     }
 
-
-
-    suspend fun pauseByUser() {
-
+    suspend fun setAppPowerMode(mode: AppPowerMode) {
         idleStopJob?.cancel()
-
         idleStopJob = null
-
-        settingsDataStore.setMonitorPausedByUser(true)
-
-        storyOrchestrator.stopStory()
-
-        storyOrchestrator.setServiceRunning(false)
-
-        MediaMonitorService.stop(context)
-
+        settingsDataStore.setAppPowerMode(mode)
+        when (mode) {
+            AppPowerMode.OFF -> {
+                storyOrchestrator.stopStory()
+                storyOrchestrator.setServiceRunning(false)
+                MediaMonitorService.stop(context)
+                mediaControllerManager.stop()
+            }
+            AppPowerMode.PARSE_ONLY, AppPowerMode.ON -> {
+                mediaControllerManager.start()
+                syncMonitorWithMedia()
+            }
+        }
     }
 
-
-
-    suspend fun resume() {
-
-        settingsDataStore.setMonitorPausedByUser(false)
-
-        mediaControllerManager.start()
-
-        syncMonitorWithMedia()
-
+    suspend fun cycleAppPowerMode() {
+        val next = settingsDataStore.appPowerMode.first().next()
+        setAppPowerMode(next)
     }
 
+    suspend fun pauseByUser() = setAppPowerMode(AppPowerMode.OFF)
 
+    suspend fun resume() = setAppPowerMode(AppPowerMode.ON)
 
     fun tryWakeFromMusicApp(packageName: String) {
-
         if (!MediaSessionSelector.isPreferredPackage(packageName)) return
-
         scope.launch {
-
+            if (settingsDataStore.appPowerMode.first() == AppPowerMode.OFF) return@launch
             mediaControllerManager.refreshActiveController()
-
-            if (settingsDataStore.monitorPausedByUser.first()) {
-
-                settingsDataStore.setMonitorPausedByUser(false)
-
-            }
-
             syncMonitorWithMedia()
-
         }
-
     }
-
-
 
     fun tryWakeFromActiveMedia() {
-
         scope.launch {
-
+            if (settingsDataStore.appPowerMode.first() == AppPowerMode.OFF) return@launch
             mediaControllerManager.refreshActiveController()
-
-            if (settingsDataStore.monitorPausedByUser.first()) {
-
-                if (!hasActiveMusicMedia()) return@launch
-
-                settingsDataStore.setMonitorPausedByUser(false)
-
-            }
-
             syncMonitorWithMedia()
-
         }
-
     }
-
-
 
     private fun startMonitorServiceIfNeeded() {
-
         MediaMonitorService.start(context)
-
         storyOrchestrator.setServiceRunning(true)
-
     }
-
-
 
     private fun scheduleStopWhenIdle() {
-
         if (idleStopJob?.isActive == true) return
-
         idleStopJob = scope.launch {
-
             delay(IDLE_STOP_DELAY_MS)
-
             if (shouldShowNotification()) return@launch
-
-            if (settingsDataStore.monitorPausedByUser.first()) return@launch
-
+            if (settingsDataStore.appPowerMode.first() == AppPowerMode.OFF) return@launch
             storyOrchestrator.setServiceRunning(false)
-
             MediaMonitorService.stop(context)
-
         }
-
     }
-
-
 
     companion object {
-
         private const val IDLE_STOP_DELAY_MS = 4_000L
-
     }
-
 }
-
-

@@ -44,6 +44,16 @@
     <string name="tour_step_ai_title">Нейросеть</string>
     <string name="tour_step_ai_body">OpenRouter, Groq или Gemini — модель выбираешь здесь (бесплатные :free или своя). Свой ключ снимает лимит сервера.</string>
 
+    <string name="power_mode_on">Включено</string>
+    <string name="power_mode_parse">Только слушаем</string>
+    <string name="power_mode_off">Выключено</string>
+    <string name="status_power_off">Приложение выключено</string>
+    <string name="status_power_off_hint">Нажми кнопку питания сверху, чтобы включить</string>
+    <string name="status_power_parse_only">Слушаем без историй</string>
+    <string name="status_power_parse_only_hint">Треки видны, авто-истории не запускаются</string>
+    <string name="hint_power_mode_parse_only">Режим «только слушаем» — истории вручную через кнопку ниже</string>
+    <string name="hint_app_power_off">Сначала включи приложение — кнопка питания сверху</string>
+
     <string name="status_no_access">Нет доступа к уведомлениям</string>
     <string name="status_monitoring">Музыка играет</string>
     <string name="status_waiting_music">Ожидание музыки</string>

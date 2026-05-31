@@ -11,6 +11,7 @@ import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.core.stringSetPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
+import com.musicstory.app.domain.AppPowerMode
 import com.musicstory.app.domain.GeminiModel
 import com.musicstory.app.domain.GroqModel
 import com.musicstory.app.domain.LlmProvider
@@ -165,9 +166,12 @@ class SettingsDataStore(private val context: Context) {
         TtsEmotion.fromId(prefs[KEY_TTS_EMOTION])
     }
 
-    val monitorPausedByUser: Flow<Boolean> = context.settingsDataStore.data.map { prefs ->
-        prefs[KEY_MONITOR_PAUSED_BY_USER] ?: false
+    val appPowerMode: Flow<AppPowerMode> = context.settingsDataStore.data.map { prefs ->
+        prefs[KEY_APP_POWER_MODE]?.let { AppPowerMode.fromId(it) }
+            ?: if (prefs[KEY_MONITOR_PAUSED_BY_USER] == true) AppPowerMode.OFF else AppPowerMode.ON
     }
+
+    val monitorPausedByUser: Flow<Boolean> = appPowerMode.map { it == AppPowerMode.OFF }
 
     val musicInterruptionMode: Flow<MusicInterruptionMode> = context.settingsDataStore.data.map { prefs ->
         MusicInterruptionMode.fromId(prefs[KEY_MUSIC_INTERRUPTION_MODE])
@@ -346,9 +350,18 @@ class SettingsDataStore(private val context: Context) {
         context.settingsDataStore.edit { it[KEY_TTS_EMOTION] = emotion.id }
     }
 
-    suspend fun setMonitorPausedByUser(paused: Boolean) {
-        context.settingsDataStore.edit { it[KEY_MONITOR_PAUSED_BY_USER] = paused }
+    suspend fun setAppPowerMode(mode: AppPowerMode) {
+        context.settingsDataStore.edit {
+            it[KEY_APP_POWER_MODE] = mode.id
+            it[KEY_MONITOR_PAUSED_BY_USER] = mode == AppPowerMode.OFF
+        }
     }
+
+    suspend fun setMonitorPausedByUser(paused: Boolean) {
+        setAppPowerMode(if (paused) AppPowerMode.OFF else AppPowerMode.ON)
+    }
+
+    suspend fun currentAppPowerMode(): AppPowerMode = appPowerMode.first()
 
     suspend fun setMusicInterruptionMode(mode: MusicInterruptionMode) {
         context.settingsDataStore.edit { it[KEY_MUSIC_INTERRUPTION_MODE] = mode.id }
@@ -405,6 +418,7 @@ class SettingsDataStore(private val context: Context) {
         private val KEY_TTS_VOICE = stringPreferencesKey("tts_voice")
         private val KEY_TTS_SPEED = stringPreferencesKey("tts_speed")
         private val KEY_TTS_EMOTION = stringPreferencesKey("tts_emotion")
+        private val KEY_APP_POWER_MODE = stringPreferencesKey("app_power_mode")
         private val KEY_MONITOR_PAUSED_BY_USER = booleanPreferencesKey("monitor_paused_by_user")
         private val KEY_MUSIC_INTERRUPTION_MODE = stringPreferencesKey("music_interruption_mode")
         private val KEY_MUSIC_FADE_SECONDS = floatPreferencesKey("music_fade_seconds")
