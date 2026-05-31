@@ -74,7 +74,8 @@ class MediaMonitorService : Service() {
                 app.mediaControllerManager.nowPlaying.map { it?.displayKey },
                 MediaNotificationListener.lastNotificationTrack.map { it?.displayKey },
                 MonitorNotificationState.preparingStory,
-            ) { sessionKey, notificationKey, _ -> sessionKey ?: notificationKey }
+                MonitorNotificationState.manualStoryUi,
+            ) { sessionKey, notificationKey, _, _ -> sessionKey ?: notificationKey }
                 .distinctUntilChanged()
                 .collect { key ->
                     val track = app.mediaControllerManager.resolveNowPlayingTrack()
@@ -87,9 +88,13 @@ class MediaMonitorService : Service() {
                 }
         }
         serviceScope.launch {
-            MonitorNotificationState.preparingStory.collect {
-                updateNotification(app.mediaControllerManager.effectiveNowPlaying.value)
-            }
+            combine(
+                MonitorNotificationState.preparingStory,
+                MonitorNotificationState.manualStoryUi,
+            ) { preparing, manualUi -> preparing to manualUi }
+                .collect {
+                    updateNotification(app.mediaControllerManager.effectiveNowPlaying.value)
+                }
         }
     }
 
@@ -139,6 +144,7 @@ class MediaMonitorService : Service() {
         )
 
         val preparing = MonitorNotificationState.preparingStory.value
+        val manualUi = MonitorNotificationState.manualStoryUi.value
         val contentTitle = when {
             preparing -> getString(R.string.app_name)
             track != null && track.isValid() -> "${track.artist} — ${track.title}"
@@ -146,6 +152,7 @@ class MediaMonitorService : Service() {
         }
         val contentText = when {
             preparing -> getString(R.string.notification_preparing_story)
+            manualUi.statusHint != null -> manualUi.statusHint
             track != null && track.isValid() -> friendlySourceLabel(track.packageName)
                 ?: getString(R.string.status_monitoring)
             else -> getString(R.string.notification_listening_hint)
@@ -159,7 +166,7 @@ class MediaMonitorService : Service() {
             .setOngoing(true)
             .setOnlyAlertOnce(true)
 
-        if (!preparing) {
+        if (manualUi.showManualAction && !preparing) {
             builder.addAction(
                 R.drawable.ic_notification,
                 getString(R.string.action_manual_story),

@@ -45,6 +45,8 @@ import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import com.musicstory.app.MusicStoryApp
 import com.musicstory.app.R
+import com.musicstory.app.data.local.SettingsDataStore
+import com.musicstory.app.domain.LlmProvider
 import com.musicstory.app.domain.OrchestratorState
 import com.musicstory.app.domain.StoryNarrator
 import com.musicstory.app.ui.components.GenerationStoryPreview
@@ -77,12 +79,28 @@ fun HomeScreen(
     val isPlaying = app.mediaControllerManager.isPlaying.collectAsState().value
     val monitorPaused by app.settingsDataStore.monitorPausedByUser.collectAsState(initial = false)
     val storyNarrator by app.settingsDataStore.storyNarrator.collectAsState(initial = StoryNarrator.AUTO)
+    val llmProvider by app.settingsDataStore.llmProvider.collectAsState(initial = LlmProvider.GROQ)
+    val groqApiKey by app.settingsDataStore.groqApiKey.collectAsState(initial = "")
+    val geminiApiKey by app.settingsDataStore.geminiApiKey.collectAsState(initial = "")
+    val openRouterApiKey by app.settingsDataStore.openRouterApiKey.collectAsState(initial = "")
+    val localOllamaUrl by app.settingsDataStore.localOllamaUrl.collectAsState(initial = SettingsDataStore.DEFAULT_LOCAL_OLLAMA_URL)
     val scope = rememberCoroutineScope()
+
+    val hasApiKey = when (llmProvider) {
+        LlmProvider.GROQ -> groqApiKey.isNotBlank()
+        LlmProvider.GEMINI -> geminiApiKey.isNotBlank()
+        LlmProvider.OPENROUTER -> openRouterApiKey.isNotBlank()
+        LlmProvider.LOCAL -> localOllamaUrl.isNotBlank()
+    }
 
     DisposableEffect(Unit) {
         onDispose {
             app.storyOrchestrator.onHomeHidden()
         }
+    }
+
+    LaunchedEffect(Unit) {
+        app.storyOrchestrator.recoverStaleUi()
     }
 
     val notificationPermissionLauncher = rememberLauncherForActivityResult(
@@ -127,7 +145,6 @@ fun HomeScreen(
         uiState.currentTrack != null &&
         (
             isPlaying ||
-                uiState.state == OrchestratorState.FETCHING_STORY ||
                 uiState.state == OrchestratorState.PREPARING_PLAYBACK ||
                 uiState.state == OrchestratorState.PLAYING_STORY
             )
@@ -183,10 +200,10 @@ fun HomeScreen(
 
                 VinylDisc(
                     isSpinning = isSpinning,
-                    size = 196.dp,
+                    size = 172.dp,
                 )
 
-                Spacer(modifier = Modifier.height(14.dp))
+                Spacer(modifier = Modifier.height(10.dp))
 
                 ServiceStatusRow(
                     hasAccess = hasAccess,
@@ -207,12 +224,38 @@ fun HomeScreen(
                 OrchestratorStatusLine(
                     narratorLabel = storyNarrator.labelRu,
                     state = uiState.state,
-                    tracksUntilNext = uiState.tracksUntilNext,
+                    isBackendFetching = uiState.isBackendFetching,
+                    tracksUntilNext = when (uiState.state) {
+                        OrchestratorState.PREPARING_PLAYBACK,
+                        OrchestratorState.PLAYING_STORY,
+                        -> null
+                        else -> uiState.tracksUntilNext
+                    },
                 )
 
-                if (uiState.state == OrchestratorState.FETCHING_STORY ||
-                    uiState.state == OrchestratorState.PREPARING_PLAYBACK
-                ) {
+                if (uiState.isBackendFetching) {
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(20.dp),
+                            color = GoldBright,
+                            strokeWidth = 2.dp,
+                        )
+                        Text(
+                            text = context.getString(R.string.state_fetching),
+                            modifier = Modifier.padding(start = 12.dp),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MutedLavender,
+                        )
+                    }
+                }
+
+                if (!hasApiKey && isListening) {
+                    Spacer(modifier = Modifier.height(12.dp))
+                    HintBanner(message = context.getString(R.string.hint_api_key_missing_banner))
+                }
+
+                if (uiState.state == OrchestratorState.PREPARING_PLAYBACK) {
                     Spacer(modifier = Modifier.height(16.dp))
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         CircularProgressIndicator(
@@ -221,16 +264,17 @@ fun HomeScreen(
                             strokeWidth = 2.dp,
                         )
                         Text(
-                            text = when (uiState.state) {
-                                OrchestratorState.PREPARING_PLAYBACK ->
-                                    context.getString(R.string.state_preparing)
-                                else -> context.getString(R.string.state_fetching)
-                            },
+                            text = context.getString(R.string.state_preparing),
                             modifier = Modifier.padding(start = 12.dp),
                             style = MaterialTheme.typography.bodyMedium,
                             color = MutedLavender,
                         )
                     }
+                }
+
+                if (!uiState.hintMessage.isNullOrBlank()) {
+                    Spacer(modifier = Modifier.height(12.dp))
+                    HintBanner(message = uiState.hintMessage!!)
                 }
 
                 if (!uiState.errorMessage.isNullOrBlank()) {
@@ -245,6 +289,8 @@ fun HomeScreen(
                         modifier = Modifier.fillMaxWidth(),
                     )
                 }
+
+                Spacer(modifier = Modifier.height(16.dp))
             }
 
             Column(
@@ -273,17 +319,17 @@ fun HomeScreen(
                 PrimaryStoryButton(
                     text = context.getString(R.string.action_manual_story),
                     onClick = { app.storyOrchestrator.requestManualStory() },
-                    enabled = uiState.state != OrchestratorState.FETCHING_STORY &&
-                        uiState.state != OrchestratorState.PREPARING_PLAYBACK &&
-                        uiState.state != OrchestratorState.PLAYING_STORY,
+                    enabled = uiState.canRequestManualStory && !uiState.isBackendFetching,
                 )
 
-                if (uiState.state == OrchestratorState.PLAYING_STORY ||
-                    uiState.state == OrchestratorState.PREPARING_PLAYBACK
-                ) {
+                if (uiState.isGenerationActive) {
                     SecondaryStoryButton(
-                        text = context.getString(R.string.action_stop_story),
-                        onClick = { app.storyOrchestrator.stopStory() },
+                        text = if (uiState.state == OrchestratorState.PLAYING_STORY) {
+                            context.getString(R.string.action_stop_story)
+                        } else {
+                            context.getString(R.string.action_cancel_generation)
+                        },
+                        onClick = { app.storyOrchestrator.cancelGeneration() },
                     )
                 }
             }
@@ -380,13 +426,13 @@ private fun NowPlayingSection(
 private fun OrchestratorStatusLine(
     narratorLabel: String,
     state: OrchestratorState,
+    isBackendFetching: Boolean,
     tracksUntilNext: Int?,
 ) {
     val context = LocalContext.current
-    val stateLabel = when (state) {
-        OrchestratorState.FETCHING_STORY,
-        OrchestratorState.PREPARING_PLAYBACK,
-        -> null
+    val stateLabel = when {
+        isBackendFetching -> null
+        state == OrchestratorState.PREPARING_PLAYBACK -> null
         else -> orchestratorStateLabel(context, state)
     }
 
@@ -413,6 +459,27 @@ private fun OrchestratorStatusLine(
                 textAlign = TextAlign.Center,
             )
         }
+    }
+}
+
+@Composable
+private fun HintBanner(message: String) {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(
+                color = GoldBright.copy(alpha = 0.10f),
+                shape = RoundedCornerShape(14.dp),
+            )
+            .padding(horizontal = 16.dp, vertical = 12.dp),
+    ) {
+        Text(
+            text = message,
+            style = MaterialTheme.typography.bodyMedium,
+            color = MutedLavender,
+            textAlign = TextAlign.Center,
+            modifier = Modifier.fillMaxWidth(),
+        )
     }
 }
 

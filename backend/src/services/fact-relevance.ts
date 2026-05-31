@@ -1,4 +1,4 @@
-/** Reject Wikipedia/DDG sentences about the wrong band (Van Halen for Dj Jump, etc.). */
+/** Reject Wikipedia/DDG sentences about the wrong act — no hardcoded artist blocklists. */
 
 function normalize(text: string): string {
   return text
@@ -14,98 +14,167 @@ function artistTokens(artist: string): string[] {
     .filter((part) => part.length >= 2);
 }
 
-const KNOWN_FOREIGN_ACTS = [
-  'van halen',
-  'bomfunk mc',
-  'bomfunk',
-  'rick ross',
-  'eminem',
-  'madonna',
-  'the beatles',
-  'led zeppelin',
-  'michael jackson',
-  'britney spears',
-  'taylor swift',
-  'beyonce',
-  'бейонсе',
-  'бейонс',
-  'kanye west',
-  'dr dre',
-  'snoop dogg',
-  'jay z',
-  'джей зи',
-  'джей з',
-  'queen',
-  'nirvana',
-  'metallica',
-  'coldplay',
-];
+/** Outlets / labels — not musical acts. */
+const NON_ACT_PHRASES = new Set(
+  [
+    'popmatters',
+    'pop matters',
+    'billboard',
+    'pitchfork',
+    'rolling stone',
+    'spin magazine',
+    'nme',
+    'variety',
+    'allmusic',
+    'discogs',
+    'musicbrainz',
+    'wikipedia',
+    'american gangster',
+    'cash box',
+  ].map(normalize),
+);
 
-const JAY_Z_PATTERN = /\b(?:jay[\s-]?z|джей[\s-]?z|джей[\s-]?zi)\b/i;
+const CRITIC_AFTER_NAME =
+  /(?:'s|\s+(?:is|was|are|were|has|had|from|of|for|at|in)\b|\s+(?:считает|писал|назвал|отметил|reviewed|wrote|said|believes|praises|notes))\b/i;
 
-function artistIsJayZ(artistNorm: string): boolean {
-  return artistNorm.includes('jay z') || artistNorm.includes('джей z') || artistNorm === 'jay';
+function dedupe(values: string[]): string[] {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const value of values) {
+    const key = normalize(value);
+    if (!key || seen.has(key)) continue;
+    seen.add(key);
+    out.push(value.trim());
+  }
+  return out;
 }
 
-/** Will Jay / Jay-Z style false friends — same token «jay» but different acts. */
-function factConfusesJayArtist(fact: string, artist: string): boolean {
-  const artistNorm = normalize(artist);
-  if (artistIsJayZ(artistNorm)) return false;
-  if (!JAY_Z_PATTERN.test(fact)) return false;
-  if (artistNorm.includes('jay z') || artistNorm.includes('джей z')) return false;
-  const tokens = artistTokens(artist);
-  if (tokens.length === 1 && tokens[0] === 'jay') return false;
-  if (tokens.includes('jay') && !artistIsJayZ(artistNorm)) return true;
-  return !artistNorm.includes('jay');
+function isNonActEntity(name: string): boolean {
+  const n = normalize(name);
+  if (NON_ACT_PHRASES.has(n)) return true;
+  for (const phrase of NON_ACT_PHRASES) {
+    if (n.includes(phrase) || phrase.includes(n)) return true;
+  }
+  return false;
 }
 
-/** Another act is the grammatical subject (e.g. «Van Halen's most successful single»). */
+function isCriticAttribution(fact: string, entity: string): boolean {
+  const idx = fact.indexOf(entity);
+  if (idx < 0) return false;
+  const after = fact.slice(idx + entity.length, idx + entity.length + 80);
+  return CRITIC_AFTER_NAME.test(after);
+}
+
+/** Named entities that could be musical acts (Latin + Cyrillic). */
+function extractNamedEntities(fact: string): string[] {
+  const entities: string[] = [];
+
+  for (const match of fact.matchAll(/\b([A-Z][a-z]+(?:-[A-Z][a-z]+)+)\b/g)) {
+    entities.push(match[1]);
+  }
+  for (const match of fact.matchAll(/\b([A-Z][a-z]+(?:\s+[A-Z][a-z]+){1,3})\b/g)) {
+    entities.push(match[1]);
+  }
+  for (const match of fact.matchAll(/\b([A-Za-z][a-z]+(?:\s+[A-Za-z][a-z]+){0,3})'s\b/g)) {
+    entities.push(match[1]);
+  }
+  for (const match of fact.matchAll(/\b([А-ЯЁ][а-яё]+(?:\s+[А-ЯЁ][а-яё]+){0,2})\b/g)) {
+    entities.push(match[1]);
+  }
+
+  return dedupe(entities);
+}
+
+/**
+ * True when `entity` is the requested artist/title — not a partial token overlap
+ * (e.g. Will Jay ≠ Jay-Z).
+ */
+export function entityMatchesArtist(entity: string, artist: string, title: string): boolean {
+  const e = normalize(entity);
+  const a = normalize(artist);
+  const t = normalize(title.replace(/\s*\([^)]*\)\s*/g, ' '));
+  if (e.length < 2) return false;
+
+  if (e === a || (a.length >= 4 && a.includes(e) && e.split(' ').length >= 2)) return true;
+  if (t.length >= 4 && (e === t || e.includes(t) || t.includes(e))) return true;
+
+  const eTok = e.split(' ').filter((part) => part.length >= 2);
+  const aTok = artistTokens(artist);
+  if (eTok.length === 0 || aTok.length === 0) return false;
+
+  if (
+    eTok.length === aTok.length &&
+    eTok.every((token) => aTok.includes(token)) &&
+    aTok.every((token) => eTok.includes(token))
+  ) {
+    return true;
+  }
+
+  const shared = eTok.filter((token) => aTok.includes(token));
+  if (shared.length === 0) return false;
+
+  // Partial overlap only → different acts (Jay-Z vs Will Jay).
+  if (shared.length < Math.min(eTok.length, aTok.length)) return false;
+
+  return eTok.every((token) => aTok.includes(token));
+}
+
+/** Another act is named in the fact — not the requested artist/title. */
 export function factNamesForeignEntity(fact: string, artist: string, title: string): boolean {
-  const norm = normalize(fact);
   const artistNorm = normalize(artist);
   const titleNorm = normalize(title.replace(/\s*\([^)]*\)\s*/g, ' '));
-  const tokens = artistTokens(artist);
+  const norm = normalize(fact);
 
-  if (factConfusesJayArtist(fact, artist)) return true;
+  for (const entity of extractNamedEntities(fact)) {
+    if (isNonActEntity(entity)) continue;
+    if (isCriticAttribution(fact, entity)) continue;
+    if (entityMatchesArtist(entity, artist, title)) continue;
 
-  for (const foreign of KNOWN_FOREIGN_ACTS) {
-    if (!norm.includes(foreign)) continue;
-    if (artistNorm.includes(foreign) || titleNorm.includes(foreign)) continue;
-    return true;
+    const eNorm = normalize(entity);
+    if (eNorm.length < 3) continue;
+
+    if (eNorm.includes('-') || eNorm.split(' ').length >= 2) return true;
+
+    const aTok = artistTokens(artist);
+    if (aTok.length >= 2 && !aTok.includes(eNorm) && eNorm.length >= 4) return true;
   }
 
-  const possessive = [...norm.matchAll(/\b([a-z0-9][a-z0-9\s]{1,24})'s\b/g)];
-  for (const [, subject] of possessive) {
-    const subj = subject.trim();
-    if (subj.length < 3) continue;
-    if (artistNorm.includes(subj) || titleNorm.includes(subj)) continue;
-    const overlaps = tokens.length > 0 && tokens.every((t) => subj.includes(t) || norm.includes(t));
-    if (!overlaps) return true;
-  }
-
-  const properLead = [
-    ...fact.matchAll(
-      /\b([A-Z][a-z]+(?:\s+[A-Z][a-z]+){0,2})(?:'s|\s+(?:is|was|are|were|has|had|считает|писал|назвал|отметил))\b/g,
-    ),
-  ];
-  for (const [, name] of properLead) {
-    const n = normalize(name);
-    if (n.length < 4) continue;
-    if (artistNorm.includes(n) || titleNorm.includes(n)) continue;
-    if (tokens.length > 0 && tokens.every((t) => n.includes(t))) continue;
-    return true;
+  // Normalized multi-word phrases: «jay z» when artist is «will jay».
+  const words = norm.split(' ').filter(Boolean);
+  for (let i = 0; i < words.length - 1; i++) {
+    const phrase = `${words[i]} ${words[i + 1]}`;
+    if (phrase.length < 5) continue;
+    if (artistNorm.includes(phrase) || titleNorm.includes(phrase)) continue;
+    if (entityMatchesArtist(phrase, artist, title)) continue;
+    const aTok = artistTokens(artist);
+    if (aTok.length >= 2 && aTok.includes(words[i]) && !aTok.includes(words[i + 1])) {
+      return true;
+    }
   }
 
   return false;
 }
 
 export function factMentionsArtist(fact: string, artist: string): boolean {
-  const tokens = artistTokens(artist);
-  const norm = normalize(fact);
-  if (tokens.length === 0) return false;
-  if (tokens.every((token) => norm.includes(token))) return true;
   const artistNorm = normalize(artist);
-  return artistNorm.length >= 3 && norm.includes(artistNorm);
+  const factNorm = normalize(fact);
+  if (artistNorm.length >= 3 && factNorm.includes(artistNorm)) return true;
+
+  const tokens = artistTokens(artist);
+  if (tokens.length === 0) return false;
+  if (tokens.length === 1) return factNorm.includes(tokens[0]);
+
+  const words = factNorm.split(' ');
+  for (let i = 0; i < words.length; i++) {
+    let matched = 0;
+    for (let j = i; j < words.length && j < i + 10; j++) {
+      if (words[j] === tokens[matched]) {
+        matched++;
+        if (matched === tokens.length) return true;
+      }
+    }
+  }
+  return false;
 }
 
 export function factMentionsTitle(fact: string, title: string): boolean {

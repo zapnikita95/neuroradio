@@ -4,21 +4,24 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import com.musicstory.app.MusicStoryApp
-import com.musicstory.app.domain.MonitorNotificationState
-import com.musicstory.app.service.MediaMonitorService
+import com.musicstory.app.util.StoryLog
 import kotlinx.coroutines.launch
 
 class StoryActionReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent?) {
         val app = context.applicationContext as? MusicStoryApp ?: return
-        when (intent?.action) {
-            ACTION_MANUAL_STORY -> {
-                MonitorNotificationState.setPreparing(true)
-                MediaMonitorService.refreshNotification(context)
-                app.storyOrchestrator.requestManualStory()
-            }
-            ACTION_STOP_MONITOR -> app.appScope.launch {
-                app.monitorLifecycle.pauseByUser()
+        val pendingResult = goAsync()
+        app.appScope.launch {
+            try {
+                when (intent?.action) {
+                    ACTION_MANUAL_STORY -> {
+                        StoryLog.i("Notification action: manual story")
+                        app.storyOrchestrator.requestManualStory(fromNotification = true)
+                    }
+                    ACTION_STOP_MONITOR -> app.monitorLifecycle.pauseByUser()
+                }
+            } finally {
+                pendingResult.finish()
             }
         }
     }

@@ -58,7 +58,7 @@ fun GenerationStoryPreview(
         }
     }
 
-    val maxHeight = (LocalConfiguration.current.screenHeightDp * 0.28f).coerceIn(120f, 240f).dp
+    val maxHeight = (LocalConfiguration.current.screenHeightDp * 0.22f).coerceIn(96f, 200f).dp
 
     Surface(
         modifier = modifier

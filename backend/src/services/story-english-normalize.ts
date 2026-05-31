@@ -65,6 +65,8 @@ export const MUSIC_PROPER_NOUNS = new Set([
   'jackson',
   'madonna',
   'elvis',
+  'flow',
+  'flo',
 ]);
 
 /** Generic English → Russian (not proper nouns). Longer phrases first. */
@@ -82,6 +84,10 @@ export const GENERIC_ENGLISH_REPLACEMENTS: Array<[RegExp, string]> = [
   [/\bunderground\b/gi, 'андеграунд'],
   [/\bperformance\b/gi, 'выступление'],
   [/\bperformances\b/gi, 'выступления'],
+  [/\bvocal delivery\b/gi, 'подача'],
+  [/\bdelivery\b/gi, 'подача'],
+  [/\bflow\b/gi, 'флоу'],
+  [/\bflo\b/gi, 'флоу'],
   [/\bengineers\b/gi, 'звукорежиссёры'],
   [/\bengineer\b/gi, 'звукорежиссёр'],
   [/\bmonitors\b/gi, 'мониторы'],
@@ -176,13 +182,23 @@ export function buildAllowedLatinTokens(
   return allowed;
 }
 
+/** LLM often mistranslates vocal «delivery» as shipping «доставка». */
+export function fixMusicalMistranslations(text: string): string {
+  return text
+    .replace(/\bдоставок\b/gi, 'подач')
+    .replace(/\bдоставкой\b/gi, 'подачей')
+    .replace(/\bдоставку\b/gi, 'подачу')
+    .replace(/\bдоставки\b/gi, 'подачи')
+    .replace(/\bдоставка\b/gi, 'подача');
+}
+
 /** Replace generic English; leave proper nouns intact. */
 export function replaceGenericEnglish(text: string): string {
   let result = text;
   for (const [pattern, replacement] of GENERIC_ENGLISH_REPLACEMENTS) {
     result = result.replace(pattern, replacement);
   }
-  return result.replace(/\s{2,}/g, ' ').trim();
+  return fixMusicalMistranslations(result.replace(/\s{2,}/g, ' ').trim());
 }
 
 export interface StoryLanguageContext {
@@ -202,6 +218,7 @@ export function prepareStoryScriptLanguage(
     text = text.replace(re, phrase);
   }
   text = replaceGenericEnglish(text);
+  text = fixMusicalMistranslations(text);
   const allowedLatin = buildAllowedLatinTokens(ctx.artist, ctx.title, ctx.referenceFacts ?? [], text);
   return { text, allowedLatin };
 }

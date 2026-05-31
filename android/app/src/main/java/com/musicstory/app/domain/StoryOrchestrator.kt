@@ -1,6 +1,7 @@
 package com.musicstory.app.domain
 
 import android.content.Context
+import android.widget.Toast
 import com.musicstory.app.R
 import com.musicstory.app.data.local.SettingsDataStore
 import com.musicstory.app.data.model.StoryResponse
@@ -51,6 +52,12 @@ data class OrchestratorUiState(
     val tracksUntilNext: Int? = null,
     val isServiceRunning: Boolean = false,
     val generationPreview: GenerationPreviewState = GenerationPreviewState(),
+    /** Запрос на сервер или озвучка — показываем «Отменить». */
+    val isGenerationActive: Boolean = false,
+    /** POST /v1/story/full in flight — «Готовим историю…». */
+    val isBackendFetching: Boolean = false,
+    /** Manual «Рассказать историю» allowed (cooldown gate). */
+    val canRequestManualStory: Boolean = true,
 )
 
 data class GenerationPreviewState(
@@ -74,6 +81,14 @@ class StoryOrchestrator(
     private var playbackSession = 0
     private var activeStoryJob: Job? = null
     private var inFlightTrackKey: String? = null
+    /** When playback of the last story actually started (for notification cooldown). */
+    private var lastStoryStartedAtMs: Long = 0L
+    private var cooldownRefreshJob: Job? = null
+    /** True while a story job is running (fetch + playback prep). */
+    private var generationInFlight = false
+    /** True only while POST /v1/story/full is in flight. */
+    private var backendFetchInFlight = false
+    private var manualStoryGateAllowed = true
 
     private val _mode = MutableStateFlow(OrchestratorMode.AUTO)
     val mode: StateFlow<OrchestratorMode> = _mode.asStateFlow()
@@ -100,7 +115,23 @@ class StoryOrchestrator(
     private var previewJob: Job? = null
 
     private fun publishUiState() {
-        if (_state.value != OrchestratorState.FETCHING_STORY &&
+        if (_state.value == OrchestratorState.FETCHING_STORY &&
+            !backendFetchInFlight &&
+            !generationInFlight &&
+            activeStoryJob?.isActive != true
+        ) {
+            StoryLog.w("Stale FETCHING state — reset to LISTENING")
+            _state.value = OrchestratorState.LISTENING
+        }
+        val generationActive = generationInFlight ||
+            activeStoryJob?.isActive == true ||
+            backendFetchInFlight ||
+            _state.value == OrchestratorState.FETCHING_STORY ||
+            _state.value == OrchestratorState.PREPARING_PLAYBACK ||
+            _state.value == OrchestratorState.PLAYING_STORY
+        if (!backendFetchInFlight &&
+            !generationActive &&
+            _state.value != OrchestratorState.FETCHING_STORY &&
             _state.value != OrchestratorState.PREPARING_PLAYBACK
         ) {
             if (MonitorNotificationState.preparingStory.value) {
@@ -117,7 +148,80 @@ class StoryOrchestrator(
             tracksUntilNext = _tracksUntilNext.value,
             isServiceRunning = _serviceRunning.value,
             generationPreview = _generationPreview.value,
+            isGenerationActive = generationActive,
+            isBackendFetching = backendFetchInFlight,
+            canRequestManualStory = manualStoryGateAllowed,
         )
+        refreshManualStoryNotificationGate(generationActive)
+    }
+
+    private fun refreshManualStoryNotificationGate(isGenerationActive: Boolean) {
+        scope.launch {
+            val track = mediaControllerManager.effectiveNowPlaying.value
+            val hasTrack = track?.isValid() == true
+            val hasApiKey = storyRepository.hasOwnApiKeyConfigured()
+            val preparing = MonitorNotificationState.preparingStory.value
+            val gate = ManualStoryGate.evaluate(
+                lastStoryStartedAtMs = lastStoryStartedAtMs,
+                hasValidTrack = hasTrack,
+                hasApiKey = hasApiKey,
+                isGenerationActive = isGenerationActive,
+                isBackendFetching = backendFetchInFlight,
+                preparingFromNotification = preparing,
+            )
+            manualStoryGateAllowed = gate.allowed
+            MonitorNotificationState.setManualStoryUi(gate.showAction, gate.userMessage)
+            _uiState.value = _uiState.value.copy(
+                canRequestManualStory = gate.allowed,
+                isBackendFetching = backendFetchInFlight,
+            )
+            if (gate.retryInMs > 0L) {
+                scheduleCooldownNotificationRefresh(gate.retryInMs)
+            } else {
+                MediaMonitorService.refreshNotification(context)
+            }
+        }
+    }
+
+    private fun scheduleCooldownNotificationRefresh(delayMs: Long) {
+        cooldownRefreshJob?.cancel()
+        cooldownRefreshJob = scope.launch {
+            delay(delayMs + 100L)
+            val generationActive = generationInFlight ||
+                activeStoryJob?.isActive == true ||
+                _state.value == OrchestratorState.FETCHING_STORY ||
+                _state.value == OrchestratorState.PREPARING_PLAYBACK ||
+                _state.value == OrchestratorState.PLAYING_STORY
+            refreshManualStoryNotificationGate(generationActive)
+            MediaMonitorService.refreshNotification(context)
+        }
+    }
+
+    private suspend fun evaluateManualStoryGate(): ManualStoryGate.Result {
+        val track = mediaControllerManager.effectiveNowPlaying.value
+        val generationActive = generationInFlight ||
+            activeStoryJob?.isActive == true ||
+            _state.value == OrchestratorState.FETCHING_STORY ||
+            _state.value == OrchestratorState.PREPARING_PLAYBACK ||
+            _state.value == OrchestratorState.PLAYING_STORY
+        return ManualStoryGate.evaluate(
+            lastStoryStartedAtMs = lastStoryStartedAtMs,
+            hasValidTrack = track?.isValid() == true,
+            hasApiKey = storyRepository.hasOwnApiKeyConfigured(),
+            isGenerationActive = generationActive,
+            isBackendFetching = backendFetchInFlight,
+            preparingFromNotification = MonitorNotificationState.preparingStory.value,
+        )
+    }
+
+    private fun showManualStoryBlocked(message: String, fromNotification: Boolean) {
+        if (fromNotification) {
+            Toast.makeText(context.applicationContext, message, Toast.LENGTH_SHORT).show()
+            MediaMonitorService.refreshNotification(context)
+        } else {
+            _hintMessage.value = message
+            publishUiState()
+        }
     }
 
     init {
@@ -149,6 +253,13 @@ class StoryOrchestrator(
                 }
             }
         }
+
+        scope.launch {
+            while (true) {
+                delay(5_000)
+                reconcileGenerationState()
+            }
+        }
     }
 
     fun setServiceRunning(running: Boolean) {
@@ -160,12 +271,34 @@ class StoryOrchestrator(
         if (running) {
             checkOverdueAutoTrigger()
         }
+        reconcileGenerationState()
+    }
+
+    /** UI must not stay «Готовим историю» if the coroutine already died. */
+    private fun reconcileGenerationState() {
+        val jobDead = activeStoryJob?.isActive != true
+        if ((generationInFlight || backendFetchInFlight || _state.value == OrchestratorState.FETCHING_STORY) && jobDead) {
+            StoryLog.w("Generation stale — clearing (no active job, state=${_state.value})")
+            generationInFlight = false
+            backendFetchInFlight = false
+            if (_state.value == OrchestratorState.FETCHING_STORY ||
+                _state.value == OrchestratorState.PREPARING_PLAYBACK
+            ) {
+                _state.value = OrchestratorState.LISTENING
+            }
+            if (MonitorNotificationState.preparingStory.value) {
+                MonitorNotificationState.setPreparing(false)
+                MediaMonitorService.refreshNotification(context)
+            }
+            publishUiState()
+        }
     }
 
     /** Counter already at N (e.g. restored) but story never fired — trigger on current track. */
     private fun checkOverdueAutoTrigger() {
         scope.launch {
             if (_mode.value != OrchestratorMode.AUTO || isStorySessionActive()) return@launch
+            if (!storyRepository.hasOwnApiKeyConfigured()) return@launch
             val track = mediaControllerManager.effectiveNowPlaying.value ?: return@launch
             if (!track.isValid()) return@launch
             val settings = loadTriggerSettings()
@@ -184,7 +317,7 @@ class StoryOrchestrator(
     }
 
     fun isStorySessionActive(): Boolean {
-        return _state.value == OrchestratorState.FETCHING_STORY ||
+        return generationInFlight ||
             _state.value == OrchestratorState.PREPARING_PLAYBACK ||
             _state.value == OrchestratorState.PLAYING_STORY
     }
@@ -223,20 +356,33 @@ class StoryOrchestrator(
             playStoryForTrack(track, manual = false)
         } else if (_state.value != OrchestratorState.PLAYING_STORY &&
             _state.value != OrchestratorState.PREPARING_PLAYBACK &&
-            _state.value != OrchestratorState.FETCHING_STORY
+            !generationInFlight
         ) {
             _state.value = OrchestratorState.LISTENING
         }
         publishUiState()
     }
 
-    fun requestManualStory() {
-        val track = mediaControllerManager.effectiveNowPlaying.value
-        if (track == null || !track.isValid()) {
-            showNoTrackHint()
-            return
+    fun requestManualStory(fromNotification: Boolean = false) {
+        scope.launch {
+            val gate = evaluateManualStoryGate()
+            if (!gate.allowed) {
+                gate.userMessage?.let { showManualStoryBlocked(it, fromNotification) }
+                return@launch
+            }
+            val track = mediaControllerManager.effectiveNowPlaying.value
+            if (track == null || !track.isValid()) {
+                showNoTrackHint()
+                return@launch
+            }
+            StoryLog.i("Manual story requested: ${track.artist} — ${track.title}")
+            backendFetchInFlight = true
+            MonitorNotificationState.setPreparing(true)
+            _state.value = OrchestratorState.FETCHING_STORY
+            publishUiState()
+            MediaMonitorService.refreshNotification(context)
+            playStoryForTrack(track, manual = true)
         }
-        playStoryForTrack(track, manual = true)
     }
 
     private fun showNoTrackHint() {
@@ -248,23 +394,47 @@ class StoryOrchestrator(
 
     private fun playStoryForTrack(requestedTrack: TrackInfo, manual: Boolean) {
         cancelInFlightGenerationImmediate("superseded")
-        val session = ++playbackSession
-        inFlightTrackKey = requestedTrack.displayKey
-        cancelGenerationPreview()
-        _tracksUntilNext.value = null
-        _state.value = OrchestratorState.FETCHING_STORY
+        generationInFlight = true
         _errorMessage.value = null
         _hintMessage.value = null
+        if (_state.value != OrchestratorState.PLAYING_STORY &&
+            _state.value != OrchestratorState.PREPARING_PLAYBACK
+        ) {
+            _state.value = OrchestratorState.LISTENING
+        }
         publishUiState()
 
         activeStoryJob = scope.launch {
+            if (!storyRepository.hasOwnApiKeyConfigured()) {
+                StoryLog.i("Story blocked: API key not configured")
+                backendFetchInFlight = false
+                MonitorNotificationState.setPreparing(false)
+                handleStoryBlockedNoApiKey(manual)
+                generationInFlight = false
+                if (manual) {
+                    MonitorNotificationState.setPreparing(false)
+                    MediaMonitorService.refreshNotification(context)
+                }
+                return@launch
+            }
+
+            val session = ++playbackSession
+            inFlightTrackKey = requestedTrack.displayKey
+            cancelGenerationPreview()
+            _tracksUntilNext.value = null
+            publishUiState()
+
             try {
                 executeStoryPipeline(session, requestedTrack, manual)
             } catch (e: CancellationException) {
                 if (e is TimeoutCancellationException) {
-                    StoryLog.e("Story pipeline timeout after ${STORY_FETCH_TIMEOUT_MS}ms", e)
-                    _errorMessage.value =
-                        "Слишком долго ждём ответ сервера. Проверь интернет, Railway и OPEN_ROUTER_API_KEY."
+                    StoryLog.e("Story pipeline timeout", e)
+                    val isLocal = settingsDataStore.llmProvider.first() == LlmProvider.LOCAL
+                    _errorMessage.value = if (isLocal) {
+                        "Слишком долго ждём локальную модель (до 20 мин). Смотри логи: Music story\\logs\\local-bff.log"
+                    } else {
+                        "Слишком долго ждём ответ сервера. Проверь интернет и backend."
+                    }
                     _state.value = OrchestratorState.ERROR
                     publishUiState()
                 } else {
@@ -277,12 +447,33 @@ class StoryOrchestrator(
                 _state.value = OrchestratorState.ERROR
                 publishUiState()
             } finally {
+                generationInFlight = false
                 inFlightTrackKey = null
                 if (_state.value == OrchestratorState.FETCHING_STORY) {
-                    scope.launch { abortGeneration(session, manual, rollbackAutoTrigger = !manual) }
+                    if (isSessionCurrent(session)) {
+                        abortGeneration(session, manual, rollbackAutoTrigger = !manual)
+                    } else {
+                        _state.value = OrchestratorState.LISTENING
+                        publishUiState()
+                    }
                 }
+                reconcileGenerationState()
             }
         }
+    }
+
+    private suspend fun handleStoryBlockedNoApiKey(manual: Boolean) {
+        if (manual) {
+            _errorMessage.value = null
+            _hintMessage.value = context.getString(R.string.hint_api_key_required)
+        } else {
+            val everyN = settingsDataStore.everyNTracks.first()
+            triggerEngine.rollbackFailedStoryTrigger(everyN)
+            settingsDataStore.setTracksSinceLastStory(triggerEngine.currentTracksSinceLastStory())
+        }
+        _state.value = OrchestratorState.LISTENING
+        refreshTracksUntilNext()
+        publishUiState()
     }
 
     /** Generation aborted (track changed, stale result, timeout) — return to listening. */
@@ -291,7 +482,13 @@ class StoryOrchestrator(
         manual: Boolean,
         rollbackAutoTrigger: Boolean,
     ) {
-        if (!isSessionCurrent(session)) return
+        if (!isSessionCurrent(session)) {
+            if (_state.value == OrchestratorState.FETCHING_STORY) {
+                _state.value = OrchestratorState.LISTENING
+                publishUiState()
+            }
+            return
+        }
         cancelGenerationPreview()
         if (rollbackAutoTrigger && !manual) {
             val everyN = settingsDataStore.everyNTracks.first()
@@ -339,8 +536,26 @@ class StoryOrchestrator(
             return
         }
 
-        val result = withTimeout(STORY_FETCH_TIMEOUT_MS) {
-            storyRepository.fetchStory(track, forceRefresh = true)
+        if (!backendFetchInFlight) {
+            backendFetchInFlight = true
+            MonitorNotificationState.setPreparing(true)
+            _state.value = OrchestratorState.FETCHING_STORY
+            publishUiState()
+        }
+
+        val fetchTimeoutMs = if (settingsDataStore.llmProvider.first() == LlmProvider.LOCAL) {
+            LOCAL_STORY_FETCH_TIMEOUT_MS
+        } else {
+            STORY_FETCH_TIMEOUT_MS
+        }
+        val result = try {
+            withTimeout(fetchTimeoutMs) {
+                storyRepository.fetchStory(track, forceRefresh = true)
+            }
+        } finally {
+            backendFetchInFlight = false
+            MonitorNotificationState.setPreparing(false)
+            MediaMonitorService.refreshNotification(context)
         }
         if (!isSessionCurrent(session) || !isTrackStillCurrent(session, track)) {
             StoryLog.i("Track changed during fetch — discard ${track.artist}")
@@ -385,6 +600,7 @@ class StoryOrchestrator(
                         resumeMusic = true,
                         onPlaybackStarted = {
                             if (!isSessionCurrent(session)) return@playStory
+                            lastStoryStartedAtMs = System.currentTimeMillis()
                             scope.launch {
                                 if (!manual) {
                                     withContext(Dispatchers.Main.immediate) {
@@ -460,8 +676,7 @@ class StoryOrchestrator(
 
     private suspend fun cancelStaleGenerationForNewTrack(track: TrackInfo, reason: String) {
         val inFlight = inFlightTrackKey
-        val generating = activeStoryJob?.isActive == true ||
-            _state.value == OrchestratorState.FETCHING_STORY ||
+        val generating = activeStoryJob?.isActive == true || generationInFlight ||
             _state.value == OrchestratorState.PREPARING_PLAYBACK
         if (!generating) return
         if (inFlight != null && inFlight == track.displayKey) return
@@ -469,9 +684,12 @@ class StoryOrchestrator(
     }
 
     private fun cancelInFlightGenerationImmediate(reason: String) {
-        val wasFetching = _state.value == OrchestratorState.FETCHING_STORY ||
+        val wasActive = generationInFlight ||
+            _state.value == OrchestratorState.FETCHING_STORY ||
             _state.value == OrchestratorState.PREPARING_PLAYBACK
         playbackSession++
+        generationInFlight = false
+        backendFetchInFlight = false
         activeStoryJob?.cancel(CancellationException(reason))
         activeStoryJob = null
         inFlightTrackKey = null
@@ -480,7 +698,7 @@ class StoryOrchestrator(
             MonitorNotificationState.setPreparing(false)
             MediaMonitorService.refreshNotification(context)
         }
-        if (wasFetching) {
+        if (wasActive) {
             _state.value = OrchestratorState.LISTENING
         }
         StoryLog.i("Story generation cancelled: $reason")
@@ -488,9 +706,12 @@ class StoryOrchestrator(
     }
 
     private suspend fun cancelInFlightGeneration(reason: String, rollbackAutoTrigger: Boolean) {
-        val wasFetching = _state.value == OrchestratorState.FETCHING_STORY ||
+        val wasActive = generationInFlight ||
+            _state.value == OrchestratorState.FETCHING_STORY ||
             _state.value == OrchestratorState.PREPARING_PLAYBACK
         playbackSession++
+        generationInFlight = false
+        backendFetchInFlight = false
         activeStoryJob?.cancel(CancellationException(reason))
         activeStoryJob = null
         inFlightTrackKey = null
@@ -499,7 +720,7 @@ class StoryOrchestrator(
             MonitorNotificationState.setPreparing(false)
             MediaMonitorService.refreshNotification(context)
         }
-        if (wasFetching) {
+        if (wasActive) {
             _state.value = OrchestratorState.LISTENING
             if (rollbackAutoTrigger) {
                 val everyN = settingsDataStore.everyNTracks.first()
@@ -555,6 +776,16 @@ class StoryOrchestrator(
             }
             publishUiState()
         }
+    }
+
+    /** Сброс залипшего «Готовим историю» при открытии главного экрана. */
+    fun recoverStaleUi() {
+        reconcileGenerationState()
+        publishUiState()
+    }
+
+    fun cancelGeneration() {
+        stopStory()
     }
 
     fun stopStory() {
@@ -648,6 +879,8 @@ class StoryOrchestrator(
         private const val PLAYBACK_START_TIMEOUT_MS = 25_000L
         /** Metadata + backend /v1/story/full — must not leave UI stuck in FETCHING. */
         private const val STORY_FETCH_TIMEOUT_MS = 90_000L
+        /** Local Ollama on PC BFF — 35b model + research. */
+        private const val LOCAL_STORY_FETCH_TIMEOUT_MS = 1_200_000L
         private const val PREVIEW_REVEAL_MAX_MS = 7_000L
         private const val PREVIEW_HOLD_MS = 7_000L
     }

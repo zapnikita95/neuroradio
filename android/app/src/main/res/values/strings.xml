@@ -55,6 +55,7 @@
     <string name="notification_preparing_story">Готовим историю…</string>
     <string name="action_stop_monitor">Остановить</string>
     <string name="action_stop_story">Остановить историю</string>
+    <string name="action_cancel_generation">Отменить</string>
     <string name="action_resume_monitor">Возобновить мониторинг</string>
     <string name="status_monitoring_paused">Мониторинг приостановлен</string>
     <string name="status_monitoring_paused_hint">Включится сам, когда откроешь Spotify или Яндекс Музыку</string>
@@ -66,6 +67,8 @@
     <string name="label_now_playing">Сейчас играет</string>
     <string name="label_no_track">Трек не определён</string>
     <string name="hint_no_track_for_story">Включи трек в Spotify или Яндекс Музыке — тогда нажми «Рассказать историю»</string>
+    <string name="hint_api_key_required">Сначала укажи API-ключ: Настройки → AI → вставь ключ → Сохранить</string>
+    <string name="hint_api_key_missing_banner">Истории не запускаются, пока не сохранён API-ключ (Настройки → AI)</string>
     <string name="label_source">Источник: %1$s</string>
     <string name="label_orchestrator">Режим работы</string>
     <string name="label_tracks_until_story">До следующей истории: %1$d трек(ов)</string>
@@ -103,7 +106,14 @@
     <string name="settings_music_fade_hint">Используется только в режиме «Плавное затемнение»</string>
     <string name="settings_ai_section">AI</string>
     <string name="settings_llm_provider">Провайдер AI</string>
-    <string name="settings_llm_provider_hint">OpenRouter, Groq или Gemini. При лимите сервер попробует другой провайдер, если ключи настроены.</string>
+    <string name="settings_llm_provider_hint">OpenRouter, Groq, Gemini или локальный Ollama (ZeroTier). При лимите сервер попробует другой провайдер, если ключи настроены.</string>
+    <string name="settings_local_backend_url">URL сервера на ПК (BFF)</string>
+    <string name="settings_local_backend_url_hint">Телефон ходит сюда. Из окна start-local-bff.bat, например http://10.196.221.190:3000</string>
+    <string name="settings_local_ollama_url">URL Ollama (на ПК с BFF)</string>
+    <string name="settings_local_ollama_url_hint">С точки зрения ПК: http://127.0.0.1:11435 — не путать с URL сервера выше.</string>
+    <string name="settings_local_ollama_model">Модель Ollama</string>
+    <string name="settings_local_ollama_model_hint">Например qwen3.6:35b-a3b-q4_K_M</string>
+    <string name="settings_local_status_ok">Ollama настроен</string>
     <string name="settings_openrouter_model">Модель OpenRouter</string>
     <string name="settings_openrouter_model_hint">Бесплатные модели с суффиксом :free. Можно указать свою с openrouter.ai/models</string>
     <string name="settings_openrouter_custom_model">Своя модель OpenRouter</string>
@@ -137,7 +147,7 @@
     <string name="settings_unlimited_groq">Без дневного лимита</string>
     <string name="settings_groq_status_ok">Ключ сохранён</string>
     <string name="settings_groq_status_missing">Без своего ключа — до 10 историй в день на сервере</string>
-    <string name="settings_own_api_key_hint">Сохрани оба ключа (Groq и Gemini): при лимите одного приложение переключится на второй.</string>
+    <string name="settings_own_api_key_hint">Ключ передаётся на Railway по HTTPS, используется только для запроса и не сохраняется на сервере. Из РФ Groq и Gemini напрямую недоступны — только через сервер.</string>
     <string name="story_source_ai">AI</string>
 
     <string name="trigger_every_n">Каждые N треков</string>
