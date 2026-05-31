@@ -1,5 +1,7 @@
 /** Reject Wikipedia/DDG sentences about the wrong act — no hardcoded artist blocklists. */
 
+import { collaboratorNames } from './artist-primary.js';
+
 function normalize(text: string): string {
   return text
     .toLowerCase()
@@ -94,7 +96,7 @@ function extractNamedEntities(fact: string): string[] {
  * True when `entity` is the requested artist/title — not a partial token overlap
  * (e.g. Will Jay ≠ Jay-Z).
  */
-export function entityMatchesArtist(entity: string, artist: string, title: string): boolean {
+function entityMatchesSingle(entity: string, artist: string, title: string): boolean {
   const e = normalize(entity);
   const a = normalize(artist);
   const t = normalize(title.replace(/\s*\([^)]*\)\s*/g, ' '));
@@ -122,6 +124,14 @@ export function entityMatchesArtist(entity: string, artist: string, title: strin
   if (shared.length < Math.min(eTok.length, aTok.length)) return false;
 
   return eTok.every((token) => aTok.includes(token));
+}
+
+export function entityMatchesArtist(entity: string, artist: string, title: string): boolean {
+  if (entityMatchesSingle(entity, artist, title)) return true;
+  for (const collab of collaboratorNames(artist)) {
+    if (collab !== artist && entityMatchesSingle(entity, collab, title)) return true;
+  }
+  return false;
 }
 
 /** Quoted spans are usually track/album titles, not other artists. */
