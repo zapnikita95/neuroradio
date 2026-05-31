@@ -14,8 +14,8 @@ import {
 } from './openrouter.js';
 import { generateStoryScriptLocal } from './local-ollama-story.js';
 import {
+  alternateLlmProviders,
   hasLlmKeyForProvider,
-  LLM_PROVIDER_ORDER,
   type LlmProviderId,
 } from './llm-provider.js';
 
@@ -34,6 +34,21 @@ async function generateForProvider(
   return generateGroqStory(input);
 }
 
+function inputForProvider(
+  input: GenerateStoryInput,
+  provider: LlmProviderId,
+  isFallback: boolean,
+): GenerateStoryInput {
+  if (!isFallback) return input;
+  // On fallback use Railway server keys — client's exhausted Groq/OpenRouter must not block retry.
+  return {
+    ...input,
+    clientGroqApiKey: provider === 'groq' ? undefined : input.clientGroqApiKey,
+    clientGeminiApiKey: provider === 'gemini' ? undefined : input.clientGeminiApiKey,
+    clientOpenRouterApiKey: provider === 'openrouter' ? undefined : input.clientOpenRouterApiKey,
+  };
+}
+
 export async function generateStoryWithFallback(
   input: GenerateStoryInput,
   preferred: LlmProviderId,
@@ -47,13 +62,35 @@ export async function generateStoryWithFallback(
     baseUrl: input.localOllamaBaseUrl,
     model: input.localOllamaModel,
   };
-  if (!LLM_PROVIDER_ORDER.some((p) => hasLlmKeyForProvider(p, clientKeys, clientLocal))) {
+  const chain = [
+    preferred,
+    ...alternateLlmProviders(preferred, clientKeys, clientLocal),
+  ].filter((provider) => hasLlmKeyForProvider(provider, clientKeys, clientLocal));
+
+  if (chain.length === 0) {
     throw new Error('No LLM API keys configured on server');
   }
 
-  const story = await generateForProvider(preferred, input);
-  console.log(`[story-llm] ok provider=${preferred}`);
-  return { story, llmUsed: preferred };
+  let lastError: unknown;
+  for (let i = 0; i < chain.length; i++) {
+    const provider = chain[i]!;
+    const isFallback = i > 0;
+    try {
+      const story = await generateForProvider(provider, inputForProvider(input, provider, isFallback));
+      if (isFallback) {
+        console.warn(`[story-llm] ok provider=${provider} (fallback after ${preferred})`);
+      } else {
+        console.log(`[story-llm] ok provider=${provider}`);
+      }
+      return { story, llmUsed: provider };
+    } catch (err) {
+      lastError = err;
+      const msg = err instanceof Error ? err.message : String(err);
+      console.warn(`[story-llm] provider=${provider} failed: ${msg.slice(0, 200)}`);
+    }
+  }
+
+  throw lastError instanceof Error ? lastError : new Error('All LLM providers failed');
 }
 
 export { isGeminiStoryFailure, hasGroqApiKey, hasGeminiApiKey, hasOpenRouterApiKey };

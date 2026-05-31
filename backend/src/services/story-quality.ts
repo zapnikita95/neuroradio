@@ -220,6 +220,7 @@ function significantWords(text: string): string[] {
 const CONCEPT_BRIDGES: Array<{ factPattern: RegExp; scriptTokens: string[] }> = [
   { factPattern: /native american/i, scriptTokens: ['индейск', 'коренн', 'плем'] },
   { factPattern: /billboard|hot 100|\bchart\b/i, scriptTokens: ['чарт', 'хит', 'парад'] },
+  { factPattern: /\bspotify\b/i, scriptTokens: ['spotify', 'спотиф'] },
   { factPattern: /top five|top 5|top-five|top ten|top 10/i, scriptTokens: ['пятёрк', 'пятер', 'десятк', 'топ'] },
   { factPattern: /number one|#\s*1|no\.?\s*1\b|only.*#1/i, scriptTokens: ['перв', 'единствен', 'лидер', 'номер'] },
   { factPattern: /\bbootleg/i, scriptTokens: ['бутлег', 'подпол', 'нелегал', 'магнит'] },
@@ -341,6 +342,15 @@ export function validateStoryScript(
   }
 
   if (!skipWatery) {
+    const garbage = findLlmGarbage(trimmed);
+    if (garbage) {
+      return { ok: false, reason: garbage };
+    }
+    const platformMismatch =
+      referenceFacts.length > 0 ? findFactPlatformMismatch(trimmed, referenceFacts) : null;
+    if (platformMismatch) {
+      return { ok: false, reason: platformMismatch };
+    }
     const fictionIssue = findGenericFiction(trimmed);
     if (fictionIssue) {
       return { ok: false, reason: fictionIssue };
@@ -485,6 +495,47 @@ export function findGenericFiction(script: string): string | null {
   return null;
 }
 
+const LLM_GARBAGE_PATTERNS: RegExp[] = [
+  /крутить\s+к\s+блюду/i,
+  /\bзвуким\b/i,
+  /шлал\s+вспоминать/i,
+  /в\s+шаблоне/i,
+  /не\s+слух,\s*а\s+чувство/i,
+  /звон\s+к\s+памяти/i,
+];
+
+export function findLlmGarbage(script: string): string | null {
+  for (const pattern of LLM_GARBAGE_PATTERNS) {
+    if (pattern.test(script)) {
+      return `llm garbage: ${pattern.source}`;
+    }
+  }
+  return null;
+}
+
+function findFactPlatformMismatch(script: string, referenceFacts: string[]): string | null {
+  const factsText = referenceFacts.join(' ');
+  const scriptNorm = normalizeForMatch(script);
+  const pairs: Array<{ fact: RegExp; scriptWrong: RegExp; scriptOk: RegExp }> = [
+    {
+      fact: /\bspotify\b/i,
+      scriptWrong: /\bbillboard\b/i,
+      scriptOk: /\bspotify\b|\bспотиф/i,
+    },
+    {
+      fact: /\bbillboard\b/i,
+      scriptWrong: /\bspotify\b|\bспотиф/i,
+      scriptOk: /\bbillboard\b/i,
+    },
+  ];
+  for (const { fact, scriptWrong, scriptOk } of pairs) {
+    if (fact.test(factsText) && scriptWrong.test(scriptNorm) && !scriptOk.test(scriptNorm)) {
+      return 'platform mismatch between seed fact and story';
+    }
+  }
+  return null;
+}
+
 const CLICHE_FILLER_PATTERNS: RegExp[] = [
   /мало кто знает/i,
   /стал[аи]?\s+легенд/i,
@@ -516,6 +567,14 @@ export function findWateryContent(
   title = '',
   referenceFacts: string[] = [],
 ): string | null {
+  const garbage = findLlmGarbage(script);
+  if (garbage) return garbage;
+
+  if (referenceFacts.length > 0) {
+    const platformMismatch = findFactPlatformMismatch(script, referenceFacts);
+    if (platformMismatch) return platformMismatch;
+  }
+
   const fiction = findGenericFiction(script);
   if (fiction) return fiction;
 

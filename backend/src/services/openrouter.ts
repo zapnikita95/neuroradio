@@ -18,7 +18,6 @@ import {
 import { resolveOpenRouterModel } from './openrouter-models.js';
 import { callOpenAiChatCompletion, OpenAiChatError } from './llm-openai-chat.js';
 import {
-  finalizeAfterQualityLoop,
   qualityOptionsForOpenRouterAttempt,
   validateGeneratedStory,
 } from './story-generate-loop.js';
@@ -193,14 +192,9 @@ export async function generateStoryScript(
     logRejectedScript('OpenRouter quality reject (single-shot)', sanitized, sanitizedQuality.reason ?? quality.reason ?? 'quality');
   }
 
-  const fallback = finalizeAfterQualityLoop(
-    lastCandidate,
-    { artist: input.artist, title: input.title },
-    (s) => finalizeStory(s, { ...input, voiceId }, storyLength),
-    referenceFacts,
-    { relaxForWeakLlm: true },
+  throw new Error(
+    lastCandidate
+      ? 'OpenRouter could not produce a usable story'
+      : 'OpenRouter returned invalid story',
   );
-  if (fallback) return fallback;
-
-  throw new Error('Could not produce a usable story');
 }
