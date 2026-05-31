@@ -563,6 +563,7 @@ export async function generateStoryScriptLocal(input: GenerateStoryInput): Promi
   );
 
     const qOpts = qualityOptionsForLocalAttempt(attempt, MAX_NARRATOR_ATTEMPTS, referenceFacts);
+    qOpts.previousScripts = previousScripts;
 
 
 

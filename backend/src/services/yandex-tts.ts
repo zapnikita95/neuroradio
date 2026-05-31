@@ -176,6 +176,7 @@ export async function synthesizeSpeech(
   console.log(
     `[yandex-tts] start${installTag}${trackTag} voice=${voiceId}→${primaryVoice} speed=${ttsOptions.speed} emotion=${ttsOptions.emotion} chars=${markedText.length} attempts=${attempts.length}`,
   );
+  console.log(`[yandex-tts] marked-text-begin${installTag}${trackTag}\n${markedText}\n[yandex-tts] marked-text-end`);
 
   await mkdir(AUDIO_DIR, { recursive: true });
 

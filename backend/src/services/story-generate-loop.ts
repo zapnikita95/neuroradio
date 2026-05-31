@@ -16,6 +16,7 @@ export interface StoryQualityAttemptOptions {
   skipFirstSentenceAnchor?: boolean;
   skipBannedPatterns?: boolean;
   skipEnglishCheck?: boolean;
+  previousScripts?: string[];
 }
 
 export function qualityOptionsForAttempt(

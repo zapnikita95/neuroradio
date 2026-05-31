@@ -27,15 +27,37 @@ const KNOWN_FOREIGN_ACTS = [
   'britney spears',
   'taylor swift',
   'beyonce',
+  'бейонсе',
+  'бейонс',
   'kanye west',
   'dr dre',
   'snoop dogg',
   'jay z',
+  'джей зи',
+  'джей з',
   'queen',
   'nirvana',
   'metallica',
   'coldplay',
 ];
+
+const JAY_Z_PATTERN = /\b(?:jay[\s-]?z|джей[\s-]?z|джей[\s-]?zi)\b/i;
+
+function artistIsJayZ(artistNorm: string): boolean {
+  return artistNorm.includes('jay z') || artistNorm.includes('джей z') || artistNorm === 'jay';
+}
+
+/** Will Jay / Jay-Z style false friends — same token «jay» but different acts. */
+function factConfusesJayArtist(fact: string, artist: string): boolean {
+  const artistNorm = normalize(artist);
+  if (artistIsJayZ(artistNorm)) return false;
+  if (!JAY_Z_PATTERN.test(fact)) return false;
+  if (artistNorm.includes('jay z') || artistNorm.includes('джей z')) return false;
+  const tokens = artistTokens(artist);
+  if (tokens.length === 1 && tokens[0] === 'jay') return false;
+  if (tokens.includes('jay') && !artistIsJayZ(artistNorm)) return true;
+  return !artistNorm.includes('jay');
+}
 
 /** Another act is the grammatical subject (e.g. «Van Halen's most successful single»). */
 export function factNamesForeignEntity(fact: string, artist: string, title: string): boolean {
@@ -43,6 +65,8 @@ export function factNamesForeignEntity(fact: string, artist: string, title: stri
   const artistNorm = normalize(artist);
   const titleNorm = normalize(title.replace(/\s*\([^)]*\)\s*/g, ' '));
   const tokens = artistTokens(artist);
+
+  if (factConfusesJayArtist(fact, artist)) return true;
 
   for (const foreign of KNOWN_FOREIGN_ACTS) {
     if (!norm.includes(foreign)) continue;
@@ -61,7 +85,7 @@ export function factNamesForeignEntity(fact: string, artist: string, title: stri
 
   const properLead = [
     ...fact.matchAll(
-      /\b([A-Z][a-z]+(?:\s+[A-Z][a-z]+){0,2})(?:'s|\s+(?:is|was|are|were|has|had))\b/g,
+      /\b([A-Z][a-z]+(?:\s+[A-Z][a-z]+){0,2})(?:'s|\s+(?:is|was|are|were|has|had|считает|писал|назвал|отметил))\b/g,
     ),
   ];
   for (const [, name] of properLead) {

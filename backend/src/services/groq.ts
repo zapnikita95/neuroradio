@@ -280,6 +280,7 @@ export async function generateStoryScript(
     story.voiceId = voiceId;
     story.word_count = countWords(story.script);
     const qOpts = qualityOptionsForAttempt(attempt, MAX_ATTEMPTS, referenceFacts);
+    qOpts.previousScripts = previousScripts;
 
     const quality = validateGeneratedStory(
       story.script,

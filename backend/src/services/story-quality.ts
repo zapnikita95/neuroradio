@@ -221,6 +221,22 @@ export function anchorsReferenceFact(script: string, referenceFacts: string[]): 
   });
 }
 
+export function scriptSimilarity(a: string, b: string): number {
+  const wordsA = a.toLowerCase().split(/\s+/).filter(Boolean);
+  const wordsB = new Set(b.toLowerCase().split(/\s+/).filter(Boolean));
+  if (wordsA.length === 0 || wordsB.size === 0) return 0;
+  const intersection = wordsA.filter((word) => wordsB.has(word)).length;
+  return intersection / Math.max(wordsA.length, wordsB.size);
+}
+
+export function isDuplicateScript(script: string, previousScripts: string[]): boolean {
+  const normalized = script.trim().toLowerCase();
+  return previousScripts.some((prev) => {
+    const p = prev.trim().toLowerCase();
+    return p === normalized || scriptSimilarity(p, normalized) > 0.78;
+  });
+}
+
 export function validateStoryScript(
   script: string,
   lengthId: StoryLengthId = DEFAULT_STORY_LENGTH,
@@ -236,6 +252,7 @@ export function validateStoryScript(
     skipEnglishCheck?: boolean;
     /** Override minimum word count (e.g. flash-lite models). */
     minWordsOverride?: number;
+    previousScripts?: string[];
   } = {},
 ): { ok: true } | { ok: false; reason: string } {
   const limits = getStoryLengthPreset(lengthId);
@@ -246,8 +263,13 @@ export function validateStoryScript(
   const skipBannedPatterns = options.skipBannedPatterns ?? false;
   const skipEnglishCheck = options.skipEnglishCheck ?? false;
   const referenceFacts = options.referenceFacts ?? [];
+  const previousScripts = options.previousScripts ?? [];
   const trimmed = script.trim();
   if (!trimmed) return { ok: false, reason: 'empty script' };
+
+  if (previousScripts.length > 0 && isDuplicateScript(trimmed, previousScripts)) {
+    return { ok: false, reason: 'duplicate of previous script for this track' };
+  }
 
   if (referenceFacts.length === 0) {
     return { ok: false, reason: 'no reference facts — story must be grounded in sources' };

@@ -281,6 +281,7 @@ function validateGeminiHardQuality(
     skipEnglishCheck: false,
     referenceFacts,
     minWordsOverride: minWords,
+    previousScripts: input.previousScripts ?? [],
   });
 }
 
@@ -299,6 +300,7 @@ function validateGeminiGracefulFallback(
     skipEnglishCheck: false,
     referenceFacts,
     minWordsOverride: geminiGracefulMinWords(modelId, storyLength),
+    previousScripts: input.previousScripts ?? [],
   });
 }
 
@@ -362,6 +364,7 @@ export async function generateStoryScript(
 
     const qOpts = qualityOptionsForAttempt(attempt, MAX_ATTEMPTS, referenceFacts);
     qOpts.skipReferenceAnchor = true;
+    qOpts.previousScripts = previousScripts;
 
     const quality = validateGeneratedStory(
       story.script,
