@@ -266,6 +266,7 @@ export function buildStoryUserPrompt(params: {
   referenceFacts?: string[];
   selectedReferenceFact?: { fact: string; scope: 'artist' | 'track'; scopeLabelRu: string };
   rawSnippets?: string[];
+  artistTier?: 'major' | 'indie';
 }): string {
   const narratorId = resolveStoryNarrator(params.storyNarrator);
   const locale = resolveTrackLocale({
@@ -292,6 +293,15 @@ export function buildStoryUserPrompt(params: {
   if (params.genre) lines.push(`Жанр: ${params.genre}`);
   lines.push(`Страна/сцена: ${locale.countryLabelRu}`);
   lines.push(`Год релиза (только для тебя, НЕ писать цифры в script): ${locale.yearLabelRu}`);
+
+  if (params.artistTier === 'indie') {
+    lines.push('');
+    lines.push(
+      'НЕЗАВИСИМЫЙ АРТИСТ — мало публичных данных. Только факты из списка ниже. ' +
+        'ЗАПРЕЩЕНО выдумывать лейблы, бизнес-проекты, компании, коллаборации, награды, ' +
+        'если их нет в семени. Можно честно рассказать про жанр, год, страну и трек.',
+    );
+  }
   lines.push(`Эпоха и контекст: ${locale.sceneHintRu}`);
   lines.push(`ЛОКАЛЬ: ${locale.localeRulesRu}`);
   lines.push('');

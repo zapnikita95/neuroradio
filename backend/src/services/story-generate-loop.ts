@@ -86,6 +86,15 @@ export function validateGeneratedStory(
   return validateStoryScript(script, storyLength, artist, title, options);
 }
 
+/** Hard failures — never accept even in weak-llm finalize. */
+const FINALIZE_HARD_REJECT = (reason: string): boolean =>
+  reason.includes('different artist') ||
+  reason.includes('duplicate of previous') ||
+  reason.includes('no reference facts') ||
+  reason.includes('empty script') ||
+  reason.includes('banned pattern') ||
+  reason.includes('english words');
+
 /** If strict checks fail on all attempts, still ship the last sanitized script. */
 export function finalizeAfterQualityLoop<T extends { script: string }>(
   lastCandidate: T | null,
@@ -129,6 +138,10 @@ export function finalizeAfterQualityLoop<T extends { script: string }>(
     skipReferenceAnchor: relax,
     skipFirstSentenceAnchor: true,
   });
+  if (!anchorCheck.ok && FINALIZE_HARD_REJECT(anchorCheck.reason ?? '')) {
+    logRejectedScript('last script rejected (hard gate)', sanitized, anchorCheck.reason ?? 'quality');
+    return null;
+  }
   if (!anchorCheck.ok && !relax) {
     logRejectedScript('last script rejected on finalize', sanitized, anchorCheck.reason ?? 'quality');
     return null;

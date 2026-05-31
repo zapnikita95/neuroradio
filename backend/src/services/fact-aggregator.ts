@@ -257,18 +257,13 @@ export async function fetchAggregatedFactContext(
   let trackFacts = mergeFacts(wiki.trackFacts, ddgSplit.track, wdSplit.track, mbTrack);
   let artistFacts = mergeFacts(wiki.artistFacts, ddgSplit.artist, wdSplit.artist, mbArtist);
 
+  trackFacts = trackFacts.filter((f) => factAppliesToRequest(f, artist, title, 'track'));
+  artistFacts = artistFacts.filter((f) => factAppliesToRequest(f, artist, title, 'artist'));
+
   if (trackFacts.length + artistFacts.length === 0) {
-    const ddgRelaxed = filterAndRankFacts(ddgUnfiltered, 5);
-    if (ddgRelaxed.length > 0) {
-      const relaxedSplit = splitByMention(ddgRelaxed, title, artist);
-      console.warn(
-        `[facts] relaxed DDG fallback for "${artist}" — "${title}" (${ddgRelaxed.length} snippets)`,
-      );
-      trackFacts =
-        relaxedSplit.track.length > 0 ? relaxedSplit.track : ddgRelaxed.slice(0, 2);
-      artistFacts =
-        relaxedSplit.artist.length > 0 ? relaxedSplit.artist : ddgRelaxed.slice(0, 4);
-    }
+    console.warn(
+      `[facts] no validated facts for "${artist}" — "${title}" after relevance filter`,
+    );
   }
 
   const bundle: ReferenceFactBundle = { trackFacts, artistFacts };

@@ -5,6 +5,9 @@ import { validateStoryFullBody } from '../middleware/validate-story.js';
 import { enrichTrackMetadata } from '../services/musicbrainz.js';
 import { fetchAggregatedFactContext } from '../services/fact-aggregator.js';
 import { explainReferenceFactSelection, pickReferenceFact } from '../services/fact-picker.js';
+import { resolveArtistTier } from '../services/artist-notability.js';
+import { buildMetadataFallbackFacts } from '../services/metadata-facts.js';
+import { factAppliesToRequest } from '../services/fact-relevance.js';
 import {
   explainLlmFactSelection,
   huntReferenceFactWithLlm,
@@ -215,6 +218,21 @@ router.post('/full', validateStoryFullBody, async (req: Request, res: Response) 
       `[facts] ${metadata.artist} — ${metadata.title}: track=${trackFactCount} artist=${artistFactCount} rawSnippets=${factCtx.rawSnippets.length}`,
     );
 
+    const artistTier = resolveArtistTier(
+      metadata.artist,
+      metadata.title,
+      metadata,
+      factBundle,
+    );
+    console.log(`[facts] tier=${artistTier} artist="${metadata.artist}"`);
+
+    if (trackFactCount + artistFactCount === 0) {
+      const metaFacts = buildMetadataFallbackFacts(metadata);
+      factBundle = { ...factBundle, artistFacts: metaFacts };
+      artistFactCount = metaFacts.length;
+      console.log(`[facts] metadata-only seeds (${metaFacts.length}) for "${metadata.artist}"`);
+    }
+
     let selectedFact = pickReferenceFact(
       factBundle,
       previousScripts,
@@ -252,19 +270,36 @@ router.post('/full', validateStoryFullBody, async (req: Request, res: Response) 
       ? [selectedFact.fact]
       : [...factBundle.trackFacts, ...factBundle.artistFacts].slice(0, 4);
 
-    if (!selectedFact && referenceFacts.length > 0) {
-      const scope: 'track' | 'artist' = trackFactCount > 0 ? 'track' : 'artist';
-      selectedFact = {
-        fact: referenceFacts[0]!,
-        scope,
-        scopeLabelRu: scope === 'track' ? 'трек' : 'группа/артист',
-      };
-      console.log(`[facts] fallback seed from bundle scope=${scope}`);
+    if (!selectedFact) {
+      const validatedPool = [...factBundle.trackFacts, ...factBundle.artistFacts].filter(
+        (fact) =>
+          factAppliesToRequest(fact, metadata.artist, metadata.title, 'track') ||
+          factAppliesToRequest(fact, metadata.artist, metadata.title, 'artist'),
+      );
+      const fallbackFact = validatedPool[0];
+      if (fallbackFact) {
+        const scope: 'track' | 'artist' = factAppliesToRequest(
+          fallbackFact,
+          metadata.artist,
+          metadata.title,
+          'track',
+        )
+          ? 'track'
+          : 'artist';
+        selectedFact = {
+          fact: fallbackFact,
+          scope,
+          scopeLabelRu: scope === 'track' ? 'трек' : 'группа/артист',
+        };
+        console.log(`[facts] fallback seed from validated pool scope=${scope}`);
+      }
     }
 
-    if (referenceFacts.length === 0) {
+    if (!selectedFact && referenceFacts.length === 0) {
       throw new NoReferenceFactsError(metadata.artist, metadata.title);
     }
+
+    const finalReferenceFacts = selectedFact ? [selectedFact.fact] : referenceFacts;
 
     const storyInput = {
       artist: metadata.artist,
@@ -276,10 +311,13 @@ router.post('/full', validateStoryFullBody, async (req: Request, res: Response) 
       storyLength,
       storyNarrator,
       previousScripts,
-      referenceFacts,
+      referenceFacts: finalReferenceFacts,
+      artistTier,
       selectedReferenceFact: selectedFact ?? undefined,
       rawSnippets:
-        referenceFacts.length <= 1 && factCtx.rawSnippets.length > 0
+        artistTier === 'major' &&
+        finalReferenceFacts.length <= 1 &&
+        factCtx.rawSnippets.length > 0
           ? factCtx.rawSnippets
           : undefined,
       geminiModel,
