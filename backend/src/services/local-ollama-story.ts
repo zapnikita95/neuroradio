@@ -390,7 +390,12 @@ function finalizeStory(
 
 ): StoryScript {
 
-  const sanitized = sanitizeScriptForTts(story.script, input.artist, input.title);
+  const sanitized = sanitizeScriptForTts(
+    story.script,
+    input.artist,
+    input.title,
+    input.referenceFacts ?? [],
+  );
 
   return {
 
@@ -550,7 +555,12 @@ export async function generateStoryScriptLocal(input: GenerateStoryInput): Promi
 
     story.word_count = countWords(story.script);
 
-    const sanitized = sanitizeScriptForTts(story.script, input.artist, input.title);
+    const sanitized = sanitizeScriptForTts(
+    story.script,
+    input.artist,
+    input.title,
+    input.referenceFacts ?? [],
+  );
 
     const qOpts = qualityOptionsForLocalAttempt(attempt, MAX_NARRATOR_ATTEMPTS, referenceFacts);
 

@@ -211,7 +211,12 @@ function finalizeStory(
   input: GenerateStoryInput,
   storyLength: StoryLengthId,
 ): StoryScript {
-  const sanitized = sanitizeScriptForTts(story.script, input.artist, input.title);
+  const sanitized = sanitizeScriptForTts(
+    story.script,
+    input.artist,
+    input.title,
+    input.referenceFacts ?? [],
+  );
   return {
     ...story,
     script: sanitized,
@@ -287,7 +292,12 @@ export async function generateStoryScript(
       return finalizeStory(story, { ...input, voiceId }, storyLength);
     }
 
-    const sanitized = sanitizeScriptForTts(story.script, input.artist, input.title);
+    const sanitized = sanitizeScriptForTts(
+    story.script,
+    input.artist,
+    input.title,
+    input.referenceFacts ?? [],
+  );
     const sanitizedQuality = validateGeneratedStory(
       sanitized,
       storyLength,

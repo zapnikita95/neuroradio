@@ -249,7 +249,12 @@ function finalizeStory(
   input: GenerateStoryInput,
   storyLength: StoryLengthId,
 ): StoryScript {
-  const sanitized = sanitizeScriptForTts(story.script, input.artist, input.title);
+  const sanitized = sanitizeScriptForTts(
+    story.script,
+    input.artist,
+    input.title,
+    input.referenceFacts ?? [],
+  );
   return {
     ...story,
     script: sanitized,
@@ -382,7 +387,12 @@ export async function generateStoryScript(
       lastRejectReason = hard.reason;
       logRejectedScript('gemini hard-quality reject', story.script, hard.reason);
     } else {
-      const sanitized = sanitizeScriptForTts(story.script, input.artist, input.title);
+      const sanitized = sanitizeScriptForTts(
+        story.script,
+        input.artist,
+        input.title,
+        referenceFacts,
+      );
       const sanitizedQuality = validateGeneratedStory(
         sanitized,
         storyLength,

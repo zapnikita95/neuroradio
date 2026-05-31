@@ -94,7 +94,12 @@ export function finalizeAfterQualityLoop<T extends { script: string }>(
   options: { relaxForWeakLlm?: boolean } = {},
 ): T | null {
   if (!lastCandidate?.script?.trim()) return null;
-  const sanitized = sanitizeScriptForTts(lastCandidate.script, input.artist, input.title);
+  const sanitized = sanitizeScriptForTts(
+    lastCandidate.script,
+    input.artist,
+    input.title,
+    referenceFacts,
+  );
   const wordCount = countWords(sanitized);
   const relax = options.relaxForWeakLlm ?? false;
   if (!relax) {

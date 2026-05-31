@@ -132,4 +132,16 @@ if (llmBad.ok) {
   ok(`llm racism seed rejected (${llmBad.reason})`);
 }
 
+const REDBONE_FACTS = [
+  'Billboard (November 24, 1973) called "Come and Get Your Love" moments of very commercial material deserving FM radio airplay.',
+  'Cash Box (March 30, 1974): Artie Goodman recommended it as one of the best pop records of the year.',
+];
+const REDBONE_SCRIPT =
+  'В то время как журнал Billboard называл «Come and Get Your Love» материалом для радиоэфира, критик Арти Гудмен из Cash Box в марте семьдесят четвертого года рекомендовал её как одну из лучших поп-записей года.';
+if (hasEnglishLeak(REDBONE_SCRIPT, 'Graham Blvd', 'Come and Get Your Love', { referenceFacts: REDBONE_FACTS })) {
+  fail('Billboard/Cash Box script should not leak English');
+} else {
+  ok('Billboard + Cash Box proper nouns allowed');
+}
+
 process.exit(failed > 0 ? 1 : 0);

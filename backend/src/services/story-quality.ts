@@ -6,7 +6,7 @@ import {
 } from './story-length.js';
 import { factNamesForeignEntity } from './fact-relevance.js';
 import { hasEnglishLeak } from './story-russian-language.js';
-import { collectLatinTokens } from './tts-en-normalize.js';
+import { prepareStoryScriptLanguage } from './story-english-normalize.js';
 
 export { DEFAULT_STORY_LENGTH, getStoryLengthPreset };
 export type { StoryLengthId, StoryLengthPreset };
@@ -73,16 +73,6 @@ const DIGIT_ORDINAL_SUFFIX =
 const ORPHAN_ORDINAL_SUFFIX =
   /(?:^|[\s,.«"—-])\s*[-–—]?(?:й|го|м|х|е|ем|ом)(?=[\s,.!?»"—-]|$)/giu;
 
-const ENGLISH_REPLACEMENTS: Array<[RegExp, string]> = [
-  [/\bshow\b/gi, 'концерт'],
-  [/\bfeedback\b/gi, 'свист'],
-  [/\bengineers\b/gi, 'звукорежиссёры'],
-  [/\bmonitors\b/gi, 'мониторы'],
-  [/\blive\b/gi, 'живой'],
-  [/\bstage\b/gi, 'сцена'],
-  [/\bstudio\b/gi, 'студия'],
-];
-
 export function countWords(text: string): number {
   return text.trim().split(/\s+/).filter(Boolean).length;
 }
@@ -93,8 +83,33 @@ function allowedDigitSequences(artist: string, title: string): Set<string> {
   return new Set(matches);
 }
 
-function allowedLatinNameTokens(artist: string, title: string): Set<string> {
-  return collectLatinTokens(artist, title);
+export function sanitizeScriptForTts(
+  script: string,
+  artist: string,
+  title: string,
+  referenceFacts: string[] = [],
+): string {
+  const allowed = allowedDigitSequences(artist, title);
+  const { text: localized, allowedLatin } = prepareStoryScriptLanguage(script, {
+    artist,
+    title,
+    referenceFacts,
+  });
+  let result = localized;
+
+  result = result.replace(DIGIT_ORDINAL_SUFFIX, ' тогда ');
+  DIGIT_ORDINAL_SUFFIX.lastIndex = 0;
+  result = result.replace(/\d+/g, (match) => (allowed.has(match) ? match : ''));
+  result = result.replace(/\b[a-z]{2,}\b/gi, (match) => {
+    return allowedLatin.has(match.toLowerCase()) ? match : '';
+  });
+  result = result.replace(ORPHAN_ORDINAL_SUFFIX, ' тогда ');
+  ORPHAN_ORDINAL_SUFFIX.lastIndex = 0;
+  result = result.replace(SPELLED_YEAR_PATTERN, ' тогда ');
+  SPELLED_YEAR_PATTERN.lastIndex = 0;
+  result = result.replace(/\s{2,}/g, ' ').replace(/\s+([,.!?])/g, '$1').trim();
+
+  return result;
 }
 
 export function findForbiddenNumbers(
@@ -122,30 +137,6 @@ export function findForbiddenNumbers(
   }
 
   return null;
-}
-
-export function sanitizeScriptForTts(script: string, artist: string, title: string): string {
-  const allowed = allowedDigitSequences(artist, title);
-  const allowedLatin = allowedLatinNameTokens(artist, title);
-  let result = script.trim();
-
-  for (const [pattern, replacement] of ENGLISH_REPLACEMENTS) {
-    result = result.replace(pattern, replacement);
-  }
-
-  result = result.replace(DIGIT_ORDINAL_SUFFIX, ' тогда ');
-  DIGIT_ORDINAL_SUFFIX.lastIndex = 0;
-  result = result.replace(/\d+/g, (match) => (allowed.has(match) ? match : ''));
-  result = result.replace(/\b[a-z]{2,}\b/gi, (match) => {
-    return allowedLatin.has(match.toLowerCase()) ? match : '';
-  });
-  result = result.replace(ORPHAN_ORDINAL_SUFFIX, ' тогда ');
-  ORPHAN_ORDINAL_SUFFIX.lastIndex = 0;
-  result = result.replace(SPELLED_YEAR_PATTERN, ' тогда ');
-  SPELLED_YEAR_PATTERN.lastIndex = 0;
-  result = result.replace(/\s{2,}/g, ' ').replace(/\s+([,.!?])/g, '$1').trim();
-
-  return result;
 }
 
 function normalizeForMatch(text: string): string {
@@ -274,7 +265,7 @@ export function validateStoryScript(
     }
   }
 
-  if (!skipEnglishCheck && hasEnglishLeak(trimmed, artist, title)) {
+  if (!skipEnglishCheck && hasEnglishLeak(trimmed, artist, title, { referenceFacts })) {
     return { ok: false, reason: 'english words in Russian narration' };
   }
 
