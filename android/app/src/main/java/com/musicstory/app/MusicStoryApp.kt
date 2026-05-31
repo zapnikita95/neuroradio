@@ -9,8 +9,6 @@ import com.musicstory.app.data.local.SettingsDataStore
 import com.musicstory.app.data.remote.AccountSyncManager
 import com.musicstory.app.data.remote.ApiClient
 import com.musicstory.app.data.remote.BackendAuthManager
-import com.musicstory.app.data.remote.GeminiStoryClient
-import com.musicstory.app.data.remote.GroqStoryClient
 import com.musicstory.app.data.remote.MetadataCache
 import com.musicstory.app.data.remote.MetadataEnricher
 import com.musicstory.app.data.repository.ScrobbleRepository
@@ -89,8 +87,6 @@ class MusicStoryApp : Application() {
             storyHistoryDao = database.storyHistoryDao(),
             settingsDataStore = settingsDataStore,
             apiClient = apiClient,
-            groqStoryClient = GroqStoryClient(),
-            geminiStoryClient = GeminiStoryClient(),
             accountSyncManager = accountSyncManager,
             metadataCache = metadataCache,
         )

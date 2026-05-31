@@ -7,6 +7,7 @@ enum class LlmProvider(
     OPENROUTER("openrouter", "OpenRouter"),
     GROQ("groq", "Groq"),
     GEMINI("gemini", "Gemini"),
+    LOCAL("local", "Локально"),
     ;
 
     companion object {

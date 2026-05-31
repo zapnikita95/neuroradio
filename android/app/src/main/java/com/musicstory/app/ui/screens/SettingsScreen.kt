@@ -69,6 +69,7 @@ import androidx.compose.ui.unit.dp
 import com.musicstory.app.MusicStoryApp
 import com.musicstory.app.util.StoryLog
 import com.musicstory.app.util.ApiKeySanitizer
+import com.musicstory.app.util.BackendUrlRules
 import com.musicstory.app.R
 import com.musicstory.app.data.local.SettingsDataStore
 import com.musicstory.app.data.remote.ConnectionCheckResult
@@ -123,6 +124,9 @@ fun SettingsScreen(
     val groqApiKey by settings.groqApiKey.collectAsState(initial = "")
     val geminiApiKey by settings.geminiApiKey.collectAsState(initial = "")
     val openRouterApiKey by settings.openRouterApiKey.collectAsState(initial = "")
+    val localOllamaUrl by settings.localOllamaUrl.collectAsState(initial = SettingsDataStore.DEFAULT_LOCAL_OLLAMA_URL)
+    val localOllamaModel by settings.localOllamaModel.collectAsState(initial = SettingsDataStore.DEFAULT_LOCAL_OLLAMA_MODEL)
+    val backendUrl by settings.backendUrl.collectAsState(initial = SettingsDataStore.DEFAULT_BACKEND_URL)
     val llmProvider by settings.llmProvider.collectAsState(initial = LlmProvider.GROQ)
     val geminiModel by settings.geminiModel.collectAsState(initial = GeminiModel.defaultRecommended)
     val groqModel by settings.groqModel.collectAsState(initial = GroqModel.defaultRecommended)
@@ -226,6 +230,18 @@ fun SettingsScreen(
     var groqInput by remember(groqApiKey) { mutableStateOf(groqApiKey) }
     var geminiInput by remember(geminiApiKey) { mutableStateOf(geminiApiKey) }
     var openRouterInput by remember(openRouterApiKey) { mutableStateOf(openRouterApiKey) }
+    var localUrlInput by remember(localOllamaUrl) { mutableStateOf(localOllamaUrl) }
+    var localModelInput by remember(localOllamaModel) { mutableStateOf(localOllamaModel) }
+    var localBackendUrlInput by remember(llmProvider) {
+        mutableStateOf(
+            if (llmProvider == LlmProvider.LOCAL) {
+                if (BackendUrlRules.isLanBackend(backendUrl)) backendUrl
+                else SettingsDataStore.SUGGESTED_LOCAL_BACKEND_URL
+            } else {
+                ""
+            },
+        )
+    }
     var groqCustomInput by remember(groqCustomModelId) { mutableStateOf(groqCustomModelId) }
     var openRouterCustomInput by remember(openRouterCustomModelId) { mutableStateOf(openRouterCustomModelId) }
     var nInput by remember(everyN) { mutableStateOf(everyN.toString()) }
@@ -250,11 +266,20 @@ fun SettingsScreen(
         LlmProvider.GROQ -> groqApiKey
         LlmProvider.GEMINI -> geminiApiKey
         LlmProvider.OPENROUTER -> openRouterApiKey
+        LlmProvider.LOCAL -> if (
+            BackendUrlRules.isLanBackend(localBackendUrlInput.trim()) &&
+            localOllamaUrl.isNotBlank()
+        ) {
+            localOllamaUrl
+        } else {
+            ""
+        }
     }
     val activeApiInput = when (llmProvider) {
         LlmProvider.GROQ -> groqInput
         LlmProvider.GEMINI -> geminiInput
         LlmProvider.OPENROUTER -> openRouterInput
+        LlmProvider.LOCAL -> localUrlInput
     }
 
     val hasPendingChanges = remember(
@@ -264,6 +289,12 @@ fun SettingsScreen(
         geminiApiKey,
         openRouterInput,
         openRouterApiKey,
+        localUrlInput,
+        localOllamaUrl,
+        localBackendUrlInput,
+        backendUrl,
+        localModelInput,
+        localOllamaModel,
         llmProvider,
         nInput,
         everyN,
@@ -276,6 +307,10 @@ fun SettingsScreen(
         ApiKeySanitizer.clean(groqInput) != ApiKeySanitizer.clean(groqApiKey) ||
             ApiKeySanitizer.clean(geminiInput) != ApiKeySanitizer.clean(geminiApiKey) ||
             ApiKeySanitizer.clean(openRouterInput) != ApiKeySanitizer.clean(openRouterApiKey) ||
+            localUrlInput.trim().trimEnd('/') != localOllamaUrl.trim().trimEnd('/') ||
+            (llmProvider == LlmProvider.LOCAL &&
+                localBackendUrlInput.trim().trimEnd('/') != backendUrl.trim().trimEnd('/')) ||
+            localModelInput.trim() != localOllamaModel.trim() ||
             sameTrackInput.toIntOrNull() != sameTrackEveryN ||
             musicFadeInput.toFloatOrNull()?.coerceIn(0.5f, 8f) != musicFadeSeconds ||
             (triggerMode == TriggerMode.EVERY_N_TRACKS && nInput.toIntOrNull() != everyN)
@@ -648,6 +683,7 @@ fun SettingsScreen(
                         LlmProvider.GEMINI -> "${llmProvider.labelRu}: ${geminiModel.settingsLabelRu}"
                         LlmProvider.GROQ -> "${llmProvider.labelRu}: ${groqModel.settingsLabelRu}"
                         LlmProvider.OPENROUTER -> "${llmProvider.labelRu}: ${openRouterModel.settingsLabelRu}"
+                        LlmProvider.LOCAL -> "${llmProvider.labelRu}: $localOllamaModel"
                     }
                 } else {
                     dailyQuota?.let { quota ->
@@ -709,6 +745,14 @@ fun SettingsScreen(
                                                 "SETTINGS UI: user tapped LLM provider -> ${provider.labelRu} (${provider.id})",
                                             )
                                             settings.setLlmProvider(provider)
+                                            if (provider == LlmProvider.LOCAL) {
+                                                val saved = settings.backendUrl.first()
+                                                localBackendUrlInput = if (BackendUrlRules.isLanBackend(saved)) {
+                                                    saved
+                                                } else {
+                                                    SettingsDataStore.SUGGESTED_LOCAL_BACKEND_URL
+                                                }
+                                            }
                                         }
                                     },
                                 )
@@ -920,17 +964,71 @@ fun SettingsScreen(
                                 },
                         )
                     }
+                    if (llmProvider == LlmProvider.LOCAL) {
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Text(
+                            text = context.getString(R.string.settings_local_backend_url_hint),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MutedLavender,
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        OutlinedTextField(
+                            value = localBackendUrlInput,
+                            onValueChange = { localBackendUrlInput = it },
+                            label = { Text(context.getString(R.string.settings_local_backend_url)) },
+                            modifier = Modifier.fillMaxWidth(),
+                            singleLine = true,
+                            colors = fieldColors,
+                            shape = RoundedCornerShape(14.dp),
+                        )
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Text(
+                            text = context.getString(R.string.settings_local_ollama_url_hint),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MutedLavender,
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        OutlinedTextField(
+                            value = localUrlInput,
+                            onValueChange = { localUrlInput = it },
+                            label = { Text(context.getString(R.string.settings_local_ollama_url)) },
+                            modifier = Modifier.fillMaxWidth(),
+                            singleLine = true,
+                            colors = fieldColors,
+                            shape = RoundedCornerShape(14.dp),
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        OutlinedTextField(
+                            value = localModelInput,
+                            onValueChange = { localModelInput = it },
+                            label = { Text(context.getString(R.string.settings_local_ollama_model)) },
+                            modifier = Modifier.fillMaxWidth(),
+                            singleLine = true,
+                            colors = fieldColors,
+                            shape = RoundedCornerShape(14.dp),
+                        )
+                        Text(
+                            text = context.getString(R.string.settings_local_ollama_model_hint),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MutedLavender,
+                            modifier = Modifier.padding(top = 4.dp),
+                        )
+                    }
                     Spacer(modifier = Modifier.height(8.dp))
                     Text(
                         text = if (activeApiKey.isNotBlank()) {
-                            context.getString(R.string.settings_groq_status_ok)
+                            if (llmProvider == LlmProvider.LOCAL) {
+                                context.getString(R.string.settings_local_status_ok)
+                            } else {
+                                context.getString(R.string.settings_groq_status_ok)
+                            }
                         } else {
                             context.getString(R.string.settings_groq_status_missing)
                         },
                         style = MaterialTheme.typography.bodySmall,
                         color = if (activeApiKey.isNotBlank()) LiveGreen else MutedLavender,
                     )
-                    if (activeApiKey.isNotBlank()) {
+                    if (activeApiKey.isNotBlank() && llmProvider != LlmProvider.LOCAL) {
                         Spacer(modifier = Modifier.height(4.dp))
                         Text(
                             text = context.getString(R.string.settings_own_api_key_hint),
@@ -952,6 +1050,7 @@ fun SettingsScreen(
                             )
                         }
                     }
+                    if (llmProvider != LlmProvider.LOCAL) {
                     Spacer(modifier = Modifier.height(12.dp))
                     OutlinedTextField(
                         value = activeApiInput,
@@ -960,6 +1059,7 @@ fun SettingsScreen(
                                 LlmProvider.GROQ -> groqInput = value
                                 LlmProvider.GEMINI -> geminiInput = value
                                 LlmProvider.OPENROUTER -> openRouterInput = value
+                                LlmProvider.LOCAL -> localUrlInput = value
                             }
                         },
                         label = { Text(context.getString(R.string.settings_api_key)) },
@@ -976,6 +1076,7 @@ fun SettingsScreen(
                                             LlmProvider.GROQ -> groqInput = ""
                                             LlmProvider.GEMINI -> geminiInput = ""
                                             LlmProvider.OPENROUTER -> openRouterInput = ""
+                                            LlmProvider.LOCAL -> localUrlInput = SettingsDataStore.DEFAULT_LOCAL_OLLAMA_URL
                                         }
                                         checkSummary = null
                                         checkResult = null
@@ -990,6 +1091,7 @@ fun SettingsScreen(
                             }
                         },
                     )
+                    }
                     Spacer(modifier = Modifier.height(8.dp))
                     PrimaryStoryButton(
                         text = if (isChecking) {
@@ -1008,24 +1110,68 @@ fun SettingsScreen(
                                     val cleanGroq = ApiKeySanitizer.clean(groqInput)
                                     val cleanGemini = ApiKeySanitizer.clean(geminiInput)
                                     val cleanOpenRouter = ApiKeySanitizer.clean(openRouterInput)
+                                    var cleanLocalBackend = localBackendUrlInput.trim().trimEnd('/')
+                                    val cleanLocalUrl = localUrlInput.trim().trimEnd('/')
+                                    val cleanLocalModel = localModelInput.trim()
+                                    val inferredBackendFromLocal = if (llmProvider == LlmProvider.LOCAL) {
+                                        BackendUrlRules.backendFromMistypedOllamaUrl(cleanLocalUrl)
+                                            ?: BackendUrlRules.backendFromMistypedOllamaUrl(cleanLocalBackend)
+                                    } else {
+                                        null
+                                    }
                                     groqInput = cleanGroq
                                     geminiInput = cleanGemini
                                     openRouterInput = cleanOpenRouter
+                                    localUrlInput =
+                                        if (inferredBackendFromLocal != null) {
+                                            SettingsDataStore.DEFAULT_LOCAL_OLLAMA_URL
+                                        } else {
+                                            cleanLocalUrl.ifBlank { SettingsDataStore.DEFAULT_LOCAL_OLLAMA_URL }
+                                        }
+                                    localModelInput = cleanLocalModel.ifBlank { SettingsDataStore.DEFAULT_LOCAL_OLLAMA_MODEL }
                                     settings.setGroqApiKey(cleanGroq)
                                     settings.setGeminiApiKey(cleanGemini)
                                     settings.setOpenRouterApiKey(cleanOpenRouter)
+                                    if (llmProvider == LlmProvider.LOCAL) {
+                                        if (inferredBackendFromLocal != null) {
+                                            cleanLocalBackend = inferredBackendFromLocal
+                                            localUrlInput = SettingsDataStore.DEFAULT_LOCAL_OLLAMA_URL
+                                            settings.setLocalOllamaUrl(localUrlInput)
+                                            StoryLog.w("SETTINGS auto-fix: moved :3000 URL to backend_url")
+                                        }
+                                        if (!BackendUrlRules.isLanBackend(cleanLocalBackend)) {
+                                            checkSummary =
+                                                "Укажи URL сервера ПК (http://IP:3000 из start-local-bff.bat)"
+                                            StoryLog.i("SETTINGS local skipped: backend not LAN ($cleanLocalBackend)")
+                                            return@launch
+                                        }
+                                        localBackendUrlInput = cleanLocalBackend
+                                        settings.setBackendUrl(cleanLocalBackend)
+                                    } else if (inferredBackendFromLocal != null) {
+                                        settings.setBackendUrl(inferredBackendFromLocal)
+                                        StoryLog.w("SETTINGS auto-fix: moved :3000 URL from Ollama field to backend_url")
+                                    }
+                                    settings.setLocalOllamaUrl(localUrlInput)
+                                    settings.setLocalOllamaModel(localModelInput)
                                     settings.setGroqCustomModelId(groqCustomInput)
                                     settings.setOpenRouterCustomModelId(openRouterCustomInput)
 
-                                    val checkedKey = when (llmProvider) {
-                                        LlmProvider.GROQ -> cleanGroq
-                                        LlmProvider.GEMINI -> cleanGemini
-                                        LlmProvider.OPENROUTER -> cleanOpenRouter
+                                    val ready = when (llmProvider) {
+                                        LlmProvider.GROQ -> cleanGroq.isNotBlank()
+                                        LlmProvider.GEMINI -> cleanGemini.isNotBlank()
+                                        LlmProvider.OPENROUTER -> cleanOpenRouter.isNotBlank()
+                                        LlmProvider.LOCAL ->
+                                            BackendUrlRules.isLanBackend(cleanLocalBackend) &&
+                                                localUrlInput.isNotBlank()
                                     }
-                                    if (checkedKey.isBlank()) {
+                                    if (!ready) {
                                         checkSummary =
-                                            "Сначала вставь API-ключ, потом нажми «Сохранить и проверить»"
-                                        StoryLog.i("SETTINGS API test skipped: no key for ${llmProvider.id}")
+                                            if (llmProvider == LlmProvider.LOCAL) {
+                                                "Укажи URL сервера ПК и Ollama, потом «Сохранить и проверить»"
+                                            } else {
+                                                "Сначала вставь API-ключ, потом нажми «Сохранить и проверить»"
+                                            }
+                                        StoryLog.i("SETTINGS API test skipped: not configured for ${llmProvider.id}")
                                         return@launch
                                     }
 
@@ -1044,6 +1190,8 @@ fun SettingsScreen(
                                         openRouterModel = openRouterModel,
                                         openRouterCustomModelId = openRouterCustomInput,
                                         backendUrl = backendUrl,
+                                        localOllamaUrl = localUrlInput,
+                                        localOllamaModel = localModelInput,
                                     )
                                     checkResult = result
                                     checkSummary = when {
@@ -1076,21 +1224,25 @@ fun SettingsScreen(
                         )
                     }
                     Spacer(modifier = Modifier.height(8.dp))
+                    if (llmProvider != LlmProvider.LOCAL) {
                     SecondaryStoryButton(
                         text = when (llmProvider) {
                             LlmProvider.GROQ -> context.getString(R.string.settings_groq_get_key)
                             LlmProvider.GEMINI -> context.getString(R.string.settings_gemini_get_key)
                             LlmProvider.OPENROUTER -> context.getString(R.string.settings_openrouter_get_key)
+                            LlmProvider.LOCAL -> ""
                         },
                         onClick = {
                             val url = when (llmProvider) {
                                 LlmProvider.GROQ -> "https://console.groq.com/keys"
                                 LlmProvider.GEMINI -> "https://aistudio.google.com/apikey"
                                 LlmProvider.OPENROUTER -> "https://openrouter.ai/keys"
+                                LlmProvider.LOCAL -> ""
                             }
                             context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
                         },
                     )
+                    }
                 }
 
                 PrimaryStoryButton(

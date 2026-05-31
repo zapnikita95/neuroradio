@@ -7,6 +7,27 @@ import org.junit.Test
 class TriggerEngineTest {
 
     @Test
+    fun firstTrackBonus_firesOnceThenWaitsForN() {
+        val engine = TriggerEngine()
+        val settings = TriggerSettings(mode = TriggerMode.EVERY_N_TRACKS, everyNTracks = 10)
+        assertTrue(
+            engine.onTrackPlayed(settings, "a|t", "Artist", null, firstTrackBonus = true),
+        )
+        repeat(8) { index ->
+            assertFalse(
+                engine.onTrackPlayed(
+                    settings,
+                    "track$index|t",
+                    "Artist",
+                    null,
+                    firstTrackBonus = true,
+                ),
+            )
+        }
+        assertTrue(engine.onTrackPlayed(settings, "last|t", "Artist", null, firstTrackBonus = true))
+    }
+
+    @Test
     fun everyNTracks_firesWhenCounterAlreadyAtN() {
         val engine = TriggerEngine()
         engine.restoreTracksSinceLastStory(10)

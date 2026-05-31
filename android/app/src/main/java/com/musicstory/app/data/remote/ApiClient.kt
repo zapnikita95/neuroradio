@@ -4,6 +4,8 @@ import com.musicstory.app.data.local.SettingsDataStore
 import com.musicstory.app.util.StoryLog
 import com.musicstory.app.data.model.StoryRequest
 import com.musicstory.app.data.model.StoryResponse
+import com.musicstory.app.data.model.LlmProbeRequest
+import com.musicstory.app.data.model.LlmProbeResponse
 import com.musicstory.app.data.remote.QuotaResponse
 import kotlinx.coroutines.runBlocking
 import okhttp3.Interceptor
@@ -30,6 +32,14 @@ class ApiClient(
         .addInterceptor(loggingInterceptor)
         .build()
 
+    /** Local Ollama on PC — research + narrator can take several minutes. */
+    private val localStoryOkHttpClient: OkHttpClient = OkHttpClient.Builder()
+        .connectTimeout(30, TimeUnit.SECONDS)
+        .readTimeout(20, TimeUnit.MINUTES)
+        .writeTimeout(30, TimeUnit.SECONDS)
+        .addInterceptor(loggingInterceptor)
+        .build()
+
     @Volatile
     private var cachedBaseUrl: String? = null
 
@@ -37,7 +47,8 @@ class ApiClient(
     private var cachedApi: StoryApi? = null
 
     suspend fun fetchFullStory(baseUrl: String, request: StoryRequest): StoryResponse {
-        val api = getApi(baseUrl)
+        val local = request.llmProvider == "local"
+        val api = getApi(baseUrl, longRead = local)
         StoryLog.i("POST /v1/story/full llm=${request.llmProvider} ${request.artist} — ${request.title}")
         return try {
             val response = api.fetchFullStory(request)
@@ -46,9 +57,11 @@ class ApiClient(
             )
             response
         } catch (first: Exception) {
+            val http = first as? retrofit2.HttpException
+            if (http != null && http.code() != 401) throw first
             StoryLog.w("Story fetch retry after: ${first.message}")
             authManager.invalidateToken()
-            getApi(baseUrl).fetchFullStory(request)
+            getApi(baseUrl, longRead = local).fetchFullStory(request)
         }
     }
 
@@ -56,12 +69,56 @@ class ApiClient(
         return getApi(baseUrl).health()
     }
 
+    suspend fun fetchOllamaHealth(
+        baseUrl: String,
+        ollamaUrl: String,
+        model: String,
+    ): Map<String, Any?> {
+        return getApi(baseUrl, longRead = true).healthOllama(
+            ollamaUrl = ollamaUrl.trim().trimEnd('/').ifBlank { null },
+            model = model.trim().ifBlank { null },
+        )
+    }
+
     suspend fun fetchQuota(baseUrl: String): QuotaResponse {
         return getApi(baseUrl).fetchQuota()
     }
 
-    fun getApi(baseUrl: String): StoryApi {
+    suspend fun probeLlm(baseUrl: String, request: LlmProbeRequest): LlmProbeResponse {
+        return try {
+            getApi(baseUrl).probeLlm(request)
+        } catch (first: Exception) {
+            StoryLog.w("LLM probe retry after: ${first.message}")
+            authManager.invalidateToken()
+            getApi(baseUrl).probeLlm(request)
+        }
+    }
+
+    @Volatile
+    private var cachedLocalApi: StoryApi? = null
+
+    @Volatile
+    private var cachedLocalBaseUrl: String? = null
+
+    fun getApi(baseUrl: String, longRead: Boolean = false): StoryApi {
         val normalized = normalizeBaseUrl(baseUrl)
+        if (longRead) {
+            val current = cachedLocalApi
+            if (current != null && cachedLocalBaseUrl == normalized) {
+                return current
+            }
+            return synchronized(this) {
+                val again = cachedLocalApi
+                if (again != null && cachedLocalBaseUrl == normalized) {
+                    again
+                } else {
+                    buildApi(normalized, localStoryOkHttpClient).also {
+                        cachedLocalApi = it
+                        cachedLocalBaseUrl = normalized
+                    }
+                }
+            }
+        }
         val current = cachedApi
         if (current != null && cachedBaseUrl == normalized) {
             return current
@@ -71,27 +128,32 @@ class ApiClient(
             if (again != null && cachedBaseUrl == normalized) {
                 again
             } else {
-                val client = baseOkHttpClient.newBuilder()
-                    .addInterceptor(createAuthInterceptor(normalized))
-                    .build()
-                Retrofit.Builder()
-                    .baseUrl(normalized)
-                    .client(client)
-                    .addConverterFactory(GsonConverterFactory.create())
-                    .build()
-                    .create(StoryApi::class.java)
-                    .also {
-                        cachedApi = it
-                        cachedBaseUrl = normalized
-                    }
+                buildApi(normalized, baseOkHttpClient).also {
+                    cachedApi = it
+                    cachedBaseUrl = normalized
+                }
             }
         }
+    }
+
+    private fun buildApi(baseUrl: String, httpClient: OkHttpClient): StoryApi {
+        val client = httpClient.newBuilder()
+            .addInterceptor(createAuthInterceptor(baseUrl))
+            .build()
+        return Retrofit.Builder()
+            .baseUrl(baseUrl)
+            .client(client)
+            .addConverterFactory(GsonConverterFactory.create())
+            .build()
+            .create(StoryApi::class.java)
     }
 
     fun invalidateCache() {
         synchronized(this) {
             cachedApi = null
             cachedBaseUrl = null
+            cachedLocalApi = null
+            cachedLocalBaseUrl = null
         }
     }
 

@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { primaryArtistName } from './artist-primary.js';
 import type { ReferenceFactBundle } from './fact-picker.js';
 import { factAppliesToRequest } from './fact-relevance.js';
 import type { TrackMetadata } from './musicbrainz.js';
@@ -64,9 +65,10 @@ export function resolveArtistTier(
   metadata: TrackMetadata,
   bundle: ReferenceFactBundle,
 ): ArtistTier {
-  if (isCatalogMajorArtist(artist)) return 'major';
+  const primary = primaryArtistName(artist);
+  if (isCatalogMajorArtist(primary) || isCatalogMajorArtist(artist)) return 'major';
 
-  const counts = validatedFactCount(bundle, artist, title);
+  const counts = validatedFactCount(bundle, primary, title);
   if (counts.track >= 1) return 'major';
   if (counts.artist >= 2) return 'major';
 

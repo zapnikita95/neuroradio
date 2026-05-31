@@ -20,6 +20,11 @@ data class StoryRequest(
     @SerializedName("gemini_model") val geminiModel: String? = null,
     @SerializedName("groq_model") val groqModel: String? = null,
     @SerializedName("openrouter_model") val openRouterModel: String? = null,
+    @SerializedName("groq_api_key") val groqApiKey: String? = null,
+    @SerializedName("gemini_api_key") val geminiApiKey: String? = null,
+    @SerializedName("openrouter_api_key") val openRouterApiKey: String? = null,
+    @SerializedName("local_ollama_url") val localOllamaUrl: String? = null,
+    @SerializedName("local_ollama_model") val localOllamaModel: String? = null,
 )
 
 data class StoryResponse(

@@ -4,7 +4,7 @@ import {
   StoryLengthId,
   StoryLengthPreset,
 } from './story-length.js';
-import { factNamesForeignEntity } from './fact-relevance.js';
+import { storyNamesForeignArtist } from './fact-relevance.js';
 import { hasEnglishLeak } from './story-russian-language.js';
 import { prepareStoryScriptLanguage } from './story-english-normalize.js';
 
@@ -136,8 +136,21 @@ export function sanitizeScriptForTts(
   ORPHAN_ORDINAL_SUFFIX.lastIndex = 0;
   result = repairOrphanDatePhrases(result, referenceFacts);
   result = result.replace(/\s{2,}/g, ' ').replace(/\s+([,.!?])/g, '$1').trim();
+  result = stripBannedFluff(result);
 
   return result;
+}
+
+/** Replace LLM fluff words instead of hard-rejecting the whole story. */
+export function stripBannedFluff(text: string): string {
+  return text
+    .replace(/\bуникальн(?:ый|ая|ое|ые|ом|ой|ую)\b/gi, 'особый')
+    .replace(/\bлегендарн\w+\b/gi, 'известный')
+    .replace(/\bмагия музыки\b/gi, '')
+    .replace(/\bчто[- ]то уникальн\w+\b/gi, 'что-то особенное')
+    .replace(/\s{2,}/g, ' ')
+    .replace(/\s+([,.!?])/g, '$1')
+    .trim();
 }
 
 export function findForbiddenNumbers(
@@ -306,7 +319,7 @@ export function validateStoryScript(
     return { ok: false, reason: 'no reference facts — story must be grounded in sources' };
   }
 
-  if (factNamesForeignEntity(trimmed, artist, title, referenceFacts.join('\n'))) {
+  if (storyNamesForeignArtist(trimmed, artist, title, referenceFacts)) {
     return { ok: false, reason: 'story names a different artist than the track' };
   }
 

@@ -4,6 +4,7 @@ import {
   countWords,
   findWateryContent,
   sanitizeScriptForTts,
+  stripBannedFluff,
   validateStoryScript,
 } from './story-quality.js';
 import { logRejectedScript } from './story-reject-log.js';
@@ -104,11 +105,13 @@ export function finalizeAfterQualityLoop<T extends { script: string }>(
   options: { relaxForWeakLlm?: boolean } = {},
 ): T | null {
   if (!lastCandidate?.script?.trim()) return null;
-  const sanitized = sanitizeScriptForTts(
-    lastCandidate.script,
-    input.artist,
-    input.title,
-    referenceFacts,
+  const sanitized = stripBannedFluff(
+    sanitizeScriptForTts(
+      lastCandidate.script,
+      input.artist,
+      input.title,
+      referenceFacts,
+    ),
   );
   const wordCount = countWords(sanitized);
   const relax = options.relaxForWeakLlm ?? false;

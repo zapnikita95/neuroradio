@@ -75,7 +75,8 @@ class TriggerEngine {
             TriggerMode.ALWAYS -> true
             TriggerMode.NEVER -> false
             TriggerMode.EVERY_N_TRACKS -> {
-                if (firstTrackBonus) {
+                if (firstTrackBonus && tracksSinceLastStory == 0) {
+                    tracksSinceLastStory = 1
                     true
                 } else {
                     tracksSinceLastStory++

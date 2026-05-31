@@ -124,6 +124,30 @@ export function entityMatchesArtist(entity: string, artist: string, title: strin
   return eTok.every((token) => aTok.includes(token));
 }
 
+/** Quoted spans are usually track/album titles, not other artists. */
+function withoutQuotedSpans(text: string): string {
+  return text
+    .replace(/[«"][^»"]+[»"]/g, ' ')
+    .replace(/«[^»]+»/g, ' ')
+    .replace(/\s{2,}/g, ' ')
+    .trim();
+}
+
+/** Story validation: ignore song titles in «quotes» when checking for wrong artists. */
+export function storyNamesForeignArtist(
+  script: string,
+  artist: string,
+  title: string,
+  referenceFacts: string[] = [],
+): boolean {
+  return factNamesForeignEntity(
+    withoutQuotedSpans(script),
+    artist,
+    title,
+    referenceFacts.join('\n'),
+  );
+}
+
 /** Another act is named in the fact — not the requested artist/title. */
 export function factNamesForeignEntity(
   fact: string,

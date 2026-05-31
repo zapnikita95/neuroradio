@@ -23,6 +23,7 @@ import com.musicstory.app.domain.TtsSpeed
 import com.musicstory.app.domain.TtsVoice
 import com.musicstory.app.domain.TriggerMode
 import com.musicstory.app.util.StoryLog
+import com.musicstory.app.util.ApiKeySanitizer
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
@@ -106,6 +107,14 @@ class SettingsDataStore(private val context: Context) {
 
     val openRouterApiKey: Flow<String> = context.settingsDataStore.data.map { prefs ->
         prefs[KEY_OPENROUTER_API_KEY] ?: ""
+    }
+
+    val localOllamaUrl: Flow<String> = context.settingsDataStore.data.map { prefs ->
+        prefs[KEY_LOCAL_OLLAMA_URL].orEmpty().trim().ifBlank { DEFAULT_LOCAL_OLLAMA_URL }
+    }
+
+    val localOllamaModel: Flow<String> = context.settingsDataStore.data.map { prefs ->
+        prefs[KEY_LOCAL_OLLAMA_MODEL].orEmpty().trim().ifBlank { DEFAULT_LOCAL_OLLAMA_MODEL }
     }
 
     val llmProvider: Flow<LlmProvider> = context.settingsDataStore.data.map { prefs ->
@@ -249,15 +258,27 @@ class SettingsDataStore(private val context: Context) {
     }
 
     suspend fun setGroqApiKey(key: String) {
-        context.settingsDataStore.edit { it[KEY_GROQ_API_KEY] = key.trim() }
+        context.settingsDataStore.edit { it[KEY_GROQ_API_KEY] = ApiKeySanitizer.clean(key) }
     }
 
     suspend fun setGeminiApiKey(key: String) {
-        context.settingsDataStore.edit { it[KEY_GEMINI_API_KEY] = key.trim() }
+        context.settingsDataStore.edit { it[KEY_GEMINI_API_KEY] = ApiKeySanitizer.clean(key) }
     }
 
     suspend fun setOpenRouterApiKey(key: String) {
-        context.settingsDataStore.edit { it[KEY_OPENROUTER_API_KEY] = key.trim() }
+        context.settingsDataStore.edit { it[KEY_OPENROUTER_API_KEY] = ApiKeySanitizer.clean(key) }
+    }
+
+    suspend fun setLocalOllamaUrl(url: String) {
+        context.settingsDataStore.edit {
+            it[KEY_LOCAL_OLLAMA_URL] = url.trim().trimEnd('/').ifBlank { DEFAULT_LOCAL_OLLAMA_URL }
+        }
+    }
+
+    suspend fun setLocalOllamaModel(model: String) {
+        context.settingsDataStore.edit {
+            it[KEY_LOCAL_OLLAMA_MODEL] = model.trim().ifBlank { DEFAULT_LOCAL_OLLAMA_MODEL }
+        }
     }
 
     suspend fun setLlmProvider(provider: LlmProvider) {
@@ -345,6 +366,11 @@ class SettingsDataStore(private val context: Context) {
         const val DEFAULT_SAME_TRACK_STORY_EVERY_N = 3
         const val DEFAULT_AUTO_INTERCEPT = true
         const val DEFAULT_MUSIC_FADE_SECONDS = 1.5f
+        /** URL Ollama с точки зрения ПК с BFF (не телефона). */
+        const val DEFAULT_LOCAL_OLLAMA_URL = "http://127.0.0.1:11435"
+        const val DEFAULT_LOCAL_OLLAMA_MODEL = "qwen3.6:35b-a3b-q4_K_M"
+        /** Shown in UI when switching to Local — user picks IP from start-local-bff.bat */
+        const val SUGGESTED_LOCAL_BACKEND_URL = "http://10.196.221.190:3000"
 
         private val KEY_AUTO_INTERCEPT = booleanPreferencesKey("auto_intercept")
         private val KEY_EVERY_N_TRACKS = intPreferencesKey("every_n_tracks")
@@ -363,6 +389,8 @@ class SettingsDataStore(private val context: Context) {
         private val KEY_GROQ_API_KEY = stringPreferencesKey("groq_api_key")
         private val KEY_GEMINI_API_KEY = stringPreferencesKey("gemini_api_key")
         private val KEY_OPENROUTER_API_KEY = stringPreferencesKey("openrouter_api_key")
+        private val KEY_LOCAL_OLLAMA_URL = stringPreferencesKey("local_ollama_url")
+        private val KEY_LOCAL_OLLAMA_MODEL = stringPreferencesKey("local_ollama_model")
         private val KEY_LLM_PROVIDER = stringPreferencesKey("llm_provider")
         private val KEY_LLM_PROVIDER_DEFAULTED_TO_OPENROUTER = booleanPreferencesKey("llm_provider_defaulted_to_openrouter")
         private val KEY_OPENROUTER_FORCE_VERSION = intPreferencesKey("openrouter_force_version")

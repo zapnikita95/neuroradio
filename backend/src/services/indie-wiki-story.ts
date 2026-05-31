@@ -123,31 +123,73 @@ export async function translateWikiLeadToStory(input: IndieWikiStoryInput): Prom
   ].join('\n');
 
   const provider = input.llmProvider;
-  let raw: string;
+  const attempts: Array<() => Promise<string>> = [];
+
   if (provider === 'gemini' && hasLlmKeyForProvider('gemini', { gemini: input.clientGeminiApiKey })) {
-    raw = await callGeminiTranslate(TRANSLATE_SYSTEM, user, input.clientGeminiApiKey);
+    attempts.push(() => callGeminiTranslate(TRANSLATE_SYSTEM, user, input.clientGeminiApiKey));
   } else if (
     provider === 'openrouter' &&
     hasLlmKeyForProvider('openrouter', { openrouter: input.clientOpenRouterApiKey })
   ) {
-    raw = await callOpenAiChatCompletion({
-      url: 'https://openrouter.ai/api/v1/chat/completions',
-      apiKey: input.clientOpenRouterApiKey?.trim() || process.env.OPEN_ROUTER_API_KEY!.trim(),
-      model: resolveOpenRouterModel(input.openRouterModel, 'story'),
-      systemPrompt: TRANSLATE_SYSTEM,
-      userPrompt: user,
-      maxTokens: 900,
-      temperature: 0.15,
-      useJsonMode: true,
-      extraHeaders: {
-        'HTTP-Referer': process.env.OPENROUTER_HTTP_REFERER?.trim() || 'https://music-story.app',
-        'X-Title': 'Music Story',
-      },
-      label: 'OpenRouter',
-    });
-  } else {
-    raw = await callGroqTranslate(TRANSLATE_SYSTEM, user, input.clientGroqApiKey);
+    attempts.push(() =>
+      callOpenAiChatCompletion({
+        url: 'https://openrouter.ai/api/v1/chat/completions',
+        apiKey: input.clientOpenRouterApiKey?.trim() || process.env.OPEN_ROUTER_API_KEY!.trim(),
+        model: resolveOpenRouterModel(input.openRouterModel, 'story'),
+        systemPrompt: TRANSLATE_SYSTEM,
+        userPrompt: user,
+        maxTokens: 900,
+        temperature: 0.15,
+        useJsonMode: true,
+        extraHeaders: {
+          'HTTP-Referer': process.env.OPENROUTER_HTTP_REFERER?.trim() || 'https://music-story.app',
+          'X-Title': 'Music Story',
+        },
+        label: 'OpenRouter',
+      }),
+    );
+  } else if (hasLlmKeyForProvider('groq', { groq: input.clientGroqApiKey })) {
+    attempts.push(() => callGroqTranslate(TRANSLATE_SYSTEM, user, input.clientGroqApiKey));
   }
+
+  if (provider !== 'openrouter' && hasLlmKeyForProvider('openrouter', { openrouter: input.clientOpenRouterApiKey })) {
+    attempts.push(() =>
+      callOpenAiChatCompletion({
+        url: 'https://openrouter.ai/api/v1/chat/completions',
+        apiKey: input.clientOpenRouterApiKey?.trim() || process.env.OPEN_ROUTER_API_KEY!.trim(),
+        model: resolveOpenRouterModel(input.openRouterModel, 'story'),
+        systemPrompt: TRANSLATE_SYSTEM,
+        userPrompt: user,
+        maxTokens: 900,
+        temperature: 0.15,
+        useJsonMode: true,
+        extraHeaders: {
+          'HTTP-Referer': process.env.OPENROUTER_HTTP_REFERER?.trim() || 'https://music-story.app',
+          'X-Title': 'Music Story',
+        },
+        label: 'OpenRouter-fallback',
+      }),
+    );
+  }
+  if (provider !== 'gemini' && hasLlmKeyForProvider('gemini', { gemini: input.clientGeminiApiKey })) {
+    attempts.push(() => callGeminiTranslate(TRANSLATE_SYSTEM, user, input.clientGeminiApiKey));
+  }
+  if (provider !== 'groq' && hasLlmKeyForProvider('groq', { groq: input.clientGroqApiKey })) {
+    attempts.push(() => callGroqTranslate(TRANSLATE_SYSTEM, user, input.clientGroqApiKey));
+  } else if (attempts.length === 0 && process.env.GROQ_API_KEY?.trim()) {
+    attempts.push(() => callGroqTranslate(TRANSLATE_SYSTEM, user));
+  }
+
+  let raw: string | null = null;
+  for (const attempt of attempts) {
+    try {
+      raw = await attempt();
+      break;
+    } catch (err) {
+      console.warn(`[indie-wiki] translate attempt failed: ${err instanceof Error ? err.message : err}`);
+    }
+  }
+  if (!raw) return null;
 
   const script = parseJsonScript(raw);
   if (!script) return null;

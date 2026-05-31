@@ -22,7 +22,7 @@ import {
   recordArtistStoryForDepth,
 } from '../services/artist-wiki-depth.js';
 import { primaryArtistName } from '../services/artist-primary.js';
-import { countWords } from '../services/story-quality.js';
+import { countWords, sanitizeScriptForTts } from '../services/story-quality.js';
 import type { StoryScript } from '../services/groq.js';
 import { setLogDetail } from '../middleware/request-logger.js';
 import { hasYandexCredentials } from '../services/yandex-tts.js';
@@ -361,20 +361,27 @@ router.post('/full', validateStoryFullBody, async (req: Request, res: Response) 
             clientOpenRouterApiKey: clientLlmKeys.openrouter,
             openRouterModel: openrouterModel,
           });
-          if (wikiScript) {
+          const wikiScriptFinal =
+            wikiScript ??
+            (wikiLead.lang === 'ru'
+              ? sanitizeScriptForTts(wikiLead.text, metadata.artist, metadata.title, [wikiLead.text])
+              : null);
+          if (wikiScriptFinal && countWords(wikiScriptFinal) >= 25) {
             selectedFact = {
               fact: wikiLead.text,
               scope: 'artist',
               scopeLabelRu: 'группа/артист',
             };
             const scripted: StoryScript = {
-              script: wikiScript,
-              word_count: countWords(wikiScript),
+              script: wikiScriptFinal,
+              word_count: countWords(wikiScriptFinal),
               voiceId,
             };
-            return { story: scripted, llmUsed: `${llmProvider}+wiki` };
+            return { story: scripted, llmUsed: wikiScript ? `${llmProvider}+wiki` : 'wiki-ru' };
           }
+          if (!wikiScript) {
           console.warn(`[indie-wiki] translate failed for "${metadata.artist}" — fallback to story LLM`);
+          }
         }
       }
       return generateStoryWithFallback(storyInput, llmProvider);

@@ -14,36 +14,6 @@ enum class OpenRouterModel(
         stable = true,
         recommended = true,
     ),
-    ROUTER_FREE(
-        id = "openrouter/free",
-        labelRu = "OpenRouter Free (авто)",
-        descriptionRu = "Роутер OpenRouter — часто 429, нестабильно",
-    ),
-    DEEPSEEK_V4_FLASH(
-        id = "deepseek/deepseek-v4-flash:free",
-        labelRu = "DeepSeek V4 Flash",
-        descriptionRu = "Часто rate-limit — нестабильно",
-    ),
-    QWEN3_NEXT_80B(
-        id = "qwen/qwen3-next-80b-a3b-instruct:free",
-        labelRu = "Qwen3 Next 80B",
-        descriptionRu = "Сильнее, но free часто 429",
-    ),
-    GEMMA_4_26B(
-        id = "google/gemma-4-26b-a4b-it:free",
-        labelRu = "Gemma 4 26B",
-        descriptionRu = "Баланс скорости и качества",
-    ),
-    NEMOTRON_NANO(
-        id = "nvidia/nemotron-nano-9b-v2:free",
-        labelRu = "Nemotron Nano 9B",
-        descriptionRu = "Компактная free NVIDIA",
-    ),
-    GPT_OSS_120B(
-        id = "openai/gpt-oss-120b:free",
-        labelRu = "GPT-OSS 120B",
-        descriptionRu = "Крупная free — может быть медленнее или 429",
-    ),
     CUSTOM(
         id = "__custom__",
         labelRu = "Своя модель…",
