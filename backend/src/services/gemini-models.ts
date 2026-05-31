@@ -1,5 +1,7 @@
 /** Бесплатные модели Gemini API (free tier). Платные — только справочно в UI. */
 
+import type { StoryLengthId } from './story-length.js';
+
 export interface GeminiModelOption {
   id: string;
   labelRu: string;
@@ -65,4 +67,20 @@ export function geminiModelSettingsLabel(modelId: string): string {
   if (!model) return modelId;
   if (model.recommended) return `${model.labelRu} · бесплатная · оптимальная`;
   return `${model.labelRu} · бесплатная`;
+}
+
+export function isGeminiFlashLiteModel(modelId: string): boolean {
+  return /flash-lite/i.test(modelId);
+}
+
+/** Flash-Lite often undershoots 130w target — accept shorter scripts after retries. */
+export function geminiGracefulMinWords(modelId: string, lengthId: StoryLengthId): number {
+  const limits = { '30s': 72, '60s': 130, unlimited: 195 } as const;
+  const base = limits[lengthId] ?? 130;
+  if (isGeminiFlashLiteModel(modelId)) {
+    if (lengthId === '30s') return 55;
+    if (lengthId === '60s') return 70;
+    return Math.max(120, base - 60);
+  }
+  return Math.max(30, base - 15);
 }

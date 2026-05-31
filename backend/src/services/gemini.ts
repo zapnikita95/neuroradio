@@ -14,6 +14,8 @@ import {
 import {
   DEFAULT_GEMINI_MODEL,
   GEMINI_FREE_MODELS,
+  geminiGracefulMinWords,
+  isGeminiFlashLiteModel,
   resolveGeminiModel,
 } from './gemini-models.js';
 import {
@@ -26,9 +28,10 @@ import {
   qualityOptionsForAttempt,
   validateGeneratedStory,
 } from './story-generate-loop.js';
+import { logRejectedScript, logStoryScript } from './story-reject-log.js';
 
 const GEMINI_API_BASE = 'https://generativelanguage.googleapis.com/v1beta/models';
-const MAX_ATTEMPTS = 1;
+const MAX_ATTEMPTS = 3;
 const GEMINI_FALLBACK_MODEL = 'gemini-2.0-flash-lite';
 
 function sleep(ms: number): Promise<void> {
@@ -260,18 +263,19 @@ function validateGeminiHardQuality(
   input: GenerateStoryInput,
   storyLength: StoryLengthId,
   referenceFacts: string[],
+  modelId: string,
 ): { ok: true } | { ok: false; reason: string } {
+  const minWords = isGeminiFlashLiteModel(modelId)
+    ? geminiGracefulMinWords(modelId, storyLength)
+    : undefined;
   return validateStoryScript(script, storyLength, input.artist, input.title, {
-    // Keep anti-leak and factual checks strict, but allow slightly shorter scripts
-    // so Gemini can converge instead of failing the whole request with 500.
     strictLength: false,
     skipWatery: false,
-    // Reference anchor is already enforced in per-attempt quality checks.
-    // Here we keep leak/length/filler gates and avoid over-rejecting final candidates.
     skipReferenceAnchor: true,
     skipBannedPatterns: false,
     skipEnglishCheck: false,
     referenceFacts,
+    minWordsOverride: minWords,
   });
 }
 
@@ -280,16 +284,16 @@ function validateGeminiGracefulFallback(
   input: GenerateStoryInput,
   storyLength: StoryLengthId,
   referenceFacts: string[],
+  modelId: string,
 ): { ok: true } | { ok: false; reason: string } {
   return validateStoryScript(script, storyLength, input.artist, input.title, {
-    // Graceful fallback: keep anti-leak/anti-water checks strict, but
-    // do not hard-fail the whole request on anchor precision after retries.
     strictLength: false,
     skipWatery: false,
     skipReferenceAnchor: true,
     skipBannedPatterns: false,
     skipEnglishCheck: false,
     referenceFacts,
+    minWordsOverride: geminiGracefulMinWords(modelId, storyLength),
   });
 }
 
@@ -317,15 +321,19 @@ export async function generateStoryScript(
   const voiceId = input.voiceId ?? voiceForYear(input.year, input.genre);
 
   let lastCandidate: StoryScript | null = null;
+  let lastRejectReason: string | undefined;
   const geminiModelIndex = 0;
+  const resolvedModel = resolveGeminiModel(input.geminiModel);
 
   for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
+    const retryDirective = buildRetryDirective(lastRejectReason, lengthPreset.wordsMin);
     const userPrompt = buildStoryUserPrompt({
       ...input,
       voiceId,
       storyLength,
       previousScripts,
       selectedReferenceFact: input.selectedReferenceFact,
+      retryReason: retryDirective ?? undefined,
     });
 
     const result = await callGemini(
@@ -336,7 +344,7 @@ export async function generateStoryScript(
       geminiModelIndex,
       input.clientGeminiApiKey,
     );
-    console.log(`[gemini] single-shot story model=${result.model}`);
+    console.log(`[gemini] single-shot story model=${result.model} attempt=${attempt + 1}/${MAX_ATTEMPTS}`);
     const content = result.content;
     const story = parseStoryJson(content);
     if (!story) {
@@ -345,6 +353,7 @@ export async function generateStoryScript(
 
     story.voiceId = voiceId;
     story.word_count = countWords(story.script);
+    logStoryScript(`gemini attempt ${attempt + 1} raw`, story.script, `model=${result.model}`);
 
     const qOpts = qualityOptionsForAttempt(attempt, MAX_ATTEMPTS, referenceFacts);
     qOpts.skipReferenceAnchor = true;
@@ -357,12 +366,21 @@ export async function generateStoryScript(
       qOpts,
     );
     if (quality.ok) {
-      const hard = validateGeminiHardQuality(story.script, input, storyLength, referenceFacts);
+      const hard = validateGeminiHardQuality(
+        story.script,
+        input,
+        storyLength,
+        referenceFacts,
+        result.model,
+      );
       if (hard.ok) {
-        return finalizeStory(story, { ...input, voiceId }, storyLength);
+        const finalized = finalizeStory(story, { ...input, voiceId }, storyLength);
+        logStoryScript('gemini accepted', finalized.script, `model=${result.model}`);
+        return finalized;
       }
       lastCandidate = story;
-      console.warn(`Gemini hard-quality reject (single-shot): ${hard.reason}`);
+      lastRejectReason = hard.reason;
+      logRejectedScript('gemini hard-quality reject', story.script, hard.reason);
     } else {
       const sanitized = sanitizeScriptForTts(story.script, input.artist, input.title);
       const sanitizedQuality = validateGeneratedStory(
@@ -373,16 +391,30 @@ export async function generateStoryScript(
         qOpts,
       );
       if (sanitizedQuality.ok) {
-        const hard = validateGeminiHardQuality(sanitized, input, storyLength, referenceFacts);
+        const hard = validateGeminiHardQuality(
+          sanitized,
+          input,
+          storyLength,
+          referenceFacts,
+          result.model,
+        );
         if (hard.ok) {
           console.warn(`Gemini story sanitized (single-shot): ${quality.reason}`);
-          return finalizeStory({ ...story, script: sanitized }, { ...input, voiceId }, storyLength);
+          const finalized = finalizeStory({ ...story, script: sanitized }, { ...input, voiceId }, storyLength);
+          logStoryScript('gemini accepted (sanitized)', finalized.script, `model=${result.model}`);
+          return finalized;
         }
         lastCandidate = { ...story, script: sanitized };
-        console.warn(`Gemini hard-quality reject (single-shot): ${hard.reason}`);
+        lastRejectReason = hard.reason;
+        logRejectedScript('gemini hard-quality reject (sanitized)', sanitized, hard.reason);
       } else {
         lastCandidate = { ...story, script: sanitized };
-        console.warn(`Gemini story quality reject (single-shot): ${sanitizedQuality.reason ?? quality.reason}`);
+        lastRejectReason = sanitizedQuality.reason ?? quality.reason;
+        logRejectedScript(
+          'gemini quality reject',
+          sanitized,
+          lastRejectReason ?? 'quality',
+        );
       }
     }
   }
@@ -395,21 +427,39 @@ export async function generateStoryScript(
     { relaxForWeakLlm: true },
   );
   if (fallback) {
-    const hard = validateGeminiHardQuality(fallback.script, input, storyLength, referenceFacts);
-    if (hard.ok) return fallback;
+    const hard = validateGeminiHardQuality(
+      fallback.script,
+      input,
+      storyLength,
+      referenceFacts,
+      resolvedModel,
+    );
+    if (hard.ok) {
+      logStoryScript('gemini fallback accepted (hard)', fallback.script, `model=${resolvedModel}`);
+      return fallback;
+    }
     const graceful = validateGeminiGracefulFallback(
       fallback.script,
       input,
       storyLength,
       referenceFacts,
+      resolvedModel,
     );
     if (graceful.ok) {
       console.warn(`Gemini fallback accepted by graceful-quality: ${hard.reason}`);
+      logStoryScript('gemini fallback accepted (graceful)', fallback.script, `model=${resolvedModel}`);
       return fallback;
     }
+    logRejectedScript(
+      'gemini fallback rejected',
+      fallback.script,
+      `hard=${hard.reason}; graceful=${graceful.reason}`,
+    );
     console.warn(
       `Gemini fallback rejected by hard+graceful quality: hard=${hard.reason}; graceful=${graceful.reason}`,
     );
+  } else if (lastCandidate?.script) {
+    logRejectedScript('gemini no fallback', lastCandidate.script, lastRejectReason ?? 'quality');
   }
 
   throw new Error('Could not produce a usable story');

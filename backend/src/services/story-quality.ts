@@ -243,6 +243,8 @@ export function validateStoryScript(
     skipFirstSentenceAnchor?: boolean;
     skipBannedPatterns?: boolean;
     skipEnglishCheck?: boolean;
+    /** Override minimum word count (e.g. flash-lite models). */
+    minWordsOverride?: number;
   } = {},
 ): { ok: true } | { ok: false; reason: string } {
   const limits = getStoryLengthPreset(lengthId);
@@ -308,7 +310,9 @@ export function validateStoryScript(
   }
 
   const words = countWords(trimmed);
-  const minWords = strictLength ? limits.wordsMin : Math.max(30, limits.wordsMin - 15);
+  const minWords =
+    options.minWordsOverride ??
+    (strictLength ? limits.wordsMin : Math.max(30, limits.wordsMin - 15));
 
   if (words < minWords) {
     return { ok: false, reason: `too short (${words} words, need ${minWords}+)` };

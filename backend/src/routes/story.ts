@@ -382,6 +382,9 @@ router.post('/full', validateStoryFullBody, async (req: Request, res: Response) 
     console.log(
       `[story] ok install=${installId.slice(0, 8)} llm=${llmUsed} words=${story.word_count} audio=${Boolean(response.audioUrl)}`,
     );
+    console.warn('[story] script-text-begin');
+    console.warn(story.script.trim());
+    console.warn('[story] script-text-end');
     res.json(response);
   } catch (err) {
     if (err instanceof PremiumTtsAccessError) {
