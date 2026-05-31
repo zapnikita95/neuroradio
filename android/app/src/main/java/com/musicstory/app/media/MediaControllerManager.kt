@@ -111,6 +111,11 @@ class MediaControllerManager(
             delay(stepDelayMs)
         }
         controls.pause()
+        // Music is paused — restore stream volume so story narration is not ducked.
+        fadedStreamOriginalVolume?.let { original ->
+            audioManager.setStreamVolume(AudioManager.STREAM_MUSIC, original, 0)
+            fadedStreamOriginalVolume = null
+        }
     }
 
     fun resumeMusic() {

@@ -17,6 +17,11 @@ import { hasLlmKeyForProvider, resolveLlmProvider, clientKeyForProvider, type Cl
 import { generateStoryWithFallback } from '../services/story-llm-router.js';
 import { fetchArtistWikiLead } from '../services/wikipedia-lead.js';
 import { translateWikiLeadToStory } from '../services/indie-wiki-story.js';
+import {
+  pickArtistWikiContent,
+  recordArtistStoryForDepth,
+} from '../services/artist-wiki-depth.js';
+import { primaryArtistName } from '../services/artist-primary.js';
 import { countWords } from '../services/story-quality.js';
 import type { StoryScript } from '../services/groq.js';
 import { setLogDetail } from '../middleware/request-logger.js';
@@ -336,10 +341,14 @@ router.post('/full', validateStoryFullBody, async (req: Request, res: Response) 
 
     const { story, llmUsed } = await (async () => {
       if (artistTier === 'indie') {
-        const wikiLead = await fetchArtistWikiLead(metadata.artist);
+        const wikiLead = await pickArtistWikiContent({
+          installId,
+          artist: metadata.artist,
+          previousScripts,
+        });
         if (wikiLead) {
           console.log(
-            `[indie-wiki] lead lang=${wikiLead.lang} chars=${wikiLead.text.length} artist="${metadata.artist}"`,
+            `[indie-wiki] lead lang=${wikiLead.lang} chars=${wikiLead.text.length} artist="${primaryArtistName(metadata.artist)}"`,
           );
           const wikiScript = await translateWikiLeadToStory({
             artist: metadata.artist,
@@ -455,6 +464,9 @@ router.post('/full', validateStoryFullBody, async (req: Request, res: Response) 
     }
 
     recordStoryGeneration(installId, req);
+    if (selectedFact?.fact) {
+      recordArtistStoryForDepth(installId, metadata.artist, selectedFact.fact);
+    }
     attachStoryQuotaHeaders(res, installId);
     console.log(
       `[story] ok install=${installId.slice(0, 8)} llm=${llmUsed} words=${story.word_count} audio=${Boolean(response.audioUrl)}`,

@@ -78,10 +78,35 @@ export function countWords(text: string): number {
   return text.trim().split(/\s+/).filter(Boolean).length;
 }
 
-function allowedDigitSequences(artist: string, title: string): Set<string> {
-  const combined = `${artist} ${title}`;
+function allowedDigitSequences(
+  artist: string,
+  title: string,
+  referenceFacts: string[] = [],
+): Set<string> {
+  const combined = `${artist} ${title} ${referenceFacts.join(' ')}`;
   const matches = combined.match(/\d+/g) ?? [];
   return new Set(matches);
+}
+
+function shouldKeepDigit(match: string, allowed: Set<string>): boolean {
+  if (allowed.has(match)) return true;
+  if (/^(19|20)\d{2}$/.test(match)) return true;
+  if (/^[1-9]\d?$/.test(match)) return true;
+  return false;
+}
+
+function repairOrphanDatePhrases(text: string, referenceFacts: string[]): string {
+  let result = text;
+  const source = referenceFacts.join(' ');
+  const years = [...source.matchAll(/\b(19|20)\d{2}\b/g)].map((m) => m[0]);
+  if (years.length === 0) return result;
+  const year = years[0]!;
+  result = result.replace(/\bв\s+году\b/gi, `в ${year} году`);
+  result = result.replace(
+    /\b(январ|феврал|март|апрел|ма[йя]|июн|июл|август|сентябр|октябр|ноябр|декабр)\w*\s+года\b/gi,
+    (month) => `${month} ${year} года`,
+  );
+  return result.replace(/\s{2,}/g, ' ').trim();
 }
 
 export function sanitizeScriptForTts(
@@ -90,7 +115,7 @@ export function sanitizeScriptForTts(
   title: string,
   referenceFacts: string[] = [],
 ): string {
-  const allowed = allowedDigitSequences(artist, title);
+  const allowed = allowedDigitSequences(artist, title, referenceFacts);
   const { text: localized, allowedLatin } = prepareStoryScriptLanguage(script, {
     artist,
     title,
@@ -98,16 +123,18 @@ export function sanitizeScriptForTts(
   });
   let result = localized;
 
-  result = result.replace(DIGIT_ORDINAL_SUFFIX, ' тогда ');
+  result = result.replace(DIGIT_ORDINAL_SUFFIX, (match) => {
+    const digits = match.match(/\d+/)?.[0];
+    return digits && shouldKeepDigit(digits, allowed) ? match : ' тогда ';
+  });
   DIGIT_ORDINAL_SUFFIX.lastIndex = 0;
-  result = result.replace(/\d+/g, (match) => (allowed.has(match) ? match : ''));
+  result = result.replace(/\d+/g, (match) => (shouldKeepDigit(match, allowed) ? match : ''));
   result = result.replace(/\b[a-z]{2,}\b/gi, (match) => {
     return allowedLatin.has(match.toLowerCase()) ? match : '';
   });
   result = result.replace(ORPHAN_ORDINAL_SUFFIX, ' тогда ');
   ORPHAN_ORDINAL_SUFFIX.lastIndex = 0;
-  result = result.replace(SPELLED_YEAR_PATTERN, ' тогда ');
-  SPELLED_YEAR_PATTERN.lastIndex = 0;
+  result = repairOrphanDatePhrases(result, referenceFacts);
   result = result.replace(/\s{2,}/g, ' ').replace(/\s+([,.!?])/g, '$1').trim();
 
   return result;
@@ -117,24 +144,27 @@ export function findForbiddenNumbers(
   script: string,
   artist: string,
   title: string,
+  referenceFacts: string[] = [],
 ): string | null {
-  const allowed = allowedDigitSequences(artist, title);
+  const allowed = allowedDigitSequences(artist, title, referenceFacts);
 
   const digits = script.match(/\d+/g) ?? [];
   for (const seq of digits) {
-    if (!allowed.has(seq)) {
+    if (!shouldKeepDigit(seq, allowed)) {
       return `digit "${seq}" not allowed`;
     }
   }
 
   if (DIGIT_ORDINAL_SUFFIX.test(script)) {
     DIGIT_ORDINAL_SUFFIX.lastIndex = 0;
-    return 'digit ordinal like "65-й"';
-  }
-
-  if (SPELLED_YEAR_PATTERN.test(script)) {
-    SPELLED_YEAR_PATTERN.lastIndex = 0;
-    return 'spelled-out year or decade';
+    const ordinals = script.match(DIGIT_ORDINAL_SUFFIX) ?? [];
+    for (const ord of ordinals) {
+      const seq = ord.match(/\d+/)?.[0];
+      if (seq && !shouldKeepDigit(seq, allowed)) {
+        return `digit ordinal like "${ord.trim()}"`;
+      }
+    }
+    DIGIT_ORDINAL_SUFFIX.lastIndex = 0;
   }
 
   return null;
@@ -292,7 +322,7 @@ export function validateStoryScript(
     return { ok: false, reason: 'english words in Russian narration' };
   }
 
-  const numberIssue = findForbiddenNumbers(trimmed, artist, title);
+  const numberIssue = findForbiddenNumbers(trimmed, artist, title, referenceFacts);
   if (numberIssue) {
     return { ok: false, reason: `forbidden numbers: ${numberIssue}` };
   }
