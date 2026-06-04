@@ -66,7 +66,8 @@ export function resolveOpenRouterModelForTier(
   }
 
   if (tier === 'free') {
-    return slot === 'fact' ? OPENROUTER_DEFAULT_FREE_FACT_MODEL : OPENROUTER_DEFAULT_STORY_MODEL;
+    // Gemma :free for story too — Liquid 1.2B fails quality gates too often.
+    return OPENROUTER_DEFAULT_FREE_FACT_MODEL;
   }
 
   if (tier === 'trial') {
@@ -94,6 +95,17 @@ export function resolveOpenRouterFactModelsForTier(tier: UserTier): string[] {
   }
   if (tier === 'trial') {
     return [TIER_OPENROUTER_TRIAL_FACT_MODEL, TIER_OPENROUTER_FACT_MODEL];
+  }
+  return [TIER_OPENROUTER_FACT_MODEL];
+}
+
+/** Free tier: Gemma first, Liquid as last resort. */
+export function resolveOpenRouterStoryModelsForTier(tier: UserTier): string[] {
+  if (tier === 'free') {
+    return [OPENROUTER_DEFAULT_FREE_FACT_MODEL, OPENROUTER_DEFAULT_STORY_MODEL];
+  }
+  if (tier === 'trial') {
+    return [TIER_OPENROUTER_FACT_MODEL, OPENROUTER_DEFAULT_STORY_MODEL];
   }
   return [TIER_OPENROUTER_FACT_MODEL];
 }

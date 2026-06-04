@@ -72,6 +72,7 @@ export async function generateStoryWithFallback(
   }
 
   let lastError: unknown;
+  let lastQualityError: Error | undefined;
   for (let i = 0; i < chain.length; i++) {
     const provider = chain[i]!;
     const isFallback = i > 0;
@@ -86,11 +87,14 @@ export async function generateStoryWithFallback(
     } catch (err) {
       lastError = err;
       const msg = err instanceof Error ? err.message : String(err);
+      if (/could not produce a usable story/i.test(msg)) {
+        lastQualityError = err instanceof Error ? err : new Error(msg);
+      }
       console.warn(`[story-llm] provider=${provider} failed: ${msg.slice(0, 200)}`);
     }
   }
 
-  throw lastError instanceof Error ? lastError : new Error('All LLM providers failed');
+  throw lastQualityError ?? (lastError instanceof Error ? lastError : new Error('All LLM providers failed'));
 }
 
 export { isGeminiStoryFailure, hasGroqApiKey, hasGeminiApiKey, hasOpenRouterApiKey };

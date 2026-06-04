@@ -92,11 +92,19 @@ export function classifyStoryLlmError(
     };
   }
 
-  if (/ollama error|local ollama|econnrefused|fetch failed/i.test(lower)) {
+  if (/ollama error|local ollama/i.test(lower)) {
     return {
       code: 'LOCAL_OLLAMA_FAILED',
       message:
         'Локальный Ollama недоступен. Проверь ZeroTier, что Ollama слушает на 11435 и URL в настройках (http://10.196.221.190:11435).',
+      httpStatus: 503,
+    };
+  }
+
+  if (/econnrefused|127\.0\.0\.1:11435|fetch failed/i.test(lower)) {
+    return {
+      code: 'STORY_QUALITY_REJECTED',
+      message: 'Не получилось собрать историю — нажми «Рассказать историю» ещё раз.',
       httpStatus: 503,
     };
   }

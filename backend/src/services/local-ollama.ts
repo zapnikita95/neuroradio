@@ -32,8 +32,29 @@ export function resolveLocalOllamaModel(override?: string): string {
   );
 }
 
+function isLoopbackOllamaUrl(url: string): boolean {
+  try {
+    const host = new URL(url).hostname.toLowerCase();
+    return host === '127.0.0.1' || host === 'localhost' || host === '::1';
+  } catch {
+    return false;
+  }
+}
+
+function isProductionHost(): boolean {
+  return Boolean(
+    process.env.RAILWAY_ENVIRONMENT?.trim() ||
+      process.env.RAILWAY_PROJECT_ID?.trim() ||
+      process.env.NODE_ENV === 'production',
+  );
+}
+
+/** Local Ollama is only available when the URL is reachable from this host (not 127.0.0.1 on Railway). */
 export function hasLocalOllamaConfigured(baseUrlOverride?: string): boolean {
-  return Boolean(resolveLocalOllamaBaseUrl(baseUrlOverride));
+  const url = resolveLocalOllamaBaseUrl(baseUrlOverride);
+  if (!url) return false;
+  if (isLoopbackOllamaUrl(url) && isProductionHost()) return false;
+  return true;
 }
 
 export async function checkOllamaHealth(baseUrl: string): Promise<{

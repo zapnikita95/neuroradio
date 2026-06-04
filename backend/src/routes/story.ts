@@ -24,7 +24,7 @@ import {
   huntReferenceFactWithLlm,
   shouldRunLlmFactHunt,
 } from '../services/story-llm-fact-hunt.js';
-import { hasLlmKeyForProvider, resolveLlmProvider, clientKeyForProvider, type ClientLlmKeys, type ClientLocalOllama } from '../services/llm-provider.js';
+import { hasLlmKeyForProvider, resolveLlmProvider, resolveEffectiveStoryLlmProvider, clientKeyForProvider, type ClientLlmKeys, type ClientLocalOllama } from '../services/llm-provider.js';
 import { generateStoryWithFallback } from '../services/story-llm-router.js';
 import { fetchArtistWikiLead } from '../services/wikipedia-lead.js';
 import { translateWikiLeadToStory } from '../services/indie-wiki-story.js';
@@ -58,6 +58,7 @@ import {
   getStoryLimitsForTier,
   resolveOpenRouterModelForTier,
   resolveOpenRouterFactModelsForTier,
+  resolveOpenRouterStoryModelsForTier,
   tierQuotaHintRu,
 } from '../services/tier-policy.js';
 import { classifyStoryLlmError } from '../services/llm-error-message.js';
@@ -125,7 +126,7 @@ router.post('/full', validateStoryFullBody, async (req: Request, res: Response) 
   );
 
   const requestedProviderRaw = body.llm_provider;
-  const llmProvider = resolveLlmProvider(body.llm_provider);
+  const userTier = resolveUserTier(installId);
   const clientLlmKeys: ClientLlmKeys = {
     groq: body.groq_api_key,
     gemini: body.gemini_api_key,
@@ -135,6 +136,7 @@ router.post('/full', validateStoryFullBody, async (req: Request, res: Response) 
     baseUrl: body.local_ollama_url,
     model: body.local_ollama_model,
   };
+  const llmProvider = resolveEffectiveStoryLlmProvider(userTier, body.llm_provider, clientLlmKeys);
   const ownLlmKey = llmProvider === 'local'
     ? Boolean(clientLocal.baseUrl?.trim())
     : Boolean(clientKeyForProvider(llmProvider, clientLlmKeys));
@@ -179,7 +181,6 @@ router.post('/full', validateStoryFullBody, async (req: Request, res: Response) 
   const geminiModel = (req.body as StoryFullBody).gemini_model;
   const groqModel = (req.body as StoryFullBody).groq_model;
   const openrouterModelRequested = (req.body as StoryFullBody).openrouter_model;
-  const userTier = resolveUserTier(installId);
   const clientOwnOpenRouter = Boolean(clientLlmKeys.openrouter?.trim());
   const openrouterModelFact = resolveOpenRouterModelForTier(
     userTier,
@@ -382,6 +383,7 @@ router.post('/full', validateStoryFullBody, async (req: Request, res: Response) 
       geminiModel,
       groqModel,
       openRouterModel: openrouterModelStory,
+      openRouterModels: resolveOpenRouterStoryModelsForTier(userTier),
       clientGroqApiKey: clientLlmKeys.groq,
       clientGeminiApiKey: clientLlmKeys.gemini,
       clientOpenRouterApiKey: clientLlmKeys.openrouter,

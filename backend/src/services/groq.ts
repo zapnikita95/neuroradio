@@ -59,6 +59,7 @@ export interface GenerateStoryInput {
   rawSnippets?: string[];
   groqModel?: string;
   openRouterModel?: string;
+  openRouterModels?: string[];
   geminiModel?: string;
   /** User's key from the app — overrides server GROQ_API_KEY when set. */
   clientGroqApiKey?: string;

@@ -127,74 +127,98 @@ export async function generateStoryScript(
   const systemPrompt = buildSystemPrompt(persona, lengthPreset);
   const voiceId = input.voiceId ?? voiceForYear(input.year, input.genre);
 
-  const model = resolveOpenRouterModel(input.openRouterModel, 'story');
-  if (!model) throw new Error('No OpenRouter model configured');
+  const models = [
+    ...new Set(
+      [
+        ...(input.openRouterModels ?? []),
+        input.openRouterModel,
+        resolveOpenRouterModel(input.openRouterModel, 'story'),
+      ].filter((m): m is string => Boolean(m?.trim())),
+    ),
+  ];
+  if (models.length === 0) throw new Error('No OpenRouter model configured');
+
   let lastCandidate: StoryScript | null = null;
+  let lastError: Error | undefined;
 
-  for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
-    const userPrompt = buildStoryUserPrompt({
-      ...input,
-      voiceId,
-      storyLength,
-      previousScripts,
-      selectedReferenceFact: input.selectedReferenceFact,
-    });
+  for (const model of models) {
+    try {
+      for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
+        const userPrompt = buildStoryUserPrompt({
+          ...input,
+          voiceId,
+          storyLength,
+          previousScripts,
+          selectedReferenceFact: input.selectedReferenceFact,
+        });
 
-    const content = await callOpenRouter(
-      systemPrompt,
-      userPrompt,
-      lengthPreset.maxTokens,
-      model,
-      input.clientOpenRouterApiKey,
-    );
-    console.log(`[openrouter] single-shot story model=${model}`);
+        const content = await callOpenRouter(
+          systemPrompt,
+          userPrompt,
+          lengthPreset.maxTokens,
+          model,
+          input.clientOpenRouterApiKey,
+        );
+        console.log(`[openrouter] single-shot story model=${model}`);
 
-    const story = parseStoryJson(content);
-    if (!story) {
-      throw new Error('OpenRouter returned invalid story JSON');
+        const story = parseStoryJson(content);
+        if (!story) {
+          throw new Error('OpenRouter returned invalid story JSON');
+        }
+
+        story.voiceId = voiceId;
+        story.word_count = countWords(story.script);
+        const qOpts = qualityOptionsForOpenRouterAttempt(attempt, MAX_ATTEMPTS, referenceFacts);
+        qOpts.previousScripts = previousScripts;
+
+        const quality = validateGeneratedStory(
+          story.script,
+          storyLength,
+          input.artist,
+          input.title,
+          qOpts,
+        );
+        if (quality.ok) {
+          return finalizeStory(story, { ...input, voiceId }, storyLength);
+        }
+
+        const sanitized = sanitizeScriptForTts(
+          story.script,
+          input.artist,
+          input.title,
+          input.referenceFacts ?? [],
+        );
+        const sanitizedQuality = validateGeneratedStory(
+          sanitized,
+          storyLength,
+          input.artist,
+          input.title,
+          qOpts,
+        );
+        if (sanitizedQuality.ok) {
+          console.warn(`Story sanitized after attempt ${attempt + 1}: ${quality.reason}`);
+          return finalizeStory({ ...story, script: sanitized }, { ...input, voiceId }, storyLength);
+        }
+
+        lastCandidate = { ...story, script: sanitized };
+        logRejectedScript(
+          'OpenRouter quality reject (single-shot)',
+          sanitized,
+          sanitizedQuality.reason ?? quality.reason ?? 'quality',
+        );
+      }
+    } catch (err) {
+      lastError = err instanceof Error ? err : new Error(String(err));
+      const msg = lastError.message;
+      if (!isOpenRouterRateLimitError(err) && !/quality reject/i.test(msg)) {
+        console.warn(`[openrouter] model=${model} failed: ${msg.slice(0, 160)}`);
+      }
     }
-
-    story.voiceId = voiceId;
-    story.word_count = countWords(story.script);
-    const qOpts = qualityOptionsForOpenRouterAttempt(attempt, MAX_ATTEMPTS, referenceFacts);
-    qOpts.previousScripts = previousScripts;
-
-    const quality = validateGeneratedStory(
-      story.script,
-      storyLength,
-      input.artist,
-      input.title,
-      qOpts,
-    );
-    if (quality.ok) {
-      return finalizeStory(story, { ...input, voiceId }, storyLength);
-    }
-
-    const sanitized = sanitizeScriptForTts(
-    story.script,
-    input.artist,
-    input.title,
-    input.referenceFacts ?? [],
-  );
-    const sanitizedQuality = validateGeneratedStory(
-      sanitized,
-      storyLength,
-      input.artist,
-      input.title,
-      qOpts,
-    );
-    if (sanitizedQuality.ok) {
-      console.warn(`Story sanitized after attempt ${attempt + 1}: ${quality.reason}`);
-      return finalizeStory({ ...story, script: sanitized }, { ...input, voiceId }, storyLength);
-    }
-
-    lastCandidate = { ...story, script: sanitized };
-    logRejectedScript('OpenRouter quality reject (single-shot)', sanitized, sanitizedQuality.reason ?? quality.reason ?? 'quality');
   }
 
   throw new Error(
     lastCandidate
       ? 'OpenRouter could not produce a usable story'
-      : 'OpenRouter returned invalid story',
+      : lastError?.message ?? 'OpenRouter returned invalid story',
   );
 }

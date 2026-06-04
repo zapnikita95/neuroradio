@@ -1,3 +1,4 @@
+import type { UserTier } from './entitlements.js';
 import { hasGeminiApiKey } from './gemini.js';
 import { hasGroqApiKey } from './groq.js';
 import { hasOpenRouterApiKey } from './openrouter.js';
@@ -67,4 +68,20 @@ export function alternateLlmProviders(
   return LLM_PROVIDER_ORDER.filter(
     (p) => p !== preferred && hasLlmKeyForProvider(p, clientKeys, clientLocal),
   );
+}
+
+/**
+ * Free/trial users without their own API key use server OpenRouter — not Groq from the app default.
+ */
+export function resolveEffectiveStoryLlmProvider(
+  tier: UserTier,
+  requested: string | undefined,
+  clientKeys?: ClientLlmKeys,
+): LlmProviderId {
+  const requestedProvider = resolveLlmProvider(requested);
+  const ownKey = Boolean(clientKeyForProvider(requestedProvider, clientKeys));
+  if ((tier === 'free' || tier === 'trial') && !ownKey && hasOpenRouterApiKey()) {
+    return 'openrouter';
+  }
+  return requestedProvider;
 }

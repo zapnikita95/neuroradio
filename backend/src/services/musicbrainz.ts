@@ -118,6 +118,15 @@ async function fetchRecordingSearch(artist: string, title: string): Promise<Musi
   return null;
 }
 
+/** Strip Yandex/streaming suffixes like «(из фильма «Форрест Гамп»)» before lookup. */
+export function normalizeStreamingTitle(title: string): string {
+  let t = title.trim();
+  t = t.replace(/\s*\(из\s+фильма\s+[«"'].*?[»"']\)\s*$/iu, '').trim();
+  t = t.replace(/\s*\(from\s+(?:the\s+)?(?:movie|film|soundtrack)\s+[^)]+\)\s*$/iu, '').trim();
+  t = t.replace(/\s*\(из\s+сериала\s+[«"'].*?[»"']\)\s*$/iu, '').trim();
+  return t || title.trim();
+}
+
 /**
  * Enriches artist/title with year and genre via MusicBrainz recording search.
  * Returns input fields unchanged when lookup fails.
@@ -126,15 +135,16 @@ export async function enrichTrackMetadata(
   artist: string,
   title: string,
 ): Promise<TrackMetadata> {
-  const base: TrackMetadata = { artist, title };
+  const lookupTitle = normalizeStreamingTitle(title);
+  const base: TrackMetadata = { artist, title: lookupTitle };
 
   try {
-    const recording = await fetchRecordingSearch(artist, title);
+    const recording = await fetchRecordingSearch(artist, lookupTitle);
     if (!recording) return base;
 
     return {
       artist,
-      title: recording.title ?? title,
+      title: recording.title ?? lookupTitle,
       year: pickYear(recording),
       genre: pickGenre(recording.tags),
       countryCode: pickCountry(recording),
