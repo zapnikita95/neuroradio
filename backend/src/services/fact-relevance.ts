@@ -248,6 +248,12 @@ export function factAppliesToRequest(
     if (mentionsArtist) return true;
     // Строки со страницы группы (бан Wounded Knee и т.п.) не повторяют имя в каждом предложении.
     if (!factNamesForeignEntity(trimmed, artist, title, artist)) return true;
+    // Web-сниппеты: Vegas / discrimination / heritage без слова «Redbone».
+    if (
+      /\b(?:Vegas|Vasquez|discrimination|heritage|Native American|appeal to (?:a )?white)\b/i.test(trimmed)
+    ) {
+      return true;
+    }
     return false;
   }
   if (mentionsTitle || mentionsArtist) return true;

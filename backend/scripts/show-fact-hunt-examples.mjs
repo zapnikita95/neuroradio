@@ -39,8 +39,11 @@ const { shouldRunLlmFactHunt, huntReferenceFactWithLlm } = await import('../dist
 console.log(`=== ${ARTIST} — ${TITLE} (живые источники) ===\n`);
 
 const ctx = await fetchAggregatedFactContext(ARTIST, TITLE, 'US');
-console.log('RAW SNIPPETS (wiki/ddg, без чарт-мусора в raw):');
-ctx.rawSnippets.forEach((s, i) => console.log(`${i}. ${s.slice(0, 220)}${s.length > 220 ? '…' : ''}`));
+console.log('RAW SNIPPETS (топ-12 по score, источники в [brackets]):');
+ctx.rawSnippets.forEach((s, i) => {
+  const src = ctx.snippetSources[i] ?? '?';
+  console.log(`${i}. [${src}] ${s.slice(0, 220)}${s.length > 220 ? '…' : ''}`);
+});
 
 console.log('\nTOP TRACK FACTS:');
 ctx.bundle.trackFacts.slice(0, 5).forEach((f, i) => {

@@ -1,9 +1,10 @@
 import fetch from 'node-fetch';
-import { buildFactHuntSearchQueries } from './story-fact-hunt.js';
 
 const USER_AGENT = 'Mozilla/5.0 (compatible; MusicStoryBFF/1.0; +https://music-story.app)';
-const MAX_QUERIES = 7;
-const SNIPPETS_PER_QUERY = 4;
+/** Только «дыры» Wikipedia — не дублируем запросы DDG Instant API. */
+const MAX_HTML_QUERIES = 4;
+const SNIPPETS_PER_QUERY = 3;
+const HTML_PARALLEL = 4;
 
 function stripTags(s: string): string {
   return s.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
@@ -19,17 +20,19 @@ function decodeHtml(s: string): string {
     .replace(/&#39;/g, "'");
 }
 
-function buildWebFactQueries(artist: string, title: string): string[] {
+/** Узкие запросы под интервью/скандалы — не в instant DDG. */
+export function buildWebOnlyQueries(artist: string, title: string): string[] {
   const cleanTitle = title.replace(/\s*\([^)]*\)\s*/g, ' ').trim();
-  const extra = [
-    `${artist} Vasquez Vegas surname stage name appeal white audience`,
-    `${artist} Pat Lolly Vegas changed name discrimination`,
-    `${artist} ${cleanTitle} radio refused play shortened edit minutes`,
-    `${artist} band interview controversy banned radio`,
-    `${artist} Native American rock band origin story interview`,
-  ];
-  const base = buildFactHuntSearchQueries(artist, title);
-  return [...new Set([...extra, ...base])].slice(0, MAX_QUERIES);
+  return [
+    `${artist} Vasquez Vegas stage name appeal white audience`,
+    `${artist} Pat Lolly Vegas changed name interview`,
+    `${artist} ${cleanTitle} radio stations refused controversy`,
+    `${artist} Native American band Jimi Hendrix interview`,
+  ].slice(0, MAX_HTML_QUERIES);
+}
+
+export function countWebSearchHttpRequests(): number {
+  return buildWebOnlyQueries('_', '_').length;
 }
 
 async function fetchDdgHtmlSnippets(query: string, maxResults: number): Promise<string[]> {
@@ -41,7 +44,7 @@ async function fetchDdgHtmlSnippets(query: string, maxResults: number): Promise<
       'User-Agent': USER_AGENT,
     },
     body: body.toString(),
-    signal: AbortSignal.timeout(14_000),
+    signal: AbortSignal.timeout(12_000),
   });
   if (!response.ok) return [];
 
@@ -52,47 +55,56 @@ async function fetchDdgHtmlSnippets(query: string, maxResults: number): Promise<
       return decodeHtml(stripTags(hit?.[1] ?? ''));
     }) ?? [];
 
-  const abstracts =
-    html.match(/class="result__body"[^>]*>\s*([^<]+)/g)?.map((m) => {
-      const hit = m.match(/>\s*([^<]+)/);
-      return decodeHtml(stripTags(hit?.[1] ?? ''));
-    }) ?? [];
-
-  const combined = [...snippets, ...abstracts]
+  const combined = snippets
     .map((s) => s.trim())
     .filter((s) => s.length >= 40 && s.length <= 480);
 
   return combined.slice(0, maxResults);
 }
 
+async function mapWithConcurrency<T, R>(
+  items: T[],
+  limit: number,
+  fn: (item: T) => Promise<R>,
+): Promise<R[]> {
+  const results: R[] = new Array(items.length);
+  let index = 0;
+  const workers = Array.from({ length: Math.min(limit, items.length) }, async () => {
+    while (index < items.length) {
+      const i = index++;
+      results[i] = await fn(items[i]);
+    }
+  });
+  await Promise.all(workers);
+  return results;
+}
+
 /**
- * HTML DuckDuckGo — интервью, статьи, то чего нет в Wikipedia extract.
+ * HTML DuckDuckGo — параллельно, без sleep между запросами.
+ * Не вызывает LLM — только HTTP.
  */
 export async function fetchWebSearchFactSnippets(artist: string, title: string): Promise<string[]> {
-  const queries = buildWebFactQueries(artist, title);
+  const queries = buildWebOnlyQueries(artist, title);
   const seen = new Set<string>();
   const collected: string[] = [];
 
-  for (const query of queries) {
-    try {
-      const snippets = await fetchDdgHtmlSnippets(query, SNIPPETS_PER_QUERY);
-      for (const text of snippets) {
-        const key = text.toLowerCase().replace(/\s+/g, ' ');
-        if (seen.has(key)) continue;
-        seen.add(key);
-        collected.push(text);
-      }
-    } catch (err) {
-      console.warn(
-        `[web-search] query failed "${query.slice(0, 60)}": ${err instanceof Error ? err.message : err}`,
-      );
+  const batches = await mapWithConcurrency(queries, HTML_PARALLEL, (query) =>
+    fetchDdgHtmlSnippets(query, SNIPPETS_PER_QUERY).catch(() => []),
+  );
+
+  for (const snippets of batches) {
+    for (const text of snippets) {
+      const key = text.toLowerCase().replace(/\s+/g, ' ');
+      if (seen.has(key)) continue;
+      seen.add(key);
+      collected.push(text);
     }
-    if (collected.length >= 14) break;
-    await new Promise((r) => setTimeout(r, 350));
   }
 
   if (collected.length > 0) {
-    console.log(`[web-search] ${artist} — ${title}: ${collected.length} snippets from ${queries.length} queries`);
+    console.log(
+      `[web-search] ${artist} — ${title}: ${collected.length} snippets, ${queries.length} parallel HTML requests`,
+    );
   }
-  return collected;
+  return collected.slice(0, 14);
 }

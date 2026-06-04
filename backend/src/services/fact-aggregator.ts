@@ -1,13 +1,13 @@
 import fetch from 'node-fetch';
 import type { ReferenceFactBundle } from './fact-picker.js';
 import { factAppliesToRequest } from './fact-relevance.js';
-import { filterAndRankFacts } from './reference-fact-quality.js';
-import { buildFactHuntSearchQueries, WEAK_TRIVIA_PATTERNS } from './story-fact-hunt.js';
+import { filterAndRankFacts, interestScore } from './reference-fact-quality.js';
+import { WEAK_TRIVIA_PATTERNS } from './story-fact-hunt.js';
 import { fetchReferenceFactBundle as fetchWikipediaBundle } from './wikipedia-facts.js';
 import { fetchWebSearchFactSnippets } from './web-search-facts.js';
 
 const USER_AGENT = 'MusicStoryBFF/1.0 (contact@example.com)';
-const RAW_SNIPPET_MIN_LEN = 35;
+const RAW_SNIPPET_MIN_LEN = 30;
 const RAW_SNIPPET_MAX = 12;
 
 export type SnippetSource = 'wiki' | 'ddg' | 'web' | 'wikidata' | 'mb';
@@ -69,39 +69,53 @@ function capRaw(collected: string[], sources: SnippetSource[]): void {
   }
 }
 
-async function fetchDuckDuckGoUnfiltered(artist: string, title: string): Promise<string[]> {
-  const queries = [
-    `${artist} ${title} song`,
-    `${artist} musician biography`,
-    ...buildFactHuntSearchQueries(artist, title),
+/** Instant DDG API — 3 быстрых запроса параллельно (остальное — HTML web-search). */
+export function buildDdgInstantQueries(artist: string, title: string): string[] {
+  const cleanTitle = title.replace(/\s*\([^)]*\)\s*/g, ' ').trim();
+  return [
+    `${artist} ${cleanTitle} song`,
+    `${artist} band biography controversy`,
+    `${artist} Wounded Knee radio banned`,
   ];
+}
+
+async function fetchDdgInstantQuery(query: string): Promise<string[]> {
+  const url = `https://api.duckduckgo.com/?q=${encodeURIComponent(query)}&format=json&no_html=1&skip_disambig=1`;
+  const response = await fetch(url, {
+    headers: { 'User-Agent': USER_AGENT, Accept: 'application/json' },
+    signal: AbortSignal.timeout(6000),
+  });
+  if (!response.ok) return [];
+  const data = (await response.json()) as {
+    AbstractText?: string;
+    Abstract?: string;
+    RelatedTopics?: Array<{ Text?: string; Topics?: Array<{ Text?: string }> }>;
+  };
   const collected: string[] = [];
-  for (const query of queries) {
-    const url = `https://api.duckduckgo.com/?q=${encodeURIComponent(query)}&format=json&no_html=1&skip_disambig=1`;
-    try {
-      const response = await fetch(url, {
-        headers: { 'User-Agent': USER_AGENT, Accept: 'application/json' },
-        signal: AbortSignal.timeout(6000),
-      });
-      if (!response.ok) continue;
-      const data = (await response.json()) as {
-        AbstractText?: string;
-        Abstract?: string;
-        RelatedTopics?: Array<{ Text?: string; Topics?: Array<{ Text?: string }> }>;
-      };
-      for (const text of [data.AbstractText, data.Abstract]) {
-        if (text?.trim()) collected.push(text.trim());
-      }
-      for (const topic of data.RelatedTopics ?? []) {
-        if (topic.Text?.trim()) collected.push(topic.Text.trim());
-        for (const nested of topic.Topics ?? []) {
-          if (nested.Text?.trim()) collected.push(nested.Text.trim());
-        }
-      }
-    } catch {
-      // skip source
+  for (const text of [data.AbstractText, data.Abstract]) {
+    if (text?.trim()) collected.push(text.trim());
+  }
+  for (const topic of data.RelatedTopics ?? []) {
+    if (topic.Text?.trim()) collected.push(topic.Text.trim());
+    for (const nested of topic.Topics ?? []) {
+      if (nested.Text?.trim()) collected.push(nested.Text.trim());
     }
-    if (collected.length >= 10) break;
+  }
+  return collected;
+}
+
+export async function fetchDuckDuckGoUnfiltered(artist: string, title: string): Promise<string[]> {
+  const queries = buildDdgInstantQueries(artist, title);
+  const batches = await Promise.all(queries.map((q) => fetchDdgInstantQuery(q).catch(() => [])));
+  const seen = new Set<string>();
+  const collected: string[] = [];
+  for (const batch of batches) {
+    for (const text of batch) {
+      const key = normalize(text);
+      if (seen.has(key)) continue;
+      seen.add(key);
+      collected.push(text);
+    }
   }
   return collected;
 }
@@ -110,7 +124,7 @@ async function fetchDuckDuckGo(artist: string, title: string): Promise<string[]>
   return filterAndRankFacts(await fetchDuckDuckGoUnfiltered(artist, title), 6);
 }
 
-async function fetchWikidataUnfiltered(artist: string, title: string, countryCode?: string): Promise<string[]> {
+export async function fetchWikidataUnfiltered(artist: string, title: string, countryCode?: string): Promise<string[]> {
   const lang = countryCode === 'RU' ? 'ru' : 'en';
   const queries = [`${title} ${artist} song`, artist];
   const results: string[] = [];
@@ -202,31 +216,52 @@ function buildRawSnippets(
   mbTrackRaw: string[],
   mbArtistRaw: string[],
 ): { rawSnippets: string[]; snippetSources: SnippetSource[] } {
-  const rawSnippets: string[] = [];
-  const snippetSources: SnippetSource[] = [];
+  const candidates: Array<{ text: string; source: SnippetSource; score: number }> = [];
 
-  for (const fact of [...wiki.trackFacts, ...wiki.artistFacts]) {
-    pushRaw(rawSnippets, snippetSources, fact, 'wiki');
-    capRaw(rawSnippets, snippetSources);
-  }
-  for (const text of ddgRaw) {
-    pushRaw(rawSnippets, snippetSources, text, 'ddg');
-    capRaw(rawSnippets, snippetSources);
-  }
-  for (const text of webRaw) {
-    pushRaw(rawSnippets, snippetSources, text, 'web');
-    capRaw(rawSnippets, snippetSources);
-  }
-  for (const text of wdRaw) {
-    pushRaw(rawSnippets, snippetSources, text, 'wikidata');
-    capRaw(rawSnippets, snippetSources);
-  }
-  for (const text of [...mbTrackRaw, ...mbArtistRaw]) {
-    pushRaw(rawSnippets, snippetSources, text, 'mb');
-    capRaw(rawSnippets, snippetSources);
-  }
+  const addCandidate = (text: string, source: SnippetSource) => {
+    const trimmed = text.trim();
+    if (trimmed.length < RAW_SNIPPET_MIN_LEN) return;
+    if (WEAK_TRIVIA_PATTERNS.some((p) => p.test(trimmed))) return;
+    candidates.push({ text: trimmed.slice(0, 480), source, score: interestScore(trimmed) });
+  };
 
-  return { rawSnippets, snippetSources };
+  for (const fact of [...wiki.trackFacts, ...wiki.artistFacts]) addCandidate(fact, 'wiki');
+  for (const text of ddgRaw) addCandidate(text, 'ddg');
+  for (const text of webRaw) addCandidate(text, 'web');
+  for (const text of wdRaw) addCandidate(text, 'wikidata');
+  for (const text of [...mbTrackRaw, ...mbArtistRaw]) addCandidate(text, 'mb');
+
+  const seen = new Set<string>();
+  const ranked = candidates
+    .sort((a, b) => b.score - a.score)
+    .filter((item) => {
+      const key = normalize(item.text);
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    })
+    .slice(0, RAW_SNIPPET_MAX);
+
+  return {
+    rawSnippets: ranked.map((r) => r.text),
+    snippetSources: ranked.map((r) => r.source),
+  };
+}
+
+export async function fetchWikiBundleMerged(
+  artist: string,
+  title: string,
+  countryCode?: string,
+): Promise<ReferenceFactBundle> {
+  let wiki = await fetchWikipediaBundle(artist, title, countryCode);
+  if (wiki.trackFacts.length + wiki.artistFacts.length < 2) {
+    const wikiEn = await fetchWikipediaBundle(artist, title, 'US');
+    wiki = {
+      trackFacts: mergeFacts(wiki.trackFacts, wikiEn.trackFacts),
+      artistFacts: mergeFacts(wiki.artistFacts, wikiEn.artistFacts),
+    };
+  }
+  return wiki;
 }
 
 export async function fetchAggregatedFactContext(
@@ -236,32 +271,31 @@ export async function fetchAggregatedFactContext(
   recordingMbid?: string,
   artistMbid?: string,
 ): Promise<AggregatedFactContext> {
-  let wiki = await fetchWikipediaBundle(artist, title, countryCode);
-  if (wiki.trackFacts.length < 2) {
-    const wikiEn = await fetchWikipediaBundle(artist, title, 'US');
-    wiki = {
-      trackFacts: mergeFacts(wiki.trackFacts, wikiEn.trackFacts),
-      artistFacts: mergeFacts(wiki.artistFacts, wikiEn.artistFacts),
-    };
-  }
-  const [ddgUnfiltered, webUnfiltered, wdUnfiltered, mbTrackRaw, mbArtistRaw] = await Promise.all([
+  const t0 = Date.now();
+  const [wiki, ddgUnfiltered, webUnfiltered, wdUnfiltered, mbTrackRaw, mbArtistRaw] = await Promise.all([
+    fetchWikiBundleMerged(artist, title, countryCode),
     fetchDuckDuckGoUnfiltered(artist, title),
     fetchWebSearchFactSnippets(artist, title),
     fetchWikidataUnfiltered(artist, title, countryCode),
     fetchMusicBrainzAnnotationsUnfiltered('recording', recordingMbid),
     fetchMusicBrainzAnnotationsUnfiltered('artist', artistMbid),
   ]);
+  console.log(
+    `[facts] parallel fetch ${artist} — ${title}: ${Date.now() - t0}ms ` +
+      `wiki=${wiki.trackFacts.length + wiki.artistFacts.length} ddg=${ddgUnfiltered.length} web=${webUnfiltered.length}`,
+  );
 
-  const externalUnfiltered = [...ddgUnfiltered, ...webUnfiltered];
-  const ddg = filterAndRankFacts(externalUnfiltered, 8);
+  const ddg = filterAndRankFacts([...ddgUnfiltered, ...webUnfiltered], 10);
   const wikidata = filterAndRankFacts(wdUnfiltered, 5);
   const mbTrack = filterAndRankFacts(mbTrackRaw, 4);
   const mbArtist = filterAndRankFacts(mbArtistRaw, 4);
 
-  const ddgFiltered = factsAboutTrackOrArtist(ddg, artist, title);
+  const externalFiltered = factsAboutTrackOrArtist(ddg, artist, title);
   const wdFiltered = factsAboutTrackOrArtist(wikidata, artist, title);
   const wdSplit = splitByMention(wdFiltered, title, artist);
-  const externalSplit = splitByMention(ddgFiltered, title, artist);
+  const webInBundle = webUnfiltered.filter((f) => externalFiltered.includes(f));
+  const ddgOnly = externalFiltered.filter((f) => !webInBundle.includes(f));
+  const externalSplit = splitByMention([...ddgOnly, ...webInBundle], title, artist);
 
   let trackFacts = mergeFacts(
     wiki.trackFacts,
@@ -269,9 +303,15 @@ export async function fetchAggregatedFactContext(
     wdSplit.track,
     mbTrack,
   );
+  const webRanked = filterAndRankFacts(
+    webUnfiltered.filter((f) => factAppliesToRequest(f, artist, title, 'artist')),
+    4,
+  );
+
   let artistFacts = mergeFacts(
     wiki.artistFacts,
     externalSplit.artist,
+    webRanked,
     wdSplit.artist,
     mbArtist,
   );
