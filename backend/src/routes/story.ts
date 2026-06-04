@@ -3,14 +3,17 @@ import { v4 as uuidv4 } from 'uuid';
 import { requireAppAuth } from '../middleware/app-auth.js';
 import { validateStoryFullBody } from '../middleware/validate-story.js';
 import { enrichTrackMetadata } from '../services/musicbrainz.js';
-import { fetchAggregatedFactContext } from '../services/fact-aggregator.js';
-import { explainReferenceFactSelection } from '../services/fact-picker.js';
+import { fetchAggregatedFactContext, emptyAggregatedFactContext } from '../services/fact-aggregator.js';
+import { explainReferenceFactSelection, type SelectedReferenceFact } from '../services/fact-picker.js';
 import { formatFactPickLog, logFactCandidatePools } from '../services/fact-interest-log.js';
 import { interestScore } from '../services/reference-fact-quality.js';
 import { interestRating10 } from '../services/fact-interest-log.js';
 import {
   collectPreviousScripts,
+  countUnusedBankFactsForUser,
+  ensureAccount,
   ingestBundleToBank,
+  pickBankFactForUser,
   pickFactForUser,
   prefetchArtistFactsToBank,
   recordUserStory,
@@ -243,23 +246,24 @@ router.post('/full', validateStoryFullBody, async (req: Request, res: Response) 
       ...new Set([...clientPreviousScripts, ...accountPreviousScripts]),
     ];
 
-    let factCtx = await fetchAggregatedFactContext(
-      metadata.artist,
-      metadata.title,
-      metadata.countryCode,
-      metadata.mbid,
-      metadata.artistMbid,
-    );
-    timing.mark(
-      'facts-fetched',
-      `track=${factCtx.bundle.trackFacts.length} artist=${factCtx.bundle.artistFacts.length} snippets=${factCtx.rawSnippets.length}`,
-    );
+    ensureAccount(installId);
+    const bankFact = pickBankFactForUser(installId, metadata.artist, metadata.title);
+    let factCtx = emptyAggregatedFactContext();
     let factBundle = factCtx.bundle;
-    let trackFactCount = factBundle.trackFacts.length;
-    let artistFactCount = factBundle.artistFacts.length;
-    if (trackFactCount + artistFactCount === 0) {
-      console.warn(`[facts] empty bundle for "${metadata.artist}" — "${metadata.title}", retrying sources`);
-      await new Promise((r) => setTimeout(r, 700));
+    let trackFactCount = 0;
+    let artistFactCount = 0;
+    let selectedFact: SelectedReferenceFact | null = bankFact;
+    let factFromBank = Boolean(bankFact);
+
+    if (bankFact) {
+      const unused = countUnusedBankFactsForUser(installId, metadata.artist, metadata.title);
+      console.log(
+        `[facts] cache hit install=${installId.slice(0, 8)} artist="${metadata.artist}" title="${metadata.title}" ` +
+          `unusedInBank=${unused} — skip wiki/web/ddg (seed already saved)`,
+      );
+      timing.mark('facts-fetched', `source=bank unused=${unused}`);
+      console.log(formatFactPickLog(bankFact, 'bank'));
+    } else {
       factCtx = await fetchAggregatedFactContext(
         metadata.artist,
         metadata.title,
@@ -267,13 +271,59 @@ router.post('/full', validateStoryFullBody, async (req: Request, res: Response) 
         metadata.mbid,
         metadata.artistMbid,
       );
+      timing.mark(
+        'facts-fetched',
+        `track=${factCtx.bundle.trackFacts.length} artist=${factCtx.bundle.artistFacts.length} snippets=${factCtx.rawSnippets.length}`,
+      );
       factBundle = factCtx.bundle;
       trackFactCount = factBundle.trackFacts.length;
       artistFactCount = factBundle.artistFacts.length;
+      if (trackFactCount + artistFactCount === 0) {
+        console.warn(`[facts] empty bundle for "${metadata.artist}" — "${metadata.title}", retrying sources`);
+        await new Promise((r) => setTimeout(r, 700));
+        factCtx = await fetchAggregatedFactContext(
+          metadata.artist,
+          metadata.title,
+          metadata.countryCode,
+          metadata.mbid,
+          metadata.artistMbid,
+        );
+        factBundle = factCtx.bundle;
+        trackFactCount = factBundle.trackFacts.length;
+        artistFactCount = factBundle.artistFacts.length;
+      }
+      console.log(
+        `[facts] ${metadata.artist} — ${metadata.title}: track=${trackFactCount} artist=${artistFactCount} rawSnippets=${factCtx.rawSnippets.length}`,
+      );
+
+      const artistTierForLog = resolveArtistTier(
+        metadata.artist,
+        metadata.title,
+        metadata,
+        factBundle,
+      );
+      console.log(`[facts] tier=${artistTierForLog} artist="${metadata.artist}"`);
+      logFactCandidatePools(factBundle, metadata.artist, metadata.title);
+
+      if (trackFactCount + artistFactCount === 0) {
+        const metaFacts = buildMetadataFallbackFacts(metadata);
+        factBundle = { ...factBundle, artistFacts: metaFacts };
+        artistFactCount = metaFacts.length;
+        console.log(`[facts] metadata-only seeds (${metaFacts.length}) for "${metadata.artist}"`);
+      }
+
+      ingestBundleToBank(metadata.artist, metadata.title, factBundle);
+      prefetchArtistFactsToBank(installId, metadata.artist, metadata.title, factBundle);
+
+      selectedFact = pickFactForUser(
+        installId,
+        factBundle,
+        metadata.artist,
+        metadata.title,
+        previousScripts.length,
+      );
+      console.log(formatFactPickLog(selectedFact, 'rules'));
     }
-    console.log(
-      `[facts] ${metadata.artist} — ${metadata.title}: track=${trackFactCount} artist=${artistFactCount} rawSnippets=${factCtx.rawSnippets.length}`,
-    );
 
     const artistTier = resolveArtistTier(
       metadata.artist,
@@ -281,37 +331,23 @@ router.post('/full', validateStoryFullBody, async (req: Request, res: Response) 
       metadata,
       factBundle,
     );
-    console.log(`[facts] tier=${artistTier} artist="${metadata.artist}"`);
-    logFactCandidatePools(factBundle, metadata.artist, metadata.title);
-
-    if (trackFactCount + artistFactCount === 0) {
-      const metaFacts = buildMetadataFallbackFacts(metadata);
-      factBundle = { ...factBundle, artistFacts: metaFacts };
-      artistFactCount = metaFacts.length;
-      console.log(`[facts] metadata-only seeds (${metaFacts.length}) for "${metadata.artist}"`);
+    if (factFromBank) {
+      console.log(`[facts] tier=${artistTier} artist="${metadata.artist}" (bank seed)`);
     }
 
-    ingestBundleToBank(metadata.artist, metadata.title, factBundle);
-    prefetchArtistFactsToBank(installId, metadata.artist, metadata.title, factBundle);
-
-    let selectedFact = pickFactForUser(
-      installId,
-      factBundle,
-      metadata.artist,
-      metadata.title,
-      previousScripts.length,
-    );
-    console.log(formatFactPickLog(selectedFact, 'rules'));
     let factHuntLlm = false;
     const bundleFactCount = trackFactCount + artistFactCount;
 
-    if (shouldRunLlmFactHunt(
-      selectedFact,
-      factCtx.rawSnippets.length,
-      bundleFactCount,
-      trackFactCount,
-      metadata.title,
-    )) {
+    if (
+      !factFromBank &&
+      shouldRunLlmFactHunt(
+        selectedFact,
+        factCtx.rawSnippets.length,
+        bundleFactCount,
+        trackFactCount,
+        metadata.title,
+      )
+    ) {
       const factModels = resolveOpenRouterFactModelsForTier(userTier);
       console.log(
         `[fact-hunt-llm] start artist="${metadata.artist}" title="${metadata.title}" ` +
@@ -348,9 +384,11 @@ router.post('/full', validateStoryFullBody, async (req: Request, res: Response) 
       );
     }
 
-    const selectedFactWhy = factHuntLlm
-      ? explainLlmFactSelection(selectedFact!)
-      : explainReferenceFactSelection(factBundle, selectedFact, metadata.artist, metadata.title);
+    const selectedFactWhy = factFromBank
+      ? 'seed from facts-bank — saved earlier, not yet told to this user'
+      : factHuntLlm
+        ? explainLlmFactSelection(selectedFact!)
+        : explainReferenceFactSelection(factBundle, selectedFact, metadata.artist, metadata.title);
 
     const referenceFacts = selectedFact
       ? [selectedFact.fact]
@@ -422,8 +460,9 @@ router.post('/full', validateStoryFullBody, async (req: Request, res: Response) 
     };
 
     if (selectedFact?.fact) {
+      const seedSource = factFromBank ? 'bank' : factHuntLlm ? 'llm' : 'rules';
       console.log(
-        formatFactPickLog(selectedFact, factHuntLlm ? 'llm' : 'rules') +
+        formatFactPickLog(selectedFact, seedSource) +
           ` track="${metadata.title}" artist="${metadata.artist}"`,
       );
       console.log(`[story-seed-why] ${selectedFactWhy}`);
@@ -518,6 +557,7 @@ router.post('/full', validateStoryFullBody, async (req: Request, res: Response) 
         factCountTrack: trackFactCount,
         factCountArtist: artistFactCount,
         referenceFactPicked: Boolean(selectedFact),
+        factFromBank,
         factHuntLlm,
         rawSnippetCount: factCtx.rawSnippets.length,
         musicbrainz: Boolean(metadata.year || metadata.genre || metadata.mbid),

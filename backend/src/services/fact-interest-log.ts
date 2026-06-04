@@ -18,7 +18,7 @@ export function interestRating10(fact: string): number {
 
 export function formatFactPickLog(
   selected: SelectedReferenceFact | null,
-  source: 'rules' | 'llm' | 'metadata' | 'none',
+  source: 'rules' | 'llm' | 'metadata' | 'bank' | 'none',
 ): string {
   if (!selected) {
     return '[facts] seed=NONE source=none interestScore=0 interest=0/10';

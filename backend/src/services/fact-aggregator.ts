@@ -20,6 +20,10 @@ export interface AggregatedFactContext {
   snippetSources: SnippetSource[];
 }
 
+export function emptyAggregatedFactContext(): AggregatedFactContext {
+  return { bundle: { trackFacts: [], artistFacts: [] }, rawSnippets: [], snippetSources: [] };
+}
+
 function normalize(text: string): string {
   return text.toLowerCase().replace(/[^\p{L}\p{N}\s]/gu, ' ').replace(/\s+/g, ' ').trim();
 }

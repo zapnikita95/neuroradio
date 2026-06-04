@@ -13,7 +13,9 @@ import {
 import {
   factFingerprint,
   ingestFacts,
+  listBankFacts,
   pickFromBank,
+  type StoredFact,
   trackKey,
 } from './fact-bank.js';
 import { splitBundleByScope, rankScopedFacts } from './fact-ranking.js';
@@ -60,6 +62,46 @@ export function ingestBundleToBank(artist: string, title: string, bundle: Refere
   );
 }
 
+function storedFactToSelected(fromBank: StoredFact): SelectedReferenceFact {
+  return {
+    fact: fromBank.fact,
+    scope: fromBank.scope,
+    scopeLabelRu:
+      fromBank.scope === 'track' ? 'трек' : fromBank.scope === 'album' ? 'альбом' : 'группа/артист',
+    interestScore: fromBank.interestScore,
+    interestRating: fromBank.interestRating,
+  };
+}
+
+/** Нерассказанный этому пользователю факт из банка — без wiki/web/ddg. */
+export function pickBankFactForUser(
+  installId: string,
+  artist: string,
+  title: string,
+): SelectedReferenceFact | null {
+  ensureAccount(installId);
+  const used = getUsedFingerprints(installId, artist, title);
+  const fromBank = pickFromBank(artist, title, used);
+  return fromBank ? storedFactToSelected(fromBank) : null;
+}
+
+export function countUnusedBankFactsForUser(
+  installId: string,
+  artist: string,
+  title: string,
+): number {
+  ensureAccount(installId);
+  const used = getUsedFingerprints(installId, artist, title);
+  const { track, artist: artistFacts } = listBankFacts(artist, title);
+  let count = 0;
+  for (const item of [...track, ...artistFacts]) {
+    if (item.interestScore < 6) continue;
+    if (used.has(factFingerprint(item.fact))) continue;
+    count += 1;
+  }
+  return count;
+}
+
 export function pickFactForUser(
   installId: string,
   bundle: ReferenceFactBundle,
@@ -67,18 +109,8 @@ export function pickFactForUser(
   title: string,
   storyIndex = 0,
 ): SelectedReferenceFact | null {
-  const used = getUsedFingerprints(installId, artist, title);
-  const fromBank = pickFromBank(artist, title, used);
-  if (fromBank) {
-    return {
-      fact: fromBank.fact,
-      scope: fromBank.scope,
-      scopeLabelRu:
-        fromBank.scope === 'track' ? 'трек' : fromBank.scope === 'album' ? 'альбом' : 'группа/артист',
-      interestScore: fromBank.interestScore,
-      interestRating: fromBank.interestRating,
-    };
-  }
+  const fromBank = pickBankFactForUser(installId, artist, title);
+  if (fromBank) return fromBank;
 
   const previous = collectPreviousScripts(installId, artist, title);
   return pickReferenceFact(bundle, previous, storyIndex, artist, title);
