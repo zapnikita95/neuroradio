@@ -13,11 +13,17 @@ export interface OpenRouterModelOption {
 
 export const OPENROUTER_MODEL_CUSTOM = '__custom__';
 
-/** Лучшая по benchmark fact-hunt (scripts/benchmark-fact-hunt-models.mjs) — ~$0.20/M in */
-export const OPENROUTER_DEFAULT_FACT_MODEL = 'deepseek/deepseek-chat-v3-0324';
+/** Бесплатный fact-hunt — Gemma 4 :free (быстрее Nemotron, JSON стабильнее). */
+export const OPENROUTER_DEFAULT_FREE_FACT_MODEL = 'google/gemma-4-26b-a4b-it:free';
 
-/** Бесплатная альтернатива для фактов — стабильнее :free с 429 */
-export const OPENROUTER_DEFAULT_FREE_FACT_MODEL = 'nvidia/nemotron-3-nano-30b-a3b:free';
+/** Запасной free при 429. */
+export const OPENROUTER_FREE_FACT_MODEL_FALLBACK = 'nvidia/nemotron-3-nano-30b-a3b:free';
+
+/** Trial: дешёвая paid Gemma (~$0.06/M) — нормальный JSON без 429 free. */
+export const OPENROUTER_TRIAL_FACT_MODEL = 'google/gemma-4-26b-a4b-it';
+
+/** Premium / trial story+fact: DeepSeek V3 (~$0.20/M, лучшее качество). */
+export const OPENROUTER_DEFAULT_FACT_MODEL = 'deepseek/deepseek-chat-v3-0324';
 
 /** Быстрая free для текста истории (факты слабее) */
 export const OPENROUTER_DEFAULT_STORY_MODEL = 'liquid/lfm-2.5-1.2b-instruct:free';
@@ -27,31 +33,37 @@ export const OPENROUTER_DEFAULT_MODEL = OPENROUTER_DEFAULT_FACT_MODEL;
 
 export const OPENROUTER_FREE_MODELS: OpenRouterModelOption[] = [
   {
+    id: OPENROUTER_DEFAULT_FREE_FACT_MODEL,
+    labelRu: 'Gemma 4 26B (free)',
+    descriptionRu: 'Бесплатная — JSON fact-hunt, быстрее Nemotron',
+    stable: true,
+    slot: 'fact',
+  },
+  {
+    id: OPENROUTER_FREE_FACT_MODEL_FALLBACK,
+    labelRu: 'Nemotron 3 Nano 30B',
+    descriptionRu: 'Запасная free при 429',
+    slot: 'fact',
+  },
+  {
+    id: OPENROUTER_TRIAL_FACT_MODEL,
+    labelRu: 'Gemma 4 26B',
+    descriptionRu: 'Trial — ~$0.06/M, стабильный fact-hunt',
+    stable: true,
+    slot: 'fact',
+  },
+  {
     id: OPENROUTER_DEFAULT_FACT_MODEL,
     labelRu: 'DeepSeek V3',
-    descriptionRu: 'Дешёвая (~$0.20/M) — лучшая для поиска фактов',
+    descriptionRu: 'Premium — лучшее качество (~$0.20/M)',
     stable: true,
     recommended: true,
-    slot: 'fact',
-  },
-  {
-    id: OPENROUTER_DEFAULT_FREE_FACT_MODEL,
-    labelRu: 'Nemotron 3 Nano 30B',
-    descriptionRu: 'Бесплатная — хорошо находит факты в сниппетах',
-    stable: true,
-    slot: 'fact',
-  },
-  {
-    id: 'google/gemma-4-26b-a4b-it',
-    labelRu: 'Gemma 4 26B',
-    descriptionRu: 'Дешёвая (~$0.06/M) — JSON и факты',
-    stable: true,
-    slot: 'fact',
+    slot: 'both',
   },
   {
     id: OPENROUTER_DEFAULT_STORY_MODEL,
     labelRu: 'Liquid LFM 2.5 1.2B',
-    descriptionRu: 'Free — быстрый текст, факты слабее',
+    descriptionRu: 'Free — быстрый текст истории',
     stable: true,
     slot: 'story',
   },
@@ -64,6 +76,17 @@ const PRESET_IDS = new Set(OPENROUTER_FREE_MODELS.map((m) => m.id));
 
 export function isOpenRouterPresetModel(id: string): boolean {
   return PRESET_IDS.has(id.trim());
+}
+
+/** Free fact-hunt: Gemma :free → Nemotron :free. */
+export function resolveOpenRouterFactModelOrder(preferred?: string): string[] {
+  const fromRequest = preferred?.trim();
+  if (fromRequest && fromRequest !== OPENROUTER_MODEL_CUSTOM && fromRequest.includes('/')) {
+    return [fromRequest];
+  }
+  const env = process.env.OPENROUTER_FACT_MODEL?.trim();
+  if (env) return [env];
+  return [OPENROUTER_DEFAULT_FREE_FACT_MODEL, OPENROUTER_FREE_FACT_MODEL_FALLBACK];
 }
 
 export function resolveOpenRouterModel(

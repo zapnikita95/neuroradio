@@ -3,11 +3,14 @@ import {
   OPENROUTER_DEFAULT_FACT_MODEL,
   OPENROUTER_DEFAULT_FREE_FACT_MODEL,
   OPENROUTER_DEFAULT_STORY_MODEL,
+  OPENROUTER_TRIAL_FACT_MODEL,
   isOpenRouterPresetModel,
+  resolveOpenRouterFactModelOrder,
 } from './openrouter-models.js';
 
-/** Бесплатный: только :free OpenRouter. Trial/Premium: DeepSeek V3. */
+/** Бесплатный: Gemma :free (+ fallback Nemotron). Trial: Gemma paid. Premium: DeepSeek V3. */
 export const TIER_OPENROUTER_FACT_MODEL = OPENROUTER_DEFAULT_FACT_MODEL;
+export const TIER_OPENROUTER_TRIAL_FACT_MODEL = OPENROUTER_TRIAL_FACT_MODEL;
 export const TIER_OPENROUTER_STORY_MODEL = OPENROUTER_DEFAULT_FACT_MODEL;
 
 export const TRIAL_PRODUCT_MONTHLY = 'trial_stories_monthly';
@@ -49,7 +52,7 @@ export function getStoryLimitsForTier(tier: UserTier): TierStoryLimits {
 
 /**
  * OpenRouter model for this subscription tier.
- * Free — Nemotron (:free) + Liquid (:free); trial/premium — DeepSeek V3.
+ * Free — Gemma :free fact-hunt; trial — Gemma paid; premium — DeepSeek V3.
  */
 export function resolveOpenRouterModelForTier(
   tier: UserTier,
@@ -66,9 +69,12 @@ export function resolveOpenRouterModelForTier(
     return slot === 'fact' ? OPENROUTER_DEFAULT_FREE_FACT_MODEL : OPENROUTER_DEFAULT_STORY_MODEL;
   }
 
-  if (tier === 'trial' || tier === 'premium') {
+  if (tier === 'trial') {
+    return slot === 'fact' ? TIER_OPENROUTER_TRIAL_FACT_MODEL : TIER_OPENROUTER_FACT_MODEL;
+  }
+
+  if (tier === 'premium') {
     if (
-      tier === 'premium' &&
       fromClient &&
       fromClient.includes('/') &&
       isOpenRouterPresetModel(fromClient)
@@ -81,6 +87,17 @@ export function resolveOpenRouterModelForTier(
   return slot === 'fact' ? OPENROUTER_DEFAULT_FREE_FACT_MODEL : OPENROUTER_DEFAULT_STORY_MODEL;
 }
 
+/** Fact-hunt: free tier пробует Gemma :free → Nemotron при 429. */
+export function resolveOpenRouterFactModelsForTier(tier: UserTier): string[] {
+  if (tier === 'free') {
+    return resolveOpenRouterFactModelOrder(undefined);
+  }
+  if (tier === 'trial') {
+    return [TIER_OPENROUTER_TRIAL_FACT_MODEL, TIER_OPENROUTER_FACT_MODEL];
+  }
+  return [TIER_OPENROUTER_FACT_MODEL];
+}
+
 export function tierQuotaHintRu(tier: UserTier): string {
   const limits = getStoryLimitsForTier(tier);
   if (tier === 'unlimited') return 'Без лимитов на этом устройстве.';
@@ -88,7 +105,7 @@ export function tierQuotaHintRu(tier: UserTier): string {
     return `Бесплатно: ${limits.dailyStories} историй в день (OpenRouter :free на сервере). Свой ключ OpenRouter в настройках — любая модель. Trial ${TRIAL_PRICE_RUB_MONTHLY} ₽/мес — ${TIER_STORY_LIMITS.trial.dailyStories}/день DeepSeek. Подписка 199 ₽/мес — ${TIER_STORY_LIMITS.premium.dailyStories}/день.`;
   }
   if (tier === 'trial') {
-    return `Пробный период: ${limits.dailyStories} историй в день, DeepSeek V3 (ключи сервера).`;
+    return `Пробный период: ${limits.dailyStories} историй/день. Fact-hunt: Gemma 4, история: DeepSeek V3.`;
   }
-  return `Подписка активна: до ${limits.dailyStories} историй в день (DeepSeek V3). Премиум-голос SaluteSpeech — отдельно.`;
+  return `Подписка: до ${limits.dailyStories} историй/день, DeepSeek V3. Премиум-голос SaluteSpeech — отдельно.`;
 }

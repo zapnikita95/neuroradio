@@ -15,30 +15,20 @@ Nemotron / Liquid `:free` — $0 LLM, лимиты RPM OpenRouter.
 
 **Yandex TTS:** ~120–180 слов ≈ 800 символов — отдельно (SpeechKit, не в OpenRouter).
 
-## Free — 3 истории/день
+## Free — 10 историй/день
 
-- Модели: `nvidia/nemotron-3-nano-30b-a3b:free` + `liquid/lfm-2.5-1.2b-instruct:free`
-- LLM: **$0**
-- TTS: 3 × 800 символов/день ≈ 72k символов/мес на пользователя
-- Риск: 429 на :free при всплеске — дневной лимит 3 снижает нагрузку
+- Fact-hunt LLM: `google/gemma-4-26b-a4b-it:free` → fallback `nvidia/nemotron-3-nano-30b-a3b:free`
+- Story: `liquid/lfm-2.5-1.2b-instruct:free`
+- Rules picker (interestScore) — основной путь; LLM только если interest ≤5/10
+- LLM: **$0** (429 на :free возможен → fallback)
 
-## Trial — 10 историй/мес, DeepSeek
+## Trial — Gemma fact + DeepSeek story
 
-- LLM: 10 × $0.0017 ≈ **$0.017/мес** на пользователя
-- При 1 ₽/мес выручка ≈ $0.01 — убыточно как единственный доход, но ок как воронка
+- Fact-hunt: `google/gemma-4-26b-a4b-it` (~$0.06/M) — стабильный JSON без 429
+- Story: DeepSeek V3
+- 10 × fact+story ≈ **$0.008/мес** LLM — ок для воронки 1 ₽
 
-## Premium — 25 историй/день (макс. 750/мес)
+## Premium — 199 ₽/мес, DeepSeek V3
 
-| Сценарий | LLM DeepSeek/мес | При 199 ₽ (~$2.5) |
-|----------|------------------|-----------------|
-| 25/день × 30 | 750 × $0.0017 ≈ **$1.28** | ~51% бюджета на LLM |
-| 15/день среднее | 450 × $0.0017 ≈ **$0.77** | ~31% |
-| 10/день | 300 × $0.0017 ≈ **$0.51** | ~20% |
-
-Остаток: Yandex TTS + Railway + факты (Wikipedia без LLM-стоимости).
-
-**Вывод:** 25 историй/день при реальном среднем 10–15/день укладывается в **199 ₽/мес (~$3)** вместе с TTS, если не включать fact-hunt на DeepSeek для каждого трека без кэша. Fact-hunt на free Nemotron для premium снижает счёт, но качество ниже — сейчас trial/premium используют DeepSeek на обоих слотах по запросу продукта.
-
-## NVIDIA Nemotron `:free`
-
-Бесплатная на OpenRouter, но есть **rate limits** (429). Для free-tier это ожидаемо; не использовать для paying users.
+- Fact + story: DeepSeek V3 (~$0.20/M)
+- 750 stories/mo max ≈ **$1.28** LLM — ~50% бюджета при полной нагрузке

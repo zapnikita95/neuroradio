@@ -1,8 +1,10 @@
 import fetch from 'node-fetch';
 import type { SelectedReferenceFact } from './fact-picker.js';
 import { factNamesForeignEntity, factMentionsArtist } from './fact-relevance.js';
-import { interestScore, isBoringFact, MIN_PICK_INTEREST_SCORE } from './reference-fact-quality.js';
-import { WEAK_TRIVIA_PATTERNS, FACT_HUNT_LLM_PROMPT_BLOCK, highImpactBonus } from './story-fact-hunt.js';
+import { interestScore, isBoringFact, MIN_PICK_INTEREST_SCORE, isWeakChartSeed } from './reference-fact-quality.js';
+import { interestRating10 } from './fact-interest-log.js';
+import { MIN_GOOD_SCOPE_INTEREST } from './fact-picker.js';
+import { WEAK_TRIVIA_PATTERNS, FACT_HUNT_LLM_PROMPT_BLOCK } from './story-fact-hunt.js';
 import { resolveGroqModelOrder } from './groq-models.js';
 import { resolveGeminiModel, DEFAULT_GEMINI_MODEL } from './gemini-models.js';
 import { GroqApiError } from './groq.js';
@@ -23,8 +25,10 @@ export interface LlmFactHuntInput {
   genre?: string;
   rawSnippets: string[];
   preferredProvider: LlmProviderId;
-  /** Same model id as story generation (OpenRouter one-model-only). */
+  /** Primary OpenRouter model id. */
   openRouterModel?: string;
+  /** Tier fact-hunt fallback chain (Gemma :free → Nemotron). */
+  openRouterModels?: string[];
 }
 
 interface LlmFactHuntJson {
@@ -68,10 +72,11 @@ export function shouldRunLlmFactHunt(
 ): boolean {
   if (rawSnippetCount < 2) return false;
   if (!selected) return bundleFactCount === 0;
+  if (selected.interestRating <= 5 || selected.interestScore < MIN_GOOD_SCOPE_INTEREST) return true;
   if (WEAK_TRIVIA_PATTERNS.some((p) => p.test(selected.fact))) return true;
+  if (isWeakChartSeed(selected.fact)) return true;
   if (isBoringFact(selected.fact)) return true;
   if (interestScore(selected.fact) < MIN_PICK_INTEREST_SCORE + 2) return true;
-  if (highImpactBonus(selected.fact) < 6 && rawSnippetCount >= 3) return true;
   return false;
 }
 
@@ -316,6 +321,8 @@ async function huntWithProvider(
         : validated.scope === 'album'
           ? 'альбом'
           : 'группа/артист',
+    interestScore: interestScore(validated.fact),
+    interestRating: interestRating10(validated.fact),
   };
 }
 
@@ -331,19 +338,38 @@ export async function huntReferenceFactWithLlm(
   const primary = resolveFactHuntProvider(input.preferredProvider);
   let lastReason = 'unknown';
 
-  for (let attempt = 0; attempt < 2; attempt++) {
-    if (!hasLlmKeyForProvider(primary)) break;
-    try {
-      const result = await huntWithProvider(
-        primary,
-        input,
-        attempt > 0 ? lastReason : undefined,
-      );
-      if (result) return result;
-      lastReason = 'validation failed';
-    } catch (err) {
-      lastReason = err instanceof Error ? err.message.slice(0, 120) : String(err);
-      console.warn(`[fact-hunt-llm] ${primary} attempt ${attempt + 1}: ${lastReason}`);
+  const openRouterModels =
+    primary === 'openrouter'
+      ? [
+          ...new Set(
+            [
+              ...(input.openRouterModels ?? []),
+              input.openRouterModel,
+            ].filter((m): m is string => Boolean(m?.trim())),
+          ),
+        ]
+      : [];
+
+  const attempts = primary === 'openrouter' && openRouterModels.length > 0 ? 1 : 2;
+
+  for (const modelId of primary === 'openrouter' ? openRouterModels : [undefined]) {
+    for (let attempt = 0; attempt < attempts; attempt++) {
+      if (!hasLlmKeyForProvider(primary)) break;
+      try {
+        const result = await huntWithProvider(
+          primary,
+          modelId ? { ...input, openRouterModel: modelId } : input,
+          attempt > 0 ? lastReason : undefined,
+        );
+        if (result) return result;
+        lastReason = 'validation failed';
+      } catch (err) {
+        lastReason = err instanceof Error ? err.message.slice(0, 120) : String(err);
+        console.warn(
+          `[fact-hunt-llm] ${primary}${modelId ? ` model=${modelId}` : ''} attempt ${attempt + 1}: ${lastReason}`,
+        );
+        if (/429|404|empty content/i.test(lastReason)) break;
+      }
     }
   }
 
@@ -351,5 +377,5 @@ export async function huntReferenceFactWithLlm(
 }
 
 export function explainLlmFactSelection(selected: SelectedReferenceFact): string {
-  return `scope=${selected.scope}, interestScore=${interestScore(selected.fact)}, source=llm-fact-hunt, backstory=${/letter|apolog|family|mother|father|daughter|son|wife|husband|письм|извин|семь/i.test(selected.fact)}`;
+  return `scope=${selected.scope}, interestScore=${selected.interestScore}, interest=${selected.interestRating}/10, source=llm-fact-hunt, backstory=${/letter|apolog|family|mother|father|daughter|son|wife|husband|письм|извин|семь/i.test(selected.fact)}`;
 }

@@ -5,6 +5,9 @@ import { validateStoryFullBody } from '../middleware/validate-story.js';
 import { enrichTrackMetadata } from '../services/musicbrainz.js';
 import { fetchAggregatedFactContext } from '../services/fact-aggregator.js';
 import { explainReferenceFactSelection, pickReferenceFact } from '../services/fact-picker.js';
+import { formatFactPickLog } from '../services/fact-interest-log.js';
+import { interestScore } from '../services/reference-fact-quality.js';
+import { interestRating10 } from '../services/fact-interest-log.js';
 import { resolveArtistTier } from '../services/artist-notability.js';
 import { buildMetadataFallbackFacts } from '../services/metadata-facts.js';
 import { factAppliesToRequest } from '../services/fact-relevance.js';
@@ -47,6 +50,7 @@ import { attachStoryQuotaHeaders, getDailyStoryQuota, recordStoryGeneration } fr
 import {
   getStoryLimitsForTier,
   resolveOpenRouterModelForTier,
+  resolveOpenRouterFactModelsForTier,
   tierQuotaHintRu,
 } from '../services/tier-policy.js';
 import { classifyStoryLlmError } from '../services/llm-error-message.js';
@@ -270,12 +274,16 @@ router.post('/full', validateStoryFullBody, async (req: Request, res: Response) 
       metadata.artist,
       metadata.title,
     );
+    console.log(formatFactPickLog(selectedFact, 'rules'));
     let factHuntLlm = false;
     const bundleFactCount = trackFactCount + artistFactCount;
 
     if (shouldRunLlmFactHunt(selectedFact, factCtx.rawSnippets.length, bundleFactCount)) {
+      const factModels = resolveOpenRouterFactModelsForTier(userTier);
       console.log(
-        `[fact-hunt-llm] start artist="${metadata.artist}" title="${metadata.title}" snippets=${factCtx.rawSnippets.length}`,
+        `[fact-hunt-llm] start artist="${metadata.artist}" title="${metadata.title}" ` +
+          `snippets=${factCtx.rawSnippets.length} models=${factModels.join(' → ')} ` +
+          `rulesInterest=${selectedFact?.interestRating ?? 0}/10`,
       );
       const hunted = await huntReferenceFactWithLlm({
         artist: metadata.artist,
@@ -285,16 +293,18 @@ router.post('/full', validateStoryFullBody, async (req: Request, res: Response) 
         rawSnippets: factCtx.rawSnippets,
         preferredProvider: llmProvider,
         openRouterModel: openrouterModelFact,
+        openRouterModels: factModels,
       });
       if (hunted) {
         selectedFact = hunted;
         factHuntLlm = true;
+        console.log(formatFactPickLog(selectedFact, 'llm'));
       }
     }
 
     const selectedFactWhy = factHuntLlm
       ? explainLlmFactSelection(selectedFact!)
-      : explainReferenceFactSelection(factBundle, selectedFact);
+      : explainReferenceFactSelection(factBundle, selectedFact, metadata.artist, metadata.title);
 
     const referenceFacts = selectedFact
       ? [selectedFact.fact]
@@ -320,8 +330,10 @@ router.post('/full', validateStoryFullBody, async (req: Request, res: Response) 
           fact: fallbackFact,
           scope,
           scopeLabelRu: scope === 'track' ? 'трек' : 'группа/артист',
+          interestScore: interestScore(fallbackFact),
+          interestRating: interestRating10(fallbackFact),
         };
-        console.log(`[facts] fallback seed from validated pool scope=${scope}`);
+        console.log(formatFactPickLog(selectedFact, 'rules'));
       }
     }
 
@@ -392,6 +404,8 @@ router.post('/full', validateStoryFullBody, async (req: Request, res: Response) 
               fact: wikiLead.text,
               scope: 'artist',
               scopeLabelRu: 'группа/артист',
+              interestScore: interestScore(wikiLead.text),
+              interestRating: interestRating10(wikiLead.text),
             };
             const scripted: StoryScript = {
               script: wikiScriptFinal,
@@ -411,7 +425,8 @@ router.post('/full', validateStoryFullBody, async (req: Request, res: Response) 
     // Copy-friendly Railway logs: seed + final script with clear block markers.
     if (selectedFact?.fact) {
       console.log(
-        `[story-seed] ${metadata.artist} — ${metadata.title} | scope=${selectedFact.scope}${factHuntLlm ? ' | llm-hunt' : ''} | ${selectedFact.fact}`,
+        formatFactPickLog(selectedFact, factHuntLlm ? 'llm' : 'rules') +
+          ` track="${metadata.title}" artist="${metadata.artist}"`,
       );
       console.log(`[story-seed-why] ${selectedFactWhy}`);
     }

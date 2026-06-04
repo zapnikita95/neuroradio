@@ -9,9 +9,11 @@ import {
   isBackstoryFact,
   isBoringFact,
   isCollectorFact,
+  isWeakChartSeed,
   MIN_PICK_INTEREST_SCORE,
 } from './reference-fact-quality.js';
-import { highImpactBonus, WEAK_TRIVIA_PATTERNS } from './story-fact-hunt.js';
+import { interestRating10 } from './fact-interest-log.js';
+import { WEAK_TRIVIA_PATTERNS } from './story-fact-hunt.js';
 import { splitBundleByScope, type RankedFactScope } from './fact-ranking.js';
 
 export type FactScope = RankedFactScope;
@@ -25,6 +27,8 @@ export interface SelectedReferenceFact {
   fact: string;
   scope: FactScope;
   scopeLabelRu: string;
+  interestScore: number;
+  interestRating: number;
 }
 
 const SCOPE_LABEL: Record<FactScope, string> = {
@@ -32,6 +36,9 @@ const SCOPE_LABEL: Record<FactScope, string> = {
   album: 'альбом',
   artist: 'группа/артист',
 };
+
+/** Минимум interestScore в scope, иначе спускаемся на альбом/артиста или LLM. */
+export const MIN_GOOD_SCOPE_INTEREST = parseInt(process.env.MIN_FACT_INTEREST_SCORE ?? '12', 10);
 
 function normalizeForMatch(text: string): string {
   return text
@@ -64,78 +71,41 @@ function factOverlapsPrevious(fact: string, previousScripts: string[]): boolean 
   return false;
 }
 
-function seedPriority(fact: string): number {
-  if (/(?:Виктор\s+Цой|Цой|1987\s+год|композици\w*|запис\w*\s+альбом)/i.test(fact)) return 3;
-  if (/\b(?:promo track under the name|originally released as a promo|withheld from release|banned by several radio|appeal to (?:a )?white|discrimination|heritage)\b/i.test(fact)) {
-    return 3;
-  }
-  if (/\b(?:single cut is significantly shorter|album version featuring an introductory)\b/i.test(fact)) {
-    return 1;
-  }
-  return 2;
+function isRejectedSeed(fact: string): boolean {
+  if (WEAK_TRIVIA_PATTERNS.some((p) => p.test(fact))) return true;
+  if (isWeakChartSeed(fact)) return true;
+  if (isBoringFact(fact)) return true;
+  if (isCollectorFact(fact)) return true;
+  return false;
 }
 
-function sortCandidates(facts: string[]): string[] {
-  return [...facts].sort((a, b) => {
-    const impact = highImpactBonus(b) - highImpactBonus(a);
-    if (impact !== 0) return impact;
-    const seed = seedPriority(b) - seedPriority(a);
-    if (seed !== 0) return seed;
-    return interestScore(b) - interestScore(a);
-  });
+function sortByInterest(facts: string[]): string[] {
+  return [...facts].sort((a, b) => interestScore(b) - interestScore(a));
 }
 
-function pickHighImpactFromPool(
+function pickBestByInterest(
   facts: string[],
   previousScripts: string[],
+  minScore = MIN_PICK_INTEREST_SCORE,
 ): string | null {
-  for (const fact of sortCandidates(facts)) {
-    if (WEAK_TRIVIA_PATTERNS.some((p) => p.test(fact))) continue;
-    if (isBoringFact(fact)) continue;
-    if (isCollectorFact(fact)) continue;
-    if (interestScore(fact) < MIN_PICK_INTEREST_SCORE) continue;
-    if (highImpactBonus(fact) < 6) continue;
+  for (const fact of sortByInterest(facts)) {
+    if (isRejectedSeed(fact)) continue;
+    if (interestScore(fact) < minScore) continue;
     if (factOverlapsPrevious(fact, previousScripts)) continue;
     return fact;
   }
   return null;
 }
 
-function pickFromPool(
-  facts: string[],
-  previousScripts: string[],
-): string | null {
-  for (const fact of sortCandidates(facts)) {
-    if (isBoringFact(fact)) continue;
-    if (isCollectorFact(fact)) continue;
-    if (interestScore(fact) < MIN_PICK_INTEREST_SCORE) continue;
-    if (!factOverlapsPrevious(fact, previousScripts)) return fact;
-  }
-  return null;
-}
-
-function pickBackstoryFromPool(
-  facts: string[],
-  previousScripts: string[],
-): string | null {
-  for (const fact of facts) {
-    if (!isBackstoryFact(fact)) continue;
-    if (isBoringFact(fact)) continue;
-    if (factOverlapsPrevious(fact, previousScripts)) continue;
-    return fact;
-  }
-  return null;
-}
-
-function pickFromScopedPool(
-  facts: string[],
-  previousScripts: string[],
-): string | null {
-  return (
-    pickHighImpactFromPool(facts, previousScripts) ??
-    pickBackstoryFromPool(facts, previousScripts) ??
-    pickFromPool(facts, previousScripts)
-  );
+function wrapSelected(fact: string, scope: FactScope): SelectedReferenceFact {
+  const score = interestScore(fact);
+  return {
+    fact,
+    scope,
+    scopeLabelRu: SCOPE_LABEL[scope],
+    interestScore: score,
+    interestRating: interestRating10(fact),
+  };
 }
 
 function normalize(text: string): string {
@@ -143,8 +113,8 @@ function normalize(text: string): string {
 }
 
 /**
- * Иерархия: трек → альбом → группа/артист.
- * Чужие названия песен отсекаются.
+ * Иерархия: трек → альбом → артист.
+ * Внутри scope — максимальный interestScore, не chart-trivia.
  */
 export function pickReferenceFact(
   bundle: ReferenceFactBundle,
@@ -155,25 +125,35 @@ export function pickReferenceFact(
 ): SelectedReferenceFact | null {
   const pools = splitBundleByScope(bundle, artist, title);
 
-  // Чётные истории — можно взять артиста, если трек/альбом уже были в previousScripts
   const scopeOrder: FactScope[] =
     storyIndex % 2 === 1 ? ['artist', 'album', 'track'] : ['track', 'album', 'artist'];
 
   for (const scope of scopeOrder) {
     const pool = pools[scope];
     if (pool.length === 0) continue;
-    const picked = pickFromScopedPool(pool, previousScripts);
-    if (picked) {
-      return {
-        fact: picked,
-        scope,
-        scopeLabelRu: SCOPE_LABEL[scope],
-      };
+    const picked = pickBestByInterest(pool, previousScripts, MIN_PICK_INTEREST_SCORE);
+    if (picked && interestScore(picked) >= MIN_GOOD_SCOPE_INTEREST) {
+      return wrapSelected(picked, scope);
     }
   }
 
+  // Лучший из всех scope, даже ниже порога — лучше чем ничего
+  const globalBest = pickBestByInterest(
+    [...pools.track, ...pools.album, ...pools.artist],
+    previousScripts,
+    MIN_PICK_INTEREST_SCORE,
+  );
+  if (globalBest) {
+    const scope: FactScope = pools.track.includes(globalBest)
+      ? 'track'
+      : pools.album.includes(globalBest)
+        ? 'album'
+        : 'artist';
+    return wrapSelected(globalBest, scope);
+  }
+
   const anyPool = [...pools.track, ...pools.album, ...pools.artist];
-  for (const fact of anyPool) {
+  for (const fact of sortByInterest(anyPool)) {
     if (isBoringFact(fact)) continue;
     if (!factOverlapsPrevious(fact, previousScripts)) {
       const scope: FactScope = pools.track.includes(fact)
@@ -181,7 +161,7 @@ export function pickReferenceFact(
         : pools.album.includes(fact)
           ? 'album'
           : 'artist';
-      return { fact, scope, scopeLabelRu: SCOPE_LABEL[scope] };
+      return wrapSelected(fact, scope);
     }
   }
 
@@ -204,14 +184,14 @@ export function explainReferenceFactSelection(
         : pools.artist;
   const fromPool = scopePool.some((fact) => normalize(fact) === normalize(selected.fact));
   const backstory = isBackstoryFact(selected.fact);
-  const impact = highImpactBonus(selected.fact);
-  const score = interestScore(selected.fact);
+  const impact = selected.interestScore;
   const reasons: string[] = [];
   reasons.push(fromPool ? `scope=${selected.scope}` : `scope=${selected.scope} (fallback pool)`);
-  reasons.push(`interestScore=${score}`);
+  reasons.push(`interestScore=${selected.interestScore}`);
+  reasons.push(`interest=${selected.interestRating}/10`);
   if (backstory) reasons.push('backstory=true');
   if (!backstory) reasons.push('backstory=false');
-  if (impact >= 6) reasons.push(`highImpact=${impact}`);
+  if (impact >= 18) reasons.push('strong=true');
   return reasons.join(', ');
 }
 
@@ -219,5 +199,4 @@ export function mergeReferenceFacts(bundle: ReferenceFactBundle, max = 6): strin
   return dedupeFacts([...bundle.trackFacts, ...bundle.artistFacts]).slice(0, max);
 }
 
-/** @deprecated internal — kept for tests importing scope helpers */
 export { isAlbumScopeFact, factMentionsOtherTrackTitle };

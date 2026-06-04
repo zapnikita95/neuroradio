@@ -135,8 +135,25 @@ export function interestScore(fact: string): number {
     score += 5;
   }
   if (/\b(?:billboard|hot 100|charted|peaked at number|top five on the)\b/i.test(fact)) score -= 15;
+  if (/\b(?:topped the|weeks on the|singles chart|number one in|popularise.{0,30}music video)\b/i.test(fact)) {
+    score -= 22;
+  }
+  if (/\b(?:operatic|no chorus|three weeks to record|skeptical|didn't believe|thought it (?:was|would)|recorded in six|distinct sections|without chorus|lack of a refr|six-minute suite)\b/i.test(fact)) {
+    score += 14;
+  }
+  if (/^(?:This image would later be used|Filmed at the New London Theatre)\b/i.test(fact.trim())) score -= 18;
+  if (/(?:предложил\w*|borrowed|suggested|названи\w*).{0,80}(?:«|")/i.test(fact)) score += 12;
+  if (/(?:origin|originally|meaning|metaphor|hidden|disguised|ironic|paradox|заклинан|смысл|метафор|ирони|парадокс)/i.test(fact)) score += 6;
   score += highImpactBonus(fact);
   return score;
+}
+
+/** Chart/metrics-only — не семя для истории. */
+export function isWeakChartSeed(fact: string): boolean {
+  return (
+    /\b(?:topped the|weeks on the (?:UK )?singles|popularise.{0,25}music video format|peaked at number|reached number (?:one|\d+) on|billboard hot|charted for \d+ weeks)\b/i.test(fact) ||
+    /\b(?:billion views|most-streamed|certified diamond|downloads across)\b/i.test(fact)
+  );
 }
 
 export function isBoringFact(fact: string): boolean {

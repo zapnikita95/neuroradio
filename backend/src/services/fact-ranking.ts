@@ -73,17 +73,11 @@ export function rankScopedFacts(pools: ScopedFactPools): RankedFact[] {
       });
     }
   }
+  const scopeOrder = { track: 3, album: 2, artist: 1 };
   return out.sort((a, b) => {
-    const scopeOrder = { track: 3, album: 2, artist: 1 };
-    const scopeDiff = scopeOrder[b.scope] - scopeOrder[a.scope];
-    if (scopeDiff !== 0 && a.interest >= 6 && b.interest >= 6) {
-      // Within good facts, scope wins
-    }
     if (a.junk !== b.junk) return a.junk ? 1 : -1;
-    const impact = b.impact - a.impact;
-    if (impact !== 0) return impact;
-    const scopePri = scopeOrder[b.scope] - scopeOrder[a.scope];
-    if (scopePri !== 0) return scopePri;
-    return b.interest - a.interest;
+    const interest = b.interest - a.interest;
+    if (interest !== 0) return interest;
+    return scopeOrder[b.scope] - scopeOrder[a.scope];
   });
 }
