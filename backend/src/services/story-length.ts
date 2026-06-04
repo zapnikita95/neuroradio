@@ -1,6 +1,6 @@
 /**
- * Word budgets assume TTS slightly above normal (~1.0): ~150 wpm at speed 1.0.
- * 30s preset targets fast speech (1.05–1.14); 60s = main mode at normal–brisk pace.
+ * Word budgets are **prompt hints** for the LLM (target TTS duration at ~150 wpm).
+ * Production quality gate does NOT reject by word count — only TTS speed + persona shape delivery.
  */
 export type StoryLengthId = '30s' | '60s' | 'unlimited';
 

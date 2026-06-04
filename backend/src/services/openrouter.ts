@@ -232,7 +232,7 @@ export async function generateStoryScript(
 
   if (lastCandidate?.script?.trim() && referenceFacts.length > 0) {
     const wc = countWords(lastCandidate.script);
-    if (wc >= 55) {
+    if (wc >= 12) {
       console.warn(
         `[openrouter] accepting last candidate ${wc} words after all quality checks (grounded fallback)`,
       );

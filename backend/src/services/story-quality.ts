@@ -377,15 +377,20 @@ export function validateStoryScript(
   }
 
   const words = countWords(trimmed);
-  const minWords =
-    options.minWordsOverride ??
-    (strictLength ? limits.wordsMin : Math.max(30, limits.wordsMin - 15));
-
-  if (words < minWords) {
-    return { ok: false, reason: `too short (${words} words, need ${minWords}+)` };
+  /** Hard reject only for empty/garbage — target word budget is a prompt hint; TTS speed sets duration. */
+  const absoluteMin = options.minWordsOverride ?? 12;
+  if (words < absoluteMin) {
+    return { ok: false, reason: `too short (${words} words, need at least ${absoluteMin})` };
   }
-  if (words > limits.wordsMax + 25) {
-    return { ok: false, reason: `too long (${words} words, max ~${limits.wordsMax})` };
+
+  if (strictLength) {
+    const minWords = options.minWordsOverride ?? limits.wordsMin;
+    if (words < minWords) {
+      return { ok: false, reason: `too short (${words} words, need ${minWords}+)` };
+    }
+    if (words > limits.wordsMax + 25) {
+      return { ok: false, reason: `too long (${words} words, max ~${limits.wordsMax})` };
+    }
   }
 
   return { ok: true };

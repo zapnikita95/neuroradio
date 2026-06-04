@@ -9,6 +9,9 @@ import {
 } from './story-quality.js';
 import { logRejectedScript } from './story-reject-log.js';
 
+/** Below this — empty/garbage, not a story. Normal length is enforced by TTS speed + preset in prompt only. */
+const ABSOLUTE_MIN_STORY_WORDS = 12;
+
 export interface StoryQualityAttemptOptions {
   strictLength?: boolean;
   skipWatery?: boolean;
@@ -21,15 +24,13 @@ export interface StoryQualityAttemptOptions {
   previousScripts?: string[];
 }
 
-export function qualityOptionsForAttempt(
-  attempt: number,
-  maxAttempts: number,
+/** Production story checks — no word-count gate; length is a prompt/TTS concern. */
+export function qualityOptionsForProductionAttempt(
   referenceFacts: string[],
 ): StoryQualityAttemptOptions {
-  const isLast = attempt >= maxAttempts - 1;
   const hasFacts = referenceFacts.length > 0;
   return {
-    strictLength: !isLast,
+    strictLength: false,
     skipWatery: false,
     skipReferenceAnchor: !hasFacts,
     skipFirstSentenceAnchor: false,
@@ -37,6 +38,14 @@ export function qualityOptionsForAttempt(
     skipEnglishCheck: false,
     referenceFacts: hasFacts ? referenceFacts : [],
   };
+}
+
+export function qualityOptionsForAttempt(
+  _attempt: number,
+  _maxAttempts: number,
+  referenceFacts: string[],
+): StoryQualityAttemptOptions {
+  return qualityOptionsForProductionAttempt(referenceFacts);
 }
 
 /** Local Ollama: never relax fiction/anchor checks — bad story is worse than no story. */
@@ -58,23 +67,13 @@ export function qualityOptionsForLocalAttempt(
   };
 }
 
-/** Слабые free-мodelи (Liquid LFM): короче нормы по длине, якорь к факту — всегда. */
+/** @deprecated alias */
 export function qualityOptionsForOpenRouterAttempt(
   _attempt: number,
   _maxAttempts: number,
   referenceFacts: string[],
 ): StoryQualityAttemptOptions {
-  const hasFacts = referenceFacts.length > 0;
-  return {
-    strictLength: false,
-    minWordsOverride: 60,
-    skipWatery: false,
-    skipReferenceAnchor: false,
-    skipFirstSentenceAnchor: false,
-    skipBannedPatterns: false,
-    skipEnglishCheck: false,
-    referenceFacts: hasFacts ? referenceFacts : [],
-  };
+  return qualityOptionsForProductionAttempt(referenceFacts);
 }
 
 export function validateGeneratedStory(
@@ -87,13 +86,13 @@ export function validateGeneratedStory(
   return validateStoryScript(script, storyLength, artist, title, options);
 }
 
-/** If strict checks fail on all attempts, still ship the last sanitized script. */
+/** If strict checks fail on all attempts, still ship the last sanitized script when grounded. */
 export function finalizeAfterQualityLoop<T extends { script: string }>(
   lastCandidate: T | null,
   input: { artist: string; title: string },
   finalize: (story: T) => T,
   referenceFacts: string[] = [],
-  options: { relaxForWeakLlm?: boolean } = {},
+  _options: { relaxForWeakLlm?: boolean } = {},
 ): T | null {
   if (!lastCandidate?.script?.trim()) return null;
   const sanitized = stripBannedFluff(
@@ -105,6 +104,10 @@ export function finalizeAfterQualityLoop<T extends { script: string }>(
     ),
   );
   const wordCount = countWords(sanitized);
+  if (wordCount < ABSOLUTE_MIN_STORY_WORDS) {
+    logRejectedScript('last script rejected as too short after retries', sanitized, `${wordCount} words`);
+    return null;
+  }
   const water = findWateryContent(sanitized, input.artist, input.title, referenceFacts);
   if (water) {
     logRejectedScript('last script rejected as water', sanitized, water);
@@ -120,10 +123,8 @@ export function finalizeAfterQualityLoop<T extends { script: string }>(
     logRejectedScript('last script rejected', sanitized, 'no reference facts');
     return null;
   }
-  const relax = options.relaxForWeakLlm ?? false;
   const anchorCheck = validateStoryScript(sanitized, '60s', input.artist, input.title, {
     strictLength: false,
-    minWordsOverride: relax ? 55 : undefined,
     referenceFacts,
     skipBannedPatterns: true,
     skipEnglishCheck: false,
@@ -132,16 +133,7 @@ export function finalizeAfterQualityLoop<T extends { script: string }>(
     skipFirstSentenceAnchor: true,
   });
   if (!anchorCheck.ok) {
-    const reason = anchorCheck.reason ?? 'quality';
-    if (relax && wordCount >= 55 && /too short/i.test(reason)) {
-      console.warn(`[story] accepting ${wordCount} words despite ${reason}`);
-      return finalize({ ...lastCandidate, script: sanitized });
-    }
-    logRejectedScript('last script rejected on finalize', sanitized, reason);
-    return null;
-  }
-  if (wordCount < 28) {
-    logRejectedScript('last script rejected as too short after retries', sanitized, `${wordCount} words`);
+    logRejectedScript('last script rejected on finalize', sanitized, anchorCheck.reason ?? 'quality');
     return null;
   }
   const story = { ...lastCandidate, script: sanitized };
