@@ -7,6 +7,7 @@ import storyRouter from './routes/story.js';
 import llmProbeRouter from './routes/llm-probe.js';
 import authRouter from './routes/auth.js';
 import syncRouter from './routes/sync.js';
+import billingRouter from './routes/billing.js';
 import { isAppAuthEnabled } from './services/jwt.js';
 import { AUDIO_DIR } from './services/yandex-tts.js';
 import { hasGroqApiKey } from './services/groq.js';
@@ -135,6 +136,7 @@ app.get('/health', (_req, res) => {
 
 app.use('/v1/auth', authRouter);
 app.use('/v1/sync', syncRouter);
+app.use('/v1/billing', billingRouter);
 app.use('/v1/llm', llmProbeRouter);
 app.use('/v1/story', storyRouter);
 
@@ -150,6 +152,7 @@ const server = app.listen(PORT, '0.0.0.0', () => {
   );
   console.log(`  POST /v1/auth/token — app JWT`);
   console.log(`  GET  /v1/sync/* — linked account settings & history`);
+  console.log(`  GET  /v1/billing/status — tier, limits, trial/premium`);
   console.log(`  POST /v1/llm/probe — test LLM key via BFF (no key logging)`);
   console.log(`  POST /v1/story/full — story + optional Yandex TTS`);
   console.log(`  GET  /health — health check`);

@@ -43,12 +43,20 @@ object ServerRateLimitParser {
             "Слишком частые запросы к серверу — подожди минуту. Это не лимит Gemini."
         "STORY_HOURLY" ->
             "На сервере не больше 10 историй в час. Подожди или добавь свой API-ключ."
+        "TRIAL_MONTHLY_LIMIT" -> {
+            val q = quota
+            if (q?.monthlyLimit != null) {
+                "Пробный период: использованы ${q.monthlyUsed ?: q.monthlyLimit}/${q.monthlyLimit} историй в месяце."
+            } else {
+                "Пробный период: месячный лимит историй исчерпан. Подписка 199 ₽/мес — до 25 в день."
+            }
+        }
         "DAILY_LIMIT" -> {
             val q = quota
             if (q != null) {
-                "Лимит сервера: ${q.used}/${q.limit} историй в день. Свой ключ обходит только серверный лимит."
+                "Лимит: сегодня ${q.used}/${q.limit} историй."
             } else {
-                "Дневной лимит бесплатных историй на сервере. Свой ключ обходит только серверный лимит."
+                "Дневной лимит историй на сервере."
             }
         }
         "IP_HOURLY" -> "Слишком много запросов с этой сети к серверу."
@@ -59,6 +67,7 @@ object ServerRateLimitParser {
         "STORY_BURST",
         "STORY_HOURLY",
         "DAILY_LIMIT",
+        "TRIAL_MONTHLY_LIMIT",
         "IP_HOURLY",
         "AUTH_RATE",
         "AUTH_DAILY",

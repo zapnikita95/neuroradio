@@ -167,6 +167,7 @@
     <string name="settings_groq_test_partial">Работает частично</string>
     <string name="settings_groq_test_fail">Не удалось подключиться</string>
     <string name="settings_free_quota">Сегодня: %1$d из %2$d</string>
+    <string name="settings_trial_quota">Пробный: %1$d из %2$d в месяце · сегодня %3$d из %4$d</string>
     <string name="settings_unlimited_groq">Без дневного лимита</string>
     <string name="settings_groq_status_ok">Ключ сохранён</string>
     <string name="settings_groq_status_missing">Без своего ключа — до 10 историй в день на сервере</string>

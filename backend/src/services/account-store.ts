@@ -1,6 +1,7 @@
 import crypto from 'node:crypto';
 
 const PREMIUM_PRODUCT_MONTHLY = 'premium_voice_monthly';
+const TRIAL_PRODUCT_MONTHLY = 'trial_stories_monthly';
 import fs from 'node:fs';
 import path from 'node:path';
 
@@ -30,11 +31,13 @@ export interface SyncHistoryEntry {
   playedAt: number;
 }
 
-export type AccountPlan = 'free' | 'premium';
+export type AccountPlan = 'free' | 'trial' | 'premium';
 
 export interface AccountEntitlement {
   plan: AccountPlan;
   premiumUntil: number;
+  trialUntil: number;
+  trialStoriesUsed: number;
   premiumProductId: string | null;
   purchaseTokenHash: string | null;
 }
@@ -49,6 +52,8 @@ interface AccountRecord {
   createdAt: number;
   plan?: AccountPlan;
   premiumUntil?: number;
+  trialUntil?: number;
+  trialStoriesUsed?: number;
   premiumProductId?: string | null;
   purchaseTokenHash?: string | null;
 }
@@ -266,6 +271,8 @@ function entitlementFromAccount(account: AccountRecord | undefined): AccountEnti
   return {
     plan: account?.plan ?? 'free',
     premiumUntil: account?.premiumUntil ?? 0,
+    trialUntil: account?.trialUntil ?? 0,
+    trialStoriesUsed: account?.trialStoriesUsed ?? 0,
     premiumProductId: account?.premiumProductId ?? null,
     purchaseTokenHash: account?.purchaseTokenHash ?? null,
   };
@@ -280,6 +287,8 @@ export function getEntitlementForInstall(installId: string): AccountEntitlement 
     return {
       plan: 'free',
       premiumUntil: 0,
+      trialUntil: 0,
+      trialStoriesUsed: 0,
       premiumProductId: null,
       purchaseTokenHash: null,
     };
@@ -337,4 +346,62 @@ export function grantPremiumSubscription(
   }
   saveStore(store);
   return entitlementFromAccount(account);
+}
+
+const TRIAL_MS_MONTH = 31 * 24 * 60 * 60 * 1000;
+
+export function grantTrialSubscription(
+  installId: string,
+  options: { months?: number; productId?: string; purchaseToken?: string } = {},
+): AccountEntitlement {
+  const months = Math.max(1, options.months ?? 1);
+  const store = loadStore();
+  const normalized = installId.trim().toLowerCase();
+  let accountId = store.installToAccount[normalized];
+  if (!accountId) {
+    const created = createAccount(installId);
+    accountId = created.accountId;
+  }
+
+  const reloaded = loadStore();
+  const account = reloaded.accountsById[accountId];
+  if (!account) return getEntitlementForInstall(installId);
+
+  const base = Math.max(Date.now(), account.trialUntil ?? 0);
+  account.plan = 'trial';
+  account.trialUntil = base + months * TRIAL_MS_MONTH;
+  account.trialStoriesUsed = 0;
+  account.premiumProductId = options.productId ?? TRIAL_PRODUCT_MONTHLY;
+  if (options.purchaseToken) {
+    account.purchaseTokenHash = crypto
+      .createHash('sha256')
+      .update(options.purchaseToken)
+      .digest('hex');
+  }
+  saveStore(reloaded);
+  return entitlementFromAccount(account);
+}
+
+/** Учитывается только в активном trial-периоде. */
+export function incrementTrialStoryUsage(installId: string): void {
+  const store = loadStore();
+  const normalized = installId.trim().toLowerCase();
+  const accountId = store.installToAccount[normalized];
+  if (!accountId) return;
+  const account = store.accountsById[accountId];
+  if (!account || account.plan !== 'trial') return;
+  if ((account.trialUntil ?? 0) <= Date.now()) return;
+  account.trialStoriesUsed = (account.trialStoriesUsed ?? 0) + 1;
+  saveStore(store);
+}
+
+export function getTrialStoryUsage(installId: string): { used: number; limit: number; periodEnds: number } | null {
+  const ent = getEntitlementForInstall(installId);
+  if (ent.plan !== 'trial' || ent.trialUntil <= Date.now()) return null;
+  const limit = parseInt(process.env.TRIAL_STORY_MONTHLY_LIMIT ?? '10', 10);
+  return {
+    used: ent.trialStoriesUsed,
+    limit,
+    periodEnds: ent.trialUntil,
+  };
 }

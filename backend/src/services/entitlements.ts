@@ -1,7 +1,7 @@
 import { isUnlimitedInstall } from '../config/security.js';
 import { getEntitlementForInstall, type AccountPlan } from './account-store.js';
 
-export type UserTier = 'free' | 'premium' | 'unlimited';
+export type UserTier = 'free' | 'trial' | 'premium' | 'unlimited';
 
 export const PREMIUM_PRODUCT_MONTHLY = 'premium_voice_monthly';
 export const PREMIUM_PRICE_RUB_MONTHLY = 199;
@@ -29,18 +29,32 @@ export function isPremiumActive(plan: AccountPlan, premiumUntil: number): boolea
   return plan === 'premium' && premiumUntil > Date.now();
 }
 
+export function isTrialActive(plan: AccountPlan, trialUntil: number): boolean {
+  return plan === 'trial' && trialUntil > Date.now();
+}
+
 export function resolveUserTier(installId: string): UserTier {
   if (isUnlimitedInstall(installId)) return 'unlimited';
   if (isPremiumInstallWhitelisted(installId)) return 'premium';
 
   const ent = getEntitlementForInstall(installId);
   if (isPremiumActive(ent.plan, ent.premiumUntil)) return 'premium';
+  if (isTrialActive(ent.plan, ent.trialUntil)) return 'trial';
   return 'free';
 }
 
 export function hasPremiumEntitlement(installId: string): boolean {
   const tier = resolveUserTier(installId);
   return tier === 'premium' || tier === 'unlimited';
+}
+
+export function hasTrialEntitlement(installId: string): boolean {
+  return resolveUserTier(installId) === 'trial';
+}
+
+export function hasPaidStoryTier(installId: string): boolean {
+  const tier = resolveUserTier(installId);
+  return tier === 'trial' || tier === 'premium' || tier === 'unlimited';
 }
 
 export function isElevenLabsEnabled(): boolean {
@@ -72,6 +86,9 @@ export function isSaluteSpeechEnabled(): boolean {
 export function premiumUpsellHintRu(tier: UserTier): string {
   if (tier === 'premium' || tier === 'unlimited') {
     return 'Премиум-голос (SaluteSpeech, Сбер) активен.';
+  }
+  if (tier === 'trial') {
+    return 'Пробный период: DeepSeek V3 и расширенный лимит историй.';
   }
   return `Профессиональный голос радиоведущего (SaluteSpeech, чистый русский) — ${PREMIUM_PRICE_RUB_MONTHLY} ₽/мес (${PREMIUM_PRODUCT_MONTHLY}).`;
 }

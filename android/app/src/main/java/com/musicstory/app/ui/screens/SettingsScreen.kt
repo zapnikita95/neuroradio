@@ -686,9 +686,8 @@ fun SettingsScreen(
                         LlmProvider.LOCAL -> "${llmProvider.labelRu}: $localOllamaModel"
                     }
                 } else {
-                    dailyQuota?.let { quota ->
-                        context.getString(R.string.settings_free_quota, quota.remaining, quota.limit)
-                    } ?: context.getString(R.string.settings_groq_status_missing)
+                    dailyQuota?.let { quota -> formatServerQuotaLabel(context, quota) }
+                        ?: context.getString(R.string.settings_groq_status_missing)
                 }
 
                 CollapsibleSettingsSection(
@@ -1040,11 +1039,7 @@ fun SettingsScreen(
                         dailyQuota?.let { quota ->
                             Spacer(modifier = Modifier.height(4.dp))
                             Text(
-                                text = context.getString(
-                                    R.string.settings_free_quota,
-                                    quota.remaining,
-                                    quota.limit,
-                                ),
+                                text = formatServerQuotaLabel(context, quota),
                                 style = MaterialTheme.typography.labelMedium,
                                 color = GoldBright,
                             )
@@ -1533,4 +1528,20 @@ private fun buildTriggerSummary(
         }
         else -> base
     }
+}
+
+private fun formatServerQuotaLabel(context: android.content.Context, quota: com.musicstory.app.data.model.StoryQuotaInfo): String {
+    val monthlyLimit = quota.monthlyLimit
+    if (monthlyLimit != null && monthlyLimit > 0) {
+        val monthlyRem = quota.monthlyRemaining
+            ?: kotlin.math.max(0, monthlyLimit - (quota.monthlyUsed ?: 0))
+        return context.getString(
+            R.string.settings_trial_quota,
+            monthlyRem,
+            monthlyLimit,
+            quota.remaining,
+            quota.limit,
+        )
+    }
+    return context.getString(R.string.settings_free_quota, quota.remaining, quota.limit)
 }

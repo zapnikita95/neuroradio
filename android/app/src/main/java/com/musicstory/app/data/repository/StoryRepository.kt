@@ -66,7 +66,8 @@ class StoryRepository(
         var backendUrl = settingsDataStore.backendUrl.first().trim()
         if (!shouldTryBackend(backendUrl)) return
         runCatching {
-            _dailyQuota.value = apiClient.fetchQuota(backendUrl).quota
+            val quotaResp = apiClient.fetchQuota(backendUrl)
+            _dailyQuota.value = quotaResp.quota?.copy(tier = quotaResp.quota.tier ?: quotaResp.tier)
         }.onFailure {
             StoryLog.w("Quota refresh failed: ${it.message}")
         }

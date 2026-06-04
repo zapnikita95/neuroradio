@@ -44,6 +44,11 @@ import { isAzureSpeechEnabled } from '../services/entitlements.js';
 import { canUseAzureSpeechProduction, hasAzureSpeechCredentials } from '../services/tts-router.js';
 import { signAudioAccess } from '../services/audio-token.js';
 import { attachStoryQuotaHeaders, getDailyStoryQuota, recordStoryGeneration } from '../middleware/rate-limit.js';
+import {
+  getStoryLimitsForTier,
+  resolveOpenRouterModelForTier,
+  tierQuotaHintRu,
+} from '../services/tier-policy.js';
 import { classifyStoryLlmError } from '../services/llm-error-message.js';
 import { isNoReferenceFactsError, NoReferenceFactsError } from '../services/story-errors.js';
 import type { StoryLengthId } from '../services/story-length.js';
@@ -82,17 +87,19 @@ router.get('/quota', (req: Request, res: Response) => {
   const installId = req.installId ?? 'unknown';
   const tier = resolveUserTier(installId);
   const quota = getDailyStoryQuota(installId);
+  const limits = getStoryLimitsForTier(tier);
   attachStoryQuotaHeaders(res, installId);
   res.json({
     tier,
     premium: hasPremiumEntitlement(installId),
     quota,
-    hint:
-      tier === 'unlimited'
-        ? 'Без лимитов на этом устройстве.'
-        : tier === 'premium'
-          ? premiumUpsellHintRu(tier)
-          : `${premiumUpsellHintRu(tier)} Свой API-ключ в приложении — без дневного лимита (запросы идут через Railway).`,
+    limits: {
+      dailyStories: limits.dailyStories,
+      monthlyStories: limits.monthlyStories,
+      labelRu: limits.labelRu,
+    },
+    hint: tierQuotaHintRu(tier),
+    premiumVoiceHint: premiumUpsellHintRu(tier),
     premiumTtsReady: canUseAzureSpeechProduction(),
     azureSpeech: hasAzureSpeechCredentials() && isAzureSpeechEnabled(),
   });
@@ -160,7 +167,18 @@ router.post('/full', validateStoryFullBody, async (req: Request, res: Response) 
   } = req.body as StoryFullBody;
   const geminiModel = (req.body as StoryFullBody).gemini_model;
   const groqModel = (req.body as StoryFullBody).groq_model;
-  const openrouterModel = (req.body as StoryFullBody).openrouter_model;
+  const openrouterModelRequested = (req.body as StoryFullBody).openrouter_model;
+  const userTier = resolveUserTier(installId);
+  const openrouterModelFact = resolveOpenRouterModelForTier(
+    userTier,
+    openrouterModelRequested,
+    'fact',
+  );
+  const openrouterModelStory = resolveOpenRouterModelForTier(
+    userTier,
+    openrouterModelRequested,
+    'story',
+  );
 
   const modelLog =
     llmProvider === 'local'
@@ -170,11 +188,11 @@ router.post('/full', validateStoryFullBody, async (req: Request, res: Response) 
       : llmProvider === 'groq'
         ? ` model=${groqModel ?? 'default'}`
         : llmProvider === 'openrouter'
-          ? ` model=${openrouterModel ?? 'default'}`
+          ? ` fact=${openrouterModelFact} story=${openrouterModelStory} tier=${userTier}`
           : '';
 
   console.log(
-    `[settings] install=${installId.slice(0, 8)} user_llm=${requestedProviderRaw ?? 'missing'} active_llm=${llmProvider}${modelLog} own_key=${ownLlmKey}`,
+    `[settings] install=${installId.slice(0, 8)} tier=${userTier} user_llm=${requestedProviderRaw ?? 'missing'} active_llm=${llmProvider}${modelLog} own_key=${ownLlmKey}`,
   );
   console.log(
     `[story] start install=${installId.slice(0, 8)} requested_llm=${requestedProviderRaw ?? 'missing'} llm=${llmProvider}${modelLog}` +
@@ -263,7 +281,7 @@ router.post('/full', validateStoryFullBody, async (req: Request, res: Response) 
         genre: metadata.genre,
         rawSnippets: factCtx.rawSnippets,
         preferredProvider: llmProvider,
-        openRouterModel: openrouterModel,
+        openRouterModel: openrouterModelFact,
       });
       if (hunted) {
         selectedFact = hunted;
@@ -331,7 +349,7 @@ router.post('/full', validateStoryFullBody, async (req: Request, res: Response) 
           : undefined,
       geminiModel,
       groqModel,
-      openRouterModel: openrouterModel,
+      openRouterModel: openrouterModelStory,
       clientGroqApiKey: clientLlmKeys.groq,
       clientGeminiApiKey: clientLlmKeys.gemini,
       clientOpenRouterApiKey: clientLlmKeys.openrouter,
@@ -359,7 +377,7 @@ router.post('/full', validateStoryFullBody, async (req: Request, res: Response) 
             clientGroqApiKey: clientLlmKeys.groq,
             clientGeminiApiKey: clientLlmKeys.gemini,
             clientOpenRouterApiKey: clientLlmKeys.openrouter,
-            openRouterModel: openrouterModel,
+            openRouterModel: openrouterModelStory,
           });
           const wikiScriptFinal =
             wikiScript ??

@@ -1,6 +1,8 @@
 import { Response } from 'express';
 import { isUnlimitedInstall, SECURITY } from '../config/security.js';
-import { getQuotaSubject } from '../services/account-store.js';
+import { getQuotaSubject, getTrialStoryUsage, incrementTrialStoryUsage } from '../services/account-store.js';
+import { resolveUserTier } from '../services/entitlements.js';
+import { getStoryLimitsForTier } from '../services/tier-policy.js';
 import { setLogDetail } from './request-logger.js';
 
 interface Bucket {
@@ -18,6 +20,11 @@ export interface QuotaSnapshot {
   limit: number;
   remaining: number;
   resetsAt: number;
+  tier?: string;
+  monthlyUsed?: number;
+  monthlyLimit?: number;
+  monthlyRemaining?: number;
+  monthlyResetsAt?: number;
 }
 
 function clientIpFromForwarded(forwarded?: string, remoteAddress?: string): string {
@@ -86,9 +93,10 @@ function rejectIfOverLimit(
   res: Response,
   message: string,
   code: string,
+  quotaExtra: Partial<QuotaSnapshot> = {},
 ): boolean {
   if (wouldAllow(key, max, windowMs)) return true;
-  sendLimitError(res, message, code, peekUsage(key, max, windowMs));
+  sendLimitError(res, message, code, { ...peekUsage(key, max, windowMs), ...quotaExtra });
   return false;
 }
 
@@ -105,18 +113,42 @@ const UNLIMITED_QUOTA: QuotaSnapshot = {
   limit: 999_999,
   remaining: 999_999,
   resetsAt: Date.now() + DAY_MS,
+  tier: 'unlimited',
 };
 
 function quotaKey(installId: string): string {
   return `story:day:${getQuotaSubject(installId)}`;
 }
 
+export function getDailyStoryLimit(installId: string): number {
+  if (isUnlimitedInstall(installId)) return UNLIMITED_QUOTA.limit;
+  const tier = resolveUserTier(installId);
+  return getStoryLimitsForTier(tier).dailyStories;
+}
+
+function enrichQuota(installId: string, base: QuotaSnapshot): QuotaSnapshot {
+  const tier = resolveUserTier(installId);
+  const trial = getTrialStoryUsage(installId);
+  return {
+    ...base,
+    tier,
+    ...(trial
+      ? {
+          monthlyUsed: trial.used,
+          monthlyLimit: trial.limit,
+          monthlyRemaining: Math.max(0, trial.limit - trial.used),
+          monthlyResetsAt: trial.periodEnds,
+        }
+      : {}),
+  };
+}
+
 export function getDailyStoryQuota(installId: string): QuotaSnapshot {
   if (isUnlimitedInstall(installId)) return { ...UNLIMITED_QUOTA, resetsAt: Date.now() + DAY_MS };
-  return peekUsage(
-    quotaKey(installId),
-    SECURITY.limits.storyPerInstallPerDay,
-    DAY_MS,
+  const dailyLimit = getDailyStoryLimit(installId);
+  return enrichQuota(
+    installId,
+    peekUsage(quotaKey(installId), dailyLimit, DAY_MS),
   );
 }
 
@@ -125,6 +157,7 @@ export function attachStoryQuotaHeaders(res: Response, installId: string): void 
   res.setHeader('X-Story-Quota-Limit', String(quota.limit));
   res.setHeader('X-Story-Quota-Remaining', String(quota.remaining));
   res.setHeader('X-Story-Quota-Resets-At', String(quota.resetsAt));
+  if (quota.tier) res.setHeader('X-Story-Tier', quota.tier);
 }
 
 export function clientIp(req: { header(name: string): string | undefined; socket: { remoteAddress?: string } }): string {
@@ -154,29 +187,65 @@ export function rateLimitHealth(req: import('express').Request, res: import('exp
   next();
 }
 
-/** Peek only — does not consume quota (failed LLM runs do not burn free tier). */
-export function rateLimitStory(installId: string): (req: import('express').Request, res: import('express').Response, next: import('express').NextFunction) => void {
+function dailyLimitMessage(installId: string, dailyLimit: number): string {
+  const tier = resolveUserTier(installId);
+  if (tier === 'free') {
+    return `Бесплатно: ${dailyLimit} истории в день. Пробный период 1 ₽/мес или подписка 199 ₽/мес — больше историй и DeepSeek.`;
+  }
+  if (tier === 'trial') {
+    return `Пробный период: не более ${dailyLimit} историй в день.`;
+  }
+  if (tier === 'premium') {
+    return `Лимит подписки: ${dailyLimit} историй в день.`;
+  }
+  return `Дневной лимит: ${dailyLimit} историй.`;
+}
+
+/** Peek only — does not consume quota (failed LLM runs do not burn tier). */
+export function rateLimitStory(
+  installId: string,
+  options: { skipDailyQuota?: boolean } = {},
+): (req: import('express').Request, res: import('express').Response, next: import('express').NextFunction) => void {
   return (req, res, next) => {
-    if (isUnlimitedInstall(installId)) {
+    if (isUnlimitedInstall(installId) || options.skipDailyQuota) {
       next();
       return;
     }
 
     const ip = clientIp(req);
     const { limits } = SECURITY;
-    const dailyLimit = limits.storyPerInstallPerDay;
+    const dailyLimit = getDailyStoryLimit(installId);
     const subject = getQuotaSubject(installId);
+    const quotaBase = enrichQuota(installId, peekUsage(quotaKey(installId), dailyLimit, DAY_MS));
 
-    if (!rejectIfOverLimit(`ip:hour:${ip}`, limits.ipGlobalPerHour, HOUR_MS, res, 'Too many requests from this network', 'IP_HOURLY')) return;
-    if (!rejectIfOverLimit(`story:burst:${subject}`, limits.storyBurstPerInstallPerMinute, MINUTE_MS, res, 'Подожди минуту — слишком частые запросы историй', 'STORY_BURST')) return;
-    if (!rejectIfOverLimit(`story:hour:${subject}`, limits.storyPerInstallPerHour, HOUR_MS, res, 'Hourly story limit reached', 'STORY_HOURLY')) return;
+    const trial = getTrialStoryUsage(installId);
+    if (trial && trial.used >= trial.limit) {
+      sendLimitError(
+        res,
+        `Пробный период: использованы все ${trial.limit} историй в этом месяце. Оформите подписку 199 ₽/мес.`,
+        'TRIAL_MONTHLY_LIMIT',
+        {
+          ...quotaBase,
+          monthlyUsed: trial.used,
+          monthlyLimit: trial.limit,
+          monthlyRemaining: 0,
+          monthlyResetsAt: trial.periodEnds,
+        },
+      );
+      return;
+    }
+
+    if (!rejectIfOverLimit(`ip:hour:${ip}`, limits.ipGlobalPerHour, HOUR_MS, res, 'Too many requests from this network', 'IP_HOURLY', quotaBase)) return;
+    if (!rejectIfOverLimit(`story:burst:${subject}`, limits.storyBurstPerInstallPerMinute, MINUTE_MS, res, 'Подожди минуту — слишком частые запросы историй', 'STORY_BURST', quotaBase)) return;
+    if (!rejectIfOverLimit(`story:hour:${subject}`, limits.storyPerInstallPerHour, HOUR_MS, res, 'Hourly story limit reached', 'STORY_HOURLY', quotaBase)) return;
     if (!rejectIfOverLimit(
       quotaKey(installId),
       dailyLimit,
       DAY_MS,
       res,
-      `Бесплатный лимит: ${dailyLimit} историй в день. Добавь свой Groq-ключ в настройках — без ограничений.`,
+      dailyLimitMessage(installId, dailyLimit),
       'DAILY_LIMIT',
+      quotaBase,
     )) return;
 
     next();
@@ -193,9 +262,14 @@ export function recordStoryGeneration(
   const ip = clientIp(req);
   const { limits } = SECURITY;
   const subject = getQuotaSubject(installId);
+  const dailyLimit = getDailyStoryLimit(installId);
 
   consumeLimit(`ip:hour:${ip}`, limits.ipGlobalPerHour, HOUR_MS);
   consumeLimit(`story:burst:${subject}`, limits.storyBurstPerInstallPerMinute, MINUTE_MS);
   consumeLimit(`story:hour:${subject}`, limits.storyPerInstallPerHour, HOUR_MS);
-  consumeLimit(quotaKey(installId), limits.storyPerInstallPerDay, DAY_MS);
+  consumeLimit(quotaKey(installId), dailyLimit, DAY_MS);
+
+  if (resolveUserTier(installId) === 'trial') {
+    incrementTrialStoryUsage(installId);
+  }
 }

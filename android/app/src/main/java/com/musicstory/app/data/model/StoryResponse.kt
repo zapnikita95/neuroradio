@@ -55,4 +55,9 @@ data class StoryQuotaInfo(
     val limit: Int = 10,
     val remaining: Int = 10,
     @SerializedName("resetsAt") val resetsAt: Long = 0,
+    val tier: String? = null,
+    @SerializedName("monthlyUsed") val monthlyUsed: Int? = null,
+    @SerializedName("monthlyLimit") val monthlyLimit: Int? = null,
+    @SerializedName("monthlyRemaining") val monthlyRemaining: Int? = null,
+    @SerializedName("monthlyResetsAt") val monthlyResetsAt: Long? = null,
 )
