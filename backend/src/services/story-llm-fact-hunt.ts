@@ -1,7 +1,7 @@
 import fetch from 'node-fetch';
 import type { SelectedReferenceFact } from './fact-picker.js';
 import { factNamesForeignEntity } from './fact-relevance.js';
-import { interestScore, MIN_PICK_INTEREST_SCORE } from './reference-fact-quality.js';
+import { interestScore, isBoringFact, MIN_PICK_INTEREST_SCORE } from './reference-fact-quality.js';
 import { WEAK_TRIVIA_PATTERNS } from './story-fact-hunt.js';
 import { FACT_HUNT_LLM_PROMPT_BLOCK } from './story-fact-hunt.js';
 import { resolveGroqModelOrder } from './groq-models.js';
@@ -112,7 +112,13 @@ export function validateLlmSeedCandidate(
     return { ok: false, reason: 'evidenceQuote not grounded in snippet' };
   }
   if (WEAK_TRIVIA_PATTERNS.some((p) => p.test(fact))) {
-    return { ok: false, reason: 'weak trivia fact' };
+    return { ok: false, reason: 'weak trivia fact (chart/hit/metrics)' };
+  }
+  if (isBoringFact(fact)) {
+    return { ok: false, reason: 'boring encyclopedia fact' };
+  }
+  if (interestScore(fact) < MIN_PICK_INTEREST_SCORE) {
+    return { ok: false, reason: `low interest score (${interestScore(fact)} < ${MIN_PICK_INTEREST_SCORE})` };
   }
   if (factNamesForeignEntity(fact, artist, title)) {
     return { ok: false, reason: 'foreign entity in fact' };

@@ -12,6 +12,7 @@ const BORING_FACT_PATTERNS: RegExp[] = [
   /\bis\s+an?\s+(?:American|British|Canadian|Russian|Ukrainian|Swedish|German|French|Japanese|Korean|Australian)\s+(?:musical\s+)?(?:duo|band|group|artist|rock\s+band)\b/i,
   /\bis\s+a\s+song\s+by\b/i,
   /\b(?:was|were)\s+formed\s+in\b/i,
+  /\b(?:name|назван\w*)\b.*\b(?:refers to|term for|means|происходит|отсылает|обозначает|термин)\b/i,
   /\boriginally\s+formed\b/i,
   /\boriginally\s+(?:titled|called|named|released)\b/i,
   /\bworking\s+title\b/i,
@@ -81,7 +82,10 @@ const STORY_FACT_PATTERNS: RegExp[] = [
   /\b(?:platinum|gold|number\s+one|topped|billboard\s+hot\s+100)\b/i,
   /\b(?:iron curtain|eastern bloc|ussr|soviet union|soviet)\b/i,
   /\b(?:mozambique|mozambican|african musician)\b/i,
-  /\b(?:прорыв|скандал|запрет|возвращени|забвени|историческ|впервые|расизм|сегрегац|шахт|уголь|рабств|смысл|метафор|вдохновен|бутлег|подполь|крови|Цой|ссср|совет)\b/i,
+  /(?:прорыв|скандал|запрет|возвращени|забвени|историческ|впервые|расизм|расист|дискриминац|сегрегац|шахт|уголь|рабств|смысл|метафор|вдохновен|бутлег|подполь|крови|Цой|ссср|совет)/i,
+  /(?:арми\w*|тюрьм\w*|бедност\w*|безуми\w*|одержим|предатель|измен\w*|изгнан|уволен|запретил|цензур|суд|плагиат|украл\w*|воровал)/i,
+  /\b(?:не\s+умел|не\s+знал|не\s+читал).*(?:нот|музык)/i,
+  /\b(?:написал\w*|сочинил\w*|записал\w*).*(?:арми|тюрьм|больниц|церкв)/i,
 ];
 
 /** Human backstory > metrics-only trivia. */
@@ -90,7 +94,7 @@ const BACKSTORY_FACT_PATTERNS: RegExp[] = [
   /\b(?:apology|letter|explained|explain|emotional|heartfelt|most emotional|dedicated to)\b/i,
   /\b(?:interview|said|he called|she said|told)\b/i,
   /\b(?:personal|real[- ]life|autobiograph|memoir)\b/i,
-  /\b(?:дочер|сын|семь|мать|отец|жена|развод|опек|усынов|извини|объясн|личн|эмоцион)\b/i,
+  /(?:дочер|сын|семь|мать|отец|жена|развод|опек|усынов|извини|объясн|личн|эмоцион)/i,
 ];
 
 export const MIN_PICK_INTEREST_SCORE = 6;
