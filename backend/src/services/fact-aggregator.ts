@@ -309,7 +309,9 @@ export async function fetchAggregatedFactContext(
   ]);
   const elapsed = Date.now() - t0;
   if (elapsed > FACT_FETCH_BUDGET_MS) {
-    console.warn(`[facts] slow parallel fetch ${elapsed}ms (budget ${FACT_FETCH_BUDGET_MS}ms) ${artist} — ${title}`);
+    console.warn(
+      `[facts] parallel fetch took ${elapsed}ms (soft budget ${FACT_FETCH_BUDGET_MS}ms — monitoring only, not a cutoff) ${artist} — ${title}`,
+    );
   }
   console.log(
     `[facts] parallel fetch ${artist} — ${title}: ${Date.now() - t0}ms ` +

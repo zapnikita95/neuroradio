@@ -62,6 +62,7 @@ import {
   tierQuotaHintRu,
 } from '../services/tier-policy.js';
 import { classifyStoryLlmError } from '../services/llm-error-message.js';
+import { StoryTiming } from '../services/story-timing.js';
 import { isNoReferenceFactsError, NoReferenceFactsError } from '../services/story-errors.js';
 import type { StoryLengthId } from '../services/story-length.js';
 import type { StoryNarratorId } from '../services/story-narrator.js';
@@ -214,8 +215,13 @@ router.post('/full', validateStoryFullBody, async (req: Request, res: Response) 
       ` narrator=${storyNarrator} artist="${artist}" title="${title}"`,
   );
 
+  const timing = new StoryTiming(installId, artist, title);
+
   try {
+    timing.mark('request');
+
     const metadata = await enrichTrackMetadata(artist, title);
+    timing.mark('metadata', `year=${metadata.year ?? '-'} mbid=${metadata.mbid ? 'yes' : 'no'}`);
     const delivery = resolveVoiceDelivery({
       ttsVoice,
       ttsStyle,
@@ -242,6 +248,10 @@ router.post('/full', validateStoryFullBody, async (req: Request, res: Response) 
       metadata.countryCode,
       metadata.mbid,
       metadata.artistMbid,
+    );
+    timing.mark(
+      'facts-fetched',
+      `track=${factCtx.bundle.trackFacts.length} artist=${factCtx.bundle.artistFacts.length} snippets=${factCtx.rawSnippets.length}`,
     );
     let factBundle = factCtx.bundle;
     let trackFactCount = factBundle.trackFacts.length;
@@ -406,6 +416,12 @@ router.post('/full', validateStoryFullBody, async (req: Request, res: Response) 
       );
       console.log(`[story-seed-why] ${selectedFactWhy}`);
     }
+    timing.mark(
+      'seed-ready',
+      selectedFact
+        ? `scope=${selectedFact.scope} score=${selectedFact.interestScore} rating=${selectedFact.interestRating}/10`
+        : 'no-seed',
+    );
 
     const { story, llmUsed } = await (async () => {
       if (artistTier === 'indie') {
@@ -456,6 +472,8 @@ router.post('/full', validateStoryFullBody, async (req: Request, res: Response) 
       }
       return generateStoryWithFallback(storyInput, llmProvider);
     })();
+
+    timing.mark('story-text', `llm=${llmUsed} words=${story.word_count}`);
 
     console.log(
       `[story-script] ${metadata.artist} — ${metadata.title} | llm=${llmUsed} | narrator=${storyNarrator} | words=${story.word_count}`,
@@ -533,6 +551,8 @@ router.post('/full', validateStoryFullBody, async (req: Request, res: Response) 
         'TTS не настроен: нужен YANDEX_API_KEY (база) или AZURE_SPEECH_KEY + AZURE_SPEECH_REGION (premium)';
     }
 
+    timing.mark('tts-ready', `audio=${Boolean(response.audioUrl)}`);
+
     recordStoryGeneration(installId, req);
     if (selectedFact?.fact) {
       recordUserStory(installId, {
@@ -544,8 +564,9 @@ router.post('/full', validateStoryFullBody, async (req: Request, res: Response) 
     }
     attachStoryQuotaHeaders(res, installId);
     console.log(
-      `[story] ok install=${installId.slice(0, 8)} llm=${llmUsed} words=${story.word_count} audio=${Boolean(response.audioUrl)}`,
+      `[story] ok install=${installId.slice(0, 8)} llm=${llmUsed} words=${story.word_count} audio=${Boolean(response.audioUrl)} totalMs=${timing.totalMs()}`,
     );
+    timing.mark('response-ready');
     console.warn('[story] script-text-begin');
     console.warn(story.script.trim());
     console.warn('[story] script-text-end');
@@ -564,6 +585,7 @@ router.post('/full', validateStoryFullBody, async (req: Request, res: Response) 
     }
 
     const rawMessage = err instanceof Error ? err.message : String(err);
+    timing.mark('failed', rawMessage.slice(0, 80));
     const isTts =
       /yandex tts|speechkit|tts\.api\.cloud\.yandex|elevenlabs|azure speech/i.test(rawMessage);
     if (isTts) {

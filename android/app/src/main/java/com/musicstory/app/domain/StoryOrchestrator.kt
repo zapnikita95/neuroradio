@@ -441,9 +441,9 @@ class StoryOrchestrator(
                     StoryLog.e("Story pipeline timeout", e)
                     val isLocal = settingsDataStore.llmProvider.first() == LlmProvider.LOCAL
                     _errorMessage.value = if (isLocal) {
-                        "Слишком долго ждём локальную модель (до 20 мин). Смотри логи: Music story\\logs\\local-bff.log"
+                        "Слишком долго ждём локальную модель (лимит 20 мин). Смотри логи: Music story\\logs\\local-bff.log"
                     } else {
-                        "Слишком долго ждём ответ сервера. Проверь интернет и backend."
+                        "Сервер не ответил за 3 мин (факты + текст + озвучка). Подожди и нажми «Рассказать историю» ещё раз."
                     }
                     _state.value = OrchestratorState.ERROR
                     publishUiState()
@@ -892,8 +892,8 @@ class StoryOrchestrator(
 
     companion object {
         private const val PLAYBACK_START_TIMEOUT_MS = 25_000L
-        /** Metadata + backend /v1/story/full — must not leave UI stuck in FETCHING. */
-        private const val STORY_FETCH_TIMEOUT_MS = 90_000L
+        /** Metadata + backend /v1/story/full (facts + LLM + Yandex TTS). */
+        private const val STORY_FETCH_TIMEOUT_MS = 180_000L
         /** Local Ollama on PC BFF — 35b model + research. */
         private const val LOCAL_STORY_FETCH_TIMEOUT_MS = 1_200_000L
         private const val PREVIEW_REVEAL_MAX_MS = 7_000L

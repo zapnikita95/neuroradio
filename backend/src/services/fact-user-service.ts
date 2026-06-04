@@ -50,10 +50,10 @@ export function getUsedFingerprints(installId: string, artist: string, title: st
   return fps;
 }
 
-export function ingestBundleToBank(artist: string, title: string, bundle: ReferenceFactBundle): void {
+export function ingestBundleToBank(artist: string, title: string, bundle: ReferenceFactBundle): number {
   const pools = splitBundleByScope(bundle, artist, title);
   const ranked = rankScopedFacts(pools).filter((r) => !r.junk && r.interest >= 6);
-  ingestFacts(
+  return ingestFacts(
     artist,
     title,
     ranked.slice(0, 16).map((r) => ({ fact: r.fact, scope: r.scope, source: 'wiki' as const })),

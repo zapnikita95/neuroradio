@@ -90,17 +90,19 @@ export function ingestFacts(
   artist: string,
   title: string,
   facts: Array<{ fact: string; scope: FactScope; source?: StoredFact['source'] }>,
-): void {
+): number {
   const bank = loadBank();
   const tk = trackKey(artist, title);
   const ak = artistKey(artist);
   const trackPool = bank.byTrack[tk] ?? [];
   const artistPool = bank.byArtist[ak] ?? [];
+  let saved = 0;
 
   for (const item of facts) {
     const trimmed = item.fact.trim();
     if (trimmed.length < 35) continue;
     const score = interestScore(trimmed);
+    if (score < 6) continue;
     const stored: StoredFact = {
       id: crypto.randomUUID(),
       artist,
@@ -113,13 +115,27 @@ export function ingestFacts(
       timesUsed: 0,
       addedAt: Date.now(),
     };
+    const poolSizeBefore =
+      item.scope === 'artist' ? artistPool.length : trackPool.length;
     if (item.scope === 'artist') upsertIntoPool(artistPool, stored);
     else upsertIntoPool(trackPool, stored);
+    const poolSizeAfter =
+      item.scope === 'artist' ? artistPool.length : trackPool.length;
+    if (poolSizeAfter >= poolSizeBefore) saved += 1;
   }
 
   bank.byTrack[tk] = trackPool;
   bank.byArtist[ak] = artistPool;
   saveBank(bank);
+
+  if (saved > 0) {
+    console.log(
+      `[fact-bank] saved ${saved} fact(s) score≥6 artist="${artist}" title="${title}" ` +
+        `trackPool=${trackPool.length} artistPool=${artistPool.length} path=${BANK_PATH}`,
+    );
+  }
+
+  return saved;
 }
 
 export function listBankFacts(
