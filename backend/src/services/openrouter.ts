@@ -206,10 +206,19 @@ export async function generateStoryScript(
         }
 
         lastCandidate = { ...story, script: sanitized };
+        const rejectReason = sanitizedQuality.reason ?? quality.reason ?? 'quality';
+        const isPersonaOnly =
+          /^(?:persona cliche|generic fiction|cliche filler):/i.test(rejectReason);
+        if (isPersonaOnly && qOpts.skipPersonaCliches) {
+          console.log(
+            `[openrouter] persona-style note (not rejected in production): ${rejectReason}`,
+          );
+          return finalizeStory({ ...story, script: sanitized }, { ...input, voiceId }, storyLength);
+        }
         logRejectedScript(
           'OpenRouter quality reject (single-shot)',
           sanitized,
-          sanitizedQuality.reason ?? quality.reason ?? 'quality',
+          rejectReason,
         );
       }
     } catch (err) {

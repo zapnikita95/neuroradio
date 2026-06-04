@@ -11,12 +11,51 @@ import { prepareStoryScriptLanguage } from './story-english-normalize.js';
 export { DEFAULT_STORY_LENGTH, getStoryLengthPreset };
 export type { StoryLengthId, StoryLengthPreset };
 
-export const BANNED_SCRIPT_PATTERNS: RegExp[] = [
+/** Podcast-style openers — always reject. */
+export const PODCAST_OPENER_PATTERNS: RegExp[] = [
   /^«?\s*знаю\s+(интересн|один|такой|факт)/i,
   /^«?\s*интересн/i,
   /^«?\s*вот что/i,
   /^«?\s*факт\s*:/i,
   /^«?\s*слушай[,]?\s*(факт|интересн)/i,
+];
+
+/** Invented first-person scenes — fact grounding violation, not ampoua style. */
+export const FABRICATED_SCENE_PATTERNS: RegExp[] = [
+  /стоял у мониторов,\s*звукорежиссёры краснели/i,
+  /зал замолчал на первой ноте/i,
+  /стоял у радиолы/i,
+  /помню студию — при записи/i,
+  /фанат\s+\S+\s+настояли/i,
+  /микрофон еле остыл/i,
+  /(?:^|[.!?…]\s*)я (?:сидел|вспоминаю) (?:в )?студии[,]?\s+где/i,
+  /^я (?:был|была) в клубе/i,
+  /^я (?:помню|был|была), когда впервые/i,
+  /^на сцене артист начинает/i,
+  /я помню студию/i,
+  /мы были в клубе/i,
+  /я стоял у мониторов/i,
+  /собирались по вечерам/i,
+  /забыл обо вс[её]м/i,
+  /танцевали на стульях/i,
+  /запах\s+(?:сигарет|кофе)/i,
+  /на\s+моей\s+полке/i,
+  /записывал\s+.*\s+он\s+пел/i,
+  /в\s+студии\s+тогда/i,
+  /слушайте,.*взрывает/i,
+];
+
+/** System/meta leaks in narration. */
+export const META_LEAK_PATTERNS: RegExp[] = [/music story/i, /\bwikipedia\b/i];
+
+/**
+ * Hard rejects: hallucinations, fake scenes, podcast framing.
+ * Not ampoua clichés — «согласно», «уникальный», «легендарный» belong in PERSONA or prompt only.
+ */
+export const HARD_SCRIPT_REJECT_PATTERNS: RegExp[] = [
+  ...PODCAST_OPENER_PATTERNS,
+  ...FABRICATED_SCENE_PATTERNS,
+  ...META_LEAK_PATTERNS,
   /зал просто сходит с ума/i,
   /зрители в экстазе/i,
   /разорв\w*\s+кабин/i,
@@ -26,42 +65,108 @@ export const BANNED_SCRIPT_PATTERNS: RegExp[] = [
   /наполнен\w*\s+темой\s+расизм/i,
   /личн\w*\s+опыт\w*\s+с\s+расизмом/i,
   /элвис в огне/i,
+  /\bдостав(?:ка|ки|кой|ку|ок)\b/i,
+  /подсказывает\s+[A-Z]/i,
+  /подсказывает\s+«?[A-Za-z]/i,
+  /готическ(?:ий|ого)\s+роман/i,
+  /конца\s+xix\s+века|xix\s+век/i,
+  /гонения\s+на\s+евреев|разрушение\s+храма/i,
+];
+
+/**
+ * Ampoua / narrator clichés — только подсказки в промпте.
+ * В production (skipPersonaCliches) не режут текст: «согласно», «уникальный», «не просто трек» допустимы,
+ * если история опирается на seed-факт.
+ */
+export const PERSONA_CLICHE_PATTERNS: RegExp[] = [
   /вкладывает душу/i,
   /магия музыки/i,
-  /music story/i,
-  /wikipedia/i,
-  /по данным/i,
-  /^согласно\s+(?:данным|источник|wikipedia)/i,
-  /стоял у мониторов,\s*звукорежиссёры краснели/i,
-  /зал замолчал на первой ноте/i,
-  /стоял у радиолы/i,
-  /помню студию — при записи/i,
-  /фанат\s+\S+\s+настояли/i,
-  /микрофон еле остыл/i,
   /влия(?:ет|ли|ющ)/i,
   /легендарн/i,
-  /уникальн(?:ый|ая|ое|ые)\s+(?:стиль|звук|талант|голос)/i,
+  /уникальн/i,
+  /согласно/i,
   /суть в том, что/i,
+  /суть\s+в\s+том/i,
   /понял[а]?, что музыка/i,
   /музыка может соедин/i,
   /чрезвычайно влия/i,
   /сделает.*классик/i,
-  /собирались по вечерам/i,
-  /забыл обо вс[её]м/i,
-  /танцевали на стульях/i,
   /характерный.*рифф/i,
-  /подсказывает\s+[A-Z]/i,
-  /подсказывает\s+«?[A-Za-z]/i,
-  /(?:^|[.!?…]\s*)я (?:сидел|вспоминаю) (?:в )?студии[,]?\s+где/i,
-  /\bдостав(?:ка|ки|кой|ку|ок)\b/i,
-  /^я (?:был|была) в клубе/i,
-  /^я (?:помню|был|была), когда впервые/i,
-  /^на сцене артист начинает/i,
-  /я помню студию/i,
-  /мы были в клубе/i,
-  /я стоял у мониторов/i,
-  // /^я помню/i — removed: valid opener, caused false rejects
+  /мало кто знает/i,
+  /стал[аи]?\s+легенд/i,
+  /зал[ауе]?\s+слав/i,
+  /трогает\s+сердц/i,
+  /заслуженн\w*\s+место/i,
+  /получил[аи]?\s+заслуженн/i,
+  /до\s+сих\s+пор\s+трогает/i,
+  /именно\s+здесь[^.]{0,40}легенд/i,
+  /место\s+в\s+истории\s+музык/i,
+  /потрясающ\w*\s+песн\w*,\s+которая\s+заставляет/i,
+  /действительно\s+потрясающ/i,
+  /скрыты(?:й|ого)\s+смысл/i,
+  /истори(?:я|ю)\s+о\s+(?:свобод|любви)/i,
+  /взрывает\s+сцен/i,
+  /пел\s+с\s+огон/i,
+  /зрител(?:и|ей)\s+сход/i,
+  /не\s+просто\s+весёлы/i,
+  /не\s+просто\s+весел/i,
+  /не\s+просто\s+рок/i,
+  /не\s+просто\s+(?:трек|песн|рок|групп)/i,
+  /откроешь\s+новую\s+гран/i,
+  /новую\s+грань\s+в\s+творчеств/i,
+  /фанаты\s+спорят\s+о\s+происхожден/i,
+  /фанаты\s+спорят,\s+почему/i,
+  /звучало\s+как\s+революц/i,
+  /продюсер\s+добавля/i,
+  /ломал\w*\s+микрофон/i,
+  /сошл\w*\s+с\s+ума/i,
+  /настоящ\w*\s+бунт/i,
+  /бунт\s+против/i,
+  /\bбунт\b/i,
+  /взорвал\w*\s+эфир/i,
+  /чистая\s+эмоци/i,
+  /безумн\w*\s+терпени/i,
+  /телефонн\w*\s+лин/i,
+  /заставил\w*\s+всех\s+петь/i,
+  /никакой\s+маги/i,
+  /гений\s+не\s+укладывается/i,
+  /настоящ\w*\s+взрыв/i,
+  /памятник\s+эпох/i,
+  /перевернул\w*\s+(?:всё|мир|музык)/i,
+  /изменил\w*\s+.*\s+навсегда/i,
+  /ни\s+в\s+один\s+стандарт/i,
+  /вызов\s+всем\s+правил/i,
+  /путешествие\s+в\s+мир/i,
+  /не\s+все\s+замечают:.*не\s+просто\s+поп/i,
+  /отражение\s+настроений/i,
+  /хит-?пара[дт]\w*\s+христиан\w*\s+музык/i,
+  /христиан\w*\s+хит-?пара[дт]/i,
+  /возглавил\w*\s+.*христиан\w*\s+чарт/i,
 ];
+
+/** @deprecated Prefer HARD_SCRIPT_REJECT_PATTERNS + PERSONA_CLICHE_PATTERNS. */
+export const BANNED_SCRIPT_PATTERNS: RegExp[] = [
+  ...HARD_SCRIPT_REJECT_PATTERNS,
+  ...PERSONA_CLICHE_PATTERNS,
+];
+
+export function findHardScriptViolation(script: string): string | null {
+  for (const pattern of HARD_SCRIPT_REJECT_PATTERNS) {
+    if (pattern.test(script)) {
+      return `hard reject: ${pattern.source}`;
+    }
+  }
+  return null;
+}
+
+export function findPersonaCliche(script: string): string | null {
+  for (const pattern of PERSONA_CLICHE_PATTERNS) {
+    if (pattern.test(script)) {
+      return `persona cliche: ${pattern.source}`;
+    }
+  }
+  return null;
+}
 
 const CYR = '[а-яё]+';
 const SPELLED_YEAR_PATTERN = new RegExp(
@@ -141,16 +246,9 @@ export function sanitizeScriptForTts(
   return result;
 }
 
-/** Replace LLM fluff words instead of hard-rejecting the whole story. */
+/** TTS cleanup — whitespace only; do not rewrite grounded wording («уникальный», «согласно»). */
 export function stripBannedFluff(text: string): string {
-  return text
-    .replace(/\bуникальн(?:ый|ая|ое|ые|ом|ой|ую)\b/gi, 'особый')
-    .replace(/\bлегендарн\w+\b/gi, 'известный')
-    .replace(/\bмагия музыки\b/gi, '')
-    .replace(/\bчто[- ]то уникальн\w+\b/gi, 'что-то особенное')
-    .replace(/\s{2,}/g, ' ')
-    .replace(/\s+([,.!?])/g, '$1')
-    .trim();
+  return text.replace(/\s{2,}/g, ' ').replace(/\s+([,.!?])/g, '$1').trim();
 }
 
 export function findForbiddenNumbers(
@@ -294,6 +392,8 @@ export function validateStoryScript(
     skipReferenceAnchor?: boolean;
     skipFirstSentenceAnchor?: boolean;
     skipBannedPatterns?: boolean;
+    /** Production: skip ampoua clichés when facts anchor the story. */
+    skipPersonaCliches?: boolean;
     skipEnglishCheck?: boolean;
     /** Override minimum word count (e.g. flash-lite models). */
     minWordsOverride?: number;
@@ -306,6 +406,7 @@ export function validateStoryScript(
   const skipReferenceAnchor = options.skipReferenceAnchor ?? false;
   const skipFirstSentenceAnchor = options.skipFirstSentenceAnchor ?? false;
   const skipBannedPatterns = options.skipBannedPatterns ?? false;
+  const skipPersonaCliches = options.skipPersonaCliches ?? false;
   const skipEnglishCheck = options.skipEnglishCheck ?? false;
   const referenceFacts = options.referenceFacts ?? [];
   const previousScripts = options.previousScripts ?? [];
@@ -325,9 +426,14 @@ export function validateStoryScript(
   }
 
   if (!skipBannedPatterns) {
-    for (const pattern of BANNED_SCRIPT_PATTERNS) {
-      if (pattern.test(trimmed)) {
-        return { ok: false, reason: `banned pattern: ${pattern.source}` };
+    const hard = findHardScriptViolation(trimmed);
+    if (hard) {
+      return { ok: false, reason: hard };
+    }
+    if (!skipPersonaCliches) {
+      const persona = findPersonaCliche(trimmed);
+      if (persona) {
+        return { ok: false, reason: persona };
       }
     }
   }
@@ -351,7 +457,7 @@ export function validateStoryScript(
     if (platformMismatch) {
       return { ok: false, reason: platformMismatch };
     }
-    const fictionIssue = findGenericFiction(trimmed);
+    const fictionIssue = skipPersonaCliches ? null : findGenericFiction(trimmed);
     if (fictionIssue) {
       return { ok: false, reason: fictionIssue };
     }
@@ -359,7 +465,9 @@ export function validateStoryScript(
     if (ungrounded) {
       return { ok: false, reason: ungrounded };
     }
-    const waterIssue = findWateryContent(trimmed, artist, title, referenceFacts);
+    const waterIssue = findWateryContent(trimmed, artist, title, referenceFacts, {
+      skipPersonaCliches,
+    });
     if (waterIssue) {
       return { ok: false, reason: waterIssue };
     }
@@ -403,63 +511,8 @@ export function firstSentenceAnchoredToFact(script: string, referenceFacts: stri
   return anchorsReferenceFact(firstSentence, referenceFacts);
 }
 
-const GENERIC_FICTION_PATTERNS: RegExp[] = [
-  /запах\s+(?:сигарет|кофе)/i,
-  /на\s+моей\s+полке/i,
-  /скрыты(?:й|ого)\s+смысл/i,
-  /истори(?:я|ю)\s+о\s+(?:свобод|любви)/i,
-  /взрывает\s+сцен/i,
-  /пел\s+с\s+огон/i,
-  /зрител(?:и|ей)\s+сход/i,
-  /не\s+просто\s+весёлы/i,
-  /не\s+просто\s+весел/i,
-  /откроешь\s+новую\s+гран/i,
-  /новую\s+грань\s+в\s+творчеств/i,
-  /фанаты\s+спорят\s+о\s+происхожден/i,
-  /звучало\s+как\s+революц/i,
-  /разорв\w*\s+кабин/i,
-  /продюсер\s+добавля/i,
-  /записывал\s+.*\s+он\s+пел/i,
-  /в\s+студии\s+тогда/i,
-  /слушайте,.*взрывает/i,
-  /политически\s+неправиль/i,
-  /запрещен[аы]?\s+на\s+радио/i,
-  /сломал[аи]?\s+правил/i,
-  /двойн(?:ую|ой)\s+сесси/i,
-  /сотни\s+дубл/i,
-  /сотен\s+дубл/i,
-  /ломал\w*\s+микрофон/i,
-  /сошл\w*\s+с\s+ума/i,
-  /настоящ\w*\s+бунт/i,
-  /бунт\s+против/i,
-  /взорвал\w*\s+эфир/i,
-  /нарушил\w*\s+все\s+правил/i,
-  /чистая\s+эмоци/i,
-  /безумн\w*\s+терпени/i,
-  /телефонн\w*\s+лин/i,
-  /заставил\w*\s+всех\s+петь/i,
-  /никакой\s+маги/i,
-  /не\s+просто\s+рок/i,
-  /гений\s+не\s+укладывается/i,
-  /\bбунт\b/i,
-  /не\s+просто\s+(?:трек|песн|рок)/i,
-  /настоящ\w*\s+взрыв/i,
-  /памятник\s+эпох/i,
-  /перевернул\w*\s+(?:всё|мир|музык)/i,
-  /изменил\w*\s+.*\s+навсегда/i,
-  /ни\s+в\s+один\s+стандарт/i,
-  /вызов\s+всем\s+правил/i,
-  /фанаты\s+спорят,\s+почему/i,
-  /гонения\s+на\s+евреев|разрушение\s+храма/i,
-  /готическ(?:ий|ого)\s+роман/i,
-  /конца\s+xix\s+века|xix\s+век/i,
-  /путешествие\s+в\s+мир/i,
-  /не\s+все\s+замечают:.*не\s+просто\s+поп/i,
-  /отражение\s+настроений/i,
-  /хит-?пара[дт]\w*\s+христиан\w*\s+музык/i,
-  /христиан\w*\s+хит-?пара[дт]/i,
-  /возглавил\w*\s+.*христиан\w*\s+чарт/i,
-];
+/** @deprecated Alias for PERSONA_CLICHE_PATTERNS — kept for test imports only. */
+const GENERIC_FICTION_PATTERNS: RegExp[] = PERSONA_CLICHE_PATTERNS;
 
 const UNGROUNDED_CLAIM_CHECKS: Array<{ claim: RegExp; factHint: RegExp }> = [
   {
@@ -492,12 +545,9 @@ export function findUngroundedClaims(script: string, referenceFacts: string[] = 
 }
 
 export function findGenericFiction(script: string): string | null {
-  for (const pattern of GENERIC_FICTION_PATTERNS) {
-    if (pattern.test(script)) {
-      return `generic fiction: ${pattern.source}`;
-    }
-  }
-  return null;
+  const persona = findPersonaCliche(script);
+  if (!persona) return null;
+  return persona.replace('persona cliche:', 'generic fiction:');
 }
 
 const LLM_GARBAGE_PATTERNS: RegExp[] = [
@@ -571,20 +621,27 @@ export function findWateryContent(
   artist = '',
   title = '',
   referenceFacts: string[] = [],
+  options: { skipPersonaCliches?: boolean } = {},
 ): string | null {
+  const skipPersona = options.skipPersonaCliches ?? false;
   const garbage = findLlmGarbage(script);
   if (garbage) return garbage;
 
   if (referenceFacts.length > 0) {
     const platformMismatch = findFactPlatformMismatch(script, referenceFacts);
     if (platformMismatch) return platformMismatch;
+    if (skipPersona && anchorsReferenceFact(script, referenceFacts)) {
+      return null;
+    }
   }
 
-  const fiction = findGenericFiction(script);
-  if (fiction) return fiction;
+  if (!skipPersona) {
+    const fiction = findGenericFiction(script);
+    if (fiction) return fiction;
 
-  const cliche = findClicheFiller(script);
-  if (cliche) return cliche;
+    const cliche = findClicheFiller(script);
+    if (cliche) return cliche;
+  }
 
   let stripped = script;
   for (const token of [...significantTokens(artist), ...significantTokens(title)]) {
@@ -592,7 +649,7 @@ export function findWateryContent(
       stripped = stripped.replace(new RegExp(`\\b${token}\\b`, 'gi'), ' ');
     }
   }
-  if (findClicheFiller(stripped)) {
+  if (!skipPersona && findClicheFiller(stripped)) {
     return 'only artist/title with cliche filler';
   }
 
@@ -611,4 +668,13 @@ export function findWateryContent(
     if (scriptNorm.split(' ').filter((w) => w.length >= 5).length >= 3) return null;
   }
   return 'no concrete fact — use detail from seed fact (instrument, label, scandal, sample)';
+}
+
+/** @deprecated alias for scripts/tests */
+export function hasFictionPattern(script: string): boolean {
+  return (
+    findHardScriptViolation(script) !== null ||
+    findGenericFiction(script) !== null ||
+    findPersonaCliche(script) !== null
+  );
 }

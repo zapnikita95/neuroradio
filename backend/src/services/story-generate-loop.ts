@@ -1,7 +1,7 @@
 import type { StoryLengthId } from './story-length.js';
 import {
-  BANNED_SCRIPT_PATTERNS,
   countWords,
+  findHardScriptViolation,
   findWateryContent,
   sanitizeScriptForTts,
   stripBannedFluff,
@@ -19,6 +19,7 @@ export interface StoryQualityAttemptOptions {
   skipReferenceAnchor?: boolean;
   skipFirstSentenceAnchor?: boolean;
   skipBannedPatterns?: boolean;
+  skipPersonaCliches?: boolean;
   skipEnglishCheck?: boolean;
   minWordsOverride?: number;
   previousScripts?: string[];
@@ -35,6 +36,7 @@ export function qualityOptionsForProductionAttempt(
     skipReferenceAnchor: !hasFacts,
     skipFirstSentenceAnchor: false,
     skipBannedPatterns: false,
+    skipPersonaCliches: true,
     skipEnglishCheck: false,
     referenceFacts: hasFacts ? referenceFacts : [],
   };
@@ -108,16 +110,17 @@ export function finalizeAfterQualityLoop<T extends { script: string }>(
     logRejectedScript('last script rejected as too short after retries', sanitized, `${wordCount} words`);
     return null;
   }
-  const water = findWateryContent(sanitized, input.artist, input.title, referenceFacts);
+  const water = findWateryContent(sanitized, input.artist, input.title, referenceFacts, {
+    skipPersonaCliches: true,
+  });
   if (water) {
-    logRejectedScript('last script rejected as water', sanitized, water);
+    logRejectedScript('last script rejected (watery/ungrounded)', sanitized, water);
     return null;
   }
-  for (const pattern of BANNED_SCRIPT_PATTERNS) {
-    if (pattern.test(sanitized)) {
-      logRejectedScript('last script rejected as banned', sanitized, pattern.source);
-      return null;
-    }
+  const hard = findHardScriptViolation(sanitized);
+  if (hard) {
+    logRejectedScript('last script rejected as hard violation', sanitized, hard);
+    return null;
   }
   if (referenceFacts.length === 0) {
     logRejectedScript('last script rejected', sanitized, 'no reference facts');
@@ -127,6 +130,7 @@ export function finalizeAfterQualityLoop<T extends { script: string }>(
     strictLength: false,
     referenceFacts,
     skipBannedPatterns: true,
+    skipPersonaCliches: true,
     skipEnglishCheck: false,
     skipWatery: true,
     skipReferenceAnchor: false,
