@@ -1,6 +1,6 @@
 import fetch from 'node-fetch';
 import type { ReferenceFactBundle } from './fact-picker.js';
-import { factAppliesToRequest } from './fact-relevance.js';
+import { assignFactsToScopes, factAppliesToRequest } from './fact-relevance.js';
 import { filterAndRankFacts, interestScore } from './reference-fact-quality.js';
 import { WEAK_TRIVIA_PATTERNS } from './story-fact-hunt.js';
 import { fetchReferenceFactBundle as fetchWikipediaBundle } from './wikipedia-facts.js';
@@ -41,12 +41,37 @@ function mergeFacts(...pools: string[][]): string[] {
   return filterAndRankFacts(pools.flat(), 8);
 }
 
-function factsAboutTrackOrArtist(facts: string[], artist: string, title: string): string[] {
+function factsAboutTrackOrArtist(
+  facts: string[],
+  artist: string,
+  title: string,
+  mode: 'strict' | 'indie' = 'strict',
+): string[] {
   return facts.filter(
     (fact) =>
-      factAppliesToRequest(fact, artist, title, 'track') ||
-      factAppliesToRequest(fact, artist, title, 'artist'),
+      factAppliesToRequest(fact, artist, title, 'track', mode) ||
+      factAppliesToRequest(fact, artist, title, 'artist', mode),
   );
+}
+
+function finalizeFactBundle(
+  trackCandidates: string[],
+  artistCandidates: string[],
+  artist: string,
+  title: string,
+): { trackFacts: string[]; artistFacts: string[]; mode: 'strict' | 'indie' } {
+  const merged = [...trackCandidates, ...artistCandidates];
+  let scoped = assignFactsToScopes(merged, artist, title, 'strict');
+  if (scoped.trackFacts.length + scoped.artistFacts.length === 0) {
+    scoped = assignFactsToScopes(merged, artist, title, 'indie');
+    if (scoped.trackFacts.length + scoped.artistFacts.length > 0) {
+      console.log(
+        `[facts] indie relevance fallback for "${artist}" — "${title}": track=${scoped.trackFacts.length} artist=${scoped.artistFacts.length}`,
+      );
+      return { ...scoped, mode: 'indie' };
+    }
+  }
+  return { ...scoped, mode: 'strict' };
 }
 
 function pushRaw(
@@ -303,18 +328,18 @@ export async function fetchAggregatedFactContext(
   const ddgOnly = externalFiltered.filter((f) => !webInBundle.includes(f));
   const externalSplit = splitByMention([...ddgOnly, ...webInBundle], title, artist);
 
-  let trackFacts = mergeFacts(
+  const webRanked = filterAndRankFacts(
+    webUnfiltered.filter((f) => factAppliesToRequest(f, artist, title, 'artist', 'indie')),
+    4,
+  );
+
+  const trackCandidates = mergeFacts(
     wiki.trackFacts,
     externalSplit.track,
     wdSplit.track,
     mbTrack,
   );
-  const webRanked = filterAndRankFacts(
-    webUnfiltered.filter((f) => factAppliesToRequest(f, artist, title, 'artist')),
-    4,
-  );
-
-  let artistFacts = mergeFacts(
+  const artistCandidates = mergeFacts(
     wiki.artistFacts,
     externalSplit.artist,
     webRanked,
@@ -322,8 +347,9 @@ export async function fetchAggregatedFactContext(
     mbArtist,
   );
 
-  trackFacts = trackFacts.filter((f) => factAppliesToRequest(f, artist, title, 'track'));
-  artistFacts = artistFacts.filter((f) => factAppliesToRequest(f, artist, title, 'artist'));
+  const finalized = finalizeFactBundle(trackCandidates, artistCandidates, artist, title);
+  let trackFacts = finalized.trackFacts;
+  let artistFacts = finalized.artistFacts;
 
   if (trackFacts.length + artistFacts.length === 0) {
     console.warn(

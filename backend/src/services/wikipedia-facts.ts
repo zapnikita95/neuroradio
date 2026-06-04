@@ -232,6 +232,7 @@ const WRONG_MUSIC_TOPIC_PATTERNS: RegExp[] = [
   /\b(?:characteristically gothic|count dracula|fin de si[eè]cle|vampire fiction|invasion literature)\b/i,
   /\b(?:esoteric numerology|heavenly journeys|pseudonyms, claiming)\b/i,
   /\b(?:the novel is|this novel|literary genre)\b/i,
+  /\b(?:master craftsman|old european guild|journeyman aspiring)\b/i,
 ];
 
 function factMentionsArtist(fact: string, artist: string): boolean {
@@ -279,7 +280,7 @@ function isWeakFact(sentence: string): boolean {
   if (/^[,;:]/.test(trimmed)) return true;
   if (/^which\b/i.test(trimmed)) return true;
   return (
-    /\b(may refer to|most commonly refers to|Queen regnant|Queen consort|disambiguation)\b/i.test(sentence) ||
+    /\b(may refer to|most commonly refers to|Queen regnant|Queen consort|disambiguation|guild system|journeyman|master craftsman)\b/i.test(sentence) ||
     isBoringFact(sentence)
   );
 }

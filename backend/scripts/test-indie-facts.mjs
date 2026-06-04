@@ -32,7 +32,7 @@ const INDIE_TRACKS = [
   { artist: 'The Subways', title: 'Rock & Roll Queen', country: 'GB', year: 2005 },
   { artist: 'Godspeed You! Black Emperor', title: 'Storm', country: 'CA', year: 2000 },
   { artist: 'Shortparis', title: 'Страшно', country: 'RU', year: 2017 },
-  { artist: 'Palm', title: 'Parietal Dispassion', country: 'US', year: 2019 },
+  { artist: 'Big Thief', title: 'Masterpiece', country: 'US', year: 2019 },
 ];
 
 const { fetchAggregatedFactContext } = await import('../dist/services/fact-aggregator.js');

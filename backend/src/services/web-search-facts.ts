@@ -20,6 +20,14 @@ function decodeHtml(s: string): string {
     .replace(/&#39;/g, "'");
 }
 
+/** Однословные имена вроде Palm / Blur — без «band» web уводит на анатомию и мусор. */
+function isAmbiguousArtistName(artist: string): boolean {
+  const trimmed = artist.trim();
+  if (!trimmed || /[\u0400-\u04FF]/.test(trimmed)) return false;
+  const words = trimmed.split(/\s+/).filter(Boolean);
+  return words.length === 1 && words[0]!.length <= 8;
+}
+
 /** Узкие запросы под интервью/скандалы — не в instant DDG. */
 export function buildWebOnlyQueries(artist: string, title: string): string[] {
   const cleanTitle = title.replace(/\s*\([^)]*\)\s*/g, ' ').trim();
@@ -31,6 +39,14 @@ export function buildWebOnlyQueries(artist: string, title: string): string[] {
       `${artist} ${cleanTitle} запись цензура`,
       `${lead} биография скандал армия`,
       `${artist} (группа) ${cleanTitle} факт`,
+    ].slice(0, MAX_HTML_QUERIES);
+  }
+  if (isAmbiguousArtistName(artist)) {
+    return [
+      `"${artist}" band ${cleanTitle} song interview`,
+      `"${artist}" band ${cleanTitle} meaning recording`,
+      `"${artist}" musical group ${cleanTitle} controversy`,
+      `"${artist}" band biography scandal interview`,
     ].slice(0, MAX_HTML_QUERIES);
   }
   return [

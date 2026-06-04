@@ -206,20 +206,81 @@ export function storyNamesForeignArtist(
   );
 }
 
+export type RelevanceMode = 'strict' | 'indie';
+
+/** Labels, platforms, festivals — not competing musical acts. */
+const CONTEXT_ENTITY_PHRASES = new Set(
+  [
+    ...NON_ACT_PHRASES,
+    'sacred bones',
+    'sacred bones records',
+    'tiktok',
+    'spotify',
+    'youtube',
+    'bandcamp',
+    'glastonbury',
+    'glastonbury festival',
+    'woodstock',
+    'przystanek woodstock',
+    'michael eavis',
+    'other stage',
+    'chrysta bell',
+    'escape from tarkov',
+    'foo fighters',
+    'eagles of death metal',
+    'minsk arena',
+    'harakiri diat',
+    'viral 50',
+    'doomer',
+    'north america',
+    'belarus',
+    'minsk',
+    'grammy',
+    'grammy awards',
+    'allmusic',
+    'adrianne lenker',
+    'buck meek',
+  ].map(normalize),
+);
+
+function isContextEntity(name: string): boolean {
+  const n = normalize(name);
+  if (CONTEXT_ENTITY_PHRASES.has(n)) return true;
+  for (const phrase of CONTEXT_ENTITY_PHRASES) {
+    if (n.includes(phrase) || phrase.includes(n)) return true;
+  }
+  return isNonActEntity(name);
+}
+
+function isSameBandHistoricalName(fact: string): boolean {
+  return /\b(?:their name to|formerly known as|renamed to|changed their name to|originally called|previously known as)\b/i.test(
+    fact,
+  );
+}
+
+const INDIE_BAND_CONTEXT =
+  /^(?:The band|They |Their |Founding member|Members |Many of the band|On \d+|In \d+|During |Over time|As well as|We never expected|The label|Later changed|In January|In \w+ \d{4}|Cash Box|Founding member|The song|The track|This track)/i;
+
 /** Another act is named in the fact — not the requested artist/title. */
 export function factNamesForeignEntity(
   fact: string,
   artist: string,
   title: string,
   allowedContext = '',
+  mode: RelevanceMode = 'strict',
 ): boolean {
+  if (mode === 'indie') {
+    if (factMentionsArtist(fact, artist)) return false;
+    if (isSameBandHistoricalName(fact)) return false;
+  }
+
   const artistNorm = normalize(artist);
   const titleNorm = normalize(title.replace(/\s*\([^)]*\)\s*/g, ' '));
   const norm = normalize(fact);
   const allowedNorm = normalize(allowedContext);
 
   for (const entity of extractNamedEntities(fact)) {
-    if (isNonActEntity(entity)) continue;
+    if (isContextEntity(entity)) continue;
     if (isCriticAttribution(fact, entity)) continue;
     if (entityMatchesArtist(entity, artist, title)) continue;
 
@@ -227,13 +288,14 @@ export function factNamesForeignEntity(
     if (eNorm.length < 3) continue;
     if (allowedNorm.length >= 8 && allowedNorm.includes(eNorm)) continue;
 
+    if (mode === 'indie' && eNorm.split(' ').length === 1 && eNorm.length < 8) continue;
+
     if (eNorm.includes('-') || eNorm.split(' ').length >= 2) return true;
 
     const aTok = artistTokens(artist);
     if (aTok.length >= 2 && !aTok.includes(eNorm) && eNorm.length >= 4) return true;
   }
 
-  // Normalized multi-word phrases: «jay z» when artist is «will jay».
   const words = norm.split(' ').filter(Boolean);
   const titleNormFull = titleNorm;
   for (let i = 0; i < words.length - 1; i++) {
@@ -243,11 +305,19 @@ export function factNamesForeignEntity(
     if (entityMatchesArtist(phrase, artist, title)) continue;
     const aTok = artistTokens(artist);
     if (aTok.length >= 2 && aTok.includes(words[i]) && !aTok.includes(words[i + 1])) {
+      if (mode === 'indie' && isContextEntity(phrase)) continue;
       return true;
     }
   }
 
   return false;
+}
+
+const GENERIC_DISAMBIGUATION =
+  /\b(?:guild system|journeyman|master craftsman|term was generally restricted|disambiguation page|may refer to)\b/i;
+
+function isGenericDisambiguationFact(fact: string, artist: string): boolean {
+  return GENERIC_DISAMBIGUATION.test(fact) && !factMentionsArtist(fact, artist);
 }
 
 export function factMentionsArtist(fact: string, artist: string): boolean {
@@ -273,9 +343,17 @@ export function factMentionsArtist(fact: string, artist: string): boolean {
 }
 
 export function factMentionsTitle(fact: string, title: string): boolean {
-  const titleNorm = normalize(title.replace(/\s*\([^)]*\)\s*/g, ' '));
-  if (titleNorm.length < 4) return false;
-  return normalize(fact).includes(titleNorm);
+  const clean = title.replace(/\s*\([^)]*\)\s*/g, ' ').trim();
+  const titleNorm = normalize(clean);
+  if (titleNorm.length < 2) return false;
+  const factNorm = normalize(fact);
+  if (titleNorm.length >= 4 && factNorm.includes(titleNorm)) return true;
+  if (titleNorm.length < 4) {
+    const escaped = clean.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    if (new RegExp(`[«""']\\s*${escaped}\\s*[»""']`, 'i').test(fact)) return true;
+    if (new RegExp(`\\b(?:song|track|single|titled?)\\s+[«""']?${escaped}[«""']?`, 'i').test(fact)) return true;
+  }
+  return false;
 }
 
 /** Другая песня того же артиста в кавычках — не семя для запрошенного трека. */
@@ -306,6 +384,8 @@ export function factMentionsOtherTrackTitle(fact: string, title: string): boolea
     if (quoted === titleNorm || titleNorm.includes(quoted) || quoted.includes(titleNorm)) continue;
     if (/\b(?:album|альбом)\b/i.test(match[1]) || /\(\d{4}\)/.test(match[1])) continue;
     if (/^(?:the|a|an)\s+/i.test(match[1])) continue;
+    if (/\b(?:folk|indie|rock|pop|metal|jazz|soul|punk|style|songwriting|alternative)\b/i.test(match[1])) continue;
+    if (match[1].trim().split(/\s+/).length > 5) continue;
     return true;
   }
   return false;
@@ -329,37 +409,70 @@ export function factAppliesToRequest(
   artist: string,
   title: string,
   scope: 'artist' | 'track',
+  mode: RelevanceMode = 'strict',
 ): boolean {
   const trimmed = fact.trim();
   if (trimmed.length < 35) return false;
   if (isWebListicleJunk(trimmed)) return false;
+  if (isGenericDisambiguationFact(trimmed, artist)) return false;
   if (isWrongTitleMediumCollision(trimmed, title)) return false;
   if (factMentionsOtherTrackTitle(trimmed, title)) return false;
-  if (factNamesForeignEntity(trimmed, artist, title)) return false;
+  if (factNamesForeignEntity(trimmed, artist, title, '', mode)) return false;
 
   const mentionsArtist = factMentionsArtist(trimmed, artist);
   const mentionsTitle = factMentionsTitle(trimmed, title);
 
   if (scope === 'artist') {
-    if (mentionsArtist) return true;
-    // Страница группы / ударный контекст — без чужих имён (Madonna и т.п.).
+    if (mentionsArtist || mentionsTitle) return true;
     const bandPageContext =
       /^(?:The band|They |Their |Members |He |She |It was|The group|According to)\b/i.test(trimmed) ||
       /\b(?:Wounded Knee|banned by several radio|withheld from release|Native American|heritage|Vasquez|Vegas)\b/i.test(trimmed) ||
       /(?:группа|песн|альбом|запрет|цензур|арми|Цой|Тсо[йи])/i.test(trimmed);
-    if (bandPageContext && !factNamesForeignEntity(trimmed, artist, title, artist)) return true;
+    if (bandPageContext && !factNamesForeignEntity(trimmed, artist, title, artist, mode)) return true;
+    if (mode === 'indie' && INDIE_BAND_CONTEXT.test(trimmed)) return true;
     return false;
   }
   if (mentionsTitle || mentionsArtist) return true;
-  // Строки со страницы песни («The song was… Hail», «The single cut…») без повторного названия.
   if (/^(?:The song|The video|The single|It|This track|This single|The single cut|The lyrics|Recording|According to|Mercury|He |They |Upon |During |After |When |While |In an interview)\b/i.test(trimmed)) {
     return true;
   }
-  if (/\b(?:music video|operatic section|studio session|composed the|wrote the|recorded at|took three weeks|no chorus)\b/i.test(trimmed)) {
+  if (/\b(?:music video|operatic section|studio session|composed the|wrote the|recorded at|took three weeks|no chorus|gained popularity|viral|tiktok|signed with|influenced by)\b/i.test(trimmed)) {
     return true;
   }
   if (/\b(?:single cut is significantly shorter|promo track under the name)\b/i.test(trimmed)) {
     return true;
   }
+  if (mode === 'indie' && INDIE_BAND_CONTEXT.test(trimmed)) return true;
   return false;
+}
+
+/** Split merged pool into track/artist with optional indie relaxation. */
+export function assignFactsToScopes(
+  facts: string[],
+  artist: string,
+  title: string,
+  mode: RelevanceMode = 'strict',
+): { trackFacts: string[]; artistFacts: string[] } {
+  const trackFacts: string[] = [];
+  const artistFacts: string[] = [];
+  const seen = new Set<string>();
+
+  for (const fact of facts) {
+    const key = normalize(fact);
+    if (seen.has(key)) continue;
+
+    const trackOk = factAppliesToRequest(fact, artist, title, 'track', mode);
+    const artistOk = factAppliesToRequest(fact, artist, title, 'artist', mode);
+    const mentionsTitle = factMentionsTitle(fact, title);
+
+    if (trackOk || (mode === 'indie' && mentionsTitle && artistOk)) {
+      seen.add(key);
+      trackFacts.push(fact);
+    } else if (artistOk) {
+      seen.add(key);
+      artistFacts.push(fact);
+    }
+  }
+
+  return { trackFacts, artistFacts };
 }
