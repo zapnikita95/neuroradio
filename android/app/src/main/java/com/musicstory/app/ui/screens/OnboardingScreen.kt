@@ -4,10 +4,13 @@ import android.content.Intent
 import android.provider.Settings
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
@@ -67,7 +70,8 @@ fun OnboardingScreen(
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_RESUME) {
-                checkAccess(andEnter = true)
+                // Автовход только если доступ уже выдан — без красной подсказки.
+                checkAccess(andEnter = false)
             }
         }
         lifecycleOwner.lifecycle.addObserver(observer)
@@ -126,17 +130,25 @@ fun OnboardingScreen(
                 )
             }
 
-            if (!hintMessage.isNullOrBlank()) {
-                Spacer(modifier = Modifier.height(12.dp))
-                Text(
-                    text = hintMessage!!,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = ErrorCoral,
-                    textAlign = TextAlign.Center,
-                )
+            Spacer(modifier = Modifier.height(24.dp))
+
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = 52.dp),
+                contentAlignment = Alignment.Center,
+            ) {
+                if (!hintMessage.isNullOrBlank()) {
+                    Text(
+                        text = hintMessage!!,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = ErrorCoral,
+                        textAlign = TextAlign.Center,
+                    )
+                }
             }
 
-            Spacer(modifier = Modifier.height(28.dp))
+            Spacer(modifier = Modifier.height(16.dp))
 
             PrimaryStoryButton(
                 text = context.getString(R.string.onboarding_open_settings),

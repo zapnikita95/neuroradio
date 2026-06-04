@@ -29,6 +29,19 @@
     <string name="onboarding_check_access">Проверить и войти</string>
     <string name="onboarding_not_granted_yet">Сначала включи «Music Story — мониторинг медиа» в настройках доступа к уведомлениям.</string>
 
+    <string name="home_tour_welcome_title">Вас приветствует нейрорадио</string>
+    <string name="home_tour_welcome_body">Слушайте любимые треки, узнавайте новое об артистах, их истории и интересных фактах.</string>
+    <string name="home_tour_track_title">Сейчас играет</string>
+    <string name="home_tour_track_body">Когда вы включаете трек в Spotify или Яндекс Музыке, он отображается здесь — название, артист и источник.</string>
+    <string name="home_tour_counter_title">Следующая история</string>
+    <string name="home_tour_counter_body">В автоматическом режиме здесь показывается, через сколько треков будет следующий рассказ.</string>
+    <string name="home_tour_story_btn_title">Рассказать историю</string>
+    <string name="home_tour_story_btn_body">Запустите рассказ вручную в любой момент — приложение подготовит текст и озвучит его голосом Yandex.</string>
+    <string name="home_tour_settings_title">Настройки</string>
+    <string name="home_tour_settings_body">Здесь режим работы, голос, длина истории, нейросеть и другие параметры. Сейчас покажем, что внутри.</string>
+    <string name="home_tour_history_title">История</string>
+    <string name="home_tour_history_body">Все рассказы и прослушанные треки сохраняются здесь — можно перечитать текст или посмотреть, что уже слушали.</string>
+
     <string name="tour_step_mode_title">Режим работы</string>
     <string name="tour_step_mode_body">Автоматический — истории по счётчику треков. Ручной — только кнопка «Рассказать». Первый реальный трек после установки тоже получит историю.</string>
     <string name="tour_step_trigger_title">Когда вставлять историю</string>
@@ -42,7 +55,7 @@
     <string name="tour_step_music_title">Музыка во время истории</string>
     <string name="tour_step_music_body">Пауза ставится, когда начинается озвучка, не раньше. Затухание — плавное приглушение перед речью.</string>
     <string name="tour_step_ai_title">Нейросеть</string>
-    <string name="tour_step_ai_body">OpenRouter, Groq или Gemini — модель выбираешь здесь (бесплатные :free или своя). Свой ключ снимает лимит сервера.</string>
+    <string name="tour_step_ai_body">DeepSeek V3 — лучшая для фактов (~$0.20/M). Nemotron :free — бесплатная альтернатива. Свой ключ снимает лимит сервера.</string>
 
     <string name="power_mode_on">Включено</string>
     <string name="power_mode_parse">Только слушаем</string>

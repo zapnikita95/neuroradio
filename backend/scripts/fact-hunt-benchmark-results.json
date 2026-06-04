@@ -1,0 +1,67 @@
+{
+  "testedAt": "2026-06-04T06:43:19.515Z",
+  "results": [
+    {
+      "model": "google/gemma-4-26b-a4b-it:free",
+      "status": "error",
+      "error": "429 {\"error\":{\"message\":\"Provider returned error\",\"code\":429,\"metadata\":{\"raw\":\"google/gemma-4-26b-a4b-it:free is temporarily rate-limited upstream. Please retry shortly, or add your o"
+    },
+    {
+      "model": "qwen/qwen3-4b:free",
+      "status": "error",
+      "error": "404 {\"error\":{\"message\":\"No endpoints found for qwen/qwen3-4b:free.\",\"code\":404},\"user_id\":\"user_39iKXF1UmankRiEjyRMLthptcj2\"}"
+    },
+    {
+      "model": "meta-llama/llama-3.3-70b-instruct:free",
+      "status": "error",
+      "error": "429 {\"error\":{\"message\":\"Provider returned error\",\"code\":429,\"metadata\":{\"raw\":\"meta-llama/llama-3.3-70b-instruct:free is temporarily rate-limited upstream. Please retry shortly, or ad"
+    },
+    {
+      "model": "nvidia/nemotron-3-nano-30b-a3b:free",
+      "status": "ok",
+      "ms": 919,
+      "fact": "Redbone was one of the first Native American bands to have a top-five hit in the",
+      "preview": "{\n  \"fact\": \"Redbone was one of the first Native American bands to have a top-five hit in the US.\",\n  \"scope\": \"artist\","
+    },
+    {
+      "model": "openai/gpt-oss-20b:free",
+      "status": "fail",
+      "ms": 1061,
+      "reason": "rejected",
+      "preview": "{\"reject\":true,\"reason\":\"No Russian sentence longer than 35 characters found in the provided snippets.\"}"
+    },
+    {
+      "model": "google/gemma-3-27b-it:free",
+      "status": "error",
+      "error": "404 {\"error\":{\"message\":\"No endpoints found for google/gemma-3-27b-it:free.\",\"code\":404},\"user_id\":\"user_39iKXF1UmankRiEjyRMLthptcj2\"}"
+    },
+    {
+      "model": "qwen/qwen3.5-9b",
+      "status": "fail",
+      "ms": 766,
+      "reason": "short fact",
+      "preview": ""
+    },
+    {
+      "model": "google/gemma-4-26b-a4b-it",
+      "status": "ok",
+      "ms": 5526,
+      "fact": "Redbone was one of the first Native American bands to have a top-five hit in the",
+      "preview": "{\"fact\":\"Redbone was one of the first Native American bands to have a top-five hit in the US.\",\"scope\":\"artist\",\"evidenc"
+    },
+    {
+      "model": "deepseek/deepseek-chat-v3-0324",
+      "status": "ok",
+      "ms": 456,
+      "fact": "Redbone was one of the first Native American bands to have a top-five hit in the",
+      "preview": "{\"fact\":\"Redbone was one of the first Native American bands to have a top-five hit in the US.\",\"scope\":\"artist\",\"evidenc"
+    },
+    {
+      "model": "liquid/lfm-2.5-1.2b-instruct:free",
+      "status": "fail",
+      "ms": 921,
+      "reason": "bad index",
+      "preview": "{\"fact\":\"Redbone was one of the first Native American bands to achieve a top-five hit in the US.\"}"
+    }
+  ]
+}

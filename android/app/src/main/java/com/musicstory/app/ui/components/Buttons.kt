@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -84,6 +85,9 @@ fun SecondaryStoryButton(
             .height(52.dp),
         shape = RoundedCornerShape(16.dp),
         border = androidx.compose.foundation.BorderStroke(1.dp, GlassBorder),
+        colors = ButtonDefaults.outlinedButtonColors(
+            containerColor = DeepVoid.copy(alpha = 0.94f),
+        ),
     ) {
         Text(text = text, color = GoldBright, fontWeight = FontWeight.SemiBold)
     }

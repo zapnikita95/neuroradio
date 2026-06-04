@@ -107,7 +107,10 @@ fun SettingsTourSpotlightOverlay(
     onSkip: () -> Unit,
 
     onControlsBottomChanged: (Float) -> Unit,
+
     onControlsTopChanged: (Float) -> Unit = {},
+
+    centerTooltipWhenNoHighlight: Boolean = false,
 
     modifier: Modifier = Modifier,
 
@@ -127,7 +130,9 @@ fun SettingsTourSpotlightOverlay(
     val fallbackTooltipHeightPx = with(density) { 178.dp.toPx() }
     var tooltipHeightPx by remember(stepIndex) { mutableFloatStateOf(0f) }
     val measuredTooltipHeightPx = tooltipHeightPx.takeIf { it > 0f } ?: fallbackTooltipHeightPx
-    val tooltipTopPx = highlightRect?.let { rect ->
+    val tooltipTopPx = if (centerTooltipWhenNoHighlight && highlightRect == null) {
+        ((screenHeightPx - measuredTooltipHeightPx) / 2f).coerceAtLeast(edgeMarginPx)
+    } else highlightRect?.let { rect ->
         val roomBelow = screenHeightPx - rect.bottom - edgeMarginPx
         val roomAbove = rect.top - edgeMarginPx
         val preferBelow = roomBelow >= measuredTooltipHeightPx + tooltipGapPx || roomBelow >= roomAbove

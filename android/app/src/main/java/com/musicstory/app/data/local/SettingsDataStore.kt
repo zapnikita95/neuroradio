@@ -59,6 +59,14 @@ class SettingsDataStore(private val context: Context) {
         prefs[KEY_SETTINGS_TOUR_COMPLETED] ?: false
     }
 
+    val homeTourPending: Flow<Boolean> = context.settingsDataStore.data.map { prefs ->
+        prefs[KEY_HOME_TOUR_PENDING] ?: false
+    }
+
+    val homeTourCompleted: Flow<Boolean> = context.settingsDataStore.data.map { prefs ->
+        prefs[KEY_HOME_TOUR_COMPLETED] ?: false
+    }
+
     val backendUrl: Flow<String> = context.settingsDataStore.data.map { prefs ->
         prefs[KEY_BACKEND_URL].orEmpty().trim().ifBlank { DEFAULT_BACKEND_URL }
     }
@@ -207,6 +215,17 @@ class SettingsDataStore(private val context: Context) {
         context.settingsDataStore.edit {
             it[KEY_SETTINGS_TOUR_COMPLETED] = completed
             if (completed) it[KEY_SETTINGS_TOUR_PENDING] = false
+        }
+    }
+
+    suspend fun setHomeTourPending(pending: Boolean) {
+        context.settingsDataStore.edit { it[KEY_HOME_TOUR_PENDING] = pending }
+    }
+
+    suspend fun setHomeTourCompleted(completed: Boolean) {
+        context.settingsDataStore.edit {
+            it[KEY_HOME_TOUR_COMPLETED] = completed
+            if (completed) it[KEY_HOME_TOUR_PENDING] = false
         }
     }
 
@@ -391,6 +410,8 @@ class SettingsDataStore(private val context: Context) {
         private val KEY_FIRST_AUTO_STORY_COMPLETED = booleanPreferencesKey("first_auto_story_completed")
         private val KEY_SETTINGS_TOUR_PENDING = booleanPreferencesKey("settings_tour_pending")
         private val KEY_SETTINGS_TOUR_COMPLETED = booleanPreferencesKey("settings_tour_completed")
+        private val KEY_HOME_TOUR_PENDING = booleanPreferencesKey("home_tour_pending")
+        private val KEY_HOME_TOUR_COMPLETED = booleanPreferencesKey("home_tour_completed")
         private val KEY_BACKEND_URL = stringPreferencesKey("backend_url")
         private val KEY_AUTH_INSTALL_ID = stringPreferencesKey("auth_install_id")
         private val KEY_AUTH_ACCESS_TOKEN = stringPreferencesKey("auth_access_token")

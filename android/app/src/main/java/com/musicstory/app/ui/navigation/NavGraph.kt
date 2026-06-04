@@ -42,20 +42,29 @@ fun MusicStoryNavGraph(
                 onAccessGranted = {
                     onNotificationAccessChanged()
                     scope.launch {
-                        app.settingsDataStore.setSettingsTourPending(true)
+                        app.settingsDataStore.setHomeTourPending(true)
                     }
-                    navController.navigate(Routes.SETTINGS) {
+                    navController.navigate(Routes.HOME) {
                         popUpTo(Routes.ONBOARDING) { inclusive = true }
                     }
                 },
             )
         }
         composable(Routes.HOME) {
+            val context = LocalContext.current
+            val app = context.applicationContext as MusicStoryApp
+            val scope = rememberCoroutineScope()
             HomeScreen(
                 onOpenSettings = { navController.navigate(Routes.SETTINGS) },
                 onOpenHistory = { navController.navigate(Routes.HISTORY) },
                 onRequestNotificationAccess = {
                     navController.navigate(Routes.ONBOARDING)
+                },
+                onHomeTourFinishedOpenSettings = {
+                    scope.launch {
+                        app.settingsDataStore.setSettingsTourPending(true)
+                    }
+                    navController.navigate(Routes.SETTINGS)
                 },
             )
         }

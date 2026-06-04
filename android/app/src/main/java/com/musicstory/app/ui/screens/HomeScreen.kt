@@ -38,9 +38,16 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.layout.LayoutCoordinates
+import androidx.compose.ui.layout.boundsInRoot
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -66,6 +73,8 @@ import com.musicstory.app.ui.theme.ErrorCoral
 import com.musicstory.app.ui.theme.GoldBright
 import com.musicstory.app.ui.theme.LiveGreen
 import com.musicstory.app.ui.theme.MutedLavender
+import com.musicstory.app.ui.tour.SettingsTourSpotlightOverlay
+import com.musicstory.app.ui.tour.SettingsTourStep
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -74,6 +83,7 @@ fun HomeScreen(
     onOpenSettings: () -> Unit,
     onOpenHistory: () -> Unit,
     onRequestNotificationAccess: () -> Unit,
+    onHomeTourFinishedOpenSettings: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
@@ -88,7 +98,76 @@ fun HomeScreen(
     val geminiApiKey by app.settingsDataStore.geminiApiKey.collectAsState(initial = "")
     val openRouterApiKey by app.settingsDataStore.openRouterApiKey.collectAsState(initial = "")
     val localOllamaUrl by app.settingsDataStore.localOllamaUrl.collectAsState(initial = SettingsDataStore.DEFAULT_LOCAL_OLLAMA_URL)
+    val homeTourPending by app.settingsDataStore.homeTourPending.collectAsState(initial = false)
     val scope = rememberCoroutineScope()
+
+    var tourStep by remember { mutableStateOf<Int?>(null) }
+    var tourTargetBounds by remember { mutableStateOf<Rect?>(null) }
+    var tourTargetCoords by remember { mutableStateOf<LayoutCoordinates?>(null) }
+
+    val tourSteps = remember(context) {
+        listOf(
+            SettingsTourStep(
+                context.getString(R.string.home_tour_welcome_title),
+                context.getString(R.string.home_tour_welcome_body),
+            ),
+            SettingsTourStep(
+                context.getString(R.string.home_tour_track_title),
+                context.getString(R.string.home_tour_track_body),
+            ),
+            SettingsTourStep(
+                context.getString(R.string.home_tour_counter_title),
+                context.getString(R.string.home_tour_counter_body),
+            ),
+            SettingsTourStep(
+                context.getString(R.string.home_tour_story_btn_title),
+                context.getString(R.string.home_tour_story_btn_body),
+            ),
+            SettingsTourStep(
+                context.getString(R.string.home_tour_settings_title),
+                context.getString(R.string.home_tour_settings_body),
+            ),
+            SettingsTourStep(
+                context.getString(R.string.home_tour_history_title),
+                context.getString(R.string.home_tour_history_body),
+            ),
+        )
+    }
+
+    LaunchedEffect(homeTourPending) {
+        if (homeTourPending) tourStep = 0
+    }
+
+    LaunchedEffect(tourStep) {
+        if (tourStep == null) {
+            tourTargetBounds = null
+            tourTargetCoords = null
+        }
+    }
+
+    fun updateTourBounds(coords: LayoutCoordinates) {
+        tourTargetCoords = coords
+        tourTargetBounds = coords.boundsInRoot()
+    }
+
+    fun tourLayoutHandler(stepIndex: Int): (LayoutCoordinates) -> Unit = { coords ->
+        if (tourStep == stepIndex) updateTourBounds(coords)
+    }
+
+    LaunchedEffect(tourStep) {
+        val step = tourStep ?: return@LaunchedEffect
+        if (step == 0) {
+            tourTargetBounds = null
+            return@LaunchedEffect
+        }
+        repeat(8) {
+            kotlinx.coroutines.delay(50)
+            tourTargetCoords?.let { updateTourBounds(it) }
+            if (tourTargetBounds != null && tourTargetBounds!!.height >= 4f) return@LaunchedEffect
+        }
+    }
+
+    val tourActive = tourStep != null
 
     val hasApiKey = when (llmProvider) {
         LlmProvider.GROQ -> groqApiKey.isNotBlank()
@@ -153,6 +232,7 @@ fun HomeScreen(
             )
 
     MusicStoryBackground(modifier = modifier) {
+        Box(modifier = Modifier.fillMaxSize()) {
         Column(modifier = Modifier.fillMaxSize()) {
             TopAppBar(
                 title = {
@@ -176,15 +256,28 @@ fun HomeScreen(
                     PowerModeToggle(
                         mode = powerMode,
                         onClick = { scope.launch { app.monitorLifecycle.cycleAppPowerMode() } },
+                        tourActive = tourActive,
                     )
-                    IconButton(onClick = onOpenHistory) {
+                    IconButton(
+                        onClick = onOpenHistory,
+                        enabled = !tourActive,
+                        modifier = Modifier.onGloballyPositioned { coords ->
+                            if (tourStep == 5) updateTourBounds(coords)
+                        },
+                    ) {
                         Icon(
                             Icons.Default.History,
                             contentDescription = context.getString(R.string.nav_history),
                             tint = GoldBright,
                         )
                     }
-                    IconButton(onClick = onOpenSettings) {
+                    IconButton(
+                        onClick = onOpenSettings,
+                        enabled = !tourActive,
+                        modifier = Modifier.onGloballyPositioned { coords ->
+                            if (tourStep == 4) updateTourBounds(coords)
+                        },
+                    ) {
                         Icon(
                             Icons.Default.Settings,
                             contentDescription = context.getString(R.string.nav_settings),
@@ -224,6 +317,9 @@ fun HomeScreen(
                     artist = uiState.currentTrack?.artist,
                     title = uiState.currentTrack?.title,
                     packageName = uiState.currentTrack?.packageName,
+                    modifier = Modifier.onGloballyPositioned { coords ->
+                        if (tourStep == 1) updateTourBounds(coords)
+                    },
                 )
 
                 Spacer(modifier = Modifier.height(20.dp))
@@ -237,6 +333,9 @@ fun HomeScreen(
                         uiState.state == OrchestratorState.PREPARING_PLAYBACK ||
                             uiState.state == OrchestratorState.PLAYING_STORY -> null
                         else -> uiState.tracksUntilNext
+                    },
+                    modifier = Modifier.onGloballyPositioned { coords ->
+                        if (tourStep == 2) updateTourBounds(coords)
                     },
                 )
 
@@ -309,7 +408,10 @@ fun HomeScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 20.dp)
-                    .padding(bottom = 28.dp),
+                    .padding(bottom = 28.dp)
+                    .onGloballyPositioned { coords ->
+                        if (tourStep == 3) updateTourBounds(coords)
+                    },
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
                 if (!hasAccess) {
@@ -322,7 +424,8 @@ fun HomeScreen(
                 PrimaryStoryButton(
                     text = context.getString(R.string.action_manual_story),
                     onClick = { app.storyOrchestrator.requestManualStory() },
-                    enabled = powerMode != AppPowerMode.OFF &&
+                    enabled = !tourActive &&
+                        powerMode != AppPowerMode.OFF &&
                         uiState.canRequestManualStory &&
                         !uiState.isBackendFetching,
                 )
@@ -339,6 +442,30 @@ fun HomeScreen(
                 }
             }
         }
+
+            tourStep?.let { step ->
+                SettingsTourSpotlightOverlay(
+                    highlightRect = if (step == 0) null else tourTargetBounds,
+                    stepIndex = step,
+                    steps = tourSteps,
+                    centerTooltipWhenNoHighlight = step == 0,
+                    onControlsBottomChanged = {},
+                    onNext = {
+                        if (step >= tourSteps.lastIndex) {
+                            tourStep = null
+                            scope.launch { app.settingsDataStore.setHomeTourCompleted(true) }
+                            onHomeTourFinishedOpenSettings()
+                        } else {
+                            tourStep = step + 1
+                        }
+                    },
+                    onSkip = {
+                        tourStep = null
+                        scope.launch { app.settingsDataStore.setHomeTourCompleted(true) }
+                    },
+                )
+            }
+        }
     }
 }
 
@@ -346,6 +473,7 @@ fun HomeScreen(
 private fun PowerModeToggle(
     mode: AppPowerMode,
     onClick: () -> Unit,
+    tourActive: Boolean = false,
 ) {
     val context = LocalContext.current
     val (icon, labelRes, tint) = when (mode) {
@@ -353,7 +481,7 @@ private fun PowerModeToggle(
         AppPowerMode.PARSE_ONLY -> Triple(Icons.Default.Headphones, R.string.power_mode_parse, GoldBright)
         AppPowerMode.OFF -> Triple(Icons.Default.PowerOff, R.string.power_mode_off, MutedLavender)
     }
-    IconButton(onClick = onClick) {
+    IconButton(onClick = onClick, enabled = !tourActive) {
         Icon(
             imageVector = icon,
             contentDescription = context.getString(labelRes),
@@ -426,10 +554,11 @@ private fun NowPlayingSection(
     artist: String?,
     title: String?,
     packageName: String?,
+    modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
     Column(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = modifier.fillMaxWidth(),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         Text(
@@ -463,6 +592,7 @@ private fun OrchestratorStatusLine(
     state: OrchestratorState,
     isBackendFetching: Boolean,
     tracksUntilNext: Int?,
+    modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
     val stateLabel = when {
@@ -471,7 +601,10 @@ private fun OrchestratorStatusLine(
         else -> orchestratorStateLabel(context, state)
     }
 
-    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+    Column(
+        modifier = modifier,
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
         Text(
             text = narratorLabel,
             style = MaterialTheme.typography.labelLarge,
