@@ -27,4 +27,10 @@ interface StoryApi {
 
     @POST("v1/llm/probe")
     suspend fun probeLlm(@Body request: LlmProbeRequest): LlmProbeResponse
+
+    @POST("v1/billing/dev-tier")
+    suspend fun setDevTier(@Body request: DevTierRequest): DevTierResponse
+
+    @GET("v1/billing/status")
+    suspend fun billingStatus(): BillingStatusResponse
 }

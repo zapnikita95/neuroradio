@@ -441,6 +441,25 @@ data class QuotaResponse(
     val hint: String? = null,
 )
 
+data class DevTierRequest(val tier: String?)
+
+data class DevTierResponse(
+    val ok: Boolean? = null,
+    val tier: String? = null,
+    val devTierOverride: String? = null,
+    val hint: String? = null,
+    val serverLlmKeys: String? = null,
+    val error: String? = null,
+    val code: String? = null,
+)
+
+data class BillingStatusResponse(
+    val tier: String? = null,
+    val devTierSwitchEnabled: Boolean? = null,
+    val devTierOverride: String? = null,
+    val hint: String? = null,
+)
+
 data class RateLimitErrorBody(
     val error: String? = null,
     val code: String? = null,

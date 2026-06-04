@@ -4,12 +4,13 @@ import { factAppliesToRequest } from './fact-relevance.js';
 import { filterAndRankFacts } from './reference-fact-quality.js';
 import { buildFactHuntSearchQueries, WEAK_TRIVIA_PATTERNS } from './story-fact-hunt.js';
 import { fetchReferenceFactBundle as fetchWikipediaBundle } from './wikipedia-facts.js';
+import { fetchWebSearchFactSnippets } from './web-search-facts.js';
 
 const USER_AGENT = 'MusicStoryBFF/1.0 (contact@example.com)';
 const RAW_SNIPPET_MIN_LEN = 35;
 const RAW_SNIPPET_MAX = 12;
 
-export type SnippetSource = 'wiki' | 'ddg' | 'wikidata' | 'mb';
+export type SnippetSource = 'wiki' | 'ddg' | 'web' | 'wikidata' | 'mb';
 
 export interface AggregatedFactContext {
   bundle: ReferenceFactBundle;
@@ -196,6 +197,7 @@ async function fetchMusicBrainzAnnotations(entity: 'recording' | 'artist', mbid?
 function buildRawSnippets(
   wiki: ReferenceFactBundle,
   ddgRaw: string[],
+  webRaw: string[],
   wdRaw: string[],
   mbTrackRaw: string[],
   mbArtistRaw: string[],
@@ -209,6 +211,10 @@ function buildRawSnippets(
   }
   for (const text of ddgRaw) {
     pushRaw(rawSnippets, snippetSources, text, 'ddg');
+    capRaw(rawSnippets, snippetSources);
+  }
+  for (const text of webRaw) {
+    pushRaw(rawSnippets, snippetSources, text, 'web');
     capRaw(rawSnippets, snippetSources);
   }
   for (const text of wdRaw) {
@@ -238,25 +244,37 @@ export async function fetchAggregatedFactContext(
       artistFacts: mergeFacts(wiki.artistFacts, wikiEn.artistFacts),
     };
   }
-  const [ddgUnfiltered, wdUnfiltered, mbTrackRaw, mbArtistRaw] = await Promise.all([
+  const [ddgUnfiltered, webUnfiltered, wdUnfiltered, mbTrackRaw, mbArtistRaw] = await Promise.all([
     fetchDuckDuckGoUnfiltered(artist, title),
+    fetchWebSearchFactSnippets(artist, title),
     fetchWikidataUnfiltered(artist, title, countryCode),
     fetchMusicBrainzAnnotationsUnfiltered('recording', recordingMbid),
     fetchMusicBrainzAnnotationsUnfiltered('artist', artistMbid),
   ]);
 
-  const ddg = filterAndRankFacts(ddgUnfiltered, 6);
+  const externalUnfiltered = [...ddgUnfiltered, ...webUnfiltered];
+  const ddg = filterAndRankFacts(externalUnfiltered, 8);
   const wikidata = filterAndRankFacts(wdUnfiltered, 5);
   const mbTrack = filterAndRankFacts(mbTrackRaw, 4);
   const mbArtist = filterAndRankFacts(mbArtistRaw, 4);
 
   const ddgFiltered = factsAboutTrackOrArtist(ddg, artist, title);
   const wdFiltered = factsAboutTrackOrArtist(wikidata, artist, title);
-  const ddgSplit = splitByMention(ddgFiltered, title, artist);
   const wdSplit = splitByMention(wdFiltered, title, artist);
+  const externalSplit = splitByMention(ddgFiltered, title, artist);
 
-  let trackFacts = mergeFacts(wiki.trackFacts, ddgSplit.track, wdSplit.track, mbTrack);
-  let artistFacts = mergeFacts(wiki.artistFacts, ddgSplit.artist, wdSplit.artist, mbArtist);
+  let trackFacts = mergeFacts(
+    wiki.trackFacts,
+    externalSplit.track,
+    wdSplit.track,
+    mbTrack,
+  );
+  let artistFacts = mergeFacts(
+    wiki.artistFacts,
+    externalSplit.artist,
+    wdSplit.artist,
+    mbArtist,
+  );
 
   trackFacts = trackFacts.filter((f) => factAppliesToRequest(f, artist, title, 'track'));
   artistFacts = artistFacts.filter((f) => factAppliesToRequest(f, artist, title, 'artist'));
@@ -271,6 +289,7 @@ export async function fetchAggregatedFactContext(
   const { rawSnippets, snippetSources } = buildRawSnippets(
     wiki,
     ddgUnfiltered,
+    webUnfiltered,
     wdUnfiltered,
     mbTrackRaw,
     mbArtistRaw,

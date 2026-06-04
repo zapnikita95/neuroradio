@@ -1,6 +1,6 @@
 import { Response } from 'express';
 import { isUnlimitedInstall, SECURITY } from '../config/security.js';
-import { getQuotaSubject, getTrialStoryUsage, incrementTrialStoryUsage } from '../services/account-store.js';
+import { getQuotaSubject } from '../services/account-store.js';
 import { resolveUserTier } from '../services/entitlements.js';
 import { getStoryLimitsForTier } from '../services/tier-policy.js';
 import { setLogDetail } from './request-logger.js';
@@ -127,20 +127,7 @@ export function getDailyStoryLimit(installId: string): number {
 }
 
 function enrichQuota(installId: string, base: QuotaSnapshot): QuotaSnapshot {
-  const tier = resolveUserTier(installId);
-  const trial = getTrialStoryUsage(installId);
-  return {
-    ...base,
-    tier,
-    ...(trial
-      ? {
-          monthlyUsed: trial.used,
-          monthlyLimit: trial.limit,
-          monthlyRemaining: Math.max(0, trial.limit - trial.used),
-          monthlyResetsAt: trial.periodEnds,
-        }
-      : {}),
-  };
+  return { ...base, tier: resolveUserTier(installId) };
 }
 
 export function getDailyStoryQuota(installId: string): QuotaSnapshot {
@@ -218,23 +205,6 @@ export function rateLimitStory(
     const subject = getQuotaSubject(installId);
     const quotaBase = enrichQuota(installId, peekUsage(quotaKey(installId), dailyLimit, DAY_MS));
 
-    const trial = getTrialStoryUsage(installId);
-    if (trial && trial.used >= trial.limit) {
-      sendLimitError(
-        res,
-        `Пробный период: использованы все ${trial.limit} историй в этом месяце. Оформите подписку 199 ₽/мес.`,
-        'TRIAL_MONTHLY_LIMIT',
-        {
-          ...quotaBase,
-          monthlyUsed: trial.used,
-          monthlyLimit: trial.limit,
-          monthlyRemaining: 0,
-          monthlyResetsAt: trial.periodEnds,
-        },
-      );
-      return;
-    }
-
     if (!rejectIfOverLimit(`ip:hour:${ip}`, limits.ipGlobalPerHour, HOUR_MS, res, 'Too many requests from this network', 'IP_HOURLY', quotaBase)) return;
     if (!rejectIfOverLimit(`story:burst:${subject}`, limits.storyBurstPerInstallPerMinute, MINUTE_MS, res, 'Подожди минуту — слишком частые запросы историй', 'STORY_BURST', quotaBase)) return;
     if (!rejectIfOverLimit(`story:hour:${subject}`, limits.storyPerInstallPerHour, HOUR_MS, res, 'Hourly story limit reached', 'STORY_HOURLY', quotaBase)) return;
@@ -268,8 +238,4 @@ export function recordStoryGeneration(
   consumeLimit(`story:burst:${subject}`, limits.storyBurstPerInstallPerMinute, MINUTE_MS);
   consumeLimit(`story:hour:${subject}`, limits.storyPerInstallPerHour, HOUR_MS);
   consumeLimit(quotaKey(installId), dailyLimit, DAY_MS);
-
-  if (resolveUserTier(installId) === 'trial') {
-    incrementTrialStoryUsage(installId);
-  }
 }

@@ -21,6 +21,12 @@ import {
   tierQuotaHintRu,
 } from '../services/tier-policy.js';
 import { getDailyStoryQuota } from '../middleware/rate-limit.js';
+import {
+  getDevTierOverride,
+  isDevTierSwitchEnabled,
+  setDevTierOverride,
+} from '../services/dev-tier-store.js';
+import type { UserTier } from '../services/entitlements.js';
 
 const router = Router();
 
@@ -71,6 +77,55 @@ router.get('/status', (req: Request, res: Response) => {
     premiumTtsProvider: 'sber',
     premiumTtsReady: canUseSaluteSpeechProduction(),
     saluteSpeech: hasSaluteSpeechCredentials() && isSaluteSpeechEnabled(),
+    devTierSwitchEnabled: isDevTierSwitchEnabled(),
+    devTierOverride: isDevTierSwitchEnabled() ? getDevTierOverride(installId) : null,
+  });
+});
+
+/**
+ * Тестовый переключатель тарифа (без Play Billing).
+ * POST /v1/billing/dev-tier  { "tier": "free" | "trial" | "premium" | null }
+ * Railway: ALLOW_DEV_TIER_SWITCH=true
+ */
+router.post('/dev-tier', (req: Request, res: Response) => {
+  if (!isDevTierSwitchEnabled()) {
+    res.status(403).json({
+      error: 'Dev tier switch disabled',
+      code: 'DEV_TIER_DISABLED',
+      hint: 'Set ALLOW_DEV_TIER_SWITCH=true on Railway',
+    });
+    return;
+  }
+
+  const installId = req.installId ?? '';
+  if (!installId) {
+    res.status(400).json({ error: 'Missing install id' });
+    return;
+  }
+
+  const raw = req.body?.tier;
+  let tier: UserTier | null = null;
+  if (raw === null || raw === 'null' || raw === '') {
+    tier = null;
+  } else if (raw === 'free' || raw === 'trial' || raw === 'premium') {
+    tier = raw;
+  } else {
+    res.status(400).json({ error: 'tier must be free, trial, premium, or null' });
+    return;
+  }
+
+  setDevTierOverride(installId, tier);
+  const effective = resolveUserTier(installId);
+  const limits = getStoryLimitsForTier(effective);
+
+  res.json({
+    ok: true,
+    devTierOverride: getDevTierOverride(installId),
+    tier: effective,
+    limits,
+    quota: getDailyStoryQuota(installId),
+    hint: tierQuotaHintRu(effective),
+    serverLlmKeys: 'Запросы без своего API-ключа идут на ключи Railway (OPEN_ROUTER_API_KEY и др.)',
   });
 });
 

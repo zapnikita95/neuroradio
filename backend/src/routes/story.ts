@@ -169,15 +169,18 @@ router.post('/full', validateStoryFullBody, async (req: Request, res: Response) 
   const groqModel = (req.body as StoryFullBody).groq_model;
   const openrouterModelRequested = (req.body as StoryFullBody).openrouter_model;
   const userTier = resolveUserTier(installId);
+  const clientOwnOpenRouter = Boolean(clientLlmKeys.openrouter?.trim());
   const openrouterModelFact = resolveOpenRouterModelForTier(
     userTier,
     openrouterModelRequested,
     'fact',
+    { clientOwnKey: clientOwnOpenRouter },
   );
   const openrouterModelStory = resolveOpenRouterModelForTier(
     userTier,
     openrouterModelRequested,
     'story',
+    { clientOwnKey: clientOwnOpenRouter },
   );
 
   const modelLog =

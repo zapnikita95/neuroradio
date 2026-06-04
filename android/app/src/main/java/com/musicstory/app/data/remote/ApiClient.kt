@@ -84,6 +84,19 @@ class ApiClient(
         return getApi(baseUrl).fetchQuota()
     }
 
+    suspend fun setDevTier(baseUrl: String, tier: String?): DevTierResponse {
+        return try {
+            getApi(baseUrl).setDevTier(DevTierRequest(tier))
+        } catch (first: Exception) {
+            authManager.invalidateToken()
+            getApi(baseUrl).setDevTier(DevTierRequest(tier))
+        }
+    }
+
+    suspend fun fetchBillingStatus(baseUrl: String): BillingStatusResponse {
+        return getApi(baseUrl).billingStatus()
+    }
+
     suspend fun probeLlm(baseUrl: String, request: LlmProbeRequest): LlmProbeResponse {
         return try {
             getApi(baseUrl).probeLlm(request)

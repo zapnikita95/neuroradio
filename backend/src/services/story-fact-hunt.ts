@@ -29,6 +29,7 @@ export const HIGH_IMPACT_FACT_PATTERNS: RegExp[] = [
   /\b(?:promo track under the name|originally released as a promo)\b/i,
   /\b(?:Louisiana term for a mixed-race|mixed ancestry|mixed-race person)\b/i,
   /\b(?:not yet ready to embrace|Mexican musicians playing surfing)\b/i,
+  /\b(?:appeal to (?:a )?white audience|changed (?:their )?name|stage name|Vasquez.*Vegas|Vegas.*Vasquez)\b/i,
   /\bJimi Hendrix inspired\b.*\b(?:Native American|all-Native)\b/i,
   /\bAccording to Pat Vegas, Jimi Hendrix inspired\b/i,
   /\b(?:single cut is significantly shorter|album version featuring an introductory)\b/i,

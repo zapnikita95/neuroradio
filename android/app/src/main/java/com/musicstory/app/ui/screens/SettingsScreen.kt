@@ -259,6 +259,8 @@ fun SettingsScreen(
     var isChecking by remember { mutableStateOf(false) }
     var checkResult by remember { mutableStateOf<ConnectionCheckResult?>(null) }
     var checkSummary by remember { mutableStateOf<String?>(null) }
+    var devTierLabel by remember { mutableStateOf<String?>(null) }
+    var devTierFeedback by remember { mutableStateOf<String?>(null) }
     var isSaving by remember { mutableStateOf(false) }
     var saveFeedback by remember { mutableStateOf<String?>(null) }
 
@@ -319,6 +321,20 @@ fun SettingsScreen(
     LaunchedEffect(activeApiInput, llmProvider) {
         checkSummary = null
         checkResult = null
+    }
+
+    LaunchedEffect(backendUrl) {
+        val url = backendUrl.trim().trimEnd('/')
+        if (url.isBlank()) return@LaunchedEffect
+        app.storyRepository.refreshQuota()
+        runCatching {
+            val status = app.apiClient.fetchBillingStatus(url)
+            if (status.devTierSwitchEnabled == true) {
+                devTierLabel = status.devTierOverride ?: status.tier
+            } else {
+                devTierLabel = status.tier
+            }
+        }
     }
 
     val fieldColors = OutlinedTextFieldDefaults.colors(
@@ -1237,6 +1253,64 @@ fun SettingsScreen(
                             context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
                         },
                     )
+                    }
+                }
+
+                if (backendUrl.trim().isNotBlank()) {
+                    CollapsibleSettingsSection(
+                        title = context.getString(R.string.settings_dev_tier_section),
+                        summary = devTierLabel ?: dailyQuota?.tier ?: "—",
+                        initiallyExpanded = false,
+                    ) {
+                        Text(
+                            text = context.getString(R.string.settings_dev_tier_hint),
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MutedLavender,
+                        )
+                        devTierLabel?.let { tier ->
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text(
+                                text = context.getString(R.string.settings_dev_tier_current, tier),
+                                style = MaterialTheme.typography.labelMedium,
+                                color = GoldBright,
+                            )
+                        }
+                        devTierFeedback?.let { msg ->
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text(
+                                text = msg,
+                                style = MaterialTheme.typography.labelSmall,
+                                color = LiveGreen,
+                            )
+                        }
+                        Spacer(modifier = Modifier.height(8.dp))
+                        listOf(
+                            null to R.string.settings_dev_tier_reset,
+                            "free" to R.string.settings_dev_tier_free,
+                            "trial" to R.string.settings_dev_tier_trial,
+                            "premium" to R.string.settings_dev_tier_premium,
+                        ).forEach { (tierId, labelRes) ->
+                            SecondaryStoryButton(
+                                text = context.getString(labelRes),
+                                onClick = {
+                                    scope.launch {
+                                        devTierFeedback = null
+                                        try {
+                                            val resp = app.apiClient.setDevTier(
+                                                backendUrl.trim().trimEnd('/'),
+                                                tierId,
+                                            )
+                                            devTierLabel = resp.tier ?: resp.devTierOverride
+                                            devTierFeedback = resp.hint ?: resp.error
+                                            app.storyRepository.refreshQuota()
+                                        } catch (e: Exception) {
+                                            devTierFeedback = e.message
+                                        }
+                                    }
+                                },
+                            )
+                            Spacer(modifier = Modifier.height(6.dp))
+                        }
                     }
                 }
 

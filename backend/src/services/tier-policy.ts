@@ -22,13 +22,13 @@ export interface TierStoryLimits {
 
 export const TIER_STORY_LIMITS: Record<UserTier, TierStoryLimits> = {
   free: {
-    dailyStories: parseInt(process.env.FREE_STORY_DAILY_LIMIT ?? '3', 10),
+    dailyStories: parseInt(process.env.FREE_STORY_DAILY_LIMIT ?? '10', 10),
     monthlyStories: null,
     labelRu: 'Бесплатно',
   },
   trial: {
     dailyStories: parseInt(process.env.TRIAL_STORY_DAILY_LIMIT ?? '10', 10),
-    monthlyStories: parseInt(process.env.TRIAL_STORY_MONTHLY_LIMIT ?? '10', 10),
+    monthlyStories: null,
     labelRu: 'Пробный период',
   },
   premium: {
@@ -55,7 +55,13 @@ export function resolveOpenRouterModelForTier(
   tier: UserTier,
   preferred: string | undefined,
   slot: 'fact' | 'story',
+  options: { clientOwnKey?: boolean } = {},
 ): string {
+  const fromClient = preferred?.trim();
+  if (options.clientOwnKey && fromClient && fromClient.includes('/')) {
+    return fromClient;
+  }
+
   if (tier === 'free') {
     return slot === 'fact' ? OPENROUTER_DEFAULT_FREE_FACT_MODEL : OPENROUTER_DEFAULT_STORY_MODEL;
   }
@@ -63,13 +69,13 @@ export function resolveOpenRouterModelForTier(
   if (tier === 'trial' || tier === 'premium') {
     if (
       tier === 'premium' &&
-      preferred?.trim() &&
-      preferred.includes('/') &&
-      isOpenRouterPresetModel(preferred)
+      fromClient &&
+      fromClient.includes('/') &&
+      isOpenRouterPresetModel(fromClient)
     ) {
-      return preferred.trim();
+      return fromClient;
     }
-    return slot === 'fact' ? TIER_OPENROUTER_FACT_MODEL : TIER_OPENROUTER_STORY_MODEL;
+    return TIER_OPENROUTER_FACT_MODEL;
   }
 
   return slot === 'fact' ? OPENROUTER_DEFAULT_FREE_FACT_MODEL : OPENROUTER_DEFAULT_STORY_MODEL;
@@ -79,10 +85,10 @@ export function tierQuotaHintRu(tier: UserTier): string {
   const limits = getStoryLimitsForTier(tier);
   if (tier === 'unlimited') return 'Без лимитов на этом устройстве.';
   if (tier === 'free') {
-    return `Бесплатно: ${limits.dailyStories} истории в день (модели OpenRouter :free). Пробный период ${TRIAL_PRICE_RUB_MONTHLY} ₽/мес — DeepSeek, ${TIER_STORY_LIMITS.trial.monthlyStories} историй. Подписка 199 ₽/мес — до ${TIER_STORY_LIMITS.premium.dailyStories} в день.`;
+    return `Бесплатно: ${limits.dailyStories} историй в день (OpenRouter :free на сервере). Свой ключ OpenRouter в настройках — любая модель. Trial ${TRIAL_PRICE_RUB_MONTHLY} ₽/мес — ${TIER_STORY_LIMITS.trial.dailyStories}/день DeepSeek. Подписка 199 ₽/мес — ${TIER_STORY_LIMITS.premium.dailyStories}/день.`;
   }
   if (tier === 'trial') {
-    return `Пробный период: до ${limits.monthlyStories} историй в месяц, не более ${limits.dailyStories} в день. Модель DeepSeek V3.`;
+    return `Пробный период: ${limits.dailyStories} историй в день, DeepSeek V3 (ключи сервера).`;
   }
   return `Подписка активна: до ${limits.dailyStories} историй в день (DeepSeek V3). Премиум-голос SaluteSpeech — отдельно.`;
 }

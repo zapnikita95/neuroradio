@@ -168,6 +168,13 @@
     <string name="settings_groq_test_fail">Не удалось подключиться</string>
     <string name="settings_free_quota">Сегодня: %1$d из %2$d</string>
     <string name="settings_trial_quota">Пробный: %1$d из %2$d в месяце · сегодня %3$d из %4$d</string>
+    <string name="settings_dev_tier_section">Тест тарифа (сервер)</string>
+    <string name="settings_dev_tier_hint">Без своих API-ключей запросы идут на Railway. На Railway: ALLOW_DEV_TIER_SWITCH=true</string>
+    <string name="settings_dev_tier_current">Сейчас: %1$s</string>
+    <string name="settings_dev_tier_free">Бесплатно</string>
+    <string name="settings_dev_tier_trial">Trial</string>
+    <string name="settings_dev_tier_premium">Подписка</string>
+    <string name="settings_dev_tier_reset">Сброс</string>
     <string name="settings_unlimited_groq">Без дневного лимита</string>
     <string name="settings_groq_status_ok">Ключ сохранён</string>
     <string name="settings_groq_status_missing">Без своего ключа — до 10 историй в день на сервере</string>
