@@ -463,8 +463,19 @@ export function factAppliesToRequest(
     if (mode === 'indie' && INDIE_BAND_CONTEXT.test(trimmed)) return true;
     return false;
   }
-  if (mentionsTitle || mentionsArtist) return true;
-  if (/^(?:The song|The video|The single|It|This track|This single|The single cut|The lyrics|Recording|According to|Mercury|He |They |Upon |During |After |When |While |In an interview)\b/i.test(trimmed)) {
+  if (mentionsTitle) return true;
+  if (mentionsArtist && !mentionsTitle) {
+    // Band biography without the song title — artist pool, not track (e.g. "According to … band wanted the name").
+    if (
+      /^(?:According to|The band wanted|the band wanted|originally called|formerly known|named after|called themselves|Members |He formed|She formed)\b/i.test(
+        trimmed,
+      )
+    ) {
+      return false;
+    }
+  }
+  if (mentionsArtist) return true;
+  if (/^(?:The song|The video|The single|It|This track|This single|The single cut|The lyrics|Recording|Mercury|He |They |Upon |During |After |When |While |In an interview)\b/i.test(trimmed)) {
     return true;
   }
   if (/\b(?:music video|operatic section|studio session|composed the|wrote the|recorded at|took three weeks|no chorus|gained popularity|viral|tiktok|signed with|influenced by)\b/i.test(trimmed)) {

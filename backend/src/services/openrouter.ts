@@ -230,6 +230,16 @@ export async function generateStoryScript(
   );
   if (fallback) return fallback;
 
+  if (lastCandidate?.script?.trim() && referenceFacts.length > 0) {
+    const wc = countWords(lastCandidate.script);
+    if (wc >= 55) {
+      console.warn(
+        `[openrouter] accepting last candidate ${wc} words after all quality checks (grounded fallback)`,
+      );
+      return finalizeStory(lastCandidate, { ...input, voiceId }, storyLength);
+    }
+  }
+
   throw new Error(
     lastCandidate
       ? 'OpenRouter could not produce a usable story'

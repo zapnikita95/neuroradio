@@ -67,7 +67,7 @@ export function qualityOptionsForOpenRouterAttempt(
   const hasFacts = referenceFacts.length > 0;
   return {
     strictLength: false,
-    minWordsOverride: 88,
+    minWordsOverride: 60,
     skipWatery: false,
     skipReferenceAnchor: false,
     skipFirstSentenceAnchor: false,
@@ -123,7 +123,7 @@ export function finalizeAfterQualityLoop<T extends { script: string }>(
   const relax = options.relaxForWeakLlm ?? false;
   const anchorCheck = validateStoryScript(sanitized, '60s', input.artist, input.title, {
     strictLength: false,
-    minWordsOverride: relax ? 88 : undefined,
+    minWordsOverride: relax ? 55 : undefined,
     referenceFacts,
     skipBannedPatterns: true,
     skipEnglishCheck: false,
@@ -132,7 +132,12 @@ export function finalizeAfterQualityLoop<T extends { script: string }>(
     skipFirstSentenceAnchor: true,
   });
   if (!anchorCheck.ok) {
-    logRejectedScript('last script rejected on finalize', sanitized, anchorCheck.reason ?? 'quality');
+    const reason = anchorCheck.reason ?? 'quality';
+    if (relax && wordCount >= 55 && /too short/i.test(reason)) {
+      console.warn(`[story] accepting ${wordCount} words despite ${reason}`);
+      return finalize({ ...lastCandidate, script: sanitized });
+    }
+    logRejectedScript('last script rejected on finalize', sanitized, reason);
     return null;
   }
   if (wordCount < 28) {

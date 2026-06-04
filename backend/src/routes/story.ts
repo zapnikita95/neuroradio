@@ -23,6 +23,7 @@ import {
   explainLlmFactSelection,
   huntReferenceFactWithLlm,
   shouldRunLlmFactHunt,
+  explainFactHuntDecision,
 } from '../services/story-llm-fact-hunt.js';
 import { hasLlmKeyForProvider, resolveLlmProvider, resolveEffectiveStoryLlmProvider, clientKeyForProvider, type ClientLlmKeys, type ClientLocalOllama } from '../services/llm-provider.js';
 import { generateStoryWithFallback } from '../services/story-llm-router.js';
@@ -337,8 +338,13 @@ router.post('/full', validateStoryFullBody, async (req: Request, res: Response) 
       }
     } else if (selectedFact) {
       console.log(
-        `[fact-hunt-llm] skip interest=${selectedFact.interestRating}/10 score=${selectedFact.interestScore} ` +
-          `(rules seed ok, trackFacts=${trackFactCount}) snippets=${factCtx.rawSnippets.length}`,
+        `[fact-hunt-llm] skip reason=${explainFactHuntDecision(
+          selectedFact,
+          factCtx.rawSnippets.length,
+          bundleFactCount,
+          trackFactCount,
+          metadata.title,
+        )} interest=${selectedFact.interestRating}/10 score=${selectedFact.interestScore} snippets=${factCtx.rawSnippets.length}`,
       );
     }
 

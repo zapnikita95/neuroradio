@@ -88,6 +88,29 @@ export function shouldRunLlmFactHunt(
   return false;
 }
 
+export function explainFactHuntDecision(
+  selected: SelectedReferenceFact | null,
+  rawSnippetCount: number,
+  bundleFactCount: number,
+  trackFactCount = 0,
+  title = '',
+): string {
+  if (rawSnippetCount < 2) return 'snippets<2';
+  if (!selected) return bundleFactCount === 0 ? 'no-facts' : 'no-selection';
+  if (trackFactCount === 0 && selected.scope !== 'track') return 'no-track-facts';
+  if (selected.scope === 'track' && title.trim() && !factMentionsTitle(selected.fact, title)) {
+    return 'track-seed-without-title';
+  }
+  if (selected.interestRating <= 5 || selected.interestScore < MIN_GOOD_SCOPE_INTEREST) {
+    return `low-interest score=${selected.interestScore}`;
+  }
+  if (WEAK_TRIVIA_PATTERNS.some((p) => p.test(selected.fact))) return 'weak-trivia';
+  if (isWeakChartSeed(selected.fact)) return 'weak-chart';
+  if (isBoringFact(selected.fact)) return 'boring';
+  if (interestScore(selected.fact) < MIN_PICK_INTEREST_SCORE + 2) return 'low-score';
+  return 'rules-seed-ok';
+}
+
 /** Evidence quote must appear in snippet (fuzzy: 3+ shared tokens of length >= 4). */
 export function verifyLlmSeedEvidence(
   evidenceQuote: string,
