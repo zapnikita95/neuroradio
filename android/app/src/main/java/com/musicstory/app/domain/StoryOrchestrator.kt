@@ -675,10 +675,15 @@ class StoryOrchestrator(
                     settingsDataStore.setTracksSinceLastStory(
                         triggerEngine.currentTracksSinceLastStory(),
                     )
+                    _errorMessage.value = null
+                    _hintMessage.value = error.message?.trim()?.take(160)
+                        ?: "Не получилось рассказать историю — нажми «Рассказать историю»"
+                    _state.value = OrchestratorState.LISTENING
+                } else {
+                    _errorMessage.value = error.message ?: "Не удалось получить историю"
+                    _hintMessage.value = null
+                    _state.value = OrchestratorState.ERROR
                 }
-                _errorMessage.value = error.message ?: "Не удалось получить историю"
-                _hintMessage.value = null
-                _state.value = OrchestratorState.ERROR
                 publishUiState()
             },
         )

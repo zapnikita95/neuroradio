@@ -191,6 +191,22 @@ function withoutQuotedSpans(text: string): string {
     .trim();
 }
 
+/** Tokens/names from reference facts — band members, places, etc. allowed in grounded stories. */
+function referenceFactTokens(referenceFacts: string[]): Set<string> {
+  const tokens = new Set<string>();
+  for (const fact of referenceFacts) {
+    for (const entity of extractNamedEntities(fact)) {
+      for (const part of normalize(entity).split(' ')) {
+        if (part.length >= 3) tokens.add(part);
+      }
+    }
+    for (const part of normalize(fact).split(' ')) {
+      if (part.length >= 4) tokens.add(part);
+    }
+  }
+  return tokens;
+}
+
 /** Story validation: ignore song titles in «quotes» when checking for wrong artists. */
 export function storyNamesForeignArtist(
   script: string,
@@ -201,6 +217,7 @@ export function storyNamesForeignArtist(
   const cleaned = withoutQuotedSpans(script);
   const cleanTitle = title.replace(/\s*\([^)]*\)\s*/g, ' ').trim();
   const allowed = referenceFacts.join('\n');
+  const seedTokens = referenceFactTokens(referenceFacts);
 
   // Grounded story already names the artist — only reject clear other *bands* (2+ words), not member surnames.
   if (factMentionsArtist(cleaned, artist)) {
@@ -210,6 +227,7 @@ export function storyNamesForeignArtist(
       if (entityMatchesArtist(entity, artist, cleanTitle)) continue;
       const eNorm = normalize(entity);
       if (eNorm.length < 3) continue;
+      if (seedTokens.has(eNorm)) continue;
       if (allowed.length >= 8 && normalize(allowed).includes(eNorm)) continue;
       if (eNorm.split(' ').length >= 2) return true;
     }

@@ -5,9 +5,8 @@ import { validateStoryFullBody } from '../middleware/validate-story.js';
 import { enrichTrackMetadata } from '../services/musicbrainz.js';
 import { fetchAggregatedFactContext } from '../services/fact-aggregator.js';
 import { explainReferenceFactSelection } from '../services/fact-picker.js';
-import { formatFactPickLog } from '../services/fact-interest-log.js';
+import { formatFactPickLog, logFactCandidatePools } from '../services/fact-interest-log.js';
 import { interestScore } from '../services/reference-fact-quality.js';
-import { MIN_GOOD_SCOPE_INTEREST } from '../services/fact-picker.js';
 import { interestRating10 } from '../services/fact-interest-log.js';
 import {
   collectPreviousScripts,
@@ -272,6 +271,7 @@ router.post('/full', validateStoryFullBody, async (req: Request, res: Response) 
       factBundle,
     );
     console.log(`[facts] tier=${artistTier} artist="${metadata.artist}"`);
+    logFactCandidatePools(factBundle, metadata.artist, metadata.title);
 
     if (trackFactCount + artistFactCount === 0) {
       const metaFacts = buildMetadataFallbackFacts(metadata);
@@ -294,7 +294,7 @@ router.post('/full', validateStoryFullBody, async (req: Request, res: Response) 
     let factHuntLlm = false;
     const bundleFactCount = trackFactCount + artistFactCount;
 
-    if (shouldRunLlmFactHunt(selectedFact, factCtx.rawSnippets.length, bundleFactCount)) {
+    if (shouldRunLlmFactHunt(selectedFact, factCtx.rawSnippets.length, bundleFactCount, trackFactCount)) {
       const factModels = resolveOpenRouterFactModelsForTier(userTier);
       console.log(
         `[fact-hunt-llm] start artist="${metadata.artist}" title="${metadata.title}" ` +
@@ -322,7 +322,7 @@ router.post('/full', validateStoryFullBody, async (req: Request, res: Response) 
     } else if (selectedFact) {
       console.log(
         `[fact-hunt-llm] skip interest=${selectedFact.interestRating}/10 score=${selectedFact.interestScore} ` +
-          `(score≥${MIN_GOOD_SCOPE_INTEREST} and rating>5 — rules seed accepted) snippets=${factCtx.rawSnippets.length}`,
+          `(rules seed ok, trackFacts=${trackFactCount}) snippets=${factCtx.rawSnippets.length}`,
       );
     }
 

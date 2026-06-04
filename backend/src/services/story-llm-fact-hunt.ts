@@ -69,9 +69,12 @@ export function shouldRunLlmFactHunt(
   selected: SelectedReferenceFact | null,
   rawSnippetCount: number,
   bundleFactCount: number,
+  trackFactCount = 0,
 ): boolean {
   if (rawSnippetCount < 2) return false;
   if (!selected) return bundleFactCount === 0;
+  // No track-level facts — artist trivia is weak for a specific song; let LLM hunt from snippets.
+  if (trackFactCount === 0 && selected.scope !== 'track') return true;
   if (selected.interestRating <= 5 || selected.interestScore < MIN_GOOD_SCOPE_INTEREST) return true;
   if (WEAK_TRIVIA_PATTERNS.some((p) => p.test(selected.fact))) return true;
   if (isWeakChartSeed(selected.fact)) return true;
