@@ -250,5 +250,13 @@ export function factAppliesToRequest(
     if (!factNamesForeignEntity(trimmed, artist, title, artist)) return true;
     return false;
   }
-  return mentionsTitle || mentionsArtist;
+  if (mentionsTitle || mentionsArtist) return true;
+  // Строки со страницы песни («The song was… Hail», «The single cut…») без повторного названия.
+  if (/^(?:The song|It|This track|This single|The single cut|The lyrics)\b/i.test(trimmed)) {
+    return true;
+  }
+  if (/\b(?:single cut is significantly shorter|promo track under the name)\b/i.test(trimmed)) {
+    return true;
+  }
+  return false;
 }

@@ -15,6 +15,10 @@ export function buildFactHuntSearchQueries(artist: string, title: string): strin
     `${artist} ${cleanTitle} cover more famous than original`,
     `${artist} musician biography scandal lawsuit racism`,
     `${artist} wrote song army prison could not read music`,
+    `${artist} ${cleanTitle} Hail promo radio edit`,
+    `${artist} Vegas Vasquez name change heritage`,
+    `${artist} Jimi Hendrix inspired Native American`,
+    `${artist} Wounded Knee radio banned`,
   ];
 }
 
@@ -24,6 +28,9 @@ export const HIGH_IMPACT_FACT_PATTERNS: RegExp[] = [
   /\bJimi Hendrix inspired\b/i,
   /\b(?:promo track under the name|originally released as a promo)\b/i,
   /\b(?:Louisiana term for a mixed-race|mixed ancestry|mixed-race person)\b/i,
+  /\b(?:not yet ready to embrace|Mexican musicians playing surfing)\b/i,
+  /\bJimi Hendrix inspired\b.*\b(?:Native American|all-Native)\b/i,
+  /\bAccording to Pat Vegas, Jimi Hendrix inspired\b/i,
   /\b(?:single cut is significantly shorter|album version featuring an introductory)\b/i,
   // Скрытый смысл: весёлая песня — тёмная изнанка
   /\b(?:hidden|secret|disguised|obscure|misunderstood|ironic|paradox)\b/i,

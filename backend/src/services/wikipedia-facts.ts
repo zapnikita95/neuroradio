@@ -69,6 +69,7 @@ function normalizeWikiText(text: string): string {
     .replace(/\s=+\s*[^=\n]+?\s*=+\s*/g, ' ')
     .replace(/\(\d{4}[^)]{0,120}\)/g, ' ')
     .replace(/\[[^\]]{0,120}\]/g, ' ')
+    .replace(/&(?:#91|#93|#x5B|#x5D);?/gi, ' ')
     .replace(/\s+/g, ' ')
     .trim();
 }
@@ -140,12 +141,16 @@ function extractTrackContextFacts(
     }
   });
   const facts = [...indices].sort((a, b) => a - b).map((index) => sentences[index]);
-  const anchored = artist
-    ? facts.filter(
-        (fact) =>
-          isTrackAnchored(fact, artist, title) && !factNamesForeignEntity(fact, artist, title),
-      )
-    : facts.filter((fact) => !factNamesForeignEntity(fact, artist, title));
+  const anchored = facts.filter((fact, position) => {
+    if (factNamesForeignEntity(fact, artist, title)) return false;
+    const index = [...indices].sort((a, b) => a - b)[position];
+    const isTitleSentence = sentenceMentions(sentences[index], title);
+    if (isTitleSentence) {
+      return artist ? isTrackAnchored(fact, artist, title) : true;
+    }
+    // Следующие предложения после упоминания трека («The song was… Hail») — без повторного названия.
+    return true;
+  });
   return filterAndRankFacts(anchored, max);
 }
 
@@ -329,6 +334,71 @@ function filterMusicFacts(
   });
 }
 
+const TRACK_BODY_SECTION_PATTERN =
+  /^(composition|background|writing|recording|release|meaning|controversy|history|legacy|influence|reception)$/i;
+const SKIP_WIKI_SECTION_PATTERN =
+  /^(charts?|track\s*listing|personnel|certifications?|formats?|credits?|see\s+also|references|external\s+links|notes)$/i;
+
+function stripWikiHtml(html: string): string {
+  return html
+    .replace(/<script[\s\S]*?<\/script>/gi, ' ')
+    .replace(/<style[\s\S]*?<\/style>/gi, ' ')
+    .replace(/<sup[^>]*>[\s\S]*?<\/sup>/gi, ' ')
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/&(?:#91|#93|#x5B|#x5D|#91;|#93;|#x5B;|#x5D;)/gi, ' ')
+    .replace(/\[?\s*\d+\s*\]?/g, ' ')
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&amp;/g, '&')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+async function fetchWikiBodySections(lang: 'ru' | 'en', title: string): Promise<string[]> {
+  const listUrl =
+    `https://${lang}.wikipedia.org/w/api.php?action=parse&page=${encodeURIComponent(title)}` +
+    `&prop=sections&format=json&origin=*`;
+  try {
+    const listResponse = await fetch(listUrl, {
+      headers: { 'User-Agent': USER_AGENT, Accept: 'application/json' },
+      signal: AbortSignal.timeout(8000),
+    });
+    if (!listResponse.ok) return [];
+    const listData = (await listResponse.json()) as {
+      parse?: { sections?: Array<{ index?: string; line?: string }> };
+    };
+    const sections = (listData.parse?.sections ?? []).filter((section) => {
+      const line = section.line?.trim() ?? '';
+      if (!line || SKIP_WIKI_SECTION_PATTERN.test(line)) return false;
+      return TRACK_BODY_SECTION_PATTERN.test(line);
+    });
+    const texts: string[] = [];
+    for (const section of sections.slice(0, 3)) {
+      const index = section.index?.trim();
+      if (!index) continue;
+      await sleep(80);
+      const sectionUrl =
+        `https://${lang}.wikipedia.org/w/api.php?action=parse&page=${encodeURIComponent(title)}` +
+        `&prop=text&section=${index}&format=json&origin=*`;
+      const sectionResponse = await fetch(sectionUrl, {
+        headers: { 'User-Agent': USER_AGENT, Accept: 'application/json' },
+        signal: AbortSignal.timeout(8000),
+      });
+      if (!sectionResponse.ok) continue;
+      const sectionData = (await sectionResponse.json()) as {
+        parse?: { text?: { '*': string } };
+      };
+      const html = sectionData.parse?.text?.['*'];
+      const text = html ? stripWikiHtml(html) : '';
+      if (text.length >= 60) texts.push(text);
+    }
+    return texts;
+  } catch {
+    return [];
+  }
+}
+
 async function fetchFactsForTitle(
   lang: 'ru' | 'en',
   title: string,
@@ -337,12 +407,43 @@ async function fetchFactsForTitle(
   artist = '',
 ): Promise<string[]> {
   await sleep(120);
-  const summary =
+  let summary =
     (await fetchFullExtract(lang, title, trackContext)) ?? (await fetchSummary(lang, title));
+  if (trackContext && summary) {
+    const bodySections = await fetchWikiBodySections(lang, title);
+    if (bodySections.length > 0) {
+      summary = [summary, ...bodySections].join('\n\n');
+    }
+  }
   if (!summary || isDisambiguationExtract(summary)) return [];
   if (artist && isWrongMusicTopic(artist, summary, title)) return [];
 
   const requireTrackAnchor = trackContext && artist.length > 0;
+
+  if (trackContext) {
+    const intro =
+      (await fetchFullExtract(lang, title, true)) ??
+      summary.split('\n\n')[0]?.trim() ??
+      summary;
+    const bodySections = await fetchWikiBodySections(lang, title);
+    const introFacts = filterMusicFacts(
+      extractTrackContextFacts(intro, mentionNeedle, artist, 3, 8),
+      artist,
+      mentionNeedle,
+      false,
+    );
+    const bodyFacts = bodySections.length
+      ? filterMusicFacts(
+          extractFactBullets(bodySections.join('\n\n'), 10),
+          artist,
+          mentionNeedle,
+          false,
+        )
+      : [];
+    const merged = filterAndRankFacts([...introFacts, ...bodyFacts], 8);
+    if (merged.length > 0) return merged;
+  }
+
   const bullets = filterMusicFacts(
     extractFactBullets(summary),
     artist,
@@ -355,7 +456,7 @@ async function fetchFactsForTitle(
       extractTrackContextFacts(summary, mentionNeedle, artist),
       artist,
       mentionNeedle,
-      requireTrackAnchor,
+      false,
     );
     if (contextual.length > 0) return contextual;
   }

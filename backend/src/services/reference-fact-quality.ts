@@ -111,8 +111,11 @@ export function interestScore(fact: string): number {
   }
   if (/\b(first|only|never|breakthrough|surprise)\b/i.test(fact)) score += 3;
   if (/\b(million|billion|decade|generation)\b/i.test(fact)) score += 2;
-  if (/\boriginally\s+(?:titled|called|named)\b/i.test(fact)) score -= 20;
-  if (/\b(?:promo|album'?s first single|video game)\b/i.test(fact)) score -= 8;
+  const isPromoRename = /\b(?:promo track under the name|originally released as a promo)\b/i.test(fact);
+  const isRadioEdit = /\b(?:single cut is significantly shorter|album version featuring an introductory)\b/i.test(fact);
+  if (isPromoRename || isRadioEdit) score += 10;
+  else if (/\boriginally\s+(?:titled|called|named)\b/i.test(fact)) score -= 20;
+  else if (/\b(?:promo|album'?s first single|video game)\b/i.test(fact)) score -= 8;
   const mediaHits = fact.match(
     /\b(?:film|movie|advert|commercial|soundtrack|video game|FIFA|Rugby|Rimmel|Die Hard|EA Sports)\b/gi,
   );
@@ -132,6 +135,8 @@ export function isBoringFact(fact: string): boolean {
   const trimmed = fact.trim();
   if (trimmed.length < 30) return true;
   if (isCollectorFact(trimmed)) return false;
+  // Promo rename, radio ban, Jimi Hendrix origin — keep even if sentence also mentions album/single.
+  if (highImpactBonus(trimmed) >= 6) return false;
   if (BORING_FACT_PATTERNS.some((pattern) => pattern.test(trimmed))) return true;
   if (interestScore(trimmed) < 4) return true;
   return false;
