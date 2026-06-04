@@ -35,8 +35,10 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 
@@ -110,13 +112,16 @@ fun SettingsTourSpotlightOverlay(
 
     onControlsTopChanged: (Float) -> Unit = {},
 
+    /** false = скрыть карточку (идёт скролл к секции); true = показать и зафиксировать позицию. */
+    visible: Boolean = true,
+
     centerTooltipWhenNoHighlight: Boolean = false,
 
     modifier: Modifier = Modifier,
 
 ) {
 
-    if (stepIndex !in steps.indices) return
+    if (stepIndex !in steps.indices || !visible) return
 
     val step = steps[stepIndex]
 
@@ -130,19 +135,34 @@ fun SettingsTourSpotlightOverlay(
     val fallbackTooltipHeightPx = with(density) { 178.dp.toPx() }
     var tooltipHeightPx by remember(stepIndex) { mutableFloatStateOf(0f) }
     val measuredTooltipHeightPx = tooltipHeightPx.takeIf { it > 0f } ?: fallbackTooltipHeightPx
-    val tooltipTopPx = if (centerTooltipWhenNoHighlight && highlightRect == null) {
-        ((screenHeightPx - measuredTooltipHeightPx) / 2f).coerceAtLeast(edgeMarginPx)
-    } else highlightRect?.let { rect ->
-        val roomBelow = screenHeightPx - rect.bottom - edgeMarginPx
-        val roomAbove = rect.top - edgeMarginPx
-        val preferBelow = roomBelow >= measuredTooltipHeightPx + tooltipGapPx || roomBelow >= roomAbove
-        val desiredTop = if (preferBelow) {
-            rect.bottom + tooltipGapPx
-        } else {
-            rect.top - measuredTooltipHeightPx - tooltipGapPx
+
+    fun computeTooltipTop(): Float {
+        return if (centerTooltipWhenNoHighlight && highlightRect == null) {
+            ((screenHeightPx - measuredTooltipHeightPx) / 2f).coerceAtLeast(edgeMarginPx)
+        } else highlightRect?.let { rect ->
+            val roomBelow = screenHeightPx - rect.bottom - edgeMarginPx
+            val roomAbove = rect.top - edgeMarginPx
+            val preferBelow = roomBelow >= measuredTooltipHeightPx + tooltipGapPx || roomBelow >= roomAbove
+            val desiredTop = if (preferBelow) {
+                rect.bottom + tooltipGapPx
+            } else {
+                rect.top - measuredTooltipHeightPx - tooltipGapPx
+            }
+            desiredTop.coerceIn(edgeMarginPx, screenHeightPx - measuredTooltipHeightPx - edgeMarginPx)
+        } ?: (screenHeightPx - measuredTooltipHeightPx - edgeMarginPx)
+    }
+
+    var lockedTooltipTopPx by remember(stepIndex) { mutableStateOf<Float?>(null) }
+    LaunchedEffect(stepIndex, highlightRect, visible, measuredTooltipHeightPx) {
+        if (!visible) {
+            lockedTooltipTopPx = null
+            return@LaunchedEffect
         }
-        desiredTop.coerceIn(edgeMarginPx, screenHeightPx - measuredTooltipHeightPx - edgeMarginPx)
-    } ?: (screenHeightPx - measuredTooltipHeightPx - edgeMarginPx)
+        if (lockedTooltipTopPx == null && (highlightRect != null || centerTooltipWhenNoHighlight)) {
+            lockedTooltipTopPx = computeTooltipTop()
+        }
+    }
+    val tooltipTopPx = lockedTooltipTopPx ?: computeTooltipTop()
 
 
 

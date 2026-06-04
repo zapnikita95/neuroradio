@@ -56,6 +56,7 @@ import androidx.core.content.ContextCompat
 import com.musicstory.app.MusicStoryApp
 import com.musicstory.app.R
 import com.musicstory.app.data.local.SettingsDataStore
+import com.musicstory.app.util.BackendUrlRules
 import com.musicstory.app.domain.AppPowerMode
 import com.musicstory.app.domain.LlmProvider
 import com.musicstory.app.domain.OrchestratorState
@@ -99,11 +100,13 @@ fun HomeScreen(
     val openRouterApiKey by app.settingsDataStore.openRouterApiKey.collectAsState(initial = "")
     val localOllamaUrl by app.settingsDataStore.localOllamaUrl.collectAsState(initial = SettingsDataStore.DEFAULT_LOCAL_OLLAMA_URL)
     val homeTourPending by app.settingsDataStore.homeTourPending.collectAsState(initial = false)
+    val backendUrl by app.settingsDataStore.backendUrl.collectAsState(initial = SettingsDataStore.DEFAULT_BACKEND_URL)
     val scope = rememberCoroutineScope()
 
     var tourStep by remember { mutableStateOf<Int?>(null) }
-    var tourTargetBounds by remember { mutableStateOf<Rect?>(null) }
-    var tourTargetCoords by remember { mutableStateOf<LayoutCoordinates?>(null) }
+    var tourBoundsByStep by remember { mutableStateOf<Map<Int, Rect>>(emptyMap()) }
+    var tourOverlayReady by remember { mutableStateOf(false) }
+    val homeScrollState = rememberScrollState()
 
     val tourSteps = remember(context) {
         listOf(
@@ -138,43 +141,34 @@ fun HomeScreen(
         if (homeTourPending) tourStep = 0
     }
 
-    LaunchedEffect(tourStep) {
-        if (tourStep == null) {
-            tourTargetBounds = null
-            tourTargetCoords = null
-        }
-    }
-
-    fun updateTourBounds(coords: LayoutCoordinates) {
-        tourTargetCoords = coords
-        tourTargetBounds = coords.boundsInRoot()
-    }
-
-    fun tourLayoutHandler(stepIndex: Int): (LayoutCoordinates) -> Unit = { coords ->
-        if (tourStep == stepIndex) updateTourBounds(coords)
+    fun recordTourBounds(stepIndex: Int, coords: LayoutCoordinates) {
+        tourBoundsByStep = tourBoundsByStep + (stepIndex to coords.boundsInRoot())
     }
 
     LaunchedEffect(tourStep) {
+        tourOverlayReady = false
         val step = tourStep ?: return@LaunchedEffect
         if (step == 0) {
-            tourTargetBounds = null
+            tourOverlayReady = true
             return@LaunchedEffect
         }
-        repeat(8) {
-            kotlinx.coroutines.delay(50)
-            tourTargetCoords?.let { updateTourBounds(it) }
-            if (tourTargetBounds != null && tourTargetBounds!!.height >= 4f) return@LaunchedEffect
-        }
+        kotlinx.coroutines.delay(220)
+        tourOverlayReady = true
     }
 
     val tourActive = tourStep != null
 
-    val hasApiKey = when (llmProvider) {
+    val hasOwnProviderKey = when (llmProvider) {
         LlmProvider.GROQ -> groqApiKey.isNotBlank()
         LlmProvider.GEMINI -> geminiApiKey.isNotBlank()
         LlmProvider.OPENROUTER -> openRouterApiKey.isNotBlank()
         LlmProvider.LOCAL -> localOllamaUrl.isNotBlank()
     }
+    val canUseServerStories = when (llmProvider) {
+        LlmProvider.LOCAL -> BackendUrlRules.isLanBackend(backendUrl) && localOllamaUrl.isNotBlank()
+        else -> backendUrl.trim().isNotBlank()
+    }
+    val showMissingKeyBanner = !hasOwnProviderKey && !canUseServerStories
 
     DisposableEffect(Unit) {
         onDispose {
@@ -262,7 +256,7 @@ fun HomeScreen(
                         onClick = onOpenHistory,
                         enabled = !tourActive,
                         modifier = Modifier.onGloballyPositioned { coords ->
-                            if (tourStep == 5) updateTourBounds(coords)
+                            recordTourBounds(5, coords)
                         },
                     ) {
                         Icon(
@@ -275,7 +269,7 @@ fun HomeScreen(
                         onClick = onOpenSettings,
                         enabled = !tourActive,
                         modifier = Modifier.onGloballyPositioned { coords ->
-                            if (tourStep == 4) updateTourBounds(coords)
+                            recordTourBounds(4, coords)
                         },
                     ) {
                         Icon(
@@ -291,7 +285,7 @@ fun HomeScreen(
                 modifier = Modifier
                     .weight(1f)
                     .fillMaxWidth()
-                    .verticalScroll(rememberScrollState())
+                    .verticalScroll(homeScrollState, enabled = !tourActive)
                     .padding(horizontal = 24.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.Top,
@@ -318,7 +312,7 @@ fun HomeScreen(
                     title = uiState.currentTrack?.title,
                     packageName = uiState.currentTrack?.packageName,
                     modifier = Modifier.onGloballyPositioned { coords ->
-                        if (tourStep == 1) updateTourBounds(coords)
+                        recordTourBounds(1, coords)
                     },
                 )
 
@@ -335,7 +329,7 @@ fun HomeScreen(
                         else -> uiState.tracksUntilNext
                     },
                     modifier = Modifier.onGloballyPositioned { coords ->
-                        if (tourStep == 2) updateTourBounds(coords)
+                        recordTourBounds(2, coords)
                     },
                 )
 
@@ -361,7 +355,7 @@ fun HomeScreen(
                     HintBanner(message = context.getString(R.string.hint_power_mode_parse_only))
                 }
 
-                if (!hasApiKey && isListening && powerMode == AppPowerMode.ON) {
+                if (showMissingKeyBanner && isListening && powerMode == AppPowerMode.ON) {
                     Spacer(modifier = Modifier.height(12.dp))
                     HintBanner(message = context.getString(R.string.hint_api_key_missing_banner))
                 }
@@ -410,7 +404,7 @@ fun HomeScreen(
                     .padding(horizontal = 20.dp)
                     .padding(bottom = 28.dp)
                     .onGloballyPositioned { coords ->
-                        if (tourStep == 3) updateTourBounds(coords)
+                        recordTourBounds(3, coords)
                     },
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
@@ -443,27 +437,32 @@ fun HomeScreen(
             }
         }
 
-            tourStep?.let { step ->
-                SettingsTourSpotlightOverlay(
-                    highlightRect = if (step == 0) null else tourTargetBounds,
-                    stepIndex = step,
-                    steps = tourSteps,
-                    centerTooltipWhenNoHighlight = step == 0,
-                    onControlsBottomChanged = {},
-                    onNext = {
-                        if (step >= tourSteps.lastIndex) {
+            if (tourOverlayReady) {
+                tourStep?.let { step ->
+                    SettingsTourSpotlightOverlay(
+                        highlightRect = if (step == 0) null else tourBoundsByStep[step],
+                        stepIndex = step,
+                        steps = tourSteps,
+                        centerTooltipWhenNoHighlight = step == 0,
+                        visible = true,
+                        onControlsBottomChanged = {},
+                        onNext = {
+                            tourOverlayReady = false
+                            if (step >= tourSteps.lastIndex) {
+                                tourStep = null
+                                scope.launch { app.settingsDataStore.setHomeTourCompleted(true) }
+                                onHomeTourFinishedOpenSettings()
+                            } else {
+                                tourStep = step + 1
+                            }
+                        },
+                        onSkip = {
                             tourStep = null
+                            tourOverlayReady = false
                             scope.launch { app.settingsDataStore.setHomeTourCompleted(true) }
-                            onHomeTourFinishedOpenSettings()
-                        } else {
-                            tourStep = step + 1
-                        }
-                    },
-                    onSkip = {
-                        tourStep = null
-                        scope.launch { app.settingsDataStore.setHomeTourCompleted(true) }
-                    },
-                )
+                        },
+                    )
+                }
             }
         }
     }

@@ -154,13 +154,9 @@ fun SettingsScreen(
     var tourStep by remember { mutableStateOf<Int?>(null) }
     var tourTargetBounds by remember { mutableStateOf<Rect?>(null) }
     var tourSectionCoords by remember { mutableStateOf<LayoutCoordinates?>(null) }
+    var tourOverlayReady by remember { mutableStateOf(false) }
     val density = LocalDensity.current
     val screenHeightPx = with(density) { LocalConfiguration.current.screenHeightDp.dp.toPx() }
-    val tourTallSteps = remember { setOf(3, 4, 6) }
-    val tourMaxCardHeightPx = remember(screenHeightPx) {
-        (screenHeightPx * 0.42f).coerceAtLeast(with(density) { 180.dp.toPx() })
-    }
-    val tourMaxCardHeight = tourMaxCardHeightPx?.let { with(density) { it.toDp() } }
     val tourSteps = remember {
         listOf(
             SettingsTourStep(context.getString(R.string.tour_step_mode_title), context.getString(R.string.tour_step_mode_body)),
@@ -173,19 +169,6 @@ fun SettingsScreen(
         )
     }
     val scrollState = rememberScrollState()
-
-    LaunchedEffect(tourPending) {
-        if (tourPending) tourStep = 0
-    }
-
-    LaunchedEffect(tourStep) {
-        if (tourStep == null) {
-            tourTargetBounds = null
-            tourSectionCoords = null
-        } else {
-            tourSectionCoords = null
-        }
-    }
 
     fun updateTourBounds(coords: LayoutCoordinates) {
         tourSectionCoords = coords
@@ -202,28 +185,41 @@ fun SettingsScreen(
             scrollState.animateScrollBy(delta)
             delay(320)
         }
+    }
+
+    LaunchedEffect(tourPending) {
+        if (tourPending) tourStep = 0
+    }
+
+    LaunchedEffect(tourStep) {
+        tourOverlayReady = false
+        tourTargetBounds = null
+        if (tourStep == null) {
+            tourSectionCoords = null
+            return@LaunchedEffect
+        }
+        tourSectionCoords = null
+        delay(280)
+        repeat(12) { attempt ->
+            val coords = tourSectionCoords
+            if (coords != null) {
+                centerTourSection(coords)
+                updateTourBounds(coords)
+                if (tourTargetBounds != null && tourTargetBounds!!.height >= 4f) {
+                    tourOverlayReady = true
+                    return@LaunchedEffect
+                }
+            }
+            delay(if (attempt == 0) 80L else 120L)
+        }
         tourSectionCoords?.let { updateTourBounds(it) }
+        tourOverlayReady = true
     }
 
     fun tourLayoutHandler(stepIndex: Int): ((LayoutCoordinates) -> Unit)? {
         if (tourStep != stepIndex) return null
         return { coords ->
-            updateTourBounds(coords)
-            scope.launch {
-                centerTourSection(coords)
-                updateTourBounds(tourSectionCoords ?: coords)
-            }
-        }
-    }
-
-    LaunchedEffect(tourStep) {
-        val step = tourStep ?: return@LaunchedEffect
-        repeat(4) { attempt ->
-            delay(if (attempt == 0) 80L else 180L)
-            val coords = tourSectionCoords ?: return@repeat
-            centerTourSection(coords)
-            updateTourBounds(coords)
-            if (tourTargetBounds != null && tourTargetBounds!!.height >= 4f) return@LaunchedEffect
+            tourSectionCoords = coords
         }
     }
 
@@ -362,7 +358,7 @@ fun SettingsScreen(
             Column(
                 modifier = Modifier
                     .fillMaxSize()
-                    .verticalScroll(scrollState)
+                    .verticalScroll(scrollState, enabled = tourStep == null)
                     .padding(20.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp),
             ) {
@@ -524,9 +520,9 @@ fun SettingsScreen(
                 CollapsibleSettingsSection(
                     title = context.getString(R.string.settings_narrator_section),
                     summary = storyNarrator.labelRu,
+                    tourHighlight = tourStep == 3,
                     forceExpanded = tourStep == 3,
                     tourActive = tourStep == 3,
-                    tourMaxHeight = if (tourStep == 3) tourMaxCardHeight else null,
                     onTourLayout = tourLayoutHandler(3),
                 ) {
                     StoryNarrator.entries.forEach { narrator ->
@@ -542,9 +538,9 @@ fun SettingsScreen(
                 CollapsibleSettingsSection(
                     title = context.getString(R.string.settings_voice_section),
                     summary = "${ttsVoice.labelRu} · ${ttsSpeed.labelRu} · ${storyLength.labelRu}",
+                    tourHighlight = tourStep == 4,
                     forceExpanded = tourStep == 4,
                     tourActive = tourStep == 4,
-                    tourMaxHeight = if (tourStep == 4) tourMaxCardHeight else null,
                     onTourLayout = tourLayoutHandler(4),
                 ) {
                     Text(
@@ -713,7 +709,6 @@ fun SettingsScreen(
                     tourHighlight = tourStep == 6,
                     forceExpanded = tourStep == 6,
                     tourActive = tourStep == 6,
-                    tourMaxHeight = if (tourStep == 6) tourMaxCardHeight else null,
                     onTourLayout = tourLayoutHandler(6),
                 ) {
                     var providerMenuExpanded by remember { mutableStateOf(false) }
@@ -1360,26 +1355,31 @@ fun SettingsScreen(
             }
         }
 
-            tourStep?.let { step ->
-                SettingsTourSpotlightOverlay(
-                    highlightRect = tourTargetBounds,
-                    stepIndex = step,
-                    steps = tourSteps,
-                    onControlsBottomChanged = {},
-                    onNext = {
-                        if (step >= tourSteps.lastIndex) {
+            if (tourOverlayReady) {
+                tourStep?.let { step ->
+                    SettingsTourSpotlightOverlay(
+                        highlightRect = tourTargetBounds,
+                        stepIndex = step,
+                        steps = tourSteps,
+                        visible = true,
+                        onControlsBottomChanged = {},
+                        onNext = {
+                            tourOverlayReady = false
+                            if (step >= tourSteps.lastIndex) {
+                                tourStep = null
+                                scope.launch { settings.setSettingsTourCompleted(true) }
+                                onBack()
+                            } else {
+                                tourStep = step + 1
+                            }
+                        },
+                        onSkip = {
                             tourStep = null
+                            tourOverlayReady = false
                             scope.launch { settings.setSettingsTourCompleted(true) }
-                            onBack()
-                        } else {
-                            tourStep = step + 1
-                        }
-                    },
-                    onSkip = {
-                        tourStep = null
-                        scope.launch { settings.setSettingsTourCompleted(true) }
-                    },
-                )
+                        },
+                    )
+                }
             }
         }
     }
@@ -1393,7 +1393,6 @@ private fun CollapsibleSettingsSection(
     tourHighlight: Boolean = false,
     forceExpanded: Boolean = false,
     tourActive: Boolean = false,
-    tourMaxHeight: Dp? = null,
     onTourLayout: ((LayoutCoordinates) -> Unit)? = null,
     content: @Composable ColumnScope.() -> Unit,
 ) {
@@ -1401,29 +1400,11 @@ private fun CollapsibleSettingsSection(
     LaunchedEffect(forceExpanded) {
         if (forceExpanded) expanded = true
     }
-    val tourContentScroll = rememberScrollState()
-    val useTourScroll = tourMaxHeight != null
-    val headerReserve = 52.dp
-    val scrollableMax = tourMaxHeight?.let { (it - headerReserve).coerceAtLeast(80.dp) }
     var sectionCoords by remember { mutableStateOf<LayoutCoordinates?>(null) }
-
-    LaunchedEffect(tourActive) {
-        if (tourActive && onTourLayout != null) {
-            delay(50)
-            sectionCoords?.let { onTourLayout(it) }
-        }
-    }
 
     GlassCard(
         modifier = Modifier
             .fillMaxWidth()
-            .then(
-                if (tourMaxHeight != null) {
-                    Modifier.heightIn(max = tourMaxHeight)
-                } else {
-                    Modifier
-                },
-            )
             .then(
                 if (onTourLayout != null) {
                     Modifier.onGloballyPositioned { coords ->
@@ -1434,6 +1415,7 @@ private fun CollapsibleSettingsSection(
                     Modifier
                 },
             ),
+        accentBorder = tourHighlight,
     ) {
         Row(
             modifier = Modifier
@@ -1472,17 +1454,7 @@ private fun CollapsibleSettingsSection(
             exit = shrinkVertically(),
         ) {
             Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .then(
-                        if (useTourScroll && scrollableMax != null) {
-                            Modifier
-                                .heightIn(max = scrollableMax)
-                                .verticalScroll(tourContentScroll)
-                        } else {
-                            Modifier
-                        },
-                    ),
+                modifier = Modifier.fillMaxWidth(),
             ) {
                 Spacer(modifier = Modifier.height(8.dp))
                 content()
