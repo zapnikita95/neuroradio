@@ -4,10 +4,18 @@ import { requireAppAuth } from '../middleware/app-auth.js';
 import { validateStoryFullBody } from '../middleware/validate-story.js';
 import { enrichTrackMetadata } from '../services/musicbrainz.js';
 import { fetchAggregatedFactContext } from '../services/fact-aggregator.js';
-import { explainReferenceFactSelection, pickReferenceFact } from '../services/fact-picker.js';
+import { explainReferenceFactSelection } from '../services/fact-picker.js';
 import { formatFactPickLog } from '../services/fact-interest-log.js';
 import { interestScore } from '../services/reference-fact-quality.js';
 import { interestRating10 } from '../services/fact-interest-log.js';
+import {
+  collectPreviousScripts,
+  ingestBundleToBank,
+  pickFactForUser,
+  prefetchArtistFactsToBank,
+  recordUserStory,
+} from '../services/fact-user-service.js';
+import { ingestFacts } from '../services/fact-bank.js';
 import { resolveArtistTier } from '../services/artist-notability.js';
 import { buildMetadataFallbackFacts } from '../services/metadata-facts.js';
 import { factAppliesToRequest } from '../services/fact-relevance.js';
@@ -22,7 +30,6 @@ import { fetchArtistWikiLead } from '../services/wikipedia-lead.js';
 import { translateWikiLeadToStory } from '../services/indie-wiki-story.js';
 import {
   pickArtistWikiContent,
-  recordArtistStoryForDepth,
 } from '../services/artist-wiki-depth.js';
 import { primaryArtistName } from '../services/artist-primary.js';
 import { countWords, sanitizeScriptForTts } from '../services/story-quality.js';
@@ -220,9 +227,13 @@ router.post('/full', validateStoryFullBody, async (req: Request, res: Response) 
     });
     const voiceId = coerceVoiceForSpeechKit(delivery.voiceId);
 
-    const previousScripts = Array.isArray(previousScriptsRaw)
+    const clientPreviousScripts = Array.isArray(previousScriptsRaw)
       ? previousScriptsRaw.filter((s): s is string => typeof s === 'string' && s.trim().length > 0)
       : [];
+    const accountPreviousScripts = collectPreviousScripts(installId, artist, title);
+    const previousScripts = [
+      ...new Set([...clientPreviousScripts, ...accountPreviousScripts]),
+    ];
 
     let factCtx = await fetchAggregatedFactContext(
       metadata.artist,
@@ -267,12 +278,15 @@ router.post('/full', validateStoryFullBody, async (req: Request, res: Response) 
       console.log(`[facts] metadata-only seeds (${metaFacts.length}) for "${metadata.artist}"`);
     }
 
-    let selectedFact = pickReferenceFact(
+    ingestBundleToBank(metadata.artist, metadata.title, factBundle);
+    prefetchArtistFactsToBank(installId, metadata.artist, metadata.title, factBundle);
+
+    let selectedFact = pickFactForUser(
+      installId,
       factBundle,
-      previousScripts,
-      previousScripts.length,
       metadata.artist,
       metadata.title,
+      previousScripts.length,
     );
     console.log(formatFactPickLog(selectedFact, 'rules'));
     let factHuntLlm = false;
@@ -298,6 +312,9 @@ router.post('/full', validateStoryFullBody, async (req: Request, res: Response) 
       if (hunted) {
         selectedFact = hunted;
         factHuntLlm = true;
+        ingestFacts(metadata.artist, metadata.title, [
+          { fact: hunted.fact, scope: hunted.scope, source: 'llm' },
+        ]);
         console.log(formatFactPickLog(selectedFact, 'llm'));
       }
     }
@@ -508,7 +525,12 @@ router.post('/full', validateStoryFullBody, async (req: Request, res: Response) 
 
     recordStoryGeneration(installId, req);
     if (selectedFact?.fact) {
-      recordArtistStoryForDepth(installId, metadata.artist, selectedFact.fact);
+      recordUserStory(installId, {
+        artist: metadata.artist,
+        title: metadata.title,
+        script: story.script,
+        seed: selectedFact,
+      });
     }
     attachStoryQuotaHeaders(res, installId);
     console.log(

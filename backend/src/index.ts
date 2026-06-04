@@ -8,6 +8,7 @@ import llmProbeRouter from './routes/llm-probe.js';
 import authRouter from './routes/auth.js';
 import syncRouter from './routes/sync.js';
 import billingRouter from './routes/billing.js';
+import accountAuthRouter from './routes/account-auth.js';
 import { isAppAuthEnabled } from './services/jwt.js';
 import { AUDIO_DIR } from './services/yandex-tts.js';
 import { hasGroqApiKey } from './services/groq.js';
@@ -137,6 +138,7 @@ app.get('/health', (_req, res) => {
 app.use('/v1/auth', authRouter);
 app.use('/v1/sync', syncRouter);
 app.use('/v1/billing', billingRouter);
+app.use('/v1/account', accountAuthRouter);
 app.use('/v1/llm', llmProbeRouter);
 app.use('/v1/story', storyRouter);
 
