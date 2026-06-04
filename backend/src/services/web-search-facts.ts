@@ -131,6 +131,10 @@ export async function fetchWebSearchFactSnippets(artist: string, title: string):
     console.log(
       `[web-search] ${artist} — ${title}: ${collected.length} snippets, ${queries.length} parallel HTML requests`,
     );
+    for (const [i, text] of collected.slice(0, 4).entries()) {
+      const preview = text.replace(/\s+/g, ' ').slice(0, 100);
+      console.log(`[web-search]   ${i + 1}. ${preview}${text.length > 100 ? '…' : ''}`);
+    }
   }
   return collected.slice(0, 14);
 }

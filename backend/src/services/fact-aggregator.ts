@@ -367,6 +367,15 @@ export async function fetchAggregatedFactContext(
     mbArtistRaw,
   );
 
+  if (rawSnippets.length > 0) {
+    console.log(`[facts] raw snippets (${rawSnippets.length}) for ${artist} — ${title}:`);
+    for (let i = 0; i < Math.min(5, rawSnippets.length); i++) {
+      const src = snippetSources[i] ?? '?';
+      const preview = rawSnippets[i]!.replace(/\s+/g, ' ').slice(0, 90);
+      console.log(`[facts]   ${i + 1}. [${src}] ${preview}${rawSnippets[i]!.length > 90 ? '…' : ''}`);
+    }
+  }
+
   return { bundle, rawSnippets, snippetSources };
 }
 

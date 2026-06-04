@@ -7,6 +7,7 @@ import { fetchAggregatedFactContext } from '../services/fact-aggregator.js';
 import { explainReferenceFactSelection } from '../services/fact-picker.js';
 import { formatFactPickLog } from '../services/fact-interest-log.js';
 import { interestScore } from '../services/reference-fact-quality.js';
+import { MIN_GOOD_SCOPE_INTEREST } from '../services/fact-picker.js';
 import { interestRating10 } from '../services/fact-interest-log.js';
 import {
   collectPreviousScripts,
@@ -298,7 +299,7 @@ router.post('/full', validateStoryFullBody, async (req: Request, res: Response) 
       console.log(
         `[fact-hunt-llm] start artist="${metadata.artist}" title="${metadata.title}" ` +
           `snippets=${factCtx.rawSnippets.length} models=${factModels.join(' → ')} ` +
-          `rulesInterest=${selectedFact?.interestRating ?? 0}/10`,
+          `rulesInterest=${selectedFact?.interestRating ?? 0}/10 score=${selectedFact?.interestScore ?? 0}`,
       );
       const hunted = await huntReferenceFactWithLlm({
         artist: metadata.artist,
@@ -318,6 +319,11 @@ router.post('/full', validateStoryFullBody, async (req: Request, res: Response) 
         ]);
         console.log(formatFactPickLog(selectedFact, 'llm'));
       }
+    } else if (selectedFact) {
+      console.log(
+        `[fact-hunt-llm] skip interest=${selectedFact.interestRating}/10 score=${selectedFact.interestScore} ` +
+          `(score≥${MIN_GOOD_SCOPE_INTEREST} and rating>5 — rules seed accepted) snippets=${factCtx.rawSnippets.length}`,
+      );
     }
 
     const selectedFactWhy = factHuntLlm
@@ -383,13 +389,23 @@ router.post('/full', validateStoryFullBody, async (req: Request, res: Response) 
       geminiModel,
       groqModel,
       openRouterModel: openrouterModelStory,
-      openRouterModels: resolveOpenRouterStoryModelsForTier(userTier),
+      openRouterModels: clientOwnOpenRouter
+        ? [openrouterModelStory]
+        : resolveOpenRouterStoryModelsForTier(userTier),
       clientGroqApiKey: clientLlmKeys.groq,
       clientGeminiApiKey: clientLlmKeys.gemini,
       clientOpenRouterApiKey: clientLlmKeys.openrouter,
       localOllamaBaseUrl: clientLocal.baseUrl,
       localOllamaModel: clientLocal.model,
     };
+
+    if (selectedFact?.fact) {
+      console.log(
+        formatFactPickLog(selectedFact, factHuntLlm ? 'llm' : 'rules') +
+          ` track="${metadata.title}" artist="${metadata.artist}"`,
+      );
+      console.log(`[story-seed-why] ${selectedFactWhy}`);
+    }
 
     const { story, llmUsed } = await (async () => {
       if (artistTier === 'indie') {
@@ -441,14 +457,6 @@ router.post('/full', validateStoryFullBody, async (req: Request, res: Response) 
       return generateStoryWithFallback(storyInput, llmProvider);
     })();
 
-    // Copy-friendly Railway logs: seed + final script with clear block markers.
-    if (selectedFact?.fact) {
-      console.log(
-        formatFactPickLog(selectedFact, factHuntLlm ? 'llm' : 'rules') +
-          ` track="${metadata.title}" artist="${metadata.artist}"`,
-      );
-      console.log(`[story-seed-why] ${selectedFactWhy}`);
-    }
     console.log(
       `[story-script] ${metadata.artist} — ${metadata.title} | llm=${llmUsed} | narrator=${storyNarrator} | words=${story.word_count}`,
     );

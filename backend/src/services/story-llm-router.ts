@@ -62,13 +62,28 @@ export async function generateStoryWithFallback(
     baseUrl: input.localOllamaBaseUrl,
     model: input.localOllamaModel,
   };
-  const chain = [
-    preferred,
-    ...alternateLlmProviders(preferred, clientKeys, clientLocal),
-  ].filter((provider) => hasLlmKeyForProvider(provider, clientKeys, clientLocal));
+  const clientOwnKey =
+    preferred === 'openrouter'
+      ? Boolean(input.clientOpenRouterApiKey?.trim())
+      : preferred === 'groq'
+        ? Boolean(input.clientGroqApiKey?.trim())
+        : preferred === 'gemini'
+          ? Boolean(input.clientGeminiApiKey?.trim())
+          : preferred === 'local'
+            ? Boolean(input.localOllamaBaseUrl?.trim())
+            : false;
+  const chain = (
+    clientOwnKey
+      ? [preferred]
+      : [preferred, ...alternateLlmProviders(preferred, clientKeys, clientLocal)]
+  ).filter((provider) => hasLlmKeyForProvider(provider, clientKeys, clientLocal));
 
   if (chain.length === 0) {
     throw new Error('No LLM API keys configured on server');
+  }
+
+  if (clientOwnKey && chain.length === 1) {
+    console.log(`[story-llm] own_key=true provider=${preferred} — no server fallback chain`);
   }
 
   let lastError: unknown;

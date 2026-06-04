@@ -198,12 +198,25 @@ export function storyNamesForeignArtist(
   title: string,
   referenceFacts: string[] = [],
 ): boolean {
-  return factNamesForeignEntity(
-    withoutQuotedSpans(script),
-    artist,
-    title,
-    referenceFacts.join('\n'),
-  );
+  const cleaned = withoutQuotedSpans(script);
+  const cleanTitle = title.replace(/\s*\([^)]*\)\s*/g, ' ').trim();
+  const allowed = referenceFacts.join('\n');
+
+  // Grounded story already names the artist — only reject clear other *bands* (2+ words), not member surnames.
+  if (factMentionsArtist(cleaned, artist)) {
+    for (const entity of extractNamedEntities(cleaned)) {
+      if (isContextEntity(entity)) continue;
+      if (isCriticAttribution(cleaned, entity)) continue;
+      if (entityMatchesArtist(entity, artist, cleanTitle)) continue;
+      const eNorm = normalize(entity);
+      if (eNorm.length < 3) continue;
+      if (allowed.length >= 8 && normalize(allowed).includes(eNorm)) continue;
+      if (eNorm.split(' ').length >= 2) return true;
+    }
+    return false;
+  }
+
+  return factNamesForeignEntity(cleaned, artist, cleanTitle, allowed);
 }
 
 export type RelevanceMode = 'strict' | 'indie';
