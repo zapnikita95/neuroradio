@@ -278,6 +278,51 @@ export function factMentionsTitle(fact: string, title: string): boolean {
   return normalize(fact).includes(titleNorm);
 }
 
+/** Другая песня того же артиста в кавычках — не семя для запрошенного трека. */
+export function factMentionsOtherTrackTitle(fact: string, title: string): boolean {
+  if (factMentionsTitle(fact, title)) return false;
+
+  const titleNorm = normalize(title.replace(/\s*\([^)]*\)\s*/g, ' '));
+  const factNorm = normalize(fact);
+
+  const otherSongPhrases = [
+    'wounded knee',
+    'we are the champions',
+    'we will rock you',
+    'seven seas of rhye',
+    'another one bites the dust',
+    'группа крови',
+    'кукушка',
+    'звезда по имени солнце',
+  ];
+  for (const phrase of otherSongPhrases) {
+    if (phrase === titleNorm || titleNorm.includes(phrase) || phrase.includes(titleNorm)) continue;
+    if (factNorm.includes(phrase)) return true;
+  }
+
+  for (const match of fact.matchAll(/[«"]([^»"]{4,80})[»"]/g)) {
+    const quoted = normalize(match[1]);
+    if (quoted.length < 4) continue;
+    if (quoted === titleNorm || titleNorm.includes(quoted) || quoted.includes(titleNorm)) continue;
+    if (/\b(?:album|альбом)\b/i.test(match[1]) || /\(\d{4}\)/.test(match[1])) continue;
+    if (/^(?:the|a|an)\s+/i.test(match[1])) continue;
+    return true;
+  }
+  return false;
+}
+
+export function isAlbumScopeFact(fact: string, title: string): boolean {
+  if (factMentionsTitle(fact, title)) return false;
+  if (/^(?:The song|This song|It was|The single|This track)\b/i.test(fact.trim())) return false;
+  if (/\b(?:promo track under the name|originally released as a promo|single cut is significantly shorter)\b/i.test(fact)) {
+    return false;
+  }
+  return (
+    /\b(?:from the album|on the album|on their (?:debut|self-titled|third|fourth|fifth|sixth) album|appears on the album|featured on their)\b/i.test(fact) ||
+    /(?:альбом[еау«»]|из\s+альбома|на\s+альбом)/i.test(fact)
+  );
+}
+
 /** Fact must belong to this artist/title — not a neighbour sentence from the wrong wiki page. */
 export function factAppliesToRequest(
   fact: string,
@@ -289,6 +334,7 @@ export function factAppliesToRequest(
   if (trimmed.length < 35) return false;
   if (isWebListicleJunk(trimmed)) return false;
   if (isWrongTitleMediumCollision(trimmed, title)) return false;
+  if (factMentionsOtherTrackTitle(trimmed, title)) return false;
   if (factNamesForeignEntity(trimmed, artist, title)) return false;
 
   const mentionsArtist = factMentionsArtist(trimmed, artist);
@@ -306,7 +352,10 @@ export function factAppliesToRequest(
   }
   if (mentionsTitle || mentionsArtist) return true;
   // Строки со страницы песни («The song was… Hail», «The single cut…») без повторного названия.
-  if (/^(?:The song|It|This track|This single|The single cut|The lyrics)\b/i.test(trimmed)) {
+  if (/^(?:The song|The video|The single|It|This track|This single|The single cut|The lyrics|Recording|According to|Mercury|He |They |Upon |During |After |When |While |In an interview)\b/i.test(trimmed)) {
+    return true;
+  }
+  if (/\b(?:music video|operatic section|studio session|composed the|wrote the|recorded at|took three weeks|no chorus)\b/i.test(trimmed)) {
     return true;
   }
   if (/\b(?:single cut is significantly shorter|promo track under the name)\b/i.test(trimmed)) {

@@ -308,7 +308,7 @@ router.post('/full', validateStoryFullBody, async (req: Request, res: Response) 
       );
       const fallbackFact = validatedPool[0];
       if (fallbackFact) {
-        const scope: 'track' | 'artist' = factAppliesToRequest(
+        const scope: 'track' | 'album' | 'artist' = factAppliesToRequest(
           fallbackFact,
           metadata.artist,
           metadata.title,

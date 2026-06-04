@@ -120,6 +120,7 @@ export function interestScore(fact: string): number {
     score += 12;
   }
   if (/(?:Виктор\s+Цой|Цой).*(?:198[0-9]|арми|запис|альбом|композици)/i.test(fact)) score += 14;
+  if (/(?:композици\w*|песн\w*).*?(?:цой|198[0-9])/i.test(fact)) score += 14;
   if (/(?:откос\w*|притвор\w*\s+сумасшедш|двойственн\w*\s+отношени\w*\s+к\s+арми)/i.test(fact)) score += 12;
   else if (/\boriginally\s+(?:titled|called|named)\b/i.test(fact)) score -= 20;
   else if (/\b(?:promo|album'?s first single|video game)\b/i.test(fact)) score -= 8;

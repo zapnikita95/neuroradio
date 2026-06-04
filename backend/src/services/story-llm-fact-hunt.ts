@@ -1,6 +1,6 @@
 import fetch from 'node-fetch';
 import type { SelectedReferenceFact } from './fact-picker.js';
-import { factNamesForeignEntity } from './fact-relevance.js';
+import { factNamesForeignEntity, factMentionsArtist } from './fact-relevance.js';
 import { interestScore, isBoringFact, MIN_PICK_INTEREST_SCORE } from './reference-fact-quality.js';
 import { WEAK_TRIVIA_PATTERNS, FACT_HUNT_LLM_PROMPT_BLOCK, highImpactBonus } from './story-fact-hunt.js';
 import { resolveGroqModelOrder } from './groq-models.js';
@@ -29,7 +29,7 @@ export interface LlmFactHuntInput {
 
 interface LlmFactHuntJson {
   fact?: string;
-  scope?: 'track' | 'artist';
+  scope?: 'track' | 'album' | 'artist';
   evidenceSnippetIndex?: number;
   evidenceQuote?: string;
   reject?: boolean;
@@ -95,7 +95,7 @@ export function validateLlmSeedCandidate(
   rawSnippets: string[],
   artist: string,
   title: string,
-): { ok: true; fact: string; scope: 'track' | 'artist'; snippetIndex: number } | { ok: false; reason: string } {
+): { ok: true; fact: string; scope: 'track' | 'album' | 'artist'; snippetIndex: number } | { ok: false; reason: string } {
   if (parsed.reject) {
     return { ok: false, reason: parsed.reason ?? 'llm rejected — no fact in snippets' };
   }
@@ -124,11 +124,19 @@ export function validateLlmSeedCandidate(
   if (factNamesForeignEntity(fact, artist, title)) {
     return { ok: false, reason: 'foreign entity in fact' };
   }
+  const artistNorm = normalize(artist);
+  if (/[\u0400-\u04FF]/.test(artist) && !factMentionsArtist(fact, artist)) {
+    const snippetHasArtist =
+      /(?:цой|кино|tsoi)/i.test(snippet) && /(?:цой|tsoi)/i.test(fact);
+    if (!snippetHasArtist) {
+      return { ok: false, reason: 'fact does not mention requested artist' };
+    }
+  }
   // Grounding is via verified evidenceQuote in snippet; fact may be Russian translation.
   if (/расизм|дискриминац|равенств\w*\s+и\s+справедливост/i.test(fact) && !/racis|discriminat|equal|justice|равенств|расизм/i.test(snippet)) {
     return { ok: false, reason: 'invented social theme' };
   }
-  const scope = parsed.scope === 'artist' ? 'artist' : 'track';
+  const scope = parsed.scope === 'artist' ? 'artist' : parsed.scope === 'album' ? 'album' : 'track';
   return { ok: true, fact, scope, snippetIndex: idx };
 }
 
@@ -148,7 +156,7 @@ function buildFactHuntSystemPrompt(): string {
 ${FACT_HUNT_LLM_PROMPT_BLOCK}
 
 Формат успеха:
-{"fact":"...","scope":"track"|"artist","evidenceSnippetIndex":0,"evidenceQuote":"..."}
+{"fact":"...","scope":"track"|"album"|"artist","evidenceSnippetIndex":0,"evidenceQuote":"..."}
 Формат отказа:
 {"reject":true,"reason":"..."}`;
 }
@@ -302,7 +310,12 @@ async function huntWithProvider(
   return {
     fact: validated.fact,
     scope: validated.scope,
-    scopeLabelRu: validated.scope === 'track' ? 'трек' : 'группа/артист',
+    scopeLabelRu:
+      validated.scope === 'track'
+        ? 'трек'
+        : validated.scope === 'album'
+          ? 'альбом'
+          : 'группа/артист',
   };
 }
 

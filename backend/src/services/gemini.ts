@@ -55,7 +55,7 @@ export interface GenerateStoryInput {
   storyNarrator?: StoryNarratorId;
   previousScripts?: string[];
   referenceFacts?: string[];
-  selectedReferenceFact?: { fact: string; scope: 'artist' | 'track'; scopeLabelRu: string };
+  selectedReferenceFact?: { fact: string; scope: 'artist' | 'track' | 'album'; scopeLabelRu: string };
   rawSnippets?: string[];
   geminiModel?: string;
   clientGeminiApiKey?: string;

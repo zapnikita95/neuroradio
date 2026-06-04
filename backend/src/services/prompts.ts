@@ -264,7 +264,7 @@ export function buildStoryUserPrompt(params: {
   previousScripts?: string[];
   retryReason?: string;
   referenceFacts?: string[];
-  selectedReferenceFact?: { fact: string; scope: 'artist' | 'track'; scopeLabelRu: string };
+  selectedReferenceFact?: { fact: string; scope: 'artist' | 'track' | 'album'; scopeLabelRu: string };
   rawSnippets?: string[];
   artistTier?: 'major' | 'indie';
 }): string {
@@ -454,7 +454,7 @@ export function buildLocalStoryUserPrompt(params: {
   previousScripts?: string[];
   retryReason?: string;
   referenceFacts?: string[];
-  selectedReferenceFact?: { fact: string; scope: 'artist' | 'track'; scopeLabelRu: string };
+  selectedReferenceFact?: { fact: string; scope: 'artist' | 'track' | 'album'; scopeLabelRu: string };
 }): string {
   const narratorId = resolveStoryNarrator(params.storyNarrator);
   const persona = buildPersonaForNarrator(

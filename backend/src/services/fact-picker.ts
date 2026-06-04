@@ -1,4 +1,8 @@
-import { factAppliesToRequest } from './fact-relevance.js';
+import {
+  factAppliesToRequest,
+  factMentionsOtherTrackTitle,
+  isAlbumScopeFact,
+} from './fact-relevance.js';
 import {
   filterAndRankFacts,
   interestScore,
@@ -8,8 +12,9 @@ import {
   MIN_PICK_INTEREST_SCORE,
 } from './reference-fact-quality.js';
 import { highImpactBonus, WEAK_TRIVIA_PATTERNS } from './story-fact-hunt.js';
+import { splitBundleByScope, type RankedFactScope } from './fact-ranking.js';
 
-export type FactScope = 'artist' | 'track';
+export type FactScope = RankedFactScope;
 
 export interface ReferenceFactBundle {
   artistFacts: string[];
@@ -21,6 +26,12 @@ export interface SelectedReferenceFact {
   scope: FactScope;
   scopeLabelRu: string;
 }
+
+const SCOPE_LABEL: Record<FactScope, string> = {
+  track: 'трек',
+  album: 'альбом',
+  artist: 'группа/артист',
+};
 
 function normalizeForMatch(text: string): string {
   return text
@@ -53,28 +64,32 @@ function factOverlapsPrevious(fact: string, previousScripts: string[]): boolean 
   return false;
 }
 
-function pickHighImpactFromPool(
-  facts: string[],
-  previousScripts: string[],
-): string | null {
-  const seedPriority = (fact: string): number => {
-    if (/(?:Виктор\s+Цой|Цой|1987\s+год|композици\w*|запис\w*\s+альбом)/i.test(fact)) return 3;
-    if (/\b(?:promo track under the name|originally released as a promo|withheld from release|banned by several radio|appeal to (?:a )?white|discrimination|heritage)\b/i.test(fact)) {
-      return 3;
-    }
-    if (/\b(?:single cut is significantly shorter|album version featuring an introductory)\b/i.test(fact)) {
-      return 1;
-    }
-    return 2;
-  };
-  const ranked = [...facts].sort((a, b) => {
+function seedPriority(fact: string): number {
+  if (/(?:Виктор\s+Цой|Цой|1987\s+год|композици\w*|запис\w*\s+альбом)/i.test(fact)) return 3;
+  if (/\b(?:promo track under the name|originally released as a promo|withheld from release|banned by several radio|appeal to (?:a )?white|discrimination|heritage)\b/i.test(fact)) {
+    return 3;
+  }
+  if (/\b(?:single cut is significantly shorter|album version featuring an introductory)\b/i.test(fact)) {
+    return 1;
+  }
+  return 2;
+}
+
+function sortCandidates(facts: string[]): string[] {
+  return [...facts].sort((a, b) => {
     const impact = highImpactBonus(b) - highImpactBonus(a);
     if (impact !== 0) return impact;
     const seed = seedPriority(b) - seedPriority(a);
     if (seed !== 0) return seed;
     return interestScore(b) - interestScore(a);
   });
-  for (const fact of ranked) {
+}
+
+function pickHighImpactFromPool(
+  facts: string[],
+  previousScripts: string[],
+): string | null {
+  for (const fact of sortCandidates(facts)) {
     if (WEAK_TRIVIA_PATTERNS.some((p) => p.test(fact))) continue;
     if (isBoringFact(fact)) continue;
     if (isCollectorFact(fact)) continue;
@@ -90,17 +105,13 @@ function pickFromPool(
   facts: string[],
   previousScripts: string[],
 ): string | null {
-  for (const fact of facts) {
+  for (const fact of sortCandidates(facts)) {
     if (isBoringFact(fact)) continue;
     if (isCollectorFact(fact)) continue;
     if (interestScore(fact) < MIN_PICK_INTEREST_SCORE) continue;
     if (!factOverlapsPrevious(fact, previousScripts)) return fact;
   }
   return null;
-}
-
-function normalize(text: string): string {
-  return text.trim().toLowerCase();
 }
 
 function pickBackstoryFromPool(
@@ -116,8 +127,24 @@ function pickBackstoryFromPool(
   return null;
 }
 
+function pickFromScopedPool(
+  facts: string[],
+  previousScripts: string[],
+): string | null {
+  return (
+    pickHighImpactFromPool(facts, previousScripts) ??
+    pickBackstoryFromPool(facts, previousScripts) ??
+    pickFromPool(facts, previousScripts)
+  );
+}
+
+function normalize(text: string): string {
+  return text.trim().toLowerCase();
+}
+
 /**
- * Alternate track vs artist facts; skip ones already covered in previous scripts.
+ * Иерархия: трек → альбом → группа/артист.
+ * Чужие названия песен отсекаются.
  */
 export function pickReferenceFact(
   bundle: ReferenceFactBundle,
@@ -126,101 +153,55 @@ export function pickReferenceFact(
   artist = '',
   title = '',
 ): SelectedReferenceFact | null {
-  const trackFacts = dedupeFacts(bundle.trackFacts).filter((f) =>
-    factAppliesToRequest(f, artist, title, 'track'),
-  );
-  const artistFacts = dedupeFacts(bundle.artistFacts).filter((f) =>
-    factAppliesToRequest(f, artist, title, 'artist'),
-  );
-  const preferTrack = storyIndex % 2 === 0;
+  const pools = splitBundleByScope(bundle, artist, title);
 
-  const primary = preferTrack ? trackFacts : artistFacts;
-  const fallback = preferTrack ? artistFacts : trackFacts;
-  const primaryScope: FactScope = preferTrack ? 'track' : 'artist';
-  const fallbackScope: FactScope = preferTrack ? 'artist' : 'track';
+  // Чётные истории — можно взять артиста, если трек/альбом уже были в previousScripts
+  const scopeOrder: FactScope[] =
+    storyIndex % 2 === 1 ? ['artist', 'album', 'track'] : ['track', 'album', 'artist'];
 
-  // 0) Strong biography/controversy beats chart trivia and weird backstory.
-  const impactPrimary = pickHighImpactFromPool(primary, previousScripts);
-  if (impactPrimary) {
-    return {
-      fact: impactPrimary,
-      scope: primaryScope,
-      scopeLabelRu: primaryScope === 'track' ? 'трек' : 'группа/артист',
-    };
-  }
-  const impactFallback = pickHighImpactFromPool(fallback, previousScripts);
-  if (impactFallback) {
-    return {
-      fact: impactFallback,
-      scope: fallbackScope,
-      scopeLabelRu: fallbackScope === 'track' ? 'трек' : 'группа/артист',
-    };
+  for (const scope of scopeOrder) {
+    const pool = pools[scope];
+    if (pool.length === 0) continue;
+    const picked = pickFromScopedPool(pool, previousScripts);
+    if (picked) {
+      return {
+        fact: picked,
+        scope,
+        scopeLabelRu: SCOPE_LABEL[scope],
+      };
+    }
   }
 
-  // 1) Soulful human backstory when no high-impact seed.
-  const backstoryPrimary = pickBackstoryFromPool(primary, previousScripts);
-  if (backstoryPrimary) {
-    return {
-      fact: backstoryPrimary,
-      scope: primaryScope,
-      scopeLabelRu: primaryScope === 'track' ? 'трек' : 'группа/артист',
-    };
-  }
-  const backstoryFallback = pickBackstoryFromPool(fallback, previousScripts);
-  if (backstoryFallback) {
-    return {
-      fact: backstoryFallback,
-      scope: fallbackScope,
-      scopeLabelRu: fallbackScope === 'track' ? 'трек' : 'группа/артист',
-    };
-  }
-
-  const primaryPick = pickFromPool(primary, previousScripts);
-  if (primaryPick) {
-    return {
-      fact: primaryPick,
-      scope: primaryScope,
-      scopeLabelRu: primaryScope === 'track' ? 'трек' : 'группа/артист',
-    };
-  }
-
-  const fallbackPick = pickFromPool(fallback, previousScripts);
-  if (fallbackPick) {
-    return {
-      fact: fallbackPick,
-      scope: fallbackScope,
-      scopeLabelRu: fallbackScope === 'track' ? 'трек' : 'группа/артист',
-    };
-  }
-
-  const anyPool = [...primary, ...fallback];
+  const anyPool = [...pools.track, ...pools.album, ...pools.artist];
   for (const fact of anyPool) {
     if (isBoringFact(fact)) continue;
     if (!factOverlapsPrevious(fact, previousScripts)) {
-      const scope = primary.includes(fact) ? primaryScope : fallbackScope;
-      return {
-        fact,
-        scope,
-        scopeLabelRu: scope === 'track' ? 'трек' : 'группа/артист',
-      };
+      const scope: FactScope = pools.track.includes(fact)
+        ? 'track'
+        : pools.album.includes(fact)
+          ? 'album'
+          : 'artist';
+      return { fact, scope, scopeLabelRu: SCOPE_LABEL[scope] };
     }
   }
 
   return null;
 }
 
-/**
- * Debug helper: explain why a specific fact was selected.
- * Used for docs/logging and future audits.
- */
 export function explainReferenceFactSelection(
   bundle: ReferenceFactBundle,
   selected: SelectedReferenceFact | null,
+  artist = '',
+  title = '',
 ): string {
   if (!selected) return 'No fact selected.';
-  const trackPool = dedupeFacts(bundle.trackFacts);
-  const artistPool = dedupeFacts(bundle.artistFacts);
-  const scopePool = selected.scope === 'track' ? trackPool : artistPool;
+  const pools = splitBundleByScope(bundle, artist, title);
+  const scopePool =
+    selected.scope === 'track'
+      ? pools.track
+      : selected.scope === 'album'
+        ? pools.album
+        : pools.artist;
   const fromPool = scopePool.some((fact) => normalize(fact) === normalize(selected.fact));
   const backstory = isBackstoryFact(selected.fact);
   const impact = highImpactBonus(selected.fact);
@@ -237,3 +218,6 @@ export function explainReferenceFactSelection(
 export function mergeReferenceFacts(bundle: ReferenceFactBundle, max = 6): string[] {
   return dedupeFacts([...bundle.trackFacts, ...bundle.artistFacts]).slice(0, max);
 }
+
+/** @deprecated internal — kept for tests importing scope helpers */
+export { isAlbumScopeFact, factMentionsOtherTrackTitle };

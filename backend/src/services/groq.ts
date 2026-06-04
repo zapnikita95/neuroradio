@@ -54,7 +54,7 @@ export interface GenerateStoryInput {
   storyNarrator?: StoryNarratorId;
   previousScripts?: string[];
   referenceFacts?: string[];
-  selectedReferenceFact?: { fact: string; scope: 'artist' | 'track'; scopeLabelRu: string };
+  selectedReferenceFact?: { fact: string; scope: 'artist' | 'track' | 'album'; scopeLabelRu: string };
   /** Raw source snippets — model picks seed + writes story in one shot (no separate fact-hunt). */
   rawSnippets?: string[];
   groqModel?: string;
