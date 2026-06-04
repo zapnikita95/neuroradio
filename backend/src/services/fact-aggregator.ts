@@ -9,6 +9,8 @@ import { fetchWebSearchFactSnippets } from './web-search-facts.js';
 const USER_AGENT = 'MusicStoryBFF/1.0 (contact@example.com)';
 const RAW_SNIPPET_MIN_LEN = 30;
 const RAW_SNIPPET_MAX = 12;
+/** Весь параллельный сбор фактов — иначе трек уже сменился. */
+const FACT_FETCH_BUDGET_MS = parseInt(process.env.FACT_FETCH_TIMEOUT_MS ?? '28000', 10);
 
 export type SnippetSource = 'wiki' | 'ddg' | 'web' | 'wikidata' | 'mb';
 
@@ -254,7 +256,7 @@ export async function fetchWikiBundleMerged(
   countryCode?: string,
 ): Promise<ReferenceFactBundle> {
   let wiki = await fetchWikipediaBundle(artist, title, countryCode);
-  if (wiki.trackFacts.length + wiki.artistFacts.length < 2) {
+  if (wiki.trackFacts.length + wiki.artistFacts.length < 2 && countryCode !== 'RU') {
     const wikiEn = await fetchWikipediaBundle(artist, title, 'US');
     wiki = {
       trackFacts: mergeFacts(wiki.trackFacts, wikiEn.trackFacts),
@@ -280,6 +282,10 @@ export async function fetchAggregatedFactContext(
     fetchMusicBrainzAnnotationsUnfiltered('recording', recordingMbid),
     fetchMusicBrainzAnnotationsUnfiltered('artist', artistMbid),
   ]);
+  const elapsed = Date.now() - t0;
+  if (elapsed > FACT_FETCH_BUDGET_MS) {
+    console.warn(`[facts] slow parallel fetch ${elapsed}ms (budget ${FACT_FETCH_BUDGET_MS}ms) ${artist} — ${title}`);
+  }
   console.log(
     `[facts] parallel fetch ${artist} — ${title}: ${Date.now() - t0}ms ` +
       `wiki=${wiki.trackFacts.length + wiki.artistFacts.length} ddg=${ddgUnfiltered.length} web=${webUnfiltered.length}`,

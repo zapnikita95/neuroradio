@@ -24,6 +24,8 @@ const BORING_FACT_PATTERNS: RegExp[] = [
   /\bdiscography\b/i,
   /\bthe\s+lyrics\s+(?:are|were|narrate)\b/i,
   /\b(?:appeared|featured|used)\s+in\b/i,
+  /(?:премьер\w*\s+фильм|фильм\s*«|военной\s+драм|картин\w*\s+рассказывает|в\s+кинотеатр)/i,
+  /\b(?:Netflix|F is for Family)\b/i,
   /\b(?:advert|commercial|ad\s+campaign)\b/i,
   /\bRimmel\b/i,
   /\bDie\s+Hard\b/i,
@@ -117,6 +119,8 @@ export function interestScore(fact: string): number {
   if (/\b(?:avoid discrimination|appeal to (?:a )?white|change their name|stage name|heritage)\b/i.test(fact)) {
     score += 12;
   }
+  if (/(?:Виктор\s+Цой|Цой).*(?:198[0-9]|арми|запис|альбом|композици)/i.test(fact)) score += 14;
+  if (/(?:откос\w*|притвор\w*\s+сумасшедш|двойственн\w*\s+отношени\w*\s+к\s+арми)/i.test(fact)) score += 12;
   else if (/\boriginally\s+(?:titled|called|named)\b/i.test(fact)) score -= 20;
   else if (/\b(?:promo|album'?s first single|video game)\b/i.test(fact)) score -= 8;
   const mediaHits = fact.match(

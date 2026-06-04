@@ -88,8 +88,56 @@ function extractNamedEntities(fact: string): string[] {
   for (const match of fact.matchAll(/\b([А-ЯЁ][а-яё]+(?:\s+[А-ЯЁ][а-яё]+){0,2})\b/g)) {
     entities.push(match[1]);
   }
+  const SKIP_SINGLE = new Set(
+    [
+      'the',
+      'this',
+      'that',
+      'when',
+      'where',
+      'like',
+      'with',
+      'from',
+      'they',
+      'their',
+      'there',
+      'these',
+      'those',
+      'song',
+      'album',
+      'band',
+      'group',
+      'single',
+      'radio',
+      'video',
+      'music',
+      'reddit',
+      'wikipedia',
+    ].map(normalize),
+  );
+  for (const match of fact.matchAll(/\b([A-Z][a-z]{2,18})\b/g)) {
+    const name = match[1];
+    if (SKIP_SINGLE.has(normalize(name))) continue;
+    entities.push(name);
+  }
 
   return dedupe(entities);
+}
+
+/** Мусор из HTML-поиска: списки «1. …», чужие хиты без связи с артистом. */
+const WEB_LISTICLE_JUNK =
+  /^\s*\d+\.\s*["«]|©Reddit|©\w{2,}\b|When\s+[A-Z][a-z]+\s+mixed\b/i;
+
+export function isWebListicleJunk(fact: string): boolean {
+  return WEB_LISTICLE_JUNK.test(fact.trim());
+}
+
+/** Тот же заголовок, но про фильм/сериал — не про песню. */
+export function isWrongTitleMediumCollision(fact: string, title: string): boolean {
+  const titleNorm = normalize(title.replace(/\s*\([^)]*\)\s*/g, ' '));
+  if (titleNorm.length < 4) return false;
+  if (!normalize(fact).includes(titleNorm)) return false;
+  return /(?:премьер\w*\s+фильм|фильм\s*«|военной\s+драм|картин\w*\s+рассказывает|в\s+кинотеатр|Netflix|сериал)/i.test(fact);
 }
 
 /**
@@ -239,6 +287,8 @@ export function factAppliesToRequest(
 ): boolean {
   const trimmed = fact.trim();
   if (trimmed.length < 35) return false;
+  if (isWebListicleJunk(trimmed)) return false;
+  if (isWrongTitleMediumCollision(trimmed, title)) return false;
   if (factNamesForeignEntity(trimmed, artist, title)) return false;
 
   const mentionsArtist = factMentionsArtist(trimmed, artist);
@@ -246,14 +296,12 @@ export function factAppliesToRequest(
 
   if (scope === 'artist') {
     if (mentionsArtist) return true;
-    // Строки со страницы группы (бан Wounded Knee и т.п.) не повторяют имя в каждом предложении.
-    if (!factNamesForeignEntity(trimmed, artist, title, artist)) return true;
-    // Web-сниппеты: Vegas / discrimination / heritage без слова «Redbone».
-    if (
-      /\b(?:Vegas|Vasquez|discrimination|heritage|Native American|appeal to (?:a )?white)\b/i.test(trimmed)
-    ) {
-      return true;
-    }
+    // Страница группы / ударный контекст — без чужих имён (Madonna и т.п.).
+    const bandPageContext =
+      /^(?:The band|They |Their |Members |He |She |It was|The group|According to)\b/i.test(trimmed) ||
+      /\b(?:Wounded Knee|banned by several radio|withheld from release|Native American|heritage|Vasquez|Vegas)\b/i.test(trimmed) ||
+      /(?:группа|песн|альбом|запрет|цензур|арми|Цой|Тсо[йи])/i.test(trimmed);
+    if (bandPageContext && !factNamesForeignEntity(trimmed, artist, title, artist)) return true;
     return false;
   }
   if (mentionsTitle || mentionsArtist) return true;

@@ -4,6 +4,7 @@ import {
   interestScore,
   isBackstoryFact,
   isBoringFact,
+  isCollectorFact,
   MIN_PICK_INTEREST_SCORE,
 } from './reference-fact-quality.js';
 import { highImpactBonus, WEAK_TRIVIA_PATTERNS } from './story-fact-hunt.js';
@@ -56,10 +57,27 @@ function pickHighImpactFromPool(
   facts: string[],
   previousScripts: string[],
 ): string | null {
-  const ranked = [...facts].sort((a, b) => interestScore(b) - interestScore(a));
+  const seedPriority = (fact: string): number => {
+    if (/(?:Виктор\s+Цой|Цой|1987\s+год|композици\w*|запис\w*\s+альбом)/i.test(fact)) return 3;
+    if (/\b(?:promo track under the name|originally released as a promo|withheld from release|banned by several radio|appeal to (?:a )?white|discrimination|heritage)\b/i.test(fact)) {
+      return 3;
+    }
+    if (/\b(?:single cut is significantly shorter|album version featuring an introductory)\b/i.test(fact)) {
+      return 1;
+    }
+    return 2;
+  };
+  const ranked = [...facts].sort((a, b) => {
+    const impact = highImpactBonus(b) - highImpactBonus(a);
+    if (impact !== 0) return impact;
+    const seed = seedPriority(b) - seedPriority(a);
+    if (seed !== 0) return seed;
+    return interestScore(b) - interestScore(a);
+  });
   for (const fact of ranked) {
     if (WEAK_TRIVIA_PATTERNS.some((p) => p.test(fact))) continue;
     if (isBoringFact(fact)) continue;
+    if (isCollectorFact(fact)) continue;
     if (interestScore(fact) < MIN_PICK_INTEREST_SCORE) continue;
     if (highImpactBonus(fact) < 6) continue;
     if (factOverlapsPrevious(fact, previousScripts)) continue;
@@ -74,6 +92,7 @@ function pickFromPool(
 ): string | null {
   for (const fact of facts) {
     if (isBoringFact(fact)) continue;
+    if (isCollectorFact(fact)) continue;
     if (interestScore(fact) < MIN_PICK_INTEREST_SCORE) continue;
     if (!factOverlapsPrevious(fact, previousScripts)) return fact;
   }

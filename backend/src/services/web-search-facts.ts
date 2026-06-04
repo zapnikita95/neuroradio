@@ -23,11 +23,21 @@ function decodeHtml(s: string): string {
 /** Узкие запросы под интервью/скандалы — не в instant DDG. */
 export function buildWebOnlyQueries(artist: string, title: string): string[] {
   const cleanTitle = title.replace(/\s*\([^)]*\)\s*/g, ' ').trim();
+  const cyrillic = /[\u0400-\u04FF]/.test(artist + title);
+  if (cyrillic) {
+    const lead = artist.trim().toLowerCase() === 'кино' ? 'Виктор Цой Кино' : artist;
+    return [
+      `${lead} ${cleanTitle} история песня смысл`,
+      `${artist} ${cleanTitle} запись цензура`,
+      `${lead} биография скандал армия`,
+      `${artist} (группа) ${cleanTitle} факт`,
+    ].slice(0, MAX_HTML_QUERIES);
+  }
   return [
-    `${artist} Vasquez Vegas stage name appeal white audience`,
-    `${artist} Pat Lolly Vegas changed name interview`,
-    `${artist} ${cleanTitle} radio stations refused controversy`,
-    `${artist} Native American band Jimi Hendrix interview`,
+    `${artist} ${cleanTitle} controversy interview meaning`,
+    `${artist} ${cleanTitle} radio banned refused`,
+    `${artist} biography scandal heritage interview`,
+    `${artist} ${cleanTitle} hidden meaning origin story`,
   ].slice(0, MAX_HTML_QUERIES);
 }
 

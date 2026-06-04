@@ -186,13 +186,17 @@ function buildTrackTitleCandidates(artist: string, title: string): string[] {
 }
 
 function buildArtistTitleCandidates(artist: string): string[] {
-  return [
+  const base = [
     `${artist} (band)`,
     `${artist} (musical group)`,
     `${artist} (musician)`,
     `${artist} (singer)`,
     artist,
-  ].filter((value, index, arr) => value.length > 1 && arr.indexOf(value) === index);
+  ];
+  if (/^[\p{Script=Cyrillic}]{2,12}$/u.test(artist.trim())) {
+    base.unshift(`${artist} (группа)`, `${artist} (музыкальная группа)`);
+  }
+  return base.filter((value, index, arr) => value.length > 1 && arr.indexOf(value) === index);
 }
 
 function buildTrackSearchQueries(artist: string, title: string): string[] {
@@ -206,13 +210,17 @@ function buildTrackSearchQueries(artist: string, title: string): string[] {
 }
 
 function buildArtistSearchQueries(artist: string): string[] {
-  return [
+  const base = [
     `${artist} band`,
     `${artist} musical group`,
     `${artist} musician`,
     `${artist} singer`,
     artist,
   ];
+  if (/^[\p{Script=Cyrillic}]{2,12}$/u.test(artist.trim())) {
+    base.unshift(`${artist} группа`, `${artist} (группа)`);
+  }
+  return base;
 }
 
 function isDisambiguationExtract(text: string): boolean {
