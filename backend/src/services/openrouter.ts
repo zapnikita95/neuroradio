@@ -20,6 +20,7 @@ import { callOpenAiChatCompletion, OpenAiChatError } from './llm-openai-chat.js'
 import {
   qualityOptionsForOpenRouterAttempt,
   validateGeneratedStory,
+  finalizeAfterQualityLoop,
 } from './story-generate-loop.js';
 import type { GenerateStoryInput, StoryScript } from './groq.js';
 import { logRejectedScript } from './story-reject-log.js';
@@ -129,14 +130,15 @@ export async function generateStoryScript(
 
   const models = [
     ...new Set(
-      [
-        ...(input.openRouterModels ?? []),
-        input.openRouterModel,
-        resolveOpenRouterModel(input.openRouterModel, 'story'),
-      ].filter((m): m is string => Boolean(m?.trim())),
+      [input.openRouterModel, ...(input.openRouterModels ?? [])].filter((m): m is string =>
+        Boolean(m?.trim()),
+      ),
     ),
   ];
-  if (models.length === 0) throw new Error('No OpenRouter model configured');
+  if (models.length === 0) {
+    throw new Error('No OpenRouter model configured');
+  }
+  console.log(`[openrouter] story model chain: ${models.join(' → ')}`);
 
   let lastCandidate: StoryScript | null = null;
   let lastError: Error | undefined;
@@ -163,7 +165,10 @@ export async function generateStoryScript(
 
         const story = parseStoryJson(content);
         if (!story) {
-          throw new Error('OpenRouter returned invalid story JSON');
+          console.warn(
+            `[openrouter] model=${model} invalid JSON, snippet=${content.slice(0, 160).replace(/\s+/g, ' ')}`,
+          );
+          break;
         }
 
         story.voiceId = voiceId;
@@ -215,6 +220,15 @@ export async function generateStoryScript(
       }
     }
   }
+
+  const fallback = finalizeAfterQualityLoop(
+    lastCandidate,
+    { artist: input.artist, title: input.title },
+    (s) => finalizeStory(s, { ...input, voiceId }, storyLength),
+    referenceFacts,
+    { relaxForWeakLlm: referenceFacts.length > 0 },
+  );
+  if (fallback) return fallback;
 
   throw new Error(
     lastCandidate

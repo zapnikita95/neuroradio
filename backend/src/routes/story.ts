@@ -304,7 +304,13 @@ router.post('/full', validateStoryFullBody, async (req: Request, res: Response) 
     let factHuntLlm = false;
     const bundleFactCount = trackFactCount + artistFactCount;
 
-    if (shouldRunLlmFactHunt(selectedFact, factCtx.rawSnippets.length, bundleFactCount, trackFactCount)) {
+    if (shouldRunLlmFactHunt(
+      selectedFact,
+      factCtx.rawSnippets.length,
+      bundleFactCount,
+      trackFactCount,
+      metadata.title,
+    )) {
       const factModels = resolveOpenRouterFactModelsForTier(userTier);
       console.log(
         `[fact-hunt-llm] start artist="${metadata.artist}" title="${metadata.title}" ` +
@@ -470,7 +476,9 @@ router.post('/full', validateStoryFullBody, async (req: Request, res: Response) 
           }
         }
       }
-      return generateStoryWithFallback(storyInput, llmProvider);
+      return generateStoryWithFallback(storyInput, llmProvider, {
+        serverManaged: userTier === 'free' && !ownLlmKey,
+      });
     })();
 
     timing.mark('story-text', `llm=${llmUsed} words=${story.word_count}`);

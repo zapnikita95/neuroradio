@@ -20,6 +20,7 @@ import { resolveGroqModelOrder } from './groq-models.js';
 import {
   finalizeAfterQualityLoop,
   qualityOptionsForAttempt,
+  qualityOptionsForOpenRouterAttempt,
   validateGeneratedStory,
 } from './story-generate-loop.js';
 import { logRejectedScript } from './story-reject-log.js';
@@ -282,7 +283,10 @@ export async function generateStoryScript(
 
     story.voiceId = voiceId;
     story.word_count = countWords(story.script);
-    const qOpts = qualityOptionsForAttempt(attempt, MAX_ATTEMPTS, referenceFacts);
+    const qOpts =
+      referenceFacts.length > 0
+        ? qualityOptionsForOpenRouterAttempt(attempt, MAX_ATTEMPTS, referenceFacts)
+        : qualityOptionsForAttempt(attempt, MAX_ATTEMPTS, referenceFacts);
     qOpts.previousScripts = previousScripts;
 
     const quality = validateGeneratedStory(
@@ -323,6 +327,7 @@ export async function generateStoryScript(
     { artist: input.artist, title: input.title },
     (s) => finalizeStory(s, { ...input, voiceId }, storyLength),
     referenceFacts,
+    { relaxForWeakLlm: referenceFacts.length > 0 },
   );
   if (fallback) return fallback;
 

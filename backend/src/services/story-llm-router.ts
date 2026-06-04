@@ -14,10 +14,15 @@ import {
 } from './openrouter.js';
 import { generateStoryScriptLocal } from './local-ollama-story.js';
 import {
-  alternateLlmProviders,
+  alternateStoryLlmProviders,
   hasLlmKeyForProvider,
   type LlmProviderId,
 } from './llm-provider.js';
+
+export interface StoryGenerationOptions {
+  /** Free tier on Railway — only OpenRouter model chain, no Groq/Gemini/local fallback. */
+  serverManaged?: boolean;
+}
 
 export interface StoryGenerationResult {
   story: StoryScript;
@@ -52,6 +57,7 @@ function inputForProvider(
 export async function generateStoryWithFallback(
   input: GenerateStoryInput,
   preferred: LlmProviderId,
+  options: StoryGenerationOptions = {},
 ): Promise<StoryGenerationResult> {
   const clientKeys = {
     groq: input.clientGroqApiKey,
@@ -75,7 +81,7 @@ export async function generateStoryWithFallback(
   const chain = (
     clientOwnKey
       ? [preferred]
-      : [preferred, ...alternateLlmProviders(preferred, clientKeys, clientLocal)]
+      : [preferred, ...alternateStoryLlmProviders(preferred, clientKeys, clientLocal, options)]
   ).filter((provider) => hasLlmKeyForProvider(provider, clientKeys, clientLocal));
 
   if (chain.length === 0) {
@@ -84,6 +90,8 @@ export async function generateStoryWithFallback(
 
   if (clientOwnKey && chain.length === 1) {
     console.log(`[story-llm] own_key=true provider=${preferred} — no server fallback chain`);
+  } else if (options.serverManaged) {
+    console.log('[story-llm] serverManaged=true — OpenRouter only, no Groq/Gemini fallback');
   }
 
   let lastError: unknown;

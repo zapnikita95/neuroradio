@@ -30,6 +30,9 @@ export function clientKeyForProvider(
 
 export const LLM_PROVIDER_ORDER: LlmProviderId[] = ['openrouter', 'groq', 'gemini', 'local'];
 
+/** Story generation — no Gemini (quota) or local Ollama on Railway. */
+export const STORY_LLM_FALLBACK_ORDER: LlmProviderId[] = ['openrouter', 'groq'];
+
 function isKnownProvider(raw: string): raw is LlmProviderId {
   return raw === 'openrouter' || raw === 'groq' || raw === 'gemini' || raw === 'local';
 }
@@ -66,6 +69,19 @@ export function alternateLlmProviders(
   clientLocal?: ClientLocalOllama,
 ): LlmProviderId[] {
   return LLM_PROVIDER_ORDER.filter(
+    (p) => p !== preferred && hasLlmKeyForProvider(p, clientKeys, clientLocal),
+  );
+}
+
+/** Server-managed free tier: OpenRouter only. Paid/own-key: OpenRouter → Groq, never Gemini/local. */
+export function alternateStoryLlmProviders(
+  preferred: LlmProviderId,
+  clientKeys?: ClientLlmKeys,
+  clientLocal?: ClientLocalOllama,
+  options: { serverManaged?: boolean } = {},
+): LlmProviderId[] {
+  if (options.serverManaged) return [];
+  return STORY_LLM_FALLBACK_ORDER.filter(
     (p) => p !== preferred && hasLlmKeyForProvider(p, clientKeys, clientLocal),
   );
 }

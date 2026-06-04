@@ -3,6 +3,7 @@ import {
   OPENROUTER_DEFAULT_FACT_MODEL,
   OPENROUTER_DEFAULT_FREE_FACT_MODEL,
   OPENROUTER_DEFAULT_STORY_MODEL,
+  OPENROUTER_FREE_FACT_MODEL_FALLBACK,
   OPENROUTER_TRIAL_FACT_MODEL,
   isOpenRouterPresetModel,
   resolveOpenRouterFactModelOrder,
@@ -99,10 +100,14 @@ export function resolveOpenRouterFactModelsForTier(tier: UserTier): string[] {
   return [TIER_OPENROUTER_FACT_MODEL];
 }
 
-/** Free tier: Gemma first, Liquid as last resort. */
+/** Free tier: Gemma → Nemotron → Liquid (Liquid often invalid JSON). */
 export function resolveOpenRouterStoryModelsForTier(tier: UserTier): string[] {
   if (tier === 'free') {
-    return [OPENROUTER_DEFAULT_FREE_FACT_MODEL, OPENROUTER_DEFAULT_STORY_MODEL];
+    return [
+      OPENROUTER_DEFAULT_FREE_FACT_MODEL,
+      OPENROUTER_FREE_FACT_MODEL_FALLBACK,
+      OPENROUTER_DEFAULT_STORY_MODEL,
+    ];
   }
   if (tier === 'trial') {
     return [TIER_OPENROUTER_FACT_MODEL, OPENROUTER_DEFAULT_STORY_MODEL];

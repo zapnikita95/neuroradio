@@ -1,6 +1,6 @@
 import fetch from 'node-fetch';
 import type { SelectedReferenceFact } from './fact-picker.js';
-import { factNamesForeignEntity, factMentionsArtist } from './fact-relevance.js';
+import { factNamesForeignEntity, factMentionsArtist, factMentionsTitle } from './fact-relevance.js';
 import { interestScore, isBoringFact, MIN_PICK_INTEREST_SCORE, isWeakChartSeed } from './reference-fact-quality.js';
 import { interestRating10 } from './fact-interest-log.js';
 import { MIN_GOOD_SCOPE_INTEREST } from './fact-picker.js';
@@ -70,11 +70,16 @@ export function shouldRunLlmFactHunt(
   rawSnippetCount: number,
   bundleFactCount: number,
   trackFactCount = 0,
+  title = '',
 ): boolean {
   if (rawSnippetCount < 2) return false;
   if (!selected) return bundleFactCount === 0;
   // No track-level facts — artist trivia is weak for a specific song; let LLM hunt from snippets.
   if (trackFactCount === 0 && selected.scope !== 'track') return true;
+  // Track-scoped fact that never mentions the song title — wrong wiki chunk (e.g. band name origin).
+  if (selected.scope === 'track' && title.trim() && !factMentionsTitle(selected.fact, title)) {
+    return true;
+  }
   if (selected.interestRating <= 5 || selected.interestScore < MIN_GOOD_SCOPE_INTEREST) return true;
   if (WEAK_TRIVIA_PATTERNS.some((p) => p.test(selected.fact))) return true;
   if (isWeakChartSeed(selected.fact)) return true;
