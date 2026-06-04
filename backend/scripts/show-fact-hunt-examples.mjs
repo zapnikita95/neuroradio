@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Production-like fact-hunt examples — uses real prompt + validator.
+ * Production fact pipeline demo — real Wikipedia/DDG snippets only.
  * Run: npm run build && node scripts/show-fact-hunt-examples.mjs
  */
 import { readFileSync, existsSync } from 'node:fs';
@@ -27,99 +27,52 @@ function loadEnvFile(path) {
 loadEnvFile(resolve(repoRoot, '.env'));
 loadEnvFile(resolve(root, '.env'));
 
-const apiKey = process.env.OPEN_ROUTER_API_KEY?.trim();
-if (!apiKey) {
-  console.error('OPEN_ROUTER_API_KEY missing');
-  process.exit(1);
-}
+const ARTIST = 'Redbone';
+const TITLE = 'Come and Get Your Love';
 
-const { FACT_HUNT_LLM_PROMPT_BLOCK } = await import('../dist/services/story-fact-hunt.js');
-const { validateLlmSeedCandidate } = await import('../dist/services/story-llm-fact-hunt.js');
+const { fetchAggregatedFactContext } = await import('../dist/services/fact-aggregator.js');
+const { pickReferenceFact, explainReferenceFactSelection } = await import('../dist/services/fact-picker.js');
 const { interestScore } = await import('../dist/services/reference-fact-quality.js');
+const { highImpactBonus, WEAK_TRIVIA_PATTERNS } = await import('../dist/services/story-fact-hunt.js');
+const { shouldRunLlmFactHunt, huntReferenceFactWithLlm } = await import('../dist/services/story-llm-fact-hunt.js');
 
-const MODELS = [
-  'deepseek/deepseek-chat-v3-0324',
-  'nvidia/nemotron-3-nano-30b-a3b:free',
-  'google/gemma-4-26b-a4b-it',
-];
+console.log(`=== ${ARTIST} — ${TITLE} (живые источники) ===\n`);
 
-/** Сниппеты как в жизни: чарт есть, но есть и биография — модель должна взять биографию */
-const SNIPPETS = [
-  'Pat and Lafe Vegas formed Redbone in 1969; the name refers to a Cajun term for a mixed-race person, reflecting their Native American and Mexican-American heritage.',
-  'Before their breakthrough, the brothers performed in Los Angeles clubs and were often marketed as a Latin band rather than as Native American musicians.',
-  'Come and Get Your Love reached No. 5 on the Billboard Hot 100 in April 1974.',
-  'Pat Vegas later said the band faced racism from radio programmers who refused to play their records or pigeonholed them by ethnicity.',
-  'The song was used in the 2014 film Guardians of the Galaxy, which led to a streaming revival decades after release.',
-];
+const ctx = await fetchAggregatedFactContext(ARTIST, TITLE, 'US');
+console.log('RAW SNIPPETS (wiki/ddg, без чарт-мусора в raw):');
+ctx.rawSnippets.forEach((s, i) => console.log(`${i}. ${s.slice(0, 220)}${s.length > 220 ? '…' : ''}`));
 
-const system = `Ты — исследователь музыкальных фактов. Отвечай ТОЛЬКО валидным JSON.
-${FACT_HUNT_LLM_PROMPT_BLOCK}
+console.log('\nTOP TRACK FACTS:');
+ctx.bundle.trackFacts.slice(0, 5).forEach((f, i) => {
+  console.log(`${i}. score=${interestScore(f)} impact=${highImpactBonus(f)} weak=${WEAK_TRIVIA_PATTERNS.some((p) => p.test(f))}`);
+  console.log(`   ${f.slice(0, 200)}${f.length > 200 ? '…' : ''}`);
+});
 
-Формат успеха:
-{"fact":"...","scope":"track"|"artist","evidenceSnippetIndex":0,"evidenceQuote":"..."}
-Формат отказа:
-{"reject":true,"reason":"..."}`;
+console.log('\nTOP ARTIST FACTS:');
+ctx.bundle.artistFacts.slice(0, 5).forEach((f, i) => {
+  console.log(`${i}. score=${interestScore(f)} impact=${highImpactBonus(f)}`);
+  console.log(`   ${f.slice(0, 200)}${f.length > 200 ? '…' : ''}`);
+});
 
-const user = [
-  'Артист: Redbone',
-  'Трек: Come and Get Your Love',
-  'Год: 1974',
-  '',
-  'СНИППЕТЫ (выбери один для семени):',
-  ...SNIPPETS.map((s, i) => `${i}. ${s}`),
-].join('\n');
+let picked = pickReferenceFact(ctx.bundle, [], 0, ARTIST, TITLE);
+console.log('\nPICKED (rule-based):');
+console.log(picked?.fact ?? '(none)');
+console.log(explainReferenceFactSelection(ctx.bundle, picked));
 
-console.log('=== ВХОД: сниппеты (есть чарт #2, но есть биография/расизм) ===\n');
-SNIPPETS.forEach((s, i) => console.log(`${i}. ${s}\n`));
-
-for (const model of MODELS) {
-  console.log('\n' + '='.repeat(64));
-  console.log('МОДЕЛЬ:', model);
-  console.log('='.repeat(64));
-  const started = Date.now();
-  try {
-    const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        'Content-Type': 'application/json',
-        'HTTP-Referer': 'https://music-story.app',
-        'X-Title': 'Music Story examples',
-      },
-      body: JSON.stringify({
-        model,
-        temperature: 0.22,
-        max_tokens: 512,
-        response_format: { type: 'json_object' },
-        messages: [
-          { role: 'system', content: system },
-          { role: 'user', content: user },
-        ],
-      }),
-      signal: AbortSignal.timeout(90000),
-    });
-    const ms = Date.now() - started;
-    const body = await res.text();
-    if (!res.ok) {
-      console.log(`HTTP ${res.status}:`, body.slice(0, 400));
-      continue;
-    }
-    const data = JSON.parse(body);
-    const raw = data.choices?.[0]?.message?.content ?? '';
-    const parsed = JSON.parse(raw.match(/\{[\s\S]*\}/)?.[0] ?? '{}');
-    console.log(`Время: ${ms} ms`);
-    console.log('Сырой ответ:', JSON.stringify(parsed, null, 2));
-
-    const validated = validateLlmSeedCandidate(parsed, SNIPPETS, 'Redbone', 'Come and Get Your Love');
-    if (validated.ok) {
-      console.log(`\n✅ ПРОШЛО ВАЛИДАТОР ПРОДА: interestScore=${interestScore(validated.fact)}`);
-      console.log(`Сниппет #${validated.snippetIndex}: ${SNIPPETS[validated.snippetIndex]}`);
-      console.log(`\nФАКТ ДЛЯ ИСТОРИИ:\n${validated.fact}`);
-    } else {
-      console.log(`\n❌ ОТКЛОНЕНО ВАЛИДАТОРОМ: ${validated.reason}`);
-    }
-  } catch (e) {
-    console.log('ОШИБКА:', e.message);
+if (shouldRunLlmFactHunt(picked, ctx.rawSnippets.length, ctx.bundle.trackFacts.length + ctx.bundle.artistFacts.length)) {
+  console.log('\nLLM fact-hunt (слабый pick → DeepSeek из сниппетов)...');
+  const hunted = await huntReferenceFactWithLlm({
+    artist: ARTIST,
+    title: TITLE,
+    year: 1974,
+    rawSnippets: ctx.rawSnippets,
+    preferredProvider: 'openrouter',
+  });
+  if (hunted) {
+    picked = hunted;
+    console.log('LLM SEED:', hunted.fact);
   }
-  await new Promise((r) => setTimeout(r, 1200));
 }
+
+console.log('\n=== FINAL SEED FOR STORY ===');
+console.log(picked?.fact ?? 'NO SEED');

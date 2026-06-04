@@ -2,7 +2,7 @@ import fetch from 'node-fetch';
 import type { ReferenceFactBundle } from './fact-picker.js';
 import { factAppliesToRequest } from './fact-relevance.js';
 import { filterAndRankFacts } from './reference-fact-quality.js';
-import { buildFactHuntSearchQueries } from './story-fact-hunt.js';
+import { buildFactHuntSearchQueries, WEAK_TRIVIA_PATTERNS } from './story-fact-hunt.js';
 import { fetchReferenceFactBundle as fetchWikipediaBundle } from './wikipedia-facts.js';
 
 const USER_AGENT = 'MusicStoryBFF/1.0 (contact@example.com)';
@@ -54,6 +54,7 @@ function pushRaw(
 ): void {
   const trimmed = text.trim();
   if (trimmed.length < RAW_SNIPPET_MIN_LEN) return;
+  if (WEAK_TRIVIA_PATTERNS.some((p) => p.test(trimmed))) return;
   const norm = normalize(trimmed);
   if (collected.some((s) => normalize(s) === norm)) return;
   collected.push(trimmed.slice(0, 480));

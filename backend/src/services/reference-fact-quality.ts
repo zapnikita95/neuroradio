@@ -14,11 +14,7 @@ const BORING_FACT_PATTERNS: RegExp[] = [
   /\b(?:was|were)\s+formed\s+in\b/i,
   /\b(?:name|назван\w*)\b.*\b(?:refers to|term for|means|происходит|отсылает|обозначает|термин)\b/i,
   /\boriginally\s+formed\b/i,
-  /\boriginally\s+(?:titled|called|named|released)\b/i,
   /\bworking\s+title\b/i,
-  /\bunder\s+the\s+name\b/i,
-  /\bpromo(?:tion(?:al)?)?\s+(?:track|single)\b/i,
-  /\bfeatured\s+on\s+(?:their|the|its)\s+(?:\w+\s+){0,3}album\b/i,
   /\bfifth\s+album\b/i,
   /\bfirst\s+single\b/i,
   /\breleased\s+as\s+(?:the|a)\s+(?:album'?s\s+)?single\b/i,
@@ -55,7 +51,6 @@ export const COLLECTOR_FACT_PATTERNS: RegExp[] = [
   /\b(?:tiktok|spotify|youtube|apple\s+music|streaming)\b/i,
   /\b(?:billion|million)\b.*\b(?:streams?|plays|views?)\b/i,
   /\b(?:streams?|plays)\b.*\b(?:billion|million|spotify)\b/i,
-  /\b(?:hot\s+100|billboard)\b/i,
   /\bco[- ]?writ(?:ten|er)\b/i,
   /\b(?:bush\s+doof|music\s+video|official\s+video)\b/i,
   /\b(?:limited\s+edition|vinyl|pressing|bootleg|b[- ]?side|cassette|7[- ]?inch)\b/i,
@@ -79,7 +74,7 @@ const STORY_FACT_PATTERNS: RegExp[] = [
   /\b(?:obsessed|wild|primitive|shaman|explosive|electric|voodoo|coffin|skull|outrageous|theatrical)\b/i,
   /\b(?:meaning|metaphor|written\s+(?:about|after|during|in\s+response)|inspired\s+by|based\s+on\s+(?:a|the|his|her|true))\b/i,
   /\b(?:took\s+issue|disagreed|argued|nearly\s+(?:didn't|dropped)|rejected\s+at\s+first|refused|described|attempt\s+to\s+write|bounced|overdubs|generations\s+of)\b/i,
-  /\b(?:platinum|gold|number\s+one|topped|billboard\s+hot\s+100)\b/i,
+  /\b(?:withheld from release|banned by|lyrical controversy|Jimi Hendrix inspired)\b/i,
   /\b(?:iron curtain|eastern bloc|ussr|soviet union|soviet)\b/i,
   /\b(?:mozambique|mozambican|african musician)\b/i,
   /(?:прорыв|скандал|запрет|возвращени|забвени|историческ|впервые|расизм|расист|дискриминац|сегрегац|шахт|уголь|рабств|смысл|метафор|вдохновен|бутлег|подполь|крови|Цой|ссср|совет)/i,
@@ -128,6 +123,7 @@ export function interestScore(fact: string): number {
   if (/\babout\s+(?:a|the|his|her)\s+\w+/i.test(fact) && /\b(?:miner|mine|coal|love|war|death|life|pain|protest)\b/i.test(fact)) {
     score += 5;
   }
+  if (/\b(?:billboard|hot 100|charted|peaked at number|top five on the)\b/i.test(fact)) score -= 15;
   score += highImpactBonus(fact);
   return score;
 }

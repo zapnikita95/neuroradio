@@ -2,8 +2,7 @@ import fetch from 'node-fetch';
 import type { SelectedReferenceFact } from './fact-picker.js';
 import { factNamesForeignEntity } from './fact-relevance.js';
 import { interestScore, isBoringFact, MIN_PICK_INTEREST_SCORE } from './reference-fact-quality.js';
-import { WEAK_TRIVIA_PATTERNS } from './story-fact-hunt.js';
-import { FACT_HUNT_LLM_PROMPT_BLOCK } from './story-fact-hunt.js';
+import { WEAK_TRIVIA_PATTERNS, FACT_HUNT_LLM_PROMPT_BLOCK, highImpactBonus } from './story-fact-hunt.js';
 import { resolveGroqModelOrder } from './groq-models.js';
 import { resolveGeminiModel, DEFAULT_GEMINI_MODEL } from './gemini-models.js';
 import { GroqApiError } from './groq.js';
@@ -67,10 +66,12 @@ export function shouldRunLlmFactHunt(
   rawSnippetCount: number,
   bundleFactCount: number,
 ): boolean {
-  // Fact-hunt is a separate LLM call — disabled; snippets go into the single story prompt.
-  void selected;
-  void rawSnippetCount;
-  void bundleFactCount;
+  if (rawSnippetCount < 2) return false;
+  if (!selected) return bundleFactCount === 0;
+  if (WEAK_TRIVIA_PATTERNS.some((p) => p.test(selected.fact))) return true;
+  if (isBoringFact(selected.fact)) return true;
+  if (interestScore(selected.fact) < MIN_PICK_INTEREST_SCORE + 2) return true;
+  if (highImpactBonus(selected.fact) < 6 && rawSnippetCount >= 3) return true;
   return false;
 }
 
@@ -215,7 +216,7 @@ async function callOpenRouterFactHunt(
   if (!apiKey) throw new Error('OPEN_ROUTER_API_KEY is not configured');
   const model = resolveOpenRouterModel(
     openRouterModel ?? process.env.OPENROUTER_FACT_MODEL,
-    'story',
+    'fact',
   );
   const content = await callOpenAiChatCompletion({
     url: 'https://openrouter.ai/api/v1/chat/completions',

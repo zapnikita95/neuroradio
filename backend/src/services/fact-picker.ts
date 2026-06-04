@@ -6,6 +6,7 @@ import {
   isBoringFact,
   MIN_PICK_INTEREST_SCORE,
 } from './reference-fact-quality.js';
+import { highImpactBonus, WEAK_TRIVIA_PATTERNS } from './story-fact-hunt.js';
 
 export type FactScope = 'artist' | 'track';
 
@@ -49,6 +50,22 @@ function factOverlapsPrevious(fact: string, previousScripts: string[]): boolean 
     if (hits >= threshold) return true;
   }
   return false;
+}
+
+function pickHighImpactFromPool(
+  facts: string[],
+  previousScripts: string[],
+): string | null {
+  const ranked = [...facts].sort((a, b) => interestScore(b) - interestScore(a));
+  for (const fact of ranked) {
+    if (WEAK_TRIVIA_PATTERNS.some((p) => p.test(fact))) continue;
+    if (isBoringFact(fact)) continue;
+    if (interestScore(fact) < MIN_PICK_INTEREST_SCORE) continue;
+    if (highImpactBonus(fact) < 6) continue;
+    if (factOverlapsPrevious(fact, previousScripts)) continue;
+    return fact;
+  }
+  return null;
 }
 
 function pickFromPool(
@@ -103,7 +120,25 @@ export function pickReferenceFact(
   const primaryScope: FactScope = preferTrack ? 'track' : 'artist';
   const fallbackScope: FactScope = preferTrack ? 'artist' : 'track';
 
-  // 0) First try a soulful/human backstory fact for better narrative quality.
+  // 0) Strong biography/controversy beats chart trivia and weird backstory.
+  const impactPrimary = pickHighImpactFromPool(primary, previousScripts);
+  if (impactPrimary) {
+    return {
+      fact: impactPrimary,
+      scope: primaryScope,
+      scopeLabelRu: primaryScope === 'track' ? 'трек' : 'группа/артист',
+    };
+  }
+  const impactFallback = pickHighImpactFromPool(fallback, previousScripts);
+  if (impactFallback) {
+    return {
+      fact: impactFallback,
+      scope: fallbackScope,
+      scopeLabelRu: fallbackScope === 'track' ? 'трек' : 'группа/артист',
+    };
+  }
+
+  // 1) Soulful human backstory when no high-impact seed.
   const backstoryPrimary = pickBackstoryFromPool(primary, previousScripts);
   if (backstoryPrimary) {
     return {
@@ -169,12 +204,14 @@ export function explainReferenceFactSelection(
   const scopePool = selected.scope === 'track' ? trackPool : artistPool;
   const fromPool = scopePool.some((fact) => normalize(fact) === normalize(selected.fact));
   const backstory = isBackstoryFact(selected.fact);
+  const impact = highImpactBonus(selected.fact);
   const score = interestScore(selected.fact);
   const reasons: string[] = [];
   reasons.push(fromPool ? `scope=${selected.scope}` : `scope=${selected.scope} (fallback pool)`);
   reasons.push(`interestScore=${score}`);
   if (backstory) reasons.push('backstory=true');
   if (!backstory) reasons.push('backstory=false');
+  if (impact >= 6) reasons.push(`highImpact=${impact}`);
   return reasons.join(', ');
 }
 

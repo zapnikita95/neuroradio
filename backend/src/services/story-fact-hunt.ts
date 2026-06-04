@@ -20,6 +20,11 @@ export function buildFactHuntSearchQueries(artist: string, title: string): strin
 
 /** Паттерны «ударного» факта — контраст, изнанка, парадокс. Плюс к interestScore. */
 export const HIGH_IMPACT_FACT_PATTERNS: RegExp[] = [
+  /\b(?:withheld from release|banned by several radio|lyrical controversy|confrontation of a sore subject)\b/i,
+  /\bJimi Hendrix inspired\b/i,
+  /\b(?:promo track under the name|originally released as a promo)\b/i,
+  /\b(?:Louisiana term for a mixed-race|mixed ancestry|mixed-race person)\b/i,
+  /\b(?:single cut is significantly shorter|album version featuring an introductory)\b/i,
   // Скрытый смысл: весёлая песня — тёмная изнанка
   /\b(?:hidden|secret|disguised|obscure|misunderstood|ironic|paradox)\b/i,
   /\b(?:invocation|incantation|chant|orix[aá]|umbanda|candombl[eé]|syncret|religious|spiritual|goddess|deity|ritual)\b/i,
@@ -61,6 +66,11 @@ export const WEAK_TRIVIA_PATTERNS: RegExp[] = [
   /\b(?:название|перевод|означает|сленг)\b.*\b(?:португал|испан)\b/i,
   /(?:попал\w*|вошл\w*|добрал\w*).*(?:чарт|хит-парад|billboard|hot 100|топ[- ]?\d)/i,
   /(?:хит[- ]?парад|топ[- ]?(?:пять|10|40|100))/i,
+  /\b(?:first|one of the first)\s+Native American\b.*\b(?:top five|billboard|hot 100|chart)\b/i,
+  /\bmade the Billboard Hot 100\b/i,
+  /\bdebuting on\b.*\bcharting for \d+ weeks\b/i,
+  /\bpeaked at number (?:one|\d+) on the (?:US )?Billboard\b/i,
+  /\breaching number five\b/i,
 ];
 
 export const FACT_HUNT_PROMPT_BLOCK = `ПОИСК СЕМЕНИ — ОБЯЗАТЕЛЬНАЯ ЛОГИКА (не «интересный факт» из первой строки Wikipedia):

@@ -245,7 +245,10 @@ export function factAppliesToRequest(
   const mentionsTitle = factMentionsTitle(trimmed, title);
 
   if (scope === 'artist') {
-    return mentionsArtist;
+    if (mentionsArtist) return true;
+    // Строки со страницы группы (бан Wounded Knee и т.п.) не повторяют имя в каждом предложении.
+    if (!factNamesForeignEntity(trimmed, artist, title, artist)) return true;
+    return false;
   }
   return mentionsTitle || mentionsArtist;
 }

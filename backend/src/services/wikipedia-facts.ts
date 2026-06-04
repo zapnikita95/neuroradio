@@ -182,11 +182,11 @@ function buildTrackTitleCandidates(artist: string, title: string): string[] {
 
 function buildArtistTitleCandidates(artist: string): string[] {
   return [
-    artist,
-    `${artist} (musician)`,
-    `${artist} (singer)`,
     `${artist} (band)`,
     `${artist} (musical group)`,
+    `${artist} (musician)`,
+    `${artist} (singer)`,
+    artist,
   ].filter((value, index, arr) => value.length > 1 && arr.indexOf(value) === index);
 }
 
@@ -271,14 +271,19 @@ function isWeakFact(sentence: string): boolean {
   );
 }
 
-async function fetchFullExtract(lang: 'ru' | 'en', title: string): Promise<string | null> {
-  const key = cacheKey(lang, title);
+async function fetchFullExtract(
+  lang: 'ru' | 'en',
+  title: string,
+  introOnly = false,
+): Promise<string | null> {
+  const key = cacheKey(lang, `${introOnly ? 'intro:' : ''}${title}`);
   const cached = extractCache.get(key);
   if (cached && Date.now() - cached.at < EXTRACT_CACHE_MS) return cached.text;
 
   const encodedTitle = encodeURIComponent(title.trim().replace(/\s+/g, '_'));
   const url =
     `https://${lang}.wikipedia.org/w/api.php?action=query&prop=extracts&explaintext=1` +
+    (introOnly ? '&exintro=1' : '') +
     `&format=json&origin=*&titles=${encodedTitle}`;
 
   for (let attempt = 0; attempt < 3; attempt++) {
@@ -332,7 +337,8 @@ async function fetchFactsForTitle(
   artist = '',
 ): Promise<string[]> {
   await sleep(120);
-  const summary = (await fetchFullExtract(lang, title)) ?? (await fetchSummary(lang, title));
+  const summary =
+    (await fetchFullExtract(lang, title, trackContext)) ?? (await fetchSummary(lang, title));
   if (!summary || isDisambiguationExtract(summary)) return [];
   if (artist && isWrongMusicTopic(artist, summary, title)) return [];
 
@@ -418,6 +424,58 @@ async function fetchFactsForLang(
   return [];
 }
 
+function mergeFactLists(...pools: string[][]): string[] {
+  return filterAndRankFacts(pools.flat(), 12);
+}
+
+/** Album page linked from song extract — e.g. Wovoka for Come and Get Your Love. */
+async function fetchAlbumPageFacts(
+  lang: 'ru' | 'en',
+  artist: string,
+  title: string,
+): Promise<string[]> {
+  for (const candidate of buildTrackTitleCandidates(artist, title)) {
+    const summary = (await fetchFullExtract(lang, candidate)) ?? (await fetchSummary(lang, candidate));
+    if (!summary) continue;
+    const albumMatch = summary.match(
+      /\b(?:album|альбом)[,\s]+([A-Za-z0-9][A-Za-z0-9'’\- ]{1,40}?)(?:\s*\(\d{4}\))?/i,
+    );
+    const albumName = albumMatch?.[1]?.trim();
+    if (!albumName || albumName.length < 2) continue;
+    const albumTitles = [
+      `${albumName} (${artist} album)`,
+      `${albumName} (album)`,
+      albumName,
+    ];
+    for (const albumTitle of albumTitles) {
+      const facts = await fetchFactsForTitle(lang, albumTitle, title, true, artist);
+      if (facts.length > 0) return facts;
+    }
+  }
+  return [];
+}
+
+/** Full band/artist page — biography angles beyond «упоминание трека». */
+async function fetchBandPageFacts(lang: 'ru' | 'en', artist: string): Promise<string[]> {
+  const titlesToTry = new Set<string>();
+  const searched = await searchWikiTitle(lang, `${artist} band`, artist);
+  if (searched) titlesToTry.add(searched);
+  for (const candidate of buildArtistTitleCandidates(artist)) {
+    titlesToTry.add(candidate);
+  }
+
+  const collected: string[] = [];
+  for (const candidate of titlesToTry) {
+    await sleep(100);
+    const summary = (await fetchFullExtract(lang, candidate)) ?? (await fetchSummary(lang, candidate));
+    if (!summary || isDisambiguationExtract(summary)) continue;
+    if (isWrongMusicTopic(artist, summary, candidate)) continue;
+    collected.push(...extractFactBullets(summary, 16));
+    if (collected.length >= 8) break;
+  }
+  return filterAndRankFacts(collected, 10);
+}
+
 async function fetchScopeFacts(
   artist: string,
   title: string,
@@ -444,16 +502,33 @@ export async function fetchReferenceFactBundle(
   countryCode?: string,
 ): Promise<ReferenceFactBundle> {
   const primaryLang = wikiLang(countryCode);
+  const enLang: 'en' = 'en';
 
-  let trackFacts = await fetchArtistMentionsForTrack(primaryLang, artist, title);
-  if (trackFacts.length === 0 && primaryLang === 'ru') {
-    trackFacts = await fetchArtistMentionsForTrack('en', artist, title);
+  let trackFromArtist = await fetchArtistMentionsForTrack(primaryLang, artist, title);
+  if (trackFromArtist.length === 0 && primaryLang === 'ru') {
+    trackFromArtist = await fetchArtistMentionsForTrack(enLang, artist, title);
   }
-  if (trackFacts.length === 0) {
-    trackFacts = await fetchScopeFacts(artist, title, countryCode, 'track');
+  let trackFromSong = await fetchScopeFacts(artist, title, countryCode, 'track');
+  if (trackFromSong.length === 0 && primaryLang === 'ru') {
+    trackFromSong = await fetchScopeFacts(artist, title, 'US', 'track');
   }
+  let trackFacts = mergeFactLists(trackFromArtist, trackFromSong);
 
-  const artistFacts = await fetchScopeFacts(artist, title, countryCode, 'artist');
+  const albumPrimary = await fetchAlbumPageFacts(primaryLang, artist, title);
+  const albumFacts =
+    albumPrimary.length > 0 || primaryLang === 'en'
+      ? albumPrimary
+      : await fetchAlbumPageFacts(enLang, artist, title);
+
+  let artistFacts = await fetchScopeFacts(artist, title, countryCode, 'artist');
+  const bandPrimary = await fetchBandPageFacts(primaryLang, artist);
+  const bandFacts =
+    bandPrimary.length > 0 || primaryLang === 'en'
+      ? bandPrimary
+      : await fetchBandPageFacts(enLang, artist);
+
+  trackFacts = mergeFactLists(trackFacts, albumFacts);
+  artistFacts = mergeFactLists(artistFacts, bandFacts);
 
   return { trackFacts, artistFacts };
 }
