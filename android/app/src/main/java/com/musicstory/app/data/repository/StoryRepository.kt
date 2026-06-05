@@ -73,20 +73,24 @@ class StoryRepository(
         }
     }
 
-    /** Stories need own API key or a configured Railway backend (server quota). */
-    suspend fun hasOwnApiKeyConfigured(): Boolean {
+    /** User-entered LLM key (OpenRouter/Groq/Gemini/local Ollama) — not Railway URL. */
+    suspend fun hasPersonalApiKeyConfigured(): Boolean {
         val provider = settingsDataStore.llmProvider.first()
         if (provider == LlmProvider.LOCAL) {
             return settingsDataStore.localOllamaUrl.first().isNotBlank()
         }
-        val hasOwnKey = apiKeyForProvider(
+        return apiKeyForProvider(
             provider,
             ApiKeySanitizer.clean(settingsDataStore.groqApiKey.first()),
             ApiKeySanitizer.clean(settingsDataStore.geminiApiKey.first()),
             ApiKeySanitizer.clean(settingsDataStore.openRouterApiKey.first()),
             settingsDataStore.localOllamaUrl.first(),
         ).isNotBlank()
-        if (hasOwnKey) return true
+    }
+
+    /** Stories need personal API key or a configured Railway backend (server quota). */
+    suspend fun hasOwnApiKeyConfigured(): Boolean {
+        if (hasPersonalApiKeyConfigured()) return true
         return settingsDataStore.backendUrl.first().trim().isNotBlank()
     }
 

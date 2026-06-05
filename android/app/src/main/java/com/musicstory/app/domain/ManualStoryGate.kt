@@ -19,7 +19,7 @@ object ManualStoryGate {
         lastStoryStartedAtMs: Long,
         nowMs: Long = System.currentTimeMillis(),
         hasValidTrack: Boolean,
-        hasApiKey: Boolean,
+        canManualStory: Boolean,
         isGenerationActive: Boolean,
         isBackendFetching: Boolean = false,
         preparingFromNotification: Boolean,
@@ -27,7 +27,7 @@ object ManualStoryGate {
         if (isBackendFetching || preparingFromNotification) {
             return Result(showAction = false, allowed = false)
         }
-        if (!hasValidTrack || !hasApiKey) {
+        if (!hasValidTrack || !canManualStory) {
             return Result(showAction = false, allowed = false)
         }
 

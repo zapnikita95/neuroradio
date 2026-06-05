@@ -61,6 +61,7 @@ import com.musicstory.app.domain.AppPowerMode
 import com.musicstory.app.domain.LlmProvider
 import com.musicstory.app.domain.OrchestratorState
 import com.musicstory.app.domain.StoryNarrator
+import com.musicstory.app.domain.TierAccess
 import com.musicstory.app.ui.components.GenerationStoryPreview
 import com.musicstory.app.ui.components.LivePulseDot
 import com.musicstory.app.ui.components.MusicStoryBackground
@@ -101,6 +102,7 @@ fun HomeScreen(
     val localOllamaUrl by app.settingsDataStore.localOllamaUrl.collectAsState(initial = SettingsDataStore.DEFAULT_LOCAL_OLLAMA_URL)
     val homeTourPending by app.settingsDataStore.homeTourPending.collectAsState(initial = false)
     val backendUrl by app.settingsDataStore.backendUrl.collectAsState(initial = SettingsDataStore.DEFAULT_BACKEND_URL)
+    val dailyQuota by app.storyRepository.dailyQuota.collectAsState(initial = null)
     val scope = rememberCoroutineScope()
 
     var tourStep by remember { mutableStateOf<Int?>(null) }
@@ -169,6 +171,10 @@ fun HomeScreen(
         else -> backendUrl.trim().isNotBlank()
     }
     val showMissingKeyBanner = !hasOwnProviderKey && !canUseServerStories
+    val showManualStoryButton = TierAccess.canShowManualStoryButton(
+        hasPersonalApiKey = hasOwnProviderKey,
+        tier = dailyQuota?.tier,
+    )
 
     DisposableEffect(Unit) {
         onDispose {
@@ -415,14 +421,16 @@ fun HomeScreen(
                     )
                 }
 
-                PrimaryStoryButton(
-                    text = context.getString(R.string.action_manual_story),
-                    onClick = { app.storyOrchestrator.requestManualStory() },
-                    enabled = !tourActive &&
-                        powerMode != AppPowerMode.OFF &&
-                        uiState.canRequestManualStory &&
-                        !uiState.isBackendFetching,
-                )
+                if (showManualStoryButton) {
+                    PrimaryStoryButton(
+                        text = context.getString(R.string.action_manual_story),
+                        onClick = { app.storyOrchestrator.requestManualStory() },
+                        enabled = !tourActive &&
+                            powerMode != AppPowerMode.OFF &&
+                            uiState.canRequestManualStory &&
+                            !uiState.isBackendFetching,
+                    )
+                }
 
                 if (uiState.isGenerationActive) {
                     SecondaryStoryButton(

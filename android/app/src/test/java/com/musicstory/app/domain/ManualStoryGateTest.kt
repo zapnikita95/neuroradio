@@ -15,7 +15,7 @@ class ManualStoryGateTest {
             lastStoryStartedAtMs = 0L,
             nowMs = base,
             hasValidTrack = true,
-            hasApiKey = true,
+            canManualStory = true,
             isGenerationActive = false,
             preparingFromNotification = false,
         )
@@ -29,7 +29,7 @@ class ManualStoryGateTest {
             lastStoryStartedAtMs = base - 3_000L,
             nowMs = base,
             hasValidTrack = true,
-            hasApiKey = true,
+            canManualStory = true,
             isGenerationActive = false,
             preparingFromNotification = false,
         )
@@ -44,7 +44,7 @@ class ManualStoryGateTest {
             lastStoryStartedAtMs = base - 65_000L,
             nowMs = base,
             hasValidTrack = true,
-            hasApiKey = true,
+            canManualStory = true,
             isGenerationActive = true,
             preparingFromNotification = false,
         )
@@ -58,7 +58,7 @@ class ManualStoryGateTest {
             lastStoryStartedAtMs = base - 20_000L,
             nowMs = base,
             hasValidTrack = true,
-            hasApiKey = true,
+            canManualStory = true,
             isGenerationActive = true,
             preparingFromNotification = false,
         )
@@ -72,7 +72,7 @@ class ManualStoryGateTest {
             lastStoryStartedAtMs = base - 20_000L,
             nowMs = base,
             hasValidTrack = true,
-            hasApiKey = true,
+            canManualStory = true,
             isGenerationActive = false,
             preparingFromNotification = false,
         )

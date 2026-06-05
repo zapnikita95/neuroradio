@@ -159,12 +159,14 @@ class StoryOrchestrator(
         scope.launch {
             val track = mediaControllerManager.effectiveNowPlaying.value
             val hasTrack = track?.isValid() == true
-            val hasApiKey = storyRepository.hasOwnApiKeyConfigured()
+            val tier = storyRepository.dailyQuota.value?.tier
+            val hasPersonalKey = storyRepository.hasPersonalApiKeyConfigured()
+            val canManual = TierAccess.canShowManualStoryButton(hasPersonalKey, tier)
             val preparing = MonitorNotificationState.preparingStory.value
             val gate = ManualStoryGate.evaluate(
                 lastStoryStartedAtMs = lastStoryStartedAtMs,
                 hasValidTrack = hasTrack,
-                hasApiKey = hasApiKey,
+                canManualStory = canManual,
                 isGenerationActive = isGenerationActive,
                 isBackendFetching = backendFetchInFlight,
                 preparingFromNotification = preparing,
@@ -199,6 +201,9 @@ class StoryOrchestrator(
 
     private suspend fun evaluateManualStoryGate(): ManualStoryGate.Result {
         val track = mediaControllerManager.effectiveNowPlaying.value
+        val tier = storyRepository.dailyQuota.value?.tier
+        val hasPersonalKey = storyRepository.hasPersonalApiKeyConfigured()
+        val canManual = TierAccess.canShowManualStoryButton(hasPersonalKey, tier)
         val generationActive = generationInFlight ||
             activeStoryJob?.isActive == true ||
             _state.value == OrchestratorState.FETCHING_STORY ||
@@ -207,7 +212,7 @@ class StoryOrchestrator(
         return ManualStoryGate.evaluate(
             lastStoryStartedAtMs = lastStoryStartedAtMs,
             hasValidTrack = track?.isValid() == true,
-            hasApiKey = storyRepository.hasOwnApiKeyConfigured(),
+            canManualStory = canManual,
             isGenerationActive = generationActive,
             isBackendFetching = backendFetchInFlight,
             preparingFromNotification = MonitorNotificationState.preparingStory.value,
@@ -414,7 +419,7 @@ class StoryOrchestrator(
 
         activeStoryJob = scope.launch {
             if (!storyRepository.hasOwnApiKeyConfigured()) {
-                StoryLog.i("Story blocked: API key not configured")
+                StoryLog.i("Story blocked: no backend and no API key")
                 backendFetchInFlight = false
                 MonitorNotificationState.setPreparing(false)
                 handleStoryBlockedNoApiKey(manual)
@@ -424,6 +429,18 @@ class StoryOrchestrator(
                     MediaMonitorService.refreshNotification(context)
                 }
                 return@launch
+            }
+            if (manual) {
+                val tier = storyRepository.dailyQuota.value?.tier
+                val hasPersonalKey = storyRepository.hasPersonalApiKeyConfigured()
+                if (!TierAccess.canShowManualStoryButton(hasPersonalKey, tier)) {
+                    StoryLog.i("Manual story blocked: free tier without personal API key")
+                    backendFetchInFlight = false
+                    MonitorNotificationState.setPreparing(false)
+                    handleStoryBlockedNoApiKey(manual = true)
+                    generationInFlight = false
+                    return@launch
+                }
             }
 
             val session = ++playbackSession
@@ -441,7 +458,7 @@ class StoryOrchestrator(
                     _errorMessage.value = if (isLocal) {
                         "Слишком долго ждём локальную модель (лимит 20 мин). Смотри логи: Music story\\logs\\local-bff.log"
                     } else {
-                        "Сервер не ответил за 3 мин (факты + текст + озвучка). Подожди и нажми «Рассказать историю» ещё раз."
+                        "Сервер не ответил за 5 мин (факты + текст + озвучка). Подожди — история может ещё готовиться на сервере."
                     }
                     _state.value = OrchestratorState.ERROR
                     publishUiState()
@@ -632,7 +649,13 @@ class StoryOrchestrator(
                             if (!isSessionCurrent(session)) return@playStory
                             cancelGenerationPreview()
                             if (musicPausedForStory.get() && storyPlayer.shouldResumeMusic()) {
-                                mediaControllerManager.resumeMusic()
+                                if (interruptionMode == MusicInterruptionMode.FADE) {
+                                    scope.launch {
+                                        mediaControllerManager.resumeMusicWithFade(fadeSeconds)
+                                    }
+                                } else {
+                                    mediaControllerManager.resumeMusic()
+                                }
                             }
                             _errorMessage.value = null
                             _state.value = OrchestratorState.LISTENING

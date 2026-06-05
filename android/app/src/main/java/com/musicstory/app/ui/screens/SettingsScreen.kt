@@ -83,6 +83,7 @@ import com.musicstory.app.domain.StoryNarrator
 import com.musicstory.app.domain.TtsEmotion
 import com.musicstory.app.domain.TtsSpeed
 import com.musicstory.app.domain.TtsVoice
+import com.musicstory.app.domain.TierAccess
 import com.musicstory.app.domain.TriggerMode
 import com.musicstory.app.ui.components.GlassCard
 import com.musicstory.app.ui.components.MusicStoryBackground
@@ -333,6 +334,26 @@ fun SettingsScreen(
         }
     }
 
+    val effectiveTier = devTierLabel ?: dailyQuota?.tier
+    val hasPersonalKey = activeApiKey.isNotBlank()
+    val canManualMode = TierAccess.canUseManualMode(hasPersonalKey, effectiveTier)
+    val canAdvancedTriggers = TierAccess.canUseAdvancedTriggers(effectiveTier)
+    val canMusicFade = TierAccess.canUseMusicFade(effectiveTier)
+
+    LaunchedEffect(canManualMode, manualMode) {
+        if (!canManualMode && manualMode) settings.setManualMode(false)
+    }
+    LaunchedEffect(canAdvancedTriggers, triggerMode) {
+        if (!canAdvancedTriggers && triggerMode != TriggerMode.EVERY_N_TRACKS) {
+            settings.setTriggerMode(TriggerMode.EVERY_N_TRACKS)
+        }
+    }
+    LaunchedEffect(canMusicFade, musicInterruptionMode) {
+        if (!canMusicFade && musicInterruptionMode == MusicInterruptionMode.FADE) {
+            settings.setMusicInterruptionMode(MusicInterruptionMode.PAUSE)
+        }
+    }
+
     val fieldColors = OutlinedTextFieldDefaults.colors(
         focusedBorderColor = GoldBright,
         unfocusedBorderColor = GoldWarm.copy(alpha = 0.35f),
@@ -379,8 +400,16 @@ fun SettingsScreen(
                     SettingSwitchRow(
                         title = context.getString(R.string.settings_manual_mode),
                         checked = manualMode,
+                        enabled = canManualMode,
                         onCheckedChange = { scope.launch { settings.setManualMode(it) } },
                     )
+                    if (!canManualMode) {
+                        Text(
+                            text = context.getString(R.string.settings_premium_locked_hint),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MutedLavender,
+                        )
+                    }
                     SettingSwitchRow(
                         title = context.getString(R.string.settings_auto_intercept),
                         checked = autoIntercept,
@@ -411,6 +440,7 @@ fun SettingsScreen(
                     onTourLayout = tourLayoutHandler(1),
                 ) {
                     TriggerMode.entries.forEach { mode ->
+                        val modeEnabled = canAdvancedTriggers || mode == TriggerMode.EVERY_N_TRACKS
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -420,10 +450,17 @@ fun SettingsScreen(
                         ) {
                             RadioButton(
                                 selected = triggerMode == mode,
-                                onClick = { scope.launch { settings.setTriggerMode(mode) } },
+                                onClick = {
+                                    if (modeEnabled) scope.launch { settings.setTriggerMode(mode) }
+                                },
+                                enabled = modeEnabled,
                                 colors = RadioButtonDefaults.colors(selectedColor = GoldBright),
                             )
-                            Text(text = triggerModeLabel(context, mode), style = MaterialTheme.typography.bodyMedium, color = CreamText)
+                            Text(
+                                text = triggerModeLabel(context, mode),
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = if (modeEnabled) CreamText else MutedLavender.copy(alpha = 0.5f),
+                            )
                         }
                     }
                     if (triggerMode == TriggerMode.EVERY_N_TRACKS) {
@@ -505,16 +542,24 @@ fun SettingsScreen(
                     tourActive = tourStep == 2,
                     onTourLayout = tourLayoutHandler(2),
                 ) {
-                    OutlinedTextField(
-                        value = sameTrackInput,
-                        onValueChange = { sameTrackInput = it.filter { ch -> ch.isDigit() }.take(2) },
-                        label = { Text(context.getString(R.string.settings_same_track_every_n)) },
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                        modifier = Modifier.fillMaxWidth(),
-                        singleLine = true,
-                        colors = fieldColors,
-                        shape = RoundedCornerShape(14.dp),
-                    )
+                    if (canAdvancedTriggers) {
+                        OutlinedTextField(
+                            value = sameTrackInput,
+                            onValueChange = { sameTrackInput = it.filter { ch -> ch.isDigit() }.take(2) },
+                            label = { Text(context.getString(R.string.settings_same_track_every_n)) },
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                            modifier = Modifier.fillMaxWidth(),
+                            singleLine = true,
+                            colors = fieldColors,
+                            shape = RoundedCornerShape(14.dp),
+                        )
+                    } else {
+                        Text(
+                            text = context.getString(R.string.settings_premium_locked_hint),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MutedLavender,
+                        )
+                    }
                 }
 
                 CollapsibleSettingsSection(
@@ -648,16 +693,26 @@ fun SettingsScreen(
                         RadioButton(
                             selected = musicInterruptionMode == MusicInterruptionMode.FADE,
                             onClick = {
-                                scope.launch {
-                                    settings.setMusicInterruptionMode(MusicInterruptionMode.FADE)
+                                if (canMusicFade) {
+                                    scope.launch {
+                                        settings.setMusicInterruptionMode(MusicInterruptionMode.FADE)
+                                    }
                                 }
                             },
+                            enabled = canMusicFade,
                             colors = RadioButtonDefaults.colors(selectedColor = GoldBright),
                         )
                         Text(
                             text = context.getString(R.string.settings_music_interrupt_fade),
                             style = MaterialTheme.typography.bodyMedium,
-                            color = CreamText,
+                            color = if (canMusicFade) CreamText else MutedLavender.copy(alpha = 0.5f),
+                        )
+                    }
+                    if (!canMusicFade) {
+                        Text(
+                            text = context.getString(R.string.settings_premium_locked_hint),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MutedLavender,
                         )
                     }
 
@@ -1521,6 +1576,7 @@ private fun SettingSwitchRow(
     title: String,
     checked: Boolean,
     onCheckedChange: (Boolean) -> Unit,
+    enabled: Boolean = true,
 ) {
     Row(
         modifier = Modifier
@@ -1532,11 +1588,12 @@ private fun SettingSwitchRow(
             text = title,
             modifier = Modifier.weight(1f),
             style = MaterialTheme.typography.titleMedium,
-            color = CreamText,
+            color = if (enabled) CreamText else MutedLavender.copy(alpha = 0.5f),
         )
         Switch(
             checked = checked,
             onCheckedChange = onCheckedChange,
+            enabled = enabled,
             colors = SwitchDefaults.colors(
                 checkedThumbColor = DeepVoid,
                 checkedTrackColor = GoldBright,
