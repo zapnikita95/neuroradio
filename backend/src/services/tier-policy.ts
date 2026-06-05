@@ -1,5 +1,9 @@
 import type { UserTier } from './entitlements.js';
 import {
+  resolveFreeDailyLimit,
+  resolveFreeModelProfile,
+} from './free-model-profile.js';
+import {
   OPENROUTER_DEFAULT_FACT_MODEL,
   OPENROUTER_DEFAULT_FREE_FACT_MODEL,
   OPENROUTER_DEFAULT_STORY_MODEL,
@@ -67,8 +71,14 @@ export function resolveOpenRouterModelForTier(
   }
 
   if (tier === 'free') {
-    // Gemma :free for story too — Liquid 1.2B fails quality gates too often.
-    return OPENROUTER_DEFAULT_FREE_FACT_MODEL;
+    if (
+      fromClient &&
+      fromClient.includes('/') &&
+      (fromClient.includes(':free') || fromClient.includes('nemotron') || fromClient.includes('gemma'))
+    ) {
+      return resolveFreeModelProfile(fromClient).modelId;
+    }
+    return resolveFreeModelProfile(undefined).modelId;
   }
 
   if (tier === 'trial') {
@@ -89,10 +99,13 @@ export function resolveOpenRouterModelForTier(
   return slot === 'fact' ? OPENROUTER_DEFAULT_FREE_FACT_MODEL : OPENROUTER_DEFAULT_STORY_MODEL;
 }
 
-/** Fact-hunt: free tier пробует Gemma :free → Nemotron при 429. */
-export function resolveOpenRouterFactModelsForTier(tier: UserTier): string[] {
+/** Fact-hunt: free tier — одна выбранная модель, без цепочки fallback. */
+export function resolveOpenRouterFactModelsForTier(
+  tier: UserTier,
+  preferredModel?: string,
+): string[] {
   if (tier === 'free') {
-    return resolveOpenRouterFactModelOrder(undefined);
+    return [resolveFreeModelProfile(preferredModel).modelId];
   }
   if (tier === 'trial') {
     return [TIER_OPENROUTER_TRIAL_FACT_MODEL, TIER_OPENROUTER_FACT_MODEL];
@@ -100,14 +113,13 @@ export function resolveOpenRouterFactModelsForTier(tier: UserTier): string[] {
   return [TIER_OPENROUTER_FACT_MODEL];
 }
 
-/** Free tier: Gemma → Nemotron → Liquid (Liquid often invalid JSON). */
-export function resolveOpenRouterStoryModelsForTier(tier: UserTier): string[] {
+/** Free tier: одна модель по выбору пользователя (Nemotron 10/день или Gemma 5/день). */
+export function resolveOpenRouterStoryModelsForTier(
+  tier: UserTier,
+  preferredModel?: string,
+): string[] {
   if (tier === 'free') {
-    return [
-      OPENROUTER_DEFAULT_FREE_FACT_MODEL,
-      OPENROUTER_FREE_FACT_MODEL_FALLBACK,
-      OPENROUTER_DEFAULT_STORY_MODEL,
-    ];
+    return [resolveFreeModelProfile(preferredModel).modelId];
   }
   if (tier === 'trial') {
     return [TIER_OPENROUTER_FACT_MODEL, OPENROUTER_DEFAULT_STORY_MODEL];

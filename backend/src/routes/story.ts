@@ -72,6 +72,7 @@ import {
 } from '../services/tier-policy.js';
 import { classifyStoryLlmError } from '../services/llm-error-message.js';
 import { StoryTiming } from '../services/story-timing.js';
+import { recordFactMiss } from '../services/fact-miss-log.js';
 import { isNoReferenceFactsError, NoReferenceFactsError } from '../services/story-errors.js';
 import type { StoryLengthId } from '../services/story-length.js';
 import type { StoryNarratorId } from '../services/story-narrator.js';
@@ -111,10 +112,18 @@ router.get('/quota', (req: Request, res: Response) => {
   const quota = getDailyStoryQuota(installId);
   const limits = getStoryLimitsForTier(tier);
   attachStoryQuotaHeaders(res, installId);
+  const freeProfiles =
+    tier === 'free'
+      ? {
+          economy: { dailyStories: 10, model: 'nvidia/nemotron-3-nano-30b-a3b:free' },
+          quality: { dailyStories: 5, model: 'google/gemma-4-26b-a4b-it:free' },
+        }
+      : undefined;
   res.json({
     tier,
     premium: hasPremiumEntitlement(installId),
     quota,
+    freeProfiles,
     limits: {
       dailyStories: limits.dailyStories,
       monthlyStories: limits.monthlyStories,
@@ -140,7 +149,10 @@ function storyFullRateLimit(req: Request, res: Response, next: import('express')
     gemini: body.gemini_api_key,
     openrouter: body.openrouter_api_key,
   }));
-  rateLimitStory(installId, { skipDailyQuota: ownKey })(req, res, next);
+  rateLimitStory(installId, {
+    skipDailyQuota: ownKey,
+    freeOpenRouterModel: body.openrouter_model,
+  })(req, res, next);
 }
 
 router.post('/full', validateStoryFullBody, storyFullRateLimit, async (req: Request, res: Response) => {
@@ -372,7 +384,7 @@ router.post('/full', validateStoryFullBody, storyFullRateLimit, async (req: Requ
       const factModels =
         ownLlmKey && openrouterModelFact.includes('/')
           ? [openrouterModelFact]
-          : resolveOpenRouterFactModelsForTier(userTier);
+          : resolveOpenRouterFactModelsForTier(userTier, openrouterModelRequested);
       console.log(
         `[fact-hunt-llm] start artist="${metadata.artist}" title="${metadata.title}" ` +
           `snippets=${factCtx.rawSnippets.length} models=${factModels.join(' → ')} ` +
@@ -446,6 +458,13 @@ router.post('/full', validateStoryFullBody, storyFullRateLimit, async (req: Requ
     }
 
     if (!selectedFact && referenceFacts.length === 0) {
+      recordFactMiss({
+        installId,
+        artist: metadata.artist,
+        title: metadata.title,
+        reason: 'no_reference_facts',
+        artistTier,
+      });
       throw new NoReferenceFactsError(metadata.artist, metadata.title);
     }
 
@@ -475,7 +494,7 @@ router.post('/full', validateStoryFullBody, storyFullRateLimit, async (req: Requ
       openRouterModel: openrouterModelStory,
       openRouterModels: clientOwnOpenRouter
         ? [openrouterModelStory]
-        : resolveOpenRouterStoryModelsForTier(userTier),
+        : resolveOpenRouterStoryModelsForTier(userTier, openrouterModelRequested),
       clientGroqApiKey: clientLlmKeys.groq,
       clientGeminiApiKey: clientLlmKeys.gemini,
       clientOpenRouterApiKey: clientLlmKeys.openrouter,
@@ -632,7 +651,7 @@ router.post('/full', validateStoryFullBody, storyFullRateLimit, async (req: Requ
 
     timing.mark('tts-ready', `audio=${Boolean(response.audioUrl)}`);
 
-    recordStoryGeneration(installId, req);
+    recordStoryGeneration(installId, req, { freeOpenRouterModel: openrouterModelRequested });
     if (selectedFact?.fact) {
       recordUserStory(installId, {
         artist: metadata.artist,
@@ -682,7 +701,7 @@ router.post('/full', validateStoryFullBody, storyFullRateLimit, async (req: Requ
         error: 'Story generation unavailable',
         code: 'NO_REFERENCE_FACTS',
         message:
-          'Не нашли проверенных фактов про этот трек — история не сгенерирована, чтобы не выдумывать. Попробуй через минуту или другой трек.',
+          'Извините, по такому треку или группе рассказать историю не получилось — проверенных фактов не нашли.',
         source: 'facts',
       });
       return;

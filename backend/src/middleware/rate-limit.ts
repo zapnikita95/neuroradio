@@ -2,6 +2,7 @@ import { Response } from 'express';
 import { isUnlimitedInstall, SECURITY } from '../config/security.js';
 import { getQuotaSubject } from '../services/account-store.js';
 import { resolveUserTier } from '../services/entitlements.js';
+import { resolveFreeDailyLimit } from '../services/free-model-profile.js';
 import { getStoryLimitsForTier } from '../services/tier-policy.js';
 import { setLogDetail } from './request-logger.js';
 
@@ -120,9 +121,12 @@ function quotaKey(installId: string): string {
   return `story:day:${getQuotaSubject(installId)}`;
 }
 
-export function getDailyStoryLimit(installId: string): number {
+export function getDailyStoryLimit(installId: string, options: { freeOpenRouterModel?: string } = {}): number {
   if (isUnlimitedInstall(installId)) return UNLIMITED_QUOTA.limit;
   const tier = resolveUserTier(installId);
+  if (tier === 'free') {
+    return resolveFreeDailyLimit(options.freeOpenRouterModel);
+  }
   return getStoryLimitsForTier(tier).dailyStories;
 }
 
@@ -130,9 +134,12 @@ function enrichQuota(installId: string, base: QuotaSnapshot): QuotaSnapshot {
   return { ...base, tier: resolveUserTier(installId) };
 }
 
-export function getDailyStoryQuota(installId: string): QuotaSnapshot {
+export function getDailyStoryQuota(
+  installId: string,
+  options: { freeOpenRouterModel?: string } = {},
+): QuotaSnapshot {
   if (isUnlimitedInstall(installId)) return { ...UNLIMITED_QUOTA, resetsAt: Date.now() + DAY_MS };
-  const dailyLimit = getDailyStoryLimit(installId);
+  const dailyLimit = getDailyStoryLimit(installId, options);
   return enrichQuota(
     installId,
     peekUsage(quotaKey(installId), dailyLimit, DAY_MS),
@@ -191,7 +198,7 @@ function dailyLimitMessage(installId: string, dailyLimit: number): string {
 /** Peek only — does not consume quota (failed LLM runs do not burn tier). */
 export function rateLimitStory(
   installId: string,
-  options: { skipDailyQuota?: boolean } = {},
+  options: { skipDailyQuota?: boolean; freeOpenRouterModel?: string } = {},
 ): (req: import('express').Request, res: import('express').Response, next: import('express').NextFunction) => void {
   return (req, res, next) => {
     if (isUnlimitedInstall(installId) || options.skipDailyQuota) {
@@ -201,7 +208,9 @@ export function rateLimitStory(
 
     const ip = clientIp(req);
     const { limits } = SECURITY;
-    const dailyLimit = getDailyStoryLimit(installId);
+    const dailyLimit = getDailyStoryLimit(installId, {
+      freeOpenRouterModel: options.freeOpenRouterModel,
+    });
     const subject = getQuotaSubject(installId);
     const quotaBase = enrichQuota(installId, peekUsage(quotaKey(installId), dailyLimit, DAY_MS));
 
@@ -226,13 +235,14 @@ export function rateLimitStory(
 export function recordStoryGeneration(
   installId: string,
   req: { header(name: string): string | undefined; socket: { remoteAddress?: string } },
+  options: { freeOpenRouterModel?: string } = {},
 ): void {
   if (isUnlimitedInstall(installId)) return;
 
   const ip = clientIp(req);
   const { limits } = SECURITY;
   const subject = getQuotaSubject(installId);
-  const dailyLimit = getDailyStoryLimit(installId);
+  const dailyLimit = getDailyStoryLimit(installId, options);
 
   consumeLimit(`ip:hour:${ip}`, limits.ipGlobalPerHour, HOUR_MS);
   consumeLimit(`story:burst:${subject}`, limits.storyBurstPerInstallPerMinute, MINUTE_MS);

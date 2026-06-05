@@ -14,10 +14,16 @@ enum class OpenRouterModel(
         stable = true,
         recommended = true,
     ),
-    NEMOTRON_NANO(
+    GEMMA_4_26B_FREE(
+        id = "google/gemma-4-26b-a4b-it:free",
+        labelRu = "Gemma 4 (бесплатно)",
+        descriptionRu = "Быстрее, факты точнее — до 5 историй в день",
+        stable = true,
+    ),
+        NEMOTRON_NANO(
         id = "nvidia/nemotron-3-nano-30b-a3b:free",
-        labelRu = "Nemotron 3 Nano 30B",
-        descriptionRu = "Бесплатная — хорошо находит факты в сниппетах",
+        labelRu = "Nemotron (бесплатно)",
+        descriptionRu = "Может думать дольше, до 10 историй в день — лимиты не суммируются",
         stable = true,
     ),
     GEMMA_4_26B(
@@ -57,6 +63,11 @@ enum class OpenRouterModel(
             entries.firstOrNull { it.id == id?.trim() } ?: DEEPSEEK_V3
 
         val defaultRecommended: OpenRouterModel get() = DEEPSEEK_V3
+
+        val freeServerPresets: List<OpenRouterModel> =
+            listOf(NEMOTRON_NANO, GEMMA_4_26B_FREE)
+
+        val defaultFreeServer: OpenRouterModel get() = NEMOTRON_NANO
 
         /** Presets verified stable — shown first in settings. */
         val stablePresets: List<OpenRouterModel> =

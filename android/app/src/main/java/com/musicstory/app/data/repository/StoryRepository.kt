@@ -186,6 +186,13 @@ class StoryRepository(
         var backendError: String? = null
 
         val directApiKey = apiKeyForProvider(llmProvider, groqKey, geminiKey, openRouterKey, localOllamaUrl)
+        val tier = _dailyQuota.value?.tier
+        val backendOpenRouterModel = resolveBackendOpenRouterModel(
+            openRouterModel = openRouterModel,
+            openRouterCustomModelId = openRouterCustomModelId,
+            hasPersonalKey = directApiKey.isNotBlank(),
+            tier = tier,
+        )
         StoryLog.i(
             "fetchStory ${track.artist} — ${track.title}: provider=${llmProvider.id}, " +
                 "ownKey=${directApiKey.isNotEmpty()}, backend=$useBackend",
@@ -251,6 +258,7 @@ class StoryRepository(
                 groqCustomModelId = groqCustomModelId,
                 openRouterModel = openRouterModel,
                 openRouterCustomModelId = openRouterCustomModelId,
+                backendOpenRouterModelId = backendOpenRouterModel,
                 groqApiKey = groqKey,
                 geminiApiKey = geminiKey,
                 openRouterApiKey = openRouterKey,
@@ -317,6 +325,7 @@ class StoryRepository(
         groqCustomModelId: String,
         openRouterModel: OpenRouterModel,
         openRouterCustomModelId: String,
+        backendOpenRouterModelId: String? = null,
         groqApiKey: String = "",
         geminiApiKey: String = "",
         openRouterApiKey: String = "",
@@ -351,7 +360,8 @@ class StoryRepository(
                         llmProvider = llmProvider.id,
                         geminiModel = geminiModel.id,
                         groqModel = groqModel.resolveApiModelId(groqCustomModelId),
-                        openRouterModel = openRouterModel.resolveApiModelId(openRouterCustomModelId),
+                        openRouterModel = backendOpenRouterModelId
+                            ?: openRouterModel.resolveApiModelId(openRouterCustomModelId),
                         groqApiKey = groqApiKey.takeIf { it.isNotBlank() },
                         geminiApiKey = geminiApiKey.takeIf { it.isNotBlank() },
                         openRouterApiKey = openRouterApiKey.takeIf { it.isNotBlank() },
@@ -401,7 +411,18 @@ class StoryRepository(
                 )
             }
             if (e is HttpException && e.code() == 503) {
-                val reason = sanitizeBackendError(parseHttpErrorBody(e, llmProvider), llmProvider)
+                val rawBody = e.response()?.errorBody()?.string().orEmpty()
+                val parsedBody = parseHttpErrorBodyFromRaw(rawBody, llmProvider)
+                val code = runCatching {
+                    gson.fromJson(rawBody, Map::class.java)["code"] as? String
+                }.getOrNull()
+                if (code == "NO_REFERENCE_FACTS" || parsedBody?.contains("не получилось") == true) {
+                    return StoryAttemptResult.Failed(
+                        reason = parsedBody
+                            ?: "Извините, по такому треку или группе рассказать историю не получилось.",
+                    )
+                }
+                val reason = sanitizeBackendError(parsedBody, llmProvider)
                     ?: "Сервер без ${llmProvider.labelRu} — добавь свой ключ в настройках"
                 StoryLog.w("Backend LLM unavailable: $reason")
                 return StoryAttemptResult.Failed(
@@ -463,8 +484,26 @@ class StoryRepository(
         }
     }
 
+    private fun resolveBackendOpenRouterModel(
+        openRouterModel: OpenRouterModel,
+        openRouterCustomModelId: String,
+        hasPersonalKey: Boolean,
+        tier: String?,
+    ): String? {
+        if (hasPersonalKey || tier?.lowercase() in setOf("premium", "trial", "unlimited")) {
+            return null
+        }
+        val free = OpenRouterModel.freeServerPresets.find { it == openRouterModel }
+            ?: OpenRouterModel.defaultFreeServer
+        return free.resolveApiModelId(openRouterCustomModelId)
+    }
+
     private fun parseHttpErrorBody(e: HttpException, llmProvider: LlmProvider): String? {
         val body = e.response()?.errorBody()?.string().orEmpty()
+        return parseHttpErrorBodyFromRaw(body, llmProvider)
+    }
+
+    private fun parseHttpErrorBodyFromRaw(body: String, llmProvider: LlmProvider): String? {
         if (body.isBlank()) return null
         return runCatching {
             val json = gson.fromJson(body, Map::class.java)

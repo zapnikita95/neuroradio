@@ -832,6 +832,22 @@ fun SettingsScreen(
                     )
                     if (llmProvider == LlmProvider.OPENROUTER) {
                         Spacer(modifier = Modifier.height(12.dp))
+                        if (!hasPersonalKey && !canAdvancedTriggers) {
+                            Text(
+                                text = context.getString(R.string.settings_free_model_section),
+                                style = MaterialTheme.typography.labelMedium,
+                                color = MutedLavender,
+                            )
+                            Spacer(modifier = Modifier.height(8.dp))
+                            OpenRouterModel.freeServerPresets.forEach { model ->
+                                NarratorRadioRow(
+                                    label = model.labelRu,
+                                    description = model.descriptionRu,
+                                    selected = openRouterModel == model,
+                                    onSelect = { scope.launch { settings.setOpenRouterModel(model) } },
+                                )
+                            }
+                        } else {
                         Text(
                             text = context.getString(R.string.settings_openrouter_model_hint),
                             style = MaterialTheme.typography.bodySmall,
@@ -891,6 +907,7 @@ fun SettingsScreen(
                                 colors = fieldColors,
                                 shape = RoundedCornerShape(14.dp),
                             )
+                        }
                         }
                     }
                     if (llmProvider == LlmProvider.GROQ) {
