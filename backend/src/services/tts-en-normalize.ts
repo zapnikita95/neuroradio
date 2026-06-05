@@ -111,12 +111,20 @@ export function collectLatinTokens(artist: string, title: string): Set<string> {
 
 /** Short pause before/after Latin runs so Yandex articulates names clearly. */
 export function addLatinArticulationPauses(text: string): string {
-  return text
+  const quotes: string[] = [];
+  const masked = text.replace(/«[^»]+»/g, (quote) => {
+    const idx = quotes.length;
+    quotes.push(quote);
+    return `\uE000LQ${idx}\uE001`;
+  });
+  let result = masked
     .replace(
       /(\s)([A-Za-z][A-Za-z0-9&'’.-]{1,}(?:\s+[A-Za-z][A-Za-z0-9&'’.-]{1,}){0,4})(\s|[,.!?…])/g,
       '$1<[small]> $2 <[small]>$3',
     )
     .replace(/<\[small\]>\s*<\[small\]>/g, '<[small]>');
+  result = result.replace(/\uE000LQ(\d+)\uE001/g, (_, index) => quotes[Number(index)] ?? '');
+  return result;
 }
 
 /** Normalize punctuation around Latin tokens (no spaces inside hyphenated names). */

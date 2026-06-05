@@ -214,6 +214,27 @@ function repairOrphanDatePhrases(text: string, referenceFacts: string[]): string
   return result.replace(/\s{2,}/g, ' ').trim();
 }
 
+const QUOTED_PASSAGE_RE = /«[^»]+»|[\u201c""][^\u201d""]+[\u201d""]|"[^"]+"/g;
+const QUOTE_PLACEHOLDER = '\uE000Q';
+const QUOTE_PLACEHOLDER_END = '\uE001';
+
+function maskQuotedPassages(text: string): { masked: string; quotes: string[] } {
+  const quotes: string[] = [];
+  const masked = text.replace(QUOTED_PASSAGE_RE, (quote) => {
+    const idx = quotes.length;
+    quotes.push(quote);
+    return `${QUOTE_PLACEHOLDER}${idx}${QUOTE_PLACEHOLDER_END}`;
+  });
+  return { masked, quotes };
+}
+
+function unmaskQuotedPassages(text: string, quotes: string[]): string {
+  return text.replace(
+    new RegExp(`${QUOTE_PLACEHOLDER}(\\d+)${QUOTE_PLACEHOLDER_END}`, 'g'),
+    (_, index) => quotes[Number(index)] ?? '',
+  );
+}
+
 export function sanitizeScriptForTts(
   script: string,
   artist: string,
@@ -234,9 +255,11 @@ export function sanitizeScriptForTts(
   });
   DIGIT_ORDINAL_SUFFIX.lastIndex = 0;
   result = result.replace(/\d+/g, (match) => (shouldKeepDigit(match, allowed) ? match : ''));
-  result = result.replace(/\b[a-z]{2,}\b/gi, (match) => {
+  const { masked, quotes } = maskQuotedPassages(result);
+  result = masked.replace(/\b[a-z]{2,}\b/gi, (match) => {
     return allowedLatin.has(match.toLowerCase()) ? match : '';
   });
+  result = unmaskQuotedPassages(result, quotes);
   result = result.replace(ORPHAN_ORDINAL_SUFFIX, ' тогда ');
   ORPHAN_ORDINAL_SUFFIX.lastIndex = 0;
   result = repairOrphanDatePhrases(result, referenceFacts);

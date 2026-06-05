@@ -47,9 +47,17 @@ function addDashPauses(text: string, profile: TtsPauseProfile): string {
 function addQuotePauses(text: string, profile: TtsPauseProfile): string {
   if (profile === 'tight') return text;
   const small = pauseTag(profile, 'small');
-  return text
+  const quotes: string[] = [];
+  const masked = text.replace(/«[^»]+»/g, (quote) => {
+    const idx = quotes.length;
+    quotes.push(quote);
+    return `\uE000QQ${idx}\uE001`;
+  });
+  let result = masked
     .replace(/«\s*/g, `«${small} `)
     .replace(/\s*»/g, ` ${small}»`);
+  result = result.replace(/\uE000QQ(\d+)\uE001/g, (_, index) => quotes[Number(index)] ?? '');
+  return result;
 }
 
 function collapseMarkupWhitespace(text: string): string {
