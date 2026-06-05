@@ -422,7 +422,7 @@ class StoryRepository(
                     serverRateLimit = parsed.isServerSource,
                 )
             }
-            if (e is HttpException && e.code() == 503) {
+            if (e is HttpException && (e.code() == 503 || e.code() == 500)) {
                 val rawBody = e.response()?.errorBody()?.string().orEmpty()
                 val parsedBody = parseHttpErrorBodyFromRaw(rawBody, llmProvider)
                 val code = runCatching {
@@ -431,6 +431,7 @@ class StoryRepository(
                 if (
                     code == "NO_REFERENCE_FACTS" ||
                     code == "COVER_AMBIGUOUS" ||
+                    code == "STORY_QUALITY_REJECTED" ||
                     parsedBody?.contains("не получилось") == true ||
                     parsedBody?.contains("кавер") == true
                 ) {
@@ -439,13 +440,15 @@ class StoryRepository(
                             ?: "Извините, по такому треку или группе рассказать историю не получилось.",
                     )
                 }
-                val reason = sanitizeBackendError(parsedBody, llmProvider)
-                    ?: "Сервер без ${llmProvider.labelRu} — добавь свой ключ в настройках"
-                StoryLog.w("Backend LLM unavailable: $reason")
-                return StoryAttemptResult.Failed(
-                    reason = reason,
-                    backendGroqDown = true,
-                )
+                if (e.code() == 503) {
+                    val reason = sanitizeBackendError(parsedBody, llmProvider)
+                        ?: "Сервер без ${llmProvider.labelRu} — добавь свой ключ в настройках"
+                    StoryLog.w("Backend LLM unavailable: $reason")
+                    return StoryAttemptResult.Failed(
+                        reason = reason,
+                        backendGroqDown = true,
+                    )
+                }
             }
             val reason = sanitizeBackendError(
                 (e as? HttpException)?.let { parseHttpErrorBody(it, llmProvider) },

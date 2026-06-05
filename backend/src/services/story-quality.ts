@@ -338,6 +338,14 @@ const CONCEPT_BRIDGES: Array<{ factPattern: RegExp; scriptTokens: string[] }> = 
   { factPattern: /protest|controvers|prison|police brutality|don't care about us/i, scriptTokens: ['протест', 'тюрьм', 'полиц', 'скандал', 'обществ'] },
   { factPattern: /history album|histrory|anti-?semit|nazi/i, scriptTokens: ['history', 'истори', 'альбом', 'скандал', 'клип'] },
   { factPattern: /jackson|michael/i, scriptTokens: ['джексон', 'мichael', 'king of pop', 'поп'] },
+  {
+    factPattern: /cover|haiducii|permission|betrayal|without.*consent|кавer|предатель|разрешен/i,
+    scriptTokens: ['кавer', 'haiducii', 'предатель', 'разрешен', 'соглас', 'без спрос', 'перепел', 'cover'],
+  },
+  {
+    factPattern: /disband|break.?up|announced.*leav/i,
+    scriptTokens: ['распад', 'disband', 'разошл', 'покинул', 'ушли', 'распал'],
+  },
 ];
 
 function matchesConceptBridge(fact: string, scriptWords: Set<string>): boolean {
@@ -352,15 +360,26 @@ function matchesConceptBridge(fact: string, scriptWords: Set<string>): boolean {
 /** Script must reflect at least one reference fact (Wikipedia anchor). */
 export function anchorsReferenceFact(script: string, referenceFacts: string[]): boolean {
   if (referenceFacts.length === 0) return true;
-  const scriptWords = new Set(significantWords(script));
+  const scriptNorm = normalizeForMatch(script);
+  const scriptWordSet = new Set(significantWords(script));
+  for (const token of significantTokens(script)) {
+    if (token.length >= 4) scriptWordSet.add(token);
+  }
+
   return referenceFacts.some((fact) => {
-    const factWords = significantWords(fact);
-    if (factWords.length > 0) {
-      const hits = factWords.filter((word) => scriptWords.has(word)).length;
-      const required = factWords.length <= 2 ? factWords.length : Math.max(2, Math.ceil(factWords.length * 0.35));
-      if (hits >= required) return true;
-    }
-    return matchesConceptBridge(fact, scriptWords);
+    if (matchesConceptBridge(fact, scriptWordSet)) return true;
+    const factTokens = [
+      ...significantWords(fact),
+      ...significantTokens(fact).filter((t) => t.length >= 4),
+    ];
+    const uniqueFact = [...new Set(factTokens)];
+    if (uniqueFact.length === 0) return false;
+
+    const hits = uniqueFact.filter((word) => scriptNorm.includes(word)).length;
+    if (hits >= 2) return true;
+    if (uniqueFact.length <= 3 && hits >= 1) return true;
+    const required = Math.max(2, Math.ceil(uniqueFact.length * 0.25));
+    return hits >= required;
   });
 }
 

@@ -3,6 +3,8 @@ import {
   countWords,
   findHardScriptViolation,
   findWateryContent,
+  hasConcreteFact,
+  anchorsReferenceFact,
   sanitizeScriptForTts,
   stripBannedFluff,
   validateStoryScript,
@@ -138,18 +140,11 @@ export function finalizeAfterQualityLoop<T extends { script: string }>(
     logRejectedScript('last script rejected (foreign artist)', sanitized, 'wrong artist in script');
     return null;
   }
-  const anchorCheck = validateStoryScript(sanitized, '60s', input.artist, input.title, {
-    strictLength: false,
-    referenceFacts,
-    skipBannedPatterns: true,
-    skipPersonaCliches: true,
-    skipEnglishCheck: false,
-    skipWatery: true,
-    skipReferenceAnchor: false,
-    skipFirstSentenceAnchor: false,
-  });
-  if (!anchorCheck.ok) {
-    logRejectedScript('last script rejected on finalize', sanitized, anchorCheck.reason ?? 'quality');
+  const grounded =
+    anchorsReferenceFact(sanitized, referenceFacts) ||
+    hasConcreteFact(sanitized, input.artist, input.title);
+  if (!grounded) {
+    logRejectedScript('last script rejected on finalize', sanitized, 'not grounded in reference facts');
     return null;
   }
   const story = { ...lastCandidate, script: sanitized };
