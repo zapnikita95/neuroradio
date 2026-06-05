@@ -238,6 +238,15 @@ router.post('/full', validateStoryFullBody, storyFullRateLimit, async (req: Requ
     'story',
     { clientOwnKey: clientOwnOpenRouter },
   );
+  if (
+    openrouterModelRequested?.trim() &&
+    openrouterModelRequested.trim() !== openrouterModelStory &&
+    !clientOwnOpenRouter
+  ) {
+    console.log(
+      `[settings] tier=${userTier} server model ${openrouterModelStory} (client sent ${openrouterModelRequested.trim()})`,
+    );
+  }
 
   const modelLog =
     llmProvider === 'local'

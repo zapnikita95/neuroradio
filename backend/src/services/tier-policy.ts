@@ -9,8 +9,6 @@ import {
   OPENROUTER_DEFAULT_STORY_MODEL,
   OPENROUTER_FREE_FACT_MODEL_FALLBACK,
   OPENROUTER_TRIAL_FACT_MODEL,
-  isOpenRouterPresetModel,
-  resolveOpenRouterFactModelOrder,
 } from './openrouter-models.js';
 
 /** Бесплатный: Gemma :free (+ fallback Nemotron). Trial: Gemma paid. Premium: DeepSeek V3. */
@@ -85,14 +83,7 @@ export function resolveOpenRouterModelForTier(
     return slot === 'fact' ? TIER_OPENROUTER_TRIAL_FACT_MODEL : TIER_OPENROUTER_FACT_MODEL;
   }
 
-  if (tier === 'premium') {
-    if (
-      fromClient &&
-      fromClient.includes('/') &&
-      isOpenRouterPresetModel(fromClient)
-    ) {
-      return fromClient;
-    }
+  if (tier === 'premium' || tier === 'unlimited') {
     return TIER_OPENROUTER_FACT_MODEL;
   }
 
@@ -113,16 +104,21 @@ export function resolveOpenRouterFactModelsForTier(
   return [TIER_OPENROUTER_FACT_MODEL];
 }
 
-/** Free tier: одна модель по выбору пользователя (Nemotron 10/день или Gemma 5/день). */
+/** Free: выбранная модель + запасная при битом JSON. Paid: только DeepSeek. */
 export function resolveOpenRouterStoryModelsForTier(
   tier: UserTier,
   preferredModel?: string,
 ): string[] {
   if (tier === 'free') {
-    return [resolveFreeModelProfile(preferredModel).modelId];
+    const primary = resolveFreeModelProfile(preferredModel).modelId;
+    const secondary =
+      primary.includes('nemotron') || primary.includes('nvidia')
+        ? OPENROUTER_DEFAULT_FREE_FACT_MODEL
+        : OPENROUTER_FREE_FACT_MODEL_FALLBACK;
+    return primary === secondary ? [primary] : [primary, secondary];
   }
   if (tier === 'trial') {
-    return [TIER_OPENROUTER_FACT_MODEL, OPENROUTER_DEFAULT_STORY_MODEL];
+    return [TIER_OPENROUTER_FACT_MODEL];
   }
   return [TIER_OPENROUTER_FACT_MODEL];
 }

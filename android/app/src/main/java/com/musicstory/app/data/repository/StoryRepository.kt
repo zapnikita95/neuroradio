@@ -22,6 +22,7 @@ import com.musicstory.app.domain.GeminiModel
 import com.musicstory.app.domain.GroqModel
 import com.musicstory.app.domain.LlmProvider
 import com.musicstory.app.domain.OpenRouterModel
+import com.musicstory.app.domain.TierAccess
 import com.musicstory.app.domain.ReferenceFactPicker
 import com.musicstory.app.domain.StoryLength
 import com.musicstory.app.domain.StoryNarrator
@@ -185,9 +186,20 @@ class StoryRepository(
         var templateRejected = false
         var backendError: String? = null
 
+        if (useBackend) {
+            runCatching { refreshQuota() }
+        }
+
         val directApiKey = apiKeyForProvider(llmProvider, groqKey, geminiKey, openRouterKey, localOllamaUrl)
         val tier = _dailyQuota.value?.tier
         val backendOpenRouterModel = resolveBackendOpenRouterModel(
+            openRouterModel = openRouterModel,
+            openRouterCustomModelId = openRouterCustomModelId,
+            hasPersonalKey = directApiKey.isNotBlank(),
+            tier = tier,
+        )
+        val requestOpenRouterModel = resolveStoryOpenRouterModel(
+            backendOpenRouterModelId = backendOpenRouterModel,
             openRouterModel = openRouterModel,
             openRouterCustomModelId = openRouterCustomModelId,
             hasPersonalKey = directApiKey.isNotBlank(),
@@ -258,7 +270,7 @@ class StoryRepository(
                 groqCustomModelId = groqCustomModelId,
                 openRouterModel = openRouterModel,
                 openRouterCustomModelId = openRouterCustomModelId,
-                backendOpenRouterModelId = backendOpenRouterModel,
+                backendOpenRouterModelId = requestOpenRouterModel,
                 groqApiKey = groqKey,
                 geminiApiKey = geminiKey,
                 openRouterApiKey = openRouterKey,
@@ -360,8 +372,7 @@ class StoryRepository(
                         llmProvider = llmProvider.id,
                         geminiModel = geminiModel.id,
                         groqModel = groqModel.resolveApiModelId(groqCustomModelId),
-                        openRouterModel = backendOpenRouterModelId
-                            ?: openRouterModel.resolveApiModelId(openRouterCustomModelId),
+                        openRouterModel = backendOpenRouterModelId,
                         groqApiKey = groqApiKey.takeIf { it.isNotBlank() },
                         geminiApiKey = geminiApiKey.takeIf { it.isNotBlank() },
                         openRouterApiKey = openRouterApiKey.takeIf { it.isNotBlank() },
@@ -487,6 +498,24 @@ class StoryRepository(
         } else {
             "Укажи URL Railway в настройках."
         }
+    }
+
+    /** Модель в POST /v1/story/full: свой ключ — из настроек; free — выбор; подписка — null (сервер). */
+    private fun resolveStoryOpenRouterModel(
+        backendOpenRouterModelId: String?,
+        openRouterModel: OpenRouterModel,
+        openRouterCustomModelId: String,
+        hasPersonalKey: Boolean,
+        tier: String?,
+    ): String? {
+        if (hasPersonalKey) {
+            return openRouterModel.resolveApiModelId(openRouterCustomModelId)
+        }
+        if (TierAccess.isPremiumLike(tier)) {
+            return null
+        }
+        return backendOpenRouterModelId
+            ?: openRouterModel.resolveApiModelId(openRouterCustomModelId)
     }
 
     private fun resolveBackendOpenRouterModel(
