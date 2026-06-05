@@ -1,6 +1,7 @@
 /** Reject Wikipedia/DDG sentences about the wrong act — no hardcoded artist blocklists. */
 
 import { collaboratorNames } from './artist-primary.js';
+import { isNonMusicProfessionText } from './wikipedia-music.js';
 
 function normalize(text: string): string {
   return text
@@ -505,6 +506,7 @@ export function factAppliesToRequest(
 ): boolean {
   const trimmed = fact.trim();
   if (trimmed.length < 35) return false;
+  if (isNonMusicProfessionText(trimmed)) return false;
   if (isAmbiguousCommonWordArtist(artist) && !factMentionsArtistAsEntity(trimmed, artist)) return false;
   if (isWebListicleJunk(trimmed)) return false;
   if (isGenericDisambiguationFact(trimmed, artist)) return false;

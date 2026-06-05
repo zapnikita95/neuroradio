@@ -35,10 +35,10 @@ export function buildWebOnlyQueries(artist: string, title: string): string[] {
   if (cyrillic) {
     const lead = artist.trim().toLowerCase() === 'кино' ? 'Виктор Цой Кино' : artist;
     return [
-      `${lead} ${cleanTitle} история песня смысл`,
-      `${artist} ${cleanTitle} запись цензура`,
-      `${lead} биография скандал армия`,
-      `${artist} (группа) ${cleanTitle} факт`,
+      `${lead} (музыкант) ${cleanTitle}`,
+      `${lead} (группа) ${cleanTitle} песня`,
+      `${artist} ${cleanTitle} история песня смысл`,
+      `${artist} ${cleanTitle} запись альбом`,
     ].slice(0, MAX_HTML_QUERIES);
   }
   if (isAmbiguousArtistName(artist)) {

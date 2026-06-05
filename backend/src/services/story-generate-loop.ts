@@ -10,6 +10,7 @@ import {
   validateStoryScript,
 } from './story-quality.js';
 import { storyNamesForeignArtist } from './fact-relevance.js';
+import { isMetadataOnlyFallbackFact } from './metadata-facts.js';
 import { logRejectedScript } from './story-reject-log.js';
 
 /** Below this — empty/garbage, not a story. Normal length is enforced by TTS speed + preset in prompt only. */
@@ -127,6 +128,10 @@ export function finalizeAfterQualityLoop<T extends { script: string }>(
   }
   if (referenceFacts.length === 0) {
     logRejectedScript('last script rejected', sanitized, 'no reference facts');
+    return null;
+  }
+  if (referenceFacts.every(isMetadataOnlyFallbackFact)) {
+    logRejectedScript('last script rejected', sanitized, 'metadata-only placeholder facts');
     return null;
   }
   if (

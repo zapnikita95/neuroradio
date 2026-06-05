@@ -176,13 +176,20 @@ class MediaControllerManager(
 
     private fun selectAndBindController(controllers: List<MediaController>?) {
         val list = controllers.orEmpty()
-        val preferred = list
-            .filter { MediaSessionSelector.isPreferredPackage(it.packageName) }
-            .sortedBy { MediaSessionSelector.priority(it.packageName) }
+            .filter { !MediaSessionSelector.isBlockedPackage(it.packageName) }
 
-        val controller = preferred.firstOrNull()
-            ?: list.firstOrNull { it.playbackState?.state == android.media.session.PlaybackState.STATE_PLAYING }
-            ?: list.firstOrNull()
+        val musicApps = list.filter { MediaSessionSelector.isPreferredPackage(it.packageName) }
+
+        val controller = musicApps
+            .filter { hasValidMetadata(it) && isPlaying(it) }
+            .minByOrNull { MediaSessionSelector.priority(it.packageName) }
+            ?: musicApps
+                .filter { hasValidMetadata(it) }
+                .minByOrNull { MediaSessionSelector.priority(it.packageName) }
+            ?: list
+                .filter { !MediaSessionSelector.isPreferredPackage(it.packageName) }
+                .filter { hasValidMetadata(it) && isPlaying(it) }
+                .firstOrNull()
 
         if (controller?.sessionToken == activeController?.sessionToken) {
             updateFromController(controller)
@@ -193,6 +200,19 @@ class MediaControllerManager(
         activeController = controller
         controller?.registerCallback(controllerCallback)
         updateFromController(controller)
+    }
+
+    private fun hasValidMetadata(controller: MediaController): Boolean {
+        val metadata = controller.metadata ?: return false
+        val artist = metadata.getString(android.media.MediaMetadata.METADATA_KEY_ARTIST)
+            ?: metadata.getString(android.media.MediaMetadata.METADATA_KEY_ALBUM_ARTIST)
+            ?: ""
+        val title = metadata.getString(android.media.MediaMetadata.METADATA_KEY_TITLE) ?: ""
+        return artist.isNotBlank() && title.isNotBlank() && artist != title
+    }
+
+    private fun isPlaying(controller: MediaController): Boolean {
+        return controller.playbackState?.state == android.media.session.PlaybackState.STATE_PLAYING
     }
 
     private fun unbindController() {

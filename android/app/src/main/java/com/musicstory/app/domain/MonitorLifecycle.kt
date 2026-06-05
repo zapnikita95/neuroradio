@@ -44,9 +44,12 @@ class MonitorLifecycle(
 
     fun hasActiveMusicMedia(): Boolean {
         val pkg = mediaControllerManager.activePackage.value
+        if (MediaSessionSelector.isBlockedPackage(pkg)) return false
         if (!MediaSessionSelector.isPreferredPackage(pkg)) return false
+        val track = mediaControllerManager.effectiveNowPlaying.value
+        if (track?.isValid() != true) return false
         if (mediaControllerManager.isPlaying.value) return true
-        return mediaControllerManager.effectiveNowPlaying.value?.isValid() == true
+        return track.isValid()
     }
 
     private fun shouldShowNotification(): Boolean {
@@ -110,6 +113,7 @@ class MonitorLifecycle(
     suspend fun resume() = setAppPowerMode(AppPowerMode.ON)
 
     fun tryWakeFromMusicApp(packageName: String) {
+        if (MediaSessionSelector.isBlockedPackage(packageName)) return
         if (!MediaSessionSelector.isPreferredPackage(packageName)) return
         scope.launch {
             if (settingsDataStore.appPowerMode.first() == AppPowerMode.OFF) return@launch

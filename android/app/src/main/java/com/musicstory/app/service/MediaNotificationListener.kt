@@ -37,6 +37,7 @@ class MediaNotificationListener : NotificationListenerService() {
 
     override fun onNotificationPosted(sbn: StatusBarNotification?) {
         sbn ?: return
+        if (MediaSessionSelector.isBlockedPackage(sbn.packageName)) return
         if (MediaSessionSelector.isPreferredPackage(sbn.packageName)) {
             parseNotificationTrack(sbn)?.let { track ->
                 if (notificationTrack.value?.displayKey != track.displayKey) {
@@ -53,6 +54,7 @@ class MediaNotificationListener : NotificationListenerService() {
 
     override fun onNotificationRemoved(sbn: StatusBarNotification?) {
         sbn ?: return
+        if (MediaSessionSelector.isBlockedPackage(sbn.packageName)) return
         if (MediaSessionSelector.isPreferredPackage(sbn.packageName)) {
             refreshSessionsDebounced()
         }

@@ -726,10 +726,15 @@ router.post('/full', validateStoryFullBody, storyFullRateLimit, async (req: Requ
       }
 
       const refFacts = effectiveStoryInput.referenceFacts ?? [];
+      const groundedSeed = effectiveStoryInput.selectedReferenceFact?.fact?.trim() ?? '';
+      const seedScore = effectiveStoryInput.selectedReferenceFact?.interestScore ?? 0;
+      const hasRealSeed =
+        groundedSeed.length > 0 &&
+        seedScore >= 6 &&
+        !isMetadataOnlyFallbackFact(groundedSeed);
       if (
         !factFromBank &&
-        (!effectiveStoryInput.selectedReferenceFact?.fact ||
-          isMetadataOnlyFallbackFact(effectiveStoryInput.selectedReferenceFact.fact)) &&
+        !hasRealSeed &&
         (refFacts.length === 0 || refFacts.every(isMetadataOnlyFallbackFact))
       ) {
         throw new NoReferenceFactsError(metadata.artist, metadata.title);
