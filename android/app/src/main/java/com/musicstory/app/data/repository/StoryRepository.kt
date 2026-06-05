@@ -46,6 +46,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeout
 import retrofit2.HttpException
 import java.io.IOException
+import java.net.SocketTimeoutException
 
 class StoryRepository(
     private val storyDao: StoryDao,
@@ -569,12 +570,19 @@ class StoryRepository(
     }
 
     private fun explainError(e: Exception, llmProvider: LlmProvider): String = when (e) {
+        is SocketTimeoutException -> "Сервер долго отвечает — подожди и попробуй ещё раз"
         is HttpException -> when (e.code()) {
             429 -> "Лимит сервера Music Story (не Gemini)"
             503 -> "${llmProvider.labelRu} на сервере недоступен"
             else -> "HTTP ${e.code()}"
         }
-        is IOException -> "нет сети"
+        is IOException -> {
+            if (e.message?.contains("timeout", ignoreCase = true) == true) {
+                "Сервер долго отвечает — подожди и попробуй ещё раз"
+            } else {
+                "Нет связи с сервером — проверь интернет"
+            }
+        }
         else -> e.message?.take(80) ?: e.javaClass.simpleName
     }
 

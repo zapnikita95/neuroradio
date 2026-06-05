@@ -12,14 +12,25 @@ const GROQ_API_URL = 'https://api.groq.com/openai/v1/chat/completions';
 const GEMINI_API_BASE = 'https://generativelanguage.googleapis.com/v1beta/models';
 
 function parseJsonScript(raw: string): string | null {
-  const match = raw.trim().match(/\{[\s\S]*\}/);
-  if (!match) return null;
-  try {
-    const data = JSON.parse(match[0]) as { script?: string };
-    return data.script?.trim() ?? null;
-  } catch {
-    return null;
+  const trimmed = raw.trim();
+  const match = trimmed.match(/\{[\s\S]*\}/);
+  if (match) {
+    try {
+      const data = JSON.parse(match[0]) as { script?: string };
+      const script = data.script?.trim();
+      if (script) return script;
+    } catch {
+      // loose extract below
+    }
   }
+  const loose = trimmed.match(/"script"\s*:\s*"((?:[^"\\]|\\.)*)/s);
+  if (loose?.[1]) {
+    return loose[1]
+      .replace(/\\n/g, '\n')
+      .replace(/\\"/g, '"')
+      .trim();
+  }
+  return null;
 }
 
 async function callGroqTranslate(

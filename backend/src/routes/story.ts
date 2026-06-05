@@ -610,7 +610,9 @@ router.post('/full', validateStoryFullBody, storyFullRateLimit, async (req: Requ
 
     const { story, llmUsed } = await (async () => {
       const hasGroundedSeed = Boolean(selectedFact?.fact && selectedFact.interestScore >= 6);
-      if (artistTier === 'indie' && !hasGroundedSeed && !factFromBank) {
+      let effectiveStoryInput = storyInput;
+
+      if (!hasGroundedSeed && !factFromBank) {
         const wikiLead = await pickArtistWikiContent({
           installId,
           artist: metadata.artist,
@@ -652,27 +654,28 @@ router.post('/full', validateStoryFullBody, storyFullRateLimit, async (req: Requ
             return { story: scripted, llmUsed: wikiScript ? `${llmProvider}+wiki` : 'wiki-ru' };
           }
           if (!wikiScript) {
-          console.warn(`[indie-wiki] translate failed for "${metadata.artist}" — fallback to story LLM`);
+            console.warn(`[indie-wiki] translate failed for "${metadata.artist}" — wiki lead → story LLM`);
           }
+          const wikiReferenceFacts = [
+            wikiLead.text,
+            ...storyReferenceFacts.filter((f) => !isMetadataOnlyFallbackFact(f)),
+          ].slice(0, 4);
+          effectiveStoryInput = {
+            ...storyInput,
+            referenceFacts: wikiReferenceFacts,
+            selectedReferenceFact: {
+              fact: wikiLead.text,
+              scope: 'artist',
+              scopeLabelRu: 'группа/артист',
+              interestScore: interestScore(wikiLead.text),
+              interestRating: interestRating10(wikiLead.text),
+            },
+            rawSnippets: undefined,
+          };
         }
       }
-      if (
-        artistTier === 'indie' &&
-        !factFromBank &&
-        !selectedFact &&
-        storyReferenceFacts.length > 0 &&
-        storyReferenceFacts.every(isMetadataOnlyFallbackFact)
-      ) {
-        recordFactMiss({
-          installId,
-          artist: metadata.artist,
-          title: metadata.title,
-          reason: 'metadata_only_no_seed',
-          artistTier,
-        });
-        throw new NoReferenceFactsError(metadata.artist, metadata.title);
-      }
-      return generateStoryWithFallback(storyInput, llmProvider, {
+
+      return generateStoryWithFallback(effectiveStoryInput, llmProvider, {
         serverManaged: userTier === 'free' && !ownLlmKey,
       });
     })();

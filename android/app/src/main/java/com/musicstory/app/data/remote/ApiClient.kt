@@ -32,6 +32,14 @@ class ApiClient(
         .addInterceptor(loggingInterceptor)
         .build()
 
+    /** Story generation can take 2+ minutes (facts + LLM + TTS queue on server). */
+    private val storyOkHttpClient: OkHttpClient = OkHttpClient.Builder()
+        .connectTimeout(30, TimeUnit.SECONDS)
+        .readTimeout(4, TimeUnit.MINUTES)
+        .writeTimeout(30, TimeUnit.SECONDS)
+        .addInterceptor(loggingInterceptor)
+        .build()
+
     /** Local Ollama on PC — research + narrator can take several minutes. */
     private val localStoryOkHttpClient: OkHttpClient = OkHttpClient.Builder()
         .connectTimeout(30, TimeUnit.SECONDS)
@@ -47,8 +55,8 @@ class ApiClient(
     private var cachedApi: StoryApi? = null
 
     suspend fun fetchFullStory(baseUrl: String, request: StoryRequest): StoryResponse {
-        val local = request.llmProvider == "local"
-        val api = getApi(baseUrl, longRead = local)
+        val longRead = request.llmProvider == "local"
+        val api = getApi(baseUrl, longRead = longRead, storyGeneration = !longRead)
         StoryLog.i("POST /v1/story/full llm=${request.llmProvider} ${request.artist} — ${request.title}")
         return try {
             val response = api.fetchFullStory(request)
@@ -61,7 +69,7 @@ class ApiClient(
             if (http != null && http.code() != 401) throw first
             StoryLog.w("Story fetch retry after: ${first.message}")
             authManager.invalidateToken()
-            getApi(baseUrl, longRead = local).fetchFullStory(request)
+            getApi(baseUrl, longRead = longRead, storyGeneration = !longRead).fetchFullStory(request)
         }
     }
 
@@ -113,7 +121,13 @@ class ApiClient(
     @Volatile
     private var cachedLocalBaseUrl: String? = null
 
-    fun getApi(baseUrl: String, longRead: Boolean = false): StoryApi {
+    @Volatile
+    private var cachedStoryApi: StoryApi? = null
+
+    @Volatile
+    private var cachedStoryBaseUrl: String? = null
+
+    fun getApi(baseUrl: String, longRead: Boolean = false, storyGeneration: Boolean = false): StoryApi {
         val normalized = normalizeBaseUrl(baseUrl)
         if (longRead) {
             val current = cachedLocalApi
@@ -128,6 +142,23 @@ class ApiClient(
                     buildApi(normalized, localStoryOkHttpClient).also {
                         cachedLocalApi = it
                         cachedLocalBaseUrl = normalized
+                    }
+                }
+            }
+        }
+        if (storyGeneration) {
+            val current = cachedStoryApi
+            if (current != null && cachedStoryBaseUrl == normalized) {
+                return current
+            }
+            return synchronized(this) {
+                val again = cachedStoryApi
+                if (again != null && cachedStoryBaseUrl == normalized) {
+                    again
+                } else {
+                    buildApi(normalized, storyOkHttpClient).also {
+                        cachedStoryApi = it
+                        cachedStoryBaseUrl = normalized
                     }
                 }
             }
@@ -167,6 +198,8 @@ class ApiClient(
             cachedBaseUrl = null
             cachedLocalApi = null
             cachedLocalBaseUrl = null
+            cachedStoryApi = null
+            cachedStoryBaseUrl = null
         }
     }
 
