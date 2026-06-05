@@ -40,3 +40,8 @@ export function buildMetadataFallbackFacts(metadata: TrackMetadata): string[] {
 
   return facts.filter((f) => f.length >= 35);
 }
+
+/** Generic MusicBrainz-only placeholder — not enough to ground a story. */
+export function isMetadataOnlyFallbackFact(fact: string): boolean {
+  return /независимый артист|в каталоге есть трек|в музыкальных каталогах/i.test(fact);
+}

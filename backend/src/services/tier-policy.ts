@@ -104,18 +104,13 @@ export function resolveOpenRouterFactModelsForTier(
   return [TIER_OPENROUTER_FACT_MODEL];
 }
 
-/** Free: выбранная модель + запасная при битом JSON. Paid: только DeepSeek. */
+/** Free story: Gemma first (stable JSON), Nemotron fallback. Fact-hunt uses user pick separately. */
 export function resolveOpenRouterStoryModelsForTier(
   tier: UserTier,
-  preferredModel?: string,
+  _preferredModel?: string,
 ): string[] {
   if (tier === 'free') {
-    const primary = resolveFreeModelProfile(preferredModel).modelId;
-    const secondary =
-      primary.includes('nemotron') || primary.includes('nvidia')
-        ? OPENROUTER_DEFAULT_FREE_FACT_MODEL
-        : OPENROUTER_FREE_FACT_MODEL_FALLBACK;
-    return primary === secondary ? [primary] : [primary, secondary];
+    return [OPENROUTER_DEFAULT_FREE_FACT_MODEL, OPENROUTER_FREE_FACT_MODEL_FALLBACK];
   }
   if (tier === 'trial') {
     return [TIER_OPENROUTER_FACT_MODEL];

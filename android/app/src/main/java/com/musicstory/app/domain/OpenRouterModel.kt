@@ -65,9 +65,9 @@ enum class OpenRouterModel(
         val defaultRecommended: OpenRouterModel get() = DEEPSEEK_V3
 
         val freeServerPresets: List<OpenRouterModel> =
-            listOf(NEMOTRON_NANO, GEMMA_4_26B_FREE)
+            listOf(GEMMA_4_26B_FREE, NEMOTRON_NANO)
 
-        val defaultFreeServer: OpenRouterModel get() = NEMOTRON_NANO
+        val defaultFreeServer: OpenRouterModel get() = GEMMA_4_26B_FREE
 
         /** Presets verified stable — shown first in settings. */
         val stablePresets: List<OpenRouterModel> =

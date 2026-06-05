@@ -20,7 +20,7 @@ import {
 } from '../services/fact-user-service.js';
 import { ingestFacts } from '../services/fact-bank.js';
 import { resolveArtistTier } from '../services/artist-notability.js';
-import { buildMetadataFallbackFacts } from '../services/metadata-facts.js';
+import { buildMetadataFallbackFacts, isMetadataOnlyFallbackFact } from '../services/metadata-facts.js';
 import { factAppliesToRequest } from '../services/fact-relevance.js';
 import {
   explainLlmFactSelection,
@@ -655,6 +655,22 @@ router.post('/full', validateStoryFullBody, storyFullRateLimit, async (req: Requ
           console.warn(`[indie-wiki] translate failed for "${metadata.artist}" — fallback to story LLM`);
           }
         }
+      }
+      if (
+        artistTier === 'indie' &&
+        !factFromBank &&
+        !selectedFact &&
+        storyReferenceFacts.length > 0 &&
+        storyReferenceFacts.every(isMetadataOnlyFallbackFact)
+      ) {
+        recordFactMiss({
+          installId,
+          artist: metadata.artist,
+          title: metadata.title,
+          reason: 'metadata_only_no_seed',
+          artistTier,
+        });
+        throw new NoReferenceFactsError(metadata.artist, metadata.title);
       }
       return generateStoryWithFallback(storyInput, llmProvider, {
         serverManaged: userTier === 'free' && !ownLlmKey,

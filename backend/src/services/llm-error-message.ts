@@ -79,15 +79,20 @@ export function classifyStoryLlmError(
         : llmProvider === 'openrouter'
           ? 'OPENROUTER_RATE_LIMIT'
           : 'GROQ_RATE_LIMIT';
+    const upstreamFree =
+      llmProvider === 'openrouter' &&
+      /temporarily rate-limited upstream|rate-limited upstream/i.test(lower);
     const apiSnippet = extractLlmApiSnippet(rawMessage);
     const dailyLimit = /free-models-per-day|free model requests per day|tokens per day|per day| tpd/i.test(
       lower,
     );
     return {
       code,
-      message: dailyLimit
-        ? `${label} (дневной лимит): ${apiSnippet}`
-        : `${label}: ${apiSnippet}`,
+      message: upstreamFree
+        ? 'Бесплатные модели OpenRouter сейчас перегружены — подожди 1–2 минуты и попробуй снова, или добавь свой ключ OpenRouter в настройках.'
+        : dailyLimit
+          ? `${label} (дневной лимит): ${apiSnippet}`
+          : `${label}: ${apiSnippet}`,
       httpStatus: 503,
     };
   }

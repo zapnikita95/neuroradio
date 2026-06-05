@@ -8,7 +8,12 @@ export interface FactMissEntry {
   artist: string;
   title: string;
   installId: string;
-  reason: 'no_reference_facts' | 'indie_no_artist_fact' | 'relevance_filter_empty' | 'cover_ambiguous';
+  reason:
+    | 'no_reference_facts'
+    | 'indie_no_artist_fact'
+    | 'relevance_filter_empty'
+    | 'cover_ambiguous'
+    | 'metadata_only_no_seed';
   artistTier?: string;
   at: number;
 }

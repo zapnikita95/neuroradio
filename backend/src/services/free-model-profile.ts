@@ -36,7 +36,7 @@ export function resolveFreeModelProfile(preferredModelId?: string): FreeModelPro
   const id = preferredModelId?.trim().toLowerCase() ?? '';
   if (id.includes('gemma') && id.includes(':free')) return FREE_MODEL_PROFILES.quality;
   if (id.includes('nemotron') && id.includes(':free')) return FREE_MODEL_PROFILES.economy;
-  return FREE_MODEL_PROFILES.economy;
+  return FREE_MODEL_PROFILES.quality;
 }
 
 export function resolveFreeDailyLimit(preferredModelId?: string): number {
