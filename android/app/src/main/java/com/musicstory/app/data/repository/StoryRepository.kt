@@ -416,7 +416,12 @@ class StoryRepository(
                 val code = runCatching {
                     gson.fromJson(rawBody, Map::class.java)["code"] as? String
                 }.getOrNull()
-                if (code == "NO_REFERENCE_FACTS" || parsedBody?.contains("не получилось") == true) {
+                if (
+                    code == "NO_REFERENCE_FACTS" ||
+                    code == "COVER_AMBIGUOUS" ||
+                    parsedBody?.contains("не получилось") == true ||
+                    parsedBody?.contains("кавер") == true
+                ) {
                     return StoryAttemptResult.Failed(
                         reason = parsedBody
                             ?: "Извините, по такому треку или группе рассказать историю не получилось.",

@@ -2,6 +2,8 @@ import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { factFingerprint } from './fact-bank.js';
+import { hasPostgres } from './db.js';
+import { hydrateKvFromPostgres, persistKv } from './pg-kv.js';
 
 const PREMIUM_PRODUCT_MONTHLY = 'premium_voice_monthly';
 const TRIAL_PRODUCT_MONTHLY = 'trial_stories_monthly';
@@ -102,8 +104,27 @@ interface StoreFile {
 
 const DATA_DIR = process.env.ACCOUNT_DATA_DIR?.trim() || path.join(process.cwd(), 'data');
 const STORE_PATH = path.join(DATA_DIR, 'accounts.json');
+const ACCOUNTS_KV_KEY = 'accounts';
 
 let cache: StoreFile | null = null;
+
+export async function hydrateAccountStoreFromPostgres(): Promise<void> {
+  await hydrateKvFromPostgres(
+    ACCOUNTS_KV_KEY,
+    STORE_PATH,
+    (value) => {
+      const parsed = value as StoreFile;
+      cache = {
+        ...emptyStore(),
+        ...parsed,
+        emailToAccount: parsed.emailToAccount ?? {},
+        telegramToAccount: parsed.telegramToAccount ?? {},
+        pendingEmailCodes: parsed.pendingEmailCodes ?? {},
+      };
+    },
+    emptyStore,
+  );
+}
 
 function emptyStore(): StoreFile {
   return {
@@ -118,6 +139,10 @@ function emptyStore(): StoreFile {
 
 function loadStore(): StoreFile {
   if (cache) return cache;
+  if (hasPostgres()) {
+    cache = emptyStore();
+    return cache;
+  }
   try {
     if (!fs.existsSync(STORE_PATH)) {
       cache = emptyStore();
@@ -140,9 +165,11 @@ function loadStore(): StoreFile {
 }
 
 function saveStore(store: StoreFile): void {
-  fs.mkdirSync(DATA_DIR, { recursive: true });
-  fs.writeFileSync(STORE_PATH, JSON.stringify(store, null, 2), 'utf8');
   cache = store;
+  persistKv(ACCOUNTS_KV_KEY, store, STORE_PATH, () => {
+    fs.mkdirSync(DATA_DIR, { recursive: true });
+    fs.writeFileSync(STORE_PATH, JSON.stringify(store, null, 2), 'utf8');
+  });
 }
 
 function generateSyncCode(): string {

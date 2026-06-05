@@ -28,6 +28,9 @@ import { requireSignedAudioAccess } from './middleware/audio-auth.js';
 import { requestLogger } from './middleware/request-logger.js';
 import { SECURITY } from './config/security.js';
 import { purgeInvalidBankFacts } from './services/fact-bank.js';
+import { initPostgres, hasPostgres, closePostgres } from './services/db.js';
+import { hydrateAccountStoreFromPostgres } from './services/account-store.js';
+import { hydrateDevTierStoreFromPostgres } from './services/dev-tier-store.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PORT = parseInt(process.env.PORT ?? '3000', 10);
@@ -133,6 +136,7 @@ app.get('/health', (_req, res) => {
     localOllama,
     yandexTts,
     appAuthRequired: isAppAuthEnabled(),
+    postgres: hasPostgres(),
   });
 });
 
@@ -147,40 +151,58 @@ app.use((_req, res) => {
   res.status(404).json({ error: 'Not found' });
 });
 
-const server = app.listen(PORT, '0.0.0.0', () => {
-  console.log(`Music Story BFF listening on http://0.0.0.0:${PORT}`);
-  console.log(`[boot] log file: ${process.env.LOCAL_LOG_FILE ?? '(console only)'}`);
-  console.log(
-    `[boot] build=${BUILD_ID} llm=${resolveLlmProvider()} openrouter=${hasOpenRouterApiKey()} groq=${hasGroqApiKey()} gemini=${hasGeminiApiKey()} yandexTts=${hasYandexCredentials()} auth=${isAppAuthEnabled()}`,
-  );
-  console.log(`  POST /v1/auth/token — app JWT`);
-  console.log(`  GET  /v1/account/* — email/Telegram auth + 7-day trial`);
-  console.log(`  GET  /v1/sync/* — linked account settings & history`);
-  console.log(`  GET  /v1/billing/status — tier, limits, trial/premium`);
-  console.log(`  POST /v1/llm/probe — test LLM key via BFF (no key logging)`);
-  console.log(`  POST /v1/story/full — story + optional Yandex TTS`);
-  console.log(`  POST /v1/story/feedback — like/dislike + reason tags`);
-  console.log(`  GET  /health — health check`);
-  console.log(`  GET  /audio/* — signed audio only`);
-  console.log(`[boot] phone backend URL must be http://YOUR_PC_IP:${PORT} (not Railway)`);
+async function boot(): Promise<void> {
+  await initPostgres();
+  if (hasPostgres()) {
+    await hydrateAccountStoreFromPostgres();
+    await hydrateDevTierStoreFromPostgres();
+    console.log('[boot] postgres stores hydrated');
+  }
+
   try {
     const purged = purgeInvalidBankFacts();
     if (purged > 0) console.log(`[boot] fact-bank cleanup removed ${purged} invalid entries`);
   } catch (err) {
     console.warn('[boot] fact-bank purge failed:', err instanceof Error ? err.message : err);
   }
-});
 
-server.on('connection', (socket) => {
-  const peer = `${socket.remoteAddress ?? '?'}:${socket.remotePort ?? '?'}`;
-  console.log(`[tcp] connect ${peer}`);
-});
+  const server = app.listen(PORT, '0.0.0.0', () => {
+    console.log(`Music Story BFF listening on http://0.0.0.0:${PORT}`);
+    console.log(`[boot] log file: ${process.env.LOCAL_LOG_FILE ?? '(console only)'}`);
+    console.log(
+      `[boot] build=${BUILD_ID} llm=${resolveLlmProvider()} openrouter=${hasOpenRouterApiKey()} groq=${hasGroqApiKey()} gemini=${hasGeminiApiKey()} yandexTts=${hasYandexCredentials()} auth=${isAppAuthEnabled()} postgres=${hasPostgres()}`,
+    );
+    console.log(`  POST /v1/auth/token — app JWT`);
+    console.log(`  GET  /v1/account/* — email/Telegram auth + 7-day trial`);
+    console.log(`  GET  /v1/sync/* — linked account settings & history`);
+    console.log(`  GET  /v1/billing/status — tier, limits, trial/premium`);
+    console.log(`  POST /v1/llm/probe — test LLM key via BFF (no key logging)`);
+    console.log(`  POST /v1/story/full — story + optional Yandex TTS`);
+    console.log(`  POST /v1/story/feedback — like/dislike + reason tags`);
+    console.log(`  GET  /health — health check`);
+    console.log(`  GET  /audio/* — signed audio only`);
+    console.log(`[boot] phone backend URL must be http://YOUR_PC_IP:${PORT} (not Railway)`);
+  });
 
-function shutdown(signal: string): void {
-  console.log(`[shutdown] ${signal} — closing HTTP server`);
-  server.close(() => process.exit(0));
-  setTimeout(() => process.exit(0), 10_000).unref();
+  server.on('connection', (socket) => {
+    const peer = `${socket.remoteAddress ?? '?'}:${socket.remotePort ?? '?'}`;
+    console.log(`[tcp] connect ${peer}`);
+  });
+
+  function shutdown(signal: string): void {
+    console.log(`[shutdown] ${signal} — closing HTTP server`);
+    server.close(async () => {
+      await closePostgres();
+      process.exit(0);
+    });
+    setTimeout(() => process.exit(0), 10_000).unref();
+  }
+
+  process.on('SIGTERM', () => shutdown('SIGTERM'));
+  process.on('SIGINT', () => shutdown('SIGINT'));
 }
 
-process.on('SIGTERM', () => shutdown('SIGTERM'));
-process.on('SIGINT', () => shutdown('SIGINT'));
+boot().catch((err) => {
+  console.error('[boot] fatal:', err);
+  process.exit(1);
+});

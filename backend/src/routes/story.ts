@@ -73,7 +73,8 @@ import {
 import { classifyStoryLlmError } from '../services/llm-error-message.js';
 import { StoryTiming } from '../services/story-timing.js';
 import { recordFactMiss } from '../services/fact-miss-log.js';
-import { isNoReferenceFactsError, NoReferenceFactsError } from '../services/story-errors.js';
+import { isNoReferenceFactsError, NoReferenceFactsError, isCoverOnHoldError, CoverOnHoldError } from '../services/story-errors.js';
+import { assessCoverSituation } from '../services/cover-policy.js';
 import {
   isValidFeedbackReason,
   recordStoryFeedback,
@@ -523,6 +524,33 @@ router.post('/full', validateStoryFullBody, storyFullRateLimit, async (req: Requ
 
     const finalReferenceFacts = selectedFact ? [selectedFact.fact] : referenceFacts;
 
+    const coverSituation = assessCoverSituation(
+      metadata.artist,
+      metadata.title,
+      selectedFact,
+      factBundle,
+    );
+    if (coverSituation.action === 'hold') {
+      recordFactMiss({
+        installId,
+        artist: metadata.artist,
+        title: metadata.title,
+        reason: 'cover_ambiguous',
+        artistTier,
+      });
+      throw new CoverOnHoldError(metadata.artist, metadata.title);
+    }
+    if (coverSituation.action === 'pivot_artist') {
+      selectedFact = coverSituation.artistFact;
+    }
+
+    const storyReferenceFacts =
+      coverSituation.action === 'pivot_artist'
+        ? coverSituation.referenceFacts
+        : selectedFact
+          ? [selectedFact.fact]
+          : finalReferenceFacts;
+
     const storyInput = {
       artist: metadata.artist,
       title: metadata.title,
@@ -533,12 +561,13 @@ router.post('/full', validateStoryFullBody, storyFullRateLimit, async (req: Requ
       storyLength,
       storyNarrator,
       previousScripts,
-      referenceFacts: finalReferenceFacts,
+      referenceFacts: storyReferenceFacts,
       artistTier,
       selectedReferenceFact: selectedFact ?? undefined,
       rawSnippets:
+        coverSituation.action !== 'pivot_artist' &&
         artistTier === 'major' &&
-        finalReferenceFacts.length <= 1 &&
+        storyReferenceFacts.length <= 1 &&
         factCtx.rawSnippets.length > 0
           ? factCtx.rawSnippets
           : undefined,
@@ -755,6 +784,17 @@ router.post('/full', validateStoryFullBody, storyFullRateLimit, async (req: Requ
         code: 'NO_REFERENCE_FACTS',
         message:
           'Извините, по такому треку или группе рассказать историю не получилось — проверенных фактов не нашли.',
+        source: 'facts',
+      });
+      return;
+    }
+    if (isCoverOnHoldError(err)) {
+      setLogDetail(res, 'code=COVER_AMBIGUOUS possible cover without explicit marker');
+      res.status(503).json({
+        error: 'Story generation unavailable',
+        code: 'COVER_AMBIGUOUS',
+        message:
+          'Похоже, это кавер без явной пометки — чтобы не перепутать с оригиналом, историю по этому треку пока не рассказываем.',
         source: 'facts',
       });
       return;

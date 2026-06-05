@@ -1,16 +1,34 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import type { UserTier } from './entitlements.js';
+import { hasPostgres } from './db.js';
+import { hydrateKvFromPostgres, persistKv } from './pg-kv.js';
 
 const DATA_DIR = process.env.ACCOUNT_DATA_DIR?.trim() || path.join(process.cwd(), 'data');
 const STORE_PATH = path.join(DATA_DIR, 'dev-tier-overrides.json');
+const DEV_TIER_KV_KEY = 'dev_tier_overrides';
 
 type DevTierFile = Record<string, UserTier>;
 
 let cache: DevTierFile | null = null;
 
+export async function hydrateDevTierStoreFromPostgres(): Promise<void> {
+  await hydrateKvFromPostgres(
+    DEV_TIER_KV_KEY,
+    STORE_PATH,
+    (value) => {
+      cache = (value as DevTierFile) ?? {};
+    },
+    () => ({}),
+  );
+}
+
 function load(): DevTierFile {
   if (cache) return cache;
+  if (hasPostgres()) {
+    cache = {};
+    return cache;
+  }
   try {
     if (!fs.existsSync(STORE_PATH)) {
       cache = {};
@@ -25,9 +43,11 @@ function load(): DevTierFile {
 }
 
 function save(store: DevTierFile): void {
-  fs.mkdirSync(DATA_DIR, { recursive: true });
-  fs.writeFileSync(STORE_PATH, JSON.stringify(store, null, 2), 'utf8');
   cache = store;
+  persistKv(DEV_TIER_KV_KEY, store, STORE_PATH, () => {
+    fs.mkdirSync(DATA_DIR, { recursive: true });
+    fs.writeFileSync(STORE_PATH, JSON.stringify(store, null, 2), 'utf8');
+  });
 }
 
 export function isDevTierSwitchEnabled(): boolean {

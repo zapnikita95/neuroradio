@@ -231,51 +231,21 @@ function referenceFactTokens(referenceFacts: string[]): Set<string> {
   return tokens;
 }
 
-const COVER_CONTEXT_RE =
+export const COVER_CONTEXT_RE =
   /\b(?:author|wrote|written by|composed|composer|создал|написал|автор|original(?:ly)?|кавер|cover|перепев|верси(?:я|и)|записал)\b/i;
 
-/** Famous compositions → original songwriter (covers: Cliff Richard / Johnny B. Goode). */
-const KNOWN_COMPOSITION_AUTHORS: Record<string, string[]> = {
-  'johnny b goode': ['Chuck Berry'],
-  'all along the watchtower': ['Bob Dylan'],
-  'hallelujah': ['Leonard Cohen'],
-  'i love rock n roll': ['The Arrows'],
-  'twist and shout': ['The Top Notes'],
-  'respect': ['Otis Redding'],
-  'nothing compares 2 u': ['Prince'],
-};
-
-function normalizeTitleKey(title: string): string {
-  return title
-    .replace(/\s*\([^)]*\)\s*/g, ' ')
-    .replace(/[^a-z0-9\s]/gi, ' ')
-    .replace(/\s+/g, ' ')
-    .trim()
-    .toLowerCase();
-}
-
-export function allowedCoverEntities(
-  referenceFacts: string[],
-  title: string,
-): Set<string> {
+/** Original artist names allowed in story only when facts explicitly mention cover/authorship. */
+export function allowedCoverEntities(referenceFacts: string[]): Set<string> {
   const allowed = new Set<string>();
   for (const fact of referenceFacts) {
-    const hasCoverCtx = COVER_CONTEXT_RE.test(fact);
+    if (!COVER_CONTEXT_RE.test(fact)) continue;
     for (const entity of extractNamedEntities(fact)) {
       const norm = normalize(entity);
       if (!norm || norm.length < 3) continue;
-      if (hasCoverCtx || norm.split(' ').length >= 2) {
-        allowed.add(norm);
-        for (const part of norm.split(' ')) {
-          if (part.length >= 4) allowed.add(part);
-        }
+      allowed.add(norm);
+      for (const part of norm.split(' ')) {
+        if (part.length >= 4) allowed.add(part);
       }
-    }
-  }
-  for (const author of KNOWN_COMPOSITION_AUTHORS[normalizeTitleKey(title)] ?? []) {
-    allowed.add(normalize(author));
-    for (const part of normalize(author).split(' ')) {
-      if (part.length >= 3) allowed.add(part);
     }
   }
   return allowed;
@@ -299,7 +269,7 @@ export function storyNamesForeignArtist(
   const cleanTitle = title.replace(/\s*\([^)]*\)\s*/g, ' ').trim();
   const allowed = referenceFacts.join('\n');
   const seedTokens = referenceFactTokens(referenceFacts);
-  const coverAllowed = allowedCoverEntities(referenceFacts, cleanTitle);
+  const coverAllowed = allowedCoverEntities(referenceFacts);
 
   // Grounded story already names the artist — only reject clear other *bands* (2+ words), not member surnames.
   if (factMentionsArtist(cleaned, artist)) {

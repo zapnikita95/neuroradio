@@ -1,6 +1,7 @@
+import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
-import crypto from 'node:crypto';
+import { getPool, hasPostgres } from './db.js';
 
 export type FeedbackVote = 'like' | 'dislike';
 
@@ -40,8 +41,31 @@ export function recordStoryFeedback(entry: Omit<StoryFeedbackEntry, 'id' | 'at'>
     at: Date.now(),
     ...entry,
   };
-  fs.mkdirSync(DATA_DIR, { recursive: true });
-  fs.appendFileSync(FEEDBACK_PATH, `${JSON.stringify(record)}\n`, 'utf8');
+
+  if (hasPostgres()) {
+    void getPool()
+      .query(
+        `INSERT INTO story_feedback (id, install_id, artist, title, vote, reason, script, created_at)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+        [
+          record.id,
+          record.installId,
+          record.artist,
+          record.title,
+          record.vote,
+          record.reason,
+          record.script ?? null,
+          record.at,
+        ],
+      )
+      .catch((err) =>
+        console.error('[feedback] postgres insert failed:', err instanceof Error ? err.message : err),
+      );
+  } else {
+    fs.mkdirSync(DATA_DIR, { recursive: true });
+    fs.appendFileSync(FEEDBACK_PATH, `${JSON.stringify(record)}\n`, 'utf8');
+  }
+
   console.log(
     `[feedback] ${record.vote} reason=${record.reason} install=${record.installId.slice(0, 8)} ` +
       `"${record.artist}" — "${record.title}"`,

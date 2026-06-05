@@ -1,0 +1,15 @@
+{
+  "testedAt": "2026-05-28T18:30:46.885Z",
+  "artist": "Michael Jackson",
+  "title": "They Don't Care About Us",
+  "delayMs": 3000,
+  "results": [
+    {
+      "model": "liquid/lfm-2.5-1.2b-instruct:free",
+      "status": "ok",
+      "ms": 1319,
+      "error": null,
+      "scriptPreview": "The artist Michael Jackson released a powerful protest song in 1995. It became a"
+    }
+  ]
+}
