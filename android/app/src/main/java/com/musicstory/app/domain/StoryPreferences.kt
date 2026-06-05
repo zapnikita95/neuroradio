@@ -43,13 +43,13 @@ enum class StoryLength(
     }
 }
 
-/** Slightly above Yandex “normal” (1.0) — app default pacing feels brisk, not sluggish. */
+/** Slightly above Yandex “normal” (1.0) — labels must match perceived speed. */
 enum class TtsSpeed(val id: String, val labelRu: String, val yandexSpeed: Float, val androidRate: Float) {
     VERY_SLOW("very_slow", "Очень медленно", 0.82f, 0.84f),
     SLOW("slow", "Медленно", 0.90f, 0.90f),
     NORMAL("normal", "Нормально", 1.0f, 1.0f),
-    FAST("fast", "Быстро", 1.12f, 1.08f),
-    VERY_FAST("very_fast", "Очень быстро", 1.18f, 1.14f),
+    FAST("fast", "Быстро", 1.06f, 1.04f),
+    VERY_FAST("very_fast", "Очень быстро", 1.12f, 1.08f),
     ;
 
     companion object {

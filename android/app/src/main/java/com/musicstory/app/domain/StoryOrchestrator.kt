@@ -545,7 +545,6 @@ class StoryOrchestrator(
         if (!isSessionCurrent(session)) return
 
         val musicPausedForStory = AtomicBoolean(false)
-        val interruptionMode = settingsDataStore.musicInterruptionMode.first()
         val fadeSeconds = settingsDataStore.musicFadeSeconds.first()
 
         var track = resolveTrackForGeneration(requestedTrack) ?: run {
@@ -601,12 +600,8 @@ class StoryOrchestrator(
                 }
 
                 if (manual) {
-                    if (interruptionMode == MusicInterruptionMode.FADE) {
-                        scope.launch {
-                            mediaControllerManager.fadeOutAndPause(fadeSeconds)
-                        }
-                    } else {
-                        mediaControllerManager.pauseMusic()
+                    scope.launch {
+                        mediaControllerManager.fadeOutAndPause(fadeSeconds)
                     }
                     musicPausedForStory.set(true)
                     startGenerationPreview(response.script, session)
@@ -632,11 +627,7 @@ class StoryOrchestrator(
                             scope.launch {
                                 if (!manual) {
                                     withContext(Dispatchers.Main.immediate) {
-                                        if (interruptionMode == MusicInterruptionMode.FADE) {
-                                            mediaControllerManager.fadeOutAndPause(fadeSeconds)
-                                        } else {
-                                            mediaControllerManager.pauseMusic()
-                                        }
+                                        mediaControllerManager.fadeOutAndPause(fadeSeconds)
                                     }
                                     musicPausedForStory.set(true)
                                     triggerEngine.onStoryPlaybackStarted()
@@ -652,12 +643,8 @@ class StoryOrchestrator(
                             if (!isSessionCurrent(session)) return@playStory
                             cancelGenerationPreview()
                             if (musicPausedForStory.get() && storyPlayer.shouldResumeMusic()) {
-                                if (interruptionMode == MusicInterruptionMode.FADE) {
-                                    scope.launch {
-                                        mediaControllerManager.resumeMusicWithFade(fadeSeconds)
-                                    }
-                                } else {
-                                    mediaControllerManager.resumeMusic()
+                                scope.launch {
+                                    mediaControllerManager.resumeMusicWithFade(fadeSeconds)
                                 }
                             }
                             _errorMessage.value = null

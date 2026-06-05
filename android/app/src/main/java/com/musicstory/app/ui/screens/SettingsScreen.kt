@@ -77,7 +77,6 @@ import com.musicstory.app.domain.GeminiModel
 import com.musicstory.app.domain.GroqModel
 import com.musicstory.app.domain.LlmProvider
 import com.musicstory.app.domain.OpenRouterModel
-import com.musicstory.app.domain.MusicInterruptionMode
 import com.musicstory.app.domain.StoryLength
 import com.musicstory.app.domain.StoryNarrator
 import com.musicstory.app.domain.TtsEmotion
@@ -148,8 +147,11 @@ fun SettingsScreen(
     val ttsVoice by settings.ttsVoice.collectAsState(initial = TtsVoice.AUTO)
     val ttsSpeed by settings.ttsSpeed.collectAsState(initial = TtsSpeed.NORMAL)
     val ttsEmotion by settings.ttsEmotion.collectAsState(initial = TtsEmotion.LIVELY)
-    val musicInterruptionMode by settings.musicInterruptionMode.collectAsState(initial = MusicInterruptionMode.PAUSE)
     val musicFadeSeconds by settings.musicFadeSeconds.collectAsState(initial = SettingsDataStore.DEFAULT_MUSIC_FADE_SECONDS)
+    val countTrackListenEnabled by settings.countTrackAfterListenEnabled.collectAsState(initial = false)
+    val countTrackListenSeconds by settings.countTrackAfterListenSeconds.collectAsState(
+        initial = SettingsDataStore.DEFAULT_COUNT_TRACK_LISTEN_SECONDS,
+    )
     val tourPending by settings.settingsTourPending.collectAsState(initial = false)
 
     var tourStep by remember { mutableStateOf<Int?>(null) }
@@ -252,6 +254,10 @@ fun SettingsScreen(
             },
         )
     }
+    var countListenEnabledUi by remember(countTrackListenEnabled) { mutableStateOf(countTrackListenEnabled) }
+    var listenSecondsInput by remember(countTrackListenSeconds) {
+        mutableStateOf(countTrackListenSeconds.toString())
+    }
 
     var isChecking by remember { mutableStateOf(false) }
     var checkResult by remember { mutableStateOf<ConnectionCheckResult?>(null) }
@@ -302,6 +308,10 @@ fun SettingsScreen(
         triggerMode,
         musicFadeInput,
         musicFadeSeconds,
+        countListenEnabledUi,
+        countTrackListenEnabled,
+        listenSecondsInput,
+        countTrackListenSeconds,
     ) {
         ApiKeySanitizer.clean(groqInput) != ApiKeySanitizer.clean(groqApiKey) ||
             ApiKeySanitizer.clean(geminiInput) != ApiKeySanitizer.clean(geminiApiKey) ||
@@ -312,6 +322,8 @@ fun SettingsScreen(
             localModelInput.trim() != localOllamaModel.trim() ||
             sameTrackInput.toIntOrNull() != sameTrackEveryN ||
             musicFadeInput.toFloatOrNull()?.coerceIn(0.5f, 8f) != musicFadeSeconds ||
+            countListenEnabledUi != countTrackListenEnabled ||
+            listenSecondsInput.toIntOrNull()?.coerceIn(5, 300) != countTrackListenSeconds ||
             (triggerMode == TriggerMode.EVERY_N_TRACKS && nInput.toIntOrNull() != everyN)
     }
 
@@ -338,7 +350,8 @@ fun SettingsScreen(
     val hasPersonalKey = activeApiKey.isNotBlank()
     val canManualMode = TierAccess.canUseManualMode(hasPersonalKey, effectiveTier)
     val canAdvancedTriggers = TierAccess.canUseAdvancedTriggers(effectiveTier)
-    val canMusicFade = TierAccess.canUseMusicFade(effectiveTier)
+    val canCustomizeFade = TierAccess.canCustomizeMusicFadeSeconds(effectiveTier)
+    val canCustomizeListen = TierAccess.canCustomizeListenThresholdSeconds(effectiveTier)
 
     LaunchedEffect(canManualMode, manualMode) {
         if (!canManualMode && manualMode) settings.setManualMode(false)
@@ -346,11 +359,6 @@ fun SettingsScreen(
     LaunchedEffect(canAdvancedTriggers, triggerMode) {
         if (!canAdvancedTriggers && triggerMode != TriggerMode.EVERY_N_TRACKS) {
             settings.setTriggerMode(TriggerMode.EVERY_N_TRACKS)
-        }
-    }
-    LaunchedEffect(canMusicFade, musicInterruptionMode) {
-        if (!canMusicFade && musicInterruptionMode == MusicInterruptionMode.FADE) {
-            settings.setMusicInterruptionMode(MusicInterruptionMode.PAUSE)
         }
     }
 
@@ -475,6 +483,51 @@ fun SettingsScreen(
                             colors = fieldColors,
                             shape = RoundedCornerShape(14.dp),
                         )
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Switch(
+                                checked = countListenEnabledUi,
+                                onCheckedChange = { countListenEnabledUi = it },
+                                colors = SwitchDefaults.colors(
+                                    checkedThumbColor = GoldBright,
+                                    checkedTrackColor = GoldWarm.copy(alpha = 0.5f),
+                                ),
+                            )
+                            Text(
+                                text = context.getString(R.string.settings_count_listen_enabled),
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = CreamText,
+                                modifier = Modifier.padding(start = 8.dp),
+                            )
+                        }
+                        Text(
+                            text = when {
+                                !countListenEnabledUi ->
+                                    context.getString(R.string.settings_count_listen_hint_off)
+                                canCustomizeListen ->
+                                    context.getString(R.string.settings_count_listen_hint_premium)
+                                else -> context.getString(R.string.settings_count_listen_hint_free)
+                            },
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MutedLavender,
+                            modifier = Modifier.padding(top = 4.dp),
+                        )
+                        if (countListenEnabledUi && canCustomizeListen) {
+                            Spacer(modifier = Modifier.height(8.dp))
+                            OutlinedTextField(
+                                value = listenSecondsInput,
+                                onValueChange = { listenSecondsInput = it.filter { ch -> ch.isDigit() }.take(3) },
+                                label = { Text(context.getString(R.string.settings_count_listen_seconds)) },
+                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                                modifier = Modifier.fillMaxWidth(),
+                                singleLine = true,
+                                colors = fieldColors,
+                                shape = RoundedCornerShape(14.dp),
+                            )
+                        }
                     }
                     if (triggerMode == TriggerMode.SPECIFIC_ARTISTS) {
                         Spacer(modifier = Modifier.height(12.dp))
@@ -649,75 +702,20 @@ fun SettingsScreen(
                     forceExpanded = tourStep == 5,
                     tourActive = tourStep == 5,
                     onTourLayout = tourLayoutHandler(5),
-                    summary = when (musicInterruptionMode) {
-                        MusicInterruptionMode.PAUSE ->
-                            context.getString(R.string.settings_music_interrupt_pause)
-                        MusicInterruptionMode.FADE ->
-                            "${context.getString(R.string.settings_music_interrupt_fade)} · ${musicFadeSeconds}s"
-                    },
+                    summary = "${context.getString(R.string.settings_music_interrupt_fade)} · ${musicFadeSeconds}s",
                 ) {
                     Text(
-                        text = context.getString(R.string.settings_music_interrupt_mode),
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MutedLavender,
+                        text = context.getString(R.string.settings_music_interrupt_fade),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = CreamText,
                     )
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clip(RoundedCornerShape(12.dp))
-                            .padding(vertical = 2.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        RadioButton(
-                            selected = musicInterruptionMode == MusicInterruptionMode.PAUSE,
-                            onClick = {
-                                scope.launch {
-                                    settings.setMusicInterruptionMode(MusicInterruptionMode.PAUSE)
-                                }
-                            },
-                            colors = RadioButtonDefaults.colors(selectedColor = GoldBright),
-                        )
-                        Text(
-                            text = context.getString(R.string.settings_music_interrupt_pause),
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = CreamText,
-                        )
-                    }
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clip(RoundedCornerShape(12.dp))
-                            .padding(vertical = 2.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        RadioButton(
-                            selected = musicInterruptionMode == MusicInterruptionMode.FADE,
-                            onClick = {
-                                if (canMusicFade) {
-                                    scope.launch {
-                                        settings.setMusicInterruptionMode(MusicInterruptionMode.FADE)
-                                    }
-                                }
-                            },
-                            enabled = canMusicFade,
-                            colors = RadioButtonDefaults.colors(selectedColor = GoldBright),
-                        )
-                        Text(
-                            text = context.getString(R.string.settings_music_interrupt_fade),
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = if (canMusicFade) CreamText else MutedLavender.copy(alpha = 0.5f),
-                        )
-                    }
-                    if (!canMusicFade) {
-                        Text(
-                            text = context.getString(R.string.settings_premium_locked_hint),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MutedLavender,
-                        )
-                    }
-
-                    if (musicInterruptionMode == MusicInterruptionMode.FADE) {
-                        Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = context.getString(R.string.settings_music_fade_hint),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MutedLavender,
+                        modifier = Modifier.padding(top = 4.dp, bottom = 8.dp),
+                    )
+                    if (canCustomizeFade) {
                         OutlinedTextField(
                             value = musicFadeInput,
                             onValueChange = { input ->
@@ -736,11 +734,14 @@ fun SettingsScreen(
                             colors = fieldColors,
                             shape = RoundedCornerShape(14.dp),
                         )
+                    } else {
                         Text(
-                            text = context.getString(R.string.settings_music_fade_hint),
+                            text = context.getString(
+                                R.string.settings_music_fade_fixed_hint,
+                                SettingsDataStore.DEFAULT_MUSIC_FADE_SECONDS,
+                            ),
                             style = MaterialTheme.typography.bodySmall,
                             color = MutedLavender,
-                            modifier = Modifier.padding(top = 4.dp),
                         )
                     }
                 }
@@ -1395,8 +1396,22 @@ fun SettingsScreen(
                             try {
                                 nInput.toIntOrNull()?.let { settings.setEveryNTracks(it) }
                                 sameTrackInput.toIntOrNull()?.let { settings.setSameTrackStoryEveryN(it) }
-                                settings.setMusicInterruptionMode(musicInterruptionMode)
-                                musicFadeInput.toFloatOrNull()?.let { settings.setMusicFadeSeconds(it) }
+                                settings.setCountTrackAfterListenEnabled(countListenEnabledUi)
+                                val listenSec = if (countListenEnabledUi) {
+                                    if (canCustomizeListen) {
+                                        listenSecondsInput.toIntOrNull()?.coerceIn(5, 300)
+                                            ?: SettingsDataStore.DEFAULT_COUNT_TRACK_LISTEN_SECONDS
+                                    } else {
+                                        SettingsDataStore.DEFAULT_COUNT_TRACK_LISTEN_SECONDS
+                                    }
+                                } else {
+                                    listenSecondsInput.toIntOrNull()?.coerceIn(5, 300)
+                                        ?: countTrackListenSeconds
+                                }
+                                settings.setCountTrackAfterListenSeconds(listenSec)
+                                if (canCustomizeFade) {
+                                    musicFadeInput.toFloatOrNull()?.let { settings.setMusicFadeSeconds(it) }
+                                }
                                 val cleanGroq = ApiKeySanitizer.clean(groqInput)
                                 val cleanGemini = ApiKeySanitizer.clean(geminiInput)
                                 val cleanOpenRouter = ApiKeySanitizer.clean(openRouterInput)

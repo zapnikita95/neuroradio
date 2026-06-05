@@ -189,6 +189,22 @@ class SettingsDataStore(private val context: Context) {
         (prefs[KEY_MUSIC_FADE_SECONDS] ?: DEFAULT_MUSIC_FADE_SECONDS).coerceIn(0.5f, 8f)
     }
 
+    val countTrackAfterListenEnabled: Flow<Boolean> = context.settingsDataStore.data.map { prefs ->
+        prefs[KEY_COUNT_TRACK_LISTEN_ENABLED] ?: false
+    }
+
+    val countTrackAfterListenSeconds: Flow<Int> = context.settingsDataStore.data.map { prefs ->
+        (prefs[KEY_COUNT_TRACK_LISTEN_SECONDS] ?: DEFAULT_COUNT_TRACK_LISTEN_SECONDS)
+            .coerceIn(5, 300)
+    }
+
+    /** 0 = count track immediately on switch; else wait this many seconds of playback. */
+    val trackListenThresholdSeconds: Flow<Int> = context.settingsDataStore.data.map { prefs ->
+        if (prefs[KEY_COUNT_TRACK_LISTEN_ENABLED] != true) return@map 0
+        (prefs[KEY_COUNT_TRACK_LISTEN_SECONDS] ?: DEFAULT_COUNT_TRACK_LISTEN_SECONDS)
+            .coerceIn(5, 300)
+    }
+
     suspend fun setAutoIntercept(enabled: Boolean) {
         context.settingsDataStore.edit { it[KEY_AUTO_INTERCEPT] = enabled }
     }
@@ -390,6 +406,21 @@ class SettingsDataStore(private val context: Context) {
         context.settingsDataStore.edit { it[KEY_MUSIC_FADE_SECONDS] = seconds.coerceIn(0.5f, 8f) }
     }
 
+    suspend fun setCountTrackAfterListenEnabled(enabled: Boolean) {
+        context.settingsDataStore.edit {
+            it[KEY_COUNT_TRACK_LISTEN_ENABLED] = enabled
+            if (enabled && it[KEY_COUNT_TRACK_LISTEN_SECONDS] == null) {
+                it[KEY_COUNT_TRACK_LISTEN_SECONDS] = DEFAULT_COUNT_TRACK_LISTEN_SECONDS
+            }
+        }
+    }
+
+    suspend fun setCountTrackAfterListenSeconds(seconds: Int) {
+        context.settingsDataStore.edit {
+            it[KEY_COUNT_TRACK_LISTEN_SECONDS] = seconds.coerceIn(5, 300)
+        }
+    }
+
     suspend fun isMonitorPausedByUser(): Boolean = monitorPausedByUser.first()
 
     companion object {
@@ -398,6 +429,7 @@ class SettingsDataStore(private val context: Context) {
         const val DEFAULT_SAME_TRACK_STORY_EVERY_N = 3
         const val DEFAULT_AUTO_INTERCEPT = true
         const val DEFAULT_MUSIC_FADE_SECONDS = 1.5f
+        const val DEFAULT_COUNT_TRACK_LISTEN_SECONDS = 10
         /** URL Ollama с точки зрения ПК с BFF (не телефона). */
         const val DEFAULT_LOCAL_OLLAMA_URL = "http://127.0.0.1:11435"
         const val DEFAULT_LOCAL_OLLAMA_MODEL = "qwen3.6:35b-a3b-q4_K_M"
@@ -443,6 +475,8 @@ class SettingsDataStore(private val context: Context) {
         private val KEY_MONITOR_PAUSED_BY_USER = booleanPreferencesKey("monitor_paused_by_user")
         private val KEY_MUSIC_INTERRUPTION_MODE = stringPreferencesKey("music_interruption_mode")
         private val KEY_MUSIC_FADE_SECONDS = floatPreferencesKey("music_fade_seconds")
+        private val KEY_COUNT_TRACK_LISTEN_ENABLED = booleanPreferencesKey("count_track_listen_enabled")
+        private val KEY_COUNT_TRACK_LISTEN_SECONDS = intPreferencesKey("count_track_listen_seconds")
         private val KEY_SYNC_CODE = stringPreferencesKey("sync_code")
         private val KEY_ACCOUNT_LINKED = booleanPreferencesKey("account_linked")
         private const val OPENROUTER_FORCE_VERSION = 2

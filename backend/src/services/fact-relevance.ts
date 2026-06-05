@@ -507,6 +507,13 @@ export function factAppliesToRequest(
   const mentionsArtist = factMentionsArtist(trimmed, artist);
   const mentionsTitle = factMentionsTitle(trimmed, title);
 
+  if (scope === 'track') {
+    // Title-only snippets describe the composition (covers, critic quotes) — not this performer.
+    if (mentionsTitle && !mentionsArtist) return false;
+    // Unrelated events (awards lists, year-in-review) without artist or title.
+    if (!mentionsArtist && !mentionsTitle) return false;
+  }
+
   if (scope === 'artist') {
     if (mentionsArtist || mentionsTitle) return true;
     const bandPageContext =

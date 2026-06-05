@@ -7,6 +7,7 @@ import {
   COVER_CONTEXT_RE,
   factAppliesToRequest,
   factMentionsArtist,
+  factMentionsTitle,
   factNamesForeignEntity,
 } from './fact-relevance.js';
 import { interestScore } from './reference-fact-quality.js';
@@ -85,10 +86,14 @@ export function assessCoverSituation(
 
   if (explicit) return { action: 'proceed' };
 
+  const titleOnlySeed =
+    Boolean(seed) &&
+    factMentionsTitle(seed, title) &&
+    !factMentionsArtist(seed, artist);
   const trackSeedConflict =
     Boolean(seed) &&
     (selectedFact?.scope === 'track' || selectedFact?.scope === 'album') &&
-    isAmbiguousCoverConflict(artist, title, seed, false);
+    (titleOnlySeed || isAmbiguousCoverConflict(artist, title, seed, false));
 
   if (trackSeedConflict) {
     const pivot = pickArtistPivotFact(artist, title, bundle);

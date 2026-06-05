@@ -29,8 +29,8 @@ export const TTS_SPEED_PRESETS: Array<{
   { id: 'very_slow', labelRu: 'Очень медленно', speed: 0.82 },
   { id: 'slow', labelRu: 'Медленно', speed: 0.9 },
   { id: 'normal', labelRu: 'Нормально', speed: 1.0 },
-  { id: 'fast', labelRu: 'Быстро', speed: 1.08 },
-  { id: 'very_fast', labelRu: 'Очень быстро', speed: 1.14 },
+  { id: 'fast', labelRu: 'Быстро', speed: 1.06 },
+  { id: 'very_fast', labelRu: 'Очень быстро', speed: 1.12 },
 ];
 
 export function resolveTtsSpeed(value: unknown): number {

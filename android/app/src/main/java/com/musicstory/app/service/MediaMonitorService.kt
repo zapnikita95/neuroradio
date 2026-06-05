@@ -21,15 +21,18 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
 class MediaMonitorService : Service() {
 
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private var trackObserverJob: Job? = null
+    private var listenCountJob: Job? = null
     private var lastTrackKey: String? = null
 
     override fun onCreate() {
@@ -55,6 +58,7 @@ class MediaMonitorService : Service() {
     override fun onDestroy() {
         if (instance === this) instance = null
         trackObserverJob?.cancel()
+        listenCountJob?.cancel()
         serviceScope.cancel()
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
             stopForeground(STOP_FOREGROUND_REMOVE)
@@ -82,7 +86,7 @@ class MediaMonitorService : Service() {
                         ?: app.mediaControllerManager.effectiveNowPlaying.value
                     if (track != null && track.isValid() && key != null && key != lastTrackKey) {
                         lastTrackKey = key
-                        onNewTrack(app, track)
+                        scheduleTrackCounted(app, track, key)
                     }
                     updateNotification(track)
                 }
@@ -98,7 +102,21 @@ class MediaMonitorService : Service() {
         }
     }
 
-    private suspend fun onNewTrack(app: MusicStoryApp, track: TrackInfo) {
+    private fun scheduleTrackCounted(app: MusicStoryApp, track: TrackInfo, trackKey: String) {
+        listenCountJob?.cancel()
+        listenCountJob = serviceScope.launch {
+            val thresholdSec = app.settingsDataStore.trackListenThresholdSeconds.first()
+            if (thresholdSec > 0) {
+                delay(thresholdSec * 1000L)
+                val currentKey = app.mediaControllerManager.resolveNowPlayingTrack()?.displayKey
+                    ?: app.mediaControllerManager.effectiveNowPlaying.value?.displayKey
+                if (currentKey != trackKey) return@launch
+            }
+            onTrackCounted(app, track)
+        }
+    }
+
+    private suspend fun onTrackCounted(app: MusicStoryApp, track: TrackInfo) {
         if (!app.scrobbleRepository.wasRecentlyScrobbled(track)) {
             app.scrobbleRepository.scrobbleTrack(track)
         }

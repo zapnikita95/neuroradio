@@ -15,6 +15,9 @@ object TierAccess {
     /** Жанры, артисты, повтор того же трека — только premium/trial. */
     fun canUseAdvancedTriggers(tier: String?): Boolean = isPremiumLike(tier)
 
-    /** Плавное затемнение музыки — платная настройка. */
-    fun canUseMusicFade(tier: String?): Boolean = isPremiumLike(tier)
+    /** Плавное затемнение — всегда доступно; длительность настраивает premium. */
+    fun canCustomizeMusicFadeSeconds(tier: String?): Boolean = isPremiumLike(tier)
+
+    /** Свой порог «трек прослушан» (секунды) — premium. */
+    fun canCustomizeListenThresholdSeconds(tier: String?): Boolean = isPremiumLike(tier)
 }

@@ -7,6 +7,7 @@ import {
   stripBannedFluff,
   validateStoryScript,
 } from './story-quality.js';
+import { storyNamesForeignArtist } from './fact-relevance.js';
 import { logRejectedScript } from './story-reject-log.js';
 
 /** Below this — empty/garbage, not a story. Normal length is enforced by TTS speed + preset in prompt only. */
@@ -126,6 +127,17 @@ export function finalizeAfterQualityLoop<T extends { script: string }>(
     logRejectedScript('last script rejected', sanitized, 'no reference facts');
     return null;
   }
+  if (
+    storyNamesForeignArtist(
+      sanitized,
+      input.artist,
+      input.title,
+      referenceFacts,
+    )
+  ) {
+    logRejectedScript('last script rejected (foreign artist)', sanitized, 'wrong artist in script');
+    return null;
+  }
   const anchorCheck = validateStoryScript(sanitized, '60s', input.artist, input.title, {
     strictLength: false,
     referenceFacts,
@@ -134,7 +146,7 @@ export function finalizeAfterQualityLoop<T extends { script: string }>(
     skipEnglishCheck: false,
     skipWatery: true,
     skipReferenceAnchor: false,
-    skipFirstSentenceAnchor: true,
+    skipFirstSentenceAnchor: false,
   });
   if (!anchorCheck.ok) {
     logRejectedScript('last script rejected on finalize', sanitized, anchorCheck.reason ?? 'quality');
