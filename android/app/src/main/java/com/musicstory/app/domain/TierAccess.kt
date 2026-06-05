@@ -25,8 +25,8 @@ object TierAccess {
     fun isFreeServerTier(tier: String?): Boolean =
         !isPremiumLike(tier)
 
-    /** Свой API-ключ — полный выбор провайдера и моделей. */
-    fun canUseAdvancedLlmSettings(hasPersonalApiKey: Boolean): Boolean = hasPersonalApiKey
+    /** Продвинутые настройки AI (ключ, провайдер, модель) — всегда доступны в UI. */
+    fun canUseAdvancedLlmSettings(): Boolean = true
 
     /** Свой порог «трек прослушан» (секунды) — premium. */
     fun canCustomizeListenThresholdSeconds(tier: String?): Boolean = isPremiumLike(tier)

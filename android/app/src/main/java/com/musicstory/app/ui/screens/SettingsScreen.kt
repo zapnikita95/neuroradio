@@ -356,7 +356,6 @@ fun SettingsScreen(
     val canAdvancedTriggers = TierAccess.canUseAdvancedTriggers(effectiveTier)
     val canCustomizeFade = TierAccess.canCustomizeMusicFadeSeconds(effectiveTier)
     val canCustomizeListen = TierAccess.canCustomizeListenThresholdSeconds(effectiveTier)
-    val canAdvancedLlm = TierAccess.canUseAdvancedLlmSettings(hasPersonalKey)
     val isPaidServerTier = TierAccess.isPremiumLike(effectiveTier) && !hasPersonalKey
     val isFreeServerTier = TierAccess.isFreeServerTier(effectiveTier) && !hasPersonalKey
 
@@ -773,12 +772,7 @@ fun SettingsScreen(
                 }
 
                 val aiSummary = when {
-                    canAdvancedLlm -> when (llmProvider) {
-                        LlmProvider.GEMINI -> "${llmProvider.labelRu}: ${geminiModel.settingsLabelRu}"
-                        LlmProvider.GROQ -> "${llmProvider.labelRu}: ${groqModel.settingsLabelRu}"
-                        LlmProvider.OPENROUTER -> "${llmProvider.labelRu}: ${openRouterModel.settingsLabelRu}"
-                        LlmProvider.LOCAL -> "${llmProvider.labelRu}: $localOllamaModel"
-                    }
+                    hasPersonalKey -> context.getString(R.string.settings_ai_own_key_active)
                     isPaidServerTier -> context.getString(
                         R.string.settings_server_llm_premium,
                         OpenRouterModel.DEEPSEEK_V3.labelRu,
@@ -790,6 +784,15 @@ fun SettingsScreen(
                     dailyQuota != null -> formatServerQuotaLabel(context, dailyQuota!!)
                     else -> context.getString(R.string.settings_groq_status_missing)
                 }
+                val advancedAiSummary = context.getString(
+                    R.string.settings_ai_advanced_summary,
+                    llmProvider.labelRu,
+                    if (activeApiKey.isNotBlank()) {
+                        context.getString(R.string.settings_groq_status_ok)
+                    } else {
+                        context.getString(R.string.settings_groq_status_missing)
+                    },
+                )
 
                 CollapsibleSettingsSection(
                     title = context.getString(R.string.settings_ai_section),
@@ -800,12 +803,22 @@ fun SettingsScreen(
                     tourActive = tourStep == 6,
                     onTourLayout = tourLayoutHandler(6),
                 ) {
-                    var providerMenuExpanded by remember { mutableStateOf(false) }
-                    var geminiModelMenuExpanded by remember { mutableStateOf(false) }
-                    var groqModelMenuExpanded by remember { mutableStateOf(false) }
-                    var openRouterModelMenuExpanded by remember { mutableStateOf(false) }
+                    if (hasPersonalKey) {
+                        Text(
+                            text = context.getString(R.string.settings_ai_own_key_active),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = LiveGreen,
+                            modifier = Modifier.padding(bottom = 8.dp),
+                        )
+                    }
 
                     if (isPaidServerTier) {
+                        Text(
+                            text = context.getString(R.string.settings_ai_server_section),
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MutedLavender,
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
                         Text(
                             text = context.getString(
                                 R.string.settings_server_llm_premium,
@@ -824,8 +837,14 @@ fun SettingsScreen(
 
                     if (isFreeServerTier) {
                         Text(
-                            text = context.getString(R.string.settings_free_model_section),
+                            text = context.getString(R.string.settings_ai_server_section),
                             style = MaterialTheme.typography.labelMedium,
+                            color = MutedLavender,
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            text = context.getString(R.string.settings_free_model_section),
+                            style = MaterialTheme.typography.bodySmall,
                             color = MutedLavender,
                         )
                         Spacer(modifier = Modifier.height(8.dp))
@@ -840,13 +859,27 @@ fun SettingsScreen(
                         Spacer(modifier = Modifier.height(8.dp))
                     }
 
-                    if (canAdvancedLlm) {
-                    Text(
-                        text = context.getString(R.string.settings_ai_advanced_section),
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MutedLavender,
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
+                    if (!hasPersonalKey) {
+                        dailyQuota?.let { quota ->
+                            Text(
+                                text = formatServerQuotaLabel(context, quota),
+                                style = MaterialTheme.typography.labelMedium,
+                                color = GoldBright,
+                            )
+                        }
+                    }
+                }
+
+                CollapsibleSettingsSection(
+                    title = context.getString(R.string.settings_ai_advanced_collapsible),
+                    summary = advancedAiSummary,
+                    initiallyExpanded = false,
+                ) {
+                    var providerMenuExpanded by remember { mutableStateOf(false) }
+                    var geminiModelMenuExpanded by remember { mutableStateOf(false) }
+                    var groqModelMenuExpanded by remember { mutableStateOf(false) }
+                    var openRouterModelMenuExpanded by remember { mutableStateOf(false) }
+
                     Text(
                         text = context.getString(R.string.settings_llm_provider_hint),
                         style = MaterialTheme.typography.bodySmall,
@@ -1379,18 +1412,6 @@ fun SettingsScreen(
                             context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
                         },
                     )
-                    }
-                    } // canAdvancedLlm
-
-                    if (!canAdvancedLlm) {
-                        dailyQuota?.let { quota ->
-                            Spacer(modifier = Modifier.height(8.dp))
-                            Text(
-                                text = formatServerQuotaLabel(context, quota),
-                                style = MaterialTheme.typography.labelMedium,
-                                color = GoldBright,
-                            )
-                        }
                     }
                 }
 
