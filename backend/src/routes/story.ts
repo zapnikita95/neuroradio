@@ -290,13 +290,13 @@ router.post('/full', validateStoryFullBody, storyFullRateLimit, async (req: Requ
     const clientPreviousScripts = Array.isArray(previousScriptsRaw)
       ? previousScriptsRaw.filter((s): s is string => typeof s === 'string' && s.trim().length > 0)
       : [];
-    const accountPreviousScripts = collectPreviousScripts(installId, artist, title);
+    const accountPreviousScripts = await collectPreviousScripts(installId, artist, title);
     const previousScripts = [
       ...new Set([...clientPreviousScripts, ...accountPreviousScripts]),
     ];
 
     ensureAccount(installId);
-    const bankFact = pickBankFactForUser(installId, metadata.artist, metadata.title);
+    const bankFact = await pickBankFactForUser(installId, metadata.artist, metadata.title);
     let factCtx = emptyAggregatedFactContext();
     let factBundle = factCtx.bundle;
     let trackFactCount = 0;
@@ -305,7 +305,7 @@ router.post('/full', validateStoryFullBody, storyFullRateLimit, async (req: Requ
     let factFromBank = Boolean(bankFact);
 
     if (bankFact) {
-      const unused = countUnusedBankFactsForUser(installId, metadata.artist, metadata.title);
+      const unused = await countUnusedBankFactsForUser(installId, metadata.artist, metadata.title);
       console.log(
         `[facts] cache hit install=${installId.slice(0, 8)} artist="${metadata.artist}" title="${metadata.title}" ` +
           `unusedInBank=${unused} — skip wiki/web/ddg (seed already saved)`,
@@ -374,7 +374,7 @@ router.post('/full', validateStoryFullBody, storyFullRateLimit, async (req: Requ
       ingestBundleToBank(metadata.artist, metadata.title, factBundle);
       prefetchArtistFactsToBank(installId, metadata.artist, metadata.title, factBundle);
 
-      selectedFact = pickFactForUser(
+      selectedFact = await pickFactForUser(
         installId,
         factBundle,
         metadata.artist,
@@ -505,7 +505,7 @@ router.post('/full', validateStoryFullBody, storyFullRateLimit, async (req: Requ
         trackFactCount = factBundle.trackFacts.length;
         artistFactCount = factBundle.artistFacts.length;
         ingestBundleToBank(metadata.artist, metadata.title, factBundle);
-        selectedFact = pickFactForUser(
+        selectedFact = await pickFactForUser(
           installId,
           factBundle,
           metadata.artist,
@@ -569,6 +569,7 @@ router.post('/full', validateStoryFullBody, storyFullRateLimit, async (req: Requ
       metadata.title,
       selectedFact,
       factBundle,
+      artistTier,
     );
     if (coverSituation.action === 'hold') {
       recordFactMiss({
@@ -831,7 +832,7 @@ router.post('/full', validateStoryFullBody, storyFullRateLimit, async (req: Requ
 
     recordStoryGeneration(installId, req, { freeOpenRouterModel: openrouterModelRequested });
     if (selectedFact?.fact) {
-      recordUserStory(installId, {
+      await recordUserStory(installId, {
         artist: metadata.artist,
         title: metadata.title,
         script: story.script,

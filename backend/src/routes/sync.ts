@@ -4,9 +4,9 @@ import {
   createAccount,
   getSyncStatus,
   linkAccount,
-  pullHistory,
+  pullHistoryAsync,
   pullSettings,
-  pushHistory,
+  pushHistoryAsync,
   pushSettings,
   type SyncHistoryEntry,
   type SyncSettings,
@@ -36,7 +36,7 @@ router.post('/create', (req: Request, res: Response) => {
   res.json({ ...created, alreadyLinked: false });
 });
 
-router.post('/link', (req: Request, res: Response) => {
+router.post('/link', async (req: Request, res: Response) => {
   const installId = req.installId!;
   const syncCode = typeof req.body?.sync_code === 'string' ? req.body.sync_code : '';
   if (!syncCode.trim()) {
@@ -50,10 +50,12 @@ router.post('/link', (req: Request, res: Response) => {
     return;
   }
 
+  const history = (await pullHistoryAsync(installId, 0)) ?? result.history;
+
   res.json({
     accountId: result.accountId,
     settings: result.settings,
-    history: result.history,
+    history,
   });
 });
 
@@ -76,9 +78,9 @@ router.put('/settings', (req: Request, res: Response) => {
   res.json({ settings });
 });
 
-router.get('/history', (req: Request, res: Response) => {
+router.get('/history', async (req: Request, res: Response) => {
   const since = parseInt(String(req.query.since ?? '0'), 10);
-  const history = pullHistory(req.installId!, Number.isNaN(since) ? 0 : since);
+  const history = await pullHistoryAsync(req.installId!, Number.isNaN(since) ? 0 : since);
   if (!history) {
     res.status(404).json({ error: 'Not linked' });
     return;
@@ -86,7 +88,7 @@ router.get('/history', (req: Request, res: Response) => {
   res.json({ history });
 });
 
-router.post('/history', (req: Request, res: Response) => {
+router.post('/history', async (req: Request, res: Response) => {
   const entry = req.body as SyncHistoryEntry;
   if (
     !entry?.id ||
@@ -101,13 +103,12 @@ router.post('/history', (req: Request, res: Response) => {
   }
 
   const installId = req.installId!;
-  let history = pushHistory(installId, entry);
-  if (!history) {
-    // Railway redeploys wipe file-backed accounts — re-register this install silently.
+  let history = await pushHistoryAsync(installId, entry);
+  if (history.length === 0) {
     createAccount(installId);
-    history = pushHistory(installId, entry);
+    history = await pushHistoryAsync(installId, entry);
   }
-  if (!history) {
+  if (history.length === 0) {
     res.status(200).json({ ok: false, skipped: true, reason: 'not_linked' });
     return;
   }

@@ -52,6 +52,48 @@ CREATE TABLE IF NOT EXISTS fact_misses (
 );
 
 CREATE INDEX IF NOT EXISTS fact_misses_created_idx ON fact_misses (created_at DESC);
+
+CREATE TABLE IF NOT EXISTS story_history (
+  id UUID PRIMARY KEY,
+  install_id TEXT NOT NULL,
+  account_id TEXT,
+  track_key TEXT NOT NULL,
+  artist TEXT NOT NULL,
+  title TEXT NOT NULL,
+  script TEXT NOT NULL,
+  angle TEXT,
+  seed_fact TEXT,
+  seed_scope TEXT,
+  interest_rating INT,
+  played_at BIGINT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS story_history_account_idx ON story_history (account_id, played_at DESC);
+CREATE INDEX IF NOT EXISTS story_history_install_idx ON story_history (install_id, played_at DESC);
+
+CREATE TABLE IF NOT EXISTS used_seeds (
+  id UUID PRIMARY KEY,
+  install_id TEXT NOT NULL,
+  account_id TEXT,
+  artist TEXT NOT NULL,
+  title TEXT NOT NULL,
+  scope TEXT NOT NULL,
+  fact_fingerprint TEXT NOT NULL,
+  fact TEXT NOT NULL,
+  interest_score INT NOT NULL DEFAULT 0,
+  interest_rating INT NOT NULL DEFAULT 0,
+  used_at BIGINT NOT NULL
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS used_seeds_account_fp_uq
+  ON used_seeds (account_id, fact_fingerprint, lower(artist), lower(title))
+  WHERE account_id IS NOT NULL;
+
+CREATE UNIQUE INDEX IF NOT EXISTS used_seeds_install_fp_uq
+  ON used_seeds (install_id, fact_fingerprint, lower(artist), lower(title))
+  WHERE account_id IS NULL;
+
+CREATE INDEX IF NOT EXISTS used_seeds_lookup_idx ON used_seeds (account_id, lower(artist));
 `;
 
 export async function initPostgres(): Promise<void> {

@@ -79,14 +79,29 @@ export function assessCoverSituation(
   title: string,
   selectedFact: SelectedReferenceFact | null,
   bundle: ReferenceFactBundle,
+  artistTier: 'major' | 'indie' | 'unknown' = 'unknown',
 ): CoverSituation {
   const seed = selectedFact?.fact?.trim() ?? '';
   const explicit = isExplicitCover(title, seed ? [seed] : []);
 
   if (explicit) return { action: 'proceed' };
 
+  // Major artists + any grounded seed — never block with cover heuristics.
+  if (artistTier === 'major' && selectedFact && selectedFact.interestScore >= 4) {
+    return { action: 'proceed' };
+  }
+
   // Good seed from rules/bank — never block the story with cover heuristics.
   if (selectedFact && selectedFact.interestScore >= 7) {
+    return { action: 'proceed' };
+  }
+
+  // Artist-scoped seed with pronoun "the group/band" — not a cover conflict.
+  if (
+    selectedFact?.scope === 'artist' &&
+    selectedFact.interestScore >= 5 &&
+    /\b(?:the group|the band|they |their )\b/i.test(seed)
+  ) {
     return { action: 'proceed' };
   }
 

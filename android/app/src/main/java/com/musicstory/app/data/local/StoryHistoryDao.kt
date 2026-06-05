@@ -23,6 +23,16 @@ interface StoryHistoryDao {
     )
     suspend fun getRecentScripts(trackKey: String, limit: Int = 8): List<String>
 
+    @Query(
+        """
+        SELECT script FROM story_history
+        WHERE artist = :artist COLLATE NOCASE
+        ORDER BY playedAt DESC
+        LIMIT :limit
+        """,
+    )
+    suspend fun getRecentScriptsForArtist(artist: String, limit: Int = 16): List<String>
+
     @Query("SELECT COUNT(*) FROM story_history WHERE trackKey = :trackKey")
     suspend fun countForTrack(trackKey: String): Int
 }

@@ -29,7 +29,7 @@ import { requestLogger } from './middleware/request-logger.js';
 import { SECURITY } from './config/security.js';
 import { purgeInvalidBankFacts } from './services/fact-bank.js';
 import { initPostgres, hasPostgres, closePostgres } from './services/db.js';
-import { hydrateAccountStoreFromPostgres } from './services/account-store.js';
+import { hydrateAccountStoreFromPostgres, migrateAccountStoryDataToPostgres } from './services/account-store.js';
 import { hydrateDevTierStoreFromPostgres } from './services/dev-tier-store.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -156,6 +156,7 @@ async function boot(): Promise<void> {
   if (hasPostgres()) {
     await hydrateAccountStoreFromPostgres();
     await hydrateDevTierStoreFromPostgres();
+    await migrateAccountStoryDataToPostgres();
     console.log('[boot] postgres stores hydrated');
   }
 

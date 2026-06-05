@@ -4,6 +4,13 @@ import path from 'node:path';
 import { factFingerprint } from './fact-bank.js';
 import { hasPostgres } from './db.js';
 import { hydrateKvFromPostgres, persistKv } from './pg-kv.js';
+import {
+  migrateStoryDataFromAccountsBlob,
+  pgGetUsedSeedFingerprints,
+  pgInsertStoryHistory,
+  pgInsertUsedSeed,
+  pgListStoryHistory,
+} from './story-history-store.js';
 
 const PREMIUM_PRODUCT_MONTHLY = 'premium_voice_monthly';
 const TRIAL_PRODUCT_MONTHLY = 'trial_stories_monthly';
@@ -314,13 +321,40 @@ export function pullSettings(installId: string): SyncSettings | null {
   return store.accountsById[accountId]?.settings ?? null;
 }
 
+export async function migrateAccountStoryDataToPostgres(): Promise<void> {
+  if (!hasPostgres()) return;
+  const store = loadStore();
+  await migrateStoryDataFromAccountsBlob(store.accountsById);
+  let stripped = false;
+  for (const account of Object.values(store.accountsById)) {
+    if ((account.history?.length ?? 0) > 0 || (account.usedSeeds?.length ?? 0) > 0) {
+      account.history = [];
+      account.usedSeeds = [];
+      stripped = true;
+    }
+  }
+  if (stripped) {
+    saveStore(store);
+    console.log('[postgres] cleared story history/usedSeeds from accounts kv blob');
+  }
+}
+
 export function pushHistory(
   installId: string,
   entry: SyncHistoryEntry,
 ): SyncHistoryEntry[] | null {
   const store = loadStore();
-  const accountId = store.installToAccount[installId.trim().toLowerCase()];
+  const normalized = installId.trim().toLowerCase();
+  let accountId = store.installToAccount[normalized] ?? null;
   if (!accountId) return null;
+
+  if (hasPostgres()) {
+    void pgInsertStoryHistory(normalized, accountId, entry).catch((err) =>
+      console.error('[postgres] pushHistory failed:', err instanceof Error ? err.message : err),
+    );
+    return null;
+  }
+
   const account = store.accountsById[accountId];
   if (!account) return null;
 
@@ -335,13 +369,45 @@ export function pushHistory(
   return account.history;
 }
 
+export async function pushHistoryAsync(
+  installId: string,
+  entry: SyncHistoryEntry,
+): Promise<SyncHistoryEntry[]> {
+  const normalized = installId.trim().toLowerCase();
+  const accountId = resolveAccountId(installId);
+  if (!accountId) return [];
+
+  if (hasPostgres()) {
+    await pgInsertStoryHistory(normalized, accountId, entry);
+    return pgListStoryHistory(normalized, accountId, 0);
+  }
+
+  return pushHistory(installId, entry) ?? [];
+}
+
 export function pullHistory(installId: string, since = 0): SyncHistoryEntry[] | null {
+  if (hasPostgres()) {
+    return null;
+  }
   const store = loadStore();
   const accountId = store.installToAccount[installId.trim().toLowerCase()];
   if (!accountId) return null;
   const history = store.accountsById[accountId]?.history ?? [];
   if (since <= 0) return history;
   return history.filter((h) => h.playedAt > since);
+}
+
+export async function pullHistoryAsync(installId: string, since = 0): Promise<SyncHistoryEntry[] | null> {
+  const normalized = installId.trim().toLowerCase();
+  const accountId = resolveAccountId(installId);
+  if (!accountId) return null;
+
+  if (hasPostgres()) {
+    const rows = await pgListStoryHistory(normalized, accountId, since);
+    return rows;
+  }
+
+  return pullHistory(installId, since);
 }
 
 function entitlementFromAccount(account: AccountRecord | undefined): AccountEntitlement {
@@ -645,8 +711,17 @@ export function recordAccountUsedSeed(
   installId: string,
   input: Omit<UsedSeedRecord, 'factFingerprint' | 'usedAt'>,
 ): void {
+  const normalized = installId.trim().toLowerCase();
+  const accountId = resolveAccountId(installId);
+
+  if (hasPostgres() && accountId) {
+    void pgInsertUsedSeed(normalized, accountId, input).catch((err) =>
+      console.error('[postgres] recordUsedSeed failed:', err instanceof Error ? err.message : err),
+    );
+    return;
+  }
+
   const store = loadStore();
-  const accountId = store.installToAccount[installId.trim().toLowerCase()];
   if (!accountId) return;
   const account = store.accountsById[accountId];
   if (!account) return;
@@ -665,6 +740,22 @@ export function recordAccountUsedSeed(
   }
 }
 
+export async function recordAccountUsedSeedAsync(
+  installId: string,
+  input: Omit<UsedSeedRecord, 'factFingerprint' | 'usedAt'>,
+): Promise<void> {
+  const normalized = installId.trim().toLowerCase();
+  const accountId = resolveAccountId(installId);
+  if (!accountId) return;
+
+  if (hasPostgres()) {
+    await pgInsertUsedSeed(normalized, accountId, input);
+    return;
+  }
+
+  recordAccountUsedSeed(installId, input);
+}
+
 export function getAccountUsedFingerprints(
   installId: string,
   artist: string,
@@ -678,14 +769,28 @@ export function getAccountUsedFingerprints(
   if (!account?.usedSeeds) return out;
 
   const artistNorm = artist.trim().toLowerCase();
-  const trackNorm = `${artistNorm}|${title.trim().toLowerCase()}`;
   for (const seed of account.usedSeeds) {
-    const key = `${seed.artist.trim().toLowerCase()}|${seed.title.trim().toLowerCase()}`;
-    if (key === trackNorm || seed.artist.trim().toLowerCase() === artistNorm) {
+    if (seed.artist.trim().toLowerCase() === artistNorm) {
       out.add(seed.factFingerprint);
     }
   }
   return out;
+}
+
+export async function getAccountUsedFingerprintsAsync(
+  installId: string,
+  artist: string,
+  title: string,
+): Promise<Set<string>> {
+  const normalized = installId.trim().toLowerCase();
+  const accountId = resolveAccountId(installId);
+  if (!accountId) return new Set();
+
+  if (hasPostgres()) {
+    return pgGetUsedSeedFingerprints(normalized, accountId, artist, title);
+  }
+
+  return getAccountUsedFingerprints(installId, artist, title);
 }
 
 export function recordAccountListen(installId: string, artist: string, _title: string): void {

@@ -1,8 +1,4 @@
-import {
-  factAppliesToRequest,
-  factMentionsOtherTrackTitle,
-  isAlbumScopeFact,
-} from './fact-relevance.js';
+import { factFingerprint } from './fact-bank.js';
 import {
   filterAndRankFacts,
   interestScore,
@@ -16,6 +12,7 @@ import { interestRating10 } from './fact-interest-log.js';
 import { WEAK_TRIVIA_PATTERNS } from './story-fact-hunt.js';
 import { isMetadataOnlyFallbackFact } from './metadata-facts.js';
 import { splitBundleByScope, type RankedFactScope } from './fact-ranking.js';
+import { isAlbumScopeFact, factMentionsOtherTrackTitle } from './fact-relevance.js';
 
 export type FactScope = RankedFactScope;
 
@@ -85,14 +82,20 @@ function sortByInterest(facts: string[]): string[] {
   return [...facts].sort((a, b) => interestScore(b) - interestScore(a));
 }
 
+function isUsedFact(fact: string, usedFingerprints: Set<string>): boolean {
+  return usedFingerprints.has(factFingerprint(fact));
+}
+
 function pickBestByInterest(
   facts: string[],
   previousScripts: string[],
+  usedFingerprints: Set<string>,
   minScore = MIN_PICK_INTEREST_SCORE,
 ): string | null {
   for (const fact of sortByInterest(facts)) {
     if (isRejectedSeed(fact)) continue;
     if (interestScore(fact) < minScore) continue;
+    if (isUsedFact(fact, usedFingerprints)) continue;
     if (factOverlapsPrevious(fact, previousScripts)) continue;
     return fact;
   }
@@ -117,6 +120,7 @@ function normalize(text: string): string {
 /**
  * Иерархия: трек → альбом → артист.
  * Внутри scope — максимальный interestScore, не chart-trivia.
+ * Никогда не возвращает факт с fingerprint из usedFingerprints (уже рассказан).
  */
 export function pickReferenceFact(
   bundle: ReferenceFactBundle,
@@ -124,6 +128,7 @@ export function pickReferenceFact(
   storyIndex = previousScripts.length,
   artist = '',
   title = '',
+  usedFingerprints: Set<string> = new Set(),
 ): SelectedReferenceFact | null {
   const pools = splitBundleByScope(bundle, artist, title);
 
@@ -133,16 +138,16 @@ export function pickReferenceFact(
   for (const scope of scopeOrder) {
     const pool = pools[scope];
     if (pool.length === 0) continue;
-    const picked = pickBestByInterest(pool, previousScripts, MIN_PICK_INTEREST_SCORE);
+    const picked = pickBestByInterest(pool, previousScripts, usedFingerprints, MIN_PICK_INTEREST_SCORE);
     if (picked && interestScore(picked) >= MIN_GOOD_SCOPE_INTEREST) {
       return wrapSelected(picked, scope);
     }
   }
 
-  // Лучший из всех scope, даже ниже порога — лучше чем ничего
   const globalBest = pickBestByInterest(
     [...pools.track, ...pools.album, ...pools.artist],
     previousScripts,
+    usedFingerprints,
     MIN_PICK_INTEREST_SCORE,
   );
   if (globalBest) {
@@ -158,6 +163,7 @@ export function pickReferenceFact(
   for (const fact of sortByInterest(anyPool)) {
     if (isMetadataOnlyFallbackFact(fact)) continue;
     if (isBoringFact(fact)) continue;
+    if (isUsedFact(fact, usedFingerprints)) continue;
     if (!factOverlapsPrevious(fact, previousScripts)) {
       const scope: FactScope = pools.track.includes(fact)
         ? 'track'

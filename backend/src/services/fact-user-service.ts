@@ -2,11 +2,11 @@ import crypto from 'node:crypto';
 import {
   createAccount,
   getAccountListenStat,
-  getAccountUsedFingerprints,
-  pullHistory,
-  pushHistory,
+  getAccountUsedFingerprintsAsync,
+  pullHistoryAsync,
+  pushHistoryAsync,
   recordAccountListen,
-  recordAccountUsedSeed,
+  recordAccountUsedSeedAsync,
   resolveAccountId,
   type SyncHistoryEntry,
 } from './account-store.js';
@@ -29,25 +29,35 @@ export function ensureAccount(installId: string): string {
   return createAccount(installId).accountId;
 }
 
-export function collectPreviousScripts(installId: string, artist: string, title: string): string[] {
+export async function collectPreviousScripts(
+  installId: string,
+  artist: string,
+  title: string,
+): Promise<string[]> {
   const scripts: string[] = [];
-  const history = pullHistory(installId, 0);
+  const history = await pullHistoryAsync(installId, 0);
   if (history) {
     const tk = trackKey(artist, title);
+    const artistNorm = artist.trim().toLowerCase();
     for (const h of history) {
-      if (h.trackKey === tk || h.artist.toLowerCase() === artist.toLowerCase()) {
+      const sameTrack = h.trackKey === tk;
+      const sameArtist = h.artist.trim().toLowerCase() === artistNorm;
+      if (sameTrack || sameArtist) {
         if (h.script?.trim()) scripts.push(h.script.trim());
-        const ext = h as SyncHistoryEntry & { seedFact?: string };
-        if (ext.seedFact?.trim()) scripts.push(ext.seedFact.trim());
+        if (h.seedFact?.trim()) scripts.push(h.seedFact.trim());
       }
     }
   }
   return scripts;
 }
 
-export function getUsedFingerprints(installId: string, artist: string, title: string): Set<string> {
-  const fps = getAccountUsedFingerprints(installId, artist, title);
-  for (const s of collectPreviousScripts(installId, artist, title)) {
+export async function getUsedFingerprints(
+  installId: string,
+  artist: string,
+  title: string,
+): Promise<Set<string>> {
+  const fps = await getAccountUsedFingerprintsAsync(installId, artist, title);
+  for (const s of await collectPreviousScripts(installId, artist, title)) {
     fps.add(factFingerprint(s));
   }
   return fps;
@@ -80,24 +90,24 @@ function storedFactToSelected(fromBank: StoredFact): SelectedReferenceFact {
 }
 
 /** Нерассказанный этому пользователю факт из банка — без wiki/web/ddg. */
-export function pickBankFactForUser(
+export async function pickBankFactForUser(
   installId: string,
   artist: string,
   title: string,
-): SelectedReferenceFact | null {
+): Promise<SelectedReferenceFact | null> {
   ensureAccount(installId);
-  const used = getUsedFingerprints(installId, artist, title);
+  const used = await getUsedFingerprints(installId, artist, title);
   const fromBank = pickFromBank(artist, title, used);
   return fromBank ? storedFactToSelected(fromBank) : null;
 }
 
-export function countUnusedBankFactsForUser(
+export async function countUnusedBankFactsForUser(
   installId: string,
   artist: string,
   title: string,
-): number {
+): Promise<number> {
   ensureAccount(installId);
-  const used = getUsedFingerprints(installId, artist, title);
+  const used = await getUsedFingerprints(installId, artist, title);
   const { track, artist: artistFacts } = listBankFacts(artist, title);
   let count = 0;
   for (const item of [...track, ...artistFacts]) {
@@ -108,21 +118,22 @@ export function countUnusedBankFactsForUser(
   return count;
 }
 
-export function pickFactForUser(
+export async function pickFactForUser(
   installId: string,
   bundle: ReferenceFactBundle,
   artist: string,
   title: string,
   storyIndex = 0,
-): SelectedReferenceFact | null {
-  const fromBank = pickBankFactForUser(installId, artist, title);
-  if (fromBank) return fromBank;
+): Promise<SelectedReferenceFact | null> {
+  const used = await getUsedFingerprints(installId, artist, title);
+  const fromBank = pickFromBank(artist, title, used);
+  if (fromBank) return storedFactToSelected(fromBank);
 
-  const previous = collectPreviousScripts(installId, artist, title);
-  return pickReferenceFact(bundle, previous, storyIndex, artist, title);
+  const previous = await collectPreviousScripts(installId, artist, title);
+  return pickReferenceFact(bundle, previous, storyIndex, artist, title, used);
 }
 
-export function recordUserStory(
+export async function recordUserStory(
   installId: string,
   input: {
     artist: string;
@@ -130,10 +141,10 @@ export function recordUserStory(
     script: string;
     seed: SelectedReferenceFact;
   },
-): void {
+): Promise<void> {
   ensureAccount(installId);
   recordAccountListen(installId, input.artist, input.title);
-  recordAccountUsedSeed(installId, {
+  await recordAccountUsedSeedAsync(installId, {
     fact: input.seed.fact,
     artist: input.artist,
     title: input.title,
@@ -142,7 +153,7 @@ export function recordUserStory(
     interestRating: input.seed.interestRating,
   });
 
-  pushHistory(installId, {
+  await pushHistoryAsync(installId, {
     id: crypto.randomUUID(),
     trackKey: trackKey(input.artist, input.title),
     artist: input.artist,

@@ -133,7 +133,10 @@ class StoryRepository(
         }
 
         val trackKey = track.displayKey
-        val previousScripts = storyHistoryDao.getRecentScripts(trackKey)
+        val previousScripts = (
+            storyHistoryDao.getRecentScripts(trackKey) +
+                storyHistoryDao.getRecentScriptsForArtist(track.artist)
+            ).distinct()
 
         if (!forceRefresh && previousScripts.isEmpty()) {
             val cached = storyDao.getByTrackKey(trackKey)
