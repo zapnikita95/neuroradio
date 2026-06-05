@@ -210,6 +210,43 @@ class ApiClient(
         return base + path
     }
 
+    suspend fun submitStoryFeedback(
+        baseUrl: String,
+        artist: String,
+        title: String,
+        vote: String,
+        reason: String,
+        script: String?,
+    ): Boolean {
+        return try {
+            getApi(baseUrl).submitStoryFeedback(
+                StoryFeedbackRequest(
+                    artist = artist,
+                    title = title,
+                    vote = vote,
+                    reason = reason,
+                    script = script,
+                ),
+            )
+            true
+        } catch (first: Exception) {
+            val http = first as? retrofit2.HttpException
+            if (http != null && http.code() != 401) return false
+            authManager.invalidateToken()
+            runCatching {
+                getApi(baseUrl).submitStoryFeedback(
+                    StoryFeedbackRequest(
+                        artist = artist,
+                        title = title,
+                        vote = vote,
+                        reason = reason,
+                        script = script,
+                    ),
+                )
+            }.isSuccess
+        }
+    }
+
     private fun normalizeBaseUrl(url: String): String {
         val trimmed = url.trim().trimEnd('/')
         return if (trimmed.endsWith("/")) trimmed else "$trimmed/"

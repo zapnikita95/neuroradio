@@ -33,4 +33,15 @@ interface StoryApi {
 
     @GET("v1/billing/status")
     suspend fun billingStatus(): BillingStatusResponse
+
+    @POST("v1/story/feedback")
+    suspend fun submitStoryFeedback(@Body request: StoryFeedbackRequest): Map<String, Any?>
 }
+
+data class StoryFeedbackRequest(
+    val artist: String,
+    val title: String,
+    val vote: String,
+    val reason: String,
+    val script: String? = null,
+)

@@ -472,6 +472,14 @@ fun HomeScreen(
                     )
                 }
             }
+
+            uiState.pendingFeedback?.let { feedback ->
+                StoryFeedbackSheet(
+                    feedback = feedback,
+                    onDismiss = { app.storyOrchestrator.clearFeedbackPrompt() },
+                    modifier = Modifier.align(Alignment.BottomCenter),
+                )
+            }
         }
     }
 }

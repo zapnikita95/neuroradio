@@ -194,17 +194,33 @@
     <string name="history_expand">Развернуть</string>
     <string name="history_collapse">Свернуть</string>
 
-    <string name="settings_sync_section">Синхронизация устройств</string>
-    <string name="settings_sync_summary">Код MS-… — телефон и виджет Windows</string>
-    <string name="settings_sync_hint">Без почты: создай код здесь и введи на другом устройстве. Общие настройки, история и лимит.</string>
-    <string name="settings_sync_your_code">Твой код</string>
-    <string name="settings_sync_create_code">Создать код</string>
-    <string name="settings_sync_link_code">Код с другого устройства</string>
-    <string name="settings_sync_link_action">Привязать</string>
-    <string name="settings_sync_code_created">Код создан: %1$s</string>
-    <string name="settings_sync_linked">Устройства связаны</string>
-    <string name="settings_sync_link_failed">Не удалось привязать — проверь код</string>
-    <string name="settings_sync_error">Ошибка синхронизации</string>
+    <string name="settings_auth_section">Аккаунт</string>
+    <string name="settings_auth_summary">Email — 7 дней Premium, общая история</string>
+    <string name="settings_auth_hint">Войди по email: код на почту. Новый аккаунт — пробный Premium 7 дней.</string>
+    <string name="settings_auth_email">Email</string>
+    <string name="settings_auth_send_code">Отправить код</string>
+    <string name="settings_auth_code">Код из письма</string>
+    <string name="settings_auth_verify">Войти</string>
+    <string name="settings_auth_resend">Другой email</string>
+    <string name="settings_auth_code_sent">Код отправлен — проверь почту</string>
+    <string name="settings_auth_success">Аккаунт привязан</string>
+    <string name="settings_auth_verify_failed">Неверный код или email</string>
+    <string name="settings_auth_linked">Аккаунт активен</string>
+    <string name="settings_auth_trial_until">Пробный Premium до %1$s</string>
+    <string name="settings_auth_premium">Premium активен</string>
+    <string name="feedback_title">Как история?</string>
+    <string name="feedback_like">👍</string>
+    <string name="feedback_dislike">👎</string>
+    <string name="feedback_like_interesting">Интересный факт</string>
+    <string name="feedback_like_speech">Хорошая речь</string>
+    <string name="feedback_like_persona">Понравился рассказчик</string>
+    <string name="feedback_dislike_hallucination">Выдумка / неправда</string>
+    <string name="feedback_dislike_boring">Скучный факт</string>
+    <string name="feedback_dislike_voice">Неестественный голос</string>
+    <string name="feedback_dislike_manner">Манера речи</string>
+    <string name="feedback_thanks">Спасибо!</string>
+    <string name="feedback_skip">Пропустить</string>
+    <string name="feedback_close">Закрыть</string>
 
     <string name="server_audio_error_message">Не удалось воспроизвести озвучку Yandex с сервера — попробуй ещё раз</string>
 </resources>

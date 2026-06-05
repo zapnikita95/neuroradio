@@ -399,6 +399,17 @@ export function grantPremiumSubscription(
 }
 
 const TRIAL_MS_MONTH = 31 * 24 * 60 * 60 * 1000;
+export const WELCOME_TRIAL_MS = 7 * 24 * 60 * 60 * 1000;
+
+function grantWelcomeTrialIfEligible(account: AccountRecord): void {
+  const now = Date.now();
+  if (account.plan === 'premium' && (account.premiumUntil ?? 0) > now) return;
+  if (account.plan === 'trial' && (account.trialUntil ?? 0) > now) return;
+  account.plan = 'trial';
+  account.trialUntil = now + WELCOME_TRIAL_MS;
+  account.trialStoriesUsed = 0;
+  console.log(`[account] welcome trial 7d account=${account.accountId.slice(0, 8)} until=${new Date(account.trialUntil).toISOString()}`);
+}
 
 export function grantTrialSubscription(
   installId: string,
@@ -465,18 +476,33 @@ export function getAccountProfile(installId: string): {
   email: string | null;
   telegramId: number | null;
   telegramUsername: string | null;
+  plan: AccountPlan | null;
+  trialUntil: number | null;
+  premiumUntil: number | null;
 } {
   const store = loadStore();
   const accountId = store.installToAccount[installId.trim().toLowerCase()] ?? null;
   if (!accountId) {
-    return { accountId: null, email: null, telegramId: null, telegramUsername: null };
+    return {
+      accountId: null,
+      email: null,
+      telegramId: null,
+      telegramUsername: null,
+      plan: null,
+      trialUntil: null,
+      premiumUntil: null,
+    };
   }
   const account = store.accountsById[accountId];
+  const ent = account ? entitlementFromAccount(account) : null;
   return {
     accountId,
     email: account?.email ?? null,
     telegramId: account?.telegramId ?? null,
     telegramUsername: account?.telegramUsername ?? null,
+    plan: ent?.plan ?? null,
+    trialUntil: ent?.trialUntil ?? null,
+    premiumUntil: ent?.premiumUntil ?? null,
   };
 }
 
@@ -529,6 +555,7 @@ export function verifyEmailLogin(
   }
 
   let accountId = store.emailToAccount[email];
+  const isFirstRegistration = !accountId;
   if (!accountId) {
     accountId = store.installToAccount[normalized] ?? createAccount(installId).accountId;
   }
@@ -536,6 +563,9 @@ export function verifyEmailLogin(
   if (!account) return { ok: false, error: 'Аккаунт недоступен' };
 
   account.email = email;
+  if (isFirstRegistration) {
+    grantWelcomeTrialIfEligible(account);
+  }
   if (!account.installIds.includes(normalized)) {
     if (account.installIds.length >= MAX_DEVICES) {
       return { ok: false, error: `Максимум ${MAX_DEVICES} устройств` };
@@ -560,6 +590,7 @@ export function linkTelegramAccount(
   const tgKey = String(telegramId);
 
   let accountId = store.telegramToAccount[tgKey];
+  const isFirstRegistration = !accountId;
   if (!accountId) {
     accountId = store.installToAccount[normalized] ?? createAccount(installId).accountId;
   }
@@ -568,6 +599,9 @@ export function linkTelegramAccount(
 
   account.telegramId = telegramId;
   account.telegramUsername = username ?? null;
+  if (isFirstRegistration) {
+    grantWelcomeTrialIfEligible(account);
+  }
   if (!account.installIds.includes(normalized)) {
     if (account.installIds.length >= MAX_DEVICES) {
       return { ok: false, error: `Максимум ${MAX_DEVICES} устройств` };

@@ -3,7 +3,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { requireAppAuth } from '../middleware/app-auth.js';
 import { validateStoryFullBody } from '../middleware/validate-story.js';
 import { enrichTrackMetadata } from '../services/musicbrainz.js';
-import { fetchAggregatedFactContext, emptyAggregatedFactContext } from '../services/fact-aggregator.js';
+import { fetchAggregatedFactContext, emptyAggregatedFactContext, fetchIndieArtistFocusContext } from '../services/fact-aggregator.js';
 import { explainReferenceFactSelection, type SelectedReferenceFact } from '../services/fact-picker.js';
 import { formatFactPickLog, logFactCandidatePools } from '../services/fact-interest-log.js';
 import { interestScore } from '../services/reference-fact-quality.js';
@@ -74,6 +74,11 @@ import { classifyStoryLlmError } from '../services/llm-error-message.js';
 import { StoryTiming } from '../services/story-timing.js';
 import { recordFactMiss } from '../services/fact-miss-log.js';
 import { isNoReferenceFactsError, NoReferenceFactsError } from '../services/story-errors.js';
+import {
+  isValidFeedbackReason,
+  recordStoryFeedback,
+  type FeedbackVote,
+} from '../services/story-feedback.js';
 import type { StoryLengthId } from '../services/story-length.js';
 import type { StoryNarratorId } from '../services/story-narrator.js';
 import type { TtsVoiceSetting } from '../services/voices.js';
@@ -426,7 +431,7 @@ router.post('/full', validateStoryFullBody, storyFullRateLimit, async (req: Requ
         ? explainLlmFactSelection(selectedFact!)
         : explainReferenceFactSelection(factBundle, selectedFact, metadata.artist, metadata.title);
 
-    const referenceFacts = selectedFact
+    let referenceFacts = selectedFact
       ? [selectedFact.fact]
       : [...factBundle.trackFacts, ...factBundle.artistFacts].slice(0, 4);
 
@@ -454,6 +459,54 @@ router.post('/full', validateStoryFullBody, storyFullRateLimit, async (req: Requ
           interestRating: interestRating10(fallbackFact),
         };
         console.log(formatFactPickLog(selectedFact, 'rules'));
+        referenceFacts = [selectedFact.fact];
+      }
+    }
+
+    if (!selectedFact && referenceFacts.length === 0 && artistTier === 'indie') {
+      console.log(
+        `[facts] indie artist-only retry for "${metadata.artist}" — "${metadata.title}"`,
+      );
+      const indieCtx = await fetchIndieArtistFocusContext(
+        metadata.artist,
+        metadata.title,
+        metadata.countryCode,
+        metadata.artistMbid,
+      );
+      const indieCount = indieCtx.bundle.artistFacts.length + indieCtx.bundle.trackFacts.length;
+      if (indieCount > 0) {
+        factBundle = indieCtx.bundle;
+        factCtx = {
+          ...factCtx,
+          rawSnippets: [...new Set([...factCtx.rawSnippets, ...indieCtx.rawSnippets])],
+        };
+        trackFactCount = factBundle.trackFacts.length;
+        artistFactCount = factBundle.artistFacts.length;
+        ingestBundleToBank(metadata.artist, metadata.title, factBundle);
+        selectedFact = pickFactForUser(
+          installId,
+          factBundle,
+          metadata.artist,
+          metadata.title,
+          previousScripts.length,
+        );
+        if (selectedFact) {
+          console.log(formatFactPickLog(selectedFact, 'rules'));
+          referenceFacts = [selectedFact.fact];
+        } else {
+          referenceFacts = [
+            ...factBundle.trackFacts,
+            ...factBundle.artistFacts,
+          ].slice(0, 4);
+        }
+      } else {
+        recordFactMiss({
+          installId,
+          artist: metadata.artist,
+          title: metadata.title,
+          reason: 'indie_no_artist_fact',
+          artistTier,
+        });
       }
     }
 
@@ -719,6 +772,32 @@ router.post('/full', validateStoryFullBody, storyFullRateLimit, async (req: Requ
       source: isTts ? 'tts' : 'llm',
     });
   }
+});
+
+router.post('/feedback', (req: Request, res: Response) => {
+  const installId = req.installId!;
+  const artist = typeof req.body?.artist === 'string' ? req.body.artist.trim() : '';
+  const title = typeof req.body?.title === 'string' ? req.body.title.trim() : '';
+  const voteRaw = typeof req.body?.vote === 'string' ? req.body.vote.trim().toLowerCase() : '';
+  const reason = typeof req.body?.reason === 'string' ? req.body.reason.trim() : '';
+  const script = typeof req.body?.script === 'string' ? req.body.script.trim() : undefined;
+
+  if (!artist || !title) {
+    res.status(400).json({ error: 'artist and title required' });
+    return;
+  }
+  if (voteRaw !== 'like' && voteRaw !== 'dislike') {
+    res.status(400).json({ error: 'vote must be like or dislike' });
+    return;
+  }
+  const vote = voteRaw as FeedbackVote;
+  if (!reason || !isValidFeedbackReason(vote, reason)) {
+    res.status(400).json({ error: 'invalid reason for vote' });
+    return;
+  }
+
+  const entry = recordStoryFeedback({ installId, artist, title, vote, reason, script });
+  res.json({ ok: true, id: entry.id });
 });
 
 export default router;

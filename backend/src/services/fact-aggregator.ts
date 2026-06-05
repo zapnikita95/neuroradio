@@ -295,6 +295,61 @@ export async function fetchWikiBundleMerged(
   return wiki;
 }
 
+import { fetchArtistWikiLead } from './wikipedia-lead.js';
+
+export function buildIndieArtistQueries(artist: string): string[] {
+  return [
+    `${artist} band biography`,
+    `${artist} musician interview history`,
+    `${artist} artist discography background`,
+  ];
+}
+
+/** Последняя попытка для indie: только факты об артисте, без привязки к треку. */
+export async function fetchIndieArtistFocusContext(
+  artist: string,
+  title: string,
+  countryCode?: string,
+  artistMbid?: string,
+): Promise<AggregatedFactContext> {
+  const t0 = Date.now();
+  const [wikiLead, ddgRaw, webRaw, mbArtistRaw] = await Promise.all([
+    fetchArtistWikiLead(artist),
+    fetchDuckDuckGoUnfiltered(artist, ''),
+    fetchWebSearchFactSnippets(artist, artist),
+    fetchMusicBrainzAnnotationsUnfiltered('artist', artistMbid),
+  ]);
+
+  const artistCandidates: string[] = [];
+  if (wikiLead?.text?.trim()) {
+    artistCandidates.push(wikiLead.text.trim().slice(0, 480));
+  }
+  for (const text of [...ddgRaw, ...webRaw, ...mbArtistRaw]) {
+    if (factAppliesToRequest(text, artist, title, 'artist', 'indie')) {
+      artistCandidates.push(text);
+    }
+  }
+
+  const artistFacts = mergeFacts(artistCandidates);
+  const finalized = finalizeFactBundle([], artistFacts, artist, title);
+  const bundle: ReferenceFactBundle = {
+    trackFacts: finalized.trackFacts,
+    artistFacts: finalized.artistFacts,
+  };
+
+  console.log(
+    `[facts] indie artist-only pass "${artist}": ${Date.now() - t0}ms ` +
+      `artistFacts=${bundle.artistFacts.length} trackFacts=${bundle.trackFacts.length}`,
+  );
+
+  const rawCollected: string[] = [];
+  const rawSources: SnippetSource[] = [];
+  for (const fact of bundle.artistFacts) pushRaw(rawCollected, rawSources, fact, 'wiki');
+  capRaw(rawCollected, rawSources);
+
+  return { bundle, rawSnippets: rawCollected, snippetSources: rawSources };
+}
+
 export async function fetchAggregatedFactContext(
   artist: string,
   title: string,

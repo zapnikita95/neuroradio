@@ -1,0 +1,50 @@
+import fs from 'node:fs';
+import path from 'node:path';
+import crypto from 'node:crypto';
+
+export type FeedbackVote = 'like' | 'dislike';
+
+export const LIKE_REASONS = ['interesting_fact', 'good_speech', 'good_persona'] as const;
+export const DISLIKE_REASONS = [
+  'hallucination',
+  'boring_fact',
+  'unnatural_voice',
+  'speech_manner',
+] as const;
+
+export type LikeReason = (typeof LIKE_REASONS)[number];
+export type DislikeReason = (typeof DISLIKE_REASONS)[number];
+
+export interface StoryFeedbackEntry {
+  id: string;
+  installId: string;
+  artist: string;
+  title: string;
+  vote: FeedbackVote;
+  reason: string;
+  script?: string;
+  at: number;
+}
+
+const DATA_DIR = process.env.ACCOUNT_DATA_DIR?.trim() || path.join(process.cwd(), 'data');
+const FEEDBACK_PATH = path.join(DATA_DIR, 'story-feedback.jsonl');
+
+export function isValidFeedbackReason(vote: FeedbackVote, reason: string): boolean {
+  if (vote === 'like') return (LIKE_REASONS as readonly string[]).includes(reason);
+  return (DISLIKE_REASONS as readonly string[]).includes(reason);
+}
+
+export function recordStoryFeedback(entry: Omit<StoryFeedbackEntry, 'id' | 'at'>): StoryFeedbackEntry {
+  const record: StoryFeedbackEntry = {
+    id: crypto.randomUUID(),
+    at: Date.now(),
+    ...entry,
+  };
+  fs.mkdirSync(DATA_DIR, { recursive: true });
+  fs.appendFileSync(FEEDBACK_PATH, `${JSON.stringify(record)}\n`, 'utf8');
+  console.log(
+    `[feedback] ${record.vote} reason=${record.reason} install=${record.installId.slice(0, 8)} ` +
+      `"${record.artist}" — "${record.title}"`,
+  );
+  return record;
+}

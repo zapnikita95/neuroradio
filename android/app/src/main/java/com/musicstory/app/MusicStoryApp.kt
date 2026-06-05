@@ -6,6 +6,7 @@ import android.app.NotificationManager
 import android.os.Build
 import com.musicstory.app.data.local.AppDatabase
 import com.musicstory.app.data.local.SettingsDataStore
+import com.musicstory.app.data.remote.AccountAuthManager
 import com.musicstory.app.data.remote.AccountSyncManager
 import com.musicstory.app.data.remote.ApiClient
 import com.musicstory.app.data.remote.BackendAuthManager
@@ -45,6 +46,9 @@ class MusicStoryApp : Application() {
     lateinit var accountSyncManager: AccountSyncManager
         private set
 
+    lateinit var accountAuthManager: AccountAuthManager
+        private set
+
     lateinit var scrobbleRepository: ScrobbleRepository
         private set
 
@@ -79,6 +83,7 @@ class MusicStoryApp : Application() {
         backendAuthManager = BackendAuthManager(this, settingsDataStore)
         apiClient = ApiClient(backendAuthManager)
         accountSyncManager = AccountSyncManager(backendAuthManager)
+        accountAuthManager = AccountAuthManager(backendAuthManager)
         scrobbleRepository = ScrobbleRepository(database.scrobbleDao())
         val metadataEnricher = MetadataEnricher()
         val metadataCache = MetadataCache(metadataEnricher)

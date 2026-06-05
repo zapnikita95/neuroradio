@@ -418,10 +418,10 @@ fun SettingsScreen(
                 }
 
                 CollapsibleSettingsSection(
-                    title = context.getString(R.string.settings_sync_section),
-                    summary = context.getString(R.string.settings_sync_summary),
+                    title = context.getString(R.string.settings_auth_section),
+                    summary = context.getString(R.string.settings_auth_summary),
                 ) {
-                    SyncDevicesSection(app = app, scope = scope)
+                    AccountAuthSection(app = app, scope = scope)
                 }
 
                 CollapsibleSettingsSection(

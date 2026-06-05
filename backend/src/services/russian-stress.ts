@@ -5,7 +5,18 @@
 
 import { normalizeRussianYo } from './russian-yo.js';
 
-/** lowercase word → word with + before stressed vowel */
+/** Loanwords: «трэк» (э) — англ. track /æ/, не «трек» с «йе». */
+export const TTS_PRONUNCIATION: Record<string, string> = {
+  трек: 'трэк',
+  трека: 'трэка',
+  треке: 'трэке',
+  треки: 'трэки',
+  треков: 'трэков',
+  трекам: 'трэкам',
+  треками: 'трэками',
+  треках: 'трэках',
+};
+
 export const RUSSIAN_STRESS: Record<string, string> = {
   атлас: 'атл+ас',
   атласе: 'атл+асе',
@@ -138,6 +149,13 @@ export function applyStressToWord(word: string): string {
 
   const bare = stripStressMarks(word);
   const lower = bare.toLowerCase();
+  const pronunciation = TTS_PRONUNCIATION[lower];
+  if (pronunciation) {
+    if (bare[0] === bare[0].toUpperCase() && bare[0] !== bare[0].toLowerCase()) {
+      return pronunciation.charAt(0).toUpperCase() + pronunciation.slice(1);
+    }
+    return pronunciation;
+  }
   const override = RUSSIAN_STRESS[lower];
   if (!override) return bare;
 

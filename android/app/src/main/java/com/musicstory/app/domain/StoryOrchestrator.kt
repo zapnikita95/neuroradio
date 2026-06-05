@@ -58,6 +58,7 @@ data class OrchestratorUiState(
     val isBackendFetching: Boolean = false,
     /** Manual «Рассказать историю» allowed (cooldown gate). */
     val canRequestManualStory: Boolean = true,
+    val pendingFeedback: PendingStoryFeedback? = null,
 )
 
 data class GenerationPreviewState(
@@ -113,6 +114,7 @@ class StoryOrchestrator(
 
     private val _generationPreview = MutableStateFlow(GenerationPreviewState())
     private var previewJob: Job? = null
+    private val _pendingFeedback = MutableStateFlow<PendingStoryFeedback?>(null)
 
     private fun publishUiState() {
         if (_state.value == OrchestratorState.FETCHING_STORY &&
@@ -151,6 +153,7 @@ class StoryOrchestrator(
             isGenerationActive = generationActive,
             isBackendFetching = backendFetchInFlight,
             canRequestManualStory = manualStoryGateAllowed,
+            pendingFeedback = _pendingFeedback.value,
         )
         refreshManualStoryNotificationGate(generationActive)
     }
@@ -659,6 +662,11 @@ class StoryOrchestrator(
                             }
                             _errorMessage.value = null
                             _state.value = OrchestratorState.LISTENING
+                            _pendingFeedback.value = PendingStoryFeedback(
+                                artist = response.artist,
+                                title = response.title,
+                                script = response.script,
+                            )
                             scope.launch { refreshTracksUntilNext() }
                             publishUiState()
                         },
@@ -820,6 +828,11 @@ class StoryOrchestrator(
             }
             publishUiState()
         }
+    }
+
+    fun clearFeedbackPrompt() {
+        _pendingFeedback.value = null
+        publishUiState()
     }
 
     /** Сброс залипшего «Готовим историю» при открытии главного экрана. */

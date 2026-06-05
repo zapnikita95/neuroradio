@@ -27,6 +27,7 @@ import { securityHeaders } from './middleware/security-headers.js';
 import { requireSignedAudioAccess } from './middleware/audio-auth.js';
 import { requestLogger } from './middleware/request-logger.js';
 import { SECURITY } from './config/security.js';
+import { purgeInvalidBankFacts } from './services/fact-bank.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PORT = parseInt(process.env.PORT ?? '3000', 10);
@@ -153,13 +154,21 @@ const server = app.listen(PORT, '0.0.0.0', () => {
     `[boot] build=${BUILD_ID} llm=${resolveLlmProvider()} openrouter=${hasOpenRouterApiKey()} groq=${hasGroqApiKey()} gemini=${hasGeminiApiKey()} yandexTts=${hasYandexCredentials()} auth=${isAppAuthEnabled()}`,
   );
   console.log(`  POST /v1/auth/token — app JWT`);
+  console.log(`  GET  /v1/account/* — email/Telegram auth + 7-day trial`);
   console.log(`  GET  /v1/sync/* — linked account settings & history`);
   console.log(`  GET  /v1/billing/status — tier, limits, trial/premium`);
   console.log(`  POST /v1/llm/probe — test LLM key via BFF (no key logging)`);
   console.log(`  POST /v1/story/full — story + optional Yandex TTS`);
+  console.log(`  POST /v1/story/feedback — like/dislike + reason tags`);
   console.log(`  GET  /health — health check`);
   console.log(`  GET  /audio/* — signed audio only`);
   console.log(`[boot] phone backend URL must be http://YOUR_PC_IP:${PORT} (not Railway)`);
+  try {
+    const purged = purgeInvalidBankFacts();
+    if (purged > 0) console.log(`[boot] fact-bank cleanup removed ${purged} invalid entries`);
+  } catch (err) {
+    console.warn('[boot] fact-bank purge failed:', err instanceof Error ? err.message : err);
+  }
 });
 
 server.on('connection', (socket) => {

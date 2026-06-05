@@ -86,6 +86,44 @@ function upsertIntoPool(pool: StoredFact[], entry: StoredFact): void {
   if (pool.length > 40) pool.length = 40;
 }
 
+function isValidStoredFact(fact: StoredFact): boolean {
+  if (isAmbiguousCommonWordArtist(fact.artist) && !factMentionsArtistAsEntity(fact.fact, fact.artist)) {
+    return false;
+  }
+  if (
+    isAmbiguousCommonWordArtist(fact.artist) &&
+    /(?:скандал|проститу|шантаж|измен|развод|арест|убий|наркот)/i.test(fact.fact)
+  ) {
+    return false;
+  }
+  return true;
+}
+
+/** Удаляет ложные факты (Привет и т.п.) из volume-банка. */
+export function purgeInvalidBankFacts(): number {
+  const bank = loadBank();
+  let removed = 0;
+  for (const key of Object.keys(bank.byTrack)) {
+    const pool = bank.byTrack[key] ?? [];
+    const filtered = pool.filter(isValidStoredFact);
+    removed += pool.length - filtered.length;
+    if (filtered.length === 0) delete bank.byTrack[key];
+    else bank.byTrack[key] = filtered;
+  }
+  for (const key of Object.keys(bank.byArtist)) {
+    const pool = bank.byArtist[key] ?? [];
+    const filtered = pool.filter(isValidStoredFact);
+    removed += pool.length - filtered.length;
+    if (filtered.length === 0) delete bank.byArtist[key];
+    else bank.byArtist[key] = filtered;
+  }
+  if (removed > 0) {
+    saveBank(bank);
+    console.log(`[fact-bank] purged ${removed} invalid fact(s) from ${BANK_PATH}`);
+  }
+  return removed;
+}
+
 /** Сохраняем хорошие факты из API — база растёт по мере прослушивания. */
 export function ingestFacts(
   artist: string,
@@ -102,6 +140,9 @@ export function ingestFacts(
   for (const item of facts) {
     const trimmed = item.fact.trim();
     if (trimmed.length < 35) continue;
+    if (!isValidStoredFact({ id: '', artist, title, scope: item.scope, fact: trimmed, interestScore: 0, interestRating: 0, source: item.source ?? 'api', timesUsed: 0, addedAt: 0 })) {
+      continue;
+    }
     const score = interestScore(trimmed);
     if (score < 6) continue;
     const stored: StoredFact = {
