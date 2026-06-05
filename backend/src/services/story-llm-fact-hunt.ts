@@ -77,10 +77,7 @@ export function shouldRunLlmFactHunt(
 ): boolean {
   if (rawSnippetCount < 2) return false;
   if (!selected) return bundleFactCount === 0;
-  if (
-    selected.interestScore >= FAST_SEED_INTEREST_SCORE &&
-    (!artist || factMentionsArtist(selected.fact, artist) || selected.scope === 'artist')
-  ) {
+  if (selected.interestScore >= FAST_SEED_INTEREST_SCORE) {
     return false;
   }
   // No track-level facts — artist trivia is weak for a specific song; let LLM hunt from snippets.

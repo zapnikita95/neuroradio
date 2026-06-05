@@ -335,6 +335,7 @@ class StoryOrchestrator(
 
         _hintMessage.value = null
         _pendingFeedback.value = null
+        mediaControllerManager.restoreSystemMusicVolumeIfNeeded()
 
         cancelStaleGenerationForNewTrack(track, reason = "track changed")
 
@@ -624,59 +625,105 @@ class StoryOrchestrator(
                         refreshTracksUntilNext()
                     }
 
-                    val audioUrl = storyRepository.resolveAudioUrl(response.audioUrl)
-                    storyPlayer.playStory(
-                        response = response,
-                        audioUrl = audioUrl,
-                        speechRate = ttsSpeed,
-                        resumeMusic = true,
-                        onPlaybackStarted = {
-                            if (!isSessionCurrent(session)) return@playStory
-                            lastStoryStartedAtMs = System.currentTimeMillis()
-                            _state.value = OrchestratorState.PLAYING_STORY
-                            _pendingFeedback.value = PendingStoryFeedback(
-                                artist = response.artist,
-                                title = response.title,
-                                script = response.script,
-                                trackKey = requestedTrack.displayKey,
-                            )
-                            publishUiState()
-                        },
-                        onFinished = {
-                            if (!isSessionCurrent(session)) return@playStory
-                            cancelGenerationPreview()
-                            if (musicPausedForStory.get() && storyPlayer.shouldResumeMusic()) {
-                                scope.launch {
-                                    mediaControllerManager.resumeMusicWithFade(fadeSeconds)
+                    var audioRefetchAttempt = 0
+
+                    fun handleAudioPlaybackFailed() {
+                        mediaControllerManager.restoreSystemMusicVolumeIfNeeded()
+                        if (!manual) {
+                            scope.launch {
+                                val everyN = settingsDataStore.everyNTracks.first()
+                                triggerEngine.rollbackFailedStoryTrigger(everyN)
+                                settingsDataStore.setTracksSinceLastStory(
+                                    triggerEngine.currentTracksSinceLastStory(),
+                                )
+                            }
+                        }
+                        _errorMessage.value = context.getString(R.string.server_audio_error_message)
+                        _hintMessage.value = null
+                        _state.value = OrchestratorState.ERROR
+                        if (musicPausedForStory.get()) {
+                            mediaControllerManager.resumeMusic()
+                        }
+                        publishUiState()
+                    }
+
+                    suspend fun startStoryPlayback(response: com.musicstory.app.data.model.StoryResponse) {
+                        val audioUrl = storyRepository.resolveAudioUrl(response.audioUrl)
+                        storyPlayer.playStory(
+                            response = response,
+                            audioUrl = audioUrl,
+                            speechRate = ttsSpeed,
+                            resumeMusic = true,
+                            onPlaybackStarted = {
+                                if (!isSessionCurrent(session)) return@playStory
+                                lastStoryStartedAtMs = System.currentTimeMillis()
+                                _state.value = OrchestratorState.PLAYING_STORY
+                                _pendingFeedback.value = PendingStoryFeedback(
+                                    artist = response.artist,
+                                    title = response.title,
+                                    script = response.script,
+                                    trackKey = requestedTrack.displayKey,
+                                )
+                                publishUiState()
+                            },
+                            onFinished = {
+                                if (!isSessionCurrent(session)) return@playStory
+                                cancelGenerationPreview()
+                                mediaControllerManager.restoreSystemMusicVolumeIfNeeded()
+                                if (musicPausedForStory.get() && storyPlayer.shouldResumeMusic()) {
+                                    scope.launch {
+                                        mediaControllerManager.resumeMusicWithFade(fadeSeconds)
+                                    }
                                 }
-                            }
-                            _errorMessage.value = null
-                            _pendingFeedback.value = null
-                            _state.value = OrchestratorState.LISTENING
-                            scope.launch { refreshTracksUntilNext() }
-                            publishUiState()
-                        },
-                        onError = {
-                            if (!isSessionCurrent(session)) return@playStory
-                            cancelGenerationPreview()
-                            if (!manual) {
-                                scope.launch {
-                                    val everyN = settingsDataStore.everyNTracks.first()
-                                    triggerEngine.rollbackFailedStoryTrigger(everyN)
-                                    settingsDataStore.setTracksSinceLastStory(
-                                        triggerEngine.currentTracksSinceLastStory(),
-                                    )
+                                _errorMessage.value = null
+                                _pendingFeedback.value = null
+                                _state.value = OrchestratorState.LISTENING
+                                scope.launch { refreshTracksUntilNext() }
+                                publishUiState()
+                            },
+                            onError = {
+                                if (!isSessionCurrent(session)) return@playStory
+                                cancelGenerationPreview()
+                                if (audioRefetchAttempt < 1) {
+                                    audioRefetchAttempt++
+                                    scope.launch {
+                                        StoryLog.w(
+                                            "Server audio failed — refetching story once (stale signed URL after redeploy?)",
+                                        )
+                                        _state.value = OrchestratorState.FETCHING_STORY
+                                        publishUiState()
+                                        val refetch = try {
+                                            withTimeout(STORY_FETCH_TIMEOUT_MS) {
+                                                storyRepository.fetchStory(track, forceRefresh = true)
+                                            }
+                                        } catch (e: CancellationException) {
+                                            throw e
+                                        } catch (e: Exception) {
+                                            Result.failure(e)
+                                        }
+                                        if (!isSessionCurrent(session) || !isTrackStillCurrent(session, track)) {
+                                            return@launch
+                                        }
+                                        refetch.fold(
+                                            onSuccess = { fresh ->
+                                                storyMutex.withLock {
+                                                    if (!isSessionCurrent(session)) return@withLock
+                                                    _state.value = OrchestratorState.PREPARING_PLAYBACK
+                                                    publishUiState()
+                                                    startStoryPlayback(fresh)
+                                                }
+                                            },
+                                            onFailure = { handleAudioPlaybackFailed() },
+                                        )
+                                    }
+                                    return@playStory
                                 }
-                            }
-                            _errorMessage.value = context.getString(R.string.server_audio_error_message)
-                            _hintMessage.value = null
-                            _state.value = OrchestratorState.ERROR
-                            if (musicPausedForStory.get()) {
-                                mediaControllerManager.resumeMusic()
-                            }
-                            publishUiState()
-                        },
-                    )
+                                handleAudioPlaybackFailed()
+                            },
+                        )
+                    }
+
+                    startStoryPlayback(response)
                     scrobbleRepository.markStoryTriggered(track)
                     schedulePlaybackWatchdog(session, musicPausedForStory)
                 }
@@ -834,6 +881,7 @@ class StoryOrchestrator(
     fun stopStory() {
         cancelInFlightGenerationImmediate("stopped by user")
         storyPlayer.stop()
+        mediaControllerManager.restoreSystemMusicVolumeIfNeeded()
         mediaControllerManager.resumeMusic()
         _pendingFeedback.value = null
         _state.value = OrchestratorState.LISTENING

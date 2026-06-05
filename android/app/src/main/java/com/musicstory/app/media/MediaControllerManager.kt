@@ -89,8 +89,12 @@ class MediaControllerManager(
         activeController?.transportControls?.pause()
     }
 
-    suspend fun fadeOutAndPause(seconds: Float) {
-        val controls = activeController?.transportControls ?: return
+  suspend fun fadeOutAndPause(seconds: Float) {
+        val controls = activeController?.transportControls
+        if (controls == null) {
+            restoreSystemMusicVolumeIfNeeded()
+            return
+        }
         val maxVolume = audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC)
         val currentVolume = audioManager.getStreamVolume(AudioManager.STREAM_MUSIC)
         if (currentVolume <= 0) {
@@ -100,36 +104,45 @@ class MediaControllerManager(
         if (fadedStreamOriginalVolume == null) {
             fadedStreamOriginalVolume = currentVolume
         }
-        val targetVolume = (maxVolume * 0.12f).toInt().coerceAtLeast(1)
-        if (seconds <= 0.2f) {
-            audioManager.setStreamVolume(AudioManager.STREAM_MUSIC, targetVolume, 0)
+        val savedOriginal = fadedStreamOriginalVolume ?: currentVolume
+        try {
+            val targetVolume = (maxVolume * 0.12f).toInt().coerceAtLeast(1)
+            if (seconds <= 0.2f) {
+                audioManager.setStreamVolume(AudioManager.STREAM_MUSIC, targetVolume, 0)
+                controls.pause()
+                return
+            }
+            val steps = (seconds * 10f).toInt().coerceIn(6, 15)
+            val stepDelayMs = ((seconds * 1000f) / steps).toLong().coerceAtLeast(50L)
+            for (i in steps downTo 1) {
+                val vol = (currentVolume - (currentVolume - targetVolume) * (steps - i + 1) / steps)
+                    .coerceAtLeast(targetVolume)
+                audioManager.setStreamVolume(AudioManager.STREAM_MUSIC, vol, 0)
+                delay(stepDelayMs)
+            }
             controls.pause()
-            restoreStoryPlaybackVolume()
-            return
+        } finally {
+            val max = audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC)
+            val restore = savedOriginal.coerceIn(1, max)
+            audioManager.setStreamVolume(AudioManager.STREAM_MUSIC, restore, 0)
+            fadedStreamOriginalVolume = null
         }
-        val steps = (seconds * 10f).toInt().coerceIn(6, 15)
-        val stepDelayMs = ((seconds * 1000f) / steps).toLong().coerceAtLeast(50L)
-        for (i in steps downTo 1) {
-            val vol = (currentVolume - (currentVolume - targetVolume) * (steps - i + 1) / steps)
-                .coerceAtLeast(targetVolume)
-            audioManager.setStreamVolume(AudioManager.STREAM_MUSIC, vol, 0)
-            delay(stepDelayMs)
-        }
-        controls.pause()
-        restoreStoryPlaybackVolume()
     }
 
-    private fun restoreStoryPlaybackVolume() {
-        fadedStreamOriginalVolume?.let { original ->
-            audioManager.setStreamVolume(AudioManager.STREAM_MUSIC, original, 0)
-        }
+    /** Call when story ends, track changes, or user stops — fixes stuck silent STREAM_MUSIC. */
+    fun restoreSystemMusicVolumeIfNeeded() {
+        val original = fadedStreamOriginalVolume ?: return
+        val max = audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC)
+        val restore = original.coerceIn(1, max)
+        audioManager.setStreamVolume(AudioManager.STREAM_MUSIC, restore, 0)
+        fadedStreamOriginalVolume = null
     }
 
     suspend fun resumeMusicWithFade(seconds: Float) {
+        restoreSystemMusicVolumeIfNeeded()
         val controls = activeController?.transportControls ?: return
-        val original = fadedStreamOriginalVolume ?: audioManager.getStreamVolume(AudioManager.STREAM_MUSIC)
-        fadedStreamOriginalVolume = null
         val maxVolume = audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC)
+        val original = audioManager.getStreamVolume(AudioManager.STREAM_MUSIC).coerceAtLeast(1)
         val startVolume = (maxVolume * 0.08f).toInt().coerceAtLeast(1)
         audioManager.setStreamVolume(AudioManager.STREAM_MUSIC, startVolume, 0)
         controls.play()
@@ -148,10 +161,7 @@ class MediaControllerManager(
     }
 
     fun resumeMusic() {
-        fadedStreamOriginalVolume?.let { original ->
-            audioManager.setStreamVolume(AudioManager.STREAM_MUSIC, original, 0)
-            fadedStreamOriginalVolume = null
-        }
+        restoreSystemMusicVolumeIfNeeded()
         activeController?.transportControls?.play()
     }
 

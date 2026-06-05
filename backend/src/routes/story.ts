@@ -327,19 +327,29 @@ router.post('/full', validateStoryFullBody, storyFullRateLimit, async (req: Requ
       factBundle = factCtx.bundle;
       trackFactCount = factBundle.trackFacts.length;
       artistFactCount = factBundle.artistFacts.length;
+      const firstFetchMs = timing.totalMs();
       if (trackFactCount + artistFactCount === 0) {
-        console.warn(`[facts] empty bundle for "${metadata.artist}" — "${metadata.title}", retrying sources`);
-        await new Promise((r) => setTimeout(r, 700));
-        factCtx = await fetchAggregatedFactContext(
-          metadata.artist,
-          metadata.title,
-          metadata.countryCode,
-          metadata.mbid,
-          metadata.artistMbid,
-        );
-        factBundle = factCtx.bundle;
-        trackFactCount = factBundle.trackFacts.length;
-        artistFactCount = factBundle.artistFacts.length;
+        const skipRetry =
+          firstFetchMs >= 18_000 ||
+          factCtx.rawSnippets.length >= 2;
+        if (skipRetry) {
+          console.warn(
+            `[facts] skip empty-bundle retry for "${metadata.artist}" — ${firstFetchMs}ms snippets=${factCtx.rawSnippets.length}`,
+          );
+        } else {
+          console.warn(`[facts] empty bundle for "${metadata.artist}" — "${metadata.title}", retrying sources`);
+          await new Promise((r) => setTimeout(r, 700));
+          factCtx = await fetchAggregatedFactContext(
+            metadata.artist,
+            metadata.title,
+            metadata.countryCode,
+            metadata.mbid,
+            metadata.artistMbid,
+          );
+          factBundle = factCtx.bundle;
+          trackFactCount = factBundle.trackFacts.length;
+          artistFactCount = factBundle.artistFacts.length;
+        }
       }
       console.log(
         `[facts] ${metadata.artist} — ${metadata.title}: track=${trackFactCount} artist=${artistFactCount} rawSnippets=${factCtx.rawSnippets.length}`,
@@ -523,14 +533,33 @@ router.post('/full', validateStoryFullBody, storyFullRateLimit, async (req: Requ
     }
 
     if (!selectedFact && referenceFacts.filter((f) => !isMetadataOnlyFallbackFact(f)).length === 0) {
-      recordFactMiss({
+      const wikiSalvage = await pickArtistWikiContent({
         installId,
         artist: metadata.artist,
-        title: metadata.title,
-        reason: 'no_reference_facts',
-        artistTier,
+        previousScripts,
       });
-      throw new NoReferenceFactsError(metadata.artist, metadata.title);
+      if (wikiSalvage && isMusicArtistWikiExtract(wikiSalvage.text)) {
+        selectedFact = {
+          fact: wikiSalvage.text,
+          scope: 'artist',
+          scopeLabelRu: 'группа/артист',
+          interestScore: interestScore(wikiSalvage.text),
+          interestRating: interestRating10(wikiSalvage.text),
+        };
+        referenceFacts = [wikiSalvage.text];
+        console.log(
+          `[facts] wiki salvage seed for "${metadata.artist}" chars=${wikiSalvage.text.length}`,
+        );
+      } else {
+        recordFactMiss({
+          installId,
+          artist: metadata.artist,
+          title: metadata.title,
+          reason: 'no_reference_facts',
+          artistTier,
+        });
+        throw new NoReferenceFactsError(metadata.artist, metadata.title);
+      }
     }
 
     const finalReferenceFacts = selectedFact ? [selectedFact.fact] : referenceFacts;

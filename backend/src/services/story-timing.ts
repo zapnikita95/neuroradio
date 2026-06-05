@@ -20,4 +20,8 @@ export class StoryTiming {
   totalMs(): number {
     return Date.now() - this.t0;
   }
+
+  elapsedMs(): number {
+    return this.totalMs();
+  }
 }

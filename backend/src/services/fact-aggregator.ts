@@ -11,6 +11,16 @@ const RAW_SNIPPET_MIN_LEN = 30;
 const RAW_SNIPPET_MAX = 12;
 /** Весь параллельный сбор фактов — иначе трек уже сменился. */
 const FACT_FETCH_BUDGET_MS = parseInt(process.env.FACT_FETCH_TIMEOUT_MS ?? '28000', 10);
+const FACT_FETCH_HARD_CAP_MS = parseInt(process.env.FACT_FETCH_HARD_CAP_MS ?? '22000', 10);
+
+function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
+  return Promise.race([
+    promise,
+    new Promise<T>((_, reject) => {
+      setTimeout(() => reject(new Error(`${label} timed out after ${ms}ms`)), ms);
+    }),
+  ]);
+}
 
 export type SnippetSource = 'wiki' | 'ddg' | 'web' | 'wikidata' | 'mb';
 
@@ -393,14 +403,39 @@ export async function fetchAggregatedFactContext(
   artistMbid?: string,
 ): Promise<AggregatedFactContext> {
   const t0 = Date.now();
-  const [wiki, ddgUnfiltered, webUnfiltered, wdUnfiltered, mbTrackRaw, mbArtistRaw] = await Promise.all([
-    fetchWikiBundleMerged(artist, title, countryCode),
-    fetchDuckDuckGoUnfiltered(artist, title),
-    fetchWebSearchFactSnippets(artist, title),
-    fetchWikidataUnfiltered(artist, title, countryCode),
-    fetchMusicBrainzAnnotationsUnfiltered('recording', recordingMbid),
-    fetchMusicBrainzAnnotationsUnfiltered('artist', artistMbid),
-  ]);
+  let wiki: ReferenceFactBundle;
+  let ddgUnfiltered: string[];
+  let webUnfiltered: string[];
+  let wdUnfiltered: string[];
+  let mbTrackRaw: string[];
+  let mbArtistRaw: string[];
+  try {
+    [wiki, ddgUnfiltered, webUnfiltered, wdUnfiltered, mbTrackRaw, mbArtistRaw] = await withTimeout(
+      Promise.all([
+        fetchWikiBundleMerged(artist, title, countryCode),
+        fetchDuckDuckGoUnfiltered(artist, title),
+        fetchWebSearchFactSnippets(artist, title),
+        fetchWikidataUnfiltered(artist, title, countryCode),
+        fetchMusicBrainzAnnotationsUnfiltered('recording', recordingMbid),
+        fetchMusicBrainzAnnotationsUnfiltered('artist', artistMbid),
+      ]),
+      FACT_FETCH_HARD_CAP_MS,
+      'fact parallel fetch',
+    );
+  } catch (err) {
+    console.warn(
+      `[facts] parallel fetch cap hit for "${artist}" — "${title}": ${err instanceof Error ? err.message : err}`,
+    );
+    wiki = await fetchWikiBundleMerged(artist, title, countryCode).catch(() => ({
+      trackFacts: [],
+      artistFacts: [],
+    }));
+    ddgUnfiltered = [];
+    webUnfiltered = [];
+    wdUnfiltered = [];
+    mbTrackRaw = [];
+    mbArtistRaw = [];
+  }
   const elapsed = Date.now() - t0;
   if (elapsed > FACT_FETCH_BUDGET_MS) {
     console.warn(

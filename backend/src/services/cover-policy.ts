@@ -85,11 +85,8 @@ export function assessCoverSituation(
 
   if (explicit) return { action: 'proceed' };
 
-  if (
-    selectedFact &&
-    selectedFact.interestScore >= 7 &&
-    factMentionsArtist(seed, artist)
-  ) {
+  // Good seed from rules/bank — never block the story with cover heuristics.
+  if (selectedFact && selectedFact.interestScore >= 7) {
     return { action: 'proceed' };
   }
 
@@ -110,6 +107,12 @@ export function assessCoverSituation(
       );
       return { action: 'pivot_artist', artistFact: pivot, referenceFacts: [pivot.fact] };
     }
+    if (selectedFact && selectedFact.interestScore >= 4) {
+      console.log(
+        `[cover] proceed with seed despite conflict "${artist}" — "${title}" score=${selectedFact.interestScore}`,
+      );
+      return { action: 'proceed' };
+    }
     return { action: 'hold', reason: 'cover_ambiguous' };
   }
 
@@ -125,6 +128,10 @@ export function assessCoverSituation(
           `[cover] pivot artist-only "${artist}" — all track facts foreign, no cover marker`,
         );
         return { action: 'pivot_artist', artistFact: pivot, referenceFacts: [pivot.fact] };
+      }
+      if (selectedFact) {
+        console.log(`[cover] proceed with selected seed "${artist}" — foreign track pool only`);
+        return { action: 'proceed' };
       }
       return { action: 'hold', reason: 'cover_ambiguous' };
     }

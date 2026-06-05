@@ -24,5 +24,8 @@ export function buildMusicFirstWikiCandidates(primary: string): string[] {
     `${primary} (musical group)`,
     primary,
   ];
-  return short ? base : [primary, ...base.filter((t) => t !== primary)];
+  const withGerman = /\b(lino|boi|kid|mc)\b/i.test(primary)
+    ? [`${primary} German rapper`, `${primary} deutsch`, ...base]
+    : base;
+  return short ? withGerman : [primary, ...withGerman.filter((t) => t !== primary)];
 }
