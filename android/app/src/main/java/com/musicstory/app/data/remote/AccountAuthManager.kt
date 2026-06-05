@@ -12,6 +12,8 @@ import java.util.concurrent.TimeUnit
 class AccountAuthManager(
     private val authManager: BackendAuthManager,
 ) {
+    private fun parseOptionalString(json: JSONObject, key: String): String? =
+        json.optString(key).trim().takeUnless { it.isBlank() || it.equals("null", ignoreCase = true) }
     private val http = OkHttpClient.Builder()
         .connectTimeout(12, TimeUnit.SECONDS)
         .readTimeout(25, TimeUnit.SECONDS)
@@ -29,11 +31,11 @@ class AccountAuthManager(
                 if (!resp.isSuccessful) return@withContext null
                 val json = JSONObject(resp.body?.string().orEmpty())
                 AccountProfile(
-                    accountId = json.optString("accountId").ifBlank { null },
-                    email = json.optString("email").ifBlank { null },
+                    accountId = parseOptionalString(json, "accountId"),
+                    email = parseOptionalString(json, "email"),
                     telegramId = json.optLong("telegramId").takeIf { it > 0L },
-                    telegramUsername = json.optString("telegramUsername").ifBlank { null },
-                    plan = json.optString("plan").ifBlank { null },
+                    telegramUsername = parseOptionalString(json, "telegramUsername"),
+                    plan = parseOptionalString(json, "plan"),
                     trialUntil = json.optLong("trialUntil").takeIf { it > 0L },
                     premiumUntil = json.optLong("premiumUntil").takeIf { it > 0L },
                 )
@@ -78,11 +80,11 @@ class AccountAuthManager(
                     val json = JSONObject(resp.body?.string().orEmpty())
                     val profile = json.optJSONObject("profile") ?: json
                     AccountProfile(
-                        accountId = profile.optString("accountId").ifBlank { null },
-                        email = profile.optString("email").ifBlank { null },
+                        accountId = parseOptionalString(profile, "accountId"),
+                        email = parseOptionalString(profile, "email"),
                         telegramId = profile.optLong("telegramId").takeIf { it > 0L },
-                        telegramUsername = profile.optString("telegramUsername").ifBlank { null },
-                        plan = profile.optString("plan").ifBlank { null },
+                        telegramUsername = parseOptionalString(profile, "telegramUsername"),
+                        plan = parseOptionalString(profile, "plan"),
                         trialUntil = profile.optLong("trialUntil").takeIf { it > 0L },
                         premiumUntil = profile.optLong("premiumUntil").takeIf { it > 0L },
                     )

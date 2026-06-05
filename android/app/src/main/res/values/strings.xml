@@ -94,6 +94,9 @@
     <string name="hint_api_key_missing_banner">Свой API-ключ не указан — истории идут через сервер (лимит free/trial). Ключ в Настройки → AI снимает лимит.</string>
     <string name="settings_premium_locked_hint">Доступно по подписке (или укажи свой API-ключ для ручного режима)</string>
     <string name="settings_free_model_section">Бесплатная модель на сервере (лимиты не суммируются)</string>
+    <string name="settings_ai_advanced_section">Продвинутые (свой API-ключ)</string>
+    <string name="settings_server_llm_premium">Модель сервера: %1$s</string>
+    <string name="settings_server_llm_premium_hint">На подписке сервер всегда использует одну модель — без выбора Nemotron/Gemma.</string>
     <string name="label_source">Источник: %1$s</string>
     <string name="label_orchestrator">Режим работы</string>
     <string name="label_tracks_until_story">До следующей истории: %1$d трек(ов)</string>
@@ -212,6 +215,12 @@
     <string name="settings_auth_linked">Аккаунт активен</string>
     <string name="settings_auth_trial_until">Пробный Premium до %1$s</string>
     <string name="settings_auth_premium">Premium активен</string>
+    <string name="settings_auth_not_linked">Войди по email — 7 дней Premium и синхронизация истории.</string>
+    <string name="settings_auth_open_login">Войти</string>
+    <string name="account_login_title">Вход в аккаунт</string>
+    <string name="account_login_subtitle">Код придёт на почту. Новый аккаунт — пробный Premium 7 дней.</string>
+    <string name="account_login_skip">Продолжить без входа</string>
+    <string name="account_login_trial_hint">Без входа доступен бесплатный тариф с базовыми настройками.</string>
     <string name="feedback_title">Как история?</string>
     <string name="feedback_like">👍</string>
     <string name="feedback_dislike">👎</string>

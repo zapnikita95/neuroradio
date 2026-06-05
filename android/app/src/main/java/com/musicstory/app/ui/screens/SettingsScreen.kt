@@ -111,6 +111,7 @@ import java.util.Locale
 @Composable
 fun SettingsScreen(
     onBack: () -> Unit,
+    onOpenAccountLogin: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
@@ -181,12 +182,13 @@ fun SettingsScreen(
     suspend fun centerTourSection(coords: LayoutCoordinates) {
         val rect = coords.boundsInRoot()
         val safeTop = with(density) { 76.dp.toPx() }
-        val safeBottom = screenHeightPx - with(density) { 220.dp.toPx() }
+        val safeBottom = screenHeightPx - with(density) { 300.dp.toPx() }
         val targetCenter = (safeTop + safeBottom) / 2f
         val delta = rect.center.y - targetCenter
         if (abs(delta) > 2f) {
             scrollState.animateScrollBy(delta)
             delay(320)
+            tourSectionCoords?.let { updateTourBounds(it) }
         }
     }
 
@@ -286,6 +288,9 @@ fun SettingsScreen(
         LlmProvider.OPENROUTER -> openRouterInput
         LlmProvider.LOCAL -> localUrlInput
     }
+    val effectiveTier = devTierLabel ?: dailyQuota?.tier
+    val hasPersonalKey = activeApiKey.isNotBlank()
+    val canCustomizeEveryN = TierAccess.canCustomizeEveryNTracks(effectiveTier)
 
     val hasPendingChanges = remember(
         groqInput,
@@ -312,6 +317,7 @@ fun SettingsScreen(
         countTrackListenEnabled,
         listenSecondsInput,
         countTrackListenSeconds,
+        canCustomizeEveryN,
     ) {
         ApiKeySanitizer.clean(groqInput) != ApiKeySanitizer.clean(groqApiKey) ||
             ApiKeySanitizer.clean(geminiInput) != ApiKeySanitizer.clean(geminiApiKey) ||
@@ -324,7 +330,7 @@ fun SettingsScreen(
             musicFadeInput.toFloatOrNull()?.coerceIn(0.5f, 8f) != musicFadeSeconds ||
             countListenEnabledUi != countTrackListenEnabled ||
             listenSecondsInput.toIntOrNull()?.coerceIn(5, 300) != countTrackListenSeconds ||
-            (triggerMode == TriggerMode.EVERY_N_TRACKS && nInput.toIntOrNull() != everyN)
+            (triggerMode == TriggerMode.EVERY_N_TRACKS && canCustomizeEveryN && nInput.toIntOrNull() != everyN)
     }
 
     LaunchedEffect(activeApiInput, llmProvider) {
@@ -346,12 +352,13 @@ fun SettingsScreen(
         }
     }
 
-    val effectiveTier = devTierLabel ?: dailyQuota?.tier
-    val hasPersonalKey = activeApiKey.isNotBlank()
     val canManualMode = TierAccess.canUseManualMode(hasPersonalKey, effectiveTier)
     val canAdvancedTriggers = TierAccess.canUseAdvancedTriggers(effectiveTier)
     val canCustomizeFade = TierAccess.canCustomizeMusicFadeSeconds(effectiveTier)
     val canCustomizeListen = TierAccess.canCustomizeListenThresholdSeconds(effectiveTier)
+    val canAdvancedLlm = TierAccess.canUseAdvancedLlmSettings(hasPersonalKey)
+    val isPaidServerTier = TierAccess.isPremiumLike(effectiveTier) && !hasPersonalKey
+    val isFreeServerTier = TierAccess.isFreeServerTier(effectiveTier) && !hasPersonalKey
 
     LaunchedEffect(canManualMode, manualMode) {
         if (!canManualMode && manualMode) settings.setManualMode(false)
@@ -429,7 +436,10 @@ fun SettingsScreen(
                     title = context.getString(R.string.settings_auth_section),
                     summary = context.getString(R.string.settings_auth_summary),
                 ) {
-                    AccountAuthSection(app = app, scope = scope)
+                    AccountStatusSection(
+                        app = app,
+                        onOpenLogin = onOpenAccountLogin,
+                    )
                 }
 
                 CollapsibleSettingsSection(
@@ -448,7 +458,7 @@ fun SettingsScreen(
                     onTourLayout = tourLayoutHandler(1),
                 ) {
                     TriggerMode.entries.forEach { mode ->
-                        val modeEnabled = canAdvancedTriggers || mode == TriggerMode.EVERY_N_TRACKS
+                        val modeEnabled = canAdvancedTriggers
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -471,18 +481,34 @@ fun SettingsScreen(
                             )
                         }
                     }
+                    if (!canAdvancedTriggers) {
+                        Text(
+                            text = context.getString(R.string.settings_premium_locked_hint),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MutedLavender,
+                            modifier = Modifier.padding(top = 4.dp),
+                        )
+                    }
                     if (triggerMode == TriggerMode.EVERY_N_TRACKS) {
                         Spacer(modifier = Modifier.height(8.dp))
-                        OutlinedTextField(
-                            value = nInput,
-                            onValueChange = { nInput = it.filter { ch -> ch.isDigit() }.take(3) },
-                            label = { Text(context.getString(R.string.settings_every_n_tracks)) },
-                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                            modifier = Modifier.fillMaxWidth(),
-                            singleLine = true,
-                            colors = fieldColors,
-                            shape = RoundedCornerShape(14.dp),
-                        )
+                        if (canCustomizeEveryN) {
+                            OutlinedTextField(
+                                value = nInput,
+                                onValueChange = { nInput = it.filter { ch -> ch.isDigit() }.take(3) },
+                                label = { Text(context.getString(R.string.settings_every_n_tracks)) },
+                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                                modifier = Modifier.fillMaxWidth(),
+                                singleLine = true,
+                                colors = fieldColors,
+                                shape = RoundedCornerShape(14.dp),
+                            )
+                        } else {
+                            Text(
+                                text = context.getString(R.string.settings_every_n_tracks) + ": $everyN",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MutedLavender,
+                            )
+                        }
                         Spacer(modifier = Modifier.height(12.dp))
                         Row(
                             modifier = Modifier.fillMaxWidth(),
@@ -746,16 +772,23 @@ fun SettingsScreen(
                     }
                 }
 
-                val aiSummary = if (activeApiKey.isNotBlank()) {
-                    when (llmProvider) {
+                val aiSummary = when {
+                    canAdvancedLlm -> when (llmProvider) {
                         LlmProvider.GEMINI -> "${llmProvider.labelRu}: ${geminiModel.settingsLabelRu}"
                         LlmProvider.GROQ -> "${llmProvider.labelRu}: ${groqModel.settingsLabelRu}"
                         LlmProvider.OPENROUTER -> "${llmProvider.labelRu}: ${openRouterModel.settingsLabelRu}"
                         LlmProvider.LOCAL -> "${llmProvider.labelRu}: $localOllamaModel"
                     }
-                } else {
-                    dailyQuota?.let { quota -> formatServerQuotaLabel(context, quota) }
-                        ?: context.getString(R.string.settings_groq_status_missing)
+                    isPaidServerTier -> context.getString(
+                        R.string.settings_server_llm_premium,
+                        OpenRouterModel.DEEPSEEK_V3.labelRu,
+                    )
+                    isFreeServerTier -> {
+                        val quotaLabel = dailyQuota?.let { formatServerQuotaLabel(context, it) }.orEmpty()
+                        if (quotaLabel.isNotBlank()) "${openRouterModel.labelRu} · $quotaLabel" else openRouterModel.labelRu
+                    }
+                    dailyQuota != null -> formatServerQuotaLabel(context, dailyQuota!!)
+                    else -> context.getString(R.string.settings_groq_status_missing)
                 }
 
                 CollapsibleSettingsSection(
@@ -772,6 +805,48 @@ fun SettingsScreen(
                     var groqModelMenuExpanded by remember { mutableStateOf(false) }
                     var openRouterModelMenuExpanded by remember { mutableStateOf(false) }
 
+                    if (isPaidServerTier) {
+                        Text(
+                            text = context.getString(
+                                R.string.settings_server_llm_premium,
+                                OpenRouterModel.DEEPSEEK_V3.labelRu,
+                            ),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = CreamText,
+                        )
+                        Text(
+                            text = context.getString(R.string.settings_server_llm_premium_hint),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MutedLavender,
+                            modifier = Modifier.padding(top = 4.dp, bottom = 8.dp),
+                        )
+                    }
+
+                    if (isFreeServerTier) {
+                        Text(
+                            text = context.getString(R.string.settings_free_model_section),
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MutedLavender,
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        OpenRouterModel.freeServerPresets.forEach { model ->
+                            NarratorRadioRow(
+                                label = model.labelRu,
+                                description = model.descriptionRu,
+                                selected = openRouterModel == model,
+                                onSelect = { scope.launch { settings.setOpenRouterModel(model) } },
+                            )
+                        }
+                        Spacer(modifier = Modifier.height(8.dp))
+                    }
+
+                    if (canAdvancedLlm) {
+                    Text(
+                        text = context.getString(R.string.settings_ai_advanced_section),
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MutedLavender,
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
                     Text(
                         text = context.getString(R.string.settings_llm_provider_hint),
                         style = MaterialTheme.typography.bodySmall,
@@ -833,22 +908,6 @@ fun SettingsScreen(
                     )
                     if (llmProvider == LlmProvider.OPENROUTER) {
                         Spacer(modifier = Modifier.height(12.dp))
-                        if (!hasPersonalKey && !canAdvancedTriggers) {
-                            Text(
-                                text = context.getString(R.string.settings_free_model_section),
-                                style = MaterialTheme.typography.labelMedium,
-                                color = MutedLavender,
-                            )
-                            Spacer(modifier = Modifier.height(8.dp))
-                            OpenRouterModel.freeServerPresets.forEach { model ->
-                                NarratorRadioRow(
-                                    label = model.labelRu,
-                                    description = model.descriptionRu,
-                                    selected = openRouterModel == model,
-                                    onSelect = { scope.launch { settings.setOpenRouterModel(model) } },
-                                )
-                            }
-                        } else {
                         Text(
                             text = context.getString(R.string.settings_openrouter_model_hint),
                             style = MaterialTheme.typography.bodySmall,
@@ -908,7 +967,6 @@ fun SettingsScreen(
                                 colors = fieldColors,
                                 shape = RoundedCornerShape(14.dp),
                             )
-                        }
                         }
                     }
                     if (llmProvider == LlmProvider.GROQ) {
@@ -1322,6 +1380,18 @@ fun SettingsScreen(
                         },
                     )
                     }
+                    } // canAdvancedLlm
+
+                    if (!canAdvancedLlm) {
+                        dailyQuota?.let { quota ->
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Text(
+                                text = formatServerQuotaLabel(context, quota),
+                                style = MaterialTheme.typography.labelMedium,
+                                color = GoldBright,
+                            )
+                        }
+                    }
                 }
 
                 if (backendUrl.trim().isNotBlank()) {
@@ -1394,7 +1464,7 @@ fun SettingsScreen(
                             isSaving = true
                             saveFeedback = null
                             try {
-                                nInput.toIntOrNull()?.let { settings.setEveryNTracks(it) }
+                                nInput.toIntOrNull()?.takeIf { canCustomizeEveryN }?.let { settings.setEveryNTracks(it) }
                                 sameTrackInput.toIntOrNull()?.let { settings.setSameTrackStoryEveryN(it) }
                                 settings.setCountTrackAfterListenEnabled(countListenEnabledUi)
                                 val listenSec = if (countListenEnabledUi) {

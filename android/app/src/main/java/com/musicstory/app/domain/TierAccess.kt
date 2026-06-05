@@ -12,11 +12,21 @@ object TierAccess {
     fun canUseManualMode(hasPersonalApiKey: Boolean, tier: String?): Boolean =
         hasPersonalApiKey || isPremiumLike(tier)
 
-    /** Жанры, артисты, повтор того же трека — только premium/trial. */
+    /** Частота (N треков), жанры, артисты, always/never — только premium/trial. */
     fun canUseAdvancedTriggers(tier: String?): Boolean = isPremiumLike(tier)
+
+    /** На free фиксированные «каждые N треков» без редактирования. */
+    fun canCustomizeEveryNTracks(tier: String?): Boolean = isPremiumLike(tier)
 
     /** Плавное затемнение — всегда доступно; длительность настраивает premium. */
     fun canCustomizeMusicFadeSeconds(tier: String?): Boolean = isPremiumLike(tier)
+
+    /** Бесплатный тариф без своего ключа — можно выбрать free-модель на сервере. */
+    fun isFreeServerTier(tier: String?): Boolean =
+        !isPremiumLike(tier)
+
+    /** Свой API-ключ — полный выбор провайдера и моделей. */
+    fun canUseAdvancedLlmSettings(hasPersonalApiKey: Boolean): Boolean = hasPersonalApiKey
 
     /** Свой порог «трек прослушан» (секунды) — premium. */
     fun canCustomizeListenThresholdSeconds(tier: String?): Boolean = isPremiumLike(tier)

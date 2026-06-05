@@ -14,8 +14,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
-import androidx.navigation.compose.rememberNavController
-import com.musicstory.app.ui.navigation.MusicStoryNavGraph
+import com.musicstory.app.ui.navigation.MusicStoryStartupGate
 import com.musicstory.app.ui.navigation.Routes
 import com.musicstory.app.ui.theme.MusicStoryTheme
 
@@ -35,8 +34,6 @@ class MainActivity : ComponentActivity() {
                     mutableStateOf(app.mediaControllerManager.hasNotificationAccess())
                 }
 
-                val startDestination = if (hasNotificationAccess) Routes.HOME else Routes.ONBOARDING
-                val navController = rememberNavController()
                 val lifecycleOwner = LocalLifecycleOwner.current
 
                 DisposableEffect(lifecycleOwner) {
@@ -44,20 +41,12 @@ class MainActivity : ComponentActivity() {
                         if (event != Lifecycle.Event.ON_RESUME) return@LifecycleEventObserver
                         val granted = app.mediaControllerManager.hasNotificationAccess()
                         hasNotificationAccess = granted
-                        if (!granted) {
-                            navController.navigate(Routes.ONBOARDING) {
-                                popUpTo(navController.graph.startDestinationId) { inclusive = true }
-                                launchSingleTop = true
-                            }
-                        }
                     }
                     lifecycleOwner.lifecycle.addObserver(observer)
                     onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
                 }
 
-                MusicStoryNavGraph(
-                    navController = navController,
-                    startDestination = startDestination,
+                MusicStoryStartupGate(
                     hasNotificationAccess = hasNotificationAccess,
                     onNotificationAccessChanged = {
                         hasNotificationAccess = app.mediaControllerManager.hasNotificationAccess()

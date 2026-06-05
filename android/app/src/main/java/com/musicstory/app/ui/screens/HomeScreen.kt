@@ -9,6 +9,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.gestures.animateScrollBy
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -48,7 +49,9 @@ import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -77,7 +80,9 @@ import com.musicstory.app.ui.theme.LiveGreen
 import com.musicstory.app.ui.theme.MutedLavender
 import com.musicstory.app.ui.tour.SettingsTourSpotlightOverlay
 import com.musicstory.app.ui.tour.SettingsTourStep
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlin.math.abs
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -109,6 +114,8 @@ fun HomeScreen(
     var tourBoundsByStep by remember { mutableStateOf<Map<Int, Rect>>(emptyMap()) }
     var tourOverlayReady by remember { mutableStateOf(false) }
     val homeScrollState = rememberScrollState()
+    val density = LocalDensity.current
+    val screenHeightPx = with(density) { LocalConfiguration.current.screenHeightDp.dp.toPx() }
 
     val tourSteps = remember(context) {
         listOf(
@@ -143,19 +150,30 @@ fun HomeScreen(
         if (homeTourPending) tourStep = 0
     }
 
-    fun recordTourBounds(stepIndex: Int, coords: LayoutCoordinates) {
-        tourBoundsByStep = tourBoundsByStep + (stepIndex to coords.boundsInRoot())
+    fun recordTourBounds(stepIndex: Int, coords: LayoutCoordinates, padDp: androidx.compose.ui.unit.Dp = 0.dp) {
+        val bounds = coords.boundsInRoot()
+        val pad = with(density) { padDp.toPx() }
+        tourBoundsByStep = tourBoundsByStep + (
+            stepIndex to Rect(
+                left = bounds.left - pad,
+                top = bounds.top - pad,
+                right = bounds.right + pad,
+                bottom = bounds.bottom + pad,
+            )
+            )
     }
 
-    LaunchedEffect(tourStep) {
-        tourOverlayReady = false
-        val step = tourStep ?: return@LaunchedEffect
-        if (step == 0) {
-            tourOverlayReady = true
-            return@LaunchedEffect
+    suspend fun centerHomeTourStep(step: Int) {
+        if (step !in setOf(1, 2)) return
+        val bounds = tourBoundsByStep[step] ?: return
+        val safeTop = with(density) { 92.dp.toPx() }
+        val safeBottom = screenHeightPx - with(density) { 280.dp.toPx() }
+        val targetCenter = (safeTop + safeBottom) / 2f
+        val delta = bounds.center.y - targetCenter
+        if (abs(delta) > 2f) {
+            homeScrollState.animateScrollBy(delta)
+            delay(280)
         }
-        kotlinx.coroutines.delay(220)
-        tourOverlayReady = true
     }
 
     val tourActive = tourStep != null
@@ -175,6 +193,32 @@ fun HomeScreen(
         hasPersonalApiKey = hasOwnProviderKey,
         tier = dailyQuota?.tier,
     )
+
+    LaunchedEffect(tourStep, showManualStoryButton) {
+        tourOverlayReady = false
+        val step = tourStep ?: return@LaunchedEffect
+        if (step == 0) {
+            tourOverlayReady = true
+            return@LaunchedEffect
+        }
+        if (step == 3 && !showManualStoryButton) {
+            tourStep = 4
+            return@LaunchedEffect
+        }
+        delay(180)
+        repeat(12) { attempt ->
+            val bounds = tourBoundsByStep[step]
+            if (bounds != null && bounds.height >= 4f) {
+                if (step in setOf(1, 2) && attempt == 0) {
+                    centerHomeTourStep(step)
+                }
+                tourOverlayReady = true
+                return@LaunchedEffect
+            }
+            delay(if (attempt == 0) 60L else 90L)
+        }
+        tourOverlayReady = true
+    }
 
     DisposableEffect(Unit) {
         onDispose {
@@ -334,9 +378,11 @@ fun HomeScreen(
                             uiState.state == OrchestratorState.PLAYING_STORY -> null
                         else -> uiState.tracksUntilNext
                     },
-                    modifier = Modifier.onGloballyPositioned { coords ->
-                        recordTourBounds(2, coords)
-                    },
+                    modifier = Modifier
+                        .padding(horizontal = 12.dp, vertical = 8.dp)
+                        .onGloballyPositioned { coords ->
+                            recordTourBounds(2, coords, padDp = 6.dp)
+                        },
                 )
 
                 if (uiState.isBackendFetching) {
@@ -408,10 +454,7 @@ fun HomeScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 20.dp)
-                    .padding(bottom = 28.dp)
-                    .onGloballyPositioned { coords ->
-                        recordTourBounds(3, coords)
-                    },
+                    .padding(bottom = 28.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
                 if (!hasAccess) {
@@ -429,6 +472,9 @@ fun HomeScreen(
                             powerMode != AppPowerMode.OFF &&
                             uiState.canRequestManualStory &&
                             !uiState.isBackendFetching,
+                        modifier = Modifier.onGloballyPositioned { coords ->
+                            recordTourBounds(3, coords, padDp = 8.dp)
+                        },
                     )
                 }
 

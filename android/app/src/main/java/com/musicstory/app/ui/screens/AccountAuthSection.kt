@@ -22,6 +22,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.musicstory.app.MusicStoryApp
 import com.musicstory.app.R
+import com.musicstory.app.data.remote.AccountAuthManager
 import com.musicstory.app.ui.components.PrimaryStoryButton
 import com.musicstory.app.ui.components.SecondaryStoryButton
 import com.musicstory.app.ui.theme.CreamText
@@ -38,14 +39,66 @@ import java.util.Date
 import java.util.Locale
 
 @Composable
-fun AccountAuthSection(app: MusicStoryApp, scope: CoroutineScope) {
+fun AccountStatusSection(
+    app: MusicStoryApp,
+    onOpenLogin: () -> Unit,
+) {
+    val context = LocalContext.current
+    var profile by remember { mutableStateOf<AccountAuthManager.AccountProfile?>(null) }
+
+    LaunchedEffect(Unit) {
+        val url = app.settingsDataStore.backendUrl.first()
+        if (url.isNotBlank()) {
+            profile = app.accountAuthManager.fetchProfile(url)
+        }
+    }
+
+    Column {
+        profile?.takeIf { it.isLoggedIn }?.let { p ->
+            val status = accountStatusText(context, p)
+            Text(
+                text = status,
+                style = MaterialTheme.typography.labelMedium,
+                color = LiveGreen,
+            )
+            p.email?.let { email ->
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = email,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = CreamText,
+                )
+            }
+        } ?: run {
+            Text(
+                text = context.getString(R.string.settings_auth_not_linked),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MutedLavender,
+            )
+            Spacer(modifier = Modifier.height(12.dp))
+            PrimaryStoryButton(
+                text = context.getString(R.string.settings_auth_open_login),
+                onClick = onOpenLogin,
+            )
+        }
+    }
+}
+
+@Composable
+fun AccountEmailLoginContent(
+    app: MusicStoryApp,
+    scope: CoroutineScope,
+    showSkip: Boolean,
+    onSkip: () -> Unit,
+    onLoggedIn: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
     val context = LocalContext.current
     var email by remember { mutableStateOf("") }
     var code by remember { mutableStateOf("") }
     var codeSent by remember { mutableStateOf(false) }
     var message by remember { mutableStateOf<String?>(null) }
     var busy by remember { mutableStateOf(false) }
-    var profile by remember { mutableStateOf<com.musicstory.app.data.remote.AccountAuthManager.AccountProfile?>(null) }
 
     val fieldColors = OutlinedTextFieldDefaults.colors(
         focusedBorderColor = GoldBright,
@@ -56,120 +109,89 @@ fun AccountAuthSection(app: MusicStoryApp, scope: CoroutineScope) {
         unfocusedTextColor = CreamText,
     )
 
-    LaunchedEffect(Unit) {
-        val url = app.settingsDataStore.backendUrl.first()
-        profile = app.accountAuthManager.fetchProfile(url)
-        profile?.email?.let { email = it }
-    }
-
-    Column {
+    Column(modifier = modifier) {
         Text(
-            text = context.getString(R.string.settings_auth_hint),
-            style = MaterialTheme.typography.bodySmall,
+            text = context.getString(R.string.account_login_subtitle),
+            style = MaterialTheme.typography.bodyLarge,
             color = MutedLavender,
         )
-        profile?.let { p ->
-            if (p.isLoggedIn) {
-                Spacer(modifier = Modifier.height(8.dp))
-                val status = when {
-                    p.plan == "premium" && (p.premiumUntil ?: 0L) > System.currentTimeMillis() ->
-                        context.getString(R.string.settings_auth_premium)
-                    p.plan == "trial" && (p.trialUntil ?: 0L) > System.currentTimeMillis() -> {
-                        val until = SimpleDateFormat("d MMM", Locale("ru")).format(Date(p.trialUntil!!))
-                        context.getString(R.string.settings_auth_trial_until, until)
-                    }
-                    else -> context.getString(R.string.settings_auth_linked)
-                }
-                Text(
-                    text = status,
-                    style = MaterialTheme.typography.labelMedium,
-                    color = LiveGreen,
-                )
-                p.email?.let {
-                    Text(
-                        text = it,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MutedLavender,
-                    )
-                }
-                Spacer(modifier = Modifier.height(12.dp))
-            }
-        }
+        Spacer(modifier = Modifier.height(16.dp))
 
-        if (profile?.isLoggedIn != true) {
+        OutlinedTextField(
+            value = email,
+            onValueChange = { email = it.trim() },
+            label = { Text(context.getString(R.string.settings_auth_email)) },
+            modifier = Modifier.fillMaxWidth(),
+            singleLine = true,
+            enabled = !codeSent && !busy,
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
+            colors = fieldColors,
+            shape = RoundedCornerShape(14.dp),
+        )
+        Spacer(modifier = Modifier.height(8.dp))
+
+        if (!codeSent) {
+            PrimaryStoryButton(
+                text = context.getString(R.string.settings_auth_send_code),
+                onClick = {
+                    if (busy || email.isBlank()) return@PrimaryStoryButton
+                    scope.launch {
+                        busy = true
+                        message = null
+                        val url = app.settingsDataStore.backendUrl.first()
+                        val err = app.accountAuthManager.startEmailLogin(url, email)
+                        if (err == null) {
+                            codeSent = true
+                            message = context.getString(R.string.settings_auth_code_sent)
+                        } else {
+                            message = err
+                        }
+                        busy = false
+                    }
+                },
+            )
+        } else {
             OutlinedTextField(
-                value = email,
-                onValueChange = { email = it.trim() },
-                label = { Text(context.getString(R.string.settings_auth_email)) },
+                value = code,
+                onValueChange = { code = it.filter { ch -> ch.isDigit() }.take(6) },
+                label = { Text(context.getString(R.string.settings_auth_code)) },
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true,
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
+                enabled = !busy,
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                 colors = fieldColors,
                 shape = RoundedCornerShape(14.dp),
             )
             Spacer(modifier = Modifier.height(8.dp))
-            if (!codeSent) {
-                PrimaryStoryButton(
-                    text = context.getString(R.string.settings_auth_send_code),
-                    onClick = {
-                        if (busy || email.isBlank()) return@PrimaryStoryButton
-                        scope.launch {
-                            busy = true
-                            message = null
-                            val url = app.settingsDataStore.backendUrl.first()
-                            val err = app.accountAuthManager.startEmailLogin(url, email)
-                            if (err == null) {
-                                codeSent = true
-                                message = context.getString(R.string.settings_auth_code_sent)
-                            } else {
-                                message = err
-                            }
-                            busy = false
+            PrimaryStoryButton(
+                text = context.getString(R.string.settings_auth_verify),
+                onClick = {
+                    if (busy || code.length < 4) return@PrimaryStoryButton
+                    scope.launch {
+                        busy = true
+                        message = null
+                        val url = app.settingsDataStore.backendUrl.first()
+                        val p = app.accountAuthManager.verifyEmailLogin(url, email, code)
+                        if (p != null) {
+                            app.settingsDataStore.setAccountLinked(true)
+                            message = context.getString(R.string.settings_auth_success)
+                            onLoggedIn()
+                        } else {
+                            message = context.getString(R.string.settings_auth_verify_failed)
                         }
-                    },
-                )
-            } else {
-                OutlinedTextField(
-                    value = code,
-                    onValueChange = { code = it.filter { ch -> ch.isDigit() }.take(6) },
-                    label = { Text(context.getString(R.string.settings_auth_code)) },
-                    modifier = Modifier.fillMaxWidth(),
-                    singleLine = true,
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                    colors = fieldColors,
-                    shape = RoundedCornerShape(14.dp),
-                )
-                Spacer(modifier = Modifier.height(8.dp))
-                PrimaryStoryButton(
-                    text = context.getString(R.string.settings_auth_verify),
-                    onClick = {
-                        if (busy || code.length < 4) return@PrimaryStoryButton
-                        scope.launch {
-                            busy = true
-                            message = null
-                            val url = app.settingsDataStore.backendUrl.first()
-                            val p = app.accountAuthManager.verifyEmailLogin(url, email, code)
-                            if (p != null) {
-                                profile = p
-                                app.settingsDataStore.setAccountLinked(true)
-                                message = context.getString(R.string.settings_auth_success)
-                            } else {
-                                message = context.getString(R.string.settings_auth_verify_failed)
-                            }
-                            busy = false
-                        }
-                    },
-                )
-                Spacer(modifier = Modifier.height(8.dp))
-                SecondaryStoryButton(
-                    text = context.getString(R.string.settings_auth_resend),
-                    onClick = { codeSent = false; code = "" },
-                )
-            }
+                        busy = false
+                    }
+                },
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            SecondaryStoryButton(
+                text = context.getString(R.string.settings_auth_resend),
+                onClick = { codeSent = false; code = "" },
+            )
         }
 
         message?.let {
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(12.dp))
             Text(
                 text = it,
                 style = MaterialTheme.typography.labelMedium,
@@ -182,5 +204,28 @@ fun AccountAuthSection(app: MusicStoryApp, scope: CoroutineScope) {
                 },
             )
         }
+
+        if (showSkip) {
+            Spacer(modifier = Modifier.height(16.dp))
+            SecondaryStoryButton(
+                text = context.getString(R.string.account_login_skip),
+                onClick = onSkip,
+            )
+        }
+    }
+}
+
+private fun accountStatusText(
+    context: android.content.Context,
+    profile: AccountAuthManager.AccountProfile,
+): String {
+    return when {
+        profile.plan == "premium" && (profile.premiumUntil ?: 0L) > System.currentTimeMillis() ->
+            context.getString(R.string.settings_auth_premium)
+        profile.plan == "trial" && (profile.trialUntil ?: 0L) > System.currentTimeMillis() -> {
+            val until = SimpleDateFormat("d MMM", Locale("ru")).format(Date(profile.trialUntil!!))
+            context.getString(R.string.settings_auth_trial_until, until)
+        }
+        else -> context.getString(R.string.settings_auth_linked)
     }
 }

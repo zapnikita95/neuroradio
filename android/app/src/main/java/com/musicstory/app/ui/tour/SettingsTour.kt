@@ -131,36 +131,68 @@ fun SettingsTourSpotlightOverlay(
 
     val screenHeightPx = with(density) { LocalConfiguration.current.screenHeightDp.dp.toPx() }
     val edgeMarginPx = with(density) { 16.dp.toPx() }
-    val tooltipGapPx = with(density) { 10.dp.toPx() }
+    val tooltipGapPx = with(density) { 12.dp.toPx() }
+    val highlightPadPx = with(density) { 10.dp.toPx() }
     val fallbackTooltipHeightPx = with(density) { 178.dp.toPx() }
     var tooltipHeightPx by remember(stepIndex) { mutableFloatStateOf(0f) }
     val measuredTooltipHeightPx = tooltipHeightPx.takeIf { it > 0f } ?: fallbackTooltipHeightPx
 
+    val paddedHighlight = highlightRect?.let { rect ->
+        Rect(
+            left = (rect.left - highlightPadPx).coerceAtLeast(0f),
+            top = (rect.top - highlightPadPx).coerceAtLeast(0f),
+            right = rect.right + highlightPadPx,
+            bottom = rect.bottom + highlightPadPx,
+        )
+    }
+
+    fun overlapsHighlight(tooltipTop: Float): Boolean {
+        val rect = paddedHighlight ?: return false
+        val tooltipBottom = tooltipTop + measuredTooltipHeightPx
+        return tooltipBottom + tooltipGapPx > rect.top && tooltipTop < rect.bottom + tooltipGapPx
+    }
+
     fun computeTooltipTop(): Float {
-        return if (centerTooltipWhenNoHighlight && highlightRect == null) {
-            ((screenHeightPx - measuredTooltipHeightPx) / 2f).coerceAtLeast(edgeMarginPx)
-        } else highlightRect?.let { rect ->
-            val roomBelow = screenHeightPx - rect.bottom - edgeMarginPx
-            val roomAbove = rect.top - edgeMarginPx
-            val preferBelow = roomBelow >= measuredTooltipHeightPx + tooltipGapPx || roomBelow >= roomAbove
-            val desiredTop = if (preferBelow) {
-                rect.bottom + tooltipGapPx
-            } else {
-                rect.top - measuredTooltipHeightPx - tooltipGapPx
+        if (centerTooltipWhenNoHighlight && paddedHighlight == null) {
+            return ((screenHeightPx - measuredTooltipHeightPx) / 2f).coerceAtLeast(edgeMarginPx)
+        }
+        val rect = paddedHighlight ?: return (screenHeightPx - measuredTooltipHeightPx - edgeMarginPx)
+        val belowTop = rect.bottom + tooltipGapPx
+        val aboveTop = rect.top - measuredTooltipHeightPx - tooltipGapPx
+        val belowFits = belowTop + measuredTooltipHeightPx <= screenHeightPx - edgeMarginPx
+        val aboveFits = aboveTop >= edgeMarginPx
+
+        val candidate = when {
+            belowFits && aboveFits -> {
+                val roomBelow = screenHeightPx - rect.bottom
+                val roomAbove = rect.top
+                if (roomBelow >= roomAbove) belowTop else aboveTop
             }
-            desiredTop.coerceIn(edgeMarginPx, screenHeightPx - measuredTooltipHeightPx - edgeMarginPx)
-        } ?: (screenHeightPx - measuredTooltipHeightPx - edgeMarginPx)
+            belowFits -> belowTop
+            aboveFits -> aboveTop
+            else -> (screenHeightPx - measuredTooltipHeightPx - edgeMarginPx).coerceAtLeast(edgeMarginPx)
+        }
+
+        val clamped = candidate.coerceIn(
+            edgeMarginPx,
+            (screenHeightPx - measuredTooltipHeightPx - edgeMarginPx).coerceAtLeast(edgeMarginPx),
+        )
+        return when {
+            overlapsHighlight(clamped) && aboveFits -> aboveTop.coerceAtLeast(edgeMarginPx)
+            overlapsHighlight(clamped) && belowFits -> belowTop.coerceAtMost(
+                screenHeightPx - measuredTooltipHeightPx - edgeMarginPx,
+            )
+            else -> clamped
+        }
     }
 
     var lockedTooltipTopPx by remember(stepIndex) { mutableStateOf<Float?>(null) }
-    LaunchedEffect(stepIndex, highlightRect, visible, measuredTooltipHeightPx) {
+    LaunchedEffect(stepIndex, paddedHighlight, visible, measuredTooltipHeightPx) {
         if (!visible) {
             lockedTooltipTopPx = null
             return@LaunchedEffect
         }
-        if (lockedTooltipTopPx == null && (highlightRect != null || centerTooltipWhenNoHighlight)) {
-            lockedTooltipTopPx = computeTooltipTop()
-        }
+        lockedTooltipTopPx = computeTooltipTop()
     }
     val tooltipTopPx = lockedTooltipTopPx ?: computeTooltipTop()
 
@@ -168,44 +200,25 @@ fun SettingsTourSpotlightOverlay(
 
     Box(modifier = modifier.fillMaxSize()) {
 
-        TourDimmingScrim(highlightRect = highlightRect)
+        TourDimmingScrim(highlightRect = paddedHighlight)
 
-
-
-        if (highlightRect != null) {
-
+        if (paddedHighlight != null) {
             val shape = RoundedCornerShape(16.dp)
-
             Box(
-
                 modifier = Modifier
-
                     .zIndex(1f)
-
                     .offset {
-
                         with(density) {
-
                             androidx.compose.ui.unit.IntOffset(
-
-                                highlightRect.left.roundToInt(),
-
-                                highlightRect.top.roundToInt(),
-
+                                paddedHighlight.left.roundToInt(),
+                                paddedHighlight.top.roundToInt(),
                             )
-
                         }
-
                     }
-
-                    .width(with(density) { highlightRect.width.toDp() })
-
-                    .height(with(density) { highlightRect.height.toDp() })
-
+                    .width(with(density) { paddedHighlight.width.toDp() })
+                    .height(with(density) { paddedHighlight.height.toDp() })
                     .border(2.5.dp, GoldBright, shape),
-
             )
-
         }
 
 
