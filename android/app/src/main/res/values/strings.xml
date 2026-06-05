@@ -235,6 +235,8 @@
     <string name="feedback_dislike_voice">Неестественный голос</string>
     <string name="feedback_dislike_manner">Манера речи</string>
     <string name="feedback_thanks">Спасибо!</string>
+    <string name="feedback_pick_reasons">Можно выбрать несколько</string>
+    <string name="feedback_send">Отправить</string>
     <string name="feedback_skip">Пропустить</string>
     <string name="feedback_close">Закрыть</string>
 

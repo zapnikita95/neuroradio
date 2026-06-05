@@ -42,6 +42,7 @@ data class StoryFeedbackRequest(
     val artist: String,
     val title: String,
     val vote: String,
-    val reason: String,
+    val reason: String? = null,
+    val reasons: List<String>? = null,
     val script: String? = null,
 )

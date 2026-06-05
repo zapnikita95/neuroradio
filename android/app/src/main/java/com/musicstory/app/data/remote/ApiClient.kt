@@ -248,35 +248,26 @@ class ApiClient(
         artist: String,
         title: String,
         vote: String,
-        reason: String,
+        reasons: List<String>,
         script: String?,
     ): Boolean {
+        if (reasons.isEmpty()) return false
+        val body = StoryFeedbackRequest(
+            artist = artist,
+            title = title,
+            vote = vote,
+            reason = reasons.first(),
+            reasons = reasons,
+            script = script,
+        )
         return try {
-            getApi(baseUrl).submitStoryFeedback(
-                StoryFeedbackRequest(
-                    artist = artist,
-                    title = title,
-                    vote = vote,
-                    reason = reason,
-                    script = script,
-                ),
-            )
+            getApi(baseUrl).submitStoryFeedback(body)
             true
         } catch (first: Exception) {
             val http = first as? retrofit2.HttpException
             if (http != null && http.code() != 401) return false
             authManager.invalidateToken()
-            runCatching {
-                getApi(baseUrl).submitStoryFeedback(
-                    StoryFeedbackRequest(
-                        artist = artist,
-                        title = title,
-                        vote = vote,
-                        reason = reason,
-                        script = script,
-                    ),
-                )
-            }.isSuccess
+            runCatching { getApi(baseUrl).submitStoryFeedback(body) }.isSuccess
         }
     }
 

@@ -334,6 +334,7 @@ class StoryOrchestrator(
         if (!track.isValid()) return
 
         _hintMessage.value = null
+        _pendingFeedback.value = null
 
         cancelStaleGenerationForNewTrack(track, reason = "track changed")
 
@@ -410,6 +411,7 @@ class StoryOrchestrator(
 
     private fun playStoryForTrack(requestedTrack: TrackInfo, manual: Boolean) {
         cancelInFlightGenerationImmediate("superseded")
+        _pendingFeedback.value = null
         generationInFlight = true
         _errorMessage.value = null
         _hintMessage.value = null
@@ -632,6 +634,12 @@ class StoryOrchestrator(
                             if (!isSessionCurrent(session)) return@playStory
                             lastStoryStartedAtMs = System.currentTimeMillis()
                             _state.value = OrchestratorState.PLAYING_STORY
+                            _pendingFeedback.value = PendingStoryFeedback(
+                                artist = response.artist,
+                                title = response.title,
+                                script = response.script,
+                                trackKey = requestedTrack.displayKey,
+                            )
                             publishUiState()
                         },
                         onFinished = {
@@ -643,12 +651,8 @@ class StoryOrchestrator(
                                 }
                             }
                             _errorMessage.value = null
+                            _pendingFeedback.value = null
                             _state.value = OrchestratorState.LISTENING
-                            _pendingFeedback.value = PendingStoryFeedback(
-                                artist = response.artist,
-                                title = response.title,
-                                script = response.script,
-                            )
                             scope.launch { refreshTracksUntilNext() }
                             publishUiState()
                         },
@@ -831,6 +835,7 @@ class StoryOrchestrator(
         cancelInFlightGenerationImmediate("stopped by user")
         storyPlayer.stop()
         mediaControllerManager.resumeMusic()
+        _pendingFeedback.value = null
         _state.value = OrchestratorState.LISTENING
         publishUiState()
     }

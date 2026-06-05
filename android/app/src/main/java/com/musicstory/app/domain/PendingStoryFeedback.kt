@@ -4,4 +4,5 @@ data class PendingStoryFeedback(
     val artist: String,
     val title: String,
     val script: String,
+    val trackKey: String,
 )

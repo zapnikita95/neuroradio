@@ -77,9 +77,11 @@ fun SecondaryStoryButton(
     text: String,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
+    enabled: Boolean = true,
 ) {
     OutlinedButton(
         onClick = onClick,
+        enabled = enabled,
         modifier = modifier
             .fillMaxWidth()
             .height(52.dp),

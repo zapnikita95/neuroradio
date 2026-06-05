@@ -868,7 +868,6 @@ router.post('/feedback', (req: Request, res: Response) => {
   const artist = typeof req.body?.artist === 'string' ? req.body.artist.trim() : '';
   const title = typeof req.body?.title === 'string' ? req.body.title.trim() : '';
   const voteRaw = typeof req.body?.vote === 'string' ? req.body.vote.trim().toLowerCase() : '';
-  const reason = typeof req.body?.reason === 'string' ? req.body.reason.trim() : '';
   const script = typeof req.body?.script === 'string' ? req.body.script.trim() : undefined;
 
   if (!artist || !title) {
@@ -880,13 +879,27 @@ router.post('/feedback', (req: Request, res: Response) => {
     return;
   }
   const vote = voteRaw as FeedbackVote;
-  if (!reason || !isValidFeedbackReason(vote, reason)) {
+
+  const reasonsRaw = req.body?.reasons;
+  const reasons: string[] = Array.isArray(reasonsRaw)
+    ? reasonsRaw
+        .filter((r): r is string => typeof r === 'string')
+        .map((r) => r.trim())
+        .filter(Boolean)
+    : typeof req.body?.reason === 'string' && req.body.reason.trim()
+      ? [req.body.reason.trim()]
+      : [];
+
+  const uniqueReasons = [...new Set(reasons)];
+  if (uniqueReasons.length === 0 || !uniqueReasons.every((r) => isValidFeedbackReason(vote, r))) {
     res.status(400).json({ error: 'invalid reason for vote' });
     return;
   }
 
-  const entry = recordStoryFeedback({ installId, artist, title, vote, reason, script });
-  res.json({ ok: true, id: entry.id });
+  const ids = uniqueReasons.map((reason) =>
+    recordStoryFeedback({ installId, artist, title, vote, reason, script }).id,
+  );
+  res.json({ ok: true, ids, count: ids.length });
 });
 
 export default router;
