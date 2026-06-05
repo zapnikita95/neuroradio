@@ -600,10 +600,6 @@ class StoryOrchestrator(
                 }
 
                 if (manual) {
-                    scope.launch {
-                        mediaControllerManager.fadeOutAndPause(fadeSeconds)
-                    }
-                    musicPausedForStory.set(true)
                     startGenerationPreview(response.script, session)
                 }
 
@@ -615,6 +611,17 @@ class StoryOrchestrator(
                     _state.value = OrchestratorState.PREPARING_PLAYBACK
                     publishUiState()
 
+                    withContext(Dispatchers.Main.immediate) {
+                        mediaControllerManager.fadeOutAndPause(fadeSeconds)
+                    }
+                    musicPausedForStory.set(true)
+                    if (!manual) {
+                        triggerEngine.onStoryPlaybackStarted()
+                        settingsDataStore.setTracksSinceLastStory(0)
+                        settingsDataStore.setFirstAutoStoryCompleted(true)
+                        refreshTracksUntilNext()
+                    }
+
                     val audioUrl = storyRepository.resolveAudioUrl(response.audioUrl)
                     storyPlayer.playStory(
                         response = response,
@@ -624,18 +631,6 @@ class StoryOrchestrator(
                         onPlaybackStarted = {
                             if (!isSessionCurrent(session)) return@playStory
                             lastStoryStartedAtMs = System.currentTimeMillis()
-                            scope.launch {
-                                if (!manual) {
-                                    withContext(Dispatchers.Main.immediate) {
-                                        mediaControllerManager.fadeOutAndPause(fadeSeconds)
-                                    }
-                                    musicPausedForStory.set(true)
-                                    triggerEngine.onStoryPlaybackStarted()
-                                    settingsDataStore.setTracksSinceLastStory(0)
-                                    settingsDataStore.setFirstAutoStoryCompleted(true)
-                                    refreshTracksUntilNext()
-                                }
-                            }
                             _state.value = OrchestratorState.PLAYING_STORY
                             publishUiState()
                         },
