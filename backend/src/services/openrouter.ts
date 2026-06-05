@@ -64,6 +64,13 @@ function extractScriptFieldLoose(raw: string): string | null {
   return unescaped.length >= 40 ? unescaped : null;
 }
 
+function isTrivialScript(script: string): boolean {
+  const s = script.trim();
+  if (s.length < 12) return true;
+  if (/^[\.\u2026…\s]+$/.test(s)) return true;
+  return countWords(s) < 12;
+}
+
 function parseStoryJson(raw: string): StoryScript | null {
   const trimmed = raw.trim();
   const jsonMatch = trimmed.match(/\{[\s\S]*\}/);
@@ -71,9 +78,11 @@ function parseStoryJson(raw: string): StoryScript | null {
     try {
       const parsed = JSON.parse(jsonMatch[0]) as Partial<StoryScript>;
       if (parsed.script && typeof parsed.script === 'string') {
+        const script = parsed.script.trim();
+        if (isTrivialScript(script)) return null;
         return {
-          script: parsed.script.trim(),
-          word_count: parsed.word_count ?? countWords(parsed.script),
+          script,
+          word_count: parsed.word_count ?? countWords(script),
           voiceId: (parsed.voiceId as YandexVoiceId) ?? 'zahar',
         };
       }
@@ -82,7 +91,7 @@ function parseStoryJson(raw: string): StoryScript | null {
     }
   }
   const loose = extractScriptFieldLoose(trimmed);
-  if (loose) {
+  if (loose && !isTrivialScript(loose)) {
     return {
       script: loose,
       word_count: countWords(loose),

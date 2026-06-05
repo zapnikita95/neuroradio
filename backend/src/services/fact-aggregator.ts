@@ -1,6 +1,6 @@
 import fetch from 'node-fetch';
 import type { ReferenceFactBundle } from './fact-picker.js';
-import { assignFactsToScopes, factAppliesToRequest } from './fact-relevance.js';
+import { assignFactsToScopes, factAppliesToRequest, factMentionsArtist, factNamesForeignEntity, isWebListicleJunk } from './fact-relevance.js';
 import { filterAndRankFacts, interestScore } from './reference-fact-quality.js';
 import { WEAK_TRIVIA_PATTERNS } from './story-fact-hunt.js';
 import { fetchReferenceFactBundle as fetchWikipediaBundle } from './wikipedia-facts.js';
@@ -58,6 +58,34 @@ function factsAboutTrackOrArtist(
   );
 }
 
+function artistSurnameInFact(fact: string, artist: string): boolean {
+  const parts = normalize(artist).split(' ').filter((w) => w.length >= 5);
+  if (parts.length === 0) return false;
+  const factNorm = normalize(fact);
+  return parts.some((token) => factNorm.includes(token));
+}
+
+function salvageArtistBioFacts(
+  candidates: string[],
+  artist: string,
+  title: string,
+): string[] {
+  return candidates.filter((fact) => {
+    const t = fact.trim();
+    if (t.length < 35) return false;
+    if (isWebListicleJunk(t)) return false;
+    if (artistSurnameInFact(t, artist)) return true;
+    if (factMentionsArtist(t, artist)) return true;
+    if (
+      /^(?:He |She |His |Her |Born |Known professionally|His stage name|Adelmo )/i.test(t) ||
+      /\b(?:known professionally as|stage name is|credited as|father of .* blues|blue plaque|commemorating)\b/i.test(t)
+    ) {
+      return !factNamesForeignEntity(t, artist, title, artist, 'indie');
+    }
+    return false;
+  });
+}
+
 function finalizeFactBundle(
   trackCandidates: string[],
   artistCandidates: string[],
@@ -73,6 +101,13 @@ function finalizeFactBundle(
         `[facts] indie relevance fallback for "${artist}" — "${title}": track=${scoped.trackFacts.length} artist=${scoped.artistFacts.length}`,
       );
       return { ...scoped, mode: 'indie' };
+    }
+    const salvaged = salvageArtistBioFacts(merged, artist, title).slice(0, 4);
+    if (salvaged.length > 0) {
+      console.log(
+        `[facts] artist-bio salvage for "${artist}": ${salvaged.length} fact(s) from wiki/bio sentences`,
+      );
+      return { trackFacts: [], artistFacts: salvaged, mode: 'indie' };
     }
   }
   return { ...scoped, mode: 'strict' };

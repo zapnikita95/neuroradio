@@ -520,7 +520,7 @@ router.post('/full', validateStoryFullBody, storyFullRateLimit, async (req: Requ
       }
     }
 
-    if (!selectedFact && referenceFacts.length === 0) {
+    if (!selectedFact && referenceFacts.filter((f) => !isMetadataOnlyFallbackFact(f)).length === 0) {
       recordFactMiss({
         installId,
         artist: metadata.artist,
@@ -618,6 +618,17 @@ router.post('/full', validateStoryFullBody, storyFullRateLimit, async (req: Requ
           artist: metadata.artist,
           previousScripts,
         });
+        if (!wikiLead) {
+          console.warn(
+            `[indie-wiki] no wiki lead for "${primaryArtistName(metadata.artist)}" — cannot ground story`,
+          );
+          const onlyPlaceholder =
+            storyReferenceFacts.length === 0 ||
+            storyReferenceFacts.every(isMetadataOnlyFallbackFact);
+          if (onlyPlaceholder) {
+            throw new NoReferenceFactsError(metadata.artist, metadata.title);
+          }
+        }
         if (wikiLead) {
           console.log(
             `[indie-wiki] lead lang=${wikiLead.lang} chars=${wikiLead.text.length} artist="${primaryArtistName(metadata.artist)}"`,
@@ -673,6 +684,16 @@ router.post('/full', validateStoryFullBody, storyFullRateLimit, async (req: Requ
             rawSnippets: undefined,
           };
         }
+      }
+
+      const refFacts = effectiveStoryInput.referenceFacts ?? [];
+      if (
+        !factFromBank &&
+        (!effectiveStoryInput.selectedReferenceFact?.fact ||
+          isMetadataOnlyFallbackFact(effectiveStoryInput.selectedReferenceFact.fact)) &&
+        (refFacts.length === 0 || refFacts.every(isMetadataOnlyFallbackFact))
+      ) {
+        throw new NoReferenceFactsError(metadata.artist, metadata.title);
       }
 
       return generateStoryWithFallback(effectiveStoryInput, llmProvider, {

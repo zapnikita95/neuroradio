@@ -404,6 +404,13 @@ function isGenericDisambiguationFact(fact: string, artist: string): boolean {
   return GENERIC_DISAMBIGUATION.test(fact) && !factMentionsArtist(fact, artist);
 }
 
+function artistSurnameInFact(fact: string, artist: string): boolean {
+  const parts = normalize(artist).split(' ').filter((w) => w.length >= 5);
+  if (parts.length === 0) return false;
+  const factNorm = normalize(fact);
+  return parts.some((token) => factNorm.includes(token));
+}
+
 export function factMentionsArtist(fact: string, artist: string): boolean {
   const artistNorm = normalize(artist);
   const factNorm = normalize(fact);
@@ -412,6 +419,7 @@ export function factMentionsArtist(fact: string, artist: string): boolean {
   const tokens = artistTokens(artist);
   if (tokens.length === 0) return false;
   if (tokens.length === 1) return factNorm.includes(tokens[0]);
+  if (artistSurnameInFact(fact, artist)) return true;
 
   const words = factNorm.split(' ');
   for (let i = 0; i < words.length; i++) {
@@ -517,7 +525,8 @@ export function factAppliesToRequest(
   if (scope === 'artist') {
     if (mentionsArtist || mentionsTitle) return true;
     const bandPageContext =
-      /^(?:The band|They |Their |Members |He |She |It was|The group|According to)\b/i.test(trimmed) ||
+      /^(?:The band|They |Their |Members |He |She |His |Her |It was|The group|According to|Born |Known professionally)\b/i.test(trimmed) ||
+      /\b(?:was a |is a |known professionally as|stage name is|credited as the|raised as a)\b/i.test(trimmed) ||
       /\b(?:Wounded Knee|banned by several radio|withheld from release|Native American|heritage|Vasquez|Vegas)\b/i.test(trimmed) ||
       /(?:группа|песн|альбом|запрет|цензур|арми|Цой|Тсо[йи])/i.test(trimmed);
     if (bandPageContext && !factNamesForeignEntity(trimmed, artist, title, artist, mode)) return true;

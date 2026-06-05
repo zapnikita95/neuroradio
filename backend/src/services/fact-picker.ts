@@ -14,6 +14,7 @@ import {
 } from './reference-fact-quality.js';
 import { interestRating10 } from './fact-interest-log.js';
 import { WEAK_TRIVIA_PATTERNS } from './story-fact-hunt.js';
+import { isMetadataOnlyFallbackFact } from './metadata-facts.js';
 import { splitBundleByScope, type RankedFactScope } from './fact-ranking.js';
 
 export type FactScope = RankedFactScope;
@@ -72,6 +73,7 @@ function factOverlapsPrevious(fact: string, previousScripts: string[]): boolean 
 }
 
 function isRejectedSeed(fact: string): boolean {
+  if (isMetadataOnlyFallbackFact(fact)) return true;
   if (WEAK_TRIVIA_PATTERNS.some((p) => p.test(fact))) return true;
   if (isWeakChartSeed(fact)) return true;
   if (isBoringFact(fact)) return true;
@@ -154,6 +156,7 @@ export function pickReferenceFact(
 
   const anyPool = [...pools.track, ...pools.album, ...pools.artist];
   for (const fact of sortByInterest(anyPool)) {
+    if (isMetadataOnlyFallbackFact(fact)) continue;
     if (isBoringFact(fact)) continue;
     if (!factOverlapsPrevious(fact, previousScripts)) {
       const scope: FactScope = pools.track.includes(fact)
