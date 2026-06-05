@@ -20,7 +20,10 @@ import type { TtsPauseProfile } from './tts-voice-profiles.js';
 const TTS_URL = 'https://tts.api.cloud.yandex.net/speech/v1/tts:synthesize';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-export const AUDIO_DIR = path.resolve(__dirname, '../../audio');
+const DATA_DIR = process.env.ACCOUNT_DATA_DIR?.trim() || path.resolve(__dirname, '../../data');
+export const AUDIO_DIR = process.env.AUDIO_DATA_DIR?.trim()
+  ? path.resolve(process.env.AUDIO_DATA_DIR.trim())
+  : path.join(DATA_DIR, 'audio');
 
 export interface SynthesisResult {
   fileName: string;

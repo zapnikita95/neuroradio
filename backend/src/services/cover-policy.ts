@@ -42,9 +42,8 @@ export function isAmbiguousCoverConflict(
   if (explicitCover) return false;
   const trimmed = seedFact.trim();
   if (!trimmed) return false;
-  if (factMentionsArtist(trimmed, artist) && !factNamesForeignEntity(trimmed, artist, title)) {
-    return false;
-  }
+  // Alias/label trivia about the performer is not a cover conflict (Moby as Voodoo Child, etc.).
+  if (factMentionsArtist(trimmed, artist)) return false;
   return factNamesForeignEntity(trimmed, artist, title);
 }
 
@@ -86,6 +85,14 @@ export function assessCoverSituation(
 
   if (explicit) return { action: 'proceed' };
 
+  if (
+    selectedFact &&
+    selectedFact.interestScore >= 7 &&
+    factMentionsArtist(seed, artist)
+  ) {
+    return { action: 'proceed' };
+  }
+
   const titleOnlySeed =
     Boolean(seed) &&
     factMentionsTitle(seed, title) &&
@@ -108,9 +115,10 @@ export function assessCoverSituation(
 
   const trackFacts = bundle.trackFacts;
   if (trackFacts.length > 0 && !explicit) {
-    const anyOk = trackFacts.some((f) => !factNamesForeignEntity(f, artist, title));
-    const allForeign = trackFacts.every((f) => factNamesForeignEntity(f, artist, title));
-    if (allForeign && !anyOk) {
+    const allAboutOtherAct = trackFacts.every(
+      (f) => !factMentionsArtist(f, artist) && factNamesForeignEntity(f, artist, title),
+    );
+    if (allAboutOtherAct) {
       const pivot = pickArtistPivotFact(artist, title, bundle);
       if (pivot) {
         console.log(

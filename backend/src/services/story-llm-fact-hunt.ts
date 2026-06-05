@@ -65,15 +65,24 @@ export function resolveFactHuntProvider(preferred: LlmProviderId): LlmProviderId
   return 'groq';
 }
 
+export const FAST_SEED_INTEREST_SCORE = parseInt(process.env.FAST_SEED_INTEREST_SCORE ?? '7', 10);
+
 export function shouldRunLlmFactHunt(
   selected: SelectedReferenceFact | null,
   rawSnippetCount: number,
   bundleFactCount: number,
   trackFactCount = 0,
   title = '',
+  artist = '',
 ): boolean {
   if (rawSnippetCount < 2) return false;
   if (!selected) return bundleFactCount === 0;
+  if (
+    selected.interestScore >= FAST_SEED_INTEREST_SCORE &&
+    (!artist || factMentionsArtist(selected.fact, artist) || selected.scope === 'artist')
+  ) {
+    return false;
+  }
   // No track-level facts — artist trivia is weak for a specific song; let LLM hunt from snippets.
   if (trackFactCount === 0 && selected.scope !== 'track') return true;
   // Track-scoped fact that never mentions the song title — wrong wiki chunk (e.g. band name origin).
@@ -97,6 +106,9 @@ export function explainFactHuntDecision(
 ): string {
   if (rawSnippetCount < 2) return 'snippets<2';
   if (!selected) return bundleFactCount === 0 ? 'no-facts' : 'no-selection';
+  if (selected.interestScore >= FAST_SEED_INTEREST_SCORE) {
+    return `fast-seed score=${selected.interestScore}`;
+  }
   if (trackFactCount === 0 && selected.scope !== 'track') return 'no-track-facts';
   if (selected.scope === 'track' && title.trim() && !factMentionsTitle(selected.fact, title)) {
     return 'track-seed-without-title';

@@ -274,6 +274,32 @@ export function stripBannedFluff(text: string): string {
   return text.replace(/\s{2,}/g, ' ').replace(/\s+([,.!?])/g, '$1').trim();
 }
 
+/** Soft flags for client/logs — story still ships but may need user scrutiny. */
+export function detectStoryQualityWarnings(
+  script: string,
+  referenceFacts: string[] = [],
+): string[] {
+  const warnings: string[] = [];
+  const seed = referenceFacts.join(' ').toLowerCase();
+  const lower = script.toLowerCase();
+
+  const liveQuote =
+    /(?:встал перед (?:аудиторией|публикой|концертом)|сказал (?:аудитории|публике|толпе)|объявил (?:перед )?(?:аудитории|публике))/i;
+  if (liveQuote.test(script) && !liveQuote.test(seed)) {
+    warnings.push('possible_unverified_live_quote');
+  }
+
+  if (
+    /(?:божеств|богин|мифolog|archer|легенд(?:а|e) о лучник)/i.test(lower) &&
+    !/(?:божеств|мифolog|archer|mytholog)/i.test(seed) &&
+    /misheard|misinterpret|неправильно слыш|misheard and vastly/i.test(seed)
+  ) {
+    warnings.push('possible_fact_misread');
+  }
+
+  return warnings;
+}
+
 export function findForbiddenNumbers(
   script: string,
   artist: string,

@@ -37,6 +37,7 @@ function normalizeArtist(name: string): string {
 const FALLBACK_MAJOR = [
   'taylor swift', 'beyonce', 'jay z', 'drake', 'eminem', 'coldplay', 'bts', 'blackpink',
   'green day', 'metallica', 'queen', 'the beatles', 'madonna', 'rihanna', 'alvaro soler',
+  'moby', 'arash', 'tame impala',
 ];
 
 const KPOP_PATTERN =

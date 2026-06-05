@@ -36,7 +36,8 @@ import {
   pickArtistWikiContent,
 } from '../services/artist-wiki-depth.js';
 import { primaryArtistName } from '../services/artist-primary.js';
-import { countWords, sanitizeScriptForTts } from '../services/story-quality.js';
+import { isMusicArtistWikiExtract } from '../services/wikipedia-music.js';
+import { countWords, detectStoryQualityWarnings, sanitizeScriptForTts } from '../services/story-quality.js';
 import type { StoryScript } from '../services/groq.js';
 import { setLogDetail } from '../middleware/request-logger.js';
 import { hasYandexCredentials } from '../services/yandex-tts.js';
@@ -394,6 +395,7 @@ router.post('/full', validateStoryFullBody, storyFullRateLimit, async (req: Requ
         bundleFactCount,
         trackFactCount,
         metadata.title,
+        metadata.artist,
       )
     ) {
       const factModels =
@@ -613,11 +615,18 @@ router.post('/full', validateStoryFullBody, storyFullRateLimit, async (req: Requ
       let effectiveStoryInput = storyInput;
 
       if (!hasGroundedSeed && !factFromBank) {
-        const wikiLead = await pickArtistWikiContent({
+        const wikiLeadRaw = await pickArtistWikiContent({
           installId,
           artist: metadata.artist,
           previousScripts,
         });
+        const wikiLead =
+          wikiLeadRaw && isMusicArtistWikiExtract(wikiLeadRaw.text) ? wikiLeadRaw : null;
+        if (wikiLeadRaw && !wikiLead) {
+          console.warn(
+            `[indie-wiki] skip non-music wiki for "${primaryArtistName(metadata.artist)}"`,
+          );
+        }
         if (!wikiLead) {
           console.warn(
             `[indie-wiki] no wiki lead for "${primaryArtistName(metadata.artist)}" — cannot ground story`,
@@ -744,6 +753,15 @@ router.post('/full', validateStoryFullBody, storyFullRateLimit, async (req: Requ
         azureTts: canUseAzureSpeechProduction(),
       },
     };
+
+    const qualityWarnings = detectStoryQualityWarnings(story.script, storyReferenceFacts);
+    if (qualityWarnings.length > 0) {
+      response.qualityWarnings = qualityWarnings;
+      console.warn(
+        `[story-quality] warnings=${qualityWarnings.join(',')} install=${installId.slice(0, 8)} ` +
+          `"${metadata.artist}" — "${metadata.title}"`,
+      );
+    }
 
     if (hasYandexCredentials() || canUseAzureSpeechProduction()) {
       const id = uuidv4();

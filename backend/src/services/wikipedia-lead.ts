@@ -1,5 +1,9 @@
 import fetch from 'node-fetch';
 import { primaryArtistName } from './artist-primary.js';
+import {
+  buildMusicFirstWikiCandidates,
+  isMusicArtistWikiExtract,
+} from './wikipedia-music.js';
 
 const USER_AGENT = 'MusicStoryBFF/1.0 (contact@example.com)';
 
@@ -26,19 +30,7 @@ function wikiTitleVariants(artist: string): string[] {
 }
 
 function buildArtistTitleCandidates(artist: string): string[] {
-  const base = wikiTitleVariants(artist);
-  const withRoles: string[] = [];
-  for (const name of base) {
-    withRoles.push(
-      name,
-      `${name} (musician)`,
-      `${name} (singer)`,
-      `${name} (rapper)`,
-      `${name} (band)`,
-      `${name} (musical group)`,
-    );
-  }
-  return [...new Set(withRoles)];
+  return buildMusicFirstWikiCandidates(artist);
 }
 
 async function searchWikiTitle(lang: 'en' | 'ru', query: string): Promise<string | null> {
@@ -103,11 +95,11 @@ async function resolveWikiPageTitle(artist: string): Promise<string | null> {
 
   for (const wikiTitle of titlesToTry) {
     const en = await fetchSummaryExtract('en', wikiTitle);
-    if (en && !isDisambiguation(en)) return wikiTitle;
+    if (en && !isDisambiguation(en) && isMusicArtistWikiExtract(en)) return wikiTitle;
   }
   for (const wikiTitle of titlesToTry) {
     const ru = await fetchSummaryExtract('ru', wikiTitle);
-    if (ru && !isDisambiguation(ru)) return wikiTitle;
+    if (ru && !isDisambiguation(ru) && isMusicArtistWikiExtract(ru)) return wikiTitle;
   }
   return null;
 }
@@ -207,14 +199,14 @@ export async function fetchArtistWikiLead(
 
   for (const wikiTitle of titlesToTry) {
     const en = await fetchSummaryExtract('en', wikiTitle);
-    if (en && !isDisambiguation(en)) {
+    if (en && !isDisambiguation(en) && isMusicArtistWikiExtract(en)) {
       return { text: en, lang: 'en' };
     }
   }
 
   for (const wikiTitle of titlesToTry) {
     const ru = await fetchSummaryExtract('ru', wikiTitle);
-    if (ru && !isDisambiguation(ru)) {
+    if (ru && !isDisambiguation(ru) && isMusicArtistWikiExtract(ru)) {
       return { text: ru, lang: 'ru' };
     }
   }
