@@ -24,6 +24,7 @@ import {
 } from './story-generate-loop.js';
 import type { GenerateStoryInput, StoryScript } from './groq.js';
 import { logRejectedScript } from './story-reject-log.js';
+import { storyNamesForeignArtist } from './fact-relevance.js';
 
 const OPENROUTER_API_URL = 'https://openrouter.ai/api/v1/chat/completions';
 const MAX_ATTEMPTS = 1;
@@ -242,6 +243,16 @@ export async function generateStoryScript(
   if (lastCandidate?.script?.trim() && referenceFacts.length > 0) {
     const wc = countWords(lastCandidate.script);
     if (wc >= 12) {
+      if (
+        storyNamesForeignArtist(
+          lastCandidate.script,
+          input.artist,
+          input.title,
+          referenceFacts,
+        )
+      ) {
+        throw new Error('OpenRouter could not produce a usable story (wrong artist in script)');
+      }
       console.warn(
         `[openrouter] accepting last candidate ${wc} words after all quality checks (grounded fallback)`,
       );

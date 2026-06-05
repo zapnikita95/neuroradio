@@ -19,6 +19,7 @@ import {
   trackKey,
 } from './fact-bank.js';
 import { splitBundleByScope, rankScopedFacts } from './fact-ranking.js';
+import { factMentionsArtistAsEntity, isAmbiguousCommonWordArtist } from './fact-relevance.js';
 import type { ReferenceFactBundle } from './fact-picker.js';
 import { pickReferenceFact, type SelectedReferenceFact } from './fact-picker.js';
 
@@ -54,7 +55,12 @@ export function getUsedFingerprints(installId: string, artist: string, title: st
 
 export function ingestBundleToBank(artist: string, title: string, bundle: ReferenceFactBundle): number {
   const pools = splitBundleByScope(bundle, artist, title);
-  const ranked = rankScopedFacts(pools).filter((r) => !r.junk && r.interest >= 6);
+  const ranked = rankScopedFacts(pools).filter(
+    (r) =>
+      !r.junk &&
+      r.interest >= 6 &&
+      (!isAmbiguousCommonWordArtist(artist) || factMentionsArtistAsEntity(r.fact, artist)),
+  );
   return ingestFacts(
     artist,
     title,

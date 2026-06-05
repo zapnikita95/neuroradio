@@ -635,7 +635,7 @@ class StoryRepository(
     )
 
     companion object {
-        private const val BACKEND_TIMEOUT_MS = 180_000L
+        private const val BACKEND_TIMEOUT_MS = 300_000L
         /** Local Ollama: research + up to 8 narrator attempts on 35b model. */
         private const val BACKEND_LOCAL_TIMEOUT_MS = 1_200_000L
         private const val METADATA_TIMEOUT_MS = 15_000L

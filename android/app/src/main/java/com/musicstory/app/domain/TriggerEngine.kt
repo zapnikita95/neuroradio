@@ -25,7 +25,7 @@ data class TriggerSettings(
 )
 
 object SettingsDefaults {
-    const val EVERY_N_TRACKS = 10
+    const val EVERY_N_TRACKS = 3
     const val SAME_TRACK_STORY_EVERY_N = 3
 }
 

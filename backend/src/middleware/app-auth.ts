@@ -5,8 +5,6 @@ import {
   getAuthJwtSecret,
   verifyJwt,
 } from '../services/jwt.js';
-import { rateLimitStory } from './rate-limit.js';
-
 declare global {
   namespace Express {
     interface Request {
@@ -50,5 +48,5 @@ export function requireAppAuth(req: Request, res: Response, next: NextFunction):
   }
 
   req.installId = payload.sub;
-  rateLimitStory(payload.sub)(req, res, next);
+  next();
 }

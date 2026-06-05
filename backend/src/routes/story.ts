@@ -57,7 +57,12 @@ import {
 import { isAzureSpeechEnabled } from '../services/entitlements.js';
 import { canUseAzureSpeechProduction, hasAzureSpeechCredentials } from '../services/tts-router.js';
 import { signAudioAccess } from '../services/audio-token.js';
-import { attachStoryQuotaHeaders, getDailyStoryQuota, recordStoryGeneration } from '../middleware/rate-limit.js';
+import {
+  attachStoryQuotaHeaders,
+  getDailyStoryQuota,
+  rateLimitStory,
+  recordStoryGeneration,
+} from '../middleware/rate-limit.js';
 import {
   getStoryLimitsForTier,
   resolveOpenRouterModelForTier,
@@ -122,7 +127,23 @@ router.get('/quota', (req: Request, res: Response) => {
   });
 });
 
-router.post('/full', validateStoryFullBody, async (req: Request, res: Response) => {
+function storyFullRateLimit(req: Request, res: Response, next: import('express').NextFunction): void {
+  const installId = req.installId ?? 'unknown';
+  const body = req.body as StoryFullBody;
+  const provider = resolveEffectiveStoryLlmProvider(resolveUserTier(installId), body.llm_provider, {
+    groq: body.groq_api_key,
+    gemini: body.gemini_api_key,
+    openrouter: body.openrouter_api_key,
+  });
+  const ownKey = Boolean(clientKeyForProvider(provider, {
+    groq: body.groq_api_key,
+    gemini: body.gemini_api_key,
+    openrouter: body.openrouter_api_key,
+  }));
+  rateLimitStory(installId, { skipDailyQuota: ownKey })(req, res, next);
+}
+
+router.post('/full', validateStoryFullBody, storyFullRateLimit, async (req: Request, res: Response) => {
   const installId = req.installId ?? 'unknown';
   const body = req.body as StoryFullBody;
   console.log(
@@ -348,7 +369,10 @@ router.post('/full', validateStoryFullBody, async (req: Request, res: Response) 
         metadata.title,
       )
     ) {
-      const factModels = resolveOpenRouterFactModelsForTier(userTier);
+      const factModels =
+        ownLlmKey && openrouterModelFact.includes('/')
+          ? [openrouterModelFact]
+          : resolveOpenRouterFactModelsForTier(userTier);
       console.log(
         `[fact-hunt-llm] start artist="${metadata.artist}" title="${metadata.title}" ` +
           `snippets=${factCtx.rawSnippets.length} models=${factModels.join(' → ')} ` +
@@ -475,7 +499,8 @@ router.post('/full', validateStoryFullBody, async (req: Request, res: Response) 
     );
 
     const { story, llmUsed } = await (async () => {
-      if (artistTier === 'indie') {
+      const hasGroundedSeed = Boolean(selectedFact?.fact && selectedFact.interestScore >= 6);
+      if (artistTier === 'indie' && !hasGroundedSeed && !factFromBank) {
         const wikiLead = await pickArtistWikiContent({
           installId,
           artist: metadata.artist,
@@ -501,7 +526,7 @@ router.post('/full', validateStoryFullBody, async (req: Request, res: Response) 
             (wikiLead.lang === 'ru'
               ? sanitizeScriptForTts(wikiLead.text, metadata.artist, metadata.title, [wikiLead.text])
               : null);
-          if (wikiScriptFinal && countWords(wikiScriptFinal) >= 25) {
+          if (wikiScriptFinal && countWords(wikiScriptFinal) >= 45) {
             selectedFact = {
               fact: wikiLead.text,
               scope: 'artist',

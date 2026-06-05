@@ -308,8 +308,7 @@ class StoryOrchestrator(
             _tracksUntilNext.value = triggerEngine.tracksUntilNext(settings)
             publishUiState()
             val counter = triggerEngine.currentTracksSinceLastStory()
-            val firstPending = !settingsDataStore.firstAutoStoryCompleted.first() && counter == 0
-            if (counter >= settings.everyNTracks || firstPending) {
+            if (counter >= settings.everyNTracks) {
                 StoryLog.i("Auto story overdue — triggering for ${track.artist} — ${track.title}")
                 _tracksUntilNext.value = null
                 playStoryForTrack(track, manual = false)
@@ -334,8 +333,7 @@ class StoryOrchestrator(
 
         val settings = loadTriggerSettings()
         val trackGenre = scrobbleRepository.lookupGenre(track.artist, track.title)
-        val firstTrackBonus = !settingsDataStore.firstAutoStoryCompleted.first() &&
-            settings.mode == TriggerMode.EVERY_N_TRACKS
+        val firstTrackBonus = false
         val autoStoriesEnabled = settingsDataStore.appPowerMode.first() == AppPowerMode.ON
         val shouldTrigger = autoStoriesEnabled &&
             _mode.value == OrchestratorMode.AUTO &&
@@ -893,7 +891,7 @@ class StoryOrchestrator(
     companion object {
         private const val PLAYBACK_START_TIMEOUT_MS = 25_000L
         /** Metadata + backend /v1/story/full (facts + LLM + Yandex TTS). */
-        private const val STORY_FETCH_TIMEOUT_MS = 180_000L
+        private const val STORY_FETCH_TIMEOUT_MS = 300_000L
         /** Local Ollama on PC BFF — 35b model + research. */
         private const val LOCAL_STORY_FETCH_TIMEOUT_MS = 1_200_000L
         private const val PREVIEW_REVEAL_MAX_MS = 7_000L

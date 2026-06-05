@@ -16,6 +16,30 @@ function artistTokens(artist: string): string[] {
     .filter((part) => part.length >= 2);
 }
 
+/** Слова-существительные/приветствия, совпадающие с именем артиста — не путать с группой. */
+const AMBIGUOUS_COMMON_WORD_ARTISTS = new Set(
+  ['привет', 'плохо', 'любовь', 'скорpioн', 'hello', 'bad', 'good', 'love', 'pain'].map(
+    normalize,
+  ),
+);
+
+export function isAmbiguousCommonWordArtist(artist: string): boolean {
+  return AMBIGUOUS_COMMON_WORD_ARTISTS.has(normalize(artist));
+}
+
+/** Для «Привет» / «Плохо» — факт должен явно называть группу, а не слово в тексте. */
+export function factMentionsArtistAsEntity(fact: string, artist: string): boolean {
+  if (!isAmbiguousCommonWordArtist(artist)) return factMentionsArtist(fact, artist);
+  const escaped = artist.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  return (
+    new RegExp(`(?:группа|артист|band|artist|коллектив|duo|псевдоним|проект)\\s+[«"']?${escaped}`, 'i').test(
+      fact,
+    ) ||
+    new RegExp(`[«"']${escaped}[«"']`, 'i').test(fact) ||
+    new RegExp(`\\b${escaped}\\s+(?:band|group|artist|коллектив|duo)\\b`, 'i').test(fact)
+  );
+}
+
 /** Outlets / labels — not musical acts. */
 const NON_ACT_PHRASES = new Set(
   [
@@ -444,6 +468,7 @@ export function factAppliesToRequest(
 ): boolean {
   const trimmed = fact.trim();
   if (trimmed.length < 35) return false;
+  if (isAmbiguousCommonWordArtist(artist) && !factMentionsArtistAsEntity(trimmed, artist)) return false;
   if (isWebListicleJunk(trimmed)) return false;
   if (isGenericDisambiguationFact(trimmed, artist)) return false;
   if (isWrongTitleMediumCollision(trimmed, title)) return false;

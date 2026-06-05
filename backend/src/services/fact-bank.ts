@@ -2,6 +2,7 @@ import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { interestRating10 } from './fact-interest-log.js';
+import { factMentionsArtistAsEntity, isAmbiguousCommonWordArtist } from './fact-relevance.js';
 import { interestScore } from './reference-fact-quality.js';
 import type { FactScope } from './fact-picker.js';
 
@@ -166,6 +167,7 @@ export function pickFromBank(
     for (const fact of pools[scope] ?? []) {
       if (usedFingerprints.has(factFingerprint(fact.fact))) continue;
       if (fact.interestScore < 6) continue;
+      if (isAmbiguousCommonWordArtist(artist) && !factMentionsArtistAsEntity(fact.fact, artist)) continue;
       markFactUsed(fact.id, artist, title);
       return fact;
     }
