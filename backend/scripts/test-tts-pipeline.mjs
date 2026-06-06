@@ -63,12 +63,12 @@ test('SSML keeps Don\'t Matter To Me as one English phrase', () => {
   assert.match(ssml, /Don&apos;t Matter To Me|Don't Matter To Me/i);
 });
 
-test('prepareYandexTtsText reads R&B as рэ-энд-би not letter-by-letter', () => {
+test('prepareYandexTtsText reads R&B as ар эн би', () => {
   const out = prepareYandexTtsText('перенёс R&B в мейнстримный хип-хоп.', {
     artist: 'Drake',
     title: 'Test',
   });
-  assert.match(out, /рэ-энд-би/i);
+  assert.match(out, /ар эн би/i);
   assert.doesNotMatch(out, /\bR\s*&\s*B\b/i);
 });
 
@@ -80,12 +80,12 @@ test('prepareYandexTtsText stresses микстейпы', () => {
   assert.match(out, /микст\+ейпы/i);
 });
 
-test('prepareYandexTtsText keeps preposition в after R&B cyrillic', () => {
+test('prepareYandexTtsText keeps preposition в after ар эн би', () => {
   const marked = prepareYandexTtsText('перенёс R&B в мейнстримный хип-хоп.', {
     artist: 'Drake',
     title: 'Test',
   });
-  assert.match(marked, /рэ-энд-би в мейнстримный/i);
+  assert.match(marked, /ар эн би в мейнстримный/i);
   const ssml = buildYandexSsml(marked);
   assert.doesNotMatch(ssml, /R&amp;B/i);
 });

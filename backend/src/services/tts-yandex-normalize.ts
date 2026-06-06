@@ -7,7 +7,7 @@ export function normalizeLatinApostrophes(text: string): string {
 }
 
 const MIXED_TTS_REPLACEMENTS: Array<[RegExp, string]> = [
-  [/\bR\s*&\s*B\b/gi, 'рэ-энд-би'],
+  [/\bR\s*&\s*B\b/gi, 'ар эн би'],
   [/\brap[\s-]singing\b/gi, 'рэп-сингинг'],
   [/\bрэп[\s-]singing\b/gi, 'рэп-сингинг'],
   [/\b(контракт(?:ом)?|сделк(?:а|у|ой|е)|подпис\w*)\s+с\s+(?=[A-Z])/gi, '$1 с лейблом '],
