@@ -15,6 +15,7 @@ import { fetchReferenceFactBundle as fetchWikipediaBundle } from './wikipedia-fa
 import { fetchArtistWikiLead } from './wikipedia-lead.js';
 import { inferRuRegionalContext } from './metadata-facts.js';
 import { fetchWebSearchFactSnippets } from './web-search-facts.js';
+import { acceptSearchGroundedSnippet } from './web-snippet-accept.js';
 
 const USER_AGENT = 'MusicStoryBFF/1.0 (contact@example.com)';
 const RAW_SNIPPET_MIN_LEN = 30;
@@ -96,14 +97,15 @@ function salvageWebSearchSnippets(
 
   for (const raw of webSnippets) {
     const snippet = raw.trim();
-    if (snippet.length < 35 || isWebListicleJunk(snippet)) continue;
+    if (snippet.length < 35) continue;
     const key = normalize(snippet);
     if (seen.has(key)) continue;
+    if (!acceptSearchGroundedSnippet(snippet, artist, title)) continue;
     seen.add(key);
 
     if (hasTrackContextSignal(snippet) || factMentionsTitle(snippet, title)) {
       track.push(snippet);
-    } else if (factMentionsArtist(snippet, artist) || artistSurnameInFact(snippet, artist)) {
+    } else {
       artistFacts.push(snippet);
     }
   }

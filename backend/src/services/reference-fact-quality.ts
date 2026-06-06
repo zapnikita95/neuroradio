@@ -147,6 +147,7 @@ export function interestScore(fact: string): number {
   if (/^(?:This image would later be used|Filmed at the New London Theatre)\b/i.test(fact.trim())) score -= 18;
   if (/(?:предложил\w*|borrowed|suggested|названи\w*).{0,80}(?:«|")/i.test(fact)) score += 12;
   if (/(?:origin|originally|meaning|metaphor|hidden|disguised|ironic|paradox|заклинан|смысл|метафор|ирони|парадокс)/i.test(fact)) score += 6;
+  if (/\b(?:intended to|repudiat\w*|members? of the (?:band|group|four)|their past|dark past)\b/i.test(fact)) score += 8;
   score += highImpactBonus(fact);
   return score;
 }

@@ -1,13 +1,9 @@
 import type { SelectedReferenceFact } from './fact-picker.js';
-import {
-  factMentionsArtist,
-  factMentionsTitle,
-  hasTrackContextSignal,
-  isWebListicleJunk,
-} from './fact-relevance.js';
+import { factMentionsTitle, hasTrackContextSignal } from './fact-relevance.js';
 import { interestRating10 } from './fact-interest-log.js';
 import { isMetadataOnlyFallbackFact } from './metadata-facts.js';
-import { interestScore, isBoringFact } from './reference-fact-quality.js';
+import { interestScore } from './reference-fact-quality.js';
+import { acceptSearchGroundedSnippet } from './web-snippet-accept.js';
 
 /** Last-resort seed from HTML search snippets when wiki/MB timed out. */
 export function pickSalvageSnippetSeed(
@@ -18,14 +14,7 @@ export function pickSalvageSnippetSeed(
   const ranked = rawSnippets
     .map((snippet) => snippet.trim())
     .filter((snippet) => snippet.length >= 35 && snippet.length <= 480)
-    .filter((snippet) => !isWebListicleJunk(snippet))
-    .filter((snippet) => !isBoringFact(snippet))
-    .filter(
-      (snippet) =>
-        hasTrackContextSignal(snippet) ||
-        factMentionsTitle(snippet, title) ||
-        factMentionsArtist(snippet, artist),
-    )
+    .filter((snippet) => acceptSearchGroundedSnippet(snippet, artist, title))
     .sort((a, b) => interestScore(b) - interestScore(a));
 
   const best = ranked[0];

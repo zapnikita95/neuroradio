@@ -49,7 +49,13 @@ export function cyrillicToLatin(text: string): string {
 }
 
 function cleanTitle(title: string): string {
-  return title.replace(/\s*\([^)]*\)\s*/g, ' ').trim();
+  return title
+    .replace(
+      /\s*\([^)]*(?:edit|mix|remaster|version|radio|live|remix|extended|single|album|bonus|deluxe)[^)]*\)/gi,
+      ' ',
+    )
+    .replace(/\s*\([^)]*\)\s*/g, ' ')
+    .trim();
 }
 
 function significantTokens(text: string): string[] {

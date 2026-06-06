@@ -105,8 +105,31 @@ function extractNamedEntities(fact: string): string[] {
   for (const match of fact.matchAll(/\b([A-Z][a-z]+(?:-[A-Z][a-z]+)+)\b/g)) {
     entities.push(match[1]);
   }
+  const SKIP_MULTI = new Set(
+    [
+      'this song',
+      'the song',
+      'this track',
+      'the track',
+      'this single',
+      'the single',
+      'this album',
+      'the album',
+      'from being',
+      'the documentary',
+      'the band',
+      'one of',
+      'four members',
+      'the four',
+      'the past',
+      'happy nation',
+      'all that',
+    ].map(normalize),
+  );
   for (const match of fact.matchAll(/\b([A-Z][a-z]+(?:\s+[A-Z][a-z]+){1,3})\b/g)) {
-    entities.push(match[1]);
+    const phrase = match[1];
+    if (SKIP_MULTI.has(normalize(phrase))) continue;
+    entities.push(phrase);
   }
   for (const match of fact.matchAll(/\b([A-Za-z][a-z]+(?:\s+[A-Za-z][a-z]+){0,3})'s\b/g)) {
     entities.push(match[1]);
@@ -358,6 +381,7 @@ const CONTEXT_ENTITY_PHRASES = new Set(
     'minsk',
     'grammy',
     'grammy awards',
+    'eurovision',
     'allmusic',
     'adrianne lenker',
     'buck meek',
@@ -426,6 +450,9 @@ export function factNamesForeignEntity(
   const words = norm.split(' ').filter(Boolean);
   const titleNormFull = titleNorm;
   for (let i = 0; i < words.length - 1; i++) {
+    const w1raw = fact.split(/\s+/)[i] ?? '';
+    const w2raw = fact.split(/\s+/)[i + 1] ?? '';
+    if (!/^[A-ZÀ-ÖØ-Ý]/.test(w1raw) || !/^[A-ZÀ-ÖØ-Ý]/.test(w2raw)) continue;
     const phrase = `${words[i]} ${words[i + 1]}`;
     if (phrase.length < 5) continue;
     if (artistNorm.includes(phrase) || titleNormFull.includes(phrase)) continue;
@@ -515,10 +542,10 @@ export function titleMentionVariants(title: string): string[] {
 export function hasTrackContextSignal(fact: string): boolean {
   const trimmed = fact.trim();
   return (
-    /^(?:The song|The video|The single|It|This track|This single|The single cut|The lyrics|Recording|Mercury|He |They |Upon |During |After |When |While |In an interview)\b/i.test(
+    /^(?:The song|The video|The single|The track|It|This track|This single|This song|This album|The album|The documentary|From being|Additionally)\b/i.test(
       trimmed,
     ) ||
-    /\b(?:music video|directed by|controversial nature|five different versions|operatic section|studio session|composed the|wrote the|recorded at|took three weeks|no chorus|gained popularity|viral|tiktok|signed with|influenced by|first single|lead single|hidden meaning|origin story|radio banned|refused to play|censored|banned by)\b/i.test(
+    /\b(?:music video|directed by|controversial nature|five different versions|operatic section|studio session|composed the|wrote the|recorded at|took three weeks|no chorus|gained popularity|viral|tiktok|signed with|influenced by|first single|lead single|hidden meaning|origin story|radio banned|refused to play|censored|banned by|intended to|repudiat\w*|members? of the (?:band|group|four)|far[- ]?right|extremist gang|documentary)\b/i.test(
       trimmed,
     ) ||
     /\b(?:single cut is significantly shorter|promo track under the name)\b/i.test(trimmed)
@@ -616,6 +643,7 @@ export function factAppliesToRequest(
 
   if (scope === 'artist') {
     if (mentionsArtist || mentionsTitle) return true;
+    if (hasTrackContextSignal(trimmed)) return true;
     const bandPageContext =
       /^(?:The band|They |Their |Members |He |She |His |Her |It was|The group|According to|Born |Known professionally)\b/i.test(trimmed) ||
       /\b(?:was a |is a |known professionally as|stage name is|credited as the|raised as a)\b/i.test(trimmed) ||
