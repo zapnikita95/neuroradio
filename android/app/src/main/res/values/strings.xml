@@ -226,7 +226,9 @@
     <string name="settings_auth_link_hint">Можно привязать второй способ входа к этому же аккаунту.</string>
     <string name="settings_auth_link_telegram">Привязать Telegram</string>
     <string name="settings_auth_telegram_linked">Telegram привязан</string>
-    <string name="settings_auth_telegram_hint">Нажми кнопку Telegram — аккаунт сохранит историю в облаке.</string>
+    <string name="settings_auth_telegram_hint">Откроется Telegram — нажми «Start» в боте. Потом вернись в приложение.</string>
+    <string name="settings_auth_telegram_waiting">Ждём подтверждение в Telegram…</string>
+    <string name="settings_auth_telegram_timeout">Время вышло — нажми Telegram ещё раз</string>
     <string name="account_login_title">Вход в аккаунт</string>
     <string name="account_login_subtitle">Код придёт на почту или войди через Telegram. Новый аккаунт — пробный Premium 7 дней.</string>
     <string name="account_login_skip">Продолжить без входа</string>

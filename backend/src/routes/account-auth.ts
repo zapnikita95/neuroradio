@@ -9,62 +9,22 @@ import {
 } from '../services/account-store.js';
 import { verifyTelegramLogin, type TelegramAuthPayload } from '../services/telegram-auth.js';
 import { isEmailConfigured } from '../services/email-sender.js';
+import { isTelegramBotConfigured } from '../services/telegram-bot-poller.js';
+import {
+  checkTelegramMobileLogin,
+  startTelegramMobileLogin,
+} from '../services/telegram-mobile-auth.js';
 
 const router = Router();
-
-/** Telegram Login Widget page (WebView in Android). Domain must match @BotFather /setdomain. */
-router.get('/telegram/widget', (_req: Request, res: Response) => {
-  const botUsername = process.env.TELEGRAM_BOT_USERNAME?.trim();
-  const botToken = process.env.TELEGRAM_BOT_TOKEN?.trim();
-  if (!botUsername || !botToken) {
-    res.status(503).type('text/html; charset=utf-8').send(
-      '<!DOCTYPE html><html><body style="font-family:sans-serif;background:#1a1520;color:#fff;padding:24px">' +
-        '<p>Telegram login не настроен на сервере (TELEGRAM_BOT_TOKEN, TELEGRAM_BOT_USERNAME).</p></body></html>',
-    );
-    return;
-  }
-
-  const safeUsername = botUsername.replace(/[^a-zA-Z0-9_]/g, '');
-  res.type('text/html; charset=utf-8').send(`<!DOCTYPE html>
-<html lang="ru">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Music Story — Telegram</title>
-<style>
-  body { font-family: system-ui, sans-serif; background: #1a1520; color: #f5efe6; margin: 0; min-height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 16px; padding: 24px; box-sizing: border-box; }
-  p { color: #a89bb8; text-align: center; max-width: 320px; line-height: 1.45; }
-</style>
-</head>
-<body>
-<p>Войди через Telegram — аккаунт привяжется к этому устройству.</p>
-<script>
-function onTelegramAuth(user) {
-  if (window.MusicStoryAndroid && window.MusicStoryAndroid.onTelegramAuth) {
-    window.MusicStoryAndroid.onTelegramAuth(JSON.stringify(user));
-  } else {
-    document.body.innerHTML = '<p style="color:#f88">Открой эту страницу из приложения Music Story.</p>';
-  }
-}
-</script>
-<script async src="https://telegram.org/js/telegram-widget.js?22"
-  data-telegram-login="${safeUsername}"
-  data-size="large"
-  data-onauth="onTelegramAuth(user)"
-  data-request-access="write"></script>
-</body>
-</html>`);
-});
 
 router.use(requireAppAuth);
 
 router.get('/config', (_req: Request, res: Response) => {
-  const botToken = process.env.TELEGRAM_BOT_TOKEN?.trim();
-  const botUsername = process.env.TELEGRAM_BOT_USERNAME?.trim();
+  const botUsername = process.env.TELEGRAM_BOT_USERNAME?.trim().replace(/^@/, '') ?? null;
   res.json({
     emailEnabled: isEmailConfigured(),
-    telegramEnabled: Boolean(botToken && botUsername),
-    telegramBotUsername: botUsername ?? null,
+    telegramEnabled: isTelegramBotConfigured(),
+    telegramBotUsername: botUsername,
   });
 });
 
@@ -96,6 +56,49 @@ router.post('/email/verify', (req: Request, res: Response) => {
   res.json({ ok: true, accountId: result.accountId, profile: getAccountProfile(req.installId!) });
 });
 
+/** Movie Planner-style: open t.me/bot?start=mobileauth_<code>, bot confirms, app polls. */
+router.post('/telegram-mobile/start', (req: Request, res: Response) => {
+  if (!isTelegramBotConfigured()) {
+    res.status(503).json({ error: 'Telegram bot не настроен (TELEGRAM_BOT_TOKEN, TELEGRAM_BOT_USERNAME)' });
+    return;
+  }
+  const started = startTelegramMobileLogin(req.installId!);
+  res.json({
+    ok: true,
+    code: started.code,
+    deep_link: started.deepLink,
+    expiresInSec: started.expiresInSec,
+  });
+});
+
+router.post('/telegram-mobile/check', (req: Request, res: Response) => {
+  const code = typeof req.body?.code === 'string' ? req.body.code : '';
+  if (!code.trim()) {
+    res.status(400).json({ error: 'code required' });
+    return;
+  }
+  const result = checkTelegramMobileLogin(req.installId!, code);
+  if (!result.ok) {
+    res.status(400).json({ error: result.error });
+    return;
+  }
+  if ('verified' in result && result.verified === false) {
+    res.json({ ok: true, verified: false });
+    return;
+  }
+  if ('accountId' in result) {
+    res.json({
+      ok: true,
+      verified: true,
+      accountId: result.accountId,
+      profile: result.profile,
+    });
+    return;
+  }
+  res.json({ ok: true, verified: false });
+});
+
+/** Legacy Login Widget verify (web). Android uses telegram-mobile flow. */
 router.post('/telegram', (req: Request, res: Response) => {
   const botToken = process.env.TELEGRAM_BOT_TOKEN?.trim();
   if (!botToken) {

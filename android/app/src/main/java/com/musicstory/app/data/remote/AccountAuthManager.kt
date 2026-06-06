@@ -66,6 +66,56 @@ class AccountAuthManager(
         }.getOrNull()
     }
 
+    suspend fun startTelegramMobileLogin(baseUrl: String): TelegramMobileStart? = withContext(Dispatchers.IO) {
+        val token = authManager.getAccessToken(baseUrl) ?: return@withContext null
+        val req = Request.Builder()
+            .url("${baseUrl.trimEnd('/')}/v1/account/telegram-mobile/start")
+            .header("Authorization", "Bearer $token")
+            .post("{}".toRequestBody("application/json".toMediaType()))
+            .build()
+        runCatching {
+            http.newCall(req).execute().use { resp ->
+                if (!resp.isSuccessful) return@withContext null
+                val json = JSONObject(resp.body?.string().orEmpty())
+                val code = json.optString("code").trim()
+                val deepLink = parseOptionalString(json, "deep_link") ?: return@withContext null
+                if (code.isBlank()) return@withContext null
+                TelegramMobileStart(
+                    code = code,
+                    deepLink = deepLink,
+                    expiresInSec = json.optInt("expiresInSec", 900),
+                )
+            }
+        }.getOrNull()
+    }
+
+    suspend fun pollTelegramMobileLogin(baseUrl: String, code: String): TelegramPollResult =
+        withContext(Dispatchers.IO) {
+            val token = authManager.getAccessToken(baseUrl) ?: return@withContext TelegramPollResult.Error("Нет связи с сервером")
+            val body = JSONObject().put("code", code.trim()).toString()
+            val req = Request.Builder()
+                .url("${baseUrl.trimEnd('/')}/v1/account/telegram-mobile/check")
+                .header("Authorization", "Bearer $token")
+                .post(body.toRequestBody("application/json".toMediaType()))
+                .build()
+            runCatching {
+                http.newCall(req).execute().use { resp ->
+                    val raw = resp.body?.string().orEmpty()
+                    val json = JSONObject(raw)
+                    if (!resp.isSuccessful) {
+                        return@withContext TelegramPollResult.Error(
+                            json.optString("error").ifBlank { "Ошибка Telegram" },
+                        )
+                    }
+                    if (!json.optBoolean("verified", false)) {
+                        return@withContext TelegramPollResult.Pending
+                    }
+                    val profileJson = json.optJSONObject("profile") ?: json
+                    TelegramPollResult.Success(parseProfile(profileJson))
+                }
+            }.getOrDefault(TelegramPollResult.Error("Ошибка сети"))
+        }
+
     suspend fun linkTelegram(baseUrl: String, authJson: JSONObject): Pair<AccountProfile?, String?> =
         withContext(Dispatchers.IO) {
             val token = authManager.getAccessToken(baseUrl) ?: return@withContext null to "Нет связи с сервером"
@@ -133,6 +183,18 @@ class AccountAuthManager(
         val telegramEnabled: Boolean,
         val telegramBotUsername: String?,
     )
+
+    data class TelegramMobileStart(
+        val code: String,
+        val deepLink: String,
+        val expiresInSec: Int,
+    )
+
+    sealed class TelegramPollResult {
+        data object Pending : TelegramPollResult()
+        data class Success(val profile: AccountProfile) : TelegramPollResult()
+        data class Error(val message: String) : TelegramPollResult()
+    }
 
     data class AccountProfile(
         val accountId: String?,
