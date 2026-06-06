@@ -18,6 +18,7 @@ import {
   type StoredFact,
   trackKey,
 } from './fact-bank.js';
+import type { CoverFactContext } from './cover-resolve.js';
 import { splitBundleByScope, rankScopedFacts } from './fact-ranking.js';
 import { factMentionsArtistAsEntity, isAmbiguousCommonWordArtist } from './fact-relevance.js';
 import type { ReferenceFactBundle } from './fact-picker.js';
@@ -94,11 +95,19 @@ export async function pickBankFactForUser(
   installId: string,
   artist: string,
   title: string,
+  cover?: CoverFactContext,
 ): Promise<SelectedReferenceFact | null> {
   ensureAccount(installId);
   const used = await getUsedFingerprints(installId, artist, title);
-  const fromBank = pickFromBank(artist, title, used);
-  return fromBank ? storedFactToSelected(fromBank) : null;
+  const keys: Array<[string, string]> = [[artist, title]];
+  if (cover?.isCover) {
+    keys.push([cover.factArtist, cover.factTitle]);
+  }
+  for (const [a, t] of keys) {
+    const fromBank = pickFromBank(a, t, used);
+    if (fromBank) return storedFactToSelected(fromBank);
+  }
+  return null;
 }
 
 export async function countUnusedBankFactsForUser(

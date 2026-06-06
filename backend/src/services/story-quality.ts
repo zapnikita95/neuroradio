@@ -4,7 +4,7 @@ import {
   StoryLengthId,
   StoryLengthPreset,
 } from './story-length.js';
-import { storyNamesForeignArtist } from './fact-relevance.js';
+import { COVER_CONTEXT_RE, factMentionsArtist, storyNamesForeignArtist } from './fact-relevance.js';
 import { hasEnglishLeak } from './story-russian-language.js';
 import { prepareStoryScriptLanguage } from './story-english-normalize.js';
 
@@ -558,6 +558,11 @@ export function validateStoryScript(
 
   if (storyNamesForeignArtist(trimmed, artist, title, referenceFacts)) {
     return { ok: false, reason: 'story names a different artist than the track' };
+  }
+
+  const coverStory = referenceFacts.some((f) => COVER_CONTEXT_RE.test(f));
+  if (!coverStory && !factMentionsArtist(trimmed, artist)) {
+    return { ok: false, reason: 'story does not mention the performing artist' };
   }
 
   if (!skipBannedPatterns) {

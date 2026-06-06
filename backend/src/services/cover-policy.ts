@@ -15,7 +15,7 @@ import { interestScore } from './reference-fact-quality.js';
 export { COVER_CONTEXT_RE };
 
 const EXPLICIT_COVER_TITLE_RE =
-  /\((?:[^)]*(?:cover|кавер|перепев)[^)]*)\)|\[(?:cover|кавер)\]|(?:^|\s)(?:cover|кавер)(?:\s|$)|(?:^|\s)(?:live\s+cover|cover\s+version)(?:\s|$)/i;
+  /\((?:[^)]*(?:cover|кавер|перепев|originally\s+(?:recorded|performed|written|sung)\s+by|originally\s+by|as\s+(?:made\s+)?famous\s+by|in\s+the\s+style\s+of|tribute\s+to|karaoke)[^)]*)\)|\[(?:cover|кавер)\]|(?:^|\s)(?:cover|кавер)(?:\s|$)|(?:^|\s)(?:live\s+cover|cover\s+version)(?:\s|$)/i;
 
 export type CoverSituation =
   | { action: 'proceed' }

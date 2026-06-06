@@ -6,7 +6,7 @@ import { callOpenAiChatCompletion } from './llm-openai-chat.js';
 import { buildOpenRouterFreeModelChain } from './openrouter-models.js';
 import { resolveGeminiModel, DEFAULT_GEMINI_MODEL } from './gemini-models.js';
 import { preserveMusicProperNames } from './tts-foreign-pronounce.js';
-import { sanitizeScriptForTts } from './story-quality.js';
+import { sanitizeScriptForTts, countWords } from './story-quality.js';
 import { factMentionsArtist } from './fact-relevance.js';
 
 const GROQ_API_URL = 'https://api.groq.com/openai/v1/chat/completions';
@@ -149,6 +149,7 @@ export interface IndieWikiStoryInput {
 function scriptFromRaw(raw: string, artist: string, title: string, wikiLead: string): string | null {
   const script = parseJsonScript(raw);
   if (!script || script.length < 40) return null;
+  if (countWords(script) < 25) return null;
   const fixed = preserveMusicProperNames(script, artist, title);
   if (!factMentionsArtist(fixed, artist)) return null;
   return sanitizeScriptForTts(fixed, artist, title, [wikiLead]);

@@ -31,6 +31,8 @@ import {
 import { hasLlmKeyForProvider, resolveLlmProvider, resolveEffectiveStoryLlmProvider, clientKeyForProvider, type ClientLlmKeys, type ClientLocalOllama } from '../services/llm-provider.js';
 import { generateStoryWithFallback } from '../services/story-llm-router.js';
 import { fetchArtistWikiLead } from '../services/wikipedia-lead.js';
+import { resolveCoverForFacts } from '../services/cover-resolve.js';
+import { lookupCuratedFact } from '../services/curated-facts.js';
 import { translateWikiLeadToStory } from '../services/indie-wiki-story.js';
 import {
   pickArtistWikiContent,
@@ -299,7 +301,14 @@ router.post('/full', validateStoryFullBody, storyFullRateLimit, async (req: Requ
   try {
     timing.mark('request');
 
-    const metadata = await enrichTrackMetadata(artist, title);
+    const coverCtx = resolveCoverForFacts(artist, title);
+    if (coverCtx.isCover) {
+      console.log(
+        `[cover] "${artist}" — "${title}" → facts for "${coverCtx.factArtist}" — "${coverCtx.factTitle}"`,
+      );
+    }
+
+    const metadata = await enrichTrackMetadata(coverCtx.factArtist, coverCtx.factTitle);
     timing.mark('metadata', `year=${metadata.year ?? '-'} mbid=${metadata.mbid ? 'yes' : 'no'}`);
     const delivery = resolveVoiceDelivery({
       ttsVoice,
@@ -322,7 +331,25 @@ router.post('/full', validateStoryFullBody, storyFullRateLimit, async (req: Requ
     ];
 
     ensureAccount(installId);
-    const bankFact = await pickBankFactForUser(installId, metadata.artist, metadata.title);
+
+    let bankFact = await pickBankFactForUser(installId, artist, title, coverCtx);
+    if (!bankFact) {
+      const curated = lookupCuratedFact(artist, title);
+      if (curated) {
+        ingestFacts(artist, title, [{ fact: curated.fact, scope: curated.scope, source: 'api' }]);
+        bankFact = {
+          fact: curated.fact,
+          scope: curated.scope,
+          scopeLabelRu: curated.scope === 'track' ? 'трек' : 'группа/артист',
+          interestScore: interestScore(curated.fact),
+          interestRating: interestRating10(curated.fact),
+        };
+        console.log(`[facts] curated hit artist="${artist}" title="${title}"`);
+      }
+    }
+
+    const factArtist = coverCtx.factArtist;
+    const factTitle = coverCtx.factTitle;
     let factCtx = emptyAggregatedFactContext();
     let factBundle = factCtx.bundle;
     let trackFactCount = 0;
@@ -397,8 +424,11 @@ router.post('/full', validateStoryFullBody, storyFullRateLimit, async (req: Requ
         console.log(`[facts] metadata-only seeds (${metaFacts.length}) for "${metadata.artist}"`);
       }
 
-      ingestBundleToBank(metadata.artist, metadata.title, factBundle);
-      prefetchArtistFactsToBank(installId, metadata.artist, metadata.title, factBundle);
+      ingestBundleToBank(factArtist, factTitle, factBundle);
+      if (coverCtx.isCover) {
+        ingestBundleToBank(artist, title, factBundle);
+      }
+      prefetchArtistFactsToBank(installId, factArtist, factTitle, factBundle);
 
       selectedFact = await pickFactForUser(
         installId,
@@ -592,8 +622,8 @@ router.post('/full', validateStoryFullBody, storyFullRateLimit, async (req: Requ
     const finalReferenceFacts = selectedFact ? [selectedFact.fact] : referenceFacts;
 
     const coverSituation = assessCoverSituation(
-      metadata.artist,
-      metadata.title,
+      artist,
+      title,
       selectedFact,
       factBundle,
       artistTier,
@@ -612,12 +642,16 @@ router.post('/full', validateStoryFullBody, storyFullRateLimit, async (req: Requ
       selectedFact = coverSituation.artistFact;
     }
 
-    const storyReferenceFacts =
+    let storyReferenceFacts =
       coverSituation.action === 'pivot_artist'
         ? coverSituation.referenceFacts
         : selectedFact
           ? [selectedFact.fact]
           : finalReferenceFacts;
+
+    if (coverCtx.isCover && coverCtx.coverNoteRu) {
+      storyReferenceFacts = [coverCtx.coverNoteRu, ...storyReferenceFacts];
+    }
 
     const storyInput = {
       artist: metadata.artist,
@@ -782,8 +816,8 @@ router.post('/full', validateStoryFullBody, storyFullRateLimit, async (req: Requ
     console.log('[story-script-end]');
 
     const response: Record<string, unknown> = {
-      artist: metadata.artist,
-      title: metadata.title,
+      artist,
+      title,
       year: metadata.year ?? null,
       genre: metadata.genre ?? null,
       country: metadata.countryCode ?? null,
