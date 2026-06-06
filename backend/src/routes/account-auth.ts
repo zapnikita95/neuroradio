@@ -8,6 +8,7 @@ import {
   verifyEmailLogin,
 } from '../services/account-store.js';
 import { verifyTelegramLogin, type TelegramAuthPayload } from '../services/telegram-auth.js';
+import { isEmailConfigured } from '../services/email-sender.js';
 
 const router = Router();
 
@@ -58,13 +59,10 @@ function onTelegramAuth(user) {
 router.use(requireAppAuth);
 
 router.get('/config', (_req: Request, res: Response) => {
-  const smtpHost = process.env.SMTP_HOST?.trim();
-  const smtpUser = process.env.SMTP_USER?.trim();
-  const smtpPass = process.env.SMTP_PASS?.trim();
   const botToken = process.env.TELEGRAM_BOT_TOKEN?.trim();
   const botUsername = process.env.TELEGRAM_BOT_USERNAME?.trim();
   res.json({
-    emailEnabled: Boolean(smtpHost && smtpUser && smtpPass),
+    emailEnabled: isEmailConfigured(),
     telegramEnabled: Boolean(botToken && botUsername),
     telegramBotUsername: botUsername ?? null,
   });

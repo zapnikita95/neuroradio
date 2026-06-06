@@ -11,6 +11,7 @@ import {
   pgInsertUsedSeed,
   pgListStoryHistory,
 } from './story-history-store.js';
+import { isEmailConfigured } from './email-sender.js';
 
 const PREMIUM_PRODUCT_MONTHLY = 'premium_voice_monthly';
 const TRIAL_PRODUCT_MONTHLY = 'trial_stories_monthly';
@@ -615,12 +616,12 @@ export function startEmailLogin(installId: string, emailRaw: string): { ok: true
   store.pendingEmailCodes = store.pendingEmailCodes ?? {};
   store.pendingEmailCodes[email] = { code, installId: normalized, email, expiresAt };
   saveStore(store);
-  if (process.env.SMTP_HOST?.trim()) {
+  if (isEmailConfigured()) {
     void import('./email-sender.js').then((m) => m.sendLoginCodeEmail(email, code)).catch((err) => {
       console.warn('[email-auth] send failed:', err instanceof Error ? err.message : err);
     });
   } else {
-    console.log(`[email-auth] code for ${email}: ${code} (set SMTP_HOST or read logs)`);
+    console.log(`[email-auth] code for ${email}: ${code} (set RESEND_API_KEY + RESEND_FROM or read logs)`);
   }
   return { ok: true, expiresInSec: 900 };
 }

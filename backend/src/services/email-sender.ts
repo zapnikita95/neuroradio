@@ -1,26 +1,34 @@
-import nodemailer from 'nodemailer';
+const RESEND_API = 'https://api.resend.com/emails';
+
+export function isEmailConfigured(): boolean {
+  const apiKey = process.env.RESEND_API_KEY?.trim();
+  const from = process.env.RESEND_FROM?.trim();
+  return Boolean(apiKey && from);
+}
 
 export async function sendLoginCodeEmail(to: string, code: string): Promise<void> {
-  const host = process.env.SMTP_HOST?.trim();
-  const user = process.env.SMTP_USER?.trim();
-  const pass = process.env.SMTP_PASS?.trim();
-  const from = process.env.SMTP_FROM?.trim() ?? user;
-  if (!host || !user || !pass || !from) {
-    throw new Error('SMTP not configured');
+  const apiKey = process.env.RESEND_API_KEY?.trim();
+  const from = process.env.RESEND_FROM?.trim();
+  if (!apiKey || !from) {
+    throw new Error('Resend not configured (RESEND_API_KEY, RESEND_FROM)');
   }
 
-  const port = parseInt(process.env.SMTP_PORT ?? '587', 10);
-  const transporter = nodemailer.createTransport({
-    host,
-    port,
-    secure: port === 465,
-    auth: { user, pass },
+  const res = await fetch(RESEND_API, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      from,
+      to: [to],
+      subject: 'Music Story — код входа',
+      text: `Код для входа: ${code}\n\nДействует 15 минут.`,
+    }),
   });
 
-  await transporter.sendMail({
-    from,
-    to,
-    subject: 'Music Story — код входа',
-    text: `Код для входа: ${code}\n\nДействует 15 минут.`,
-  });
+  if (!res.ok) {
+    const detail = await res.text().catch(() => '');
+    throw new Error(`Resend HTTP ${res.status}${detail ? `: ${detail.slice(0, 200)}` : ''}`);
+  }
 }
