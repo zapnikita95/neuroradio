@@ -27,12 +27,6 @@ import { logRejectedScript } from './story-reject-log.js';
 
 const OPENROUTER_API_URL = 'https://openrouter.ai/api/v1/chat/completions';
 const MAX_ATTEMPTS = 1;
-const RATE_LIMIT_RETRIES = 3;
-const RATE_LIMIT_DELAYS_MS = [2000, 5000, 10000];
-
-function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
 
 function openRouterHeaders(): Record<string, string> {
   return {
@@ -179,102 +173,93 @@ export async function generateStoryScript(
   let lastError: Error | undefined;
 
   for (const model of models) {
-    let rateLimitTry = 0;
-    modelLoop: while (rateLimitTry <= RATE_LIMIT_RETRIES) {
-      try {
-        for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
-          const userPrompt = buildStoryUserPrompt({
-            ...input,
-            voiceId,
-            storyLength,
-            previousScripts,
-            selectedReferenceFact: input.selectedReferenceFact,
-          });
+    try {
+      for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
+        const userPrompt = buildStoryUserPrompt({
+          ...input,
+          voiceId,
+          storyLength,
+          previousScripts,
+          selectedReferenceFact: input.selectedReferenceFact,
+        });
 
-          const content = await callOpenRouter(
-            systemPrompt,
-            userPrompt,
-            lengthPreset.maxTokens,
-            model,
-            input.clientOpenRouterApiKey,
-          );
-          console.log(`[openrouter] single-shot story model=${model}`);
+        const content = await callOpenRouter(
+          systemPrompt,
+          userPrompt,
+          lengthPreset.maxTokens,
+          model,
+          input.clientOpenRouterApiKey,
+        );
+        console.log(`[openrouter] single-shot story model=${model}`);
 
-          const story = parseStoryJson(content);
-          if (!story) {
-            console.warn(
-              `[openrouter] model=${model} invalid JSON, snippet=${content.slice(0, 160).replace(/\s+/g, ' ')}`,
-            );
-            break modelLoop;
-          }
-
-          story.voiceId = voiceId;
-          story.word_count = countWords(story.script);
-          const qOpts = qualityOptionsForOpenRouterAttempt(attempt, MAX_ATTEMPTS, referenceFacts);
-          qOpts.previousScripts = previousScripts;
-
-          const quality = validateGeneratedStory(
-            story.script,
-            storyLength,
-            input.artist,
-            input.title,
-            qOpts,
-          );
-          if (quality.ok) {
-            return finalizeStory(story, { ...input, voiceId }, storyLength);
-          }
-
-          const sanitized = sanitizeScriptForTts(
-            story.script,
-            input.artist,
-            input.title,
-            input.referenceFacts ?? [],
-          );
-          const sanitizedQuality = validateGeneratedStory(
-            sanitized,
-            storyLength,
-            input.artist,
-            input.title,
-            qOpts,
-          );
-          if (sanitizedQuality.ok) {
-            console.warn(`Story sanitized after attempt ${attempt + 1}: ${quality.reason}`);
-            return finalizeStory({ ...story, script: sanitized }, { ...input, voiceId }, storyLength);
-          }
-
-          lastCandidate = { ...story, script: sanitized };
-          const rejectReason = sanitizedQuality.reason ?? quality.reason ?? 'quality';
-          const isPersonaOnly =
-            /^(?:persona cliche|generic fiction|cliche filler):/i.test(rejectReason);
-          if (isPersonaOnly && qOpts.skipPersonaCliches) {
-            console.log(
-              `[openrouter] persona-style note (not rejected in production): ${rejectReason}`,
-            );
-            return finalizeStory({ ...story, script: sanitized }, { ...input, voiceId }, storyLength);
-          }
-          logRejectedScript(
-            'OpenRouter quality reject (single-shot)',
-            sanitized,
-            rejectReason,
-          );
-        }
-        break modelLoop;
-      } catch (err) {
-        if (isOpenRouterRateLimitError(err) && rateLimitTry < RATE_LIMIT_RETRIES) {
-          const delay = RATE_LIMIT_DELAYS_MS[rateLimitTry] ?? 10000;
+        const story = parseStoryJson(content);
+        if (!story) {
           console.warn(
-            `[openrouter] model=${model} rate-limited — retry ${rateLimitTry + 1}/${RATE_LIMIT_RETRIES} in ${delay}ms`,
+            `[openrouter] model=${model} invalid JSON, snippet=${content.slice(0, 160).replace(/\s+/g, ' ')} — next model`,
           );
-          await sleep(delay);
-          rateLimitTry++;
-          continue;
+          break;
         }
-        lastError = err instanceof Error ? err : new Error(String(err));
-        const msg = lastError.message;
-        if (!isOpenRouterRateLimitError(err) && !/quality reject/i.test(msg)) {
-          console.warn(`[openrouter] model=${model} failed: ${msg.slice(0, 160)}`);
+
+        story.voiceId = voiceId;
+        story.word_count = countWords(story.script);
+        const qOpts = qualityOptionsForOpenRouterAttempt(attempt, MAX_ATTEMPTS, referenceFacts);
+        qOpts.previousScripts = previousScripts;
+
+        const quality = validateGeneratedStory(
+          story.script,
+          storyLength,
+          input.artist,
+          input.title,
+          qOpts,
+        );
+        if (quality.ok) {
+          return finalizeStory(story, { ...input, voiceId }, storyLength);
         }
-        break modelLoop;
+
+        const sanitized = sanitizeScriptForTts(
+          story.script,
+          input.artist,
+          input.title,
+          input.referenceFacts ?? [],
+        );
+        const sanitizedQuality = validateGeneratedStory(
+          sanitized,
+          storyLength,
+          input.artist,
+          input.title,
+          qOpts,
+        );
+        if (sanitizedQuality.ok) {
+          console.warn(`Story sanitized after attempt ${attempt + 1}: ${quality.reason}`);
+          return finalizeStory({ ...story, script: sanitized }, { ...input, voiceId }, storyLength);
+        }
+
+        lastCandidate = { ...story, script: sanitized };
+        const rejectReason = sanitizedQuality.reason ?? quality.reason ?? 'quality';
+        const isPersonaOnly =
+          /^(?:persona cliche|generic fiction|cliche filler):/i.test(rejectReason);
+        if (isPersonaOnly && qOpts.skipPersonaCliches) {
+          console.log(
+            `[openrouter] persona-style note (not rejected in production): ${rejectReason}`,
+          );
+          return finalizeStory({ ...story, script: sanitized }, { ...input, voiceId }, storyLength);
+        }
+        logRejectedScript(
+          'OpenRouter quality reject (single-shot)',
+          sanitized,
+          rejectReason,
+        );
+        console.warn(`[openrouter] model=${model} quality reject — next model`);
+      }
+    } catch (err) {
+      lastError = err instanceof Error ? err : new Error(String(err));
+      const msg = lastError.message;
+      if (isOpenRouterRateLimitError(err)) {
+        console.warn(`[openrouter] model=${model} rate-limited — next model`);
+        continue;
+      }
+      if (!/quality reject/i.test(msg)) {
+        console.warn(`[openrouter] model=${model} failed: ${msg.slice(0, 160)} — next model`);
       }
     }
   }

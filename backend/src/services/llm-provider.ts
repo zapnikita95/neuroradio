@@ -73,14 +73,21 @@ export function alternateLlmProviders(
   );
 }
 
-/** Server-managed free tier: OpenRouter only. Paid/own-key: OpenRouter → Groq, never Gemini/local. */
+/**
+ * Free tier without own key: OpenRouter :free chain first, then server Groq if all models 429.
+ * Paid/own-key: OpenRouter → Groq, never Gemini/local.
+ */
 export function alternateStoryLlmProviders(
   preferred: LlmProviderId,
   clientKeys?: ClientLlmKeys,
   clientLocal?: ClientLocalOllama,
   options: { serverManaged?: boolean } = {},
 ): LlmProviderId[] {
-  if (options.serverManaged) return [];
+  if (options.serverManaged) {
+    return STORY_LLM_FALLBACK_ORDER.filter(
+      (p) => p === 'groq' && p !== preferred && hasLlmKeyForProvider(p, clientKeys, clientLocal),
+    );
+  }
   return STORY_LLM_FALLBACK_ORDER.filter(
     (p) => p !== preferred && hasLlmKeyForProvider(p, clientKeys, clientLocal),
   );

@@ -9,6 +9,7 @@ import {
   OPENROUTER_DEFAULT_STORY_MODEL,
   OPENROUTER_FREE_FACT_MODEL_FALLBACK,
   OPENROUTER_TRIAL_FACT_MODEL,
+  buildOpenRouterFreeModelChain,
 } from './openrouter-models.js';
 
 /** Бесплатный: Gemma :free (+ fallback Nemotron). Trial: Gemma paid. Premium: DeepSeek V3. */
@@ -90,13 +91,15 @@ export function resolveOpenRouterModelForTier(
   return slot === 'fact' ? OPENROUTER_DEFAULT_FREE_FACT_MODEL : OPENROUTER_DEFAULT_STORY_MODEL;
 }
 
-/** Fact-hunt: free tier — одна выбранная модель, без цепочки fallback. */
+/** Fact-hunt: free tier — user pick + :free chain on 429. */
 export function resolveOpenRouterFactModelsForTier(
   tier: UserTier,
   preferredModel?: string,
 ): string[] {
   if (tier === 'free') {
-    return [resolveFreeModelProfile(preferredModel).modelId];
+    return buildOpenRouterFreeModelChain(
+      preferredModel?.trim() || resolveFreeModelProfile(preferredModel).modelId,
+    );
   }
   if (tier === 'trial') {
     return [TIER_OPENROUTER_TRIAL_FACT_MODEL, TIER_OPENROUTER_FACT_MODEL];
@@ -104,13 +107,15 @@ export function resolveOpenRouterFactModelsForTier(
   return [TIER_OPENROUTER_FACT_MODEL];
 }
 
-/** Free story: Gemma first (stable JSON), Nemotron fallback. Fact-hunt uses user pick separately. */
+/** Free story: user pick → Liquid LFM → Nemotron; Groq fallback in story-llm-router if all 429. */
 export function resolveOpenRouterStoryModelsForTier(
   tier: UserTier,
-  _preferredModel?: string,
+  preferredModel?: string,
 ): string[] {
   if (tier === 'free') {
-    return [OPENROUTER_DEFAULT_FREE_FACT_MODEL, OPENROUTER_FREE_FACT_MODEL_FALLBACK];
+    return buildOpenRouterFreeModelChain(
+      preferredModel?.trim() || resolveFreeModelProfile(preferredModel).modelId,
+    );
   }
   if (tier === 'trial') {
     return [TIER_OPENROUTER_FACT_MODEL];

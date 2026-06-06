@@ -31,6 +31,26 @@ export const OPENROUTER_DEFAULT_STORY_MODEL = 'liquid/lfm-2.5-1.2b-instruct:free
 /** По умолчанию для сервера — fact-модель (главный гэп) */
 export const OPENROUTER_DEFAULT_MODEL = OPENROUTER_DEFAULT_FACT_MODEL;
 
+/**
+ * Free-tier failover chain. User pick first; Liquid LFM before Nemotron for story JSON.
+ * Gemma/Nemotron often 429 upstream; Liquid LFM is faster and more stable for story text.
+ */
+export const OPENROUTER_FREE_MODEL_CHAIN: readonly string[] = [
+  OPENROUTER_DEFAULT_FREE_FACT_MODEL,
+  OPENROUTER_DEFAULT_STORY_MODEL,
+  OPENROUTER_FREE_FACT_MODEL_FALLBACK,
+];
+
+/** Dedupe while preserving order; put user-preferred :free model first. */
+export function buildOpenRouterFreeModelChain(preferred?: string): string[] {
+  const pref = preferred?.trim();
+  const base = [...OPENROUTER_FREE_MODEL_CHAIN];
+  if (pref && pref.includes('/') && pref.includes(':free')) {
+    return [pref, ...base.filter((m) => m !== pref)];
+  }
+  return base;
+}
+
 export const OPENROUTER_FREE_MODELS: OpenRouterModelOption[] = [
   {
     id: OPENROUTER_DEFAULT_FREE_FACT_MODEL,
@@ -78,15 +98,16 @@ export function isOpenRouterPresetModel(id: string): boolean {
   return PRESET_IDS.has(id.trim());
 }
 
-/** Free fact-hunt: Gemma :free → Nemotron :free. */
+/** Free fact-hunt: user pick → full :free chain. */
 export function resolveOpenRouterFactModelOrder(preferred?: string): string[] {
   const fromRequest = preferred?.trim();
   if (fromRequest && fromRequest !== OPENROUTER_MODEL_CUSTOM && fromRequest.includes('/')) {
+    if (fromRequest.includes(':free')) return buildOpenRouterFreeModelChain(fromRequest);
     return [fromRequest];
   }
   const env = process.env.OPENROUTER_FACT_MODEL?.trim();
-  if (env) return [env];
-  return [OPENROUTER_DEFAULT_FREE_FACT_MODEL, OPENROUTER_FREE_FACT_MODEL_FALLBACK];
+  if (env) return env.includes(':free') ? buildOpenRouterFreeModelChain(env) : [env];
+  return buildOpenRouterFreeModelChain();
 }
 
 export function resolveOpenRouterModel(

@@ -20,7 +20,7 @@ import {
 } from './llm-provider.js';
 
 export interface StoryGenerationOptions {
-  /** Free tier on Railway — only OpenRouter model chain, no Groq/Gemini/local fallback. */
+  /** Free tier on Railway — OpenRouter :free chain, then server Groq if exhausted. */
   serverManaged?: boolean;
 }
 
@@ -91,7 +91,10 @@ export async function generateStoryWithFallback(
   if (clientOwnKey && chain.length === 1) {
     console.log(`[story-llm] own_key=true provider=${preferred} — no server fallback chain`);
   } else if (options.serverManaged) {
-    console.log('[story-llm] serverManaged=true — OpenRouter only, no Groq/Gemini fallback');
+    const groqFallback = chain.includes('groq');
+    console.log(
+      `[story-llm] serverManaged=true — OpenRouter :free chain${groqFallback ? ', Groq if 429' : ''}`,
+    );
   }
 
   let lastError: unknown;
