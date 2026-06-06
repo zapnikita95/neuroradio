@@ -32,8 +32,6 @@ import { ingestCuratedFactsOnBoot } from './services/curated-facts.js';
 import { initPostgres, hasPostgres, closePostgres } from './services/db.js';
 import { hydrateAccountStoreFromPostgres, migrateAccountStoryDataToPostgres } from './services/account-store.js';
 import { hydrateDevTierStoreFromPostgres } from './services/dev-tier-store.js';
-import { hydrateTelegramMobileAuthFromPostgres } from './services/telegram-mobile-auth.js';
-import { startTelegramBotPolling, stopTelegramBotPolling, isTelegramBotConfigured } from './services/telegram-bot-poller.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PORT = parseInt(process.env.PORT ?? '3000', 10);
@@ -159,7 +157,6 @@ async function boot(): Promise<void> {
   if (hasPostgres()) {
     await hydrateAccountStoreFromPostgres();
     await hydrateDevTierStoreFromPostgres();
-    await hydrateTelegramMobileAuthFromPostgres();
     await migrateAccountStoryDataToPostgres();
     console.log('[boot] postgres stores hydrated');
   }
@@ -175,10 +172,7 @@ async function boot(): Promise<void> {
   const server = app.listen(PORT, '0.0.0.0', () => {
     console.log(`Music Story BFF listening on http://0.0.0.0:${PORT}`);
     console.log(`[boot] log file: ${process.env.LOCAL_LOG_FILE ?? '(console only)'}`);
-    console.log(`[boot] build=${BUILD_ID} llm=${resolveLlmProvider()} openrouter=${hasOpenRouterApiKey()} groq=${hasGroqApiKey()} gemini=${hasGeminiApiKey()} yandexTts=${hasYandexCredentials()} auth=${isAppAuthEnabled()} postgres=${hasPostgres()} telegramBot=${isTelegramBotConfigured()}`);
-    if (isTelegramBotConfigured()) {
-      void startTelegramBotPolling();
-    }
+    console.log(`[boot] build=${BUILD_ID} llm=${resolveLlmProvider()} openrouter=${hasOpenRouterApiKey()} groq=${hasGroqApiKey()} gemini=${hasGeminiApiKey()} yandexTts=${hasYandexCredentials()} auth=${isAppAuthEnabled()} postgres=${hasPostgres()}`);
     console.log(`  POST /v1/auth/token — app JWT`);
     console.log(`  GET  /v1/account/* — email/Telegram auth + 7-day trial`);
     console.log(`  GET  /v1/sync/* — linked account settings & history`);
@@ -198,7 +192,6 @@ async function boot(): Promise<void> {
 
   function shutdown(signal: string): void {
     console.log(`[shutdown] ${signal} — closing HTTP server`);
-    stopTelegramBotPolling();
     server.close(async () => {
       await closePostgres();
       process.exit(0);

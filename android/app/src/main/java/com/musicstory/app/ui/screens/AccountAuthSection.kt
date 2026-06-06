@@ -1,7 +1,5 @@
 package com.musicstory.app.ui.screens
 
-import android.content.Intent
-import android.net.Uri
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -28,6 +26,7 @@ import com.musicstory.app.R
 import com.musicstory.app.data.remote.AccountAuthManager
 import com.musicstory.app.ui.components.PrimaryStoryButton
 import com.musicstory.app.ui.components.SecondaryStoryButton
+import com.musicstory.app.ui.components.TelegramLoginWidgetSheet
 import com.musicstory.app.ui.theme.CreamText
 import com.musicstory.app.ui.theme.ErrorCoral
 import com.musicstory.app.ui.theme.GoldBright
@@ -35,7 +34,6 @@ import com.musicstory.app.ui.theme.GoldWarm
 import com.musicstory.app.ui.theme.LiveGreen
 import com.musicstory.app.ui.theme.MutedLavender
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
@@ -50,46 +48,6 @@ private suspend fun finishAccountLogin(app: MusicStoryApp) {
     }
 }
 
-private suspend fun runTelegramBotLogin(
-    app: MusicStoryApp,
-    context: android.content.Context,
-    onMessage: (String) -> Unit,
-    onSuccess: () -> Unit,
-): Boolean {
-    val url = app.settingsDataStore.backendUrl.first()
-    if (url.isBlank()) {
-        onMessage(context.getString(R.string.settings_auth_verify_failed))
-        return false
-    }
-    val start = app.accountAuthManager.startTelegramMobileLogin(url)
-    if (start == null) {
-        onMessage(context.getString(R.string.settings_auth_verify_failed))
-        return false
-    }
-    context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(start.deepLink)))
-    onMessage(context.getString(R.string.settings_auth_telegram_waiting))
-
-    val deadline = System.currentTimeMillis() + start.expiresInSec * 1000L
-    while (System.currentTimeMillis() < deadline) {
-        delay(2_000)
-        when (val poll = app.accountAuthManager.pollTelegramMobileLogin(url, start.code)) {
-            is AccountAuthManager.TelegramPollResult.Pending -> Unit
-            is AccountAuthManager.TelegramPollResult.Success -> {
-                finishAccountLogin(app)
-                onMessage(context.getString(R.string.settings_auth_success))
-                onSuccess()
-                return true
-            }
-            is AccountAuthManager.TelegramPollResult.Error -> {
-                onMessage(poll.message)
-                return false
-            }
-        }
-    }
-    onMessage(context.getString(R.string.settings_auth_telegram_timeout))
-    return false
-}
-
 @Composable
 fun AccountStatusSection(
     app: MusicStoryApp,
@@ -100,13 +58,39 @@ fun AccountStatusSection(
     var profile by remember { mutableStateOf<AccountAuthManager.AccountProfile?>(null) }
     var authConfig by remember { mutableStateOf<AccountAuthManager.AuthConfig?>(null) }
     var message by remember { mutableStateOf<String?>(null) }
-    var busy by remember { mutableStateOf(false) }
+    var showTelegramSheet by remember { mutableStateOf(false) }
+    var backendUrl by remember { mutableStateOf("") }
 
     LaunchedEffect(Unit) {
         val url = app.settingsDataStore.backendUrl.first()
+        backendUrl = url
         if (url.isNotBlank()) {
             authConfig = app.accountAuthManager.fetchConfig(url)
             profile = app.accountAuthManager.fetchProfile(url)
+        }
+    }
+
+    authConfig?.let { cfg ->
+        if (showTelegramSheet && !cfg.telegramBotUsername.isNullOrBlank() && !cfg.telegramWidgetBaseUrl.isNullOrBlank()) {
+            TelegramLoginWidgetSheet(
+                visible = true,
+                botUsername = cfg.telegramBotUsername,
+                widgetBaseUrl = cfg.telegramWidgetBaseUrl,
+                onDismiss = { showTelegramSheet = false },
+                onAuthPayload = { payload ->
+                    scope.launch {
+                        val (p, err) = app.accountAuthManager.linkTelegram(backendUrl, payload)
+                        if (p != null) {
+                            finishAccountLogin(app)
+                            message = context.getString(R.string.settings_auth_success)
+                            showTelegramSheet = false
+                            profile = p
+                        } else {
+                            message = err ?: context.getString(R.string.settings_auth_verify_failed)
+                        }
+                    }
+                },
+            )
         }
     }
 
@@ -119,19 +103,11 @@ fun AccountStatusSection(
             )
             p.email?.let { email ->
                 Spacer(modifier = Modifier.height(4.dp))
-                Text(
-                    text = email,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = CreamText,
-                )
+                Text(text = email, style = MaterialTheme.typography.bodyMedium, color = CreamText)
             }
             p.telegramUsername?.let { username ->
                 Spacer(modifier = Modifier.height(4.dp))
-                Text(
-                    text = "@$username",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = CreamText,
-                )
+                Text(text = "@$username", style = MaterialTheme.typography.bodyMedium, color = CreamText)
             } ?: p.telegramId?.let {
                 Spacer(modifier = Modifier.height(4.dp))
                 Text(
@@ -158,8 +134,7 @@ fun AccountStatusSection(
                     onSkip = {},
                     onLoggedIn = {
                         scope.launch {
-                            val url = app.settingsDataStore.backendUrl.first()
-                            profile = app.accountAuthManager.fetchProfile(url)
+                            profile = app.accountAuthManager.fetchProfile(backendUrl)
                         }
                     },
                 )
@@ -167,27 +142,9 @@ fun AccountStatusSection(
 
             if (p.telegramId == null && authConfig?.telegramEnabled == true) {
                 Spacer(modifier = Modifier.height(12.dp))
-                PrimaryStoryButton(
+                SecondaryStoryButton(
                     text = context.getString(R.string.settings_auth_link_telegram),
-                    onClick = {
-                        if (busy) return@PrimaryStoryButton
-                        scope.launch {
-                            busy = true
-                            message = null
-                            runTelegramBotLogin(
-                                app = app,
-                                context = context,
-                                onMessage = { message = it },
-                                onSuccess = {
-                                    scope.launch {
-                                        val url = app.settingsDataStore.backendUrl.first()
-                                        profile = app.accountAuthManager.fetchProfile(url)
-                                    }
-                                },
-                            )
-                            busy = false
-                        }
-                    },
+                    onClick = { showTelegramSheet = true },
                 )
             }
         } ?: run {
@@ -356,8 +313,41 @@ fun AccountTelegramLoginSection(
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
+    var authConfig by remember { mutableStateOf<AccountAuthManager.AuthConfig?>(null) }
+    var backendUrl by remember { mutableStateOf("") }
     var message by remember { mutableStateOf<String?>(null) }
-    var busy by remember { mutableStateOf(false) }
+    var showSheet by remember { mutableStateOf(false) }
+
+    LaunchedEffect(Unit) {
+        backendUrl = app.settingsDataStore.backendUrl.first()
+        if (backendUrl.isNotBlank()) {
+            authConfig = app.accountAuthManager.fetchConfig(backendUrl)
+        }
+    }
+
+    authConfig?.let { cfg ->
+        if (showSheet && !cfg.telegramBotUsername.isNullOrBlank() && !cfg.telegramWidgetBaseUrl.isNullOrBlank()) {
+            TelegramLoginWidgetSheet(
+                visible = true,
+                botUsername = cfg.telegramBotUsername,
+                widgetBaseUrl = cfg.telegramWidgetBaseUrl,
+                onDismiss = { showSheet = false },
+                onAuthPayload = { payload ->
+                    scope.launch {
+                        val (p, err) = app.accountAuthManager.linkTelegram(backendUrl, payload)
+                        if (p != null) {
+                            finishAccountLogin(app)
+                            message = context.getString(R.string.settings_auth_success)
+                            showSheet = false
+                            onLoggedIn()
+                        } else {
+                            message = err ?: context.getString(R.string.settings_auth_verify_failed)
+                        }
+                    }
+                },
+            )
+        }
+    }
 
     Column(modifier = modifier) {
         Text(
@@ -369,17 +359,10 @@ fun AccountTelegramLoginSection(
         PrimaryStoryButton(
             text = context.getString(R.string.settings_auth_telegram),
             onClick = {
-                if (busy) return@PrimaryStoryButton
-                scope.launch {
-                    busy = true
-                    message = null
-                    runTelegramBotLogin(
-                        app = app,
-                        context = context,
-                        onMessage = { message = it },
-                        onSuccess = onLoggedIn,
-                    )
-                    busy = false
+                if (authConfig?.telegramWidgetBaseUrl.isNullOrBlank()) {
+                    message = context.getString(R.string.settings_auth_telegram_not_configured)
+                } else {
+                    showSheet = true
                 }
             },
         )
@@ -388,11 +371,7 @@ fun AccountTelegramLoginSection(
             Text(
                 text = it,
                 style = MaterialTheme.typography.labelMedium,
-                color = if (it.contains("ошиб", ignoreCase = true) || it.contains("истёк", ignoreCase = true)) {
-                    ErrorCoral
-                } else {
-                    LiveGreen
-                },
+                color = if (it.contains("ошиб", ignoreCase = true)) ErrorCoral else LiveGreen,
             )
         }
     }

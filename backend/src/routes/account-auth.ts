@@ -9,22 +9,26 @@ import {
 } from '../services/account-store.js';
 import { verifyTelegramLogin, type TelegramAuthPayload } from '../services/telegram-auth.js';
 import { isEmailConfigured } from '../services/email-sender.js';
-import { isTelegramBotConfigured } from '../services/telegram-bot-poller.js';
-import {
-  checkTelegramMobileLogin,
-  startTelegramMobileLogin,
-} from '../services/telegram-mobile-auth.js';
+
+function telegramBotUsername(): string | null {
+  return process.env.TELEGRAM_BOT_USERNAME?.trim().replace(/^@/, '') ?? null;
+}
+
+function isTelegramConfigured(): boolean {
+  return Boolean(process.env.TELEGRAM_BOT_TOKEN?.trim() && telegramBotUsername());
+}
 
 const router = Router();
 
 router.use(requireAppAuth);
 
 router.get('/config', (_req: Request, res: Response) => {
-  const botUsername = process.env.TELEGRAM_BOT_USERNAME?.trim().replace(/^@/, '') ?? null;
+  const widgetBase = process.env.TELEGRAM_WIDGET_BASE_URL?.trim().replace(/\/$/, '') ?? null;
   res.json({
     emailEnabled: isEmailConfigured(),
-    telegramEnabled: isTelegramBotConfigured(),
-    telegramBotUsername: botUsername,
+    telegramEnabled: isTelegramConfigured(),
+    telegramBotUsername: telegramBotUsername(),
+    telegramWidgetBaseUrl: widgetBase,
   });
 });
 
@@ -56,49 +60,7 @@ router.post('/email/verify', (req: Request, res: Response) => {
   res.json({ ok: true, accountId: result.accountId, profile: getAccountProfile(req.installId!) });
 });
 
-/** Movie Planner-style: open t.me/bot?start=mobileauth_<code>, bot confirms, app polls. */
-router.post('/telegram-mobile/start', (req: Request, res: Response) => {
-  if (!isTelegramBotConfigured()) {
-    res.status(503).json({ error: 'Telegram bot не настроен (TELEGRAM_BOT_TOKEN, TELEGRAM_BOT_USERNAME)' });
-    return;
-  }
-  const started = startTelegramMobileLogin(req.installId!);
-  res.json({
-    ok: true,
-    code: started.code,
-    deep_link: started.deepLink,
-    expiresInSec: started.expiresInSec,
-  });
-});
-
-router.post('/telegram-mobile/check', (req: Request, res: Response) => {
-  const code = typeof req.body?.code === 'string' ? req.body.code : '';
-  if (!code.trim()) {
-    res.status(400).json({ error: 'code required' });
-    return;
-  }
-  const result = checkTelegramMobileLogin(req.installId!, code);
-  if (!result.ok) {
-    res.status(400).json({ error: result.error });
-    return;
-  }
-  if ('verified' in result && result.verified === false) {
-    res.json({ ok: true, verified: false });
-    return;
-  }
-  if ('accountId' in result) {
-    res.json({
-      ok: true,
-      verified: true,
-      accountId: result.accountId,
-      profile: result.profile,
-    });
-    return;
-  }
-  res.json({ ok: true, verified: false });
-});
-
-/** Legacy Login Widget verify (web). Android uses telegram-mobile flow. */
+/** Telegram Login Widget — hash verified server-side (WebView in app, baseUrl = TELEGRAM_WIDGET_BASE_URL). */
 router.post('/telegram', (req: Request, res: Response) => {
   const botToken = process.env.TELEGRAM_BOT_TOKEN?.trim();
   if (!botToken) {
