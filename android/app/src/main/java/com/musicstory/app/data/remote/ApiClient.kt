@@ -64,6 +64,9 @@ class ApiClient(
             val call = activeStoryCall
             if (call != null && !call.isCanceled()) {
                 StoryLog.w("HTTP cancel story/full reason=$reason")
+                if (com.musicstory.app.BuildConfig.DEBUG) {
+                    StoryLog.w("HTTP cancel stack: ${Throwable().stackTraceToString().take(1200)}")
+                }
                 call.cancel()
             }
             activeStoryCall = null

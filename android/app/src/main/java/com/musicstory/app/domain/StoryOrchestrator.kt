@@ -355,10 +355,15 @@ class StoryOrchestrator(
     private var manualStorySession = 0
 
     /** User skipped to another track — stop auto fetch only (never kill manual button). */
-    fun onPlaybackTrackSkipped(newTitle: String) {
+    fun onPlaybackTrackSkipped(newTitle: String, newArtist: String) {
         if (manualStoryInFlight) return
+        if (backendFetchInFlight) {
+            StoryLog.i("Track skip ignored — story fetch in flight")
+            return
+        }
         val inFlight = inFlightTrackKey ?: return
-        if (inFlight == trackTitleKey(newTitle)) return
+        val incoming = TrackTitleNormalizer.matchKey(newArtist, newTitle)
+        if (inFlight == incoming) return
         storyRepository.cancelActiveStoryFetch("track skipped")
         _pendingFeedback.value = null
         scope.launch {
@@ -453,7 +458,7 @@ class StoryOrchestrator(
     @Synchronized
     private fun playStoryForTrack(requestedTrack: TrackInfo, manual: Boolean) {
         val manualSession = if (manual) ++manualStorySession else 0
-        val trackKey = trackTitleKey(requestedTrack)
+        val trackKey = trackMatchKey(requestedTrack)
         val fetchRunning = backendFetchInFlight ||
             (generationInFlight && activeStoryJob?.isActive == true)
 
@@ -482,6 +487,10 @@ class StoryOrchestrator(
             backendFetchInFlight = true
             MonitorNotificationState.setPreparing(true)
             _state.value = OrchestratorState.FETCHING_STORY
+        } else {
+            backendFetchInFlight = true
+            MonitorNotificationState.setPreparing(true)
+            _state.value = OrchestratorState.FETCHING_STORY
         }
         if (!manual) {
             _pendingFeedback.value = null
@@ -489,20 +498,7 @@ class StoryOrchestrator(
         generationInFlight = true
         _errorMessage.value = null
         _hintMessage.value = null
-        if (!manual &&
-            _state.value != OrchestratorState.PLAYING_STORY &&
-            _state.value != OrchestratorState.PREPARING_PLAYBACK
-        ) {
-            _state.value = OrchestratorState.LISTENING
-        }
         publishUiState()
-
-        if (activeStoryJob?.isActive == true && inFlightTrackKey != null && inFlightTrackKey != trackKey) {
-            storyRepository.cancelActiveStoryFetch("new track")
-            activeStoryJob?.cancel(CancellationException("replaced"))
-            playbackSession++
-            activeStoryJob = null
-        }
         inFlightTrackKey = trackKey
 
         activeStoryJob = scope.launch {
@@ -533,7 +529,7 @@ class StoryOrchestrator(
                 }
 
                 val session = ++playbackSession
-                inFlightTrackKey = trackTitleKey(requestedTrack)
+                inFlightTrackKey = trackMatchKey(requestedTrack)
                 cancelGenerationPreview()
                 _tracksUntilNext.value = null
                 publishUiState()
@@ -853,9 +849,6 @@ class StoryOrchestrator(
         return wasStoryRequestCancelled()
     }
 
-    private fun trackTitleKey(track: TrackInfo): String =
-        TrackTitleNormalizer.normalize(track.title).trim().lowercase()
-
     private fun trackTitleKey(title: String): String =
         TrackTitleNormalizer.normalize(title).trim().lowercase()
 
@@ -869,11 +862,15 @@ class StoryOrchestrator(
 
     private suspend fun cancelStaleGenerationForNewTrack(track: TrackInfo, reason: String) {
         if (manualStoryInFlight) return
+        if (backendFetchInFlight) {
+            StoryLog.i("Skip cancelStale ($reason) — backend fetch in flight")
+            return
+        }
         val inFlight = inFlightTrackKey
         val generating = activeStoryJob?.isActive == true || generationInFlight ||
             _state.value == OrchestratorState.PREPARING_PLAYBACK
         if (!generating) return
-        if (inFlight != null && inFlight == trackTitleKey(track)) return
+        if (inFlight != null && inFlight == trackMatchKey(track)) return
         cancelInFlightGeneration(reason, rollbackAutoTrigger = true)
     }
 
@@ -964,8 +961,10 @@ class StoryOrchestrator(
         val current = mediaControllerManager.resolveNowPlayingTrack()
             ?: mediaControllerManager.effectiveNowPlaying.value
             ?: return true
-        return trackTitleKey(current) == trackTitleKey(track)
+        return trackMatchKey(current) == trackMatchKey(track)
     }
+
+    private fun trackMatchKey(track: TrackInfo): String = TrackTitleNormalizer.matchKey(track)
 
     private fun schedulePlaybackWatchdog(session: Int, musicPausedForStory: AtomicBoolean) {
         scope.launch {

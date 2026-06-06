@@ -37,7 +37,7 @@ class MediaMonitorService : Service() {
     private var trackObserverJob: Job? = null
     private var listenCountJob: Job? = null
     private var lastTrackKey: String? = null
-    private var lastTrackTitle: String? = null
+    private var lastTrackMatchKey: String? = null
 
     override fun onCreate() {
         super.onCreate()
@@ -87,19 +87,18 @@ class MediaMonitorService : Service() {
                     val track = app.mediaControllerManager.resolveNowPlayingTrack()
                         ?: app.mediaControllerManager.effectiveNowPlaying.value
                     if (track != null && track.isValid() && key != null && key != lastTrackKey) {
-                        val titleNorm = TrackTitleNormalizer.normalize(track.title).trim().lowercase()
-                        val firstTrack = lastTrackTitle == null
-                        val titleChanged = !firstTrack &&
-                            !lastTrackTitle.equals(titleNorm, ignoreCase = true)
+                        val matchKey = TrackTitleNormalizer.matchKey(track)
+                        val firstTrack = lastTrackMatchKey == null
+                        val titleChanged = !firstTrack && lastTrackMatchKey != matchKey
                         if (titleChanged) {
-                            app.storyOrchestrator.onPlaybackTrackSkipped(track.title)
+                            app.storyOrchestrator.onPlaybackTrackSkipped(track.title, track.artist)
                             scheduleTrackCounted(app, track)
                         } else if (firstTrack) {
                             scheduleTrackCounted(app, track)
                         }
                         lastTrackKey = key
                         if (firstTrack || titleChanged) {
-                            lastTrackTitle = titleNorm
+                            lastTrackMatchKey = matchKey
                         }
                     }
                     updateNotification(track)
@@ -118,7 +117,7 @@ class MediaMonitorService : Service() {
 
     private fun scheduleTrackCounted(app: MusicStoryApp, track: TrackInfo) {
         listenCountJob?.cancel()
-        val dwellTitle = TrackTitleNormalizer.normalize(track.title).trim()
+        val dwellMatchKey = TrackTitleNormalizer.matchKey(track)
         listenCountJob = serviceScope.launch {
             val countListenEnabled = app.settingsDataStore.countTrackAfterListenEnabled.first()
             val userSec = if (countListenEnabled) {
@@ -133,10 +132,7 @@ class MediaMonitorService : Service() {
             suspend fun stillOnTrack(): Boolean {
                 val current = app.mediaControllerManager.resolveNowPlayingTrack()
                     ?: app.mediaControllerManager.effectiveNowPlaying.value
-                return current?.title?.let {
-                    TrackTitleNormalizer.normalize(it).trim()
-                        .equals(dwellTitle, ignoreCase = true)
-                } == true
+                return current?.let { TrackTitleNormalizer.matchKey(it) == dwellMatchKey } == true
             }
 
             if (userSec > 0) {

@@ -317,7 +317,7 @@ router.post('/full', validateStoryFullBody, storyFullRateLimit, async (req: Requ
       );
     }
 
-    const metadata = await enrichTrackMetadata(coverCtx.factArtist, coverCtx.factTitle);
+    const metadata = await enrichTrackMetadata(coverCtx.factArtist, coverCtx.factTitle, clientAbort);
     timing.mark('metadata', `year=${metadata.year ?? '-'} mbid=${metadata.mbid ? 'yes' : 'no'}`);
     throwIfStoryAborted(clientAbort, 'metadata');
     const delivery = resolveVoiceDelivery({
