@@ -15,7 +15,7 @@ import { fetchReferenceFactBundle as fetchWikipediaBundle } from './wikipedia-fa
 import { fetchArtistWikiLead } from './wikipedia-lead.js';
 import { inferRuRegionalContext } from './metadata-facts.js';
 import { fetchWebSearchFactSnippets } from './web-search-facts.js';
-import { acceptSearchGroundedSnippet } from './web-snippet-accept.js';
+import { acceptSearchGroundedSnippet, acceptIndieEmergingSnippet } from './web-snippet-accept.js';
 
 const USER_AGENT = 'MusicStoryBFF/1.0 (contact@example.com)';
 const RAW_SNIPPET_MIN_LEN = 30;
@@ -90,6 +90,7 @@ function salvageWebSearchSnippets(
   webSnippets: string[],
   artist: string,
   title: string,
+  relaxed = false,
 ): ReferenceFactBundle {
   const track: string[] = [];
   const artistFacts: string[] = [];
@@ -100,7 +101,10 @@ function salvageWebSearchSnippets(
     if (snippet.length < 35) continue;
     const key = normalize(snippet);
     if (seen.has(key)) continue;
-    if (!acceptSearchGroundedSnippet(snippet, artist, title)) continue;
+    const accepted = relaxed
+      ? acceptIndieEmergingSnippet(snippet, artist, title)
+      : acceptSearchGroundedSnippet(snippet, artist, title);
+    if (!accepted) continue;
     seen.add(key);
 
     if (hasTrackContextSignal(snippet) || factMentionsTitle(snippet, title)) {
@@ -152,7 +156,7 @@ function factsAboutTrackOrArtist(
 }
 
 function artistSurnameInFact(fact: string, artist: string): boolean {
-  const parts = normalize(artist).split(' ').filter((w) => w.length >= 5);
+  const parts = normalize(artist).split(' ').filter((w) => w.length >= 4);
   if (parts.length === 0) return false;
   const factNorm = normalize(fact);
   return parts.some((token) => factNorm.includes(token));
@@ -493,7 +497,10 @@ export async function fetchIndieArtistFocusContext(
     artistCandidates.push(wikiLead.text.trim().slice(0, 480));
   }
   for (const text of [...ddgRaw, ...webRaw, ...mbArtistRaw]) {
-    if (factAppliesToRequest(text, artist, title, 'artist', 'indie')) {
+    if (
+      factAppliesToRequest(text, artist, title, 'artist', 'indie') ||
+      acceptIndieEmergingSnippet(text, artist, title)
+    ) {
       artistCandidates.push(text);
     }
   }
@@ -604,14 +611,21 @@ export async function fetchAggregatedFactContext(
   let artistFacts = finalized.artistFacts;
 
   if (trackFacts.length + artistFacts.length === 0 && webUnfiltered.length > 0) {
-    const salvaged = salvageWebSearchSnippets(webUnfiltered, artist, title);
-    trackFacts = salvaged.trackFacts;
-    artistFacts = salvaged.artistFacts;
-    if (trackFacts.length + artistFacts.length > 0) {
+    let salvaged = salvageWebSearchSnippets(webUnfiltered, artist, title);
+    if (salvaged.trackFacts.length + salvaged.artistFacts.length === 0) {
+      salvaged = salvageWebSearchSnippets(webUnfiltered, artist, title, true);
+      if (salvaged.trackFacts.length + salvaged.artistFacts.length > 0) {
+        console.log(
+          `[facts] indie web-search salvage for "${artist}" — "${title}": track=${salvaged.trackFacts.length} artist=${salvaged.artistFacts.length}`,
+        );
+      }
+    } else {
       console.log(
-        `[facts] web-search salvage for "${artist}" — "${title}": track=${trackFacts.length} artist=${artistFacts.length}`,
+        `[facts] web-search salvage for "${artist}" — "${title}": track=${salvaged.trackFacts.length} artist=${salvaged.artistFacts.length}`,
       );
     }
+    trackFacts = salvaged.trackFacts;
+    artistFacts = salvaged.artistFacts;
   }
 
   if (trackFacts.length + artistFacts.length === 0) {

@@ -5,6 +5,7 @@ import { primaryArtistName } from './artist-primary.js';
 import type { ReferenceFactBundle } from './fact-picker.js';
 import { factAppliesToRequest } from './fact-relevance.js';
 import type { TrackMetadata } from './musicbrainz.js';
+import { isMetadataOnlyFallbackFact } from './metadata-facts.js';
 
 export type ArtistTier = 'major' | 'indie';
 
@@ -70,8 +71,14 @@ function validatedFactCount(
   artist: string,
   title: string,
 ): { track: number; artist: number } {
-  const track = bundle.trackFacts.filter((f) => factAppliesToRequest(f, artist, title, 'track')).length;
-  const artistN = bundle.artistFacts.filter((f) => factAppliesToRequest(f, artist, title, 'artist')).length;
+  const grounded = (facts: string[]) =>
+    facts.filter((f) => !isMetadataOnlyFallbackFact(f));
+  const track = grounded(bundle.trackFacts).filter((f) =>
+    factAppliesToRequest(f, artist, title, 'track'),
+  ).length;
+  const artistN = grounded(bundle.artistFacts).filter((f) =>
+    factAppliesToRequest(f, artist, title, 'artist'),
+  ).length;
   return { track, artist: artistN };
 }
 

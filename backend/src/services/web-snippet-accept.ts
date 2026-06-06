@@ -1,5 +1,6 @@
 import {
   factMentionsArtist,
+  factMentionsArtistLoose,
   factMentionsOtherTrackTitle,
   factMentionsTitle,
   hasTrackContextSignal,
@@ -29,9 +30,21 @@ export function decodeHtmlEntities(text: string): string {
 const TRUNCATED_MARKETING =
   /^(?:It'?s easy to understand why|Delve into the|Join professional|Explore songs|The most successful and the best-known is|Getting your Trinity Audio|Watch exclusive videos|This document provides|Early Life and Career Beginnings|If history is any guide)/i;
 
+/** SEO clip cut mid-sentence but still a usable emerging-artist hook. */
+export function isEmergingArtistNarrativeSnippet(snippet: string): boolean {
+  const trimmed = decodeHtmlEntities(snippet).trim();
+  return (
+    trimmed.length >= 40 &&
+    /\b(?:busk(?:ing|ed|s)?|tiktok|madison square garden|meteoric rise|rose to fame|viral on|posting covers|emerging musician|town center|street musician|first rose to fame|covers and original|joining .* on tour|verified,)\b/i.test(
+      trimmed,
+    )
+  );
+}
+
 /** SEO/listicle fragment — not a speakable fact. */
 export function isTruncatedMarketingSnippet(snippet: string): boolean {
   const trimmed = decodeHtmlEntities(snippet).trim();
+  if (isEmergingArtistNarrativeSnippet(trimmed)) return false;
   if (TRUNCATED_MARKETING.test(trimmed)) return true;
   if (/\b(?:detailed summary and analysis|provides a detailed summary)\b/i.test(trimmed)) return true;
   if (trimmed.length < 55 && !/[.!?…]["']?\s*$/.test(trimmed)) return true;
@@ -131,7 +144,40 @@ export function hasNarrativeSeedSignal(text: string): boolean {
   if (/\b(?:apology|explained|said in an interview|revealed|admitted|denied)\b/i.test(trimmed)) {
     return true;
   }
+  if (isEmergingArtistNarrativeSnippet(trimmed)) return true;
   return interestScore(trimmed) >= 6;
+}
+
+/** Relaxed accept for indie / emerging artists — truncated press clips OK. */
+export function acceptIndieEmergingSnippet(
+  snippet: string,
+  artist: string,
+  title: string,
+): boolean {
+  const trimmed = decodeHtmlEntities(snippet).trim();
+  if (trimmed.length < 35 || trimmed.length > 480) return false;
+  if (isLowQualityWebSnippet(trimmed)) return false;
+  if (isWebListicleJunk(trimmed)) return false;
+  if (isPlaylistJunkSnippet(trimmed, artist, title)) return false;
+  if (factMentionsOtherTrackTitle(trimmed, title)) return false;
+
+  // Search was scoped to artist+title — truncated rise/fame clips need not repeat the name.
+  if (isEmergingArtistNarrativeSnippet(trimmed)) return true;
+
+  if (factMentionsArtistLoose(trimmed, artist)) {
+    if (acceptSearchGroundedSnippet(trimmed, artist, title)) return true;
+    // Short bio/press lines — interest scorer often returns 0 for SEO clips.
+    if (trimmed.length >= 40 && !isTruncatedMarketingSnippet(trimmed)) return true;
+  }
+
+  if (factMentionsTitle(trimmed, title)) {
+    return (
+      acceptSearchGroundedSnippet(trimmed, artist, title) ||
+      (hasNarrativeSeedSignal(trimmed) && interestScore(trimmed) >= 3)
+    );
+  }
+
+  return hasNarrativeSeedSignal(trimmed) && interestScore(trimmed) >= 4;
 }
 
 /**
@@ -151,7 +197,7 @@ export function acceptSearchGroundedSnippet(
 
   const explicit =
     factMentionsTitle(trimmed, title) ||
-    factMentionsArtist(trimmed, artist) ||
+    factMentionsArtistLoose(trimmed, artist) ||
     hasTrackContextSignal(trimmed);
 
   if (explicit) {

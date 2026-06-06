@@ -519,6 +519,22 @@ function artistSurnameInFact(fact: string, artist: string): boolean {
   return false;
 }
 
+/** Common press misspellings (Ray/Reay) and partial name match for web snippets. */
+export function factMentionsArtistLoose(fact: string, artist: string): boolean {
+  if (factMentionsArtist(fact, artist)) return true;
+  const variants: string[] = [artist];
+  if (/\breay\b/i.test(artist)) variants.push(artist.replace(/\breay\b/gi, 'Ray'));
+  if (/\breay\b/i.test(artist)) variants.push(artist.replace(/\breay\b/gi, 'Reay'));
+  for (const variant of variants) {
+    if (variant !== artist && factMentionsArtist(fact, variant)) return true;
+  }
+  const factNorm = normalize(fact);
+  for (const token of artistTokens(artist)) {
+    if (token.length >= 4 && factNorm.includes(token)) return true;
+  }
+  return false;
+}
+
 export function factMentionsArtist(fact: string, artist: string): boolean {
   const artistNorm = normalize(artist);
   const factNorm = normalize(fact);

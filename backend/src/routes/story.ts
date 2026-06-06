@@ -28,7 +28,7 @@ import {
   shouldRunLlmFactHunt,
   explainFactHuntDecision,
 } from '../services/story-llm-fact-hunt.js';
-import { pickSalvageSnippetSeed, isWeakSelectedFact, isWeakSnippetSeed } from '../services/search-snippet-salvage.js';
+import { pickSalvageSnippetSeed, pickRelaxedSnippetSeed, isWeakSelectedFact, isWeakSnippetSeed } from '../services/search-snippet-salvage.js';
 import { hasLlmKeyForProvider, resolveLlmProvider, resolveEffectiveStoryLlmProvider, clientKeyForProvider, type ClientLlmKeys, type ClientLocalOllama } from '../services/llm-provider.js';
 import { generateStoryWithFallback } from '../services/story-llm-router.js';
 import { fetchArtistWikiLead } from '../services/wikipedia-lead.js';
@@ -415,7 +415,8 @@ router.post('/full', validateStoryFullBody, storyFullRateLimit, async (req: Requ
       if (trackFactCount + artistFactCount === 0) {
         const skipRetry =
           firstFetchMs >= 18_000 ||
-          countGroundedFacts(factCtx.bundle) > 0;
+          countGroundedFacts(factCtx.bundle) > 0 ||
+          factCtx.rawSnippets.length > 0;
         if (skipRetry) {
           console.warn(
             `[facts] skip empty-bundle retry for "${metadata.artist}" — ${firstFetchMs}ms snippets=${factCtx.rawSnippets.length} grounded=${countGroundedFacts(factCtx.bundle)}`,
@@ -447,6 +448,25 @@ router.post('/full', validateStoryFullBody, storyFullRateLimit, async (req: Requ
       );
       console.log(`[facts] tier=${artistTierForLog} artist="${metadata.artist}"`);
       logFactCandidatePools(factBundle, metadata.artist, metadata.title);
+
+      if (trackFactCount + artistFactCount === 0) {
+        const relaxedSeed = pickRelaxedSnippetSeed(
+          factCtx.rawSnippets,
+          metadata.artist,
+          metadata.title,
+        );
+        if (relaxedSeed) {
+          factBundle =
+            relaxedSeed.scope === 'track'
+              ? { trackFacts: [relaxedSeed.fact], artistFacts: [] }
+              : { trackFacts: [], artistFacts: [relaxedSeed.fact] };
+          trackFactCount = factBundle.trackFacts.length;
+          artistFactCount = factBundle.artistFacts.length;
+          console.log(
+            `[facts] relaxed web snippet seed for "${metadata.artist}": "${relaxedSeed.fact.slice(0, 100)}"`,
+          );
+        }
+      }
 
       if (trackFactCount + artistFactCount === 0) {
         const metaFacts = buildMetadataFallbackFacts(metadata);
@@ -526,11 +546,9 @@ router.post('/full', validateStoryFullBody, storyFullRateLimit, async (req: Requ
         ]);
         console.log(formatFactPickLog(selectedFact, 'llm'));
       } else if (factCtx.rawSnippets.length > 0) {
-        const snippetSeed = pickSalvageSnippetSeed(
-          factCtx.rawSnippets,
-          metadata.artist,
-          metadata.title,
-        );
+        const snippetSeed =
+          pickSalvageSnippetSeed(factCtx.rawSnippets, metadata.artist, metadata.title) ??
+          pickRelaxedSnippetSeed(factCtx.rawSnippets, metadata.artist, metadata.title);
         if (snippetSeed) {
           selectedFact = snippetSeed;
           ingestFacts(metadata.artist, metadata.title, [
@@ -625,9 +643,9 @@ router.post('/full', validateStoryFullBody, storyFullRateLimit, async (req: Requ
       }
     }
 
-    if (!selectedFact && countGroundedFacts(factBundle) === 0 && artistTier === 'indie') {
+    if (!selectedFact && countGroundedFacts(factBundle) === 0) {
       console.log(
-        `[facts] indie artist-only retry for "${metadata.artist}" — "${metadata.title}"`,
+        `[facts] indie artist-only retry for "${metadata.artist}" — "${metadata.title}" tier=${artistTier}`,
       );
       const indieCtx = await fetchIndieArtistFocusContext(
         metadata.artist,
@@ -696,11 +714,9 @@ router.post('/full', validateStoryFullBody, storyFullRateLimit, async (req: Requ
           `[facts] wiki salvage seed for "${metadata.artist}" chars=${wikiSalvage.text.length}`,
         );
       } else {
-        const snippetSeed = pickSalvageSnippetSeed(
-          factCtx.rawSnippets,
-          metadata.artist,
-          metadata.title,
-        );
+        const snippetSeed =
+          pickSalvageSnippetSeed(factCtx.rawSnippets, metadata.artist, metadata.title) ??
+          pickRelaxedSnippetSeed(factCtx.rawSnippets, metadata.artist, metadata.title);
         if (snippetSeed) {
           selectedFact = snippetSeed;
           referenceFacts = [snippetSeed.fact];
@@ -1005,11 +1021,9 @@ router.post('/full', validateStoryFullBody, storyFullRateLimit, async (req: Requ
         !hasRealSeed &&
         (refFacts.length === 0 || refFacts.every(isMetadataOnlyFallbackFact))
       ) {
-        const snippetSeed = pickSalvageSnippetSeed(
-          factCtx.rawSnippets,
-          metadata.artist,
-          metadata.title,
-        );
+        const snippetSeed =
+          pickSalvageSnippetSeed(factCtx.rawSnippets, metadata.artist, metadata.title) ??
+          pickRelaxedSnippetSeed(factCtx.rawSnippets, metadata.artist, metadata.title);
         if (snippetSeed) {
           effectiveStoryInput = {
             ...effectiveStoryInput,
