@@ -387,28 +387,28 @@ export async function fetchWikiBundleMerged(
       'wiki-primary',
       () => fetchWikipediaBundle(artist, title, primaryLang === 'RU' ? 'RU' : cc),
       EMPTY_WIKI,
-      11_000,
+      18_000,
     ),
     cc === 'RU'
       ? fetchWithCap(
           'wiki-en-fallback',
           () => fetchWikipediaBundle(artist, title, 'US'),
           EMPTY_WIKI,
-          11_000,
+          18_000,
         )
       : inferRuRegionalContext(artist, title)
         ? fetchWithCap(
             'wiki-ru-fallback',
             () => fetchWikipediaBundle(artist, title, 'RU'),
             EMPTY_WIKI,
-            11_000,
+            18_000,
           )
         : primaryLang !== 'RU'
           ? fetchWithCap(
               'wiki-en-fallback',
               () => fetchWikipediaBundle(artist, title, 'US'),
               EMPTY_WIKI,
-              11_000,
+              18_000,
             )
           : Promise.resolve(EMPTY_WIKI),
   ]);

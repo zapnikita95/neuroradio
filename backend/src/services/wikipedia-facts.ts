@@ -1,5 +1,6 @@
 import fetch from 'node-fetch';
 import type { ReferenceFactBundle } from './fact-picker.js';
+import { collaboratorNames, primaryArtistName } from './artist-primary.js';
 import { factNamesForeignEntity } from './fact-relevance.js';
 import { filterAndRankFacts, isBoringFact, isCollectorFact } from './reference-fact-quality.js';
 
@@ -173,16 +174,34 @@ function cacheKey(lang: string, title: string): string {
   return `${lang}:${title.trim().toLowerCase()}`;
 }
 
+function cleanTrackTitle(title: string): string {
+  return title
+    .replace(/\s*\([^)]*\)\s*/g, ' ')
+    .replace(/[.!?…]+$/g, '')
+    .trim();
+}
+
+function collabArtistVariants(artist: string): string[] {
+  const names = collaboratorNames(artist);
+  const variants = [artist, primaryArtistName(artist), ...names];
+  if (names.length === 2) {
+    variants.push(`${names[0]} and ${names[1]}`, `${names[0]} & ${names[1]}`);
+  }
+  return [...new Set(variants.filter((v) => v.length >= 2))];
+}
+
 function buildTrackTitleCandidates(artist: string, title: string): string[] {
-  const cleanTitle = title.replace(/\s*\([^)]*\)\s*/g, ' ').trim();
-  // Сначала страница песни — иначе «Apocalypse»/«Dracula» уводят на религию/роман.
-  return [
-    `${cleanTitle} (${artist} song)`,
-    `${cleanTitle} by ${artist}`,
-    `${artist} ${cleanTitle}`,
-    `${cleanTitle} (song)`,
-    cleanTitle,
-  ].filter((value, index, arr) => value.length > 1 && arr.indexOf(value) === index);
+  const cleanTitle = cleanTrackTitle(title);
+  const out: string[] = [];
+  for (const artistVariant of collabArtistVariants(artist)) {
+    out.push(
+      `${cleanTitle} (${artistVariant} song)`,
+      `${cleanTitle} by ${artistVariant}`,
+      `${artistVariant} ${cleanTitle}`,
+    );
+  }
+  out.push(`${cleanTitle} (song)`, cleanTitle);
+  return out.filter((value, index, arr) => value.length > 1 && arr.indexOf(value) === index);
 }
 
 function buildArtistTitleCandidates(artist: string): string[] {
@@ -200,13 +219,17 @@ function buildArtistTitleCandidates(artist: string): string[] {
 }
 
 function buildTrackSearchQueries(artist: string, title: string): string[] {
-  const cleanTitle = title.replace(/\s*\([^)]*\)\s*/g, ' ').trim();
-  return [
-    `${cleanTitle} ${artist} song`,
-    `${cleanTitle} song ${artist}`,
-    `${artist} ${cleanTitle}`,
-    `${cleanTitle} song`,
-  ];
+  const cleanTitle = cleanTrackTitle(title);
+  const out: string[] = [];
+  for (const artistVariant of collabArtistVariants(artist)) {
+    out.push(
+      `${cleanTitle} ${artistVariant} song`,
+      `${cleanTitle} song ${artistVariant}`,
+      `${artistVariant} ${cleanTitle}`,
+    );
+  }
+  out.push(`${cleanTitle} song`);
+  return out;
 }
 
 function buildArtistSearchQueries(artist: string): string[] {

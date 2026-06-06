@@ -259,6 +259,22 @@ function entityAllowedAsCover(entity: string, coverAllowed: Set<string>): boolea
   return parts.length >= 2 && parts.every((p) => coverAllowed.has(p));
 }
 
+/** Band/label/place named in seed facts — not a «wrong artist» in the story. */
+function entityInReferenceFacts(entity: string, referenceFacts: string[]): boolean {
+  const eNorm = normalize(entity);
+  if (eNorm.length < 3) return false;
+  const blob = normalize(referenceFacts.join(' '));
+  if (blob.includes(eNorm)) return true;
+  const parts = eNorm.split(' ').filter((p) => p.length >= 3);
+  if (parts.length >= 2 && parts.every((p) => blob.includes(p))) return true;
+  for (const fact of referenceFacts) {
+    for (const refEntity of extractNamedEntities(fact)) {
+      if (normalize(refEntity) === eNorm) return true;
+    }
+  }
+  return false;
+}
+
 /** Story validation: ignore song titles in «quotes» when checking for wrong artists. */
 export function storyNamesForeignArtist(
   script: string,
@@ -279,6 +295,7 @@ export function storyNamesForeignArtist(
       if (isCriticAttribution(cleaned, entity)) continue;
       if (entityMatchesArtist(entity, artist, cleanTitle)) continue;
       if (entityAllowedAsCover(entity, coverAllowed)) continue;
+      if (entityInReferenceFacts(entity, referenceFacts)) continue;
       const eNorm = normalize(entity);
       if (eNorm.length < 3) continue;
       if (seedTokens.has(eNorm)) continue;
@@ -422,16 +439,29 @@ function isGenericDisambiguationFact(fact: string, artist: string): boolean {
 }
 
 function artistSurnameInFact(fact: string, artist: string): boolean {
-  const parts = normalize(artist).split(' ').filter((w) => w.length >= 5);
-  if (parts.length === 0) return false;
   const factNorm = normalize(fact);
-  return parts.some((token) => factNorm.includes(token));
+  const names = [artist, ...collaboratorNames(artist)];
+  for (const name of names) {
+    const parts = normalize(name)
+      .split(' ')
+      .filter((w) => w.length >= 4);
+    if (parts.some((token) => factNorm.includes(token))) return true;
+  }
+  return false;
 }
 
 export function factMentionsArtist(fact: string, artist: string): boolean {
   const artistNorm = normalize(artist);
   const factNorm = normalize(fact);
   if (artistNorm.length >= 3 && factNorm.includes(artistNorm)) return true;
+
+  const credits = collaboratorNames(artist);
+  if (credits.length > 1) {
+    for (const name of credits) {
+      const nameNorm = normalize(name);
+      if (nameNorm.length >= 2 && factNorm.includes(nameNorm)) return true;
+    }
+  }
 
   const tokens = artistTokens(artist);
   if (tokens.length === 0) return false;
