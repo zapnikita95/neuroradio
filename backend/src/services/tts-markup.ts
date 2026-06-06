@@ -5,7 +5,7 @@
 
 import { sanitizeScriptForTts } from './story-quality.js';
 import { applyRussianStress, RUSSIAN_STRESS } from './russian-stress.js';
-import { enhanceMixedLanguageText } from './tts-en-normalize.js';
+import { applyForeignPronunciation } from './tts-foreign-pronounce.js';
 import { runTtsQualityPass } from './tts-quality-pass.js';
 import type { TtsPauseProfile } from './tts-voice-profiles.js';
 
@@ -44,12 +44,12 @@ function addDashPauses(text: string, profile: TtsPauseProfile): string {
     .replace(/\s+-\s+/g, ` ${pauseTag(profile, 'small')} `);
 }
 
-/** «слово» → «фраза в кавычках, слово,» so SpeechKit reads quoted bits clearly. */
+/** «слово» → «в кавычках слово» — SpeechKit проговаривает цитату явно. */
 function expandQuotesForSpeech(text: string): string {
   return text.replace(/«([^»]+)»/g, (_match, inner: string) => {
     const phrase = inner.trim();
     if (!phrase) return '';
-    return `фраза в кавычках, ${phrase},`;
+    return `в кавычках ${phrase}`;
   });
 }
 
@@ -93,8 +93,8 @@ export function prepareYandexTtsText(
   text = quality.text;
 
   text = expandQuotesForSpeech(text);
+  text = applyForeignPronunciation(text, artist, title);
   text = applyRussianStress(text);
-  text = enhanceMixedLanguageText(text, artist, title);
 
   if (options.sentencePauses !== false) {
     text = addSentencePauses(text, pauseProfile);

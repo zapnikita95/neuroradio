@@ -35,8 +35,12 @@ if (findIncompleteEnding(trimmed)) {
 console.log('OK: incomplete ending trimmed to:', trimmed.slice(-60));
 
 const marked = prepareYandexTtsText(ellaScript, { artist: 'Ella Boh', title: 'babydoll' });
-if (!marked.includes('фраза в кавычках')) {
+if (!marked.includes('в кавычках')) {
   console.error('FAIL: quotes not expanded for speech');
+  process.exit(1);
+}
+if (marked.includes('фраза в кавычках')) {
+  console.error('FAIL: should not use "фраза в кавычках"');
   process.exit(1);
 }
 if (marked.includes('а её') || marked.includes('но за')) {
@@ -47,3 +51,23 @@ if (marked.includes('а её') || marked.includes('но за')) {
   process.exit(1);
 }
 console.log('OK: all TTS polish checks passed');
+
+const damianoScript =
+  'Damiano David — итальянский певец, фронтмен рок-группы Måneskin. В 2021 году коллектив победил на фестивале Sanremo Music Festival и на Евровидении с песней «Zitti e buoni». В 2024 году David начал сольную карьеру, выпустив синглы «Silverlines» и «Born with a Broken Heart».';
+const damianoMarked = prepareYandexTtsText(damianoScript, {
+  artist: 'Damiano David',
+  title: 'Next Summer',
+});
+for (const forbidden of ['Silverlines', 'Zitti e buoni', 'Måneskin', 'Må ']) {
+  if (damianoMarked.includes(forbidden)) {
+    console.error(`FAIL: Latin left in TTS: ${forbidden}`);
+    console.error(damianoMarked);
+    process.exit(1);
+  }
+}
+if (!damianoMarked.includes('Зитти') || !damianoMarked.includes('Силверлайнз')) {
+  console.error('FAIL: expected Cyrillic pronunciations for Italian/English titles');
+  console.error(damianoMarked);
+  process.exit(1);
+}
+console.log('OK: foreign pronunciation transliteration');
