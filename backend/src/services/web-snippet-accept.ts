@@ -15,9 +15,35 @@ const LOW_QUALITY_WEB_PREFIX =
   /^(?:Explore songs|Be the first to comment|Provided to YouTube|Nobody|Add your thoughts|Watch exclusive videos|There have been few stars)/i;
 
 /** HTML search junk — not story seeds. */
+export function decodeHtmlEntities(text: string): string {
+  return text
+    .replace(/&#x27;/gi, "'")
+    .replace(/&#39;/gi, "'")
+    .replace(/&apos;/gi, "'")
+    .replace(/&quot;/gi, '"')
+    .replace(/&amp;/gi, '&')
+    .replace(/&lt;/gi, '<')
+    .replace(/&gt;/gi, '>');
+}
+
+const TRUNCATED_MARKETING =
+  /^(?:It'?s easy to understand why|Delve into the|Join professional|Explore songs|The most successful and the best-known is|Getting your Trinity Audio|Watch exclusive videos)/i;
+
+/** SEO/listicle fragment — not a speakable fact. */
+export function isTruncatedMarketingSnippet(snippet: string): boolean {
+  const trimmed = decodeHtmlEntities(snippet).trim();
+  if (TRUNCATED_MARKETING.test(trimmed)) return true;
+  if (trimmed.length < 55 && !/[.!?…]["']?\s*$/.test(trimmed)) return true;
+  if (/\b(?:drawn to|impact of|lasting impact of|raw emotion,? poignant lyrics)\s*$/i.test(trimmed)) {
+    return true;
+  }
+  return false;
+}
+
 export function isLowQualityWebSnippet(snippet: string): boolean {
-  const trimmed = snippet.trim();
+  const trimmed = decodeHtmlEntities(snippet).trim();
   if (trimmed.length < 35) return true;
+  if (isTruncatedMarketingSnippet(trimmed)) return true;
   if (LOW_QUALITY_WEB_PREFIX.test(trimmed)) return true;
   if (/^[\d.]+\.\s/.test(trimmed)) return true;
   if (/©\w{2,}\b|©Reddit/i.test(trimmed)) return true;
@@ -52,7 +78,7 @@ export function acceptSearchGroundedSnippet(
   artist: string,
   title: string,
 ): boolean {
-  const trimmed = snippet.trim();
+  const trimmed = decodeHtmlEntities(snippet).trim();
   if (isLowQualityWebSnippet(trimmed)) return false;
   if (isWebListicleJunk(trimmed)) return false;
   if (factMentionsOtherTrackTitle(trimmed, title)) return false;

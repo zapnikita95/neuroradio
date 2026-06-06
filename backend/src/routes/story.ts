@@ -28,7 +28,7 @@ import {
   shouldRunLlmFactHunt,
   explainFactHuntDecision,
 } from '../services/story-llm-fact-hunt.js';
-import { pickSalvageSnippetSeed } from '../services/search-snippet-salvage.js';
+import { pickSalvageSnippetSeed, isWeakSelectedFact, isWeakSnippetSeed } from '../services/search-snippet-salvage.js';
 import { hasLlmKeyForProvider, resolveLlmProvider, resolveEffectiveStoryLlmProvider, clientKeyForProvider, type ClientLlmKeys, type ClientLocalOllama } from '../services/llm-provider.js';
 import { generateStoryWithFallback } from '../services/story-llm-router.js';
 import { fetchArtistWikiLead } from '../services/wikipedia-lead.js';
@@ -544,6 +544,13 @@ router.post('/full', validateStoryFullBody, storyFullRateLimit, async (req: Requ
       );
     }
 
+    if (selectedFact && isWeakSelectedFact(selectedFact)) {
+      console.warn(
+        `[facts] reject weak seed score=${selectedFact.interestScore} fact="${selectedFact.fact.slice(0, 100)}"`,
+      );
+      selectedFact = null;
+    }
+
     const selectedFactWhy = factFromBank
       ? 'seed from facts-bank — saved earlier, not yet told to this user'
       : factHuntLlm
@@ -555,11 +562,15 @@ router.post('/full', validateStoryFullBody, storyFullRateLimit, async (req: Requ
       : [...factBundle.trackFacts, ...factBundle.artistFacts].slice(0, 4);
 
     if (!selectedFact) {
-      const validatedPool = [...factBundle.trackFacts, ...factBundle.artistFacts].filter(
-        (fact) =>
-          factAppliesToRequest(fact, metadata.artist, metadata.title, 'track') ||
-          factAppliesToRequest(fact, metadata.artist, metadata.title, 'artist'),
-      );
+      const validatedPool = [...factBundle.trackFacts, ...factBundle.artistFacts]
+        .filter(
+          (fact) =>
+            !isWeakSnippetSeed(fact) &&
+            interestScore(fact) >= 6 &&
+            (factAppliesToRequest(fact, metadata.artist, metadata.title, 'track') ||
+              factAppliesToRequest(fact, metadata.artist, metadata.title, 'artist')),
+        )
+        .sort((a, b) => interestScore(b) - interestScore(a));
       const fallbackFact = validatedPool[0];
       if (fallbackFact) {
         const scope: 'track' | 'album' | 'artist' = factAppliesToRequest(
@@ -775,25 +786,38 @@ router.post('/full', validateStoryFullBody, storyFullRateLimit, async (req: Requ
     throwIfStoryAborted(clientAbort, 'seed-ready');
 
     const { story, llmUsed } = await (async () => {
-      const hasGroundedSeed = Boolean(selectedFact?.fact && selectedFact.interestScore >= 6);
+      const hasGroundedSeed = Boolean(selectedFact?.fact && selectedFact.interestScore >= 6 && !isWeakSelectedFact(selectedFact));
       let effectiveStoryInput = storyInput;
 
       if (!hasGroundedSeed && !factFromBank) {
-        const realRefFacts = storyReferenceFacts.filter((f) => !isMetadataOnlyFallbackFact(f));
-        const snippetFirst = pickSalvageSnippetSeed(
-          factCtx.rawSnippets,
-          metadata.artist,
-          metadata.title,
+        if (selectedFact && isWeakSelectedFact(selectedFact)) {
+          console.warn(
+            `[story-pipeline] weak seed rejected score=${selectedFact.interestScore} fact="${selectedFact.fact.slice(0, 100)}"`,
+          );
+        }
+        const strongBundleFacts = [...factBundle.trackFacts, ...factBundle.artistFacts]
+          .filter((f) => interestScore(f) >= 6 && !isWeakSnippetSeed(f))
+          .sort((a, b) => interestScore(b) - interestScore(a));
+        const realRefFacts = storyReferenceFacts.filter(
+          (f) => !isMetadataOnlyFallbackFact(f) && !isWeakSnippetSeed(f),
         );
-        if (snippetFirst) {
+
+        if (strongBundleFacts.length > 0) {
+          const best = strongBundleFacts[0]!;
           effectiveStoryInput = {
             ...storyInput,
-            referenceFacts: [snippetFirst.fact],
-            selectedReferenceFact: snippetFirst,
+            referenceFacts: [best],
+            selectedReferenceFact: {
+              fact: best,
+              scope: factBundle.trackFacts.includes(best) ? 'track' : 'artist',
+              scopeLabelRu: factBundle.trackFacts.includes(best) ? 'трек' : 'группа/артист',
+              interestScore: interestScore(best),
+              interestRating: interestRating10(best),
+            },
             rawSnippets: undefined,
           };
           console.log(
-            `[story-pipeline] early snippet salvage scope=${snippetFirst.scope} fact="${snippetFirst.fact.slice(0, 120)}"`,
+            `[story-pipeline] strong bundle fact score=${interestScore(best)} fact="${best.slice(0, 120)}"`,
           );
         } else if (realRefFacts.length > 0) {
           const best = realRefFacts.sort((a, b) => interestScore(b) - interestScore(a))[0]!;
@@ -828,13 +852,30 @@ router.post('/full', validateStoryFullBody, storyFullRateLimit, async (req: Requ
         }
         if (!wikiLead) {
           console.warn(
-            `[indie-wiki] no wiki lead for "${primaryArtistName(metadata.artist)}" — cannot ground story`,
+            `[indie-wiki] no wiki lead for "${primaryArtistName(metadata.artist)}" — trying snippet salvage`,
           );
-          const onlyPlaceholder =
-            storyReferenceFacts.length === 0 ||
-            storyReferenceFacts.every(isMetadataOnlyFallbackFact);
-          if (onlyPlaceholder) {
-            throw new NoReferenceFactsError(metadata.artist, metadata.title);
+          const snippetFirst = pickSalvageSnippetSeed(
+            factCtx.rawSnippets,
+            metadata.artist,
+            metadata.title,
+          );
+          if (snippetFirst) {
+            effectiveStoryInput = {
+              ...storyInput,
+              referenceFacts: [snippetFirst.fact],
+              selectedReferenceFact: snippetFirst,
+              rawSnippets: undefined,
+            };
+            console.log(
+              `[story-pipeline] snippet salvage after wiki miss scope=${snippetFirst.scope} fact="${snippetFirst.fact.slice(0, 120)}"`,
+            );
+          } else {
+            const onlyPlaceholder =
+              storyReferenceFacts.length === 0 ||
+              storyReferenceFacts.every(isMetadataOnlyFallbackFact);
+            if (onlyPlaceholder) {
+              throw new NoReferenceFactsError(metadata.artist, metadata.title);
+            }
           }
         }
         if (wikiLead) {
@@ -901,7 +942,8 @@ router.post('/full', validateStoryFullBody, storyFullRateLimit, async (req: Requ
       const hasRealSeed =
         groundedSeed.length > 0 &&
         seedScore >= 6 &&
-        !isMetadataOnlyFallbackFact(groundedSeed);
+        !isMetadataOnlyFallbackFact(groundedSeed) &&
+        !isWeakSnippetSeed(groundedSeed, seedScore);
       if (
         !factFromBank &&
         !hasRealSeed &&

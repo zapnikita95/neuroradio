@@ -7,6 +7,8 @@ import {
 import { COVER_CONTEXT_RE, factMentionsArtist, storyNamesForeignArtist } from './fact-relevance.js';
 import { hasEnglishLeak } from './story-russian-language.js';
 import { prepareStoryScriptLanguage } from './story-english-normalize.js';
+import { isTruncatedMarketingSnippet } from './web-snippet-accept.js';
+import { interestScore } from './reference-fact-quality.js';
 
 export { DEFAULT_STORY_LENGTH, getStoryLengthPreset };
 export type { StoryLengthId, StoryLengthPreset };
@@ -562,6 +564,13 @@ function matchesConceptBridge(fact: string, scriptWords: Set<string>): boolean {
   );
 }
 
+/** Skip anchor check when reference facts are SEO junk — LLM may still produce valid lore. */
+function referenceFactsAreAnchorable(referenceFacts: string[]): boolean {
+  return referenceFacts.some(
+    (f) => f.trim().length > 0 && !isTruncatedMarketingSnippet(f) && interestScore(f) >= 6,
+  );
+}
+
 /** Script must reflect at least one reference fact (Wikipedia anchor). */
 export function anchorsReferenceFact(script: string, referenceFacts: string[]): boolean {
   if (referenceFacts.length === 0) return true;
@@ -706,12 +715,16 @@ export function validateStoryScript(
 
   if (
     !skipReferenceAnchor &&
-    referenceFacts.length > 0 &&
+    referenceFactsAreAnchorable(referenceFacts) &&
     !anchorsReferenceFact(trimmed, referenceFacts)
   ) {
     return { ok: false, reason: 'story ignores reference facts' };
   }
-  if (referenceFacts.length > 0 && !skipFirstSentenceAnchor && !firstSentenceAnchoredToFact(trimmed, referenceFacts)) {
+  if (
+    referenceFactsAreAnchorable(referenceFacts) &&
+    !skipFirstSentenceAnchor &&
+    !firstSentenceAnchoredToFact(trimmed, referenceFacts)
+  ) {
     return { ok: false, reason: 'first sentence is not anchored to seed fact' };
   }
 

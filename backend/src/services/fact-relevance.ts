@@ -541,8 +541,15 @@ export function titleMentionVariants(title: string): string[] {
 /** Snippet clearly about the song/video/recording even without repeating artist/title. */
 export function hasTrackContextSignal(fact: string): boolean {
   const trimmed = fact.trim();
+  if (/^It['']s\b/i.test(trimmed)) return false;
+  if (/^(?:It'?s easy to understand|Delve into the|Join professional|Explore songs|Be the first to|The most successful and the best-known is)/i.test(trimmed)) {
+    return false;
+  }
   return (
-    /^(?:The song|The video|The single|The track|It|This track|This single|This song|This album|The album|The documentary|From being|Additionally)\b/i.test(
+    /^(?:The song|The video|The single|The track|This track|This single|This song|This album|The album|The documentary|From being|Additionally)\b/i.test(
+      trimmed,
+    ) ||
+    /^It\s+(?:was|is|became|would|has|had|features|samples|opens|starts|tells|explores|remains)\b/i.test(
       trimmed,
     ) ||
     /\b(?:music video|directed by|controversial nature|five different versions|operatic section|studio session|composed the|wrote the|recorded at|took three weeks|no chorus|gained popularity|viral|tiktok|signed with|influenced by|first single|lead single|hidden meaning|origin story|radio banned|refused to play|censored|banned by|intended to|repudiat\w*|members? of the (?:band|group|four)|far[- ]?right|extremist gang|documentary)\b/i.test(

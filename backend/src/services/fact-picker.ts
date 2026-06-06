@@ -11,6 +11,7 @@ import {
 import { interestRating10 } from './fact-interest-log.js';
 import { WEAK_TRIVIA_PATTERNS } from './story-fact-hunt.js';
 import { isMetadataOnlyFallbackFact } from './metadata-facts.js';
+import { isTruncatedMarketingSnippet } from './web-snippet-accept.js';
 import { splitBundleByScope, type RankedFactScope } from './fact-ranking.js';
 import { isAlbumScopeFact, factMentionsOtherTrackTitle, isMisattributedBandTrackFact } from './fact-relevance.js';
 
@@ -76,6 +77,7 @@ function isRejectedSeed(fact: string, title = ''): boolean {
   if (isWeakChartSeed(fact)) return true;
   if (isBoringFact(fact)) return true;
   if (isCollectorFact(fact)) return true;
+  if (isTruncatedMarketingSnippet(fact)) return true;
   return false;
 }
 
@@ -167,6 +169,8 @@ export function pickReferenceFact(
     if (isMetadataOnlyFallbackFact(fact)) continue;
     if (isMisattributedBandTrackFact(fact, title)) continue;
     if (isBoringFact(fact)) continue;
+    if (isRejectedSeed(fact, title)) continue;
+    if (interestScore(fact) < 6) continue;
     if (isUsedFact(fact, usedFingerprints)) continue;
     if (!factOverlapsPrevious(fact, previousScripts)) {
       const scope: FactScope = pools.track.includes(fact)
