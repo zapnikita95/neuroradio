@@ -30,7 +30,7 @@ import type { GenerateStoryInput, StoryScript } from './groq.js';
 import { logRejectedScript } from './story-reject-log.js';
 
 const OPENROUTER_API_URL = 'https://openrouter.ai/api/v1/chat/completions';
-const MAX_ATTEMPTS = 1;
+const MAX_ATTEMPTS = 2;
 
 function openRouterHeaders(): Record<string, string> {
   return {

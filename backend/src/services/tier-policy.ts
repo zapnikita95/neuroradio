@@ -8,12 +8,13 @@ import {
   OPENROUTER_DEFAULT_FREE_FACT_MODEL,
   OPENROUTER_DEFAULT_STORY_MODEL,
   OPENROUTER_FREE_FACT_MODEL_FALLBACK,
+  OPENROUTER_FREE_STABLE_MODEL,
   OPENROUTER_TRIAL_FACT_MODEL,
   buildOpenRouterFreeModelChain,
   buildOpenRouterFreeStoryModelChain,
 } from './openrouter-models.js';
 
-/** Бесплатный: Gemma :free (+ fallback Nemotron). Trial: Gemma paid. Premium: DeepSeek V3. */
+/** Free: paid Gemma (stable). Trial/premium: DeepSeek V3. */
 export const TIER_OPENROUTER_FACT_MODEL = OPENROUTER_DEFAULT_FACT_MODEL;
 export const TIER_OPENROUTER_TRIAL_FACT_MODEL = OPENROUTER_TRIAL_FACT_MODEL;
 export const TIER_OPENROUTER_STORY_MODEL = OPENROUTER_DEFAULT_FACT_MODEL;
@@ -57,7 +58,7 @@ export function getStoryLimitsForTier(tier: UserTier): TierStoryLimits {
 
 /**
  * OpenRouter model for this subscription tier.
- * Free — Gemma :free fact-hunt; trial — Gemma paid; premium — DeepSeek V3.
+ * Free — paid Gemma (stable, ~$0.06/M); trial — DeepSeek; premium — DeepSeek V3.
  */
 export function resolveOpenRouterModelForTier(
   tier: UserTier,
@@ -108,7 +109,7 @@ export function resolveOpenRouterFactModelsForTier(
   return [TIER_OPENROUTER_FACT_MODEL];
 }
 
-/** Free story: Gemma → Nemotron (no Liquid LFM — incoherent ungrounded slop). */
+/** Free story + fact: paid Gemma (no :free 429). Legacy :free if OPENROUTER_FREE_LEGACY=true. */
 export function resolveOpenRouterStoryModelsForTier(
   tier: UserTier,
   preferredModel?: string,
@@ -128,7 +129,7 @@ export function tierQuotaHintRu(tier: UserTier): string {
   const limits = getStoryLimitsForTier(tier);
   if (tier === 'unlimited') return 'Без лимитов на этом устройстве.';
   if (tier === 'free') {
-    return `Бесплатно: ${limits.dailyStories} историй в день (OpenRouter :free на сервере). Свой ключ OpenRouter в настройках — любая модель. Trial ${TRIAL_PRICE_RUB_MONTHLY} ₽/мес — ${TIER_STORY_LIMITS.trial.dailyStories}/день DeepSeek. Подписка 199 ₽/мес — ${TIER_STORY_LIMITS.premium.dailyStories}/день.`;
+    return `Бесплатно: ${limits.dailyStories} историй в день (Gemma 4 на сервере, стабильно). Свой ключ OpenRouter — любая модель. Trial ${TRIAL_PRICE_RUB_MONTHLY} ₽/мес — ${TIER_STORY_LIMITS.trial.dailyStories}/день DeepSeek. Подписка 199 ₽/мес — ${TIER_STORY_LIMITS.premium.dailyStories}/день.`;
   }
   if (tier === 'trial') {
     return `Пробный период: ${limits.dailyStories} историй/день. Fact-hunt: Gemma 4, история: DeepSeek V3.`;

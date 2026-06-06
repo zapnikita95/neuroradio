@@ -13,14 +13,20 @@ export interface OpenRouterModelOption {
 
 export const OPENROUTER_MODEL_CUSTOM = '__custom__';
 
-/** Бесплатный fact-hunt — Gemma 4 :free (быстрее Nemotron, JSON стабильнее). */
+/** Бесплатный fact-hunt — Gemma 4 :free (лимиты RPM, 429). Запасной вариант. */
 export const OPENROUTER_DEFAULT_FREE_FACT_MODEL = 'google/gemma-4-26b-a4b-it:free';
 
 /** Запасной free при 429. */
 export const OPENROUTER_FREE_FACT_MODEL_FALLBACK = 'nvidia/nemotron-3-nano-30b-a3b:free';
 
-/** Trial: дешёвая paid Gemma (~$0.06/M) — нормальный JSON без 429 free. */
+/** Trial / free stable: Gemma 4 26B paid (~$0.06/M). */
 export const OPENROUTER_TRIAL_FACT_MODEL = 'google/gemma-4-26b-a4b-it';
+
+/**
+ * Стабильная модель для free tier на сервере — paid Gemma, без :free RPM/429.
+ * Override: OPENROUTER_FREE_STORY_MODEL / OPENROUTER_FREE_FACT_MODEL.
+ */
+export const OPENROUTER_FREE_STABLE_MODEL = OPENROUTER_TRIAL_FACT_MODEL;
 
 /** Premium / trial story+fact: DeepSeek V3 (~$0.20/M, лучшее качество). */
 export const OPENROUTER_DEFAULT_FACT_MODEL = 'deepseek/deepseek-chat-v3-0324';
@@ -32,8 +38,7 @@ export const OPENROUTER_DEFAULT_STORY_MODEL = 'liquid/lfm-2.5-1.2b-instruct:free
 export const OPENROUTER_DEFAULT_MODEL = OPENROUTER_DEFAULT_FACT_MODEL;
 
 /**
- * Free-tier failover chain for fact-hunt / JSON tasks.
- * Story generation uses {@link OPENROUTER_FREE_STORY_MODEL_CHAIN} — no Liquid LFM (incoherent Russian).
+ * Legacy :free chains (OPENROUTER_FREE_LEGACY=true). Default free tier uses paid Gemma.
  */
 export const OPENROUTER_FREE_MODEL_CHAIN: readonly string[] = [
   OPENROUTER_DEFAULT_FREE_FACT_MODEL,
@@ -41,29 +46,35 @@ export const OPENROUTER_FREE_MODEL_CHAIN: readonly string[] = [
   OPENROUTER_DEFAULT_STORY_MODEL,
 ];
 
-/** Free story chain: Gemma → Nemotron only. Liquid LFM is last-resort translate, not narration. */
 export const OPENROUTER_FREE_STORY_MODEL_CHAIN: readonly string[] = [
   OPENROUTER_DEFAULT_FREE_FACT_MODEL,
   OPENROUTER_FREE_FACT_MODEL_FALLBACK,
 ];
 
 export function buildOpenRouterFreeStoryModelChain(preferred?: string): string[] {
+  const stable =
+    process.env.OPENROUTER_FREE_STORY_MODEL?.trim() || OPENROUTER_FREE_STABLE_MODEL;
   const pref = preferred?.trim();
-  const base = [...OPENROUTER_FREE_STORY_MODEL_CHAIN];
-  if (pref && pref.includes('/') && pref.includes(':free') && !pref.includes('lfm-2.5')) {
-    return [pref, ...base.filter((m) => m !== pref)];
+  if (process.env.OPENROUTER_FREE_LEGACY === 'true') {
+    const legacy = [...OPENROUTER_FREE_STORY_MODEL_CHAIN];
+    if (pref && pref.includes(':free')) return [stable, pref, ...legacy.filter((m) => m !== pref && m !== stable)];
+    return [stable, ...legacy.filter((m) => m !== stable)];
   }
-  return base;
+  if (pref && pref.includes('/') && !pref.includes(':free')) return [pref];
+  return [stable];
 }
 
-/** Dedupe while preserving order; put user-preferred :free model first. */
 export function buildOpenRouterFreeModelChain(preferred?: string): string[] {
+  const stable =
+    process.env.OPENROUTER_FREE_FACT_MODEL?.trim() || OPENROUTER_FREE_STABLE_MODEL;
   const pref = preferred?.trim();
-  const base = [...OPENROUTER_FREE_MODEL_CHAIN];
-  if (pref && pref.includes('/') && pref.includes(':free')) {
-    return [pref, ...base.filter((m) => m !== pref)];
+  if (process.env.OPENROUTER_FREE_LEGACY === 'true') {
+    const legacy = [...OPENROUTER_FREE_MODEL_CHAIN];
+    if (pref && pref.includes(':free')) return [stable, pref, ...legacy.filter((m) => m !== pref && m !== stable)];
+    return [stable, ...legacy.filter((m) => m !== stable)];
   }
-  return base;
+  if (pref && pref.includes('/') && !pref.includes(':free')) return [pref];
+  return [stable];
 }
 
 export const OPENROUTER_FREE_MODELS: OpenRouterModelOption[] = [
@@ -83,9 +94,10 @@ export const OPENROUTER_FREE_MODELS: OpenRouterModelOption[] = [
   {
     id: OPENROUTER_TRIAL_FACT_MODEL,
     labelRu: 'Gemma 4 26B',
-    descriptionRu: 'Trial — ~$0.06/M, стабильный fact-hunt',
+    descriptionRu: 'Free/trial на сервере — стабильная paid (~$0.06/M)',
     stable: true,
-    slot: 'fact',
+    recommended: true,
+    slot: 'both',
   },
   {
     id: OPENROUTER_DEFAULT_FACT_MODEL,

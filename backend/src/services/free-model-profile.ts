@@ -1,6 +1,7 @@
 import {
   OPENROUTER_DEFAULT_FREE_FACT_MODEL,
   OPENROUTER_FREE_FACT_MODEL_FALLBACK,
+  OPENROUTER_FREE_STABLE_MODEL,
 } from './openrouter-models.js';
 
 export type FreeModelProfileId = 'economy' | 'quality';
@@ -24,11 +25,11 @@ export const FREE_MODEL_PROFILES: Record<FreeModelProfileId, FreeModelProfile> =
   },
   quality: {
     id: 'quality',
-    modelId: OPENROUTER_DEFAULT_FREE_FACT_MODEL,
+    modelId: OPENROUTER_FREE_STABLE_MODEL,
     dailyStories: parseInt(process.env.FREE_QUALITY_DAILY_LIMIT ?? '5', 10),
-    labelRu: 'Gemma 4 (бесплатно)',
+    labelRu: 'Gemma 4',
     descriptionRu:
-      'Быстрее и точнее, но до 5 историй в день. Лимиты не суммируются с Nemotron.',
+      'Стабильная модель на сервере. До 5 историй в день. Лимиты не суммируются с Nemotron.',
   },
 };
 

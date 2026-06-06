@@ -82,6 +82,7 @@ import {
   resolveOpenRouterStoryModelsForTier,
   tierQuotaHintRu,
 } from '../services/tier-policy.js';
+import { OPENROUTER_FREE_STABLE_MODEL } from '../services/openrouter-models.js';
 import { classifyStoryLlmError } from '../services/llm-error-message.js';
 import { StoryTiming } from '../services/story-timing.js';
 import { recordFactMiss } from '../services/fact-miss-log.js';
@@ -150,8 +151,8 @@ router.get('/quota', (req: Request, res: Response) => {
   const freeProfiles =
     tier === 'free'
       ? {
-          economy: { dailyStories: 10, model: 'nvidia/nemotron-3-nano-30b-a3b:free' },
-          quality: { dailyStories: 5, model: 'google/gemma-4-26b-a4b-it:free' },
+          economy: { dailyStories: 10, model: OPENROUTER_FREE_STABLE_MODEL },
+          quality: { dailyStories: 5, model: OPENROUTER_FREE_STABLE_MODEL },
         }
       : undefined;
   res.json({
