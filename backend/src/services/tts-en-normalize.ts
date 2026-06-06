@@ -100,6 +100,28 @@ export const MUSIC_LATIN_ALLOWLIST = new Set([
 const LATIN_RUN_RE =
   /[A-Za-zÀ-ÿ][A-Za-zÀ-ÿ0-9''.\-&]{0,}(?:\s+(?![.!?…]\s)[A-Za-zÀ-ÿ][A-Za-zÀ-ÿ0-9''.\-&]{0,})*/g;
 
+const YANDEX_MARKUP_TAG_RE = /<\[(?:small|medium|large|tiny|huge|sentence)\]>/g;
+const MARKUP_SLOT = '\uE012';
+const MARKUP_SLOT_END = '\uE013';
+
+/** Hide `<[sentence]>` etc. before Latin pass — otherwise "sentence" becomes en-US speech. */
+function maskYandexMarkupTags(text: string): { masked: string; slots: string[] } {
+  const slots: string[] = [];
+  const masked = text.replace(YANDEX_MARKUP_TAG_RE, (tag) => {
+    const idx = slots.length;
+    slots.push(tag);
+    return `${MARKUP_SLOT}${idx}${MARKUP_SLOT_END}`;
+  });
+  return { masked, slots };
+}
+
+function unmaskYandexMarkupTags(text: string, slots: string[]): string {
+  return text.replace(
+    new RegExp(`${MARKUP_SLOT}(\\d+)${MARKUP_SLOT_END}`, 'g'),
+    (_, index) => slots[Number(index)] ?? '',
+  );
+}
+
 export function collectLatinTokens(artist: string, title: string): Set<string> {
   const tokens = new Set<string>();
   const collect = (value: string) => {
@@ -119,8 +141,9 @@ export function collectLatinTokens(artist: string, title: string): Set<string> {
 
 /** Short pause before/after whole Latin phrases — never split multi-word names. */
 export function addLatinArticulationPauses(text: string): string {
+  const { masked: markupMasked, slots: markupSlots } = maskYandexMarkupTags(text);
   const quotes: string[] = [];
-  const maskedQuotes = text.replace(/«[^»]+»/g, (quote) => {
+  const maskedQuotes = markupMasked.replace(/«[^»]+»/g, (quote) => {
     const idx = quotes.length;
     quotes.push(quote);
     return `\uE000LQ${idx}\uE001`;
@@ -136,7 +159,8 @@ export function addLatinArticulationPauses(text: string): string {
     return `<[small]> ${run} <[small]>`;
   });
   result = result.replace(/<\[small\]>\s*<\[small\]>/g, '<[small]>');
-  return result.replace(/\uE000LQ(\d+)\uE001/g, (_, index) => quotes[Number(index)] ?? '');
+  result = result.replace(/\uE000LQ(\d+)\uE001/g, (_, index) => quotes[Number(index)] ?? '');
+  return unmaskYandexMarkupTags(result, markupSlots);
 }
 
 /** Normalize punctuation around Latin tokens (no spaces inside hyphenated names). */

@@ -211,7 +211,7 @@ export function pickFromBank(
     for (const fact of pools[scope] ?? []) {
       if (usedFingerprints.has(factFingerprint(fact.fact))) continue;
       if (fact.interestScore < 6) continue;
-      if (!isSpeakableReferenceFact(fact.fact)) continue;
+      if (!isSpeakableReferenceFact(fact.fact, artist, title)) continue;
       if (isAmbiguousCommonWordArtist(artist) && !factMentionsArtistAsEntity(fact.fact, artist)) continue;
       unused.push(fact);
     }
