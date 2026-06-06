@@ -97,8 +97,15 @@ function pausesToPlaceholders(text: string): string {
 function placeholdersToBreaks(text: string): string {
   return text
     .replaceAll(BREAK_SENTENCE, '<break time="260ms"/>')
-    .replaceAll(BREAK_SMALL, '<break time="40ms"/>')
-    .replaceAll(BREAK_MEDIUM, '<break time="120ms"/>');
+    .replaceAll(BREAK_SMALL, '<break time="12ms"/>')
+    .replaceAll(BREAK_MEDIUM, '<break time="80ms"/>');
+}
+
+/** Strip micro-pauses hugging <lang> — foreign words should flow like in speech. */
+function trimBreaksAroundLangTags(text: string): string {
+  return text
+    .replace(/<break time="\d+ms"\/?>\s*(<lang\b)/g, '$1')
+    .replace(/(<\/lang>)\s*<break time="\d+ms"\/?>/g, '$1');
 }
 
 /** Оборачивает латинские фрагменты в SSML lang; русский текст и +ударения — как есть. */
@@ -125,7 +132,7 @@ export function wrapMixedLanguageBody(text: string): string {
   if (last < prepared.length) {
     out += escapeSsml(prepared.slice(last));
   }
-  return placeholdersToBreaks(out);
+  return trimBreaksAroundLangTags(placeholdersToBreaks(out));
 }
 
 export function buildYandexSsml(markedText: string, _voice?: YandexVoiceId): string {

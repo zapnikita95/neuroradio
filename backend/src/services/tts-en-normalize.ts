@@ -139,28 +139,9 @@ export function collectLatinTokens(artist: string, title: string): Set<string> {
   return tokens;
 }
 
-/** Short pause before/after whole Latin phrases — never split multi-word names. */
+/** Latin phrases stay inline — SSML <lang> handles pronunciation; no extra pauses around foreign words. */
 export function addLatinArticulationPauses(text: string): string {
-  const { masked: markupMasked, slots: markupSlots } = maskYandexMarkupTags(text);
-  const quotes: string[] = [];
-  const maskedQuotes = markupMasked.replace(/«[^»]+»/g, (quote) => {
-    const idx = quotes.length;
-    quotes.push(quote);
-    return `\uE000LQ${idx}\uE001`;
-  });
-  const runs: string[] = [];
-  const masked = maskedQuotes.replace(LATIN_RUN_RE, (run) => {
-    const idx = runs.length;
-    runs.push(run);
-    return `\uE016L${idx}\uE017`;
-  });
-  let result = masked.replace(/\uE016L(\d+)\uE017/g, (_, index) => {
-    const run = runs[Number(index)] ?? '';
-    return `<[small]> ${run} <[small]>`;
-  });
-  result = result.replace(/<\[small\]>\s*<\[small\]>/g, '<[small]>');
-  result = result.replace(/\uE000LQ(\d+)\uE001/g, (_, index) => quotes[Number(index)] ?? '');
-  return unmaskYandexMarkupTags(result, markupSlots);
+  return text;
 }
 
 /** Normalize punctuation around Latin tokens (no spaces inside hyphenated names). */

@@ -101,7 +101,7 @@ import {
   throwIfStoryAborted,
 } from '../services/story-request-abort.js';
 import type { StoryLengthId } from '../services/story-length.js';
-import type { StoryNarratorId } from '../services/story-narrator.js';
+import { getNarratorPreset, type StoryNarratorId } from '../services/story-narrator.js';
 import type { TtsVoiceSetting } from '../services/voices.js';
 import type { TtsEmotion } from '../services/tts-options.js';
 import { normalizeYearsForRussianTts } from '../services/tts-russian-years.js';
@@ -1100,6 +1100,11 @@ router.post('/full', validateStoryFullBody, storyFullRateLimit, async (req: Requ
 
     throwIfStoryAborted(clientAbort, 'story-text');
     timing.mark('story-text', `llm=${llmUsed} words=${story.word_count}`);
+
+    const narratorPreset = getNarratorPreset(storyNarrator);
+    console.log(
+      `[story-llm] narrator=${storyNarrator}${narratorPreset ? ` persona="${narratorPreset.labelRu}"` : ''}`,
+    );
 
     console.log(
       `[story-script] ${metadata.artist} — ${metadata.title} | llm=${llmUsed} | narrator=${storyNarrator} | words=${story.word_count}`,
