@@ -91,8 +91,6 @@ class StoryOrchestrator(
     /** True only while POST /v1/story/full is in flight. */
     private var backendFetchInFlight = false
     private var manualStoryGateAllowed = true
-    /** After failed/cancelled auto fetch — stop spam retries. */
-    private var lastAutoStoryFailAtMs: Long = 0L
 
     private val _mode = MutableStateFlow(OrchestratorMode.AUTO)
     val mode: StateFlow<OrchestratorMode> = _mode.asStateFlow()
@@ -287,37 +285,30 @@ class StoryOrchestrator(
 
     /** UI must not stay «Готовим историю» if the coroutine already died. */
     private fun reconcileGenerationState() {
-        if (activeStoryJob?.isActive == true) return
-        // Startup window: requestManualStory sets flags before activeStoryJob is assigned.
-        if (manualStoryInFlight || backendFetchInFlight) return
-        if (generationInFlight && activeStoryJob == null) return
-        if (!generationInFlight && !backendFetchInFlight &&
-            _state.value != OrchestratorState.FETCHING_STORY &&
-            _state.value != OrchestratorState.PREPARING_PLAYBACK
-        ) {
-            return
+        val jobDead = activeStoryJob?.isActive != true
+        if (manualStoryInFlight && !jobDead) return
+        if ((generationInFlight || backendFetchInFlight || _state.value == OrchestratorState.FETCHING_STORY) && jobDead) {
+            StoryLog.w("Generation stale — clearing (no active job, state=${_state.value})")
+            generationInFlight = false
+            backendFetchInFlight = false
+            if (_state.value == OrchestratorState.FETCHING_STORY ||
+                _state.value == OrchestratorState.PREPARING_PLAYBACK
+            ) {
+                _state.value = OrchestratorState.LISTENING
+            }
+            if (MonitorNotificationState.preparingStory.value) {
+                MonitorNotificationState.setPreparing(false)
+                MediaMonitorService.refreshNotification(context)
+            }
+            publishUiState()
         }
-        StoryLog.w("Generation stale — clearing (no active job, state=${_state.value})")
-        generationInFlight = false
-        backendFetchInFlight = false
-        if (_state.value == OrchestratorState.FETCHING_STORY ||
-            _state.value == OrchestratorState.PREPARING_PLAYBACK
-        ) {
-            _state.value = OrchestratorState.LISTENING
-        }
-        if (MonitorNotificationState.preparingStory.value) {
-            MonitorNotificationState.setPreparing(false)
-            MediaMonitorService.refreshNotification(context)
-        }
-        publishUiState()
     }
 
     /** Counter already at N (e.g. restored) but story never fired — trigger on current track. */
     private fun checkOverdueAutoTrigger() {
         scope.launch {
             if (settingsDataStore.appPowerMode.first() != AppPowerMode.ON) return@launch
-            if (manualStoryInFlight || backendFetchInFlight || generationInFlight) return@launch
-            if (activeStoryJob?.isActive == true) return@launch
+            if (manualStoryInFlight) return@launch
             if (_mode.value != OrchestratorMode.AUTO || isStorySessionActive()) return@launch
             if (!storyRepository.hasOwnApiKeyConfigured()) return@launch
             val track = mediaControllerManager.effectiveNowPlaying.value ?: return@launch
@@ -329,10 +320,6 @@ class StoryOrchestrator(
             publishUiState()
             val counter = triggerEngine.currentTracksSinceLastStory()
             if (counter >= settings.everyNTracks) {
-                if (isAutoStoryCooldownActive()) {
-                    StoryLog.i("Auto story overdue skipped — cooldown active")
-                    return@launch
-                }
                 StoryLog.i("Auto story overdue — triggering for ${track.artist} — ${track.title}")
                 _tracksUntilNext.value = null
                 playStoryForTrack(track, manual = false)
@@ -354,13 +341,9 @@ class StoryOrchestrator(
     private var manualStoryInFlight = false
     private var manualStorySession = 0
 
-    /** User skipped to another track — stop auto fetch only (never kill manual button). */
+    /** User skipped to another track — the only automatic HTTP cancel besides «Отменить». */
     fun onPlaybackTrackSkipped(newTitle: String, newArtist: String) {
         if (manualStoryInFlight) return
-        if (backendFetchInFlight) {
-            StoryLog.i("Track skip ignored — story fetch in flight")
-            return
-        }
         val inFlight = inFlightTrackKey ?: return
         val incoming = TrackTitleNormalizer.matchKey(newArtist, newTitle)
         if (inFlight == incoming) return
@@ -379,8 +362,6 @@ class StoryOrchestrator(
             _pendingFeedback.value = null
         }
         mediaControllerManager.restoreSystemMusicVolumeIfNeeded()
-
-        cancelStaleGenerationForNewTrack(track, reason = "track changed")
 
         triggerEngine.restoreTracksSinceLastStory(settingsDataStore.tracksSinceLastStory.first())
 
@@ -403,13 +384,11 @@ class StoryOrchestrator(
         settingsDataStore.setTracksSinceLastStory(triggerEngine.currentTracksSinceLastStory())
         _tracksUntilNext.value = triggerEngine.tracksUntilNext(settings)
 
-        if (shouldTrigger && !isAutoStoryCooldownActive()) {
+        if (shouldTrigger) {
             StoryLog.i("Auto story trigger: ${track.artist} — ${track.title}")
             scrobbleRepository.markStoryTriggered(track)
             _tracksUntilNext.value = null
             playStoryForTrack(track, manual = false)
-        } else if (shouldTrigger) {
-            StoryLog.i("Auto story trigger skipped — cooldown active")
         } else if (_state.value != OrchestratorState.PLAYING_STORY &&
             _state.value != OrchestratorState.PREPARING_PLAYBACK &&
             !generationInFlight
@@ -428,11 +407,6 @@ class StoryOrchestrator(
                 )
                 return@launch
             }
-            if ((backendFetchInFlight || generationInFlight) && !manualStoryInFlight) {
-                StoryLog.i("Manual story — cancelling in-flight auto fetch")
-                storyRepository.cancelActiveStoryFetch("manual override")
-                cancelInFlightGenerationImmediate("manual override")
-            }
             val gate = evaluateManualStoryGate()
             if (!gate.allowed) {
                 gate.userMessage?.let { showManualStoryBlocked(it, fromNotification) }
@@ -444,6 +418,11 @@ class StoryOrchestrator(
                 return@launch
             }
             StoryLog.i("Manual story requested: ${track.artist} — ${track.title}")
+            backendFetchInFlight = true
+            MonitorNotificationState.setPreparing(true)
+            _state.value = OrchestratorState.FETCHING_STORY
+            publishUiState()
+            MediaMonitorService.refreshNotification(context)
             playStoryForTrack(track, manual = true)
         }
     }
@@ -455,39 +434,23 @@ class StoryOrchestrator(
         publishUiState()
     }
 
-    @Synchronized
     private fun playStoryForTrack(requestedTrack: TrackInfo, manual: Boolean) {
         val manualSession = if (manual) ++manualStorySession else 0
-        val trackKey = trackMatchKey(requestedTrack)
-        val fetchRunning = backendFetchInFlight ||
-            (generationInFlight && activeStoryJob?.isActive == true)
-
-        if (fetchRunning && inFlightTrackKey == trackKey) {
-            StoryLog.i("Story fetch already running for «${requestedTrack.title}» — skip duplicate")
-            return
-        }
         if (!manual && manualStoryInFlight) {
             StoryLog.i("Auto story skipped — manual fetch in flight")
             return
         }
-        if (!manual && fetchRunning) {
+        if (!manual && (generationInFlight || backendFetchInFlight || activeStoryJob?.isActive == true)) {
             StoryLog.i("Auto story skipped — fetch already in flight")
             return
         }
-        if (!manual && isAutoStoryCooldownActive()) {
-            StoryLog.i("Auto story skipped — cooldown after failed fetch")
-            return
-        }
-        if (manual && manualStoryInFlight && activeStoryJob?.isActive == true) {
-            StoryLog.i("Manual story already in flight — ignore duplicate tap")
-            return
-        }
         if (manual) {
+            if (manualStoryInFlight) {
+                StoryLog.i("Manual story already in flight — ignore duplicate tap")
+                return
+            }
             manualStoryInFlight = true
-            backendFetchInFlight = true
-            MonitorNotificationState.setPreparing(true)
-            _state.value = OrchestratorState.FETCHING_STORY
-        } else {
+            supersedePreviousStoryJobOnly()
             backendFetchInFlight = true
             MonitorNotificationState.setPreparing(true)
             _state.value = OrchestratorState.FETCHING_STORY
@@ -498,8 +461,13 @@ class StoryOrchestrator(
         generationInFlight = true
         _errorMessage.value = null
         _hintMessage.value = null
+        if (!manual &&
+            _state.value != OrchestratorState.PLAYING_STORY &&
+            _state.value != OrchestratorState.PREPARING_PLAYBACK
+        ) {
+            _state.value = OrchestratorState.LISTENING
+        }
         publishUiState()
-        inFlightTrackKey = trackKey
 
         activeStoryJob = scope.launch {
             try {
@@ -529,7 +497,7 @@ class StoryOrchestrator(
                 }
 
                 val session = ++playbackSession
-                inFlightTrackKey = trackMatchKey(requestedTrack)
+                inFlightTrackKey = trackTitleKey(requestedTrack)
                 cancelGenerationPreview()
                 _tracksUntilNext.value = null
                 publishUiState()
@@ -549,6 +517,9 @@ class StoryOrchestrator(
                         publishUiState()
                     } else if (manual) {
                         StoryLog.w("Manual story cancelled by app: ${e.message}")
+                        _errorMessage.value = "Запрос прерван приложением. Нажми «Рассказать историю» ещё раз."
+                        _state.value = OrchestratorState.ERROR
+                        publishUiState()
                     } else {
                         StoryLog.i("Story pipeline cancelled: ${e.message}")
                     }
@@ -562,10 +533,14 @@ class StoryOrchestrator(
                     generationInFlight = false
                     inFlightTrackKey = null
                     if (_state.value == OrchestratorState.FETCHING_STORY) {
-                        _state.value = OrchestratorState.LISTENING
-                        scope.launch { refreshTracksUntilNext() }
-                        publishUiState()
+                        if (isSessionCurrent(session)) {
+                            abortGeneration(session, manual, rollbackAutoTrigger = !manual)
+                        } else if (activeStoryJob?.isActive != true && !manualStoryInFlight) {
+                            _state.value = OrchestratorState.LISTENING
+                            publishUiState()
+                        }
                     }
+                    reconcileGenerationState()
                 }
             } finally {
                 if (manual && manualSession == manualStorySession) {
@@ -573,6 +548,19 @@ class StoryOrchestrator(
                 }
             }
         }
+    }
+
+    /** Manual button: drop only a previous job — do not reset «Готовим историю» for the new request. */
+    private fun supersedePreviousStoryJobOnly() {
+        val hadJob = activeStoryJob?.isActive == true
+        if (hadJob) {
+            storyRepository.cancelActiveStoryFetch("manual supersede")
+            activeStoryJob?.cancel(CancellationException("superseded"))
+            playbackSession++
+        }
+        activeStoryJob = null
+        inFlightTrackKey = null
+        cancelGenerationPreview()
     }
 
     /** Only real user skip/stop may kill HTTP; auto/supersede must not rip manual fetch. */
@@ -611,7 +599,6 @@ class StoryOrchestrator(
         }
         cancelGenerationPreview()
         if (rollbackAutoTrigger && !manual) {
-            markAutoStoryFailed()
             val everyN = settingsDataStore.everyNTracks.first()
             triggerEngine.rollbackFailedStoryTrigger(everyN)
             settingsDataStore.setTracksSinceLastStory(triggerEngine.currentTracksSinceLastStory())
@@ -796,17 +783,10 @@ class StoryOrchestrator(
                 }
             },
             onFailure = { error ->
-                if (error.isBenignStoryCancel()) {
-                    StoryLog.i("Story fetch interrupted — no rollback, no error UI")
-                    if (!manual) markAutoStoryFailed()
-                    _errorMessage.value = null
-                    _hintMessage.value = null
-                    _state.value = OrchestratorState.LISTENING
-                    scope.launch { refreshTracksUntilNext() }
-                    publishUiState()
-                    return@fold
-                }
-                if (!manual) markAutoStoryFailed()
+                if (!manual && error is CancellationException) return@fold
+                if (!manual && error.message?.contains("cancel", ignoreCase = true) == true) return@fold
+                if (!manual && error.message?.contains("отмен", ignoreCase = true) == true) return@fold
+                if (!manual && error.message?.contains("499", ignoreCase = false) == true) return@fold
                 cancelGenerationPreview()
                 if (!manual) {
                     val everyN = settingsDataStore.everyNTracks.first()
@@ -840,50 +820,18 @@ class StoryOrchestrator(
         val msg = message.orEmpty()
         return msg.contains("cancel", ignoreCase = true) ||
             msg.contains("отмен", ignoreCase = true) ||
-            msg.contains("499") ||
-            msg.contains("aborted", ignoreCase = true)
+            msg.contains("499")
     }
 
-    private fun Throwable.isBenignStoryCancel(): Boolean {
-        if (this is CancellationException) return true
-        return wasStoryRequestCancelled()
-    }
-
-    private fun trackTitleKey(title: String): String =
-        TrackTitleNormalizer.normalize(title).trim().lowercase()
-
-    private fun isAutoStoryCooldownActive(): Boolean =
-        lastAutoStoryFailAtMs > 0L &&
-            System.currentTimeMillis() - lastAutoStoryFailAtMs < AUTO_STORY_COOLDOWN_MS
-
-    private fun markAutoStoryFailed() {
-        lastAutoStoryFailAtMs = System.currentTimeMillis()
-    }
-
-    private suspend fun cancelStaleGenerationForNewTrack(track: TrackInfo, reason: String) {
-        if (manualStoryInFlight) return
-        if (backendFetchInFlight) {
-            StoryLog.i("Skip cancelStale ($reason) — backend fetch in flight")
-            return
-        }
-        val inFlight = inFlightTrackKey
-        val generating = activeStoryJob?.isActive == true || generationInFlight ||
-            _state.value == OrchestratorState.PREPARING_PLAYBACK
-        if (!generating) return
-        if (inFlight != null && inFlight == trackMatchKey(track)) return
-        cancelInFlightGeneration(reason, rollbackAutoTrigger = true)
-    }
+    private fun trackTitleKey(track: TrackInfo): String =
+        TrackTitleNormalizer.matchKey(track)
 
     private fun cancelInFlightGenerationImmediate(reason: String) {
         if (!shouldAbortInFlightStory(reason)) {
             StoryLog.i("Keep in-flight story ($reason) — manual request active")
             return
         }
-        if (reason == "superseded") {
-            playbackSession++
-            return
-        }
-        if (reason == "track skipped" || reason == "stopped by user" || reason == "manual override") {
+        if (reason == "track skipped" || reason == "stopped by user") {
             storyRepository.cancelActiveStoryFetch(reason)
         }
         val wasActive = generationInFlight ||
@@ -912,11 +860,7 @@ class StoryOrchestrator(
             StoryLog.i("Keep in-flight story ($reason) — manual request active")
             return
         }
-        if (reason == "superseded") {
-            playbackSession++
-            return
-        }
-        if (reason == "track skipped" || reason == "stopped by user" || reason == "manual override") {
+        if (reason == "track skipped" || reason == "stopped by user") {
             storyRepository.cancelActiveStoryFetch(reason)
         }
         val wasActive = generationInFlight ||
@@ -936,7 +880,6 @@ class StoryOrchestrator(
         if (wasActive) {
             _state.value = OrchestratorState.LISTENING
             if (rollbackAutoTrigger) {
-                markAutoStoryFailed()
                 val everyN = settingsDataStore.everyNTracks.first()
                 triggerEngine.rollbackFailedStoryTrigger(everyN)
                 settingsDataStore.setTracksSinceLastStory(
@@ -961,10 +904,8 @@ class StoryOrchestrator(
         val current = mediaControllerManager.resolveNowPlayingTrack()
             ?: mediaControllerManager.effectiveNowPlaying.value
             ?: return true
-        return trackMatchKey(current) == trackMatchKey(track)
+        return trackTitleKey(current) == trackTitleKey(track)
     }
-
-    private fun trackMatchKey(track: TrackInfo): String = TrackTitleNormalizer.matchKey(track)
 
     private fun schedulePlaybackWatchdog(session: Int, musicPausedForStory: AtomicBoolean) {
         scope.launch {
@@ -1112,8 +1053,6 @@ class StoryOrchestrator(
         private const val LOCAL_STORY_FETCH_TIMEOUT_MS = 1_200_000L
         private const val PREVIEW_REVEAL_MAX_MS = 7_000L
         private const val PREVIEW_HOLD_MS = 7_000L
-        /** Pause auto retries after cancel/failure — breaks POST spam loops. */
-        private const val AUTO_STORY_COOLDOWN_MS = 90_000L
     }
 }
 

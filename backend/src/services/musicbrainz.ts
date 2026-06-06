@@ -2,21 +2,7 @@ import fetch from 'node-fetch';
 
 const MUSICBRAINZ_BASE = 'https://musicbrainz.org/ws/2';
 const USER_AGENT = 'MusicStoryBFF/1.0 (contact@example.com)';
-
-function anyAbortSignal(a: AbortSignal, b: AbortSignal): AbortSignal {
-  if (typeof AbortSignal.any === 'function') {
-    return AbortSignal.any([a, b]);
-  }
-  const ctrl = new AbortController();
-  const onAbort = () => ctrl.abort();
-  if (a.aborted || b.aborted) {
-    ctrl.abort();
-    return ctrl.signal;
-  }
-  a.addEventListener('abort', onAbort, { once: true });
-  b.addEventListener('abort', onAbort, { once: true });
-  return ctrl.signal;
-}
+const MAX_RETRIES = 3;
 
 export interface TrackMetadata {
   artist: string;
@@ -98,22 +84,15 @@ function isRetryableNetworkError(err: unknown): boolean {
     msg.includes('network');
 }
 
-async function fetchRecordingSearch(
-  artist: string,
-  title: string,
-  clientSignal?: AbortSignal,
-): Promise<MusicBrainzRecording | null> {
+async function fetchRecordingSearch(artist: string, title: string): Promise<MusicBrainzRecording | null> {
   const query = encodeURIComponent(`artist:"${artist}" AND recording:"${title}"`);
   const url = `${MUSICBRAINZ_BASE}/recording?query=${query}&fmt=json&limit=5&inc=artist-credits`;
-  const maxAttempts = 2;
 
-  for (let attempt = 0; attempt < maxAttempts; attempt++) {
-    if (clientSignal?.aborted) return null;
+  for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
     try {
-      const timeout = AbortSignal.timeout(2_500);
       const response = await fetch(url, {
         headers: { 'User-Agent': USER_AGENT },
-        signal: clientSignal ? anyAbortSignal(clientSignal, timeout) : timeout,
+        signal: AbortSignal.timeout(8000),
       });
 
       if (!response.ok) {
@@ -124,8 +103,8 @@ async function fetchRecordingSearch(
       const data = (await response.json()) as MusicBrainzSearchResponse;
       return data.recordings?.[0] ?? null;
     } catch (err) {
-      if (attempt < maxAttempts - 1 && isRetryableNetworkError(err)) {
-        await new Promise((resolve) => setTimeout(resolve, 300));
+      if (attempt < MAX_RETRIES - 1 && isRetryableNetworkError(err)) {
+        await new Promise((resolve) => setTimeout(resolve, 400 * (attempt + 1)));
         continue;
       }
       console.warn(
@@ -155,13 +134,12 @@ export function normalizeStreamingTitle(title: string): string {
 export async function enrichTrackMetadata(
   artist: string,
   title: string,
-  clientSignal?: AbortSignal,
 ): Promise<TrackMetadata> {
   const lookupTitle = normalizeStreamingTitle(title);
   const base: TrackMetadata = { artist, title: lookupTitle };
 
   try {
-    const recording = await fetchRecordingSearch(artist, lookupTitle, clientSignal);
+    const recording = await fetchRecordingSearch(artist, lookupTitle);
     if (!recording) return base;
 
     return {

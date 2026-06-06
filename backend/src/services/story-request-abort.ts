@@ -3,19 +3,29 @@ import type { Request } from 'express';
 const activeByInstall = new Map<string, AbortController>();
 
 export class StoryRequestAbortedError extends Error {
-  readonly reason: 'superseded' | 'client_disconnect';
+  readonly reason: 'client_disconnect';
 
-  constructor(reason: 'superseded' | 'client_disconnect') {
+  constructor(reason: 'client_disconnect') {
     super(`Story request aborted (${reason})`);
     this.name = 'StoryRequestAbortedError';
     this.reason = reason;
   }
 }
 
-/** One in-flight story per install — new POST cancels the previous. */
+export class StoryRequestDuplicateError extends Error {
+  constructor() {
+    super('Story request already in progress');
+    this.name = 'StoryRequestDuplicateError';
+  }
+}
+
+/** One in-flight story per install — duplicate POST is rejected, never aborts the active one. */
 export function claimStoryGeneration(installId: string, req: Request): AbortSignal {
   const key = installId.trim().toLowerCase();
-  activeByInstall.get(key)?.abort('superseded');
+  const existing = activeByInstall.get(key);
+  if (existing && !existing.signal.aborted) {
+    throw new StoryRequestDuplicateError();
+  }
 
   const ctrl = new AbortController();
   activeByInstall.set(key, ctrl);
@@ -50,7 +60,6 @@ export function releaseStoryGeneration(installId: string, signal: AbortSignal): 
 
 export function throwIfStoryAborted(signal: AbortSignal, phase: string): void {
   if (!signal.aborted) return;
-  const reason = signal.reason === 'superseded' ? 'superseded' : 'client_disconnect';
-  console.log(`[story] abort at ${phase} reason=${reason}`);
-  throw new StoryRequestAbortedError(reason);
+  console.log(`[story] abort at ${phase} reason=client_disconnect`);
+  throw new StoryRequestAbortedError('client_disconnect');
 }

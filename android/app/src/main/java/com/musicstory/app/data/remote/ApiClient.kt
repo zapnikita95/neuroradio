@@ -29,22 +29,9 @@ class ApiClient(
 
     @Volatile
     private var activeStoryCall: okhttp3.Call? = null
-    @Volatile
-    private var storyRequestInFlight = false
 
     /** Tracks active POST /v1/story/full — cancel only via [cancelActiveStoryRequest] (track skip). */
     private val storyCancelInterceptor = Interceptor { chain ->
-        val req = chain.request()
-        val isStoryPost = req.method.equals("POST", ignoreCase = true) &&
-            req.url.encodedPath.endsWith("/v1/story/full")
-        if (isStoryPost) {
-            synchronized(storyCallLock) {
-                if (storyRequestInFlight) {
-                    throw java.io.IOException("story fetch already in flight")
-                }
-                storyRequestInFlight = true
-            }
-        }
         val call = chain.call()
         synchronized(storyCallLock) {
             activeStoryCall = call
@@ -54,7 +41,6 @@ class ApiClient(
         } finally {
             synchronized(storyCallLock) {
                 if (activeStoryCall === call) activeStoryCall = null
-                if (isStoryPost) storyRequestInFlight = false
             }
         }
     }
@@ -64,13 +50,9 @@ class ApiClient(
             val call = activeStoryCall
             if (call != null && !call.isCanceled()) {
                 StoryLog.w("HTTP cancel story/full reason=$reason")
-                if (com.musicstory.app.BuildConfig.DEBUG) {
-                    StoryLog.w("HTTP cancel stack: ${Throwable().stackTraceToString().take(1200)}")
-                }
                 call.cancel()
             }
             activeStoryCall = null
-            storyRequestInFlight = false
         }
     }
 
@@ -115,9 +97,6 @@ class ApiClient(
             )
             response
         } catch (first: Exception) {
-            if (first is java.io.IOException && first.message?.contains("Canceled", ignoreCase = true) == true) {
-                throw kotlinx.coroutines.CancellationException("story cancelled")
-            }
             val http = first as? retrofit2.HttpException
             if (http != null && http.code() != 401) throw first
             StoryLog.w("Story fetch retry after: ${first.message}")

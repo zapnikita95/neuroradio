@@ -117,7 +117,7 @@ class MediaMonitorService : Service() {
 
     private fun scheduleTrackCounted(app: MusicStoryApp, track: TrackInfo) {
         listenCountJob?.cancel()
-        val dwellMatchKey = TrackTitleNormalizer.matchKey(track)
+        val dwellTitle = track.title.trim()
         listenCountJob = serviceScope.launch {
             val countListenEnabled = app.settingsDataStore.countTrackAfterListenEnabled.first()
             val userSec = if (countListenEnabled) {
@@ -132,7 +132,7 @@ class MediaMonitorService : Service() {
             suspend fun stillOnTrack(): Boolean {
                 val current = app.mediaControllerManager.resolveNowPlayingTrack()
                     ?: app.mediaControllerManager.effectiveNowPlaying.value
-                return current?.let { TrackTitleNormalizer.matchKey(it) == dwellMatchKey } == true
+                return current?.title?.trim()?.equals(dwellTitle, ignoreCase = true) == true
             }
 
             if (userSec > 0) {

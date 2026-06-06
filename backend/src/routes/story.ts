@@ -94,6 +94,7 @@ import {
   claimStoryGeneration,
   releaseStoryGeneration,
   StoryRequestAbortedError,
+  StoryRequestDuplicateError,
   throwIfStoryAborted,
 } from '../services/story-request-abort.js';
 import type { StoryLengthId } from '../services/story-length.js';
@@ -187,7 +188,17 @@ function storyFullRateLimit(req: Request, res: Response, next: import('express')
 
 router.post('/full', validateStoryFullBody, storyFullRateLimit, async (req: Request, res: Response) => {
   const installId = req.installId ?? 'unknown';
-  const clientAbort = claimStoryGeneration(installId, req);
+  let clientAbort: AbortSignal;
+  try {
+    clientAbort = claimStoryGeneration(installId, req);
+  } catch (err) {
+    if (err instanceof StoryRequestDuplicateError) {
+      console.log(`[story] duplicate POST ignored install=${installId.slice(0, 8)}`);
+      res.status(409).json({ ok: false, code: 'story_in_progress' });
+      return;
+    }
+    throw err;
+  }
   const body = req.body as StoryFullBody;
   console.log(
     `[story] <<< request install=${installId.slice(0, 8)} llm=${body.llm_provider ?? 'missing'} ` +
@@ -317,7 +328,7 @@ router.post('/full', validateStoryFullBody, storyFullRateLimit, async (req: Requ
       );
     }
 
-    const metadata = await enrichTrackMetadata(coverCtx.factArtist, coverCtx.factTitle, clientAbort);
+    const metadata = await enrichTrackMetadata(coverCtx.factArtist, coverCtx.factTitle);
     timing.mark('metadata', `year=${metadata.year ?? '-'} mbid=${metadata.mbid ? 'yes' : 'no'}`);
     throwIfStoryAborted(clientAbort, 'metadata');
     const delivery = resolveVoiceDelivery({

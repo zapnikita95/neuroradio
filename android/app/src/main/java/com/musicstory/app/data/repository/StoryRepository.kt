@@ -565,6 +565,10 @@ class StoryRepository(
             if (e is HttpException && e.code() == 499) {
                 throw CancellationException("story cancelled")
             }
+            if (e is HttpException && e.code() == 409) {
+                StoryLog.i("Backend story already in progress (409) — not retrying")
+                throw CancellationException("story in progress")
+            }
             if (e is IOException && e.message?.contains("cancel", ignoreCase = true) == true) {
                 throw CancellationException("story cancelled")
             }
