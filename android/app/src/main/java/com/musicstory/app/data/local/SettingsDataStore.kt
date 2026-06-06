@@ -20,6 +20,7 @@ import com.musicstory.app.domain.MusicInterruptionMode
 import com.musicstory.app.domain.StoryLength
 import com.musicstory.app.domain.StoryNarrator
 import com.musicstory.app.domain.TtsEmotion
+import com.musicstory.app.domain.TtsPlaybackEngine
 import com.musicstory.app.domain.TtsSpeed
 import com.musicstory.app.domain.TtsVoice
 import com.musicstory.app.domain.TriggerMode
@@ -172,6 +173,10 @@ class SettingsDataStore(private val context: Context) {
 
     val ttsEmotion: Flow<TtsEmotion> = context.settingsDataStore.data.map { prefs ->
         TtsEmotion.fromId(prefs[KEY_TTS_EMOTION])
+    }
+
+    val ttsPlaybackEngine: Flow<TtsPlaybackEngine> = context.settingsDataStore.data.map { prefs ->
+        TtsPlaybackEngine.fromId(prefs[KEY_TTS_PLAYBACK_ENGINE])
     }
 
     val appPowerMode: Flow<AppPowerMode> = context.settingsDataStore.data.map { prefs ->
@@ -385,6 +390,10 @@ class SettingsDataStore(private val context: Context) {
         context.settingsDataStore.edit { it[KEY_TTS_EMOTION] = emotion.id }
     }
 
+    suspend fun setTtsPlaybackEngine(engine: TtsPlaybackEngine) {
+        context.settingsDataStore.edit { it[KEY_TTS_PLAYBACK_ENGINE] = engine.id }
+    }
+
     suspend fun setAppPowerMode(mode: AppPowerMode) {
         context.settingsDataStore.edit {
             it[KEY_APP_POWER_MODE] = mode.id
@@ -471,6 +480,7 @@ class SettingsDataStore(private val context: Context) {
         private val KEY_TTS_VOICE = stringPreferencesKey("tts_voice")
         private val KEY_TTS_SPEED = stringPreferencesKey("tts_speed")
         private val KEY_TTS_EMOTION = stringPreferencesKey("tts_emotion")
+        private val KEY_TTS_PLAYBACK_ENGINE = stringPreferencesKey("tts_playback_engine")
         private val KEY_APP_POWER_MODE = stringPreferencesKey("app_power_mode")
         private val KEY_MONITOR_PAUSED_BY_USER = booleanPreferencesKey("monitor_paused_by_user")
         private val KEY_MUSIC_INTERRUPTION_MODE = stringPreferencesKey("music_interruption_mode")

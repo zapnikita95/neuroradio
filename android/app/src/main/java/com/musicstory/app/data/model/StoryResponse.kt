@@ -25,6 +25,7 @@ data class StoryRequest(
     @SerializedName("openrouter_api_key") val openRouterApiKey: String? = null,
     @SerializedName("local_ollama_url") val localOllamaUrl: String? = null,
     @SerializedName("local_ollama_model") val localOllamaModel: String? = null,
+    @SerializedName("skip_server_tts") val skipServerTts: Boolean = false,
 )
 
 data class StoryResponse(

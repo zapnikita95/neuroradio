@@ -169,6 +169,8 @@
     <string name="settings_gemini_pricing_link">Тарифы Google AI</string>
     <string name="settings_gemini_get_key">Получить Gemini-ключ</string>
     <string name="settings_tts_voice">Голос</string>
+    <string name="settings_tts_playback_engine">Озвучка</string>
+    <string name="settings_tts_playback_engine_hint">Android TTS — тест без Yandex. Нужен русский голос в настройках телефона.</string>
     <string name="settings_story_length">Длина истории</string>
     <string name="settings_tts_speed">Скорость речи</string>
     <string name="settings_tts_emotion">Интонация</string>
@@ -241,4 +243,5 @@
     <string name="feedback_close">Закрыть</string>
 
     <string name="server_audio_error_message">Не удалось воспроизвести озвучку Yandex с сервера — попробуй ещё раз</string>
+    <string name="android_tts_error_message">Не удалось озвучить на телефоне — установи русский голос в настройках TTS или вернись на Yandex</string>
 </resources>

@@ -133,6 +133,7 @@ class StoryRepository(
         }
 
         val trackKey = track.displayKey
+        val ttsPlaybackEngine = settingsDataStore.ttsPlaybackEngine.first()
         val previousScripts = (
             storyHistoryDao.getRecentScripts(trackKey) +
                 storyHistoryDao.getRecentScriptsForArtist(track.artist)
@@ -141,7 +142,7 @@ class StoryRepository(
         if (!forceRefresh && previousScripts.isEmpty()) {
             val cached = storyDao.getByTrackKey(trackKey)
             if (cached != null && !cached.demo && !isCacheExpired(cached) &&
-                (!cached.audioUrl.isNullOrBlank() ||
+                ((!cached.audioUrl.isNullOrBlank() || ttsPlaybackEngine.skipsServerTts) &&
                     !StoryScriptQuality.isTemplateLike(cached.script, cached.artist, cached.title))
             ) {
                 StoryLog.i("Story from cache")
@@ -268,6 +269,7 @@ class StoryRepository(
                 ttsVoice = ttsVoice,
                 ttsSpeed = ttsSpeed,
                 ttsEmotion = ttsEmotion,
+                skipServerTts = ttsPlaybackEngine.skipsServerTts,
                 llmProvider = llmProvider,
                 geminiModel = geminiModel,
                 groqModel = groqModel,
@@ -335,6 +337,7 @@ class StoryRepository(
         ttsVoice: TtsVoice,
         ttsSpeed: TtsSpeed,
         ttsEmotion: TtsEmotion,
+        skipServerTts: Boolean = false,
         llmProvider: LlmProvider,
         geminiModel: GeminiModel,
         groqModel: GroqModel,
@@ -382,6 +385,7 @@ class StoryRepository(
                         openRouterApiKey = openRouterApiKey.takeIf { it.isNotBlank() },
                         localOllamaUrl = localOllamaUrl.takeIf { it.isNotBlank() },
                         localOllamaModel = localOllamaModel.takeIf { it.isNotBlank() },
+                        skipServerTts = skipServerTts,
                     ),
                 )
             }
@@ -394,7 +398,7 @@ class StoryRepository(
                     StoryLog.w("Backend response rejected: empty or duplicate")
                     StoryAttemptResult.Failed("Сервер вернул пустой или повторный текст")
                 }
-                response.audioUrl.isNullOrBlank() -> {
+                response.audioUrl.isNullOrBlank() && !skipServerTts -> {
                     StoryLog.e("Backend returned story without Yandex audioUrl")
                     StoryAttemptResult.Failed(
                         "Сервер не отдал озвучку Yandex. Проверь YANDEX_API_KEY и YANDEX_FOLDER_ID на Railway.",
@@ -402,7 +406,10 @@ class StoryRepository(
                 }
                 else -> {
                     response.quota?.let { quota -> _dailyQuota.value = quota }
-                    StoryLog.i("Backend OK: audio=yes, quota=${response.quota?.remaining}/${response.quota?.limit}")
+                    StoryLog.i(
+                        "Backend OK: audio=${!response.audioUrl.isNullOrBlank()} " +
+                            "androidTts=$skipServerTts quota=${response.quota?.remaining}/${response.quota?.limit}",
+                    )
                     persistStory(trackKey, track, response, narratorTag)
                     StoryAttemptResult.Success(response)
                 }

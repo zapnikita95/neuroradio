@@ -7,6 +7,9 @@ import android.media.AudioManager
 import android.os.Build
 import android.os.Handler
 import android.os.Looper
+import android.speech.tts.TextToSpeech
+import android.speech.tts.UtteranceProgressListener
+import android.speech.tts.Voice
 import androidx.media3.common.AudioAttributes as MediaAudioAttributes
 import androidx.media3.common.C
 import androidx.media3.common.MediaItem
@@ -17,6 +20,7 @@ import com.musicstory.app.util.StoryLog
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import java.util.Locale
 
 enum class StoryPlaybackState {
     IDLE,
@@ -27,7 +31,9 @@ enum class StoryPlaybackState {
     ERROR,
 }
 
-/** Server-only playback: Yandex TTS on Railway → signed audio URL → ExoPlayer. No Android TextToSpeech. */
+/**
+ * Playback: Yandex server audio (ExoPlayer) or Android TextToSpeech (test toggle in settings).
+ */
 class StoryPlayer(context: Context) {
 
     private val appContext = context.applicationContext
@@ -43,6 +49,13 @@ class StoryPlayer(context: Context) {
             true,
         )
         .build()
+
+    private var textToSpeech: TextToSpeech? = null
+    private var androidTtsReady = false
+    private var androidTtsInitStarted = false
+    private var activePlaybackEngine = TtsPlaybackEngine.YANDEX_SERVER
+    private var lastAndroidSpeechRate = 1.0f
+    private var lastAndroidScript: String? = null
 
     private var resumeMusicOnFinish = true
     private var onFinishedCallback: (() -> Unit)? = null
@@ -116,7 +129,8 @@ class StoryPlayer(context: Context) {
     fun playStory(
         response: StoryResponse,
         audioUrl: String?,
-        @Suppress("UNUSED_PARAMETER") speechRate: Float = 0.92f,
+        speechRate: Float = 0.92f,
+        playbackEngine: TtsPlaybackEngine = TtsPlaybackEngine.YANDEX_SERVER,
         resumeMusic: Boolean = true,
         onPlaybackStarted: (() -> Unit)? = null,
         onFinished: (() -> Unit)? = null,
@@ -129,21 +143,169 @@ class StoryPlayer(context: Context) {
         onPlaybackStartedCallback = onPlaybackStarted
         playbackStartedNotified = false
         exoRetryUsed = false
+        activePlaybackEngine = playbackEngine
+        lastAndroidSpeechRate = speechRate
         _currentScript.value = response.script
-
-        if (audioUrl.isNullOrBlank()) {
-            StoryLog.e("No server audioUrl — Yandex TTS on Railway is required; Android TTS is not used")
-            _state.value = StoryPlaybackState.ERROR
-            invokeError()
-            return
-        }
 
         if (!requestAudioFocus()) {
             StoryLog.w("Audio focus not granted — trying playback anyway")
         }
 
-        StoryLog.i("Playing Yandex server audio: $audioUrl")
-        playWithExoPlayer(audioUrl)
+        when (playbackEngine) {
+            TtsPlaybackEngine.ANDROID_DEVICE -> playWithAndroidTts(response.script, speechRate)
+            TtsPlaybackEngine.YANDEX_SERVER -> {
+                if (audioUrl.isNullOrBlank()) {
+                    StoryLog.e("No server audioUrl — switch to Android TTS in settings or check Yandex on Railway")
+                    _state.value = StoryPlaybackState.ERROR
+                    invokeError()
+                    return
+                }
+                StoryLog.i("Playing Yandex server audio: $audioUrl")
+                playWithExoPlayer(audioUrl)
+            }
+        }
+    }
+
+    private fun playWithAndroidTts(script: String, speechRate: Float) {
+        val plainText = sanitizeScriptForAndroidTts(script)
+        if (plainText.isBlank()) {
+            StoryLog.e("Android TTS: empty script after sanitize")
+            failPlayback()
+            return
+        }
+        lastAndroidScript = plainText
+        _state.value = StoryPlaybackState.PREPARING
+        scheduleAndroidStartTimeout()
+        ensureAndroidTts(
+            onReady = {
+                val tts = textToSpeech ?: run {
+                    failPlayback()
+                    return@ensureAndroidTts
+                }
+                tts.setSpeechRate(speechRate.coerceIn(0.5f, 2.0f))
+                tts.setOnUtteranceProgressListener(androidUtteranceListener)
+                val result = tts.speak(plainText, TextToSpeech.QUEUE_FLUSH, null, UTTERANCE_ID)
+                if (result == TextToSpeech.ERROR) {
+                    StoryLog.e("Android TTS speak() returned ERROR")
+                    failPlayback()
+                }
+            },
+            onError = {
+                StoryLog.e("Android TTS init failed — install Russian voice in system settings")
+                failPlayback()
+            },
+        )
+    }
+
+    private val androidUtteranceListener = object : UtteranceProgressListener() {
+        override fun onStart(utteranceId: String?) {
+            mainHandler.post {
+                cancelPlaybackTimeout()
+                notifyPlaybackStarted()
+                _state.value = StoryPlaybackState.PLAYING
+            }
+        }
+
+        override fun onDone(utteranceId: String?) {
+            mainHandler.post {
+                cancelPlaybackTimeout()
+                _state.value = StoryPlaybackState.COMPLETED
+                abandonAudioFocus()
+                invokeFinished()
+            }
+        }
+
+        @Deprecated("Deprecated in Java")
+        override fun onError(utteranceId: String?) {
+            mainHandler.post { failPlayback() }
+        }
+
+        override fun onError(utteranceId: String?, errorCode: Int) {
+            mainHandler.post {
+                StoryLog.e("Android TTS utterance error code=$errorCode")
+                failPlayback()
+            }
+        }
+    }
+
+    private fun ensureAndroidTts(onReady: () -> Unit, onError: () -> Unit) {
+        if (androidTtsReady && textToSpeech != null) {
+            onReady()
+            return
+        }
+        if (androidTtsInitStarted && textToSpeech != null) {
+            pendingAndroidReady = onReady
+            pendingAndroidError = onError
+            return
+        }
+        androidTtsInitStarted = true
+        pendingAndroidReady = onReady
+        pendingAndroidError = onError
+        textToSpeech = TextToSpeech(appContext) { status ->
+            mainHandler.post {
+                if (status != TextToSpeech.SUCCESS) {
+                    StoryLog.e("Android TTS init status=$status")
+                    androidTtsInitStarted = false
+                    pendingAndroidError?.invoke()
+                    clearPendingAndroidCallbacks()
+                    return@post
+                }
+                val tts = textToSpeech ?: run {
+                    pendingAndroidError?.invoke()
+                    clearPendingAndroidCallbacks()
+                    return@post
+                }
+                val locale = Locale.forLanguageTag("ru-RU")
+                val langResult = tts.setLanguage(locale)
+                if (langResult == TextToSpeech.LANG_MISSING_DATA ||
+                    langResult == TextToSpeech.LANG_NOT_SUPPORTED
+                ) {
+                    StoryLog.e("Android TTS: Russian language not supported (langResult=$langResult)")
+                    pendingAndroidError?.invoke()
+                    clearPendingAndroidCallbacks()
+                    return@post
+                }
+                selectRussianVoice(tts)
+                androidTtsReady = true
+                StoryLog.i("Android TTS ready, voice=${tts.voice?.name ?: "default"}")
+                pendingAndroidReady?.invoke()
+                clearPendingAndroidCallbacks()
+            }
+        }
+    }
+
+    private var pendingAndroidReady: (() -> Unit)? = null
+    private var pendingAndroidError: (() -> Unit)? = null
+
+    private fun clearPendingAndroidCallbacks() {
+        pendingAndroidReady = null
+        pendingAndroidError = null
+    }
+
+    private fun selectRussianVoice(tts: TextToSpeech) {
+        val voices = tts.voices.orEmpty()
+        val ruVoice = voices
+            .filter { voice ->
+                voice.locale.language.equals("ru", ignoreCase = true) && !voice.isNetworkConnectionRequired
+            }
+            .maxByOrNull { voice ->
+                var score = 0
+                if (voice.quality >= Voice.QUALITY_HIGH) score += 4
+                if (!voice.isNetworkConnectionRequired) score += 2
+                score
+            }
+        if (ruVoice != null) {
+            tts.voice = ruVoice
+            StoryLog.i("Android TTS voice selected: ${ruVoice.name}")
+        }
+    }
+
+    private fun sanitizeScriptForAndroidTts(script: String): String {
+        return script
+            .replace(Regex("\\+(?=[А-ЯЁа-яё])"), "")
+            .replace(Regex("<\\[(?:small|medium|large)\\]>"), " ")
+            .replace(Regex("\\s+"), " ")
+            .trim()
     }
 
     private fun playWithExoPlayer(url: String) {
@@ -153,6 +315,21 @@ class StoryPlayer(context: Context) {
         exoPlayer.setMediaItem(MediaItem.fromUri(url))
         exoPlayer.prepare()
         exoPlayer.playWhenReady = true
+    }
+
+    private fun scheduleAndroidStartTimeout() {
+        cancelPlaybackTimeout()
+        playbackTimeoutRunnable = Runnable {
+            if (_state.value != StoryPlaybackState.PREPARING &&
+                _state.value != StoryPlaybackState.PLAYING
+            ) {
+                return@Runnable
+            }
+            if (textToSpeech?.isSpeaking == true) return@Runnable
+            StoryLog.e("Android TTS start timeout")
+            failPlayback()
+        }
+        mainHandler.postDelayed(playbackTimeoutRunnable!!, ANDROID_START_TIMEOUT_MS)
     }
 
     private fun scheduleExoBufferingTimeout() {
@@ -184,11 +361,17 @@ class StoryPlayer(context: Context) {
     }
 
     private fun failPlayback() {
-        exoPlayer.stop()
-        exoPlayer.clearMediaItems()
+        stopActiveEngine()
         _state.value = StoryPlaybackState.ERROR
         abandonAudioFocus()
         invokeError()
+    }
+
+    private fun stopActiveEngine() {
+        cancelPlaybackTimeout()
+        exoPlayer.stop()
+        exoPlayer.clearMediaItems()
+        textToSpeech?.stop()
     }
 
     private fun cancelPlaybackTimeout() {
@@ -245,15 +428,33 @@ class StoryPlayer(context: Context) {
     }
 
     fun pause() {
-        if (exoPlayer.isPlaying) {
-            exoPlayer.pause()
-            _state.value = StoryPlaybackState.PAUSED
+        when (activePlaybackEngine) {
+            TtsPlaybackEngine.ANDROID_DEVICE -> {
+                textToSpeech?.stop()
+                _state.value = StoryPlaybackState.PAUSED
+            }
+            TtsPlaybackEngine.YANDEX_SERVER -> {
+                if (exoPlayer.isPlaying) {
+                    exoPlayer.pause()
+                    _state.value = StoryPlaybackState.PAUSED
+                }
+            }
         }
     }
 
     fun resume() {
-        if (exoPlayer.mediaItemCount > 0) {
-            exoPlayer.play()
+        when (activePlaybackEngine) {
+            TtsPlaybackEngine.ANDROID_DEVICE -> {
+                val script = lastAndroidScript
+                if (!script.isNullOrBlank() && androidTtsReady) {
+                    playWithAndroidTts(script, lastAndroidSpeechRate)
+                }
+            }
+            TtsPlaybackEngine.YANDEX_SERVER -> {
+                if (exoPlayer.mediaItemCount > 0) {
+                    exoPlayer.play()
+                }
+            }
         }
     }
 
@@ -262,13 +463,12 @@ class StoryPlayer(context: Context) {
     }
 
     private fun stopInternal(clearCallback: Boolean) {
-        cancelPlaybackTimeout()
-        exoPlayer.stop()
-        exoPlayer.clearMediaItems()
+        stopActiveEngine()
         abandonAudioFocus()
         _state.value = StoryPlaybackState.IDLE
         _currentScript.value = null
         currentExoUrl = null
+        lastAndroidScript = null
         playbackStartedNotified = false
         onPlaybackStartedCallback = null
         if (clearCallback) {
@@ -282,9 +482,15 @@ class StoryPlayer(context: Context) {
     fun release() {
         stop()
         exoPlayer.release()
+        textToSpeech?.shutdown()
+        textToSpeech = null
+        androidTtsReady = false
+        androidTtsInitStarted = false
     }
 
     companion object {
         private const val EXO_START_TIMEOUT_MS = 28_000L
+        private const val ANDROID_START_TIMEOUT_MS = 12_000L
+        private const val UTTERANCE_ID = "music_story_script"
     }
 }

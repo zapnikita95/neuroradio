@@ -58,6 +58,28 @@ enum class TtsSpeed(val id: String, val labelRu: String, val yandexSpeed: Float,
     }
 }
 
+/** Тестовый переключатель: Yandex на Railway (prod) vs системный TTS на телефоне. */
+enum class TtsPlaybackEngine(val id: String, val labelRu: String, val descriptionRu: String) {
+    YANDEX_SERVER(
+        id = "yandex",
+        labelRu = "Yandex SpeechKit (сервер)",
+        descriptionRu = "Озвучка на Railway — основной режим",
+    ),
+    ANDROID_DEVICE(
+        id = "android",
+        labelRu = "Android TTS (тест)",
+        descriptionRu = "Голос телефона, без Yandex — для проверки качества русского",
+    ),
+    ;
+
+    val skipsServerTts: Boolean get() = this == ANDROID_DEVICE
+
+    companion object {
+        fun fromId(id: String?): TtsPlaybackEngine =
+            entries.firstOrNull { it.id == id } ?: YANDEX_SERVER
+    }
+}
+
 enum class TtsEmotion(val id: String, val labelRu: String, val descriptionRu: String) {
     NEUTRAL("neutral", "Нейтральная", "Ровная, спокойная подача"),
     LIVELY("good", "Живая", "Дружелюбная, тёплая интонация"),

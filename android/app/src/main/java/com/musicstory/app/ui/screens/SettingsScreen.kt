@@ -80,6 +80,7 @@ import com.musicstory.app.domain.OpenRouterModel
 import com.musicstory.app.domain.StoryLength
 import com.musicstory.app.domain.StoryNarrator
 import com.musicstory.app.domain.TtsEmotion
+import com.musicstory.app.domain.TtsPlaybackEngine
 import com.musicstory.app.domain.TtsSpeed
 import com.musicstory.app.domain.TtsVoice
 import com.musicstory.app.domain.TierAccess
@@ -148,6 +149,7 @@ fun SettingsScreen(
     val ttsVoice by settings.ttsVoice.collectAsState(initial = TtsVoice.AUTO)
     val ttsSpeed by settings.ttsSpeed.collectAsState(initial = TtsSpeed.NORMAL)
     val ttsEmotion by settings.ttsEmotion.collectAsState(initial = TtsEmotion.LIVELY)
+    val ttsPlaybackEngine by settings.ttsPlaybackEngine.collectAsState(initial = TtsPlaybackEngine.YANDEX_SERVER)
     val musicFadeSeconds by settings.musicFadeSeconds.collectAsState(initial = SettingsDataStore.DEFAULT_MUSIC_FADE_SECONDS)
     val countTrackListenEnabled by settings.countTrackAfterListenEnabled.collectAsState(initial = false)
     val countTrackListenSeconds by settings.countTrackAfterListenSeconds.collectAsState(
@@ -660,12 +662,38 @@ fun SettingsScreen(
 
                 CollapsibleSettingsSection(
                     title = context.getString(R.string.settings_voice_section),
-                    summary = "${ttsVoice.labelRu} · ${ttsSpeed.labelRu} · ${storyLength.labelRu}",
+                    summary = when (ttsPlaybackEngine) {
+                        TtsPlaybackEngine.ANDROID_DEVICE ->
+                            "${ttsPlaybackEngine.labelRu} · ${ttsSpeed.labelRu} · ${storyLength.labelRu}"
+                        TtsPlaybackEngine.YANDEX_SERVER ->
+                            "${ttsVoice.labelRu} · ${ttsSpeed.labelRu} · ${storyLength.labelRu}"
+                    },
                     tourHighlight = tourStep == 4,
                     forceExpanded = tourStep == 4,
                     tourActive = tourStep == 4,
                     onTourLayout = tourLayoutHandler(4),
                 ) {
+                    Text(
+                        text = context.getString(R.string.settings_tts_playback_engine),
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MutedLavender,
+                    )
+                    Text(
+                        text = context.getString(R.string.settings_tts_playback_engine_hint),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MutedLavender,
+                        modifier = Modifier.padding(top = 4.dp, bottom = 8.dp),
+                    )
+                    TtsPlaybackEngine.entries.forEach { engine ->
+                        NarratorRadioRow(
+                            label = engine.labelRu,
+                            description = engine.descriptionRu,
+                            selected = ttsPlaybackEngine == engine,
+                            onSelect = { scope.launch { settings.setTtsPlaybackEngine(engine) } },
+                        )
+                    }
+                    Spacer(modifier = Modifier.height(8.dp))
+                    if (ttsPlaybackEngine == TtsPlaybackEngine.YANDEX_SERVER) {
                     Text(
                         text = context.getString(R.string.settings_tts_voice),
                         style = MaterialTheme.typography.labelMedium,
@@ -694,6 +722,7 @@ fun SettingsScreen(
                         )
                     }
                     Spacer(modifier = Modifier.height(8.dp))
+                    }
                     Text(
                         text = context.getString(R.string.settings_tts_speed),
                         style = MaterialTheme.typography.labelMedium,

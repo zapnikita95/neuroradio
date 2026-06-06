@@ -111,6 +111,8 @@ interface StoryFullBody {
   openrouter_api_key?: string;
   local_ollama_url?: string;
   local_ollama_model?: string;
+  /** Client-side Android TTS — skip Yandex/Salute synthesis to save cost during testing. */
+  skip_server_tts?: boolean;
 }
 
 router.get('/quota', (req: Request, res: Response) => {
@@ -799,7 +801,11 @@ router.post('/full', validateStoryFullBody, storyFullRateLimit, async (req: Requ
       );
     }
 
-    if (hasYandexCredentials() || canUseAzureSpeechProduction()) {
+    if (body.skip_server_tts) {
+      response.audioUrl = null;
+      response.audioFile = null;
+      response.ttsHint = 'Озвучка на устройстве (skip_server_tts)';
+    } else if (hasYandexCredentials() || canUseAzureSpeechProduction()) {
       const id = uuidv4();
       console.log(
         `[tts] queue install=${installId.slice(0, 8)} voice=${voiceId} style=${delivery.styleId} speed=${delivery.speed} emotion=${delivery.emotion} tier=${voiceTier} provider=${ttsProvider} words=${story.word_count}`,
