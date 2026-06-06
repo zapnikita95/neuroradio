@@ -189,7 +189,9 @@ export async function synthesizeStoryAudio(request: TtsRouteRequest): Promise<Tt
     });
   }
 
-  await postprocessOggFile(result.filePath);
+  if (result.filePath.endsWith('.ogg')) {
+    await postprocessOggFile(result.filePath);
+  }
 
   return {
     ...result,

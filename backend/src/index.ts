@@ -57,7 +57,11 @@ process.on('uncaughtException', (err) => {
   console.error('[process] uncaughtException:', err);
 });
 
-app.use('/audio', requireSignedAudioAccess, express.static(AUDIO_DIR, {
+app.use('/audio', requireSignedAudioAccess, (req, res, next) => {
+  if (req.path.endsWith('.wav')) res.type('audio/wav');
+  else if (req.path.endsWith('.ogg')) res.type('audio/ogg');
+  next();
+}, express.static(AUDIO_DIR, {
   dotfiles: 'deny',
   index: false,
   maxAge: 0,

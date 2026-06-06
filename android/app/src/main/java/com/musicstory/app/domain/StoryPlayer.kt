@@ -13,8 +13,11 @@ import android.speech.tts.Voice
 import androidx.media3.common.AudioAttributes as MediaAudioAttributes
 import androidx.media3.common.C
 import androidx.media3.common.MediaItem
+import androidx.media3.common.MimeTypes
 import androidx.media3.common.Player
+import androidx.media3.datasource.DefaultHttpDataSource
 import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import com.musicstory.app.data.model.StoryResponse
 import com.musicstory.app.util.StoryLog
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -40,7 +43,13 @@ class StoryPlayer(context: Context) {
     private val mainHandler = Handler(Looper.getMainLooper())
     private val audioManager = appContext.getSystemService(Context.AUDIO_SERVICE) as AudioManager
     private var audioFocusRequest: AudioFocusRequest? = null
+    private val httpDataSourceFactory = DefaultHttpDataSource.Factory()
+        .setUserAgent("MusicStory/${com.musicstory.app.BuildConfig.VERSION_NAME} (Android)")
+        .setAllowCrossProtocolRedirects(true)
+        .setConnectTimeoutMs(30_000)
+        .setReadTimeoutMs(90_000)
     private val exoPlayer: ExoPlayer = ExoPlayer.Builder(appContext)
+        .setMediaSourceFactory(DefaultMediaSourceFactory(httpDataSourceFactory))
         .setAudioAttributes(
             MediaAudioAttributes.Builder()
                 .setUsage(C.USAGE_MEDIA)
@@ -321,7 +330,16 @@ class StoryPlayer(context: Context) {
         currentExoUrl = url
         _state.value = StoryPlaybackState.PREPARING
         scheduleExoBufferingTimeout()
-        exoPlayer.setMediaItem(MediaItem.fromUri(url))
+        val mimeType = when {
+            url.contains(".wav", ignoreCase = true) -> MimeTypes.AUDIO_WAV
+            url.contains(".ogg", ignoreCase = true) -> MimeTypes.AUDIO_OGG
+            else -> null
+        }
+        val mediaItemBuilder = MediaItem.Builder().setUri(url)
+        if (mimeType != null) {
+            mediaItemBuilder.setMimeType(mimeType)
+        }
+        exoPlayer.setMediaItem(mediaItemBuilder.build())
         exoPlayer.prepare()
         exoPlayer.playWhenReady = true
     }

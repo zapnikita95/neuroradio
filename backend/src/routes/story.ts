@@ -874,7 +874,7 @@ router.post('/full', validateStoryFullBody, storyFullRateLimit, async (req: Requ
         ttsProvider,
         script: story.script,
         voiceId,
-        fileName: `${id}.ogg`,
+        fileName: `${id}.wav`,
         speed: delivery.speed,
         emotion: delivery.emotion,
         pauseProfile: delivery.pauseProfile,

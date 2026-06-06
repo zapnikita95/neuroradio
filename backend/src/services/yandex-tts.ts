@@ -19,6 +19,43 @@ import { buildYandexSsml, hasLatinForSsml } from './tts-yandex-ssml.js';
 import type { TtsPauseProfile } from './tts-voice-profiles.js';
 
 const TTS_URL = 'https://tts.api.cloud.yandex.net/speech/v1/tts:synthesize';
+const YANDEX_LPCM_SAMPLE_RATE = 48_000;
+
+export type YandexAudioFormat = 'oggopus' | 'lpcm-wav';
+
+/** WAV by default — Android ExoPlayer reliably plays PCM WAV; oggopus fails on some devices. */
+export function resolveYandexAudioFormat(): YandexAudioFormat {
+  const fmt = process.env.YANDEX_TTS_FORMAT?.trim().toLowerCase();
+  if (fmt === 'ogg' || fmt === 'oggopus') return 'oggopus';
+  if (fmt === 'wav' || fmt === 'lpcm' || fmt === 'lpcm-wav') return 'lpcm-wav';
+  return 'lpcm-wav';
+}
+
+export function yandexAudioExtension(format: YandexAudioFormat = resolveYandexAudioFormat()): 'ogg' | 'wav' {
+  return format === 'lpcm-wav' ? 'wav' : 'ogg';
+}
+
+function wrapPcmAsWav(pcm: Buffer, sampleRate = YANDEX_LPCM_SAMPLE_RATE): Buffer {
+  const numChannels = 1;
+  const bitsPerSample = 16;
+  const blockAlign = numChannels * (bitsPerSample / 8);
+  const byteRate = sampleRate * blockAlign;
+  const header = Buffer.alloc(44);
+  header.write('RIFF', 0);
+  header.writeUInt32LE(36 + pcm.length, 4);
+  header.write('WAVE', 8);
+  header.write('fmt ', 12);
+  header.writeUInt32LE(16, 16);
+  header.writeUInt16LE(1, 20);
+  header.writeUInt16LE(numChannels, 22);
+  header.writeUInt32LE(sampleRate, 24);
+  header.writeUInt32LE(byteRate, 28);
+  header.writeUInt16LE(blockAlign, 32);
+  header.writeUInt16LE(bitsPerSample, 34);
+  header.write('data', 36);
+  header.writeUInt32LE(pcm.length, 40);
+  return Buffer.concat([header, pcm]);
+}
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const DATA_DIR = process.env.ACCOUNT_DATA_DIR?.trim() || path.resolve(__dirname, '../../data');
@@ -65,15 +102,19 @@ function buildTtsParams(
   voiceId: YandexVoiceId,
   folderId: string,
   options: TtsOptions,
+  audioFormat: YandexAudioFormat = resolveYandexAudioFormat(),
 ): URLSearchParams {
   const useSsml = hasLatinForSsml(markedText);
   const params = new URLSearchParams({
     lang: 'ru-RU',
     voice: voiceId,
-    format: 'oggopus',
+    format: audioFormat === 'lpcm-wav' ? 'lpcm' : 'oggopus',
     folderId,
     speed: String(options.speed),
   });
+  if (audioFormat === 'lpcm-wav') {
+    params.set('sampleRateHertz', String(YANDEX_LPCM_SAMPLE_RATE));
+  }
 
   if (useSsml) {
     params.set('ssml', buildYandexSsml(markedText, voiceId));
@@ -140,7 +181,7 @@ function buildTtsAttempts(
 }
 
 /**
- * Synthesizes Russian speech via Yandex SpeechKit and saves OGG Opus to audio/.
+ * Synthesizes Russian speech via Yandex SpeechKit and saves WAV (default) or OGG to audio/.
  */
 export async function synthesizeSpeech(
   text: string,
@@ -183,10 +224,12 @@ export async function synthesizeSpeech(
   });
 
   const primaryVoice = coerceVoiceForSpeechKit(voiceId);
+  const audioFormat = resolveYandexAudioFormat();
+  const audioExt = yandexAudioExtension(audioFormat);
   const attempts = buildTtsAttempts(primaryVoice, ttsOptions);
 
   console.log(
-    `[yandex-tts] start${installTag}${trackTag} voice=${voiceId}→${primaryVoice} speed=${ttsOptions.speed} emotion=${ttsOptions.emotion} chars=${markedText.length} ssml=${hasLatinForSsml(markedText)} attempts=${attempts.length} billing=${options.credentials ? 'client' : 'server'}`,
+    `[yandex-tts] start${installTag}${trackTag} voice=${voiceId}→${primaryVoice} speed=${ttsOptions.speed} emotion=${ttsOptions.emotion} format=${audioFormat} chars=${markedText.length} ssml=${hasLatinForSsml(markedText)} attempts=${attempts.length} billing=${options.credentials ? 'client' : 'server'}`,
   );
   console.log(`[yandex-tts] marked-text-begin${installTag}${trackTag}\n${markedText}\n[yandex-tts] marked-text-end`);
   if (hasLatinForSsml(markedText)) {
@@ -201,20 +244,22 @@ export async function synthesizeSpeech(
   let lastError = 'Yandex TTS failed';
 
   for (const attempt of attempts) {
-    let params = buildTtsParams(markedText, attempt.voice, folderId, attempt.options);
+    let params = buildTtsParams(markedText, attempt.voice, folderId, attempt.options, audioFormat);
     let response = await requestTts(apiKey, params);
 
     if (!response.ok && params.has('emotion') && attempt.options.emotion !== 'neutral') {
       params = buildTtsParams(markedText, attempt.voice, folderId, {
         ...attempt.options,
         emotion: 'neutral',
-      });
+      }, audioFormat);
       response = await requestTts(apiKey, params);
     }
 
     if (response.ok) {
-      const buffer = Buffer.from(await response.arrayBuffer());
-      const safeName = fileName.endsWith('.ogg') ? fileName : `${fileName}.ogg`;
+      const raw = Buffer.from(await response.arrayBuffer());
+      const buffer = audioFormat === 'lpcm-wav' ? wrapPcmAsWav(raw) : raw;
+      const baseName = fileName.replace(/\.(ogg|wav)$/i, '');
+      const safeName = `${baseName}.${audioExt}`;
       const filePath = path.join(AUDIO_DIR, safeName);
       await writeFile(filePath, buffer);
 

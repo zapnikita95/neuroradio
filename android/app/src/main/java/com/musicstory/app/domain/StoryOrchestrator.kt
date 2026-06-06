@@ -821,6 +821,10 @@ class StoryOrchestrator(
             ) {
                 return@launch
             }
+            if (storyPlayer.state.value == StoryPlaybackState.PREPARING) {
+                StoryLog.w("Playback watchdog: still buffering server audio — waiting for ExoPlayer")
+                return@launch
+            }
             StoryLog.w("Playback watchdog: story did not start in time")
             storyPlayer.stop()
             cancelGenerationPreview()
@@ -942,7 +946,7 @@ class StoryOrchestrator(
     }
 
     companion object {
-        private const val PLAYBACK_START_TIMEOUT_MS = 25_000L
+        private const val PLAYBACK_START_TIMEOUT_MS = 55_000L
         /** Metadata + backend /v1/story/full (facts + LLM + Yandex TTS). */
         private const val STORY_FETCH_TIMEOUT_MS = 300_000L
         /** Local Ollama on PC BFF — 35b model + research. */

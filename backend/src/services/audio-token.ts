@@ -31,7 +31,7 @@ export function verifyAudioAccess(fileName: string, expRaw: string | undefined, 
 
 function pathBasename(fileName: string): string {
   const base = fileName.split(/[/\\]/).pop() ?? fileName;
-  if (!/^[a-zA-Z0-9._-]+\.ogg$/.test(base)) {
+  if (!/^[a-zA-Z0-9._-]+\.(ogg|wav)$/.test(base)) {
     throw new Error('Invalid audio file name');
   }
   return base;
