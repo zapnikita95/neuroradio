@@ -15,6 +15,7 @@ import {
   TtsOptions,
 } from './tts-options.js';
 import { prepareYandexTtsText } from './tts-markup.js';
+import { buildYandexSsml, hasLatinForSsml } from './tts-yandex-ssml.js';
 import type { TtsPauseProfile } from './tts-voice-profiles.js';
 
 const TTS_URL = 'https://tts.api.cloud.yandex.net/speech/v1/tts:synthesize';
@@ -59,19 +60,25 @@ function isRetryableTtsParamError(status: number, body: string): boolean {
 }
 
 function buildTtsParams(
-  text: string,
+  markedText: string,
   voiceId: YandexVoiceId,
   folderId: string,
   options: TtsOptions,
 ): URLSearchParams {
+  const useSsml = hasLatinForSsml(markedText);
   const params = new URLSearchParams({
-    text,
     lang: 'ru-RU',
     voice: voiceId,
     format: 'oggopus',
     folderId,
     speed: String(options.speed),
   });
+
+  if (useSsml) {
+    params.set('ssml', buildYandexSsml(markedText, voiceId));
+  } else {
+    params.set('text', markedText);
+  }
 
   if (voiceSupportsEmotion(voiceId)) {
     const emotion =
@@ -177,9 +184,14 @@ export async function synthesizeSpeech(
   const attempts = buildTtsAttempts(primaryVoice, ttsOptions);
 
   console.log(
-    `[yandex-tts] start${installTag}${trackTag} voice=${voiceId}→${primaryVoice} speed=${ttsOptions.speed} emotion=${ttsOptions.emotion} chars=${markedText.length} attempts=${attempts.length}`,
+    `[yandex-tts] start${installTag}${trackTag} voice=${voiceId}→${primaryVoice} speed=${ttsOptions.speed} emotion=${ttsOptions.emotion} chars=${markedText.length} ssml=${hasLatinForSsml(markedText)} attempts=${attempts.length}`,
   );
   console.log(`[yandex-tts] marked-text-begin${installTag}${trackTag}\n${markedText}\n[yandex-tts] marked-text-end`);
+  if (hasLatinForSsml(markedText)) {
+    console.log(
+      `[yandex-tts] ssml-begin${installTag}${trackTag}\n${buildYandexSsml(markedText, primaryVoice)}\n[yandex-tts] ssml-end`,
+    );
+  }
 
   await mkdir(AUDIO_DIR, { recursive: true });
 

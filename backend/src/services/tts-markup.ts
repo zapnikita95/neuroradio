@@ -5,7 +5,6 @@
 
 import { sanitizeScriptForTts } from './story-quality.js';
 import { applyRussianStress, RUSSIAN_STRESS } from './russian-stress.js';
-import { applyForeignPronunciation } from './tts-foreign-pronounce.js';
 import { runTtsQualityPass } from './tts-quality-pass.js';
 import type { TtsPauseProfile } from './tts-voice-profiles.js';
 
@@ -93,7 +92,6 @@ export function prepareYandexTtsText(
   text = quality.text;
 
   text = expandQuotesForSpeech(text);
-  text = applyForeignPronunciation(text, artist, title);
   text = applyRussianStress(text);
 
   if (options.sentencePauses !== false) {

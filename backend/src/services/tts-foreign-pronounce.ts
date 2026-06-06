@@ -1,6 +1,5 @@
 /**
- * Latin / Italian / Spanish → Cyrillic for Yandex ru-RU voices (ermil, zahar, …).
- * Raw Latin in Russian narration is misread (Silverlines → «silver lens», Zitti → «tsitti»).
+ * Wiki translation fixes (band name truncation). Latin pronunciation → tts-yandex-ssml.ts SSML lang tags.
  */
 
 const PHRASE_PRONUNCIATION_RU: Record<string, string> = {

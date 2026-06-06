@@ -1,5 +1,6 @@
-import { polishScriptForSpeechDelivery, splitLongSentencesForSpeech } from '../dist/services/tts-speech-polish.js';
+import { polishScriptForSpeechDelivery } from '../dist/services/tts-speech-polish.js';
 import { prepareYandexTtsText } from '../dist/services/tts-markup.js';
+import { buildYandexSsml, hasLatinForSsml } from '../dist/services/tts-yandex-ssml.js';
 import { findIncompleteEnding, trimToLastCompleteSentence } from '../dist/services/story-quality.js';
 
 const ellaScript =
@@ -43,31 +44,54 @@ if (marked.includes('фраза в кавычках')) {
   console.error('FAIL: should not use "фраза в кавычках"');
   process.exit(1);
 }
-if (marked.includes('а её') || marked.includes('но за')) {
-  console.log('OK: marked text keeps conjunctions');
-} else {
-  console.error('FAIL: marked text lost conjunctions');
-  console.error(marked);
+if (marked.includes('On Mor Tim') || marked.includes('Spиrs')) {
+  console.error('FAIL: should not transliterate Latin to fake Cyrillic');
   process.exit(1);
 }
-console.log('OK: all TTS polish checks passed');
+console.log('OK: marked text polish');
+
+const britneyScript =
+  'Когда Britney Spears выпустила «Baby One More Time», никто не ожидал, что школьная форма станет символом целой эпохи. «Baby One More Time» — это не просто песня, это точка отсчёта новой эры поп-музыки.';
+const britneyMarked = prepareYandexTtsText(britneyScript, {
+  artist: 'Britney Spears',
+  title: 'Baby One More Time',
+});
+if (!britneyMarked.includes('Baby One More Time')) {
+  console.error('FAIL: English title must stay Latin in marked text');
+  console.error(britneyMarked);
+  process.exit(1);
+}
+if (britneyMarked.includes('On Mor Tim')) {
+  console.error('FAIL: must not butcher English title');
+  process.exit(1);
+}
+if (!hasLatinForSsml(britneyMarked)) {
+  console.error('FAIL: should use SSML for mixed RU/EN');
+  process.exit(1);
+}
+const ssml = buildYandexSsml(britneyMarked, 'ermil');
+if (!ssml.includes('xml:lang="en-US">Baby One More Time</lang>')) {
+  console.error('FAIL: SSML must wrap title in en-US');
+  console.error(ssml);
+  process.exit(1);
+}
+if (!ssml.includes('xml:lang="en-US">Britney Spears</lang>')) {
+  console.error('FAIL: SSML must wrap artist in en-US');
+  process.exit(1);
+}
+console.log('OK: Britney SSML en-US lang tags');
 
 const damianoScript =
-  'Damiano David — итальянский певец, фронтмен рок-группы Måneskin. В 2021 году коллектив победил на фестивале Sanremo Music Festival и на Евровидении с песней «Zitti e buoni». В 2024 году David начал сольную карьеру, выпустив синглы «Silverlines» и «Born with a Broken Heart».';
+  'Damiano David — итальянский певец, фронтмен рок-группы Måneskin. В 2021 году коллектив победил с песней «Zitti e buoni».';
 const damianoMarked = prepareYandexTtsText(damianoScript, {
   artist: 'Damiano David',
   title: 'Next Summer',
 });
-for (const forbidden of ['Silverlines', 'Zitti e buoni', 'Måneskin', 'Må ']) {
-  if (damianoMarked.includes(forbidden)) {
-    console.error(`FAIL: Latin left in TTS: ${forbidden}`);
-    console.error(damianoMarked);
-    process.exit(1);
-  }
-}
-if (!damianoMarked.includes('Зитти') || !damianoMarked.includes('Силверлайнз')) {
-  console.error('FAIL: expected Cyrillic pronunciations for Italian/English titles');
-  console.error(damianoMarked);
+const damianoSsml = buildYandexSsml(damianoMarked, 'ermil');
+if (!damianoSsml.includes('xml:lang="it-IT">Zitti e buoni')) {
+  console.error('FAIL: Italian title should use it-IT in SSML');
+  console.error(damianoSsml);
   process.exit(1);
 }
-console.log('OK: foreign pronunciation transliteration');
+console.log('OK: Italian SSML it-IT lang tags');
+console.log('OK: all TTS polish checks passed');
