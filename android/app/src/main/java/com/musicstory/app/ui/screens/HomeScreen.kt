@@ -109,6 +109,7 @@ fun HomeScreen(
     val homeTourPending by app.settingsDataStore.homeTourPending.collectAsState(initial = false)
     val backendUrl by app.settingsDataStore.backendUrl.collectAsState(initial = SettingsDataStore.DEFAULT_BACKEND_URL)
     val dailyQuota by app.storyRepository.dailyQuota.collectAsState(initial = null)
+    val storyHistory by app.storyRepository.storyHistory.collectAsState(initial = emptyList())
     val scope = rememberCoroutineScope()
 
     var tourStep by remember { mutableStateOf<Int?>(null) }
@@ -152,12 +153,12 @@ fun HomeScreen(
         if (homeTourPending) tourStep = 0
     }
 
-    LaunchedEffect(uiState.pendingFeedback?.trackKey) {
-        val trackKey = uiState.pendingFeedback?.trackKey
-        feedbackAlreadyVoted = if (trackKey.isNullOrBlank()) {
+    LaunchedEffect(uiState.pendingFeedback?.trackKey, uiState.pendingFeedback?.script, storyHistory) {
+        val feedback = uiState.pendingFeedback
+        feedbackAlreadyVoted = if (feedback == null) {
             false
         } else {
-            app.storyRepository.findLatestVoteForTrack(trackKey) != null
+            app.storyRepository.hasVoteForStory(feedback.trackKey, feedback.script)
         }
     }
 

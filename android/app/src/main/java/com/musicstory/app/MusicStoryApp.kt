@@ -146,7 +146,11 @@ class MusicStoryApp : Application() {
     }
 
     /** Pull cloud settings down, merge if newer, then push local snapshot. */
-    suspend fun syncSettingsWithServer(baseUrl: String = settingsDataStore.backendUrl.first().trim()) {
+    suspend fun syncSettingsWithServer() {
+        syncSettingsWithServer(settingsDataStore.backendUrl.first().trim())
+    }
+
+    suspend fun syncSettingsWithServer(baseUrl: String) {
         val url = baseUrl.trim()
         if (url.isBlank()) return
         if (!settingsDataStore.accountLinked.first()) return

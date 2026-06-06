@@ -173,6 +173,7 @@ fun StoryFeedbackSheet(
                         )
                         if (ok) {
                             sent = true
+                            app.storyOrchestrator.clearFeedbackIfStory(feedback.trackKey, feedback.script)
                         }
                         sending = false
                     }

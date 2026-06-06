@@ -78,8 +78,14 @@ class StoryPlayer(context: Context) {
     private val _state = MutableStateFlow(StoryPlaybackState.IDLE)
     val state: StateFlow<StoryPlaybackState> = _state.asStateFlow()
 
+    /** 0..1 — position / duration while server audio plays. */
+    private val _playbackProgress = MutableStateFlow(0f)
+    val playbackProgress: StateFlow<Float> = _playbackProgress.asStateFlow()
+
     private val _currentScript = MutableStateFlow<String?>(null)
     val currentScript: StateFlow<String?> = _currentScript.asStateFlow()
+
+    private var progressPollRunnable: Runnable? = null
 
     init {
         exoPlayer.addListener(
@@ -94,6 +100,8 @@ class StoryPlayer(context: Context) {
                         }
                         Player.STATE_ENDED -> {
                             cancelPlaybackTimeout()
+                            stopProgressPolling()
+                            _playbackProgress.value = 1f
                             _state.value = StoryPlaybackState.COMPLETED
                             abandonAudioFocus()
                             invokeFinished()
@@ -111,8 +119,12 @@ class StoryPlayer(context: Context) {
                         cancelPlaybackTimeout()
                         notifyPlaybackStarted()
                         _state.value = StoryPlaybackState.PLAYING
+                        startProgressPolling()
                     } else if (exoPlayer.playbackState == Player.STATE_READY) {
                         _state.value = StoryPlaybackState.PAUSED
+                        stopProgressPolling()
+                    } else {
+                        stopProgressPolling()
                     }
                 }
 
@@ -142,6 +154,7 @@ class StoryPlayer(context: Context) {
         onPlaybackStartedCallback = onPlaybackStarted
         playbackStartedNotified = false
         exoRetryCount = 0
+        _playbackProgress.value = 0f
         activePlaybackEngine = playbackEngine
         lastAndroidSpeechRate = speechRate
         _currentScript.value = response.script
@@ -202,12 +215,14 @@ class StoryPlayer(context: Context) {
                 cancelPlaybackTimeout()
                 notifyPlaybackStarted()
                 _state.value = StoryPlaybackState.PLAYING
+                _playbackProgress.value = 0f
             }
         }
 
         override fun onDone(utteranceId: String?) {
             mainHandler.post {
                 cancelPlaybackTimeout()
+                _playbackProgress.value = 1f
                 _state.value = StoryPlaybackState.COMPLETED
                 abandonAudioFocus()
                 invokeFinished()
@@ -384,8 +399,34 @@ class StoryPlayer(context: Context) {
         invokeError()
     }
 
+    private fun startProgressPolling() {
+        if (activePlaybackEngine != TtsPlaybackEngine.YANDEX_SERVER) return
+        stopProgressPolling()
+        progressPollRunnable = object : Runnable {
+            override fun run() {
+                val duration = exoPlayer.duration
+                if (duration > 0L) {
+                    _playbackProgress.value =
+                        (exoPlayer.currentPosition.toFloat() / duration).coerceIn(0f, 1f)
+                }
+                val playing = exoPlayer.isPlaying
+                val buffering = exoPlayer.playbackState == Player.STATE_BUFFERING
+                if (playing || buffering) {
+                    mainHandler.postDelayed(this, 50L)
+                }
+            }
+        }
+        mainHandler.post(progressPollRunnable!!)
+    }
+
+    private fun stopProgressPolling() {
+        progressPollRunnable?.let { mainHandler.removeCallbacks(it) }
+        progressPollRunnable = null
+    }
+
     private fun stopActiveEngine() {
         cancelPlaybackTimeout()
+        stopProgressPolling()
         exoPlayer.stop()
         exoPlayer.clearMediaItems()
         textToSpeech?.stop()

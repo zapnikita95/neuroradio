@@ -765,8 +765,11 @@ class StoryOrchestrator(
                                 _errorMessage.value = null
                                 scope.launch {
                                     val trackKey = requestedTrack.displayKey
-                                    val existingVote = storyRepository.findLatestVoteForTrack(trackKey)
-                                    _pendingFeedback.value = if (existingVote.isNullOrBlank()) {
+                                    val existingVote = storyRepository.hasVoteForStory(
+                                        trackKey,
+                                        response.script,
+                                    )
+                                    _pendingFeedback.value = if (!existingVote) {
                                         PendingStoryFeedback(
                                             artist = response.artist,
                                             title = response.title,
@@ -973,6 +976,13 @@ class StoryOrchestrator(
         }
     }
 
+    fun clearFeedbackIfStory(trackKey: String, script: String) {
+        val pending = _pendingFeedback.value ?: return
+        if (pending.trackKey == trackKey && pending.script == script) {
+            clearFeedbackPrompt()
+        }
+    }
+
     /** Сброс залипшего «Готовим историю» при открытии главного экрана. */
     fun recoverStaleUi() {
         reconcileGenerationState()
@@ -1040,7 +1050,10 @@ class StoryOrchestrator(
         previewJob?.cancel()
         previewJob = scope.launch {
             val revealMaxMs = PREVIEW_REVEAL_MAX_MS
-            val holdMs = PREVIEW_HOLD_MS
+            val wordDelayMs = wordRevealDelayMs(words.size, revealMaxMs)
+            val bufferCapWords = (words.size * 0.15f).toInt().coerceIn(2, 12)
+            val waitStartMs = System.currentTimeMillis()
+
             _generationPreview.value = GenerationPreviewState(
                 words = words,
                 visibleWordCount = 0,
@@ -1050,20 +1063,43 @@ class StoryOrchestrator(
             )
             publishUiState()
 
-            val wordDelayMs = wordRevealDelayMs(words.size, revealMaxMs)
-            for (index in 1..words.size) {
-                if (session != playbackSession) return@launch
-                _generationPreview.value = _generationPreview.value.copy(visibleWordCount = index)
-                if (index == 1 || index == words.size || index % 2 == 0) {
+            var lastCount = 0
+            while (session == playbackSession) {
+                val playerState = storyPlayer.state.value
+                val progress = storyPlayer.playbackProgress.value
+
+                val count = when (playerState) {
+                    StoryPlaybackState.COMPLETED -> words.size
+                    StoryPlaybackState.PLAYING, StoryPlaybackState.PAUSED -> {
+                        if (progress > 0.01f) {
+                            (progress * words.size).toInt().coerceIn(1, words.size)
+                        } else {
+                            val elapsed = System.currentTimeMillis() - waitStartMs
+                            (elapsed / wordDelayMs).toInt().coerceIn(1, words.size)
+                        }
+                    }
+                    else -> {
+                        val elapsed = System.currentTimeMillis() - waitStartMs
+                        (elapsed / wordDelayMs).toInt().coerceIn(0, bufferCapWords)
+                    }
+                }
+
+                if (count != lastCount) {
+                    lastCount = count
+                    _generationPreview.value = _generationPreview.value.copy(visibleWordCount = count)
                     publishUiState()
                 }
-                if (index < words.size) {
-                    delay(wordDelayMs)
-                }
+
+                if (playerState == StoryPlaybackState.COMPLETED) break
+                delay(40L)
             }
-            delay(holdMs.coerceAtMost(1_100L))
+
             if (session != playbackSession) return@launch
-            _generationPreview.value = _generationPreview.value.copy(alpha = 1f, isActive = true)
+            _generationPreview.value = _generationPreview.value.copy(
+                visibleWordCount = words.size,
+                alpha = 1f,
+                isActive = true,
+            )
             publishUiState()
         }
     }
@@ -1080,7 +1116,6 @@ class StoryOrchestrator(
         /** Local Ollama on PC BFF — 35b model + research. */
         private const val LOCAL_STORY_FETCH_TIMEOUT_MS = 1_200_000L
         private const val PREVIEW_REVEAL_MAX_MS = 7_000L
-        private const val PREVIEW_HOLD_MS = 7_000L
     }
 }
 

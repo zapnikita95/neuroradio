@@ -66,6 +66,25 @@ interface StoryHistoryDao {
     @Query(
         """
         SELECT vote FROM story_history
+        WHERE trackKey = :trackKey AND script = :script
+        AND vote IS NOT NULL AND TRIM(vote) != ''
+        LIMIT 1
+        """,
+    )
+    suspend fun findVoteForTrackAndScript(trackKey: String, script: String): String?
+
+    @Query(
+        """
+        SELECT * FROM story_history
+        WHERE trackKey = :trackKey
+        ORDER BY playedAt DESC LIMIT 1
+        """,
+    )
+    suspend fun findLatestByTrackKey(trackKey: String): StoryHistoryEntry?
+
+    @Query(
+        """
+        SELECT vote FROM story_history
         WHERE trackKey = :trackKey AND vote IS NOT NULL AND TRIM(vote) != ''
         ORDER BY playedAt DESC LIMIT 1
         """,

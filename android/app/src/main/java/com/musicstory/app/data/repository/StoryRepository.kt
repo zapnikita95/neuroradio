@@ -107,6 +107,9 @@ class StoryRepository(
     suspend fun findLatestVoteForTrack(trackKey: String): String? =
         storyHistoryDao.findLatestVoteForTrack(trackKey)
 
+    suspend fun hasVoteForStory(trackKey: String, script: String): Boolean =
+        storyHistoryDao.findVoteForTrackAndScript(trackKey, script) != null
+
     private suspend fun pushAllLocalHistoryToServer(baseUrl: String) {
         val sync = accountSyncManager ?: return
         val url = baseUrl.trim()
@@ -162,12 +165,13 @@ class StoryRepository(
         reasons: List<String>,
     ): Boolean {
         val historyEntry = storyHistoryDao.findLatestByTrackAndScript(feedback.trackKey, feedback.script)
+            ?: storyHistoryDao.findLatestByTrackKey(feedback.trackKey)
         if (historyEntry != null) {
             return submitStoryFeedback(historyEntry, vote, reasons)
         }
         val url = settingsDataStore.backendUrl.first().trim()
         if (url.isBlank()) return false
-        return apiClient.submitStoryFeedback(
+        val ok = apiClient.submitStoryFeedback(
             baseUrl = url,
             artist = feedback.artist,
             title = feedback.title,
@@ -175,6 +179,11 @@ class StoryRepository(
             reasons = reasons,
             script = feedback.script,
         )
+        if (ok) {
+            storyHistoryDao.findLatestByTrackAndScript(feedback.trackKey, feedback.script)
+                ?.let { storyHistoryDao.updateVote(it.id, vote) }
+        }
+        return ok
     }
 
     suspend fun refreshQuota() {

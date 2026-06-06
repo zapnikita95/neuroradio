@@ -26,7 +26,6 @@ import com.musicstory.app.domain.GenerationPreviewState
 import com.musicstory.app.ui.theme.CreamText
 import com.musicstory.app.ui.theme.MutedLavender
 import com.musicstory.app.R
-import kotlinx.coroutines.delay
 
 @Composable
 fun GenerationStoryPreview(
@@ -51,14 +50,12 @@ fun GenerationStoryPreview(
 
     val previewHeight = (LocalConfiguration.current.screenHeightDp * 0.22f).coerceIn(96f, 200f).dp
     val scrollState = rememberScrollState()
-    val revealComplete = preview.visibleWordCount >= preview.words.size
+    val wordRatio = preview.visibleWordCount.toFloat() / preview.words.size.coerceAtLeast(1)
 
-    LaunchedEffect(revealComplete) {
-        if (!revealComplete) return@LaunchedEffect
-        delay(80L)
-        if (scrollState.maxValue > 0) {
-            scrollState.scrollTo(scrollState.maxValue)
-        }
+    LaunchedEffect(wordRatio, scrollState.maxValue) {
+        if (scrollState.maxValue <= 0) return@LaunchedEffect
+        val target = (scrollState.maxValue * wordRatio).toInt().coerceIn(0, scrollState.maxValue)
+        scrollState.animateScrollTo(target)
     }
 
     Surface(
@@ -91,7 +88,7 @@ fun GenerationStoryPreview(
                 text = visibleText,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .verticalScroll(scrollState, enabled = revealComplete),
+                    .verticalScroll(scrollState, enabled = false),
                 style = MaterialTheme.typography.bodyLarge,
                 color = CreamText,
                 textAlign = TextAlign.Center,

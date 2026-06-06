@@ -395,7 +395,7 @@ private fun HistoryStoryFeedbackBlock(
                     if (ok) {
                         vote = selectedVote
                         sent = true
-                        app.storyOrchestrator.clearFeedbackIfTrack(entry.trackKey)
+                        app.storyOrchestrator.clearFeedbackIfStory(entry.trackKey, entry.script)
                     }
                     sending = false
                 }

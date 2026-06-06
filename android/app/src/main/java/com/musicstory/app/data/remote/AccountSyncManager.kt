@@ -88,11 +88,10 @@ class AccountSyncManager(
             payload.ttsPlaybackEngine?.let { body.put("ttsPlaybackEngine", it) }
             payload.llmProvider?.let { body.put("llmProvider", it) }
             body.put("updatedAt", payload.updatedAt)
-                .toString()
             val req = Request.Builder()
                 .url("${baseUrl.trimEnd('/')}/v1/sync/settings")
                 .header("Authorization", "Bearer $token")
-                .put(body.toRequestBody("application/json".toMediaType()))
+                .put(body.toString().toRequestBody("application/json".toMediaType()))
                 .build()
             runCatching { http.newCall(req).execute().close() }
         }
