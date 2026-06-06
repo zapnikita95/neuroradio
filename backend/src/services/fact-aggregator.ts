@@ -4,6 +4,7 @@ import { assignFactsToScopes, factAppliesToRequest, factMentionsArtist, factName
 import { filterAndRankFacts, interestScore } from './reference-fact-quality.js';
 import { WEAK_TRIVIA_PATTERNS } from './story-fact-hunt.js';
 import { fetchReferenceFactBundle as fetchWikipediaBundle } from './wikipedia-facts.js';
+import { fetchArtistWikiLead } from './wikipedia-lead.js';
 import { inferRuRegionalContext } from './metadata-facts.js';
 import { fetchWebSearchFactSnippets } from './web-search-facts.js';
 
@@ -78,6 +79,24 @@ function splitByMention(facts: string[], title: string, artist: string): { track
 
 function mergeFacts(...pools: string[][]): string[] {
   return filterAndRankFacts(pools.flat(), 8);
+}
+
+/** Wikipedia REST lead — grounding anchor; must not be dropped by lineup «boring» heuristics. */
+function mergeFactsWithWikiLead(
+  wikiLeadFacts: string[],
+  ...pools: string[][]
+): string[] {
+  const merged = mergeFacts(...pools);
+  const seen = new Set(merged.map(normalize));
+  for (const fact of wikiLeadFacts) {
+    const trimmed = fact.trim();
+    if (trimmed.length < 35) continue;
+    const key = normalize(trimmed);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    merged.unshift(trimmed);
+  }
+  return merged.slice(0, 8);
 }
 
 function factsAboutTrackOrArtist(
@@ -349,56 +368,63 @@ function buildRawSnippets(
   };
 }
 
+function mergeWikiBundles(...bundles: ReferenceFactBundle[]): ReferenceFactBundle {
+  return {
+    trackFacts: mergeFacts(...bundles.map((b) => b.trackFacts)),
+    artistFacts: mergeFacts(...bundles.map((b) => b.artistFacts)),
+  };
+}
+
 export async function fetchWikiBundleMerged(
   artist: string,
   title: string,
   countryCode?: string,
 ): Promise<ReferenceFactBundle> {
   const cc = resolveFactCountryCode(artist, title, countryCode);
-  let wiki = await fetchWithCap(
-    'wiki-primary',
-    () => fetchWikipediaBundle(artist, title, cc),
-    EMPTY_WIKI,
-    12_000,
-  );
-  if (wiki.trackFacts.length + wiki.artistFacts.length < 2 && cc === 'RU') {
-    const wikiEn = await fetchWithCap(
-      'wiki-en-fallback',
-      () => fetchWikipediaBundle(artist, title, 'US'),
+  const primaryLang = cc === 'RU' ? 'RU' : cc ?? 'US';
+  const [wikiPrimary, wikiAlt] = await Promise.all([
+    fetchWithCap(
+      'wiki-primary',
+      () => fetchWikipediaBundle(artist, title, primaryLang === 'RU' ? 'RU' : cc),
       EMPTY_WIKI,
-      10_000,
-    );
-    wiki = {
-      trackFacts: mergeFacts(wiki.trackFacts, wikiEn.trackFacts),
-      artistFacts: mergeFacts(wiki.artistFacts, wikiEn.artistFacts),
-    };
-  } else if (wiki.trackFacts.length + wiki.artistFacts.length < 2 && cc !== 'RU' && inferRuRegionalContext(artist, title)) {
-    const wikiRu = await fetchWithCap(
-      'wiki-ru-fallback',
-      () => fetchWikipediaBundle(artist, title, 'RU'),
-      EMPTY_WIKI,
-      10_000,
-    );
-    wiki = {
-      trackFacts: mergeFacts(wiki.trackFacts, wikiRu.trackFacts),
-      artistFacts: mergeFacts(wiki.artistFacts, wikiRu.artistFacts),
-    };
-  } else if (wiki.trackFacts.length + wiki.artistFacts.length < 2 && cc !== 'RU') {
-    const wikiEn = await fetchWithCap(
-      'wiki-en-fallback',
-      () => fetchWikipediaBundle(artist, title, 'US'),
-      EMPTY_WIKI,
-      10_000,
-    );
-    wiki = {
-      trackFacts: mergeFacts(wiki.trackFacts, wikiEn.trackFacts),
-      artistFacts: mergeFacts(wiki.artistFacts, wikiEn.artistFacts),
-    };
-  }
-  return wiki;
+      11_000,
+    ),
+    cc === 'RU'
+      ? fetchWithCap(
+          'wiki-en-fallback',
+          () => fetchWikipediaBundle(artist, title, 'US'),
+          EMPTY_WIKI,
+          11_000,
+        )
+      : inferRuRegionalContext(artist, title)
+        ? fetchWithCap(
+            'wiki-ru-fallback',
+            () => fetchWikipediaBundle(artist, title, 'RU'),
+            EMPTY_WIKI,
+            11_000,
+          )
+        : primaryLang !== 'RU'
+          ? fetchWithCap(
+              'wiki-en-fallback',
+              () => fetchWikipediaBundle(artist, title, 'US'),
+              EMPTY_WIKI,
+              11_000,
+            )
+          : Promise.resolve(EMPTY_WIKI),
+  ]);
+  return mergeWikiBundles(wikiPrimary, wikiAlt);
 }
 
-import { fetchArtistWikiLead } from './wikipedia-lead.js';
+function wikiLeadToFacts(
+  lead: { text: string; lang: 'en' | 'ru' },
+  artist: string,
+  title: string,
+): ReferenceFactBundle {
+  const text = lead.text.trim();
+  if (!text) return EMPTY_WIKI;
+  // Full artist-page lead — band members/places are valid context; use artist scope.
+  return { trackFacts: [], artistFacts: [text] };
+}
 
 export function buildIndieArtistQueries(artist: string): string[] {
   return [
@@ -462,9 +488,10 @@ export async function fetchAggregatedFactContext(
 ): Promise<AggregatedFactContext> {
   const t0 = Date.now();
   const cc = resolveFactCountryCode(artist, title, countryCode);
-  const [wiki, ddgUnfiltered, webUnfiltered, wdUnfiltered, mbTrackRaw, mbArtistRaw] =
+  const [wiki, wikiLead, ddgUnfiltered, webUnfiltered, wdUnfiltered, mbTrackRaw, mbArtistRaw] =
     await Promise.all([
       fetchWithCap('wiki', () => fetchWikiBundleMerged(artist, title, cc), EMPTY_WIKI, 14_000),
+      fetchWithCap('wiki-lead', () => fetchArtistWikiLead(artist), null, 10_000),
       fetchWithCap('ddg', () => fetchDuckDuckGoUnfiltered(artist, title), [], 12_000),
       fetchWithCap('web', () => fetchWebSearchFactSnippets(artist, title), [], 14_000),
       fetchWithCap('wikidata', () => fetchWikidataUnfiltered(artist, title, cc), [], 10_000),
@@ -481,6 +508,12 @@ export async function fetchAggregatedFactContext(
         8_000,
       ),
     ]);
+  const wikiLeadBundle = wikiLead ? wikiLeadToFacts(wikiLead, artist, title) : EMPTY_WIKI;
+  if (wikiLeadBundle.trackFacts.length + wikiLeadBundle.artistFacts.length > 0) {
+    console.log(
+      `[facts] wiki-lead ok artist="${artist}" track=${wikiLeadBundle.trackFacts.length} artistFacts=${wikiLeadBundle.artistFacts.length}`,
+    );
+  }
   const elapsed = Date.now() - t0;
   if (elapsed > FACT_FETCH_BUDGET_MS) {
     console.warn(
@@ -489,7 +522,9 @@ export async function fetchAggregatedFactContext(
   }
   console.log(
     `[facts] parallel fetch ${artist} — ${title}: ${Date.now() - t0}ms ` +
-      `wiki=${wiki.trackFacts.length + wiki.artistFacts.length} ddg=${ddgUnfiltered.length} web=${webUnfiltered.length}`,
+      `wiki=${wiki.trackFacts.length + wiki.artistFacts.length} ` +
+      `wikiLead=${wikiLeadBundle.trackFacts.length + wikiLeadBundle.artistFacts.length} ` +
+      `ddg=${ddgUnfiltered.length} web=${webUnfiltered.length}`,
   );
 
   const ddg = filterAndRankFacts([...ddgUnfiltered, ...webUnfiltered], 10);
@@ -509,13 +544,15 @@ export async function fetchAggregatedFactContext(
     4,
   );
 
-  const trackCandidates = mergeFacts(
+  const trackCandidates = mergeFactsWithWikiLead(
+    wikiLeadBundle.trackFacts,
     wiki.trackFacts,
     externalSplit.track,
     wdSplit.track,
     mbTrack,
   );
-  const artistCandidates = mergeFacts(
+  const artistCandidates = mergeFactsWithWikiLead(
+    wikiLeadBundle.artistFacts,
     wiki.artistFacts,
     externalSplit.artist,
     webRanked,

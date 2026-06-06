@@ -178,6 +178,40 @@ export function resetWikiParagraphCache(): void {
   paragraphCache.clear();
 }
 
+/** Direct REST summary — one round-trip, no search API (The Rasmus, etc.). */
+async function fetchDirectWikiLead(
+  primary: string,
+): Promise<{ text: string; lang: 'en' | 'ru' } | null> {
+  const directTitles = [
+    primary,
+    `${primary} (band)`,
+    `${primary} (musical group)`,
+    `${primary} (musician)`,
+    `${primary} (singer)`,
+  ];
+  const seen = new Set<string>();
+  const batch = directTitles.filter((t) => {
+    const key = t.toLowerCase();
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+  const hits = await Promise.all(
+    batch.map(async (wikiTitle) => {
+      const en = await fetchSummaryExtract('en', wikiTitle);
+      if (en && !isDisambiguation(en) && isMusicArtistWikiExtract(en)) {
+        return { text: en, lang: 'en' as const };
+      }
+      const ru = await fetchSummaryExtract('ru', wikiTitle);
+      if (ru && !isDisambiguation(ru) && isMusicArtistWikiExtract(ru)) {
+        return { text: ru, lang: 'ru' as const };
+      }
+      return null;
+    }),
+  );
+  return hits.find(Boolean) ?? null;
+}
+
 /** First paragraph from artist Wikipedia — prefers English for indie bios. */
 export async function fetchArtistWikiLead(
   artist: string,
@@ -185,6 +219,9 @@ export async function fetchArtistWikiLead(
   const primary = primaryArtistName(artist);
   const cached = paragraphCache.get(cacheKey(primary));
   if (cached) return { text: cached.lead, lang: cached.lang };
+
+  const direct = await fetchDirectWikiLead(primary);
+  if (direct) return direct;
 
   const titlesToTry = new Set<string>();
   for (const candidate of buildArtistTitleCandidates(primary)) {

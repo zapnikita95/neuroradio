@@ -354,6 +354,10 @@ export function factNamesForeignEntity(
   allowedContext = '',
   mode: RelevanceMode = 'strict',
 ): boolean {
+  if (factMentionsArtist(fact, artist) && isBandBiographyFact(fact)) {
+    return false;
+  }
+
   if (mode === 'indie') {
     if (factMentionsArtist(fact, artist)) return false;
     if (isSameBandHistoricalName(fact)) return false;
@@ -400,6 +404,18 @@ export function factNamesForeignEntity(
 
 const GENERIC_DISAMBIGUATION =
   /\b(?:guild system|journeyman|master craftsman|term was generally restricted|disambiguation page|may refer to)\b/i;
+
+/** Wikipedia band page — member names and places are expected, not «foreign acts». */
+function isBandBiographyFact(fact: string): boolean {
+  return (
+    /\b(?:rock band|pop band|hip hop|rap group|musical group|boy band|girl group|группа|рок группа)\b/i.test(
+      fact,
+    ) ||
+    /\b(?:band members?|formed in|replaced by|original (?:band )?members|line[- ]up|co[- ]founder|vocalist|bassist|guitarist|drummer)\b/i.test(
+      fact,
+    )
+  );
+}
 
 function isGenericDisambiguationFact(fact: string, artist: string): boolean {
   return GENERIC_DISAMBIGUATION.test(fact) && !factMentionsArtist(fact, artist);

@@ -47,6 +47,14 @@ const RU_REGIONAL_MAJOR = [
   'pyrokinesis', 'face', 'feduk', 'scriptonite', 'eldzhey', 'эльджей',
 ];
 
+/** Европейский рок/поп — часто выпадают из top-1000 Wikipedia list. */
+const EUROPEAN_ROCK_MAJOR = [
+  'the rasmus', 'him', 'nightwish', 'children of bodom', 'lordi', 'apocalyptica',
+  'within temptation', 'epica', 'rammstein', 'scorpions', 'aqua', 'ace of base',
+  'a-ha', 'robbie williams', 'placebo', 'muse', 'the killers',
+  'arctic monkeys', 'the strokes', 'linkin park', 'green day', 'blink-182',
+];
+
 const KPOP_PATTERN =
   /\b(bts|blackpink|twice|stray kids|newjeans|aespa|itzy|seventeen|nct|exo|bigbang|super junior|girls'? generation|red velvet|ive|le sserafim|txt|enhypen|ateez|gidle|mamamoo)\b/i;
 
@@ -65,11 +73,17 @@ function isRuRegionalMajorArtist(artist: string): boolean {
   return RU_REGIONAL_MAJOR.some((name) => n === normalizeArtist(name) || n.includes(normalizeArtist(name)));
 }
 
+function isEuropeanRockMajorArtist(artist: string): boolean {
+  const n = normalizeArtist(artist);
+  return EUROPEAN_ROCK_MAJOR.some((name) => n === normalizeArtist(name) || n.includes(normalizeArtist(name)));
+}
+
 export function isCatalogMajorArtist(artist: string): boolean {
   const catalog = loadCatalogMajor();
   const n = normalizeArtist(artist);
   if (catalog.has(n)) return true;
   if (isRuRegionalMajorArtist(artist)) return true;
+  if (isEuropeanRockMajorArtist(artist)) return true;
   return KPOP_PATTERN.test(artist);
 }
 

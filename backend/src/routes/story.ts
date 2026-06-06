@@ -334,10 +334,10 @@ router.post('/full', validateStoryFullBody, storyFullRateLimit, async (req: Requ
       if (trackFactCount + artistFactCount === 0) {
         const skipRetry =
           firstFetchMs >= 18_000 ||
-          factCtx.rawSnippets.length >= 2;
+          countGroundedFacts(factCtx.bundle) > 0;
         if (skipRetry) {
           console.warn(
-            `[facts] skip empty-bundle retry for "${metadata.artist}" — ${firstFetchMs}ms snippets=${factCtx.rawSnippets.length}`,
+            `[facts] skip empty-bundle retry for "${metadata.artist}" — ${firstFetchMs}ms snippets=${factCtx.rawSnippets.length} grounded=${countGroundedFacts(factCtx.bundle)}`,
           );
         } else {
           console.warn(`[facts] empty bundle for "${metadata.artist}" — "${metadata.title}", retrying sources`);
@@ -489,7 +489,7 @@ router.post('/full', validateStoryFullBody, storyFullRateLimit, async (req: Requ
       }
     }
 
-    if (!selectedFact && referenceFacts.length === 0 && artistTier === 'indie') {
+    if (!selectedFact && countGroundedFacts(factBundle) === 0 && artistTier === 'indie') {
       console.log(
         `[facts] indie artist-only retry for "${metadata.artist}" — "${metadata.title}"`,
       );

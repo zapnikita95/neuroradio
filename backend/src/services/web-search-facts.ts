@@ -28,9 +28,18 @@ function isAmbiguousArtistName(artist: string): boolean {
   return words.length === 1 && words[0]!.length <= 8;
 }
 
+function quotedArtist(artist: string): string {
+  const trimmed = artist.trim();
+  if (/^the\s+/i.test(trimmed) || trimmed.split(/\s+/).length >= 2) {
+    return `"${trimmed}"`;
+  }
+  return trimmed;
+}
+
 /** Узкие запросы под интервью/скандалы — не в instant DDG. */
 export function buildWebOnlyQueries(artist: string, title: string): string[] {
   const cleanTitle = title.replace(/\s*\([^)]*\)\s*/g, ' ').trim();
+  const artistQ = quotedArtist(artist);
   const cyrillic = /[\u0400-\u04FF]/.test(artist + title);
   const ruTitle = /[\u0400-\u04FF]/.test(title);
   if (cyrillic || ruTitle) {
@@ -44,17 +53,17 @@ export function buildWebOnlyQueries(artist: string, title: string): string[] {
   }
   if (isAmbiguousArtistName(artist)) {
     return [
-      `"${artist}" band ${cleanTitle} song interview`,
-      `"${artist}" band ${cleanTitle} meaning recording`,
-      `"${artist}" musical group ${cleanTitle} controversy`,
-      `"${artist}" band biography scandal interview`,
+      `${artistQ} band ${cleanTitle} song interview`,
+      `${artistQ} band ${cleanTitle} meaning recording`,
+      `${artistQ} musical group ${cleanTitle} controversy`,
+      `${artistQ} band biography scandal interview`,
     ].slice(0, MAX_HTML_QUERIES);
   }
   return [
-    `${artist} ${cleanTitle} controversy interview meaning`,
-    `${artist} ${cleanTitle} radio banned refused`,
-    `${artist} biography scandal heritage interview`,
-    `${artist} ${cleanTitle} hidden meaning origin story`,
+    `${artistQ} ${cleanTitle} song interview meaning`,
+    `${artistQ} ${cleanTitle} radio banned refused`,
+    `${artistQ} band biography scandal heritage`,
+    `${artistQ} ${cleanTitle} hidden meaning origin story`,
   ].slice(0, MAX_HTML_QUERIES);
 }
 
