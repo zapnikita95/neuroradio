@@ -6,6 +6,8 @@
 import { sanitizeScriptForTts } from './story-quality.js';
 import { applyRussianStressSafe, RUSSIAN_STRESS } from './russian-stress.js';
 import { runTtsQualityPass } from './tts-quality-pass.js';
+import { applyForeignPronunciation, preserveMusicProperNames } from './tts-foreign-pronounce.js';
+import { stripYandexPauseMarkup } from './tts-azure-ssml.js';
 import type { TtsPauseProfile } from './tts-voice-profiles.js';
 
 /** @deprecated use RUSSIAN_STRESS from russian-stress.ts */
@@ -102,6 +104,29 @@ export function prepareYandexTtsText(
   }
 
   return collapseMarkupWhitespace(text);
+}
+
+/**
+ * Plain Russian text for Silero / other engines without SSML:
+ * same sanitize → polish → quotes → stress as Yandex, then Latin → Cyrillic transliteration.
+ */
+export function prepareSileroTtsText(
+  script: string,
+  options: TtsMarkupOptions = {},
+): string {
+  const artist = options.artist ?? '';
+  const title = options.title ?? '';
+
+  // Latin → Cyrillic first (Yandex keeps Latin for SSML lang tags; Silero needs Cyrillic).
+  let text = preserveMusicProperNames(script, artist, title);
+  text = applyForeignPronunciation(text, artist, title);
+
+  text = sanitizeScriptForTts(text, artist, title);
+  text = runTtsQualityPass(text).text;
+  text = expandQuotesForSpeech(text);
+  text = applyRussianStressSafe(text);
+
+  return stripYandexPauseMarkup(text);
 }
 
 export { STRESS_OVERRIDES, RUSSIAN_STRESS };

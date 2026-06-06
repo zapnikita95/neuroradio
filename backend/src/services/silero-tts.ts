@@ -1,7 +1,7 @@
 import { mkdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import fetch from 'node-fetch';
-import { preparePlainSpeechText } from './tts-azure-ssml.js';
+import { prepareSileroTtsText } from './tts-markup.js';
 import { AUDIO_DIR, type SynthesisResult } from './yandex-tts.js';
 
 export type SileroVoiceId = 'aidar' | 'baya' | 'kseniya' | 'xenia' | 'eugene';
@@ -116,12 +116,13 @@ export async function synthesizeSpeechSilero(
   const artist = options.artist ?? '';
   const title = options.title ?? '';
   const voice = options.voice ?? resolveSileroVoice();
-  const plainText = preparePlainSpeechText(script, artist, title);
+  const plainText = prepareSileroTtsText(script, { artist, title });
   if (!plainText.trim()) {
     throw new Error('Silero TTS: пустой текст после подготовки');
   }
 
   const apiMode = resolveSileroApiMode();
+  const synthStarted = Date.now();
   let buffer: Buffer;
   try {
     buffer =
@@ -143,7 +144,25 @@ export async function synthesizeSpeechSilero(
 
   await mkdir(AUDIO_DIR, { recursive: true });
   const filePath = path.join(AUDIO_DIR, fileName);
+  const transcriptPath = filePath.replace(/\.(wav|ogg|opus)$/i, '.txt');
   await writeFile(filePath, buffer);
+  await writeFile(
+    transcriptPath,
+    [
+      `# Silero TTS transcript`,
+      `# artist=${artist || '-'} title=${title || '-'}`,
+      `# voice=${voice} chars=${plainText.length} ms=${Date.now() - synthStarted}`,
+      '',
+      plainText,
+      '',
+    ].join('\n'),
+    'utf8',
+  );
+
+  console.log(
+    `[silero-tts] ok voice=${voice} chars=${plainText.length} bytes=${buffer.length} ms=${Date.now() - synthStarted} transcript=${transcriptPath}`,
+  );
+  console.log(`[silero-tts] text-begin\n${plainText}\n[silero-tts] text-end`);
 
   return {
     fileName,
