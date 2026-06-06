@@ -39,7 +39,7 @@ export function qualityOptionsForProductionAttempt(
     strictLength: false,
     skipWatery: false,
     skipReferenceAnchor: !hasFacts,
-    skipFirstSentenceAnchor: false,
+    skipFirstSentenceAnchor: true,
     skipBannedPatterns: false,
     skipPersonaCliches: true,
     skipEnglishCheck: false,

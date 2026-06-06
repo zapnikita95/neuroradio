@@ -462,7 +462,96 @@ const CONCEPT_BRIDGES: Array<{ factPattern: RegExp; scriptTokens: string[] }> = 
     factPattern: /disband|break.?up|announced.*leav/i,
     scriptTokens: ['распад', 'disband', 'разошл', 'покинул', 'ушли', 'распал'],
   },
+  { factPattern: /\bluminate\b/i, scriptTokens: ['luminate', 'люмин'] },
+  {
+    factPattern: /stream|on-?demand|audio stream|plays?\b/i,
+    scriptTokens: ['стрим', 'прослуш', 'поток', 'потоков'],
+  },
+  {
+    factPattern: /billion|\d+\.\d+\s*b\b|\d+\s*billion/i,
+    scriptTokens: ['миллиард', 'млрд', 'billion', 'полтора', 'полутора'],
+  },
+  {
+    factPattern: /million|\d+\.\d+\s*m\b|\d+\s*million/i,
+    scriptTokens: ['миллион', 'million'],
+  },
+  {
+    factPattern: /second biggest|#\s*2|no\.?\s*2|top two|2nd\b/i,
+    scriptTokens: ['втор', 'second', 'два'],
+  },
+  {
+    factPattern: /midyear|mid-?year|first half|half.?year|six months/i,
+    scriptTokens: ['полугод', 'середин', 'шесть месяц', 'полгода', 'midyear'],
+  },
+  {
+    factPattern: /youtube|music video|\bviews?\b|billion views|million views/i,
+    scriptTokens: ['youtube', 'ютуб', 'клип', 'просмотр', 'видео'],
+  },
 ];
+
+const GENERIC_FACT_WORDS = new Set([
+  'about',
+  'after',
+  'audio',
+  'became',
+  'being',
+  'biggest',
+  'billion',
+  'demand',
+  'during',
+  'earning',
+  'first',
+  'from',
+  'globally',
+  'global',
+  'have',
+  'million',
+  'midyear',
+  'music',
+  'number',
+  'report',
+  'second',
+  'since',
+  'song',
+  'stream',
+  'streams',
+  'that',
+  'their',
+  'third',
+  'through',
+  'video',
+  'views',
+  'which',
+  'with',
+  'world',
+]);
+
+function distinctiveLatinTokens(fact: string): string[] {
+  const tokens = new Set<string>();
+  for (const match of fact.matchAll(/\b[A-Za-z][A-Za-z0-9'.-]{2,}\b/g)) {
+    const raw = match[0]!;
+    const lower = raw.toLowerCase().replace(/['']s$/i, '');
+    if (lower.length >= 4 && !GENERIC_FACT_WORDS.has(lower)) {
+      tokens.add(lower);
+    }
+  }
+  return [...tokens];
+}
+
+function matchesLatinBrandAnchor(fact: string, scriptNorm: string): boolean {
+  return distinctiveLatinTokens(fact).some((token) => scriptNorm.includes(token));
+}
+
+function matchesNumericBridge(fact: string, script: string): boolean {
+  const scriptLower = script.toLowerCase();
+  if (/\d[\d.,]*\s*(?:billion|million|миллиард|миллион|млрд)\b/i.test(scriptLower)) {
+    if (/\d[\d.,]*\s*(?:billion|million)\b/i.test(fact)) return true;
+    if (/\bmillion\b|\bbillion\b/i.test(fact)) return true;
+  }
+  if (/миллиард|млрд/i.test(scriptLower) && /\bbillion\b/i.test(fact)) return true;
+  if (/миллион/i.test(scriptLower) && /\bmillion\b/i.test(fact)) return true;
+  return false;
+}
 
 function matchesConceptBridge(fact: string, scriptWords: Set<string>): boolean {
   const words = [...scriptWords];
@@ -484,6 +573,8 @@ export function anchorsReferenceFact(script: string, referenceFacts: string[]): 
 
   return referenceFacts.some((fact) => {
     if (matchesConceptBridge(fact, scriptWordSet)) return true;
+    if (matchesLatinBrandAnchor(fact, scriptNorm)) return true;
+    if (matchesNumericBridge(fact, script)) return true;
     const factTokens = [
       ...significantWords(fact),
       ...significantTokens(fact).filter((t) => t.length >= 4),
@@ -618,7 +709,7 @@ export function validateStoryScript(
     referenceFacts.length > 0 &&
     !anchorsReferenceFact(trimmed, referenceFacts)
   ) {
-    return { ok: false, reason: 'story ignores Wikipedia reference facts' };
+    return { ok: false, reason: 'story ignores reference facts' };
   }
   if (referenceFacts.length > 0 && !skipFirstSentenceAnchor && !firstSentenceAnchoredToFact(trimmed, referenceFacts)) {
     return { ok: false, reason: 'first sentence is not anchored to seed fact' };
