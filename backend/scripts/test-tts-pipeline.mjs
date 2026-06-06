@@ -129,14 +129,17 @@ test('salute ssml uses sber voice and breaks', () => {
 
 test('prepareSileroTtsText transliterates Italian titles and keeps stress', () => {
   const script =
-    'Damiano David победил на Евровидении с песней «Zitti e buoni». Звукорежиссёр поймал свист в колонках.';
+    'Damiano David победил на Евровидении с песней «Zitti e buoni». Звукорежиссёр поймал свист в колонках. ' +
+    'В 2021 году коллектив победил снова.';
   const trace = prepareSileroTtsTextTrace(script, {
     artist: 'Damiano David',
     title: 'Next Summer',
   });
   const out = trace.prepared;
-  assert.match(out, /Зитти э буони/i);
+  assert.match(out, /Цитти э буони/i);
   assert.doesNotMatch(out, /Zitti/i);
+  assert.doesNotMatch(out, /в\s+кavыч/i);
+  assert.match(out, /двадцать первом году/i);
   assert.match(out, /св\+ист|свист/i);
   assert.match(out, /кол\+он/i);
   assert.doesNotMatch(out, /<\[/);

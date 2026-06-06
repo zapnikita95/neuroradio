@@ -11,6 +11,7 @@ import {
   preserveMusicProperNames,
 } from './tts-foreign-pronounce.js';
 import { stripYandexPauseMarkup } from './tts-azure-ssml.js';
+import { normalizeYearsForRussianTts } from './tts-russian-years.js';
 import type { SileroTtsTextTrace } from './tts-silero-transcript.js';
 import type { TtsPauseProfile } from './tts-voice-profiles.js';
 
@@ -49,11 +50,24 @@ function addDashPauses(text: string, profile: TtsPauseProfile): string {
     .replace(/\s+-\s+/g, ` ${pauseTag(profile, 'small')} `);
 }
 
-/** «слово» → «в кавычках слово» — SpeechKit проговаривает цитату явно. */
+/** Латинские названия треков/песен — без «в кавычках», только текст. */
+function isForeignSongTitleQuote(phrase: string): boolean {
+  const latin = (phrase.match(/[A-Za-zÀ-ÿ]/g) ?? []).length;
+  const cyrillic = (phrase.match(/[а-яёА-ЯЁ]/g) ?? []).length;
+  return latin >= 2 && latin >= cyrillic;
+}
+
+/** «слово» → «в кавычках слово» для русских цитат; иностранные треки — без обёртки. */
+const SONG_CONTEXT_BEFORE_QUOTE =
+  /(?:песн\S*|трек\S*|хит\S*|сингл\S*|композици\S*|альбом\S*)\s*$/i;
+
 function expandQuotesForSpeech(text: string): string {
-  return text.replace(/«([^»]+)»/g, (_match, inner: string) => {
+  return text.replace(/«([^»]+)»/g, (_match, inner: string, offset: number, whole: string) => {
     const phrase = inner.trim();
     if (!phrase) return '';
+    if (isForeignSongTitleQuote(phrase)) return phrase;
+    const before = whole.slice(Math.max(0, offset - 48), offset);
+    if (SONG_CONTEXT_BEFORE_QUOTE.test(before)) return phrase;
     return `в кавычках ${phrase}`;
   });
 }
@@ -97,6 +111,7 @@ export function prepareYandexTtsText(
   const quality = runTtsQualityPass(text);
   text = quality.text;
 
+  text = normalizeYearsForRussianTts(text);
   text = expandQuotesForSpeech(text);
   text = applyRussianStressSafe(text);
 
@@ -129,6 +144,7 @@ export function prepareSileroTtsTextTrace(
   let text = afterLatinTransliteration;
   text = sanitizeScriptForTts(text, artist, title);
   text = runTtsQualityPass(text).text;
+  text = normalizeYearsForRussianTts(text);
   text = expandQuotesForSpeech(text);
   text = applyRussianStressSafe(text);
   const prepared = stripYandexPauseMarkup(text);

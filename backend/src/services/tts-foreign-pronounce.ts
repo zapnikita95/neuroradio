@@ -3,7 +3,7 @@
  */
 
 const PHRASE_PRONUNCIATION_RU: Record<string, string> = {
-  'zitti e buoni': 'Зитти э буони',
+  'zitti e buoni': 'Цитти э буони',
   'bohemian rhapsody': 'Бохимиан Рэпсоди',
   queen: 'Куин',
   'ella boh': 'Элла Бо',
@@ -77,7 +77,7 @@ const EN_WORD_RU: Record<string, string> = {
 };
 
 const IT_WORD_RU: Record<string, string> = {
-  zitti: 'Зитти',
+  zitti: 'Цитти',
   buoni: 'буони',
   buono: 'буоно',
   mambo: 'мambo',
@@ -133,7 +133,7 @@ function transliterateItalianWord(word: string): string {
   out = out.replace(/gn/g, 'нь');
   out = out.replace(/gli/g, 'ли');
   out = out.replace(/zz/g, 'дц');
-  out = out.replace(/^z(?=[aeiou])/i, 'dz');
+  out = out.replace(/^z(?=[aeiou])/i, 'ц');
   out = out.replace(/ch/g, 'к');
   out = out.replace(/gh/g, 'g');
   out = out.replace(/c(?=[ie])/g, 'ч');

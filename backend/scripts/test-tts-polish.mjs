@@ -92,6 +92,21 @@ const damianoMarked = prepareYandexTtsText(damianoScript, {
   artist: 'Damiano David',
   title: 'Next Summer',
 });
+if (!/с песней Zitti e buoni/i.test(damianoMarked)) {
+  console.error('FAIL: song title must be spoken without "в кavычках" wrapper');
+  console.error(damianoMarked);
+  process.exit(1);
+}
+if (!damianoMarked.includes('двадцать первом году')) {
+  console.error('FAIL: year must be spoken as Russian ordinal');
+  console.error(damianoMarked);
+  process.exit(1);
+}
+if (!damianoMarked.includes('Zitti e buoni')) {
+  console.error('FAIL: Italian title must stay Latin for SSML');
+  console.error(damianoMarked);
+  process.exit(1);
+}
 const damianoSsml = buildYandexSsml(damianoMarked, 'ermil');
 if (!damianoSsml.includes('xml:lang="it-IT">Zitti e buoni')) {
   console.error('FAIL: Italian title should use it-IT in SSML');
