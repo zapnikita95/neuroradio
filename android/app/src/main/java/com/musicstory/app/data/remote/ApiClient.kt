@@ -29,9 +29,22 @@ class ApiClient(
 
     @Volatile
     private var activeStoryCall: okhttp3.Call? = null
+    @Volatile
+    private var storyRequestInFlight = false
 
     /** Tracks active POST /v1/story/full — cancel only via [cancelActiveStoryRequest] (track skip). */
     private val storyCancelInterceptor = Interceptor { chain ->
+        val req = chain.request()
+        val isStoryPost = req.method.equals("POST", ignoreCase = true) &&
+            req.url.encodedPath.endsWith("/v1/story/full")
+        if (isStoryPost) {
+            synchronized(storyCallLock) {
+                if (storyRequestInFlight) {
+                    throw java.io.IOException("story fetch already in flight")
+                }
+                storyRequestInFlight = true
+            }
+        }
         val call = chain.call()
         synchronized(storyCallLock) {
             activeStoryCall = call
@@ -41,6 +54,7 @@ class ApiClient(
         } finally {
             synchronized(storyCallLock) {
                 if (activeStoryCall === call) activeStoryCall = null
+                if (isStoryPost) storyRequestInFlight = false
             }
         }
     }
@@ -53,6 +67,7 @@ class ApiClient(
                 call.cancel()
             }
             activeStoryCall = null
+            storyRequestInFlight = false
         }
     }
 

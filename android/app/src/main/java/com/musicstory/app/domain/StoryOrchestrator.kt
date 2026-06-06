@@ -436,6 +436,7 @@ class StoryOrchestrator(
         publishUiState()
     }
 
+    @Synchronized
     private fun playStoryForTrack(requestedTrack: TrackInfo, manual: Boolean) {
         val manualSession = if (manual) ++manualStorySession else 0
         val trackKey = trackTitleKey(requestedTrack)
