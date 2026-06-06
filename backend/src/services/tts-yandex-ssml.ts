@@ -45,8 +45,8 @@ function pausesToPlaceholders(text: string): string {
 
 function placeholdersToBreaks(text: string): string {
   return text
-    .replaceAll(BREAK_SMALL, '<break time="220ms"/>')
-    .replaceAll(BREAK_MEDIUM, '<break time="420ms"/>');
+    .replaceAll(BREAK_SMALL, '<break time="70ms"/>')
+    .replaceAll(BREAK_MEDIUM, '<break time="120ms"/>');
 }
 
 /** Оборачивает латинские фрагменты в SSML lang; русский текст и +ударения — как есть. */

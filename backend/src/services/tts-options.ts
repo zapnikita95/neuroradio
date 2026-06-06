@@ -26,11 +26,11 @@ export const TTS_SPEED_PRESETS: Array<{
   labelRu: string;
   speed: number;
 }> = [
-  { id: 'very_slow', labelRu: 'Очень медленно', speed: 0.82 },
-  { id: 'slow', labelRu: 'Медленно', speed: 0.9 },
-  { id: 'normal', labelRu: 'Нормально', speed: 1.0 },
-  { id: 'fast', labelRu: 'Быстро', speed: 1.06 },
-  { id: 'very_fast', labelRu: 'Очень быстро', speed: 1.12 },
+  { id: 'very_slow', labelRu: 'Очень медленно', speed: 0.88 },
+  { id: 'slow', labelRu: 'Медленно', speed: 1.0 },
+  { id: 'normal', labelRu: 'Нормально', speed: 1.15 },
+  { id: 'fast', labelRu: 'Быстро', speed: 1.32 },
+  { id: 'very_fast', labelRu: 'Очень быстро', speed: 1.48 },
 ];
 
 export function resolveTtsSpeed(value: unknown): number {

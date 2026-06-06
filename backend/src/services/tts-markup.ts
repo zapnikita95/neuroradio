@@ -106,7 +106,7 @@ export function prepareYandexTtsText(
 ): string {
   const artist = options.artist ?? '';
   const title = options.title ?? '';
-  const pauseProfile = options.pauseProfile ?? 'natural';
+  const pauseProfile = options.pauseProfile ?? 'tight';
 
   let text = preserveMusicProperNames(script, artist, title);
   text = sanitizeScriptForTts(text, artist, title);

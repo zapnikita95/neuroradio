@@ -45,11 +45,11 @@ enum class StoryLength(
 
 /** Slightly above Yandex “normal” (1.0) — labels must match perceived speed. */
 enum class TtsSpeed(val id: String, val labelRu: String, val yandexSpeed: Float, val androidRate: Float) {
-    VERY_SLOW("very_slow", "Очень медленно", 0.82f, 0.84f),
-    SLOW("slow", "Медленно", 0.90f, 0.90f),
-    NORMAL("normal", "Нормально", 1.0f, 1.0f),
-    FAST("fast", "Быстро", 1.06f, 1.04f),
-    VERY_FAST("very_fast", "Очень быстро", 1.12f, 1.08f),
+    VERY_SLOW("very_slow", "Очень медленно", 0.88f, 0.84f),
+    SLOW("slow", "Медленно", 1.0f, 0.92f),
+    NORMAL("normal", "Нормально", 1.15f, 1.08f),
+    FAST("fast", "Быстро", 1.32f, 1.22f),
+    VERY_FAST("very_fast", "Очень быстро", 1.48f, 1.35f),
     ;
 
     companion object {

@@ -15,6 +15,7 @@ import {
   TtsOptions,
 } from './tts-options.js';
 import { prepareYandexTtsText } from './tts-markup.js';
+import { stripYandexMarkup } from './tts-azure-ssml.js';
 import { buildYandexSsml, hasLatinForSsml } from './tts-yandex-ssml.js';
 import type { TtsPauseProfile } from './tts-voice-profiles.js';
 
@@ -67,6 +68,8 @@ export interface SynthesisResult {
   fileName: string;
   filePath: string;
   audioUrl: string;
+  /** Plain text sent to TTS (years as words, stress +, no pause markup). */
+  ttsTranscript?: string;
 }
 
 export interface YandexTtsLogContext {
@@ -163,16 +166,11 @@ function buildTtsAttempts(
     push(primaryVoice, { ...baseOptions, emotion: 'neutral' }, 'neutral-emotion');
   }
 
-  if (baseOptions.speed > 1.1) {
-    push(primaryVoice, { ...baseOptions, speed: 1.05 }, 'speed-1.05');
-    push(primaryVoice, { ...baseOptions, speed: 1.0, emotion: 'neutral' }, 'speed-1.0-neutral');
-  }
-
   for (const fallbackVoice of TTS_FALLBACK_CHAIN) {
     if (fallbackVoice === primaryVoice) continue;
     push(
       fallbackVoice,
-      { speed: Math.min(baseOptions.speed, 1.05), emotion: 'neutral' },
+      { ...baseOptions, emotion: 'neutral' },
       `fallback-${fallbackVoice}`,
     );
   }
@@ -220,8 +218,9 @@ export async function synthesizeSpeech(
     artist: artist ?? logContext?.artist,
     title: title ?? logContext?.title,
     sentencePauses: true,
-    pauseProfile: options.pauseProfile ?? 'natural',
+    pauseProfile: options.pauseProfile ?? 'tight',
   });
+  const ttsTranscript = stripYandexMarkup(markedText);
 
   const primaryVoice = coerceVoiceForSpeechKit(voiceId);
   const audioFormat = resolveYandexAudioFormat();
@@ -277,6 +276,7 @@ export async function synthesizeSpeech(
         fileName: safeName,
         filePath,
         audioUrl: `/audio/${safeName}`,
+        ttsTranscript,
       };
     }
 

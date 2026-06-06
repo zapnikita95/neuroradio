@@ -67,6 +67,8 @@ data class GenerationPreviewState(
     val visibleWordCount: Int = 0,
     val alpha: Float = 1f,
     val isActive: Boolean = false,
+    /** True when [words] come from server tts_transcript (exact narration text). */
+    val isSpokenTranscript: Boolean = false,
 )
 
 class StoryOrchestrator(
@@ -691,7 +693,7 @@ class StoryOrchestrator(
                     return@fold
                 }
 
-                startGenerationPreview(response.script, session)
+                startGenerationPreview(response.ttsTranscript ?: response.script, session, response.ttsTranscript != null)
 
                 if (!isSessionCurrent(session)) return@fold
 
@@ -703,7 +705,6 @@ class StoryOrchestrator(
 
                     withContext(Dispatchers.Main.immediate) {
                         mediaControllerManager.fadeOutAndPause(fadeSeconds)
-                        mediaControllerManager.restoreSystemMusicVolumeIfNeeded()
                     }
                     musicPausedForStory.set(true)
                     if (!manual) {
@@ -747,6 +748,7 @@ class StoryOrchestrator(
                             resumeMusic = true,
                             onPlaybackStarted = {
                                 if (!isSessionCurrent(session)) return@playStory
+                                mediaControllerManager.restoreSystemMusicVolumeIfNeeded()
                                 lastStoryStartedAtMs = System.currentTimeMillis()
                                 _state.value = OrchestratorState.PLAYING_STORY
                                 publishUiState()
@@ -1031,7 +1033,7 @@ class StoryOrchestrator(
         _generationPreview.value = GenerationPreviewState()
     }
 
-    private fun startGenerationPreview(script: String, session: Int) {
+    private fun startGenerationPreview(script: String, session: Int, isSpokenTranscript: Boolean = false) {
         val words = script.trim().split(Regex("\\s+")).filter { it.isNotEmpty() }
         if (words.isEmpty()) return
 
@@ -1044,6 +1046,7 @@ class StoryOrchestrator(
                 visibleWordCount = 0,
                 alpha = 1f,
                 isActive = true,
+                isSpokenTranscript = isSpokenTranscript,
             )
             publishUiState()
 

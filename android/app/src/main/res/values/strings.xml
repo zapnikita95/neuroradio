@@ -79,6 +79,7 @@
     <string name="action_stop_monitor">Остановить</string>
     <string name="action_stop_story">Остановить историю</string>
     <string name="action_cancel_generation">Отменить</string>
+    <string name="story_spoken_transcript_label">Как озвучено</string>
     <string name="action_resume_monitor">Возобновить мониторинг</string>
     <string name="status_monitoring_paused">Мониторинг приостановлен</string>
     <string name="status_monitoring_paused_hint">Включится сам, когда откроешь Spotify или Яндекс Музыку</string>

@@ -102,6 +102,7 @@ import type { StoryLengthId } from '../services/story-length.js';
 import type { StoryNarratorId } from '../services/story-narrator.js';
 import type { TtsVoiceSetting } from '../services/voices.js';
 import type { TtsEmotion } from '../services/tts-options.js';
+import { normalizeYearsForRussianTts } from '../services/tts-russian-years.js';
 
 const router = Router();
 
@@ -940,6 +941,8 @@ router.post('/full', validateStoryFullBody, storyFullRateLimit, async (req: Requ
     console.log(story.script);
     console.log('[story-script-end]');
 
+    const displayScript = normalizeYearsForRussianTts(story.script);
+
     const response: Record<string, unknown> = {
       artist,
       title,
@@ -947,7 +950,7 @@ router.post('/full', validateStoryFullBody, storyFullRateLimit, async (req: Requ
       genre: metadata.genre ?? null,
       country: metadata.countryCode ?? null,
       mbid: metadata.mbid ?? null,
-      script: story.script,
+      script: displayScript,
       word_count: story.word_count,
       voiceId,
       ttsStyle: delivery.styleId,
@@ -1017,6 +1020,9 @@ router.post('/full', validateStoryFullBody, storyFullRateLimit, async (req: Requ
       response.audioUrl = signAudioAccess(audio.fileName) ?? audio.audioUrl;
       response.audioFile = audio.fileName;
       response.ttsProvider = audio.provider;
+      if (audio.ttsTranscript) {
+        response.tts_transcript = audio.ttsTranscript;
+      }
     } else {
       response.audioUrl = null;
       response.audioFile = null;

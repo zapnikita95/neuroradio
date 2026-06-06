@@ -143,10 +143,8 @@ export function normalizeLatinPunctuation(text: string): string {
 
 export function enhanceMixedLanguageText(
   text: string,
-  artist: string,
-  title: string,
+  _artist: string,
+  _title: string,
 ): string {
-  let result = normalizeLatinPunctuation(text);
-  result = addLatinArticulationPauses(result);
-  return result.replace(/\s{2,}/g, ' ').trim();
+  return normalizeLatinPunctuation(text);
 }

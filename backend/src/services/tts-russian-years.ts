@@ -42,9 +42,9 @@ function yearToSpoken(year: number, yearCase: YearCase): string {
     const tail = year % 100;
     if (year <= 2009) {
       const unit = UNITS[yearCase][tail]!;
-      if (yearCase === 'prep') return `двухтысячном ${unit}`;
-      if (yearCase === 'gen') return `двухтысячного ${unit}`;
-      return `двухтысячный ${UNITS.nom[tail]}`;
+      if (yearCase === 'prep') return `две тысячи ${unit}`;
+      if (yearCase === 'gen') return `две тысячи ${UNITS.gen[tail]}`;
+      return `две тысячи ${UNITS.nom[tail]}`;
     }
     return twoDigitOrdinal(tail, yearCase);
   }

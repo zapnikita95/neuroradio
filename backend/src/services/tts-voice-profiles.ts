@@ -23,9 +23,9 @@ interface VoiceStylePreset {
 }
 
 const STYLE_PRESETS: Record<Exclude<TtsVoiceStyleId, 'auto'>, VoiceStylePreset> = {
-  radio_host: { speed: 0.94, emotion: 'good', pauseProfile: 'natural', voiceHint: 'filipp' },
-  warm_story: { speed: 0.9, emotion: 'good', pauseProfile: 'airy', voiceHint: 'marina' },
-  night_soft: { speed: 0.86, emotion: 'neutral', pauseProfile: 'airy', voiceHint: 'ermil' },
+  radio_host: { speed: 0.94, emotion: 'good', pauseProfile: 'tight', voiceHint: 'filipp' },
+  warm_story: { speed: 0.9, emotion: 'good', pauseProfile: 'tight', voiceHint: 'marina' },
+  night_soft: { speed: 0.86, emotion: 'neutral', pauseProfile: 'tight', voiceHint: 'ermil' },
 };
 
 const NARRATOR_STYLE_MAP: Partial<Record<StoryNarratorId, TtsVoiceStyleId>> = {
@@ -72,7 +72,7 @@ export function resolveVoiceDelivery(
       voiceId: baseVoice,
       speed: options.clientSpeed ?? DEFAULT_TTS_SPEED,
       emotion: options.clientEmotion ?? DEFAULT_TTS_EMOTION,
-      pauseProfile: 'natural',
+      pauseProfile: 'tight',
       styleId: 'auto',
     };
   }

@@ -41,6 +41,7 @@ data class StoryResponse(
     val mbid: String? = null,
     val script: String,
     @SerializedName("word_count") val wordCount: Int = 0,
+    @SerializedName("tts_transcript") val ttsTranscript: String? = null,
     val voiceId: String? = null,
     val demo: Boolean = false,
     val audioUrl: String? = null,
