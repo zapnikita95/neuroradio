@@ -13,6 +13,7 @@
     "test:gemini:prod": "node scripts/test-production-gemini.mjs",
     "test:quality": "npm run build && node scripts/test-story-quality.mjs",
     "test:tts": "npm run build && node scripts/test-tts-pipeline.mjs",
+    "test:tts:voices": "npm run build && node scripts/test-all-voices-tts.mjs",
     "test:fact-sources": "npm run build && node scripts/benchmark-fact-sources.mjs"
   },
   "keywords": ["music", "story", "bff", "express"],

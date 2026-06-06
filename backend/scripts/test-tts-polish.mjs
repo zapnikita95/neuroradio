@@ -1,6 +1,7 @@
 import { polishScriptForSpeechDelivery } from '../dist/services/tts-speech-polish.js';
 import { prepareYandexTtsText } from '../dist/services/tts-markup.js';
 import { buildYandexSsml, hasLatinForSsml } from '../dist/services/tts-yandex-ssml.js';
+import { ALL_VOICES, coerceVoiceForSpeechKit } from '../dist/services/voices.js';
 import { findIncompleteEnding, trimToLastCompleteSentence, stripTrackTitleGuillemets } from '../dist/services/story-quality.js';
 
 const ellaScript =
@@ -145,5 +146,15 @@ if (bepSsml.includes('<voice')) {
   process.exit(1);
 }
 console.log('OK: stage names + SSML without voice tag');
+
+for (const voiceId of ALL_VOICES) {
+  const apiVoice = coerceVoiceForSpeechKit(voiceId);
+  const ssml = buildYandexSsml(bepMarked, apiVoice);
+  if (ssml.includes('<voice')) {
+    console.error(`FAIL: voice ${voiceId} SSML has forbidden <voice> tag`);
+    process.exit(1);
+  }
+}
+console.log(`OK: all ${ALL_VOICES.length} UI voices SSML valid (no voice tag)`);
 
 console.log('OK: all TTS polish checks passed');
