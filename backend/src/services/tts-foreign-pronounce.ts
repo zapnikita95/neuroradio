@@ -212,7 +212,7 @@ const MARKUP_END = '\uE011';
 
 function maskTtsMarkup(text: string): { masked: string; slots: string[] } {
   const slots: string[] = [];
-  const masked = text.replace(/<\[(?:small|medium|large|tiny|huge)\]>/g, (tag) => {
+  const masked = text.replace(/<\[(?:small|medium|large|tiny|huge|sentence)\]>/g, (tag) => {
     const idx = slots.length;
     slots.push(tag);
     return `${MARKUP_SLOT}${idx}${MARKUP_END}`;

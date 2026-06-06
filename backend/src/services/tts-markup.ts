@@ -7,6 +7,7 @@ import { sanitizeScriptForTts } from './story-quality.js';
 import { applyRussianStressSafe, RUSSIAN_STRESS } from './russian-stress.js';
 import { runTtsQualityPass } from './tts-quality-pass.js';
 import {
+  applyForeignPronunciation,
   applyForeignPronunciationWithReplacements,
   preserveMusicProperNames,
 } from './tts-foreign-pronounce.js';
@@ -33,8 +34,8 @@ function pauseTag(profile: TtsPauseProfile, size: 'small' | 'medium'): string {
 }
 
 function addSentencePauses(text: string, profile: TtsPauseProfile): string {
-  const small = pauseTag(profile, 'small');
-  return text.replace(/([.!?…])(\s+)(?=[А-ЯЁа-яё«])/g, `$1 ${small}$2`);
+  const tag = profile === 'tight' ? '<[sentence]>' : pauseTag(profile, 'medium');
+  return text.replace(/([.!?…])(\s+)(?=[А-ЯЁа-яё«])/g, `$1 ${tag}$2`);
 }
 
 function addCommaPauses(text: string, profile: TtsPauseProfile): string {
@@ -116,6 +117,7 @@ export function prepareYandexTtsText(
   text = normalizeYearsForRussianTts(text);
   text = expandQuotesForSpeech(text);
   text = applyRussianStressSafe(text);
+  text = applyForeignPronunciation(text, artist, title);
 
   if (options.sentencePauses !== false) {
     text = addSentencePauses(text, pauseProfile);

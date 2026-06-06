@@ -15,6 +15,7 @@ import {
   StoryNarratorId,
 } from './story-narrator.js';
 import { eraContextForPrompt, resolveTrackLocale, type TrackLocale } from './track-locale.js';
+import { resolveArtistGrammarRu } from './artist-grammar.js';
 
 export { eraContextForPrompt, resolveTrackLocale };
 export type { TrackLocale };
@@ -285,9 +286,11 @@ export function buildStoryUserPrompt(params: {
     params.countryCode,
   );
   const length = getStoryLengthPreset(params.storyLength);
+  const grammar = resolveArtistGrammarRu(params.artist);
   const lines: string[] = [
     `Артист: ${params.artist}`,
     `Трек: ${params.title}`,
+    `ГРАММАТИКА: ${grammar.promptHint}`,
   ];
 
   if (params.genre) lines.push(`Жанр: ${params.genre}`);

@@ -31,7 +31,7 @@ export function escapeXml(text: string): string {
 /** Remove SpeechKit pause tags only — keep + stress marks for plain-text engines (Silero). */
 export function stripYandexPauseMarkup(text: string): string {
   return text
-    .replace(/<\[(?:small|medium|large|tiny|huge)\]>/g, ' ')
+    .replace(/<\[(?:small|medium|large|tiny|huge|sentence)\]>/g, ' ')
     .replace(/\s{2,}/g, ' ')
     .trim();
 }

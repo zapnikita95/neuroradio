@@ -8,6 +8,7 @@ import type { YandexVoiceId } from './voices.js';
 
 const BREAK_SMALL = '\uE020';
 const BREAK_MEDIUM = '\uE021';
+const BREAK_SENTENCE = '\uE022';
 
 const LATIN_RUN_RE =
   /[A-Za-zÀ-ÿ][A-Za-zÀ-ÿ0-9''\-&]*(?:\s+(?![.!?…]\s)[A-Za-zÀ-ÿ][A-Za-zÀ-ÿ0-9''\-&]*)*/g;
@@ -38,6 +39,7 @@ function detectLangCode(latinSpan: string): string {
 
 function pausesToPlaceholders(text: string): string {
   return text
+    .replace(/<\[sentence\]>/g, BREAK_SENTENCE)
     .replace(/<\[small\]>/g, BREAK_SMALL)
     .replace(/<\[medium\]>/g, BREAK_MEDIUM)
     .replace(/<\[large\]>/g, BREAK_MEDIUM);
@@ -45,7 +47,8 @@ function pausesToPlaceholders(text: string): string {
 
 function placeholdersToBreaks(text: string): string {
   return text
-    .replaceAll(BREAK_SMALL, '<break time="70ms"/>')
+    .replaceAll(BREAK_SENTENCE, '<break time="260ms"/>')
+    .replaceAll(BREAK_SMALL, '<break time="40ms"/>')
     .replaceAll(BREAK_MEDIUM, '<break time="120ms"/>');
 }
 

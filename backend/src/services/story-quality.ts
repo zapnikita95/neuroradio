@@ -9,6 +9,7 @@ import { hasEnglishLeak } from './story-russian-language.js';
 import { prepareStoryScriptLanguage } from './story-english-normalize.js';
 import { isTruncatedMarketingSnippet } from './web-snippet-accept.js';
 import { interestScore } from './reference-fact-quality.js';
+import { fixSoloArtistPronounsRu } from './artist-grammar.js';
 
 export { DEFAULT_STORY_LENGTH, getStoryLengthPreset };
 export type { StoryLengthId, StoryLengthPreset };
@@ -334,6 +335,7 @@ export function sanitizeScriptForTts(
   result = repairOrphanDatePhrases(result, referenceFacts);
   result = result.replace(/\s{2,}/g, ' ').replace(/\s+([,.!?])/g, '$1').trim();
   result = stripBannedFluff(result);
+  result = fixSoloArtistPronounsRu(result, artist);
 
   return result;
 }
