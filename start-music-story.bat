@@ -66,16 +66,19 @@ netsh advfirewall firewall add rule name="MusicStory BFF TCP 3000" dir=in action
 
 rem --- 6) BFF in background ---
 echo [..] Starting BFF on port %PORT%...
-start "MusicStory-BFF" /min cmd /c "cd /d \"%ROOT%backend\" && set LLM_PROVIDER=local&& set PORT=%PORT%&& set NODE_ENV=development&& set LOCAL_OLLAMA_BASE_URL=%LOCAL_OLLAMA_BASE_URL%&& set LOCAL_OLLAMA_MODEL=%LOCAL_OLLAMA_MODEL%&& set SILERO_TTS_URL=%SILERO_TTS_URL%&& set SILERO_TTS_ENABLED=true&& set TTS_PREFER_SILERO=true&& set SILERO_TTS_API=legacy&& set LOCAL_LOG_FILE=%LOCAL_LOG_FILE%&& node dist\index.js >> \"%LOCAL_LOG_FILE%\" 2>&1"
+start "MusicStory-BFF" /min "%ROOT%scripts\run-local-bff.cmd"
 
 set /a BFF_WAIT=0
 :wait_bff
 timeout /t 2 /nobreak >nul
+curl.exe -s --max-time 3 http://127.0.0.1:%PORT%/health >nul 2>&1
+if not errorlevel 1 goto bff_up
 netstat -ano 2>nul | findstr ":%PORT% " | findstr LISTENING >nul 2>&1
 if not errorlevel 1 goto bff_up
 set /a BFF_WAIT+=1
-if !BFF_WAIT! LSS 30 goto wait_bff
-echo [ERROR] BFF не поднялся на :%PORT% — см. %LOCAL_LOG_FILE%
+if !BFF_WAIT! LSS 45 goto wait_bff
+echo [ERROR] BFF не поднялся на :%PORT% — последние строки лога:
+powershell -NoProfile -Command "Get-Content -LiteralPath '%LOCAL_LOG_FILE%' -Tail 25 -ErrorAction SilentlyContinue"
 goto fail
 :bff_up
 echo [OK] BFF http://127.0.0.1:%PORT%
@@ -92,8 +95,8 @@ if errorlevel 1 (
 del "%LOGDIR%\tunnel-silero.log" 2>nul
 del "%LOGDIR%\tunnel-bff.log" 2>nul
 
-start "MusicStory-tunnel-silero" /min cmd /c ""%CLOUDFLARED%" tunnel --url http://127.0.0.1:%SILERO_PORT% > "%LOGDIR%\tunnel-silero.log" 2>&1"
-start "MusicStory-tunnel-bff" /min cmd /c ""%CLOUDFLARED%" tunnel --url http://127.0.0.1:%PORT% > "%LOGDIR%\tunnel-bff.log" 2>&1"
+start "MusicStory-tunnel-silero" /min cmd /c ""%CLOUDFLARED%" tunnel --url http://127.0.0.1:%SILERO_PORT% 1>>"%LOGDIR%\tunnel-silero.log" 2>&1"
+start "MusicStory-tunnel-bff" /min cmd /c ""%CLOUDFLARED%" tunnel --url http://127.0.0.1:%PORT% 1>>"%LOGDIR%\tunnel-bff.log" 2>&1"
 
 echo [..] Cloudflare tunnel — жди 15-40 сек...
 call :wait_tunnel_url "%LOGDIR%\tunnel-silero.log" SILERO_PUBLIC 90
