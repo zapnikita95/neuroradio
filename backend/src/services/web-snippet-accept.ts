@@ -41,10 +41,23 @@ export function isEmergingArtistNarrativeSnippet(snippet: string): boolean {
   );
 }
 
+/** Truncated press/listicle about a hit song — Latin/English hooks. */
+export function isHitTrackNarrativeSnippet(snippet: string): boolean {
+  const trimmed = decodeHtmlEntities(snippet).trim();
+  if (trimmed.length < 35) return false;
+  return (
+    /\b(?:heartbreak|harmony|launched in|summer hit|worldwide hit|chart|grammy|billboard|neo-fasc|controvers|misappropriat|dedic(?:at|ó)|esposa|álbum|album mi sangre|mi sangre|karaoke|entérate|escribi[óo]|inspir(?:ed|ada)|written by|origin(?:ated|ó)|festival|soundtrack|film|movie)\b/i.test(
+      trimmed,
+    ) ||
+    /\b(?:From .+ to .+ Launched|known professionally as|transl\.|black shirt)\b/i.test(trimmed)
+  );
+}
+
 /** SEO/listicle fragment — not a speakable fact. */
 export function isTruncatedMarketingSnippet(snippet: string): boolean {
   const trimmed = decodeHtmlEntities(snippet).trim();
   if (isEmergingArtistNarrativeSnippet(trimmed)) return false;
+  if (isHitTrackNarrativeSnippet(trimmed)) return false;
   if (TRUNCATED_MARKETING.test(trimmed)) return true;
   if (/\b(?:detailed summary and analysis|provides a detailed summary)\b/i.test(trimmed)) return true;
   if (trimmed.length < 55 && !/[.!?…]["']?\s*$/.test(trimmed)) return true;
@@ -163,6 +176,7 @@ export function acceptIndieEmergingSnippet(
 
   // Search was scoped to artist+title — truncated rise/fame clips need not repeat the name.
   if (isEmergingArtistNarrativeSnippet(trimmed)) return true;
+  if (isHitTrackNarrativeSnippet(trimmed)) return true;
 
   if (factMentionsArtistLoose(trimmed, artist)) {
     if (acceptSearchGroundedSnippet(trimmed, artist, title)) return true;
@@ -189,7 +203,8 @@ export function hasActionableSnippets(
   return snippets.some(
     (snippet) =>
       acceptSearchGroundedSnippet(snippet, artist, title) ||
-      acceptIndieEmergingSnippet(snippet, artist, title),
+      acceptIndieEmergingSnippet(snippet, artist, title) ||
+      isHitTrackNarrativeSnippet(snippet),
   );
 }
 

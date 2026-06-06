@@ -689,6 +689,13 @@ const FAST_TRACK_WIKI_SECTIONS = [
   'Meaning',
   'History',
   'Legacy',
+  'Music and structure',
+  'Lyrics',
+  'Controversy',
+  'Reception',
+  'Chart performance',
+  'Critical reception',
+  'Music video',
 ];
 
 function extractWikiSection(extract: string, sectionName: string): string | null {
@@ -703,14 +710,35 @@ function extractWikiSection(extract: string, sectionName: string): string | null
  */
 export async function fetchFastTrackWikiFacts(artist: string, title: string): Promise<string[]> {
   const lang: 'en' = 'en';
-  const candidates = buildTrackTitleCandidates(artist, title).slice(0, 4);
+  const cleanTitle = cleanTrackTitle(title);
+  const fromBuilder = buildTrackTitleCandidates(artist, title);
+  const candidates = [
+    cleanTitle,
+    `${cleanTitle} (song)`,
+    ...fromBuilder.filter((c) => c !== cleanTitle && c !== `${cleanTitle} (song)`),
+  ].slice(0, 10);
 
   for (const candidate of candidates) {
-    const extract = await fetchFullExtract(lang, candidate, false);
+    let extract = await fetchFullExtract(lang, candidate, false);
+    if (!extract) extract = await fetchSummary(lang, candidate);
+    if (!extract || isDisambiguationExtract(extract)) {
+      const searched = await searchWikiTitle(lang, `${cleanTitle} ${artist} song`, artist, title);
+      if (searched) {
+        extract =
+          (await fetchFullExtract(lang, searched, false)) ?? (await fetchSummary(lang, searched));
+      }
+    }
     if (!extract || isDisambiguationExtract(extract)) continue;
     if (isWrongMusicTopic(artist, extract, candidate)) continue;
 
     const sectionFacts: string[] = [];
+    const intro = extract.split(/\n+==/)[0]?.trim() ?? '';
+    if (intro.length >= 60) {
+      sectionFacts.push(
+        ...filterMusicFacts(extractFactBullets(intro, 6), artist, title, false),
+      );
+    }
+
     for (const section of FAST_TRACK_WIKI_SECTIONS) {
       const body = extractWikiSection(extract, section);
       if (!body || body.length < 50) continue;
@@ -727,13 +755,31 @@ export async function fetchFastTrackWikiFacts(artist: string, title: string): Pr
     );
 
     const merged = filterAndRankFacts([...sectionFacts, ...contextual], 8).filter(
-      (fact) => interestScore(fact) >= 5,
+      (fact) => interestScore(fact) >= 4,
     );
     if (merged.length > 0) {
       console.log(
         `[wiki-fast-track] "${artist}" — "${title}" page="${candidate}" facts=${merged.length}`,
       );
       return merged;
+    }
+
+    if (intro.length >= 60) {
+      const looseIntro = filterAndRankFacts(
+        extractFactBullets(intro, 6).filter(
+          (f) =>
+            factMentionsTrack(f, title) ||
+            factMentionsArtist(f, artist) ||
+            interestScore(f) >= 6,
+        ),
+        4,
+      );
+      if (looseIntro.length > 0) {
+        console.log(
+          `[wiki-fast-track] intro fallback "${artist}" — "${title}" page="${candidate}" facts=${looseIntro.length}`,
+        );
+        return looseIntro;
+      }
     }
   }
   return [];

@@ -147,6 +147,10 @@ export const RUSSIAN_STRESS: Record<string, string> = {
   звезду: 'звезд+у',
   звёзд: 'зв+ёзд',
   звезд: 'зв+езд',
+  гордон: 'г+ордон',
+  мэттью: 'м+эттью',
+  матthew: 'м+эттью',
+  гordon: 'г+ордон',
 };
 
 export const FORCE_RESTRESS = new Set(Object.keys(RUSSIAN_STRESS));

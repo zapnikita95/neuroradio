@@ -4,6 +4,7 @@ import { requireAppAuth } from '../middleware/app-auth.js';
 import { validateStoryFullBody } from '../middleware/validate-story.js';
 import { enrichTrackMetadata } from '../services/musicbrainz.js';
 import { fetchAggregatedFactContext, emptyAggregatedFactContext, fetchIndieArtistFocusContext, fetchEmergencyFactRescue } from '../services/fact-aggregator.js';
+import { fetchFastTrackWikiFacts } from '../services/wikipedia-facts.js';
 import { explainReferenceFactSelection, type SelectedReferenceFact } from '../services/fact-picker.js';
 import { formatFactPickLog, logFactCandidatePools } from '../services/fact-interest-log.js';
 import { interestScore, isWikiBiographyLead } from '../services/reference-fact-quality.js';
@@ -465,6 +466,17 @@ router.post('/full', validateStoryFullBody, storyFullRateLimit, async (req: Requ
           artistFactCount = factBundle.artistFacts.length;
           console.log(
             `[facts] relaxed web snippet seed for "${metadata.artist}": "${relaxedSeed.fact.slice(0, 100)}"`,
+          );
+        }
+      }
+
+      if (trackFactCount + artistFactCount === 0) {
+        const wikiFastOnly = await fetchFastTrackWikiFacts(metadata.artist, metadata.title);
+        if (wikiFastOnly.length > 0) {
+          factBundle = { trackFacts: wikiFastOnly.slice(0, 4), artistFacts: [] };
+          trackFactCount = factBundle.trackFacts.length;
+          console.log(
+            `[facts] wiki-fast salvage for "${metadata.artist}" — "${metadata.title}": ${trackFactCount} fact(s)`,
           );
         }
       }
