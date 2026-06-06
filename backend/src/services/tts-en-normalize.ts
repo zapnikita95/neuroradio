@@ -90,6 +90,8 @@ export const MUSIC_LATIN_ALLOWLIST = new Set([
   'unplugged',
   'acapella',
   'a cappella',
+  'bedroom',
+  'viral',
 ]);
 
 export function collectLatinTokens(artist: string, title: string): Set<string> {

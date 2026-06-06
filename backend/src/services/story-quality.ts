@@ -183,6 +183,34 @@ export function countWords(text: string): number {
   return text.trim().split(/\s+/).filter(Boolean).length;
 }
 
+const INCOMPLETE_TRAILING_CLAUSE_RE =
+  /\s+(?:как|что|где|когда|чтобы|если|пока|хотя|котор(?:ый|ая|ое|ые)|и|а|но|или)\s*$/iu;
+
+/** Script ends mid-sentence — LLM token cut or bad fallback; must not go to TTS. */
+export function findIncompleteEnding(script: string): string | null {
+  const trimmed = script.trim();
+  if (!trimmed) return 'empty script';
+  if (/[.!?…]$/.test(trimmed)) return null;
+  if (INCOMPLETE_TRAILING_CLAUSE_RE.test(trimmed)) return 'incomplete trailing clause';
+  if (/[,;:—–-]\s*$/.test(trimmed)) return 'incomplete trailing punctuation';
+  return 'missing sentence ending';
+}
+
+/** Drop unfinished tail after the last complete sentence (TTS safety net). */
+export function trimToLastCompleteSentence(script: string): string {
+  const trimmed = script.trim();
+  if (/[.!?…]$/.test(trimmed)) return trimmed;
+
+  let lastEnd = -1;
+  for (const ch of ['.', '!', '?', '…']) {
+    lastEnd = Math.max(lastEnd, trimmed.lastIndexOf(ch));
+  }
+  if (lastEnd >= 40) {
+    return trimmed.slice(0, lastEnd + 1).trim();
+  }
+  return trimmed;
+}
+
 function allowedDigitSequences(
   artist: string,
   title: string,
@@ -557,6 +585,11 @@ export function validateStoryScript(
   const absoluteMin = options.minWordsOverride ?? 12;
   if (words < absoluteMin) {
     return { ok: false, reason: `too short (${words} words, need at least ${absoluteMin})` };
+  }
+
+  const incomplete = findIncompleteEnding(trimmed);
+  if (incomplete) {
+    return { ok: false, reason: incomplete };
   }
 
   if (strictLength) {

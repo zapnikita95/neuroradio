@@ -1,3 +1,4 @@
+import { findIncompleteEnding, trimToLastCompleteSentence } from './story-quality.js';
 import { polishScriptForSpeechDelivery } from './tts-speech-polish.js';
 
 const BROKEN_PATTERNS: RegExp[] = [
@@ -37,6 +38,15 @@ export function runTtsQualityPass(script: string): TtsQualityPassResult {
   if (polished !== text) {
     text = polished;
     adjusted = true;
+  }
+
+  if (findIncompleteEnding(text)) {
+    const trimmed = trimToLastCompleteSentence(text);
+    if (!findIncompleteEnding(trimmed)) {
+      text = trimmed;
+      warnings.push('trimmed incomplete ending for TTS');
+      adjusted = true;
+    }
   }
 
   return { text, adjusted, warnings };

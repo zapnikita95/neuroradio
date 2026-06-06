@@ -26,8 +26,26 @@ const DRY_OPENER_FIXES: Array<[RegExp, string]> = [
 
 const MAX_SENTENCE_WORDS = 22;
 
+/** Split on conjunctions but keep «а», «но», «где» — plain split() eats the delimiter. */
+const CONJUNCTION_SPLIT_RE =
+  /(?<=\s)(и|а|но|потому что|когда|где|который|которая|которые)(\s+)/gi;
+
 function countWords(sentence: string): number {
   return sentence.trim().split(/\s+/).filter(Boolean).length;
+}
+
+function splitSentenceOnConjunctions(sentence: string): string[] {
+  const parts = sentence.split(CONJUNCTION_SPLIT_RE);
+  if (parts.length <= 1) return [sentence];
+
+  const chunks: string[] = [parts[0] ?? ''];
+  for (let i = 1; i < parts.length; i += 3) {
+    const conj = parts[i] ?? '';
+    const space = parts[i + 1] ?? ' ';
+    const rest = parts[i + 2] ?? '';
+    chunks.push(`${conj}${space}${rest}`);
+  }
+  return chunks.filter((chunk) => chunk.trim().length > 0);
 }
 
 /** Split overly long sentences at natural conjunctions. */
@@ -41,9 +59,7 @@ export function splitLongSentencesForSpeech(text: string): string {
       continue;
     }
 
-    const chunks = sentence.split(
-      /(?<=\s)(?:и|а|но|потому что|когда|где|который|которая|которые)\s+/i,
-    );
+    const chunks = splitSentenceOnConjunctions(sentence);
     if (chunks.length <= 1) {
       out.push(sentence);
       continue;

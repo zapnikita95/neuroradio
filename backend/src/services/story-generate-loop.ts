@@ -2,11 +2,13 @@ import type { StoryLengthId } from './story-length.js';
 import {
   countWords,
   findHardScriptViolation,
+  findIncompleteEnding,
   findWateryContent,
   hasConcreteFact,
   anchorsReferenceFact,
   sanitizeScriptForTts,
   stripBannedFluff,
+  trimToLastCompleteSentence,
   validateStoryScript,
 } from './story-quality.js';
 import { storyNamesForeignArtist } from './fact-relevance.js';
@@ -101,9 +103,19 @@ export function finalizeAfterQualityLoop<T extends { script: string }>(
   _options: { relaxForWeakLlm?: boolean } = {},
 ): T | null {
   if (!lastCandidate?.script?.trim()) return null;
+  let scriptBody = lastCandidate.script;
+  if (findIncompleteEnding(scriptBody)) {
+    const trimmed = trimToLastCompleteSentence(scriptBody);
+    if (findIncompleteEnding(trimmed)) {
+      logRejectedScript('last script rejected', scriptBody, 'incomplete ending');
+      return null;
+    }
+    console.warn('[story] trimmed incomplete ending before finalize');
+    scriptBody = trimmed;
+  }
   const sanitized = stripBannedFluff(
     sanitizeScriptForTts(
-      lastCandidate.script,
+      scriptBody,
       input.artist,
       input.title,
       referenceFacts,

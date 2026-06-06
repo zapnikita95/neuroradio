@@ -44,6 +44,15 @@ function addDashPauses(text: string, profile: TtsPauseProfile): string {
     .replace(/\s+-\s+/g, ` ${pauseTag(profile, 'small')} `);
 }
 
+/** «слово» → «фраза в кавычках, слово,» so SpeechKit reads quoted bits clearly. */
+function expandQuotesForSpeech(text: string): string {
+  return text.replace(/«([^»]+)»/g, (_match, inner: string) => {
+    const phrase = inner.trim();
+    if (!phrase) return '';
+    return `фраза в кавычках, ${phrase},`;
+  });
+}
+
 function addQuotePauses(text: string, profile: TtsPauseProfile): string {
   if (profile === 'tight') return text;
   const small = pauseTag(profile, 'small');
@@ -83,6 +92,7 @@ export function prepareYandexTtsText(
   const quality = runTtsQualityPass(text);
   text = quality.text;
 
+  text = expandQuotesForSpeech(text);
   text = applyRussianStress(text);
   text = enhanceMixedLanguageText(text, artist, title);
 
