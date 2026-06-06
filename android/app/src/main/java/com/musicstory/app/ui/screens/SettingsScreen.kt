@@ -81,6 +81,7 @@ import com.musicstory.app.domain.StoryLength
 import com.musicstory.app.domain.StoryNarrator
 import com.musicstory.app.domain.TtsEmotion
 import com.musicstory.app.domain.TtsPlaybackEngine
+import com.musicstory.app.domain.UserTtsBilling
 import com.musicstory.app.domain.TtsSpeed
 import com.musicstory.app.domain.TtsVoice
 import com.musicstory.app.domain.TierAccess
@@ -150,6 +151,10 @@ fun SettingsScreen(
     val ttsSpeed by settings.ttsSpeed.collectAsState(initial = TtsSpeed.NORMAL)
     val ttsEmotion by settings.ttsEmotion.collectAsState(initial = TtsEmotion.LIVELY)
     val ttsPlaybackEngine by settings.ttsPlaybackEngine.collectAsState(initial = TtsPlaybackEngine.YANDEX_SERVER)
+    val userTtsBilling by settings.userTtsBilling.collectAsState(initial = UserTtsBilling.SERVER)
+    val yandexApiKey by settings.yandexApiKey.collectAsState(initial = "")
+    val yandexFolderId by settings.yandexFolderId.collectAsState(initial = "")
+    val saluteAuthKey by settings.saluteAuthKey.collectAsState(initial = "")
     val musicFadeSeconds by settings.musicFadeSeconds.collectAsState(initial = SettingsDataStore.DEFAULT_MUSIC_FADE_SECONDS)
     val countTrackListenEnabled by settings.countTrackAfterListenEnabled.collectAsState(initial = false)
     val countTrackListenSeconds by settings.countTrackAfterListenSeconds.collectAsState(
@@ -231,6 +236,10 @@ fun SettingsScreen(
     }
 
     var groqInput by remember(groqApiKey) { mutableStateOf(groqApiKey) }
+    var yandexKeyInput by remember(yandexApiKey) { mutableStateOf(yandexApiKey) }
+    var yandexFolderInput by remember(yandexFolderId) { mutableStateOf(yandexFolderId) }
+    var saluteKeyInput by remember(saluteAuthKey) { mutableStateOf(saluteAuthKey) }
+    var userTtsSaveFeedback by remember { mutableStateOf<String?>(null) }
     var geminiInput by remember(geminiApiKey) { mutableStateOf(geminiApiKey) }
     var openRouterInput by remember(openRouterApiKey) { mutableStateOf(openRouterApiKey) }
     var localUrlInput by remember(localOllamaUrl) { mutableStateOf(localOllamaUrl) }
@@ -747,6 +756,142 @@ fun SettingsScreen(
                             selected = storyLength == length,
                             onSelect = { scope.launch { settings.setStoryLength(length) } },
                         )
+                    }
+                    if (ttsPlaybackEngine == TtsPlaybackEngine.YANDEX_SERVER) {
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Text(
+                            text = context.getString(R.string.settings_user_tts_section),
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MutedLavender,
+                        )
+                        Text(
+                            text = context.getString(R.string.settings_user_tts_hint),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MutedLavender,
+                            modifier = Modifier.padding(top = 4.dp, bottom = 8.dp),
+                        )
+                        UserTtsBilling.entries.forEach { billing ->
+                            NarratorRadioRow(
+                                label = billing.labelRu,
+                                description = billing.descriptionRu,
+                                selected = userTtsBilling == billing,
+                                onSelect = {
+                                    userTtsSaveFeedback = null
+                                    scope.launch { settings.setUserTtsBilling(billing) }
+                                },
+                            )
+                        }
+                        if (userTtsBilling != UserTtsBilling.SERVER) {
+                            Text(
+                                text = context.getString(
+                                    R.string.settings_user_tts_active,
+                                    userTtsBilling.labelRu,
+                                ),
+                                style = MaterialTheme.typography.labelMedium,
+                                color = GoldBright,
+                                modifier = Modifier.padding(top = 8.dp, bottom = 8.dp),
+                            )
+                        }
+                        if (userTtsBilling == UserTtsBilling.YANDEX) {
+                            OutlinedTextField(
+                                value = yandexKeyInput,
+                                onValueChange = { yandexKeyInput = it; userTtsSaveFeedback = null },
+                                label = { Text(context.getString(R.string.settings_yandex_api_key)) },
+                                modifier = Modifier.fillMaxWidth(),
+                                singleLine = true,
+                                visualTransformation = PasswordVisualTransformation(),
+                                colors = fieldColors,
+                                shape = RoundedCornerShape(14.dp),
+                            )
+                            Spacer(modifier = Modifier.height(8.dp))
+                            OutlinedTextField(
+                                value = yandexFolderInput,
+                                onValueChange = { yandexFolderInput = it; userTtsSaveFeedback = null },
+                                label = { Text(context.getString(R.string.settings_yandex_folder_id)) },
+                                modifier = Modifier.fillMaxWidth(),
+                                singleLine = true,
+                                colors = fieldColors,
+                                shape = RoundedCornerShape(14.dp),
+                            )
+                            Text(
+                                text = context.getString(R.string.settings_yandex_tts_hint),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MutedLavender,
+                                modifier = Modifier.padding(top = 6.dp, bottom = 4.dp),
+                            )
+                            Text(
+                                text = context.getString(R.string.settings_yandex_get_key),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = GoldBright,
+                                modifier = Modifier
+                                    .padding(bottom = 8.dp)
+                                    .clickable {
+                                        context.startActivity(
+                                            Intent(
+                                                Intent.ACTION_VIEW,
+                                                Uri.parse("https://yandex.cloud/ru/docs/speechkit/quickstart"),
+                                            ),
+                                        )
+                                    },
+                            )
+                        }
+                        if (userTtsBilling == UserTtsBilling.SBER) {
+                            OutlinedTextField(
+                                value = saluteKeyInput,
+                                onValueChange = { saluteKeyInput = it; userTtsSaveFeedback = null },
+                                label = { Text(context.getString(R.string.settings_salute_auth_key)) },
+                                modifier = Modifier.fillMaxWidth(),
+                                singleLine = true,
+                                visualTransformation = PasswordVisualTransformation(),
+                                colors = fieldColors,
+                                shape = RoundedCornerShape(14.dp),
+                            )
+                            Text(
+                                text = context.getString(R.string.settings_salute_tts_hint),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MutedLavender,
+                                modifier = Modifier.padding(top = 6.dp, bottom = 4.dp),
+                            )
+                            Text(
+                                text = context.getString(R.string.settings_salute_get_key),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = GoldBright,
+                                modifier = Modifier
+                                    .padding(bottom = 8.dp)
+                                    .clickable {
+                                        context.startActivity(
+                                            Intent(
+                                                Intent.ACTION_VIEW,
+                                                Uri.parse("https://developers.sber.ru/studio"),
+                                            ),
+                                        )
+                                    },
+                            )
+                        }
+                        if (userTtsBilling != UserTtsBilling.SERVER) {
+                            SecondaryStoryButton(
+                                text = context.getString(R.string.settings_user_tts_save),
+                                onClick = {
+                                    scope.launch {
+                                        settings.setYandexApiKey(ApiKeySanitizer.clean(yandexKeyInput))
+                                        settings.setYandexFolderId(yandexFolderInput.trim())
+                                        settings.setSaluteAuthKey(ApiKeySanitizer.clean(saluteKeyInput))
+                                        yandexKeyInput = ApiKeySanitizer.clean(yandexKeyInput)
+                                        saluteKeyInput = ApiKeySanitizer.clean(saluteKeyInput)
+                                        userTtsSaveFeedback = context.getString(R.string.settings_user_tts_saved)
+                                    }
+                                },
+                                modifier = Modifier.fillMaxWidth(),
+                            )
+                            userTtsSaveFeedback?.let { msg ->
+                                Text(
+                                    text = msg,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = GoldBright,
+                                    modifier = Modifier.padding(top = 6.dp),
+                                )
+                            }
+                        }
                     }
                 }
 

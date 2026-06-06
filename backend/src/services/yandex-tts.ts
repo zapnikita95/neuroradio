@@ -151,10 +151,11 @@ export async function synthesizeSpeech(
     title?: string;
     pauseProfile?: TtsPauseProfile;
     logContext?: YandexTtsLogContext;
+    credentials?: { apiKey: string; folderId: string };
   } = {},
 ): Promise<SynthesisResult> {
-  const apiKey = process.env.YANDEX_API_KEY;
-  const folderId = process.env.YANDEX_FOLDER_ID;
+  const apiKey = options.credentials?.apiKey ?? process.env.YANDEX_API_KEY;
+  const folderId = options.credentials?.folderId ?? process.env.YANDEX_FOLDER_ID;
 
   if (!apiKey || !folderId) {
     throw new Error('YANDEX_API_KEY and YANDEX_FOLDER_ID are required');
@@ -185,7 +186,7 @@ export async function synthesizeSpeech(
   const attempts = buildTtsAttempts(primaryVoice, ttsOptions);
 
   console.log(
-    `[yandex-tts] start${installTag}${trackTag} voice=${voiceId}→${primaryVoice} speed=${ttsOptions.speed} emotion=${ttsOptions.emotion} chars=${markedText.length} ssml=${hasLatinForSsml(markedText)} attempts=${attempts.length}`,
+    `[yandex-tts] start${installTag}${trackTag} voice=${voiceId}→${primaryVoice} speed=${ttsOptions.speed} emotion=${ttsOptions.emotion} chars=${markedText.length} ssml=${hasLatinForSsml(markedText)} attempts=${attempts.length} billing=${options.credentials ? 'client' : 'server'}`,
   );
   console.log(`[yandex-tts] marked-text-begin${installTag}${trackTag}\n${markedText}\n[yandex-tts] marked-text-end`);
   if (hasLatinForSsml(markedText)) {

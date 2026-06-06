@@ -30,6 +30,13 @@ interface StoryFullBody {
   openrouter_api_key?: unknown;
   local_ollama_url?: unknown;
   local_ollama_model?: unknown;
+  yandex_api_key?: unknown;
+  yandex_folder_id?: unknown;
+  salute_auth_key?: unknown;
+  salute_client_id?: unknown;
+  salute_client_secret?: unknown;
+  user_tts_provider?: unknown;
+  skip_server_tts?: unknown;
 }
 
 const VALID_VOICE_TIERS = new Set<string>(['default', 'premium']);
@@ -75,6 +82,13 @@ function asOptionalApiKey(value: unknown): string | undefined {
   if (typeof value !== 'string') return undefined;
   const trimmed = value.replace(/[\s\n\r]+/g, '').trim();
   if (!trimmed || trimmed.length > 256) return undefined;
+  return trimmed;
+}
+
+function asOptionalFolderId(value: unknown): string | undefined {
+  if (typeof value !== 'string') return undefined;
+  const trimmed = value.trim();
+  if (!trimmed || trimmed.length > 64) return undefined;
   return trimmed;
 }
 
@@ -128,6 +142,17 @@ export function validateStoryFullBody(req: Request, res: Response, next: NextFun
   const openrouterApiKey = asOptionalApiKey(body.openrouter_api_key);
   const localOllamaUrl = asOptionalOllamaUrl(body.local_ollama_url);
   const localOllamaModel = asOptionalModelId(body.local_ollama_model, 128);
+  const yandexApiKey = asOptionalApiKey(body.yandex_api_key);
+  const yandexFolderId = asOptionalFolderId(body.yandex_folder_id);
+  const saluteAuthKey = asOptionalApiKey(body.salute_auth_key);
+  const saluteClientId = asOptionalApiKey(body.salute_client_id);
+  const saluteClientSecret = asOptionalApiKey(body.salute_client_secret);
+  const userTtsProvider =
+    typeof body.user_tts_provider === 'string' &&
+    (body.user_tts_provider === 'yandex' || body.user_tts_provider === 'sber')
+      ? body.user_tts_provider
+      : undefined;
+  const skipServerTts = body.skip_server_tts === true;
 
   req.body = {
     artist,
@@ -150,6 +175,13 @@ export function validateStoryFullBody(req: Request, res: Response, next: NextFun
     openrouter_api_key: openrouterApiKey,
     local_ollama_url: localOllamaUrl,
     local_ollama_model: localOllamaModel,
+    yandex_api_key: yandexApiKey,
+    yandex_folder_id: yandexFolderId,
+    salute_auth_key: saluteAuthKey,
+    salute_client_id: saluteClientId,
+    salute_client_secret: saluteClientSecret,
+    user_tts_provider: userTtsProvider,
+    skip_server_tts: skipServerTts,
   };
   next();
 }

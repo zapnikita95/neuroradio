@@ -32,6 +32,8 @@ export interface SaluteSynthesisOptions {
   styleId?: string;
   storyNarrator?: StoryNarratorId;
   voice?: SaluteVoiceId;
+  /** Client billing — Authorization Key from Studio (not stored on server). */
+  clientAuthKey?: string;
 }
 
 /**
@@ -42,7 +44,8 @@ export async function synthesizeSpeechSalute(
   fileName: string,
   options: SaluteSynthesisOptions = {},
 ): Promise<SynthesisResult> {
-  if (!canUseSaluteSpeechProduction()) {
+  const clientAuthKey = options.clientAuthKey?.trim();
+  if (!clientAuthKey && !canUseSaluteSpeechProduction()) {
     throw new Error(
       'SaluteSpeech не включён. Нужны ключи Studio и SALUTE_SPEECH_ENABLED=true. См. backend/SALUTE_SPEECH.md',
     );
@@ -65,7 +68,7 @@ export async function synthesizeSpeechSalute(
   const format = process.env.SALUTE_SPEECH_FORMAT?.trim() || 'opus';
   const url = `${SYNTH_URL}?format=${encodeURIComponent(format)}&voice=${encodeURIComponent(voice)}`;
 
-  const token = await getSaluteAccessToken();
+  const token = await getSaluteAccessToken(clientAuthKey);
   const rqUid = crypto.randomUUID();
 
   const response = await fetch(url, {
@@ -94,7 +97,7 @@ export async function synthesizeSpeechSalute(
   await writeFile(filePath, buffer);
 
   console.log(
-    `[salute-tts] ok voice=${voice} format=${format} bytes=${buffer.length} chars=${plainText.length}`,
+    `[salute-tts] ok voice=${voice} format=${format} bytes=${buffer.length} chars=${plainText.length} billing=${clientAuthKey ? 'client' : 'server'}`,
   );
 
   return {

@@ -80,6 +80,31 @@ enum class TtsPlaybackEngine(val id: String, val labelRu: String, val descriptio
     }
 }
 
+/** Кто платит за озвучку на сервере: наш SpeechKit или ключ пользователя. */
+enum class UserTtsBilling(val id: String, val labelRu: String, val descriptionRu: String) {
+    SERVER(
+        id = "server",
+        labelRu = "Сервер приложения",
+        descriptionRu = "Yandex SpeechKit на Railway — как у всех",
+    ),
+    YANDEX(
+        id = "yandex",
+        labelRu = "Свой Yandex SpeechKit",
+        descriptionRu = "API Key + Folder ID из Yandex Cloud — списание с вашего счёта",
+    ),
+    SBER(
+        id = "sber",
+        labelRu = "Свой SaluteSpeech (Сбер)",
+        descriptionRu = "Authorization Key из developers.sber.ru — работает из РФ, freemium до лимита",
+    ),
+    ;
+
+    companion object {
+        fun fromId(id: String?): UserTtsBilling =
+            entries.firstOrNull { it.id == id } ?: SERVER
+    }
+}
+
 enum class TtsEmotion(val id: String, val labelRu: String, val descriptionRu: String) {
     NEUTRAL("neutral", "Нейтральная", "Ровная, спокойная подача"),
     LIVELY("good", "Живая", "Дружелюбная, тёплая интонация"),

@@ -28,6 +28,7 @@ import com.musicstory.app.domain.StoryLength
 import com.musicstory.app.domain.StoryNarrator
 import com.musicstory.app.domain.StoryPersona
 import com.musicstory.app.domain.StoryScriptQuality
+import com.musicstory.app.domain.UserTtsBilling
 import com.musicstory.app.domain.TtsEmotion
 import com.musicstory.app.domain.TtsSpeed
 import com.musicstory.app.domain.TtsVoice
@@ -177,6 +178,10 @@ class StoryRepository(
         val ttsVoice = settingsDataStore.ttsVoice.first()
         val ttsSpeed = settingsDataStore.ttsSpeed.first()
         val ttsEmotion = settingsDataStore.ttsEmotion.first()
+        val userTtsBilling = settingsDataStore.userTtsBilling.first()
+        val yandexTtsKey = ApiKeySanitizer.clean(settingsDataStore.yandexApiKey.first())
+        val yandexFolderId = settingsDataStore.yandexFolderId.first().trim()
+        val saluteAuthKey = ApiKeySanitizer.clean(settingsDataStore.saluteAuthKey.first())
         val geminiModel = settingsDataStore.geminiModel.first()
         val narratorTag = storyNarrator.labelRu
         val inferredBackendFromLocal = if (llmProvider == LlmProvider.LOCAL) {
@@ -258,6 +263,30 @@ class StoryRepository(
             return Result.failure(IOException(BackendUrlRules.localBackendRequiredMessage(backendUrl)))
         }
 
+        if (!ttsPlaybackEngine.skipsServerTts) {
+            when (userTtsBilling) {
+                UserTtsBilling.YANDEX -> {
+                    if (yandexTtsKey.isBlank() || yandexFolderId.isBlank()) {
+                        return Result.failure(
+                            IOException(
+                                "Выбран свой Yandex SpeechKit, но не указаны API Key и Folder ID в Настройки → Озвучка → Свои ключи.",
+                            ),
+                        )
+                    }
+                }
+                UserTtsBilling.SBER -> {
+                    if (saluteAuthKey.isBlank()) {
+                        return Result.failure(
+                            IOException(
+                                "Выбран SaluteSpeech, но не указан Authorization Key в Настройки → Озвучка → Свои ключи.",
+                            ),
+                        )
+                    }
+                }
+                UserTtsBilling.SERVER -> Unit
+            }
+        }
+
         coroutineContext.ensureActive()
 
         if (!useBackend) {
@@ -293,6 +322,10 @@ class StoryRepository(
                 openRouterApiKey = openRouterKey,
                 localOllamaUrl = localOllamaUrl,
                 localOllamaModel = localOllamaModel,
+                userTtsBilling = userTtsBilling,
+                yandexTtsApiKey = yandexTtsKey,
+                yandexFolderId = yandexFolderId,
+                saluteAuthKey = saluteAuthKey,
             )) {
                 is StoryAttemptResult.Success -> return Result.success(backendResult.response)
                 is StoryAttemptResult.TemplateRejected -> templateRejected = true
@@ -361,6 +394,10 @@ class StoryRepository(
         openRouterApiKey: String = "",
         localOllamaUrl: String = SettingsDataStore.DEFAULT_LOCAL_OLLAMA_URL,
         localOllamaModel: String = SettingsDataStore.DEFAULT_LOCAL_OLLAMA_MODEL,
+        userTtsBilling: UserTtsBilling = UserTtsBilling.SERVER,
+        yandexTtsApiKey: String = "",
+        yandexFolderId: String = "",
+        saluteAuthKey: String = "",
     ): StoryAttemptResult {
         return try {
             StoryLog.i(
@@ -397,6 +434,18 @@ class StoryRepository(
                         localOllamaUrl = localOllamaUrl.takeIf { it.isNotBlank() },
                         localOllamaModel = localOllamaModel.takeIf { it.isNotBlank() },
                         skipServerTts = skipServerTts,
+                        ttsProvider = when (userTtsBilling) {
+                            UserTtsBilling.YANDEX -> "yandex"
+                            UserTtsBilling.SBER -> "sber"
+                            UserTtsBilling.SERVER -> null
+                        },
+                        userTtsProvider = when (userTtsBilling) {
+                            UserTtsBilling.SERVER -> null
+                            else -> userTtsBilling.id
+                        },
+                        yandexApiKey = yandexTtsApiKey.takeIf { userTtsBilling == UserTtsBilling.YANDEX && it.isNotBlank() },
+                        yandexFolderId = yandexFolderId.takeIf { userTtsBilling == UserTtsBilling.YANDEX && it.isNotBlank() },
+                        saluteAuthKey = saluteAuthKey.takeIf { userTtsBilling == UserTtsBilling.SBER && it.isNotBlank() },
                     ),
                 )
             }
@@ -410,10 +459,16 @@ class StoryRepository(
                     StoryAttemptResult.Failed("Сервер вернул пустой или повторный текст")
                 }
                 response.audioUrl.isNullOrBlank() && !skipServerTts -> {
-                    StoryLog.e("Backend returned story without Yandex audioUrl")
-                    StoryAttemptResult.Failed(
-                        "Сервер не отдал озвучку Yandex. Проверь YANDEX_API_KEY и YANDEX_FOLDER_ID на Railway.",
-                    )
+                    StoryLog.e("Backend returned story without audioUrl")
+                    val ttsHint = when (userTtsBilling) {
+                        UserTtsBilling.YANDEX ->
+                            "Не удалось озвучить через ваш Yandex SpeechKit. Проверь API Key, Folder ID и баланс в Yandex Cloud."
+                        UserTtsBilling.SBER ->
+                            "Не удалось озвучить через SaluteSpeech. Проверь Authorization Key и лимит на developers.sber.ru."
+                        UserTtsBilling.SERVER ->
+                            "Сервер не отдал озвучку. Проверь YANDEX_API_KEY на Railway или укажи свой ключ в настройках."
+                    }
+                    StoryAttemptResult.Failed(ttsHint)
                 }
                 else -> {
                     response.quota?.let { quota -> _dailyQuota.value = quota }

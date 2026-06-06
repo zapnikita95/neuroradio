@@ -21,6 +21,7 @@ import com.musicstory.app.domain.StoryLength
 import com.musicstory.app.domain.StoryNarrator
 import com.musicstory.app.domain.TtsEmotion
 import com.musicstory.app.domain.TtsPlaybackEngine
+import com.musicstory.app.domain.UserTtsBilling
 import com.musicstory.app.domain.TtsSpeed
 import com.musicstory.app.domain.TtsVoice
 import com.musicstory.app.domain.TriggerMode
@@ -177,6 +178,22 @@ class SettingsDataStore(private val context: Context) {
 
     val ttsPlaybackEngine: Flow<TtsPlaybackEngine> = context.settingsDataStore.data.map { prefs ->
         TtsPlaybackEngine.fromId(prefs[KEY_TTS_PLAYBACK_ENGINE])
+    }
+
+    val userTtsBilling: Flow<UserTtsBilling> = context.settingsDataStore.data.map { prefs ->
+        UserTtsBilling.fromId(prefs[KEY_USER_TTS_BILLING])
+    }
+
+    val yandexApiKey: Flow<String> = context.settingsDataStore.data.map { prefs ->
+        prefs[KEY_YANDEX_API_KEY] ?: ""
+    }
+
+    val yandexFolderId: Flow<String> = context.settingsDataStore.data.map { prefs ->
+        prefs[KEY_YANDEX_FOLDER_ID] ?: ""
+    }
+
+    val saluteAuthKey: Flow<String> = context.settingsDataStore.data.map { prefs ->
+        prefs[KEY_SALUTE_AUTH_KEY] ?: ""
     }
 
     val appPowerMode: Flow<AppPowerMode> = context.settingsDataStore.data.map { prefs ->
@@ -394,6 +411,22 @@ class SettingsDataStore(private val context: Context) {
         context.settingsDataStore.edit { it[KEY_TTS_PLAYBACK_ENGINE] = engine.id }
     }
 
+    suspend fun setUserTtsBilling(billing: UserTtsBilling) {
+        context.settingsDataStore.edit { it[KEY_USER_TTS_BILLING] = billing.id }
+    }
+
+    suspend fun setYandexApiKey(key: String) {
+        context.settingsDataStore.edit { it[KEY_YANDEX_API_KEY] = ApiKeySanitizer.clean(key) }
+    }
+
+    suspend fun setYandexFolderId(folderId: String) {
+        context.settingsDataStore.edit { it[KEY_YANDEX_FOLDER_ID] = folderId.trim() }
+    }
+
+    suspend fun setSaluteAuthKey(key: String) {
+        context.settingsDataStore.edit { it[KEY_SALUTE_AUTH_KEY] = ApiKeySanitizer.clean(key) }
+    }
+
     suspend fun setAppPowerMode(mode: AppPowerMode) {
         context.settingsDataStore.edit {
             it[KEY_APP_POWER_MODE] = mode.id
@@ -481,6 +514,10 @@ class SettingsDataStore(private val context: Context) {
         private val KEY_TTS_SPEED = stringPreferencesKey("tts_speed")
         private val KEY_TTS_EMOTION = stringPreferencesKey("tts_emotion")
         private val KEY_TTS_PLAYBACK_ENGINE = stringPreferencesKey("tts_playback_engine")
+        private val KEY_USER_TTS_BILLING = stringPreferencesKey("user_tts_billing")
+        private val KEY_YANDEX_API_KEY = stringPreferencesKey("yandex_api_key")
+        private val KEY_YANDEX_FOLDER_ID = stringPreferencesKey("yandex_folder_id")
+        private val KEY_SALUTE_AUTH_KEY = stringPreferencesKey("salute_auth_key")
         private val KEY_APP_POWER_MODE = stringPreferencesKey("app_power_mode")
         private val KEY_MONITOR_PAUSED_BY_USER = booleanPreferencesKey("monitor_paused_by_user")
         private val KEY_MUSIC_INTERRUPTION_MODE = stringPreferencesKey("music_interruption_mode")

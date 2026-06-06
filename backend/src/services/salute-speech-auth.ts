@@ -31,15 +31,15 @@ export function getSaluteScope(): string {
   return process.env.SALUTE_SPEECH_SCOPE?.trim() || 'SALUTE_SPEECH_PERS';
 }
 
-export async function getSaluteAccessToken(): Promise<string> {
-  const now = Date.now();
-  if (cache && cache.expiresAt > now + 60_000) {
-    return cache.accessToken;
-  }
-
-  const authKey = getSaluteAuthKey();
+export async function getSaluteAccessToken(authKeyOverride?: string): Promise<string> {
+  const authKey = authKeyOverride?.trim() || getSaluteAuthKey();
   if (!authKey) {
     throw new Error('SALUTE_SPEECH_AUTH_KEY or CLIENT_ID+CLIENT_SECRET required');
+  }
+
+  const now = Date.now();
+  if (!authKeyOverride && cache && cache.expiresAt > now + 60_000) {
+    return cache.accessToken;
   }
 
   const rqUid = crypto.randomUUID();
@@ -73,10 +73,12 @@ export async function getSaluteAccessToken(): Promise<string> {
   }
 
   const expiresInSec = typeof data.expires_in === 'number' ? data.expires_in : 1800;
-  cache = {
-    accessToken: data.access_token,
-    expiresAt: now + expiresInSec * 1000,
-  };
+  if (!authKeyOverride) {
+    cache = {
+      accessToken: data.access_token,
+      expiresAt: now + expiresInSec * 1000,
+    };
+  }
 
-  return cache.accessToken;
+  return data.access_token;
 }

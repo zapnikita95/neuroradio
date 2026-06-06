@@ -28,6 +28,11 @@ import {
 } from './yandex-tts.js';
 import type { YandexVoiceId } from './voices.js';
 import type { StoryNarratorId } from './story-narrator.js';
+import type { UserTtsCredentials } from './user-tts-credentials.js';
+import {
+  hasUserTtsCredentials,
+  resolveUserTtsProvider,
+} from './user-tts-credentials.js';
 
 export type TtsProviderId = 'auto' | 'yandex' | 'sber' | 'azure' | 'elevenlabs' | 'silero';
 export type EffectiveTtsProvider = 'yandex' | 'sber' | 'azure' | 'elevenlabs' | 'silero';
@@ -48,6 +53,7 @@ export interface TtsRouteRequest {
   artist?: string;
   title?: string;
   logContext?: YandexTtsLogContext;
+  userTtsCredentials?: UserTtsCredentials | null;
 }
 
 export interface TtsRouteResult extends SynthesisResult {
@@ -75,8 +81,12 @@ function pickPremiumAutoProvider(): EffectiveTtsProvider {
 }
 
 export function resolveEffectiveTtsProvider(
-  request: Pick<TtsRouteRequest, 'voiceTier' | 'ttsProvider' | 'installId'>,
+  request: Pick<TtsRouteRequest, 'voiceTier' | 'ttsProvider' | 'installId' | 'userTtsCredentials'>,
 ): EffectiveTtsProvider {
+  const userProvider = resolveUserTtsProvider(request.userTtsCredentials ?? null);
+  if (userProvider === 'yandex') return 'yandex';
+  if (userProvider === 'sber') return 'sber';
+
   const requirePremium = () => {
     if (!hasPremiumEntitlement(request.installId)) {
       throw new PremiumTtsAccessError(
@@ -141,6 +151,7 @@ export async function synthesizeStoryAudio(request: TtsRouteRequest): Promise<Tt
       pauseProfile: request.pauseProfile,
       styleId: request.ttsStyle,
       storyNarrator: request.storyNarrator,
+      clientAuthKey: request.userTtsCredentials?.salute?.authKey,
     });
   } else if (provider === 'azure') {
     result = await synthesizeSpeechAzure(request.script, request.fileName, {
@@ -174,6 +185,7 @@ export async function synthesizeStoryAudio(request: TtsRouteRequest): Promise<Tt
       title: request.title,
       pauseProfile: request.pauseProfile,
       logContext: request.logContext,
+      credentials: request.userTtsCredentials?.yandex,
     });
   }
 

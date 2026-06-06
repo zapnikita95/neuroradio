@@ -42,6 +42,11 @@ import type { StoryScript } from '../services/groq.js';
 import { setLogDetail } from '../middleware/request-logger.js';
 import { hasYandexCredentials } from '../services/yandex-tts.js';
 import { canUseSileroTts } from '../services/silero-tts.js';
+import {
+  canSynthesizeServerTts,
+  hasUserTtsCredentials,
+  parseUserTtsCredentials,
+} from '../services/user-tts-credentials.js';
 import { coerceVoiceForSpeechKit } from '../services/voices.js';
 import { resolveVoiceDelivery } from '../services/tts-voice-profiles.js';
 import type { TtsVoiceStyleId } from '../services/tts-voice-profiles.js';
@@ -112,6 +117,12 @@ interface StoryFullBody {
   openrouter_api_key?: string;
   local_ollama_url?: string;
   local_ollama_model?: string;
+  yandex_api_key?: string;
+  yandex_folder_id?: string;
+  salute_auth_key?: string;
+  salute_client_id?: string;
+  salute_client_secret?: string;
+  user_tts_provider?: 'yandex' | 'sber';
   /** Client-side Android TTS — skip Yandex/Salute synthesis to save cost during testing. */
   skip_server_tts?: boolean;
 }
@@ -184,6 +195,18 @@ router.post('/full', validateStoryFullBody, storyFullRateLimit, async (req: Requ
     baseUrl: body.local_ollama_url,
     model: body.local_ollama_model,
   };
+  const userTtsCredentials = parseUserTtsCredentials(body);
+  if (body.user_tts_provider && !hasUserTtsCredentials(userTtsCredentials)) {
+    res.status(400).json({
+      error: 'Invalid user TTS credentials',
+      code: 'USER_TTS_CREDENTIALS_INVALID',
+      message:
+        body.user_tts_provider === 'yandex'
+          ? 'Укажи Yandex API Key и Folder ID в настройках приложения.'
+          : 'Укажи Authorization Key SaluteSpeech в настройках приложения.',
+    });
+    return;
+  }
   const llmProvider = resolveEffectiveStoryLlmProvider(userTier, body.llm_provider, clientLlmKeys);
   const ownLlmKey = llmProvider === 'local'
     ? Boolean(clientLocal.baseUrl?.trim())
@@ -806,10 +829,10 @@ router.post('/full', validateStoryFullBody, storyFullRateLimit, async (req: Requ
       response.audioUrl = null;
       response.audioFile = null;
       response.ttsHint = 'Озвучка на устройстве (skip_server_tts)';
-    } else if (hasYandexCredentials() || canUseAzureSpeechProduction() || canUseSileroTts()) {
+    } else if (canSynthesizeServerTts(userTtsCredentials)) {
       const id = uuidv4();
       console.log(
-        `[tts] queue install=${installId.slice(0, 8)} voice=${voiceId} style=${delivery.styleId} speed=${delivery.speed} emotion=${delivery.emotion} tier=${voiceTier} provider=${ttsProvider} words=${story.word_count}`,
+        `[tts] queue install=${installId.slice(0, 8)} voice=${voiceId} style=${delivery.styleId} speed=${delivery.speed} emotion=${delivery.emotion} tier=${voiceTier} provider=${ttsProvider} userBilling=${hasUserTtsCredentials(userTtsCredentials) ? userTtsCredentials?.provider : 'server'} words=${story.word_count}`,
       );
       const audio = await synthesizeStoryAudio({
         installId,
@@ -830,6 +853,7 @@ router.post('/full', validateStoryFullBody, storyFullRateLimit, async (req: Requ
           artist: metadata.artist,
           title: metadata.title,
         },
+        userTtsCredentials,
       });
       response.audioUrl = signAudioAccess(audio.fileName) ?? audio.audioUrl;
       response.audioFile = audio.fileName;
