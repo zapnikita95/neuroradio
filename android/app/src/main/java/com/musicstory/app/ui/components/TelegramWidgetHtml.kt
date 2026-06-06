@@ -12,10 +12,11 @@ fun buildTelegramWidgetHtml(botUsername: String): String {
 <style>
   html, body { margin:0; min-height:100%; background:#1a1520; color:#f5efe6;
     font:16px system-ui,sans-serif; }
-  body { display:flex; flex-direction:column; align-items:center; justify-content:center;
-    padding:20px 16px 28px; box-sizing:border-box; text-align:center; }
-  #tg-wrap { min-height:52px; display:flex; align-items:center; justify-content:center; }
-  .hint { color:rgba(245,239,230,.55); font-size:13px; line-height:1.45; margin:16px 0 0; max-width:280px; }
+  body { display:flex; flex-direction:column; align-items:center; justify-content:flex-start;
+    padding:28px 12px 32px; box-sizing:border-box; text-align:center; }
+  #tg-wrap { min-height:72px; width:100%; display:flex; align-items:center; justify-content:center;
+    margin-top:8px; }
+  .hint { color:rgba(245,239,230,.55); font-size:13px; line-height:1.45; margin:20px 0 0; max-width:280px; }
   .err { color:#ff6b6b; font-size:13px; margin-top:12px; }
 </style>
 </head>

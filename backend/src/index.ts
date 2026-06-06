@@ -32,6 +32,7 @@ import { ingestCuratedFactsOnBoot } from './services/curated-facts.js';
 import { initPostgres, hasPostgres, closePostgres } from './services/db.js';
 import { hydrateAccountStoreFromPostgres, migrateAccountStoryDataToPostgres } from './services/account-store.js';
 import { hydrateDevTierStoreFromPostgres } from './services/dev-tier-store.js';
+import { buildTelegramWidgetPageHtml, telegramBotUsername } from './routes/telegram-widget-page.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PORT = parseInt(process.env.PORT ?? '3000', 10);
@@ -151,6 +152,18 @@ app.use('/v1/billing', billingRouter);
 app.use('/v1/account', accountAuthRouter);
 app.use('/v1/llm', llmProbeRouter);
 app.use('/v1/story', storyRouter);
+
+/** Telegram Login Widget — domain must point here (BotFather /setdomain). */
+function sendTelegramWidgetPage(res: express.Response): void {
+  const bot = telegramBotUsername();
+  if (!bot) {
+    res.status(503).type('text/plain').send('TELEGRAM_BOT_USERNAME not configured');
+    return;
+  }
+  res.type('html').send(buildTelegramWidgetPageHtml(bot));
+}
+app.get('/', (_req, res) => sendTelegramWidgetPage(res));
+app.get('/telegram-login', (_req, res) => sendTelegramWidgetPage(res));
 
 app.use((_req, res) => {
   res.status(404).json({ error: 'Not found' });
