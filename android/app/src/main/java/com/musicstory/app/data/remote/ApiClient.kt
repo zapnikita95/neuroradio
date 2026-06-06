@@ -25,6 +25,34 @@ class ApiClient(
         level = HttpLoggingInterceptor.Level.BASIC
     }
 
+    private val storyCallLock = Any()
+
+    @Volatile
+    private var activeStoryCall: okhttp3.Call? = null
+
+    /** Cancels in-flight POST /v1/story/full when user skips to another track. */
+    private val storyCancelInterceptor = Interceptor { chain ->
+        val call = chain.call()
+        synchronized(storyCallLock) {
+            activeStoryCall?.cancel()
+            activeStoryCall = call
+        }
+        try {
+            chain.proceed(chain.request())
+        } finally {
+            synchronized(storyCallLock) {
+                if (activeStoryCall === call) activeStoryCall = null
+            }
+        }
+    }
+
+    fun cancelActiveStoryRequest() {
+        synchronized(storyCallLock) {
+            activeStoryCall?.cancel()
+            activeStoryCall = null
+        }
+    }
+
     private val baseOkHttpClient: OkHttpClient = OkHttpClient.Builder()
         .connectTimeout(15, TimeUnit.SECONDS)
         .readTimeout(50, TimeUnit.SECONDS)
@@ -37,6 +65,7 @@ class ApiClient(
         .connectTimeout(30, TimeUnit.SECONDS)
         .readTimeout(4, TimeUnit.MINUTES)
         .writeTimeout(30, TimeUnit.SECONDS)
+        .addInterceptor(storyCancelInterceptor)
         .addInterceptor(loggingInterceptor)
         .build()
 

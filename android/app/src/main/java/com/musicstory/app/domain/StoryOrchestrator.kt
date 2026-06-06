@@ -333,6 +333,14 @@ class StoryOrchestrator(
             _state.value == OrchestratorState.PLAYING_STORY
     }
 
+    /** User skipped to another track — stop fetch immediately (don't wait for dwell timer). */
+    fun onPlaybackTrackSkipped() {
+        storyRepository.cancelActiveStoryFetch()
+        scope.launch {
+            cancelInFlightGeneration("track skipped", rollbackAutoTrigger = true)
+        }
+    }
+
     suspend fun onTrackChanged(track: TrackInfo) {
         if (!track.isValid()) return
 
@@ -743,6 +751,7 @@ class StoryOrchestrator(
     }
 
     private fun cancelInFlightGenerationImmediate(reason: String) {
+        storyRepository.cancelActiveStoryFetch()
         val wasActive = generationInFlight ||
             _state.value == OrchestratorState.FETCHING_STORY ||
             _state.value == OrchestratorState.PREPARING_PLAYBACK
@@ -765,6 +774,7 @@ class StoryOrchestrator(
     }
 
     private suspend fun cancelInFlightGeneration(reason: String, rollbackAutoTrigger: Boolean) {
+        storyRepository.cancelActiveStoryFetch()
         val wasActive = generationInFlight ||
             _state.value == OrchestratorState.FETCHING_STORY ||
             _state.value == OrchestratorState.PREPARING_PLAYBACK

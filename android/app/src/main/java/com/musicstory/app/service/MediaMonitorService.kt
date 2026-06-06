@@ -85,6 +85,9 @@ class MediaMonitorService : Service() {
                     val track = app.mediaControllerManager.resolveNowPlayingTrack()
                         ?: app.mediaControllerManager.effectiveNowPlaying.value
                     if (track != null && track.isValid() && key != null && key != lastTrackKey) {
+                        if (lastTrackKey != null) {
+                            app.storyOrchestrator.onPlaybackTrackSkipped()
+                        }
                         lastTrackKey = key
                         scheduleTrackCounted(app, track, key)
                     }

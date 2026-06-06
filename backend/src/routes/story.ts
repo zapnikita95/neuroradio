@@ -90,6 +90,12 @@ import {
   type FeedbackVote,
 } from '../services/story-feedback.js';
 import { updateHistoryVoteAsync } from '../services/account-store.js';
+import {
+  claimStoryGeneration,
+  releaseStoryGeneration,
+  StoryRequestAbortedError,
+  throwIfStoryAborted,
+} from '../services/story-request-abort.js';
 import type { StoryLengthId } from '../services/story-length.js';
 import type { StoryNarratorId } from '../services/story-narrator.js';
 import type { TtsVoiceSetting } from '../services/voices.js';
@@ -181,6 +187,7 @@ function storyFullRateLimit(req: Request, res: Response, next: import('express')
 
 router.post('/full', validateStoryFullBody, storyFullRateLimit, async (req: Request, res: Response) => {
   const installId = req.installId ?? 'unknown';
+  const clientAbort = claimStoryGeneration(installId, req);
   const body = req.body as StoryFullBody;
   console.log(
     `[story] <<< request install=${installId.slice(0, 8)} llm=${body.llm_provider ?? 'missing'} ` +
@@ -301,6 +308,7 @@ router.post('/full', validateStoryFullBody, storyFullRateLimit, async (req: Requ
 
   try {
     timing.mark('request');
+    throwIfStoryAborted(clientAbort, 'request');
 
     const coverCtx = resolveCoverForFacts(artist, title);
     if (coverCtx.isCover) {
@@ -311,6 +319,7 @@ router.post('/full', validateStoryFullBody, storyFullRateLimit, async (req: Requ
 
     const metadata = await enrichTrackMetadata(coverCtx.factArtist, coverCtx.factTitle);
     timing.mark('metadata', `year=${metadata.year ?? '-'} mbid=${metadata.mbid ? 'yes' : 'no'}`);
+    throwIfStoryAborted(clientAbort, 'metadata');
     const delivery = resolveVoiceDelivery({
       ttsVoice,
       ttsStyle,
@@ -374,6 +383,7 @@ router.post('/full', validateStoryFullBody, storyFullRateLimit, async (req: Requ
         metadata.mbid,
         metadata.artistMbid,
       );
+      throwIfStoryAborted(clientAbort, 'facts-fetch');
       timing.mark(
         'facts-fetched',
         `track=${factCtx.bundle.trackFacts.length} artist=${factCtx.bundle.artistFacts.length} snippets=${factCtx.rawSnippets.length}`,
@@ -440,6 +450,8 @@ router.post('/full', validateStoryFullBody, storyFullRateLimit, async (req: Requ
       );
       console.log(formatFactPickLog(selectedFact, 'rules'));
     }
+
+    throwIfStoryAborted(clientAbort, 'facts-ready');
 
     const artistTier = resolveArtistTier(
       metadata.artist,
@@ -702,6 +714,8 @@ router.post('/full', validateStoryFullBody, storyFullRateLimit, async (req: Requ
         : 'no-seed',
     );
 
+    throwIfStoryAborted(clientAbort, 'seed-ready');
+
     const { story, llmUsed } = await (async () => {
       const hasGroundedSeed = Boolean(selectedFact?.fact && selectedFact.interestScore >= 6);
       let effectiveStoryInput = storyInput;
@@ -807,6 +821,7 @@ router.post('/full', validateStoryFullBody, storyFullRateLimit, async (req: Requ
       });
     })();
 
+    throwIfStoryAborted(clientAbort, 'story-text');
     timing.mark('story-text', `llm=${llmUsed} words=${story.word_count}`);
 
     console.log(
@@ -921,6 +936,15 @@ router.post('/full', validateStoryFullBody, storyFullRateLimit, async (req: Requ
     console.warn('[story] script-text-end');
     res.json(response);
   } catch (err) {
+    if (err instanceof StoryRequestAbortedError) {
+      console.log(
+        `[story] cancelled install=${installId.slice(0, 8)} artist="${artist}" title="${title}" reason=${err.reason}`,
+      );
+      if (!res.headersSent) {
+        res.status(499).json({ ok: false, cancelled: true, reason: err.reason });
+      }
+      return;
+    }
     if (err instanceof PremiumTtsAccessError) {
       res.status(402).json({
         error: 'Premium voice required',
@@ -980,6 +1004,8 @@ router.post('/full', validateStoryFullBody, storyFullRateLimit, async (req: Requ
       message: userMessage,
       source: isTts ? 'tts' : 'llm',
     });
+  } finally {
+    releaseStoryGeneration(installId, clientAbort);
   }
 });
 

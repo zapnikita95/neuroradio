@@ -212,7 +212,7 @@ class SettingsDataStore(private val context: Context) {
     }
 
     val countTrackAfterListenEnabled: Flow<Boolean> = context.settingsDataStore.data.map { prefs ->
-        prefs[KEY_COUNT_TRACK_LISTEN_ENABLED] ?: false
+        prefs[KEY_COUNT_TRACK_LISTEN_ENABLED] ?: true
     }
 
     val countTrackAfterListenSeconds: Flow<Int> = context.settingsDataStore.data.map { prefs ->
@@ -220,9 +220,9 @@ class SettingsDataStore(private val context: Context) {
             .coerceIn(5, 300)
     }
 
-    /** 0 = count track immediately on switch; else wait this many seconds of playback. */
+    /** Seconds of stable playback before auto-story / scrobble. 0 only if user disabled wait in settings. */
     val trackListenThresholdSeconds: Flow<Int> = context.settingsDataStore.data.map { prefs ->
-        if (prefs[KEY_COUNT_TRACK_LISTEN_ENABLED] != true) return@map 0
+        if (prefs[KEY_COUNT_TRACK_LISTEN_ENABLED] == false) return@map 0
         (prefs[KEY_COUNT_TRACK_LISTEN_SECONDS] ?: DEFAULT_COUNT_TRACK_LISTEN_SECONDS)
             .coerceIn(5, 300)
     }

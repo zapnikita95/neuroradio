@@ -66,6 +66,10 @@ class StoryRepository(
 
     val storyHistory: Flow<List<StoryHistoryEntry>> = storyHistoryDao.observeAll()
 
+    fun cancelActiveStoryFetch() {
+        apiClient.cancelActiveStoryRequest()
+    }
+
     /** Pull cloud history after login / reinstall and merge into local Room DB. */
     suspend fun mergeHistoryFromServer(baseUrl: String) {
         val sync = accountSyncManager ?: return
