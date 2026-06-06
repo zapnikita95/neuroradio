@@ -61,10 +61,49 @@ export function buildWebOnlyQueries(artist: string, title: string): string[] {
   }
   return [
     `${artistQ} ${cleanTitle} song interview meaning`,
-    `${artistQ} ${cleanTitle} radio banned refused`,
+    `${artistQ} ${cleanTitle} origin story written recorded`,
+    `${artistQ} ${cleanTitle} hidden meaning behind the scenes`,
     `${artistQ} band biography scandal heritage`,
-    `${artistQ} ${cleanTitle} hidden meaning origin story`,
   ].slice(0, MAX_HTML_QUERIES);
+}
+
+/** Backstory-focused queries when generic search returned nothing useful. */
+export function buildBackstoryWebQueries(artist: string, title: string): string[] {
+  const cleanTitle = title.replace(/\s*\([^)]*\)\s*/g, ' ').trim();
+  const artistQ = quotedArtist(artist);
+  return [
+    `"${cleanTitle}" ${artistQ} written motel hotel origin`,
+    `"${cleanTitle}" ${artistQ} song interview meaning recording`,
+    `"${cleanTitle}" ${artistQ} film soundtrack chart success`,
+    `${artistQ} "${cleanTitle}" behind the scenes story`,
+  ];
+}
+
+/** Last-resort HTML search for song backstory (Dutch motel, Flevo, etc.). */
+export async function fetchBackstoryWebSnippets(artist: string, title: string): Promise<string[]> {
+  const queries = buildBackstoryWebQueries(artist, title);
+  const seen = new Set<string>();
+  const collected: string[] = [];
+
+  const batches = await mapWithConcurrency(queries, HTML_PARALLEL, (query) =>
+    fetchDdgHtmlSnippets(query, SNIPPETS_PER_QUERY).catch(() => []),
+  );
+
+  for (const snippets of batches) {
+    for (const text of snippets) {
+      const key = text.toLowerCase().replace(/\s+/g, ' ');
+      if (seen.has(key)) continue;
+      seen.add(key);
+      collected.push(text);
+    }
+  }
+
+  if (collected.length > 0) {
+    console.log(
+      `[web-backstory] ${artist} — ${title}: ${collected.length} snippets from ${queries.length} queries`,
+    );
+  }
+  return collected.slice(0, 10);
 }
 
 export function countWebSearchHttpRequests(): number {

@@ -133,6 +133,21 @@ export function fixSoloArtistPronounsRu(script: string, artist: string): string 
   for (const [re, repl] of patterns) {
     result = result.replace(re, repl);
   }
+
+  if (grammar.gender === 'feminine') {
+    const esc = artist.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    result = result.replace(new RegExp(`(${esc})\\s+не\\s+просто\\s+пел(?![а-яёa-z])`, 'gi'), '$1 не просто пела');
+    result = result.replace(/(?<![а-яёa-z])не просто пел(?![а-яёa-z])/gi, 'не просто пела');
+    result = result.replace(/он создавал(?![а-яёa-z])/gi, 'она создавала');
+    result = result.replace(/она создавал(?![а-яёa-z])/gi, 'она создавала');
+    result = result.replace(/он записал/gi, 'она записала');
+    result = result.replace(/(?<![а-яёa-z])он пел(?![а-яёa-z])/gi, 'она пела');
+    result = result.replace(/он стал/gi, 'она стала');
+    result = result.replace(/он написал/gi, 'она написала');
+    result = result.replace(new RegExp(`(${esc})\\s+—\\s+он\\s+`, 'gi'), '$1 — она ');
+    result = result.replace(/ — он /g, ' — она ');
+  }
+
   return result.replace(/\s{2,}/g, ' ').trim();
 }
 

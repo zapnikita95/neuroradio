@@ -11,12 +11,11 @@ import {
 } from './fact-relevance.js';
 import { filterAndRankFacts, interestScore } from './reference-fact-quality.js';
 import { WEAK_TRIVIA_PATTERNS } from './story-fact-hunt.js';
-import { fetchReferenceFactBundle as fetchWikipediaBundle } from './wikipedia-facts.js';
+import { fetchReferenceFactBundle as fetchWikipediaBundle, fetchFastTrackWikiFacts } from './wikipedia-facts.js';
 import { fetchArtistWikiLead } from './wikipedia-lead.js';
 import { inferRuRegionalContext } from './metadata-facts.js';
-import { fetchWebSearchFactSnippets } from './web-search-facts.js';
+import { fetchWebSearchFactSnippets, fetchBackstoryWebSnippets } from './web-search-facts.js';
 import { acceptSearchGroundedSnippet, acceptIndieEmergingSnippet } from './web-snippet-accept.js';
-
 const USER_AGENT = 'MusicStoryBFF/1.0 (contact@example.com)';
 const RAW_SNIPPET_MIN_LEN = 30;
 const RAW_SNIPPET_MAX = 12;
@@ -534,7 +533,7 @@ export async function fetchAggregatedFactContext(
 ): Promise<AggregatedFactContext> {
   const t0 = Date.now();
   const cc = resolveFactCountryCode(artist, title, countryCode);
-  const [wiki, wikiLead, ddgUnfiltered, webUnfiltered, wdUnfiltered, mbTrackRaw, mbArtistRaw] =
+  const [wiki, wikiLead, ddgUnfiltered, webUnfiltered, wdUnfiltered, mbTrackRaw, mbArtistRaw, wikiFastTrack] =
     await Promise.all([
       fetchWithCap('wiki', () => fetchWikiBundleMerged(artist, title, cc), EMPTY_WIKI, 14_000),
       fetchWithCap('wiki-lead', () => fetchArtistWikiLead(artist), null, 10_000),
@@ -553,6 +552,7 @@ export async function fetchAggregatedFactContext(
         [],
         8_000,
       ),
+      fetchWithCap('wiki-fast-track', () => fetchFastTrackWikiFacts(artist, title), [], 8_000),
     ]);
   const wikiLeadBundle = wikiLead ? wikiLeadToFacts(wikiLead, artist, title) : EMPTY_WIKI;
   if (wikiLeadBundle.trackFacts.length + wikiLeadBundle.artistFacts.length > 0) {
@@ -593,6 +593,7 @@ export async function fetchAggregatedFactContext(
   const trackCandidates = mergeFactsWithWikiLead(
     wikiLeadBundle.trackFacts,
     wiki.trackFacts,
+    wikiFastTrack,
     externalSplit.track,
     wdSplit.track,
     mbTrack,
@@ -654,6 +655,37 @@ export async function fetchAggregatedFactContext(
   }
 
   return { bundle, rawSnippets, snippetSources };
+}
+
+/** Last resort before 503: fast wiki track page + backstory web search. */
+export async function fetchEmergencyFactRescue(
+  artist: string,
+  title: string,
+  existingSnippets: string[] = [],
+): Promise<AggregatedFactContext> {
+  console.log(`[facts] emergency rescue for "${artist}" — "${title}"`);
+  const [wikiFast, webBack] = await Promise.all([
+    fetchFastTrackWikiFacts(artist, title),
+    existingSnippets.length >= 3 ? Promise.resolve([]) : fetchBackstoryWebSnippets(artist, title),
+  ]);
+
+  const trackFacts = mergeFacts(wikiFast);
+  let artistFacts: string[] = [];
+  const salvaged =
+    trackFacts.length > 0
+      ? { trackFacts, artistFacts: [] as string[] }
+      : salvageWebSearchSnippets(webBack, artist, title, true);
+
+  const bundle: ReferenceFactBundle = {
+    trackFacts: salvaged.trackFacts.length > 0 ? salvaged.trackFacts : trackFacts,
+    artistFacts: salvaged.artistFacts.length > 0 ? salvaged.artistFacts : artistFacts,
+  };
+
+  const rawSnippets = [...new Set([...existingSnippets, ...webBack, ...wikiFast])].slice(0, 14);
+  console.log(
+    `[facts] emergency rescue result "${artist}" — "${title}": track=${bundle.trackFacts.length} artist=${bundle.artistFacts.length} snippets=${rawSnippets.length}`,
+  );
+  return { bundle, rawSnippets, snippetSources: rawSnippets.map(() => 'web' as SnippetSource) };
 }
 
 /** @deprecated use fetchAggregatedFactContext */

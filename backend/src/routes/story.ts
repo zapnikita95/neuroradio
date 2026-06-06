@@ -3,7 +3,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { requireAppAuth } from '../middleware/app-auth.js';
 import { validateStoryFullBody } from '../middleware/validate-story.js';
 import { enrichTrackMetadata } from '../services/musicbrainz.js';
-import { fetchAggregatedFactContext, emptyAggregatedFactContext, fetchIndieArtistFocusContext } from '../services/fact-aggregator.js';
+import { fetchAggregatedFactContext, emptyAggregatedFactContext, fetchIndieArtistFocusContext, fetchEmergencyFactRescue } from '../services/fact-aggregator.js';
 import { explainReferenceFactSelection, type SelectedReferenceFact } from '../services/fact-picker.js';
 import { formatFactPickLog, logFactCandidatePools } from '../services/fact-interest-log.js';
 import { interestScore, isWikiBiographyLead } from '../services/reference-fact-quality.js';
@@ -29,6 +29,7 @@ import {
   explainFactHuntDecision,
 } from '../services/story-llm-fact-hunt.js';
 import { pickSalvageSnippetSeed, pickRelaxedSnippetSeed, isWeakSelectedFact, isWeakSnippetSeed } from '../services/search-snippet-salvage.js';
+import { hasActionableSnippets } from '../services/web-snippet-accept.js';
 import { hasLlmKeyForProvider, resolveLlmProvider, resolveEffectiveStoryLlmProvider, clientKeyForProvider, type ClientLlmKeys, type ClientLocalOllama } from '../services/llm-provider.js';
 import { generateStoryWithFallback } from '../services/story-llm-router.js';
 import { fetchArtistWikiLead } from '../services/wikipedia-lead.js';
@@ -416,7 +417,7 @@ router.post('/full', validateStoryFullBody, storyFullRateLimit, async (req: Requ
         const skipRetry =
           firstFetchMs >= 18_000 ||
           countGroundedFacts(factCtx.bundle) > 0 ||
-          factCtx.rawSnippets.length > 0;
+          hasActionableSnippets(factCtx.rawSnippets, metadata.artist, metadata.title);
         if (skipRetry) {
           console.warn(
             `[facts] skip empty-bundle retry for "${metadata.artist}" — ${firstFetchMs}ms snippets=${factCtx.rawSnippets.length} grounded=${countGroundedFacts(factCtx.bundle)}`,
@@ -724,6 +725,47 @@ router.post('/full', validateStoryFullBody, storyFullRateLimit, async (req: Requ
             `[facts] search-snippet salvage for "${metadata.artist}" — "${metadata.title}"`,
           );
         } else {
+        const emergencyCtx = await fetchEmergencyFactRescue(
+          metadata.artist,
+          metadata.title,
+          factCtx.rawSnippets,
+        );
+        factCtx = {
+          ...factCtx,
+          bundle: emergencyCtx.bundle,
+          rawSnippets: [...new Set([...factCtx.rawSnippets, ...emergencyCtx.rawSnippets])],
+        };
+        factBundle = emergencyCtx.bundle;
+        trackFactCount = factBundle.trackFacts.length;
+        artistFactCount = factBundle.artistFacts.length;
+        if (trackFactCount + artistFactCount > 0) {
+          ingestBundleToBank(metadata.artist, metadata.title, factBundle);
+          selectedFact = await pickFactForUser(
+            installId,
+            factBundle,
+            metadata.artist,
+            metadata.title,
+            previousScripts.length,
+            storyNarrator,
+          );
+          if (selectedFact) {
+            referenceFacts = [selectedFact.fact];
+            console.log(formatFactPickLog(selectedFact, 'rules') + ' (emergency-rescue)');
+          }
+        }
+        if (!selectedFact) {
+          const snippetSeed =
+            pickSalvageSnippetSeed(factCtx.rawSnippets, metadata.artist, metadata.title) ??
+            pickRelaxedSnippetSeed(factCtx.rawSnippets, metadata.artist, metadata.title);
+          if (snippetSeed) {
+            selectedFact = snippetSeed;
+            referenceFacts = [snippetSeed.fact];
+            console.log(
+              `[facts] emergency snippet salvage for "${metadata.artist}" — "${metadata.title}"`,
+            );
+          }
+        }
+        if (!selectedFact) {
         recordFactMiss({
           installId,
           artist: metadata.artist,
@@ -732,6 +774,7 @@ router.post('/full', validateStoryFullBody, storyFullRateLimit, async (req: Requ
           artistTier,
         });
         throw new NoReferenceFactsError(metadata.artist, metadata.title);
+        }
         }
       }
     }

@@ -2,7 +2,7 @@ import fetch from 'node-fetch';
 import type { ReferenceFactBundle } from './fact-picker.js';
 import { collaboratorNames, primaryArtistName } from './artist-primary.js';
 import { factNamesForeignEntity } from './fact-relevance.js';
-import { filterAndRankFacts, isBoringFact, isCollectorFact } from './reference-fact-quality.js';
+import { filterAndRankFacts, interestScore, isBoringFact, isCollectorFact } from './reference-fact-quality.js';
 
 const USER_AGENT = 'MusicStoryBFF/1.0 (contact@example.com)';
 
@@ -186,6 +186,10 @@ function collabArtistVariants(artist: string): string[] {
   const variants = [artist, primaryArtistName(artist), ...names];
   if (names.length === 2) {
     variants.push(`${names[0]} and ${names[1]}`, `${names[0]} & ${names[1]}`);
+  }
+  for (const name of [artist, primaryArtistName(artist)]) {
+    if (/\bThe\b/.test(name)) variants.push(name.replace(/\bThe\b/g, 'the'));
+    if (/\bthe\b/.test(name)) variants.push(name.replace(/\bthe\b/g, 'The'));
   }
   return [...new Set(variants.filter((v) => v.length >= 2))];
 }
@@ -674,4 +678,63 @@ export async function fetchReferenceFacts(
 ): Promise<string[]> {
   const bundle = await fetchReferenceFactBundle(artist, title, countryCode);
   return [...bundle.trackFacts, ...bundle.artistFacts].slice(0, 6);
+}
+
+const FAST_TRACK_WIKI_SECTIONS = [
+  'Background',
+  'Writing',
+  'Composition',
+  'Recording',
+  'Release',
+  'Meaning',
+  'History',
+  'Legacy',
+];
+
+function extractWikiSection(extract: string, sectionName: string): string | null {
+  const re = new RegExp(`==\\s*${sectionName}\\s*==\\s*([\\s\\S]*?)(?=\\n+==|$)`, 'i');
+  const match = extract.match(re);
+  return match?.[1]?.trim() ?? null;
+}
+
+/**
+ * Fast path: one Wikipedia full extract + Background/Writing sections (~2–4s).
+ * Used when the slow multi-page bundle times out on Railway.
+ */
+export async function fetchFastTrackWikiFacts(artist: string, title: string): Promise<string[]> {
+  const lang: 'en' = 'en';
+  const candidates = buildTrackTitleCandidates(artist, title).slice(0, 4);
+
+  for (const candidate of candidates) {
+    const extract = await fetchFullExtract(lang, candidate, false);
+    if (!extract || isDisambiguationExtract(extract)) continue;
+    if (isWrongMusicTopic(artist, extract, candidate)) continue;
+
+    const sectionFacts: string[] = [];
+    for (const section of FAST_TRACK_WIKI_SECTIONS) {
+      const body = extractWikiSection(extract, section);
+      if (!body || body.length < 50) continue;
+      sectionFacts.push(
+        ...filterMusicFacts(extractFactBullets(body, 8), artist, title, false),
+      );
+    }
+
+    const contextual = filterMusicFacts(
+      extractTrackContextFacts(extract, title, artist, 2, 8),
+      artist,
+      title,
+      false,
+    );
+
+    const merged = filterAndRankFacts([...sectionFacts, ...contextual], 8).filter(
+      (fact) => interestScore(fact) >= 5,
+    );
+    if (merged.length > 0) {
+      console.log(
+        `[wiki-fast-track] "${artist}" — "${title}" page="${candidate}" facts=${merged.length}`,
+      );
+      return merged;
+    }
+  }
+  return [];
 }

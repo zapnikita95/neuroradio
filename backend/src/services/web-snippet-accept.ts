@@ -180,6 +180,19 @@ export function acceptIndieEmergingSnippet(
   return hasNarrativeSeedSignal(trimmed) && interestScore(trimmed) >= 4;
 }
 
+/** At least one snippet usable for seed/salvage — weak wikidata alone does not count. */
+export function hasActionableSnippets(
+  snippets: string[],
+  artist: string,
+  title: string,
+): boolean {
+  return snippets.some(
+    (snippet) =>
+      acceptSearchGroundedSnippet(snippet, artist, title) ||
+      acceptIndieEmergingSnippet(snippet, artist, title),
+  );
+}
+
 /**
  * Accept web search snippet as a grounded fact seed.
  * Search was for artist+title — narrative snippets need not repeat both names.
