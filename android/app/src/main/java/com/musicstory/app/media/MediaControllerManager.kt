@@ -95,7 +95,6 @@ class MediaControllerManager(
             restoreSystemMusicVolumeIfNeeded()
             return
         }
-        val maxVolume = audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC)
         val currentVolume = audioManager.getStreamVolume(AudioManager.STREAM_MUSIC)
         if (currentVolume <= 0) {
             controls.pause()
@@ -104,29 +103,21 @@ class MediaControllerManager(
         if (fadedStreamOriginalVolume == null) {
             fadedStreamOriginalVolume = currentVolume
         }
-        val savedOriginal = fadedStreamOriginalVolume ?: currentVolume
-        try {
-            val targetVolume = (maxVolume * 0.12f).toInt().coerceAtLeast(1)
-            if (seconds <= 0.2f) {
-                audioManager.setStreamVolume(AudioManager.STREAM_MUSIC, targetVolume, 0)
-                controls.pause()
-                return
-            }
-            val steps = (seconds * 10f).toInt().coerceIn(6, 15)
-            val stepDelayMs = ((seconds * 1000f) / steps).toLong().coerceAtLeast(50L)
-            for (i in steps downTo 1) {
-                val vol = (currentVolume - (currentVolume - targetVolume) * (steps - i + 1) / steps)
-                    .coerceAtLeast(targetVolume)
-                audioManager.setStreamVolume(AudioManager.STREAM_MUSIC, vol, 0)
-                delay(stepDelayMs)
-            }
+        val targetVolume = 0
+        if (seconds <= 0.2f) {
+            audioManager.setStreamVolume(AudioManager.STREAM_MUSIC, targetVolume, 0)
             controls.pause()
-        } finally {
-            val max = audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC)
-            val restore = savedOriginal.coerceIn(1, max)
-            audioManager.setStreamVolume(AudioManager.STREAM_MUSIC, restore, 0)
-            fadedStreamOriginalVolume = null
+            return
         }
+        val steps = (seconds * 12f).toInt().coerceIn(8, 20)
+        val stepDelayMs = ((seconds * 1000f) / steps).toLong().coerceAtLeast(40L)
+        for (step in 1..steps) {
+            val vol = (currentVolume - (currentVolume - targetVolume) * step / steps)
+                .coerceAtLeast(0)
+            audioManager.setStreamVolume(AudioManager.STREAM_MUSIC, vol, 0)
+            delay(stepDelayMs)
+        }
+        controls.pause()
     }
 
     /** Call when story ends, track changes, or user stops — fixes stuck silent STREAM_MUSIC. */

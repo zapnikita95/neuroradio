@@ -169,7 +169,9 @@ fun VinylDisc(
                 val sparkCount = 6
                 for (i in 0 until sparkCount) {
                     val phase = (sparklePhase + i.toFloat() / sparkCount) % 1f
-                    val angle = (i.toFloat() / sparkCount) * 2f * PI.toFloat()
+                    // Orbit clockwise — same direction as the spinning disc.
+                    val angle = (i.toFloat() / sparkCount) * 2f * PI.toFloat() +
+                        sparklePhase * 2f * PI.toFloat()
                     val orbitPulse = 0.94f + 0.06f * sin(phase * PI.toFloat() * 2f)
                     val orbit = grooveRadius * orbitPulse
                     val sparkCenter = Offset(

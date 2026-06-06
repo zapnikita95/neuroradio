@@ -458,6 +458,7 @@ router.post('/full', validateStoryFullBody, storyFullRateLimit, async (req: Requ
         metadata.artist,
         metadata.title,
         previousScripts.length,
+        storyNarrator,
       );
       console.log(formatFactPickLog(selectedFact, 'rules'));
     }
@@ -592,6 +593,7 @@ router.post('/full', validateStoryFullBody, storyFullRateLimit, async (req: Requ
           metadata.artist,
           metadata.title,
           previousScripts.length,
+          storyNarrator,
         );
         if (selectedFact) {
           console.log(formatFactPickLog(selectedFact, 'rules'));
@@ -618,6 +620,7 @@ router.post('/full', validateStoryFullBody, storyFullRateLimit, async (req: Requ
         installId,
         artist: metadata.artist,
         previousScripts,
+        narrator: storyNarrator,
       });
       if (wikiSalvage && isMusicArtistWikiExtract(wikiSalvage.text)) {
         selectedFact = {
@@ -736,6 +739,7 @@ router.post('/full', validateStoryFullBody, storyFullRateLimit, async (req: Requ
           installId,
           artist: metadata.artist,
           previousScripts,
+          narrator: storyNarrator,
         });
         const wikiLead =
           wikiLeadRaw && isMusicArtistWikiExtract(wikiLeadRaw.text) ? wikiLeadRaw : null;

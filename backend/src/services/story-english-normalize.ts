@@ -64,6 +64,9 @@ export const MUSIC_PROPER_NOUNS = new Set([
   'beatles',
   'queen',
   'nirvana',
+  'gorillaz',
+  'albarn',
+  'hewlett',
   'jackson',
   'madonna',
   'elvis',
@@ -144,7 +147,41 @@ export const GENERIC_ENGLISH_REPLACEMENTS: Array<[RegExp, string]> = [
   [/\bindie\b/gi, 'инди'],
 ];
 
-const LATIN_CAP_WORD = /\b[A-Z][a-z]+(?:[''][a-z]+)?\b/g;
+/** Latin phrases that must survive generic EN→RU replacement (e.g. «soul» in De La Soul). */
+const PROTECTED_LATIN_PHRASES = [
+  'De La Soul',
+  'Gorillaz',
+  'Jamie Hewlett',
+  'Damon Albarn',
+  'Feel Good Inc.',
+  'Måneskin',
+  'The Rasmus',
+];
+
+const PHRASE_SLOT = '\uE012P';
+const PHRASE_END = '\uE013';
+
+function maskProtectedLatinPhrases(text: string): { masked: string; phrases: string[] } {
+  const phrases: string[] = [];
+  let masked = text;
+  const sorted = [...PROTECTED_LATIN_PHRASES].sort((a, b) => b.length - a.length);
+  for (const phrase of sorted) {
+    const re = new RegExp(escapeRegExp(phrase), 'gi');
+    masked = masked.replace(re, (match) => {
+      const idx = phrases.length;
+      phrases.push(match);
+      return `${PHRASE_SLOT}${idx}${PHRASE_END}`;
+    });
+  }
+  return { masked, phrases };
+}
+
+function unmaskProtectedLatinPhrases(text: string, phrases: string[]): string {
+  return text.replace(
+    new RegExp(`${PHRASE_SLOT}(\\d+)${PHRASE_END}`, 'g'),
+    (_, index) => phrases[Number(index)] ?? '',
+  );
+}
 const LATIN_TITLE = /\b[A-Z][a-z]+(?:\s+[A-Z][a-z]+){0,5}\b/g;
 
 function escapeRegExp(value: string): string {
@@ -205,12 +242,16 @@ export function fixMusicalMistranslations(text: string): string {
 
 /** Replace generic English; leave proper nouns intact. */
 export function replaceGenericEnglish(text: string): string {
-  let result = text;
+  const { masked, phrases } = maskProtectedLatinPhrases(text);
+  let result = masked;
   for (const [pattern, replacement] of GENERIC_ENGLISH_REPLACEMENTS) {
     result = result.replace(pattern, replacement);
   }
-  return fixMusicalMistranslations(result.replace(/\s{2,}/g, ' ').trim());
+  result = fixMusicalMistranslations(unmaskProtectedLatinPhrases(result, phrases));
+  return result.replace(/\s{2,}/g, ' ').trim();
 }
+
+const LATIN_CAP_WORD = /\b[A-Z][a-z]+(?:[''][a-z]+)?\b/g;
 
 export interface StoryLanguageContext {
   artist: string;

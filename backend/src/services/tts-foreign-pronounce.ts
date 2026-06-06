@@ -1,6 +1,4 @@
-/**
- * Wiki translation fixes (band name truncation). Latin pronunciation → tts-yandex-ssml.ts SSML lang tags.
- */
+import { fixWikiTranslationArtifacts } from './wiki-translate-quality.js';
 
 const PHRASE_PRONUNCIATION_RU: Record<string, string> = {
   'zitti e buoni': 'Цитти э буони',
@@ -16,8 +14,12 @@ const PHRASE_PRONUNCIATION_RU: Record<string, string> = {
   'born with a broken heart': 'Борн уиз э Брокен Харт',
   'funny little fears': 'Фанни Литл Фирс',
   'sanremo music festival': 'Сан-Ремо',
-  'måneskin': 'Монескин',
-  maneskin: 'Монескин',
+  'måneskin': 'Måneskin',
+  maneskin: 'Måneskin',
+  gorillaz: 'Gorillaz',
+  'de la soul': 'De La Soul',
+  'damon albarn': 'Деймон Элборн',
+  'jamie hewlett': 'Jamie Hewlett',
   'mambo italiano': 'Мambo Italiano',
   'moliendo café': 'Молиэндo Кафе',
   'moliendo cafe': 'Молиэндo Кафе',
@@ -324,12 +326,17 @@ export function applyForeignPronunciation(
 
 /** Fix LLM truncating band names in wiki translation. */
 export function preserveMusicProperNames(script: string, artist: string, title: string): string {
-  let result = script;
+  let result = fixWikiTranslationArtifacts(script, artist, title);
   const artistLower = artist.toLowerCase();
 
   if (/maneskin|måneskin/i.test(artistLower)) {
     result = result.replace(/\bMå\b/g, 'Måneskin').replace(/\bMa\b(?=\s|,|\.)/g, 'Måneskin');
     result = result.replace(/\bMåneskin\b/gi, 'Måneskin');
+  }
+
+  if (/gorillaz/i.test(artistLower)) {
+    result = result.replace(/\bGoril+\s*Laz\b/gi, 'Gorillaz');
+    result = result.replace(/\bГорил+\s*Laz\b/gi, 'Gorillaz');
   }
 
   if (artist.trim() && hasLatinLetters(artist)) {

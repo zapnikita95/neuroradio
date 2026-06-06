@@ -1,4 +1,5 @@
 import { normalizeArtistKey, primaryArtistName } from './artist-primary.js';
+import type { StoryNarratorId } from './story-narrator.js';
 import { fetchArtistWikiLead, fetchArtistWikiParagraphs } from './wikipedia-lead.js';
 
 const DEPTH_PREFETCH_THRESHOLD = 5;
@@ -46,6 +47,16 @@ export interface PickWikiContentInput {
   installId: string;
   artist: string;
   previousScripts: string[];
+  narrator?: StoryNarratorId;
+}
+
+function narratorWikiStartOffset(narrator: StoryNarratorId, count: number): number {
+  if (count <= 1) return 0;
+  let hash = 0;
+  for (let i = 0; i < narrator.length; i += 1) {
+    hash = (hash * 31 + narrator.charCodeAt(i)) >>> 0;
+  }
+  return hash % count;
 }
 
 /** Pick wiki paragraph — rotates away from already-used lead when depth cache has more. */
@@ -61,8 +72,11 @@ export async function pickArtistWikiContent(
   const candidates = [cached.lead, ...cached.paragraphs].filter(
     (p) => p.trim().length >= 40,
   );
+  const narrator = input.narrator ?? 'auto';
+  const start = narratorWikiStartOffset(narrator, candidates.length);
 
-  for (const candidate of candidates) {
+  for (let offset = 0; offset < candidates.length; offset += 1) {
+    const candidate = candidates[(start + offset) % candidates.length]!;
     if (isSeedUsed(input.installId, primary, candidate)) continue;
     if (input.previousScripts.some((s) => scriptOverlapsSeed(s, candidate))) continue;
     return { text: candidate, lang: cached.lang };

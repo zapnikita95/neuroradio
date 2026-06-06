@@ -17,11 +17,13 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import kotlinx.coroutines.delay
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -67,6 +69,13 @@ fun StoryFeedbackSheet(
         "speech_manner" to R.string.feedback_dislike_manner,
     )
 
+    LaunchedEffect(sent) {
+        if (sent) {
+            delay(1400)
+            onDismiss()
+        }
+    }
+
     Column(
         modifier = modifier
             .fillMaxWidth()
@@ -87,8 +96,6 @@ fun StoryFeedbackSheet(
                 style = MaterialTheme.typography.bodyMedium,
                 color = LiveGreen,
             )
-            Spacer(modifier = Modifier.height(8.dp))
-            SecondaryStoryButton(text = context.getString(R.string.feedback_close), onClick = onDismiss)
             return@Column
         }
         Row(

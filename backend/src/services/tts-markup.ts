@@ -107,7 +107,8 @@ export function prepareYandexTtsText(
   const title = options.title ?? '';
   const pauseProfile = options.pauseProfile ?? 'natural';
 
-  let text = sanitizeScriptForTts(script, artist, title);
+  let text = preserveMusicProperNames(script, artist, title);
+  text = sanitizeScriptForTts(text, artist, title);
   const quality = runTtsQualityPass(text);
   text = quality.text;
 

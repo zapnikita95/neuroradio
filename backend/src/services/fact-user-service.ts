@@ -1,4 +1,5 @@
 import crypto from 'node:crypto';
+import type { StoryNarratorId } from './story-narrator.js';
 import {
   createAccount,
   getAccountListenStat,
@@ -127,19 +128,30 @@ export async function countUnusedBankFactsForUser(
   return count;
 }
 
+function narratorFactIndexOffset(narrator: StoryNarratorId): number {
+  let hash = 0;
+  for (let i = 0; i < narrator.length; i += 1) {
+    hash = (hash * 31 + narrator.charCodeAt(i)) >>> 0;
+  }
+  return hash % 13;
+}
+
 export async function pickFactForUser(
   installId: string,
   bundle: ReferenceFactBundle,
   artist: string,
   title: string,
   storyIndex = 0,
+  narrator: StoryNarratorId = 'auto',
 ): Promise<SelectedReferenceFact | null> {
   const used = await getUsedFingerprints(installId, artist, title);
-  const fromBank = pickFromBank(artist, title, used);
+  const offset = narratorFactIndexOffset(narrator);
+  const fromBank = pickFromBank(artist, title, used, ['track', 'album', 'artist'], offset);
   if (fromBank) return storedFactToSelected(fromBank);
 
   const previous = await collectPreviousScripts(installId, artist, title);
-  return pickReferenceFact(bundle, previous, storyIndex, artist, title, used);
+  const effectiveIndex = storyIndex + narratorFactIndexOffset(narrator);
+  return pickReferenceFact(bundle, previous, effectiveIndex, artist, title, used);
 }
 
 export async function recordUserStory(

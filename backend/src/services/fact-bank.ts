@@ -196,6 +196,7 @@ export function pickFromBank(
   title: string,
   usedFingerprints: Set<string>,
   preferScope: FactScope[] = ['track', 'album', 'artist'],
+  startOffset = 0,
 ): StoredFact | null {
   const { track, artist: artistFacts } = listBankFacts(artist, title);
   const pools: Record<FactScope, StoredFact[]> = {
@@ -204,16 +205,19 @@ export function pickFromBank(
     artist: artistFacts,
   };
 
+  const unused: StoredFact[] = [];
   for (const scope of preferScope) {
     for (const fact of pools[scope] ?? []) {
       if (usedFingerprints.has(factFingerprint(fact.fact))) continue;
       if (fact.interestScore < 6) continue;
       if (isAmbiguousCommonWordArtist(artist) && !factMentionsArtistAsEntity(fact.fact, artist)) continue;
-      markFactUsed(fact.id, artist, title);
-      return fact;
+      unused.push(fact);
     }
   }
-  return null;
+  if (unused.length === 0) return null;
+  const picked = unused[startOffset % unused.length]!;
+  markFactUsed(picked.id, artist, title);
+  return picked;
 }
 
 function markFactUsed(id: string, artist: string, title: string): void {
