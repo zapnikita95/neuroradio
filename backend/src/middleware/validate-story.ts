@@ -33,7 +33,7 @@ interface StoryFullBody {
 }
 
 const VALID_VOICE_TIERS = new Set<string>(['default', 'premium']);
-const VALID_TTS_PROVIDERS = new Set<string>(['auto', 'yandex', 'sber', 'azure', 'elevenlabs']);
+const VALID_TTS_PROVIDERS = new Set<string>(['auto', 'yandex', 'sber', 'azure', 'elevenlabs', 'silero']);
 
 function resolveVoiceTier(value: unknown): VoiceTier {
   if (typeof value === 'string' && VALID_VOICE_TIERS.has(value)) {

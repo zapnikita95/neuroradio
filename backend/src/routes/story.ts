@@ -41,6 +41,7 @@ import { countWords, detectStoryQualityWarnings, sanitizeScriptForTts } from '..
 import type { StoryScript } from '../services/groq.js';
 import { setLogDetail } from '../middleware/request-logger.js';
 import { hasYandexCredentials } from '../services/yandex-tts.js';
+import { canUseSileroTts } from '../services/silero-tts.js';
 import { coerceVoiceForSpeechKit } from '../services/voices.js';
 import { resolveVoiceDelivery } from '../services/tts-voice-profiles.js';
 import type { TtsVoiceStyleId } from '../services/tts-voice-profiles.js';
@@ -805,7 +806,7 @@ router.post('/full', validateStoryFullBody, storyFullRateLimit, async (req: Requ
       response.audioUrl = null;
       response.audioFile = null;
       response.ttsHint = 'Озвучка на устройстве (skip_server_tts)';
-    } else if (hasYandexCredentials() || canUseAzureSpeechProduction()) {
+    } else if (hasYandexCredentials() || canUseAzureSpeechProduction() || canUseSileroTts()) {
       const id = uuidv4();
       console.log(
         `[tts] queue install=${installId.slice(0, 8)} voice=${voiceId} style=${delivery.styleId} speed=${delivery.speed} emotion=${delivery.emotion} tier=${voiceTier} provider=${ttsProvider} words=${story.word_count}`,
@@ -837,7 +838,7 @@ router.post('/full', validateStoryFullBody, storyFullRateLimit, async (req: Requ
       response.audioUrl = null;
       response.audioFile = null;
       response.ttsHint =
-        'TTS не настроен: нужен YANDEX_API_KEY (база) или AZURE_SPEECH_KEY + AZURE_SPEECH_REGION (premium)';
+        'TTS не настроен: YANDEX_API_KEY, Silero (SILERO_TTS_*), или Azure premium';
     }
 
     timing.mark('tts-ready', `audio=${Boolean(response.audioUrl)}`);

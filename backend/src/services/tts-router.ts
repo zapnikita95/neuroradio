@@ -15,6 +15,10 @@ import {
   canUseSaluteSpeechProduction,
   hasSaluteSpeechCredentials,
 } from './salute-tts.js';
+import {
+  canUseSileroTts,
+  synthesizeSpeechSilero,
+} from './silero-tts.js';
 import type { TtsEmotion } from './tts-options.js';
 import type { TtsPauseProfile, TtsVoiceStyleId } from './tts-voice-profiles.js';
 import {
@@ -25,8 +29,8 @@ import {
 import type { YandexVoiceId } from './voices.js';
 import type { StoryNarratorId } from './story-narrator.js';
 
-export type TtsProviderId = 'auto' | 'yandex' | 'sber' | 'azure' | 'elevenlabs';
-export type EffectiveTtsProvider = 'yandex' | 'sber' | 'azure' | 'elevenlabs';
+export type TtsProviderId = 'auto' | 'yandex' | 'sber' | 'azure' | 'elevenlabs' | 'silero';
+export type EffectiveTtsProvider = 'yandex' | 'sber' | 'azure' | 'elevenlabs' | 'silero';
 export type VoiceTier = 'default' | 'premium';
 
 export interface TtsRouteRequest {
@@ -85,6 +89,12 @@ export function resolveEffectiveTtsProvider(
     return 'yandex';
   }
 
+  if (request.ttsProvider === 'silero') {
+    if (canUseSileroTts()) return 'silero';
+    console.warn('[tts-router] silero requested but not configured — fallback to Yandex');
+    return 'yandex';
+  }
+
   if (request.ttsProvider === 'sber') {
     requirePremium();
     if (canUseSaluteSpeechProduction()) return 'sber';
@@ -110,6 +120,10 @@ export function resolveEffectiveTtsProvider(
   if (request.voiceTier === 'premium') {
     requirePremium();
     return pickPremiumAutoProvider();
+  }
+
+  if (canUseSileroTts() && process.env.TTS_PREFER_SILERO?.trim() !== 'false') {
+    return 'silero';
   }
 
   return 'yandex';
@@ -147,6 +161,11 @@ export async function synthesizeStoryAudio(request: TtsRouteRequest): Promise<Tt
       artist: request.artist,
       title: request.title,
     });
+  } else if (provider === 'silero') {
+    result = await synthesizeSpeechSilero(request.script, request.fileName, {
+      artist: request.artist,
+      title: request.title,
+    });
   } else {
     result = await synthesizeYandex(request.script, request.voiceId, request.fileName, {
       speed: request.speed,
@@ -172,4 +191,5 @@ export {
   canUseAzureSpeechProduction,
   hasSaluteSpeechCredentials,
   canUseSaluteSpeechProduction,
+  canUseSileroTts,
 };

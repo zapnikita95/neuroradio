@@ -68,7 +68,7 @@ enum class TtsPlaybackEngine(val id: String, val labelRu: String, val descriptio
     ANDROID_DEVICE(
         id = "android",
         labelRu = "Android TTS (тест)",
-        descriptionRu = "Голос телефона, без Yandex — для проверки качества русского",
+        descriptionRu = "Голос телефона. Нужен Google TTS + русский; Poco/Huawei часто не подходят",
     ),
     ;
 

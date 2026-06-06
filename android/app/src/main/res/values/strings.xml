@@ -170,7 +170,7 @@
     <string name="settings_gemini_get_key">Получить Gemini-ключ</string>
     <string name="settings_tts_voice">Голос</string>
     <string name="settings_tts_playback_engine">Озвучка</string>
-    <string name="settings_tts_playback_engine_hint">Android TTS — тест без Yandex. Нужен русский голос в настройках телефона.</string>
+    <string name="settings_tts_playback_engine_hint">Android TTS — только телефоны с Google Speech Services и русским языком. Poco/Huawei обычно не подходят. Для теста озвучки лучше Silero на ПК + локальный BFF.</string>
     <string name="settings_story_length">Длина истории</string>
     <string name="settings_tts_speed">Скорость речи</string>
     <string name="settings_tts_emotion">Интонация</string>
