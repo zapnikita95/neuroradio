@@ -83,6 +83,9 @@ class MusicStoryApp : Application() {
         backendAuthManager = BackendAuthManager(this, settingsDataStore)
         apiClient = ApiClient(backendAuthManager)
         accountSyncManager = AccountSyncManager(backendAuthManager)
+        settingsDataStore.setCloudSyncHook {
+            syncSettingsWithServer()
+        }
         accountAuthManager = AccountAuthManager(backendAuthManager)
         scrobbleRepository = ScrobbleRepository(
             scrobbleDao = database.scrobbleDao(),
@@ -137,8 +140,26 @@ class MusicStoryApp : Application() {
     suspend fun syncAccountDataWithServer(baseUrl: String) {
         val url = baseUrl.trim()
         if (url.isBlank()) return
+        syncSettingsWithServer(url)
         storyRepository.syncAccountDataWithServer(url)
         scrobbleRepository.syncAccountDataWithServer(url)
+    }
+
+    /** Pull cloud settings down, merge if newer, then push local snapshot. */
+    suspend fun syncSettingsWithServer(baseUrl: String = settingsDataStore.backendUrl.first().trim()) {
+        val url = baseUrl.trim()
+        if (url.isBlank()) return
+        if (!settingsDataStore.accountLinked.first()) return
+        val syncCode = settingsDataStore.syncCode.first()
+        if (!accountSyncManager.ensureSyncRegistered(url, syncCode) { settingsDataStore.setSyncCode(it) }) {
+            return
+        }
+        accountSyncManager.pullSettings(url)?.let { remote ->
+            settingsDataStore.applyRemoteSettings(remote)
+        }
+        val payload = settingsDataStore.buildSyncPayload()
+        accountSyncManager.pushSettings(url, payload)
+        settingsDataStore.markSettingsSynced(payload.updatedAt)
     }
 
     private fun prefetchBackendAuth() {

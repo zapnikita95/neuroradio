@@ -229,10 +229,12 @@ class SettingsDataStore(private val context: Context) {
 
     suspend fun setAutoIntercept(enabled: Boolean) {
         context.settingsDataStore.edit { it[KEY_AUTO_INTERCEPT] = enabled }
+        notifyCloudSync()
     }
 
     suspend fun setEveryNTracks(n: Int) {
         context.settingsDataStore.edit { it[KEY_EVERY_N_TRACKS] = n.coerceAtLeast(1) }
+        notifyCloudSync()
     }
 
     suspend fun setTracksSinceLastStory(count: Int) {
@@ -300,22 +302,26 @@ class SettingsDataStore(private val context: Context) {
 
     suspend fun setTriggerMode(mode: TriggerMode) {
         context.settingsDataStore.edit { it[KEY_TRIGGER_MODE] = mode.name }
+        notifyCloudSync()
     }
 
     suspend fun setSpecificArtists(artists: Set<String>) {
         context.settingsDataStore.edit {
             it[KEY_SPECIFIC_ARTISTS] = artists.map { name -> name.trim() }.filter { name -> name.isNotEmpty() }.toSet()
         }
+        notifyCloudSync()
     }
 
     suspend fun setSpecificGenres(genres: Set<String>) {
         context.settingsDataStore.edit {
             it[KEY_SPECIFIC_GENRES] = genres.map { name -> name.trim() }.filter { name -> name.isNotEmpty() }.toSet()
         }
+        notifyCloudSync()
     }
 
     suspend fun setManualMode(enabled: Boolean) {
         context.settingsDataStore.edit { it[KEY_MANUAL_MODE] = enabled }
+        notifyCloudSync()
     }
 
     suspend fun setGroqApiKey(key: String) {
@@ -359,6 +365,7 @@ class SettingsDataStore(private val context: Context) {
                 "SETTINGS install=$installId LLM provider confirmed: ${provider.id} (${provider.labelRu})",
             )
         }
+        notifyCloudSync()
     }
 
     suspend fun setGeminiModel(model: GeminiModel) {
@@ -385,30 +392,37 @@ class SettingsDataStore(private val context: Context) {
         context.settingsDataStore.edit {
             it[KEY_SAME_TRACK_STORY_EVERY_N] = n.coerceIn(1, 20)
         }
+        notifyCloudSync()
     }
 
     suspend fun setStoryLength(length: StoryLength) {
         context.settingsDataStore.edit { it[KEY_STORY_LENGTH] = length.id }
+        notifyCloudSync()
     }
 
     suspend fun setStoryNarrator(narrator: StoryNarrator) {
         context.settingsDataStore.edit { it[KEY_STORY_NARRATOR] = narrator.id }
+        notifyCloudSync()
     }
 
     suspend fun setTtsVoice(voice: TtsVoice) {
         context.settingsDataStore.edit { it[KEY_TTS_VOICE] = voice.id }
+        notifyCloudSync()
     }
 
     suspend fun setTtsSpeed(speed: TtsSpeed) {
         context.settingsDataStore.edit { it[KEY_TTS_SPEED] = speed.id }
+        notifyCloudSync()
     }
 
     suspend fun setTtsEmotion(emotion: TtsEmotion) {
         context.settingsDataStore.edit { it[KEY_TTS_EMOTION] = emotion.id }
+        notifyCloudSync()
     }
 
     suspend fun setTtsPlaybackEngine(engine: TtsPlaybackEngine) {
         context.settingsDataStore.edit { it[KEY_TTS_PLAYBACK_ENGINE] = engine.id }
+        notifyCloudSync()
     }
 
     suspend fun setUserTtsBilling(billing: UserTtsBilling) {
@@ -464,6 +478,71 @@ class SettingsDataStore(private val context: Context) {
     }
 
     suspend fun isMonitorPausedByUser(): Boolean = monitorPausedByUser.first()
+
+    private var cloudSyncHook: (suspend () -> Unit)? = null
+
+    fun setCloudSyncHook(hook: suspend () -> Unit) {
+        cloudSyncHook = hook
+    }
+
+    private suspend fun notifyCloudSync() {
+        cloudSyncHook?.invoke()
+    }
+
+    suspend fun buildSyncPayload(): com.musicstory.app.data.remote.AccountSyncManager.SyncSettingsPayload {
+        val prefs = context.settingsDataStore.data.first()
+        return com.musicstory.app.data.remote.AccountSyncManager.SyncSettingsPayload(
+            manualMode = prefs[KEY_MANUAL_MODE] ?: false,
+            autoIntercept = prefs[KEY_AUTO_INTERCEPT] ?: DEFAULT_AUTO_INTERCEPT,
+            triggerMode = prefs[KEY_TRIGGER_MODE] ?: TriggerMode.EVERY_N_TRACKS.name,
+            everyNTracks = prefs[KEY_EVERY_N_TRACKS] ?: DEFAULT_EVERY_N_TRACKS,
+            sameTrackStoryEveryN = prefs[KEY_SAME_TRACK_STORY_EVERY_N] ?: DEFAULT_SAME_TRACK_STORY_EVERY_N,
+            specificArtists = prefs[KEY_SPECIFIC_ARTISTS]?.toList() ?: emptyList(),
+            specificGenres = prefs[KEY_SPECIFIC_GENRES]?.toList() ?: emptyList(),
+            storyLength = prefs[KEY_STORY_LENGTH] ?: StoryLength.SEC_60.id,
+            storyNarrator = prefs[KEY_STORY_NARRATOR] ?: StoryNarrator.AUTO.id,
+            ttsVoice = prefs[KEY_TTS_VOICE] ?: TtsVoice.AUTO.id,
+            ttsSpeed = prefs[KEY_TTS_SPEED] ?: TtsSpeed.NORMAL.id,
+            ttsEmotion = prefs[KEY_TTS_EMOTION] ?: TtsEmotion.LIVELY.id,
+            ttsPlaybackEngine = prefs[KEY_TTS_PLAYBACK_ENGINE] ?: TtsPlaybackEngine.YANDEX_SERVER.id,
+            llmProvider = prefs[KEY_LLM_PROVIDER] ?: LlmProvider.OPENROUTER.id,
+            updatedAt = System.currentTimeMillis(),
+        )
+    }
+
+    /** Apply server settings when remote is newer than local sync timestamp. */
+    suspend fun applyRemoteSettings(
+        remote: com.musicstory.app.data.remote.AccountSyncManager.SyncSettingsPayload,
+    ): Boolean {
+        val remoteAt = remote.updatedAt
+        val localAt = context.settingsDataStore.data.first()[KEY_SETTINGS_SYNCED_AT] ?: 0L
+        if (remoteAt <= localAt) return false
+        context.settingsDataStore.edit { prefs ->
+            remote.manualMode?.let { prefs[KEY_MANUAL_MODE] = it }
+            remote.autoIntercept?.let { prefs[KEY_AUTO_INTERCEPT] = it }
+            remote.triggerMode?.let { prefs[KEY_TRIGGER_MODE] = it }
+            remote.everyNTracks?.let { prefs[KEY_EVERY_N_TRACKS] = it.coerceAtLeast(1) }
+            remote.sameTrackStoryEveryN?.let {
+                prefs[KEY_SAME_TRACK_STORY_EVERY_N] = it.coerceIn(1, 20)
+            }
+            remote.specificArtists?.let { prefs[KEY_SPECIFIC_ARTISTS] = it.toSet() }
+            remote.specificGenres?.let { prefs[KEY_SPECIFIC_GENRES] = it.toSet() }
+            remote.storyLength?.let { prefs[KEY_STORY_LENGTH] = it }
+            remote.storyNarrator?.let { prefs[KEY_STORY_NARRATOR] = it }
+            remote.ttsVoice?.let { prefs[KEY_TTS_VOICE] = it }
+            remote.ttsSpeed?.let { prefs[KEY_TTS_SPEED] = it }
+            remote.ttsEmotion?.let { prefs[KEY_TTS_EMOTION] = it }
+            remote.ttsPlaybackEngine?.let { prefs[KEY_TTS_PLAYBACK_ENGINE] = it }
+            remote.llmProvider?.let { prefs[KEY_LLM_PROVIDER] = it }
+            prefs[KEY_SETTINGS_SYNCED_AT] = remoteAt
+        }
+        StoryLog.i("SETTINGS cloud pull applied updatedAt=$remoteAt")
+        return true
+    }
+
+    suspend fun markSettingsSynced(updatedAt: Long = System.currentTimeMillis()) {
+        context.settingsDataStore.edit { it[KEY_SETTINGS_SYNCED_AT] = updatedAt }
+    }
 
     companion object {
         const val DEFAULT_BACKEND_URL = "https://music-story-production.up.railway.app"
@@ -526,6 +605,7 @@ class SettingsDataStore(private val context: Context) {
         private val KEY_COUNT_TRACK_LISTEN_SECONDS = intPreferencesKey("count_track_listen_seconds")
         private val KEY_SYNC_CODE = stringPreferencesKey("sync_code")
         private val KEY_ACCOUNT_LINKED = booleanPreferencesKey("account_linked")
+        private val KEY_SETTINGS_SYNCED_AT = longPreferencesKey("settings_synced_at")
         private const val OPENROUTER_FORCE_VERSION = 2
     }
 }

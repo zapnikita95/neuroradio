@@ -3,6 +3,7 @@ import {
   countWords,
   findHardScriptViolation,
   findIncompleteEnding,
+  findLlmGarbage,
   findWateryContent,
   anchorsReferenceFact,
   sanitizeScriptForTts,
@@ -135,6 +136,11 @@ export function finalizeAfterQualityLoop<T extends { script: string }>(
   const hard = findHardScriptViolation(sanitized);
   if (hard) {
     logRejectedScript('last script rejected as hard violation', sanitized, hard);
+    return null;
+  }
+  const garbage = findLlmGarbage(sanitized);
+  if (garbage) {
+    logRejectedScript('last script rejected as llm garbage', sanitized, garbage);
     return null;
   }
   if (referenceFacts.length === 0) {

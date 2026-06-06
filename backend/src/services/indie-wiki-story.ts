@@ -3,10 +3,16 @@ import type { LlmProviderId } from './llm-provider.js';
 import { hasLlmKeyForProvider } from './llm-provider.js';
 import { resolveGroqModelOrder } from './groq-models.js';
 import { callOpenAiChatCompletion } from './llm-openai-chat.js';
-import { buildOpenRouterFreeModelChain } from './openrouter-models.js';
+import { buildOpenRouterFreeModelChain, buildOpenRouterFreeStoryModelChain } from './openrouter-models.js';
 import { resolveGeminiModel, DEFAULT_GEMINI_MODEL } from './gemini-models.js';
 import { preserveMusicProperNames } from './tts-foreign-pronounce.js';
-import { sanitizeScriptForTts, countWords } from './story-quality.js';
+import {
+  sanitizeScriptForTts,
+  countWords,
+  findLlmGarbage,
+  validateStoryScript,
+} from './story-quality.js';
+import { DEFAULT_STORY_LENGTH } from './story-length.js';
 import { factMentionsArtist } from './fact-relevance.js';
 
 const GROQ_API_URL = 'https://api.groq.com/openai/v1/chat/completions';
@@ -150,10 +156,20 @@ export interface IndieWikiStoryInput {
 function scriptFromRaw(raw: string, artist: string, title: string, wikiLead: string): string | null {
   const script = parseJsonScript(raw);
   if (!script || script.length < 40) return null;
-  if (countWords(script) < 25) return null;
+  if (countWords(script) < 35) return null;
   const fixed = preserveMusicProperNames(script, artist, title);
   if (!factMentionsArtist(fixed, artist)) return null;
-  return sanitizeScriptForTts(fixed, artist, title, []);
+  const garbage = findLlmGarbage(fixed);
+  if (garbage) return null;
+  const sanitized = sanitizeScriptForTts(fixed, artist, title, [wikiLead]);
+  const quality = validateStoryScript(sanitized, DEFAULT_STORY_LENGTH, artist, title, {
+    referenceFacts: [wikiLead],
+    skipFirstSentenceAnchor: true,
+    skipPersonaCliches: true,
+    strictLength: false,
+  });
+  if (!quality.ok) return null;
+  return sanitized;
 }
 
 /** Translate Wikipedia lead → Russian narration script (indie path). */
@@ -173,7 +189,11 @@ export async function translateWikiLeadToStory(input: IndieWikiStoryInput): Prom
     input.wikiLead,
   ].join('\n');
 
-  const openRouterModels = buildOpenRouterFreeModelChain(input.openRouterModel);
+  console.log(`[indie-wiki] wiki-lead-begin artist="${input.artist}" lang=${input.wikiLang}`);
+  console.log(input.wikiLead.slice(0, 600).replace(/\s+/g, ' '));
+  console.log('[indie-wiki] wiki-lead-end');
+
+  const openRouterModels = buildOpenRouterFreeStoryModelChain(input.openRouterModel);
   const attempts: Array<{ label: string; run: () => Promise<string> }> = [];
 
   if (hasLlmKeyForProvider('openrouter', { openrouter: input.clientOpenRouterApiKey })) {
@@ -211,12 +231,20 @@ export async function translateWikiLeadToStory(input: IndieWikiStoryInput): Prom
   for (const attempt of attempts) {
     try {
       const raw = await attempt.run();
+      console.log(`[indie-wiki] translate raw-begin model=${attempt.label}`);
+      console.log(raw.slice(0, 400).replace(/\s+/g, ' '));
+      console.log('[indie-wiki] translate raw-end');
       const script = scriptFromRaw(raw, input.artist, input.title, input.wikiLead);
       if (script) {
-        console.log(`[indie-wiki] translate ok via ${attempt.label} words=${script.split(/\s+/).length}`);
+        console.log(
+          `[indie-wiki] translate ok via ${attempt.label} words=${countWords(script)}`,
+        );
+        console.log('[indie-wiki] translate script-begin]');
+        console.log(script);
+        console.log('[indie-wiki] translate script-end]');
         return script;
       }
-      console.warn(`[indie-wiki] translate ${attempt.label}: empty or invalid JSON`);
+      console.warn(`[indie-wiki] translate ${attempt.label}: empty, short, or failed quality gate`);
     } catch (err) {
       console.warn(
         `[indie-wiki] translate ${attempt.label} failed: ${err instanceof Error ? err.message : err}`,

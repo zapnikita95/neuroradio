@@ -73,15 +73,21 @@ class AccountSyncManager(
         withContext(Dispatchers.IO) {
             val token = authManager.getAccessToken(baseUrl) ?: return@withContext
             val body = JSONObject()
-                .put("manualMode", payload.manualMode)
-                .put("autoIntercept", payload.autoIntercept)
-                .put("triggerMode", payload.triggerMode)
-                .put("everyNTracks", payload.everyNTracks)
-                .put("sameTrackStoryEveryN", payload.sameTrackStoryEveryN)
-                .put("specificArtists", JSONArray(payload.specificArtists))
-                .put("specificGenres", JSONArray(payload.specificGenres))
-                .put("storyLength", payload.storyLength)
-                .put("updatedAt", payload.updatedAt)
+            payload.manualMode?.let { body.put("manualMode", it) }
+            payload.autoIntercept?.let { body.put("autoIntercept", it) }
+            payload.triggerMode?.let { body.put("triggerMode", it) }
+            payload.everyNTracks?.let { body.put("everyNTracks", it) }
+            payload.sameTrackStoryEveryN?.let { body.put("sameTrackStoryEveryN", it) }
+            payload.specificArtists?.let { body.put("specificArtists", JSONArray(it)) }
+            payload.specificGenres?.let { body.put("specificGenres", JSONArray(it)) }
+            payload.storyLength?.let { body.put("storyLength", it) }
+            payload.storyNarrator?.let { body.put("storyNarrator", it) }
+            payload.ttsVoice?.let { body.put("ttsVoice", it) }
+            payload.ttsSpeed?.let { body.put("ttsSpeed", it) }
+            payload.ttsEmotion?.let { body.put("ttsEmotion", it) }
+            payload.ttsPlaybackEngine?.let { body.put("ttsPlaybackEngine", it) }
+            payload.llmProvider?.let { body.put("llmProvider", it) }
+            body.put("updatedAt", payload.updatedAt)
                 .toString()
             val req = Request.Builder()
                 .url("${baseUrl.trimEnd('/')}/v1/sync/settings")
@@ -90,6 +96,47 @@ class AccountSyncManager(
                 .build()
             runCatching { http.newCall(req).execute().close() }
         }
+    }
+
+    suspend fun pullSettings(baseUrl: String): SyncSettingsPayload? = withContext(Dispatchers.IO) {
+        val token = authManager.getAccessToken(baseUrl) ?: return@withContext null
+        val req = Request.Builder()
+            .url("${baseUrl.trimEnd('/')}/v1/sync/settings")
+            .header("Authorization", "Bearer $token")
+            .get()
+            .build()
+        runCatching {
+            http.newCall(req).execute().use { resp ->
+                if (!resp.isSuccessful) return@withContext null
+                val json = JSONObject(resp.body?.string().orEmpty())
+                val s = json.optJSONObject("settings") ?: return@withContext null
+                SyncSettingsPayload(
+                    manualMode = if (s.has("manualMode")) s.getBoolean("manualMode") else null,
+                    autoIntercept = if (s.has("autoIntercept")) s.getBoolean("autoIntercept") else null,
+                    triggerMode = s.optString("triggerMode").ifBlank { null },
+                    everyNTracks = if (s.has("everyNTracks")) s.getInt("everyNTracks") else null,
+                    sameTrackStoryEveryN = if (s.has("sameTrackStoryEveryN")) s.getInt("sameTrackStoryEveryN") else null,
+                    specificArtists = s.optJSONArray("specificArtists")?.let { arr ->
+                        buildList {
+                            for (i in 0 until arr.length()) add(arr.optString(i))
+                        }
+                    },
+                    specificGenres = s.optJSONArray("specificGenres")?.let { arr ->
+                        buildList {
+                            for (i in 0 until arr.length()) add(arr.optString(i))
+                        }
+                    },
+                    storyLength = s.optString("storyLength").ifBlank { null },
+                    storyNarrator = s.optString("storyNarrator").ifBlank { null },
+                    ttsVoice = s.optString("ttsVoice").ifBlank { null },
+                    ttsSpeed = s.optString("ttsSpeed").ifBlank { null },
+                    ttsEmotion = s.optString("ttsEmotion").ifBlank { null },
+                    ttsPlaybackEngine = s.optString("ttsPlaybackEngine").ifBlank { null },
+                    llmProvider = s.optString("llmProvider").ifBlank { null },
+                    updatedAt = s.optLong("updatedAt", 0L),
+                )
+            }
+        }.getOrNull()
     }
 
     /**
@@ -269,14 +316,20 @@ class AccountSyncManager(
     }
 
     data class SyncSettingsPayload(
-        val manualMode: Boolean,
-        val autoIntercept: Boolean,
-        val triggerMode: String,
-        val everyNTracks: Int,
-        val sameTrackStoryEveryN: Int,
-        val specificArtists: List<String>,
-        val specificGenres: List<String>,
-        val storyLength: String,
+        val manualMode: Boolean? = null,
+        val autoIntercept: Boolean? = null,
+        val triggerMode: String? = null,
+        val everyNTracks: Int? = null,
+        val sameTrackStoryEveryN: Int? = null,
+        val specificArtists: List<String>? = null,
+        val specificGenres: List<String>? = null,
+        val storyLength: String? = null,
+        val storyNarrator: String? = null,
+        val ttsVoice: String? = null,
+        val ttsSpeed: String? = null,
+        val ttsEmotion: String? = null,
+        val ttsPlaybackEngine: String? = null,
+        val llmProvider: String? = null,
         val updatedAt: Long = System.currentTimeMillis(),
     )
 }

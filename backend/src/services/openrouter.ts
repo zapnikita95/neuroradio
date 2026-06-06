@@ -7,6 +7,7 @@ import { resolveStoryNarrator, StoryNarratorId } from './story-narrator.js';
 import { YandexVoiceId, voiceForYear } from './voices.js';
 import {
   countWords,
+  findLlmGarbage,
   sanitizeScriptForTts,
   validateStoryScript,
 } from './story-quality.js';
@@ -230,12 +231,34 @@ export async function generateStoryScript(
           qOpts,
         );
         if (sanitizedQuality.ok) {
-          console.warn(`Story sanitized after attempt ${attempt + 1}: ${quality.reason}`);
-          return finalizeStory({ ...story, script: sanitized }, { ...input, voiceId }, storyLength);
+          const originalReason = quality.ok ? '' : quality.reason;
+          const sanitizedGarbage = findLlmGarbage(sanitized);
+          const rejectSanitized =
+            sanitizedGarbage != null ||
+            originalReason.startsWith('llm garbage:') ||
+            originalReason.startsWith('no concrete fact') ||
+            originalReason.startsWith('ungrounded claim:');
+          if (rejectSanitized) {
+            console.warn(
+              `[openrouter] model=${model} sanitized rejected: ${sanitizedGarbage ?? originalReason}`,
+            );
+          } else {
+            console.warn(
+              `[openrouter] model=${model} sanitized ok (was: ${originalReason || 'ok'}) words=${countWords(sanitized)}`,
+            );
+            return finalizeStory({ ...story, script: sanitized }, { ...input, voiceId }, storyLength);
+          }
+        } else if (!sanitizedQuality.ok) {
+          console.warn(
+            `[openrouter] model=${model} quality reject: ${sanitizedQuality.reason ?? (!quality.ok ? quality.reason : 'quality')}`,
+          );
         }
 
         lastCandidate = { ...story, script: sanitized };
-        const rejectReason = sanitizedQuality.reason ?? quality.reason ?? 'quality';
+        const rejectReason =
+          (!sanitizedQuality.ok ? sanitizedQuality.reason : undefined) ??
+          (!quality.ok ? quality.reason : undefined) ??
+          'quality';
         const isPersonaOnly =
           /^(?:persona cliche|generic fiction|cliche filler):/i.test(rejectReason);
         if (isPersonaOnly && qOpts.skipPersonaCliches) {

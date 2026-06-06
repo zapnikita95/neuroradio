@@ -32,14 +32,29 @@ export const OPENROUTER_DEFAULT_STORY_MODEL = 'liquid/lfm-2.5-1.2b-instruct:free
 export const OPENROUTER_DEFAULT_MODEL = OPENROUTER_DEFAULT_FACT_MODEL;
 
 /**
- * Free-tier failover chain. User pick first; Liquid LFM before Nemotron for story JSON.
- * Gemma/Nemotron often 429 upstream; Liquid LFM is faster and more stable for story text.
+ * Free-tier failover chain for fact-hunt / JSON tasks.
+ * Story generation uses {@link OPENROUTER_FREE_STORY_MODEL_CHAIN} — no Liquid LFM (incoherent Russian).
  */
 export const OPENROUTER_FREE_MODEL_CHAIN: readonly string[] = [
   OPENROUTER_DEFAULT_FREE_FACT_MODEL,
+  OPENROUTER_FREE_FACT_MODEL_FALLBACK,
   OPENROUTER_DEFAULT_STORY_MODEL,
+];
+
+/** Free story chain: Gemma → Nemotron only. Liquid LFM is last-resort translate, not narration. */
+export const OPENROUTER_FREE_STORY_MODEL_CHAIN: readonly string[] = [
+  OPENROUTER_DEFAULT_FREE_FACT_MODEL,
   OPENROUTER_FREE_FACT_MODEL_FALLBACK,
 ];
+
+export function buildOpenRouterFreeStoryModelChain(preferred?: string): string[] {
+  const pref = preferred?.trim();
+  const base = [...OPENROUTER_FREE_STORY_MODEL_CHAIN];
+  if (pref && pref.includes('/') && pref.includes(':free') && !pref.includes('lfm-2.5')) {
+    return [pref, ...base.filter((m) => m !== pref)];
+  }
+  return base;
+}
 
 /** Dedupe while preserving order; put user-preferred :free model first. */
 export function buildOpenRouterFreeModelChain(preferred?: string): string[] {

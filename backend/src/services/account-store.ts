@@ -35,6 +35,12 @@ export interface SyncSettings {
   specificArtists?: string[];
   specificGenres?: string[];
   storyLength?: string;
+  storyNarrator?: string;
+  ttsVoice?: string;
+  ttsSpeed?: string;
+  ttsEmotion?: string;
+  ttsPlaybackEngine?: string;
+  llmProvider?: string;
   updatedAt?: number;
 }
 
@@ -409,7 +415,7 @@ export function pushSettings(installId: string, settings: SyncSettings): SyncSet
   const incomingAt = settings.updatedAt ?? Date.now();
   const currentAt = account.settings.updatedAt ?? 0;
   if (incomingAt >= currentAt) {
-    account.settings = { ...settings, updatedAt: incomingAt };
+    account.settings = { ...account.settings, ...settings, updatedAt: incomingAt };
     saveStore(store);
   }
   return account.settings;

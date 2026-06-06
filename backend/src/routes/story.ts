@@ -755,6 +755,22 @@ router.post('/full', validateStoryFullBody, storyFullRateLimit, async (req: Requ
         : 'no-seed',
     );
 
+    if (selectedFact?.fact) {
+      console.log('[story-pipeline] seed-fact-begin');
+      console.log(selectedFact.fact.slice(0, 500));
+      console.log('[story-pipeline] seed-fact-end');
+    } else if (storyReferenceFacts.length > 0) {
+      const preview = storyReferenceFacts
+        .filter((f) => !isMetadataOnlyFallbackFact(f))
+        .map((f) => f.slice(0, 200))
+        .join(' | ');
+      console.log(
+        `[story-pipeline] no selected seed; referenceFacts=${storyReferenceFacts.length} preview="${preview.slice(0, 240)}"`,
+      );
+    } else {
+      console.log('[story-pipeline] no seed and no reference facts before story LLM');
+    }
+
     throwIfStoryAborted(clientAbort, 'seed-ready');
 
     const { story, llmUsed } = await (async () => {
@@ -762,6 +778,40 @@ router.post('/full', validateStoryFullBody, storyFullRateLimit, async (req: Requ
       let effectiveStoryInput = storyInput;
 
       if (!hasGroundedSeed && !factFromBank) {
+        const realRefFacts = storyReferenceFacts.filter((f) => !isMetadataOnlyFallbackFact(f));
+        const snippetFirst = pickSalvageSnippetSeed(
+          factCtx.rawSnippets,
+          metadata.artist,
+          metadata.title,
+        );
+        if (snippetFirst) {
+          effectiveStoryInput = {
+            ...storyInput,
+            referenceFacts: [snippetFirst.fact],
+            selectedReferenceFact: snippetFirst,
+            rawSnippets: undefined,
+          };
+          console.log(
+            `[story-pipeline] early snippet salvage scope=${snippetFirst.scope} fact="${snippetFirst.fact.slice(0, 120)}"`,
+          );
+        } else if (realRefFacts.length > 0) {
+          const best = realRefFacts.sort((a, b) => interestScore(b) - interestScore(a))[0]!;
+          effectiveStoryInput = {
+            ...storyInput,
+            referenceFacts: [best],
+            selectedReferenceFact: {
+              fact: best,
+              scope: 'artist',
+              scopeLabelRu: 'группа/артист',
+              interestScore: interestScore(best),
+              interestRating: interestRating10(best),
+            },
+            rawSnippets: undefined,
+          };
+          console.log(
+            `[story-pipeline] use salvaged reference fact score=${interestScore(best)} fact="${best.slice(0, 120)}"`,
+          );
+        } else {
         const wikiLeadRaw = await pickArtistWikiContent({
           installId,
           artist: metadata.artist,
@@ -840,6 +890,7 @@ router.post('/full', validateStoryFullBody, storyFullRateLimit, async (req: Requ
             },
             rawSnippets: undefined,
           };
+        }
         }
       }
 

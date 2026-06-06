@@ -10,6 +10,7 @@ import {
   OPENROUTER_FREE_FACT_MODEL_FALLBACK,
   OPENROUTER_TRIAL_FACT_MODEL,
   buildOpenRouterFreeModelChain,
+  buildOpenRouterFreeStoryModelChain,
 } from './openrouter-models.js';
 
 /** Бесплатный: Gemma :free (+ fallback Nemotron). Trial: Gemma paid. Premium: DeepSeek V3. */
@@ -107,13 +108,13 @@ export function resolveOpenRouterFactModelsForTier(
   return [TIER_OPENROUTER_FACT_MODEL];
 }
 
-/** Free story: user pick → Liquid LFM → Nemotron; retries stay within OpenRouter only. */
+/** Free story: Gemma → Nemotron (no Liquid LFM — incoherent ungrounded slop). */
 export function resolveOpenRouterStoryModelsForTier(
   tier: UserTier,
   preferredModel?: string,
 ): string[] {
   if (tier === 'free') {
-    return buildOpenRouterFreeModelChain(
+    return buildOpenRouterFreeStoryModelChain(
       preferredModel?.trim() || resolveFreeModelProfile(preferredModel).modelId,
     );
   }
