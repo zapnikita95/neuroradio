@@ -47,10 +47,47 @@ export function isTruncatedMarketingSnippet(snippet: string): boolean {
   return false;
 }
 
+/** SEO, Reddit, platform UI — not a speakable story seed. */
+export function isUnspeakableWebSeed(snippet: string): boolean {
+  const trimmed = decodeHtmlEntities(snippet).trim();
+  if (isTruncatedMarketingSnippet(trimmed)) return true;
+  if (LOW_QUALITY_WEB_PREFIX.test(trimmed)) return true;
+  if (
+    /\b(?:sub\s*reddit|subreddit|subscribers?\s+in\s+the|\d[\d,.]*K?\s+subscribers?|dedicated to everything about|community\.?\s*A sub)\b/i.test(
+      trimmed,
+    )
+  ) {
+    return true;
+  }
+  if (/\bbrowse all\b|welcome to our daily|studio version\s*\/\s*music video/i.test(trimmed)) {
+    return true;
+  }
+  if (/\bwritten by\b/i.test(trimmed) && /\bbrowse all\b/i.test(trimmed)) return true;
+  if (
+    /\d[\d,.]*K?\b/.test(trimmed) &&
+    !/\b(?:wrote|written|recorded|album|song|track|band|duo|artist|single|chart|grammy|video|directed|advertisement|newspaper|formed|met)\b/i.test(
+      trimmed,
+    )
+  ) {
+    return true;
+  }
+  return false;
+}
+
+/** Fact strong enough to anchor LLM output + quality gate. */
+export function isSpeakableReferenceFact(fact: string): boolean {
+  const trimmed = decodeHtmlEntities(fact).trim();
+  if (trimmed.length < 35) return false;
+  if (isUnspeakableWebSeed(trimmed)) return false;
+  if (isWebListicleJunk(trimmed)) return false;
+  if (isBoringFact(trimmed) && !isBackstoryFact(trimmed)) return false;
+  return interestScore(trimmed) >= 6 || isBackstoryFact(trimmed);
+}
+
 export function isLowQualityWebSnippet(snippet: string): boolean {
   const trimmed = decodeHtmlEntities(snippet).trim();
   if (trimmed.length < 35) return true;
-  if (isTruncatedMarketingSnippet(trimmed)) return true;
+  if (isUnspeakableWebSeed(trimmed)) return true;
   if (LOW_QUALITY_WEB_PREFIX.test(trimmed)) return true;
   if (/^[\d.]+\.\s/.test(trimmed)) return true;
   if (/©\w{2,}\b|©Reddit/i.test(trimmed)) return true;

@@ -8,9 +8,11 @@ import { YandexVoiceId, voiceForYear } from './voices.js';
 import {
   countWords,
   findLlmGarbage,
+  referenceFactsAreAnchorable,
   sanitizeScriptForTts,
   validateStoryScript,
 } from './story-quality.js';
+import { factMentionsArtist } from './fact-relevance.js';
 import {
   DEFAULT_STORY_LENGTH,
   getStoryLengthPreset,
@@ -265,6 +267,17 @@ export async function generateStoryScript(
         if (isPersonaOnly && qOpts.skipPersonaCliches) {
           console.log(
             `[openrouter] persona-style note (not rejected in production): ${rejectReason}`,
+          );
+          return finalizeStory({ ...story, script: sanitized }, { ...input, voiceId }, storyLength);
+        }
+        if (
+          rejectReason === 'story ignores reference facts' &&
+          !referenceFactsAreAnchorable(referenceFacts) &&
+          factMentionsArtist(sanitized, input.artist) &&
+          !findLlmGarbage(sanitized)
+        ) {
+          console.warn(
+            `[openrouter] accept story with junk seed — artist named, lore ok (${countWords(sanitized)} words)`,
           );
           return finalizeStory({ ...story, script: sanitized }, { ...input, voiceId }, storyLength);
         }

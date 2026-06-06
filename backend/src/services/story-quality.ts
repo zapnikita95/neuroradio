@@ -7,7 +7,7 @@ import {
 import { COVER_CONTEXT_RE, factMentionsArtist, storyNamesForeignArtist } from './fact-relevance.js';
 import { hasEnglishLeak } from './story-russian-language.js';
 import { prepareStoryScriptLanguage } from './story-english-normalize.js';
-import { isTruncatedMarketingSnippet } from './web-snippet-accept.js';
+import { isTruncatedMarketingSnippet, isSpeakableReferenceFact } from './web-snippet-accept.js';
 import { interestScore } from './reference-fact-quality.js';
 import { fixSoloArtistPronounsRu } from './artist-grammar.js';
 
@@ -568,9 +568,7 @@ function matchesConceptBridge(fact: string, scriptWords: Set<string>): boolean {
 
 /** Skip anchor check when reference facts are SEO junk — LLM may still produce valid lore. */
 export function referenceFactsAreAnchorable(referenceFacts: string[]): boolean {
-  return referenceFacts.some(
-    (f) => f.trim().length > 0 && !isTruncatedMarketingSnippet(f) && interestScore(f) >= 6,
-  );
+  return referenceFacts.some((f) => isSpeakableReferenceFact(f));
 }
 
 /** Script must reflect at least one reference fact (Wikipedia anchor). */

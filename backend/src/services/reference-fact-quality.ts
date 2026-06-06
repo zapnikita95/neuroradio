@@ -1,5 +1,5 @@
 import { highImpactBonus } from './story-fact-hunt.js';
-import { isTruncatedMarketingSnippet } from './web-snippet-accept.js';
+import { isTruncatedMarketingSnippet, isUnspeakableWebSeed } from './web-snippet-accept.js';
 
 /** Filters dry encyclopedia lines; ranks human drama, breakthroughs, meaning — not working titles. */
 
@@ -109,6 +109,7 @@ export function interestScore(fact: string): number {
   let score = 0;
   const trimmed = fact.trim();
   if (isTruncatedMarketingSnippet(trimmed)) score -= 40;
+  if (isUnspeakableWebSeed(trimmed)) score -= 50;
   if (isCollectorFact(fact)) score += 8;
   if (BACKSTORY_FACT_PATTERNS.some((pattern) => pattern.test(fact))) score += 12;
   for (const pattern of STORY_FACT_PATTERNS) {
@@ -186,6 +187,7 @@ export function filterAndRankFacts(facts: string[], max = 6): string[] {
       return true;
     })
     .filter((fact) => !isTruncatedMarketingSnippet(fact))
+    .filter((fact) => !isUnspeakableWebSeed(fact))
     .sort((a, b) => interestScore(b) - interestScore(a))
     .filter((fact) => !isBoringFact(fact))
     .slice(0, max);

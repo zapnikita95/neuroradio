@@ -1,15 +1,15 @@
 import type { SelectedReferenceFact } from './fact-picker.js';
-import { factMentionsTitle, hasTrackContextSignal } from './fact-relevance.js';
+import { factMentionsArtist, factMentionsTitle, hasTrackContextSignal } from './fact-relevance.js';
 import { interestRating10 } from './fact-interest-log.js';
 import { isMetadataOnlyFallbackFact } from './metadata-facts.js';
 import { interestScore } from './reference-fact-quality.js';
-import { acceptSearchGroundedSnippet, isTruncatedMarketingSnippet } from './web-snippet-accept.js';
+import { acceptSearchGroundedSnippet, isSpeakableReferenceFact, isUnspeakableWebSeed } from './web-snippet-accept.js';
 
 /** Seed too weak to ground LLM + quality gate — upgrade to wiki/better facts. */
 export function isWeakSnippetSeed(fact: string, score = interestScore(fact)): boolean {
   const trimmed = fact.trim();
   if (score < 6) return true;
-  return isTruncatedMarketingSnippet(trimmed);
+  return isUnspeakableWebSeed(trimmed) || !isSpeakableReferenceFact(trimmed);
 }
 
 export function isWeakSelectedFact(selected: SelectedReferenceFact | null): boolean {
@@ -28,7 +28,13 @@ export function pickSalvageSnippetSeed(
     .filter((snippet) => snippet.length >= 35 && snippet.length <= 480)
     .filter((snippet) => acceptSearchGroundedSnippet(snippet, artist, title))
     .filter((snippet) => !isWeakSnippetSeed(snippet))
-    .sort((a, b) => interestScore(b) - interestScore(a));
+    .sort((a, b) => {
+      const boost = (s: string) =>
+        (factMentionsArtist(s, artist) ? 25 : 0) +
+        (factMentionsTitle(s, title) ? 15 : 0) +
+        (hasTrackContextSignal(s) ? 10 : 0);
+      return interestScore(b) + boost(b) - (interestScore(a) + boost(a));
+    });
 
   const best = ranked[0];
   if (!best || interestScore(best) < 6) return null;

@@ -174,8 +174,16 @@ export function finalizeAfterQualityLoop<T extends { script: string }>(
     ? anchorsReferenceFact(sanitized, referenceFacts)
     : true;
   if (!grounded) {
-    logRejectedScript('last script rejected on finalize', sanitized, 'not grounded in reference facts');
-    return null;
+    if (
+      !referenceFactsAreAnchorable(referenceFacts) &&
+      factMentionsArtist(sanitized, input.artist) &&
+      !findLlmGarbage(sanitized)
+    ) {
+      console.warn('[story] accepting last script — junk seed, artist lore ok');
+    } else {
+      logRejectedScript('last script rejected on finalize', sanitized, 'not grounded in reference facts');
+      return null;
+    }
   }
   const story = { ...lastCandidate, script: sanitized };
   console.warn('[story] accepting last script after quality retries exhausted');

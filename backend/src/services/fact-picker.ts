@@ -11,7 +11,7 @@ import {
 import { interestRating10 } from './fact-interest-log.js';
 import { WEAK_TRIVIA_PATTERNS } from './story-fact-hunt.js';
 import { isMetadataOnlyFallbackFact } from './metadata-facts.js';
-import { isTruncatedMarketingSnippet } from './web-snippet-accept.js';
+import { isTruncatedMarketingSnippet, isUnspeakableWebSeed } from './web-snippet-accept.js';
 import { splitBundleByScope, type RankedFactScope } from './fact-ranking.js';
 import { isAlbumScopeFact, factMentionsOtherTrackTitle, isMisattributedBandTrackFact } from './fact-relevance.js';
 
@@ -78,6 +78,7 @@ function isRejectedSeed(fact: string, title = ''): boolean {
   if (isBoringFact(fact)) return true;
   if (isCollectorFact(fact)) return true;
   if (isTruncatedMarketingSnippet(fact)) return true;
+  if (isUnspeakableWebSeed(fact)) return true;
   return false;
 }
 
