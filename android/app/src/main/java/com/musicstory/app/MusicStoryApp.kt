@@ -84,7 +84,11 @@ class MusicStoryApp : Application() {
         apiClient = ApiClient(backendAuthManager)
         accountSyncManager = AccountSyncManager(backendAuthManager)
         accountAuthManager = AccountAuthManager(backendAuthManager)
-        scrobbleRepository = ScrobbleRepository(database.scrobbleDao())
+        scrobbleRepository = ScrobbleRepository(
+            scrobbleDao = database.scrobbleDao(),
+            accountSyncManager = accountSyncManager,
+            settingsDataStore = settingsDataStore,
+        )
         val metadataEnricher = MetadataEnricher()
         val metadataCache = MetadataCache(metadataEnricher)
         storyRepository = StoryRepository(
@@ -126,8 +130,15 @@ class MusicStoryApp : Application() {
             val profile = accountAuthManager.fetchProfile(backendUrl) ?: return@launch
             if (!profile.isLoggedIn) return@launch
             settingsDataStore.setAccountLinked(true)
-            storyRepository.mergeHistoryFromServer(backendUrl)
+            syncAccountDataWithServer(backendUrl)
         }
+    }
+
+    suspend fun syncAccountDataWithServer(baseUrl: String) {
+        val url = baseUrl.trim()
+        if (url.isBlank()) return
+        storyRepository.syncAccountDataWithServer(url)
+        scrobbleRepository.syncAccountDataWithServer(url)
     }
 
     private fun prefetchBackendAuth() {

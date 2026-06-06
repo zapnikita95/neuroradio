@@ -46,7 +46,7 @@ private suspend fun finishAccountLogin(app: MusicStoryApp) {
     app.settingsDataStore.setAccountLinked(true)
     val url = app.settingsDataStore.backendUrl.first()
     if (url.isNotBlank()) {
-        app.storyRepository.mergeHistoryFromServer(url)
+        app.syncAccountDataWithServer(url)
     }
 }
 

@@ -98,6 +98,7 @@ class MediaControllerManager(
         val currentVolume = audioManager.getStreamVolume(AudioManager.STREAM_MUSIC)
         if (currentVolume <= 0) {
             controls.pause()
+            restoreSystemMusicVolumeIfNeeded()
             return
         }
         if (fadedStreamOriginalVolume == null) {
@@ -107,6 +108,7 @@ class MediaControllerManager(
         if (seconds <= 0.2f) {
             audioManager.setStreamVolume(AudioManager.STREAM_MUSIC, targetVolume, 0)
             controls.pause()
+            restoreSystemMusicVolumeIfNeeded()
             return
         }
         val steps = (seconds * 12f).toInt().coerceIn(8, 20)
@@ -118,6 +120,8 @@ class MediaControllerManager(
             delay(stepDelayMs)
         }
         controls.pause()
+        // Music stays paused via MediaSession; restore volume so ExoPlayer story audio is audible.
+        restoreSystemMusicVolumeIfNeeded()
     }
 
     /** Call when story ends, track changes, or user stops — fixes stuck silent STREAM_MUSIC. */

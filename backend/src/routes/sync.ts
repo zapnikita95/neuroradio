@@ -8,9 +8,15 @@ import {
   pullSettings,
   pushHistoryAsync,
   pushSettings,
+  resolveAccountId,
   type SyncHistoryEntry,
   type SyncSettings,
 } from '../services/account-store.js';
+import {
+  pgInsertScrobbleHistory,
+  pgListScrobbleHistory,
+  type SyncScrobbleEntry,
+} from '../services/scrobble-history-store.js';
 
 const router = Router();
 
@@ -113,6 +119,49 @@ router.post('/history', async (req: Request, res: Response) => {
     return;
   }
   res.json({ ok: true, history });
+});
+
+router.get('/scrobbles', async (req: Request, res: Response) => {
+  const since = parseInt(String(req.query.since ?? '0'), 10);
+  const installId = req.installId!;
+  const accountId = resolveAccountId(installId);
+  if (!accountId) {
+    res.status(404).json({ error: 'Not linked' });
+    return;
+  }
+  const scrobbles = await pgListScrobbleHistory(
+    installId,
+    accountId,
+    Number.isNaN(since) ? 0 : since,
+  );
+  res.json({ scrobbles });
+});
+
+router.post('/scrobbles', async (req: Request, res: Response) => {
+  const entry = req.body as SyncScrobbleEntry;
+  if (
+    !entry?.id ||
+    !entry.artist?.trim() ||
+    !entry.title?.trim() ||
+    typeof entry.scrobbledAt !== 'number'
+  ) {
+    res.status(400).json({ error: 'Invalid scrobble entry' });
+    return;
+  }
+
+  const installId = req.installId!;
+  let accountId = resolveAccountId(installId);
+  if (!accountId) {
+    createAccount(installId);
+    accountId = resolveAccountId(installId);
+  }
+  if (!accountId) {
+    res.status(200).json({ ok: false, skipped: true, reason: 'not_linked' });
+    return;
+  }
+
+  await pgInsertScrobbleHistory(installId, accountId, entry);
+  res.json({ ok: true });
 });
 
 export default router;

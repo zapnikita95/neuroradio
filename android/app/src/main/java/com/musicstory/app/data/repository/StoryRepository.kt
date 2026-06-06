@@ -99,6 +99,27 @@ class StoryRepository(
         }
     }
 
+    /** Pull cloud data down, then push local entries up (login / cold start). */
+    suspend fun syncAccountDataWithServer(baseUrl: String) {
+        mergeHistoryFromServer(baseUrl)
+        pushAllLocalHistoryToServer(baseUrl)
+    }
+
+    private suspend fun pushAllLocalHistoryToServer(baseUrl: String) {
+        val sync = accountSyncManager ?: return
+        val url = baseUrl.trim()
+        if (url.isBlank()) return
+        val syncCode = settingsDataStore.syncCode.first()
+        for (entry in storyHistoryDao.getAllRecent()) {
+            sync.pushHistoryEntry(
+                baseUrl = url,
+                entry = entry,
+                localSyncCode = syncCode,
+                onSyncCodeUpdated = { settingsDataStore.setSyncCode(it) },
+            )
+        }
+    }
+
     /** Send feedback and persist vote locally + in cloud history when linked. */
     suspend fun submitStoryFeedback(
         entry: StoryHistoryEntry,
@@ -823,12 +844,10 @@ class StoryRepository(
             val sync = accountSyncManager ?: return@launch
             val url = settingsDataStore.backendUrl.first()
             if (url.isBlank()) return@launch
-            val syncCode = settingsDataStore.syncCode.first()
-            if (syncCode.isBlank() && !settingsDataStore.accountLinked.first()) return@launch
             sync.pushHistoryEntry(
                 baseUrl = url,
                 entry = entry,
-                localSyncCode = syncCode,
+                localSyncCode = settingsDataStore.syncCode.first(),
                 onSyncCodeUpdated = { settingsDataStore.setSyncCode(it) },
             )
         }

@@ -147,6 +147,87 @@ class AccountSyncManager(
             }.getOrNull()
         }
 
+    suspend fun pullScrobbles(baseUrl: String, since: Long = 0): List<com.musicstory.app.data.local.ScrobbleEntry>? =
+        withContext(Dispatchers.IO) {
+            val token = authManager.getAccessToken(baseUrl) ?: return@withContext null
+            val req = Request.Builder()
+                .url("${baseUrl.trimEnd('/')}/v1/sync/scrobbles?since=$since")
+                .header("Authorization", "Bearer $token")
+                .get()
+                .build()
+            runCatching {
+                http.newCall(req).execute().use { resp ->
+                    if (!resp.isSuccessful) return@withContext null
+                    val json = JSONObject(resp.body?.string().orEmpty())
+                    val arr = json.optJSONArray("scrobbles") ?: return@withContext emptyList()
+                    buildList {
+                        for (i in 0 until arr.length()) {
+                            val item = arr.optJSONObject(i) ?: continue
+                            add(
+                                com.musicstory.app.data.local.ScrobbleEntry(
+                                    serverId = item.optString("id").ifBlank { null },
+                                    artist = item.optString("artist"),
+                                    title = item.optString("title"),
+                                    album = item.optString("album").ifBlank { null },
+                                    genre = item.optString("genre").ifBlank { null },
+                                    packageName = item.optString("packageName").ifBlank { null },
+                                    storyTriggered = item.optBoolean("storyTriggered"),
+                                    scrobbledAt = item.optLong("scrobbledAt", System.currentTimeMillis()),
+                                ),
+                            )
+                        }
+                    }
+                }
+            }.getOrNull()
+        }
+
+    suspend fun pushScrobbleEntry(
+        baseUrl: String,
+        entry: com.musicstory.app.data.local.ScrobbleEntry,
+        localSyncCode: String = "",
+        onSyncCodeUpdated: suspend (String) -> Unit = {},
+    ) {
+        withContext(Dispatchers.IO) {
+            val token = authManager.getAccessToken(baseUrl) ?: return@withContext
+            val syncId = entry.serverId?.takeIf { it.isNotBlank() } ?: UUID.randomUUID().toString()
+            val body = JSONObject()
+                .put("id", syncId)
+                .put("artist", entry.artist)
+                .put("title", entry.title)
+                .put("scrobbledAt", entry.scrobbledAt)
+                .put("storyTriggered", entry.storyTriggered)
+            entry.album?.let { body.put("album", it) }
+            entry.genre?.let { body.put("genre", it) }
+            entry.packageName?.let { body.put("packageName", it) }
+
+            fun postOnce(): Int {
+                val req = Request.Builder()
+                    .url("${baseUrl.trimEnd('/')}/v1/sync/scrobbles")
+                    .header("Authorization", "Bearer $token")
+                    .post(body.toString().toRequestBody("application/json".toMediaType()))
+                    .build()
+                return runCatching {
+                    http.newCall(req).execute().use { it.code }
+                }.getOrDefault(-1)
+            }
+
+            when (postOnce()) {
+                200, 201 -> return@withContext
+                404 -> {
+                    if (!ensureSyncRegistered(baseUrl, localSyncCode, onSyncCodeUpdated)) return@withContext
+                    postOnce()
+                }
+            }
+        }
+    }
+
+    data class SyncStatus(
+        val linked: Boolean,
+        val accountId: String?,
+        val syncCode: String?,
+        val deviceCount: Int,
+    )
+
     suspend fun pushHistoryEntry(
         baseUrl: String,
         entry: StoryHistoryEntry,
@@ -186,13 +267,6 @@ class AccountSyncManager(
             }
         }
     }
-
-    data class SyncStatus(
-        val linked: Boolean,
-        val accountId: String?,
-        val syncCode: String?,
-        val deviceCount: Int,
-    )
 
     data class SyncSettingsPayload(
         val manualMode: Boolean,

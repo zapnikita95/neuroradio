@@ -811,6 +811,15 @@ export async function verifyEmailLogin(
   await saveStoreAsync(store);
   if (hasPostgres()) {
     await pgDeletePendingEmailCode(email);
+    const { pgReassignStoryHistoryForInstall, pgReassignScrobbleHistoryForInstall } =
+      await import('./scrobble-history-store.js');
+    const storyRows = await pgReassignStoryHistoryForInstall(normalized, accountId);
+    const scrobbleRows = await pgReassignScrobbleHistoryForInstall(normalized, accountId);
+    if (storyRows > 0 || scrobbleRows > 0) {
+      console.log(
+        `[email-auth] reassigned history install=${normalized} account=${accountId} stories=${storyRows} scrobbles=${scrobbleRows}`,
+      );
+    }
   }
   return { ok: true, accountId };
 }

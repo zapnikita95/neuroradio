@@ -3,7 +3,7 @@ package com.musicstory.app.ui.components
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -22,7 +22,6 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.musicstory.app.domain.GenerationPreviewState
 import com.musicstory.app.ui.theme.CreamText
-import com.musicstory.app.ui.theme.MutedLavender
 import kotlinx.coroutines.delay
 
 @Composable
@@ -44,26 +43,22 @@ fun GenerationStoryPreview(
 
     if (visibleText.isBlank()) return
 
+    val previewHeight = (LocalConfiguration.current.screenHeightDp * 0.22f).coerceIn(96f, 200f).dp
     val scrollState = rememberScrollState()
-    LaunchedEffect(visibleText) {
+    val revealComplete = preview.visibleWordCount >= preview.words.size
+
+    LaunchedEffect(revealComplete) {
+        if (!revealComplete) return@LaunchedEffect
+        delay(80L)
         if (scrollState.maxValue > 0) {
-            val target = scrollState.maxValue
-            val step = (target / 90).coerceAtLeast(1)
-            var current = 0
-            while (current < target) {
-                current = (current + step).coerceAtMost(target)
-                scrollState.scrollTo(current)
-                delay(42L)
-            }
+            scrollState.scrollTo(scrollState.maxValue)
         }
     }
-
-    val maxHeight = (LocalConfiguration.current.screenHeightDp * 0.22f).coerceIn(96f, 200f).dp
 
     Surface(
         modifier = modifier
             .fillMaxWidth()
-            .heightIn(min = 48.dp, max = maxHeight)
+            .height(previewHeight)
             .alpha(animatedAlpha)
             .padding(horizontal = 2.dp, vertical = 6.dp),
         shape = RoundedCornerShape(16.dp),
@@ -74,14 +69,10 @@ fun GenerationStoryPreview(
             text = visibleText,
             modifier = Modifier
                 .fillMaxWidth()
-                .verticalScroll(scrollState)
+                .verticalScroll(scrollState, enabled = revealComplete)
                 .padding(horizontal = 12.dp, vertical = 10.dp),
             style = MaterialTheme.typography.bodyLarge,
-            color = if (preview.visibleWordCount >= preview.words.size) {
-                CreamText
-            } else {
-                MutedLavender
-            },
+            color = CreamText,
             textAlign = TextAlign.Center,
             softWrap = true,
         )

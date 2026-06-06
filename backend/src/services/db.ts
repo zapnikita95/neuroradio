@@ -102,6 +102,22 @@ CREATE TABLE IF NOT EXISTS pending_email_codes (
   install_id TEXT NOT NULL,
   expires_at BIGINT NOT NULL
 );
+
+CREATE TABLE IF NOT EXISTS scrobble_history (
+  id UUID PRIMARY KEY,
+  install_id TEXT NOT NULL,
+  account_id TEXT,
+  artist TEXT NOT NULL,
+  title TEXT NOT NULL,
+  album TEXT,
+  genre TEXT,
+  package_name TEXT,
+  story_triggered BOOLEAN NOT NULL DEFAULT false,
+  scrobbled_at BIGINT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS scrobble_history_account_idx ON scrobble_history (account_id, scrobbled_at DESC);
+CREATE INDEX IF NOT EXISTS scrobble_history_install_idx ON scrobble_history (install_id, scrobbled_at DESC);
 `;
 
 export async function initPostgres(): Promise<void> {

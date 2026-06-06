@@ -37,6 +37,9 @@ interface StoryHistoryDao {
     @Query("SELECT * FROM story_history ORDER BY playedAt DESC")
     fun observeAll(): Flow<List<StoryHistoryEntry>>
 
+    @Query("SELECT * FROM story_history ORDER BY playedAt DESC LIMIT :limit")
+    suspend fun getAllRecent(limit: Int = 500): List<StoryHistoryEntry>
+
     @Query(
         """
         SELECT script FROM story_history

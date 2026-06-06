@@ -70,6 +70,20 @@ interface ScrobbleDao {
     )
     fun observeTopGenres(limit: Int): Flow<List<ScrobbleGenreStat>>
 
+    @Query("SELECT COUNT(*) FROM scrobble_entries WHERE serverId = :serverId")
+    suspend fun countByServerId(serverId: String): Int
+
+    @Query(
+        """
+        SELECT COUNT(*) FROM scrobble_entries
+        WHERE artist = :artist AND title = :title AND scrobbledAt = :scrobbledAt
+        """,
+    )
+    suspend fun countByTrackAndTime(artist: String, title: String, scrobbledAt: Long): Int
+
+    @Query("SELECT * FROM scrobble_entries ORDER BY scrobbledAt DESC LIMIT :limit")
+    suspend fun getRecent(limit: Int = 500): List<ScrobbleEntry>
+
     @Query("DELETE FROM scrobble_entries")
     suspend fun deleteAll()
 }

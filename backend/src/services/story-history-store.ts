@@ -108,8 +108,8 @@ export async function pgListStoryHistory(
     FROM story_history WHERE played_at > $1`;
 
   if (accountId) {
-    params.push(accountId);
-    sql += ` AND account_id = $2`;
+    params.push(accountId, normalized);
+    sql += ` AND (account_id = $2 OR install_id = $3)`;
   } else {
     params.push(normalized);
     sql += ` AND install_id = $2 AND account_id IS NULL`;
