@@ -55,7 +55,7 @@
     <string name="tour_step_music_title">Музыка во время истории</string>
     <string name="tour_step_music_body">Пауза ставится, когда начинается озвучка, не раньше. Затухание — плавное приглушение перед речью.</string>
     <string name="tour_step_ai_title">Нейросеть</string>
-    <string name="tour_step_ai_body">DeepSeek V3 — лучшая для фактов (~$0.20/M). Nemotron :free — бесплатная альтернатива. Свой ключ снимает лимит сервера.</string>
+    <string name="tour_step_ai_body">DeepSeek V3 — лучшая для фактов на подписке. Бесплатно — Gemma 4 на сервере. Свой ключ OpenRouter снимает лимит сервера.</string>
 
     <string name="power_mode_on">Включено</string>
     <string name="power_mode_parse">Только слушаем</string>
@@ -94,13 +94,15 @@
     <string name="hint_api_key_required">Сначала укажи API-ключ: Настройки → AI → Продвинутые настройки → вставь ключ → Сохранить и проверить</string>
     <string name="hint_api_key_missing_banner">Свой API-ключ не указан — истории идут через сервер (лимит free/trial). Ключ в Настройки → Продвинутые настройки снимает лимит.</string>
     <string name="settings_premium_locked_hint">Доступно по подписке (или укажи свой API-ключ для ручного режима)</string>
-    <string name="settings_free_model_section">Бесплатная модель на сервере (лимиты не суммируются)</string>
+    <string name="settings_free_model_section">Модель на сервере</string>
+    <string name="settings_server_llm_free">Модель сервера: %1$s</string>
+    <string name="settings_server_llm_free_hint">На бесплатном тарифе сервер всегда использует Gemma 4 — без выбора модели.</string>
     <string name="settings_ai_advanced_collapsible">Продвинутые настройки</string>
     <string name="settings_ai_advanced_summary">%1$s · %2$s</string>
     <string name="settings_ai_server_section">Модель по подписке</string>
     <string name="settings_ai_own_key_active">Истории идут через ваш API-ключ — лимиты сервера не применяются.</string>
     <string name="settings_server_llm_premium">Модель сервера: %1$s</string>
-    <string name="settings_server_llm_premium_hint">На подписке сервер всегда использует одну модель — без выбора Nemotron/Gemma.</string>
+    <string name="settings_server_llm_premium_hint">На подписке сервер всегда использует одну модель — DeepSeek V3.</string>
     <string name="label_source">Источник: %1$s</string>
     <string name="label_orchestrator">Режим работы</string>
     <string name="label_tracks_until_story">До следующей истории: %1$d трек(ов)</string>

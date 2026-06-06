@@ -953,7 +953,8 @@ fun SettingsScreen(
                     )
                     isFreeServerTier -> {
                         val quotaLabel = dailyQuota?.let { formatServerQuotaLabel(context, it) }.orEmpty()
-                        if (quotaLabel.isNotBlank()) "${openRouterModel.labelRu} · $quotaLabel" else openRouterModel.labelRu
+                        val modelLabel = OpenRouterModel.defaultFreeServer.labelRu
+                        if (quotaLabel.isNotBlank()) "$modelLabel · $quotaLabel" else modelLabel
                     }
                     dailyQuota != null -> formatServerQuotaLabel(context, dailyQuota!!)
                     else -> context.getString(R.string.settings_groq_status_missing)
@@ -1017,20 +1018,19 @@ fun SettingsScreen(
                         )
                         Spacer(modifier = Modifier.height(8.dp))
                         Text(
-                            text = context.getString(R.string.settings_free_model_section),
+                            text = context.getString(
+                                R.string.settings_server_llm_free,
+                                OpenRouterModel.defaultFreeServer.labelRu,
+                            ),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = CreamText,
+                        )
+                        Text(
+                            text = context.getString(R.string.settings_server_llm_free_hint),
                             style = MaterialTheme.typography.bodySmall,
                             color = MutedLavender,
+                            modifier = Modifier.padding(top = 4.dp, bottom = 8.dp),
                         )
-                        Spacer(modifier = Modifier.height(8.dp))
-                        OpenRouterModel.freeServerPresets.forEach { model ->
-                            NarratorRadioRow(
-                                label = model.labelRu,
-                                description = model.descriptionRu,
-                                selected = openRouterModel == model,
-                                onSelect = { scope.launch { settings.setOpenRouterModel(model) } },
-                            )
-                        }
-                        Spacer(modifier = Modifier.height(8.dp))
                     }
 
                     if (!hasPersonalKey) {

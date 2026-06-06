@@ -16,20 +16,20 @@ enum class OpenRouterModel(
     ),
     GEMMA_4_26B_FREE(
         id = "google/gemma-4-26b-a4b-it:free",
-        labelRu = "Gemma 4 (бесплатно)",
-        descriptionRu = "Быстрее, факты точнее — до 5 историй в день",
+        labelRu = "Gemma 4 (legacy :free)",
+        descriptionRu = "Устарело — сервер использует paid Gemma",
         stable = true,
     ),
-        NEMOTRON_NANO(
+    NEMOTRON_NANO(
         id = "nvidia/nemotron-3-nano-30b-a3b:free",
-        labelRu = "Nemotron (бесплатно)",
-        descriptionRu = "Может думать дольше, до 10 историй в день — лимиты не суммируются",
+        labelRu = "Nemotron (legacy)",
+        descriptionRu = "Убрано с бесплатного тарифа",
         stable = true,
     ),
     GEMMA_4_26B(
         id = "google/gemma-4-26b-a4b-it",
-        labelRu = "Gemma 4 26B",
-        descriptionRu = "Дешёвая (~$0.06/M) — JSON и факты",
+        labelRu = "Gemma 4",
+        descriptionRu = "Бесплатный тариф на сервере — стабильная модель (~$0.06/M)",
         stable = true,
     ),
     LIQUID_LFM(
@@ -59,15 +59,17 @@ enum class OpenRouterModel(
     }
 
     companion object {
-        fun fromId(id: String?): OpenRouterModel =
-            entries.firstOrNull { it.id == id?.trim() } ?: DEEPSEEK_V3
+        fun fromId(id: String?): OpenRouterModel {
+            val trimmed = id?.trim()
+            if (trimmed == NEMOTRON_NANO.id || trimmed == GEMMA_4_26B_FREE.id) return defaultFreeServer
+            return entries.firstOrNull { it.id == trimmed } ?: DEEPSEEK_V3
+        }
 
         val defaultRecommended: OpenRouterModel get() = DEEPSEEK_V3
 
-        val freeServerPresets: List<OpenRouterModel> =
-            listOf(GEMMA_4_26B_FREE, NEMOTRON_NANO)
+        val freeServerPresets: List<OpenRouterModel> = listOf(GEMMA_4_26B)
 
-        val defaultFreeServer: OpenRouterModel get() = GEMMA_4_26B_FREE
+        val defaultFreeServer: OpenRouterModel get() = GEMMA_4_26B
 
         /** Presets verified stable — shown first in settings. */
         val stablePresets: List<OpenRouterModel> =
