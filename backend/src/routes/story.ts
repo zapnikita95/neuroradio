@@ -89,6 +89,7 @@ import {
   recordStoryFeedback,
   type FeedbackVote,
 } from '../services/story-feedback.js';
+import { updateHistoryVoteAsync } from '../services/account-store.js';
 import type { StoryLengthId } from '../services/story-length.js';
 import type { StoryNarratorId } from '../services/story-narrator.js';
 import type { TtsVoiceSetting } from '../services/voices.js';
@@ -998,6 +999,8 @@ router.post('/feedback', (req: Request, res: Response) => {
     return;
   }
   const vote = voteRaw as FeedbackVote;
+  const historyId =
+    typeof req.body?.historyId === 'string' ? req.body.historyId.trim() : undefined;
 
   const reasonsRaw = req.body?.reasons;
   const reasons: string[] = Array.isArray(reasonsRaw)
@@ -1018,6 +1021,14 @@ router.post('/feedback', (req: Request, res: Response) => {
   const ids = uniqueReasons.map((reason) =>
     recordStoryFeedback({ installId, artist, title, vote, reason, script }).id,
   );
+  if (historyId) {
+    void updateHistoryVoteAsync(installId, historyId, vote).catch((err) =>
+      console.warn(
+        '[feedback] history vote update failed:',
+        err instanceof Error ? err.message : err,
+      ),
+    );
+  }
   res.json({ ok: true, ids, count: ids.length });
 });
 

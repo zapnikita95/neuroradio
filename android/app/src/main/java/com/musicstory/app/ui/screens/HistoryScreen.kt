@@ -1,8 +1,13 @@
 package com.musicstory.app.ui.screens
 
 import androidx.compose.animation.animateContentSize
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -46,13 +51,17 @@ import com.musicstory.app.data.local.ScrobbleEntry
 import com.musicstory.app.data.local.StoryHistoryEntry
 import com.musicstory.app.ui.components.GlassCard
 import com.musicstory.app.ui.components.MusicStoryBackground
+import com.musicstory.app.ui.components.SecondaryStoryButton
 import com.musicstory.app.ui.components.SourceBadge
 import com.musicstory.app.ui.components.VinylDisc
 import com.musicstory.app.ui.theme.CreamText
 import com.musicstory.app.ui.theme.DeepVoid
+import com.musicstory.app.ui.theme.ErrorCoral
 import com.musicstory.app.ui.theme.GoldBright
+import com.musicstory.app.ui.theme.GoldWarm
 import com.musicstory.app.ui.theme.LiveGreen
 import com.musicstory.app.ui.theme.MutedLavender
+import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -129,6 +138,7 @@ private fun StoryHistoryTab(app: MusicStoryApp) {
                     onToggle = {
                         expandedId = if (expandedId == entry.id) -1L else entry.id
                     },
+                    app = app,
                 )
             }
         }
@@ -182,6 +192,7 @@ private fun StoryHistoryItem(
     entry: StoryHistoryEntry,
     expanded: Boolean,
     onToggle: () -> Unit,
+    app: MusicStoryApp,
 ) {
     val context = LocalContext.current
     val formatter = rememberDateFormatter()
@@ -249,6 +260,10 @@ private fun StoryHistoryItem(
                         modifier = Modifier.padding(top = 4.dp),
                     )
                 }
+                if (expanded) {
+                    Spacer(modifier = Modifier.height(12.dp))
+                    HistoryStoryFeedbackBlock(entry = entry, app = app)
+                }
             }
             Icon(
                 imageVector = if (expanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
@@ -264,6 +279,142 @@ private fun StoryHistoryItem(
             )
         }
     }
+}
+
+@Composable
+private fun HistoryStoryFeedbackBlock(
+    entry: StoryHistoryEntry,
+    app: MusicStoryApp,
+) {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    var vote by remember(entry.id, entry.vote) { mutableStateOf(entry.vote) }
+    var pickVote by remember { mutableStateOf<String?>(null) }
+    var selectedReasons by remember { mutableStateOf(setOf<String>()) }
+    var sending by remember { mutableStateOf(false) }
+    var sent by remember { mutableStateOf(false) }
+
+    val likeReasons = listOf(
+        "interesting_fact" to R.string.feedback_like_interesting,
+        "good_speech" to R.string.feedback_like_speech,
+        "good_persona" to R.string.feedback_like_persona,
+    )
+    val dislikeReasons = listOf(
+        "hallucination" to R.string.feedback_dislike_hallucination,
+        "boring_fact" to R.string.feedback_dislike_boring,
+        "unnatural_voice" to R.string.feedback_dislike_voice,
+        "speech_manner" to R.string.feedback_dislike_manner,
+    )
+
+    if (vote != null) {
+        Text(
+            text = if (vote == "like") {
+                context.getString(R.string.history_voted_like)
+            } else {
+                context.getString(R.string.history_voted_dislike)
+            },
+            style = MaterialTheme.typography.labelMedium,
+            color = if (vote == "like") LiveGreen else ErrorCoral,
+        )
+        return
+    }
+
+    if (sent) {
+        Text(
+            text = context.getString(R.string.feedback_thanks),
+            style = MaterialTheme.typography.labelMedium,
+            color = LiveGreen,
+        )
+        return
+    }
+
+    Text(
+        text = context.getString(R.string.history_rate_story),
+        style = MaterialTheme.typography.labelMedium,
+        color = MutedLavender,
+    )
+    Spacer(modifier = Modifier.height(8.dp))
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(16.dp, Alignment.CenterHorizontally),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        HistoryVoteChip(
+            label = context.getString(R.string.feedback_like),
+            selected = pickVote == "like",
+            onClick = {
+                pickVote = "like"
+                selectedReasons = emptySet()
+            },
+        )
+        HistoryVoteChip(
+            label = context.getString(R.string.feedback_dislike),
+            selected = pickVote == "dislike",
+            onClick = {
+                pickVote = "dislike"
+                selectedReasons = emptySet()
+            },
+        )
+    }
+
+    pickVote?.let { selectedVote ->
+        Spacer(modifier = Modifier.height(10.dp))
+        val reasons = if (selectedVote == "like") likeReasons else dislikeReasons
+        reasons.forEach { (reasonId, labelRes) ->
+            val picked = selectedReasons.contains(reasonId)
+            Text(
+                text = context.getString(labelRes),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 3.dp)
+                    .clip(RoundedCornerShape(10.dp))
+                    .background(
+                        if (picked) GoldBright.copy(alpha = 0.20f) else GoldWarm.copy(alpha = 0.08f),
+                    )
+                    .clickable {
+                        selectedReasons = if (picked) selectedReasons - reasonId else selectedReasons + reasonId
+                    }
+                    .padding(horizontal = 12.dp, vertical = 10.dp),
+                style = MaterialTheme.typography.bodySmall,
+                color = if (picked) CreamText else MutedLavender,
+            )
+        }
+        Spacer(modifier = Modifier.height(8.dp))
+        SecondaryStoryButton(
+            text = context.getString(R.string.feedback_send),
+            enabled = selectedReasons.isNotEmpty() && !sending,
+            onClick = {
+                if (sending) return@SecondaryStoryButton
+                sending = true
+                scope.launch {
+                    val ok = app.storyRepository.submitStoryFeedback(
+                        entry = entry,
+                        vote = selectedVote,
+                        reasons = selectedReasons.toList(),
+                    )
+                    if (ok) {
+                        vote = selectedVote
+                        sent = true
+                    }
+                    sending = false
+                }
+            },
+        )
+    }
+}
+
+@Composable
+private fun HistoryVoteChip(label: String, selected: Boolean, onClick: () -> Unit) {
+    Text(
+        text = label,
+        modifier = Modifier
+            .clip(RoundedCornerShape(12.dp))
+            .background(if (selected) GoldBright.copy(alpha = 0.24f) else GoldWarm.copy(alpha = 0.10f))
+            .clickable(onClick = onClick)
+            .padding(horizontal = 20.dp, vertical = 10.dp),
+        style = MaterialTheme.typography.titleMedium,
+        color = if (selected) CreamText else MutedLavender,
+    )
 }
 
 @Composable

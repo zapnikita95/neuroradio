@@ -116,6 +116,18 @@ class MusicStoryApp : Application() {
         )
         scheduleBackgroundAuthRefresh()
         prefetchBackendAuth()
+        prefetchAccountHistory()
+    }
+
+    private fun prefetchAccountHistory() {
+        appScope.launch {
+            val backendUrl = settingsDataStore.backendUrl.first().trim()
+            if (backendUrl.isBlank()) return@launch
+            val profile = accountAuthManager.fetchProfile(backendUrl) ?: return@launch
+            if (!profile.isLoggedIn) return@launch
+            settingsDataStore.setAccountLinked(true)
+            storyRepository.mergeHistoryFromServer(backendUrl)
+        }
     }
 
     private fun prefetchBackendAuth() {

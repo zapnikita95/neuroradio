@@ -65,6 +65,7 @@ CREATE TABLE IF NOT EXISTS story_history (
   seed_fact TEXT,
   seed_scope TEXT,
   interest_rating INT,
+  vote TEXT,
   played_at BIGINT NOT NULL
 );
 
@@ -101,6 +102,7 @@ export async function initPostgres(): Promise<void> {
   const client = await getPool().connect();
   try {
     await client.query(SCHEMA);
+    await client.query('ALTER TABLE story_history ADD COLUMN IF NOT EXISTS vote TEXT');
     console.log('[postgres] schema ready');
   } finally {
     client.release();

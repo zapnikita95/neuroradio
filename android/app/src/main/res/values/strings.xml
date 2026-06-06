@@ -217,6 +217,9 @@
     <string name="history_tap_to_expand">Нажми, чтобы прочитать целиком</string>
     <string name="history_expand">Развернуть</string>
     <string name="history_collapse">Свернуть</string>
+    <string name="history_rate_story">Оцени рассказ</string>
+    <string name="history_voted_like">Ты поставил 👍</string>
+    <string name="history_voted_dislike">Ты поставил 👎</string>
 
     <string name="settings_auth_section">Аккаунт</string>
     <string name="settings_auth_summary">Email или Telegram — история в облаке</string>

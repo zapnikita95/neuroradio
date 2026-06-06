@@ -45,4 +45,5 @@ data class StoryFeedbackRequest(
     val reason: String? = null,
     val reasons: List<String>? = null,
     val script: String? = null,
+    val historyId: String? = null,
 )

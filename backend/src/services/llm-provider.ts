@@ -30,8 +30,8 @@ export function clientKeyForProvider(
 
 export const LLM_PROVIDER_ORDER: LlmProviderId[] = ['openrouter', 'groq', 'gemini', 'local'];
 
-/** Story generation — no Gemini (quota) or local Ollama on Railway. */
-export const STORY_LLM_FALLBACK_ORDER: LlmProviderId[] = ['openrouter', 'groq'];
+/** Story generation — OpenRouter only on server; Groq only with client key in advanced settings. */
+export const STORY_LLM_FALLBACK_ORDER: LlmProviderId[] = ['openrouter'];
 
 function isKnownProvider(raw: string): raw is LlmProviderId {
   return raw === 'openrouter' || raw === 'groq' || raw === 'gemini' || raw === 'local';
@@ -42,11 +42,11 @@ export function resolveLlmProvider(override?: unknown): LlmProviderId {
   if (isKnownProvider(raw)) return raw;
   const fromEnv = process.env.LLM_PROVIDER?.trim().toLowerCase();
   if (fromEnv && isKnownProvider(fromEnv)) return fromEnv;
+  if (hasOpenRouterApiKey()) return 'openrouter';
   if (hasGroqApiKey()) return 'groq';
   if (hasGeminiApiKey()) return 'gemini';
-  if (hasOpenRouterApiKey()) return 'openrouter';
   if (hasLocalOllamaConfigured()) return 'local';
-  return 'groq';
+  return 'openrouter';
 }
 
 export function hasLlmKeyForProvider(
@@ -74,8 +74,8 @@ export function alternateLlmProviders(
 }
 
 /**
- * Free tier without own key: OpenRouter :free chain first, then server Groq if all models 429.
- * Paid/own-key: OpenRouter → Groq, never Gemini/local.
+ * Server-managed stories: OpenRouter model chain only (no server Groq).
+ * Groq appears only when the user supplied their own key in advanced settings.
  */
 export function alternateStoryLlmProviders(
   preferred: LlmProviderId,
@@ -83,13 +83,12 @@ export function alternateStoryLlmProviders(
   clientLocal?: ClientLocalOllama,
   options: { serverManaged?: boolean } = {},
 ): LlmProviderId[] {
-  if (options.serverManaged) {
-    return STORY_LLM_FALLBACK_ORDER.filter(
-      (p) => p === 'groq' && p !== preferred && hasLlmKeyForProvider(p, clientKeys, clientLocal),
-    );
-  }
+  if (options.serverManaged) return [];
   return STORY_LLM_FALLBACK_ORDER.filter(
-    (p) => p !== preferred && hasLlmKeyForProvider(p, clientKeys, clientLocal),
+    (p) =>
+      p !== preferred &&
+      (p !== 'groq' || Boolean(clientKeys?.groq?.trim())) &&
+      hasLlmKeyForProvider(p, clientKeys, clientLocal),
   );
 }
 

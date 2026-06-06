@@ -57,12 +57,12 @@ export function resolveFactHuntMode(): FactHuntMode {
 
 export function resolveFactHuntProvider(preferred: LlmProviderId): LlmProviderId {
   const env = process.env.LLM_FACT_PROVIDER?.trim().toLowerCase();
-  if (env === 'groq' || env === 'gemini' || env === 'openrouter') return env;
-  if (preferred !== 'local') return preferred;
-  if (hasLlmKeyForProvider('groq')) return 'groq';
-  if (hasLlmKeyForProvider('gemini')) return 'gemini';
+  if (env === 'openrouter' || env === 'groq' || env === 'gemini') return env;
+  if (preferred === 'groq' || preferred === 'gemini' || preferred === 'openrouter') return preferred;
   if (hasLlmKeyForProvider('openrouter')) return 'openrouter';
-  return 'groq';
+  if (hasLlmKeyForProvider('gemini')) return 'gemini';
+  if (hasLlmKeyForProvider('groq')) return 'groq';
+  return 'openrouter';
 }
 
 export const FAST_SEED_INTEREST_SCORE = parseInt(process.env.FAST_SEED_INTEREST_SCORE ?? '7', 10);

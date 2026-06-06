@@ -48,6 +48,7 @@ import kotlinx.coroutines.withTimeout
 import retrofit2.HttpException
 import java.io.IOException
 import java.net.SocketTimeoutException
+import java.util.UUID
 
 class StoryRepository(
     private val storyDao: StoryDao,
@@ -65,15 +66,85 @@ class StoryRepository(
 
     val storyHistory: Flow<List<StoryHistoryEntry>> = storyHistoryDao.observeAll()
 
-    /** Pull cloud history after email/Telegram login and merge into local Room DB. */
+    /** Pull cloud history after login / reinstall and merge into local Room DB. */
     suspend fun mergeHistoryFromServer(baseUrl: String) {
         val sync = accountSyncManager ?: return
         val remote = sync.pullHistory(baseUrl.trim()) ?: return
         for (entry in remote) {
+            val serverId = entry.serverId?.takeIf { it.isNotBlank() }
+            if (serverId != null) {
+                val existing = storyHistoryDao.findByServerId(serverId)
+                if (existing != null) {
+                    val remoteVote = entry.vote?.takeIf { it.isNotBlank() }
+                    if (remoteVote != null && existing.vote != remoteVote) {
+                        storyHistoryDao.updateVote(existing.id, remoteVote)
+                    }
+                    continue
+                }
+                if (storyHistoryDao.countByServerId(serverId) == 0) {
+                    storyHistoryDao.insert(entry)
+                }
+                continue
+            }
             if (storyHistoryDao.countByTrackAndTime(entry.trackKey, entry.playedAt) == 0) {
                 storyHistoryDao.insert(entry)
             }
         }
+    }
+
+    /** Send feedback and persist vote locally + in cloud history when linked. */
+    suspend fun submitStoryFeedback(
+        entry: StoryHistoryEntry,
+        vote: String,
+        reasons: List<String>,
+    ): Boolean {
+        if (reasons.isEmpty()) return false
+        val url = settingsDataStore.backendUrl.first().trim()
+        if (url.isBlank()) return false
+
+        var serverId = entry.serverId
+        if (serverId.isNullOrBlank()) {
+            serverId = UUID.randomUUID().toString()
+            storyHistoryDao.updateServerId(entry.id, serverId)
+        }
+
+        val ok = apiClient.submitStoryFeedback(
+            baseUrl = url,
+            artist = entry.artist,
+            title = entry.title,
+            vote = vote,
+            reasons = reasons,
+            script = entry.script,
+            historyId = serverId,
+        )
+        if (!ok) return false
+
+        storyHistoryDao.updateVote(entry.id, vote)
+        scopePushSyncHistory(
+            entry.copy(serverId = serverId, vote = vote),
+        )
+        return true
+    }
+
+    suspend fun submitPendingStoryFeedback(
+        feedback: com.musicstory.app.domain.PendingStoryFeedback,
+        vote: String,
+        reasons: List<String>,
+    ): Boolean {
+        val historyEntry = storyHistoryDao.findLatestByTrackAndScript(feedback.trackKey, feedback.script)
+        if (historyEntry != null) {
+            return submitStoryFeedback(historyEntry, vote, reasons)
+        }
+        val url = settingsDataStore.backendUrl.first().trim()
+        if (url.isBlank()) return false
+        return apiClient.submitStoryFeedback(
+            baseUrl = url,
+            artist = feedback.artist,
+            title = feedback.title,
+            vote = vote,
+            reasons = reasons,
+            script = feedback.script,
+        )
     }
 
     suspend fun refreshQuota() {
@@ -715,6 +786,7 @@ class StoryRepository(
             ),
         )
         val entry = StoryHistoryEntry(
+            serverId = UUID.randomUUID().toString(),
             trackKey = trackKey,
             artist = track.artist,
             title = track.title,

@@ -11,6 +11,7 @@ import {
   pgInsertStoryHistory,
   pgInsertUsedSeed,
   pgListStoryHistory,
+  pgUpdateStoryHistoryVote,
 } from './story-history-store.js';
 import { isEmailConfigured } from './email-sender.js';
 
@@ -43,6 +44,7 @@ export interface SyncHistoryEntry {
   seedFact?: string;
   seedScope?: string;
   interestRating?: number;
+  vote?: 'like' | 'dislike';
 }
 
 export interface UsedSeedRecord {
@@ -360,10 +362,15 @@ export function pushHistory(
   const account = store.accountsById[accountId];
   if (!account) return null;
 
-  const exists = account.history.some(
+  const existsIdx = account.history.findIndex(
     (h) => h.id === entry.id || (h.trackKey === entry.trackKey && h.playedAt === entry.playedAt),
   );
-  if (!exists) {
+  if (existsIdx >= 0) {
+    if (entry.vote) {
+      account.history[existsIdx]!.vote = entry.vote;
+      saveStore(store);
+    }
+  } else {
     account.history.unshift(entry);
     account.history = account.history.slice(0, MAX_HISTORY);
     saveStore(store);
@@ -386,6 +393,29 @@ export async function pushHistoryAsync(
   }
 
   return pushHistory(installId, entry) ?? [];
+}
+
+export async function updateHistoryVoteAsync(
+  installId: string,
+  historyId: string,
+  vote: 'like' | 'dislike',
+): Promise<boolean> {
+  const accountId = resolveAccountId(installId);
+  if (!accountId || !historyId.trim()) return false;
+  const normalizedId = normalizeStoryHistoryId(historyId);
+
+  if (hasPostgres()) {
+    return pgUpdateStoryHistoryVote(accountId, normalizedId, vote);
+  }
+
+  const store = loadStore();
+  const account = store.accountsById[accountId];
+  if (!account) return false;
+  const entry = account.history.find((h) => h.id === normalizedId);
+  if (!entry) return false;
+  entry.vote = vote;
+  saveStore(store);
+  return true;
 }
 
 export function pullHistory(installId: string, since = 0): SyncHistoryEntry[] | null {

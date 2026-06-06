@@ -131,12 +131,14 @@ class AccountSyncManager(
                             val item = arr.optJSONObject(i) ?: continue
                             add(
                                 StoryHistoryEntry(
+                                    serverId = item.optString("id").ifBlank { null },
                                     trackKey = item.optString("trackKey"),
                                     artist = item.optString("artist"),
                                     title = item.optString("title"),
                                     script = item.optString("script"),
                                     angle = item.optString("angle").ifBlank { null },
                                     playedAt = item.optLong("playedAt", System.currentTimeMillis()),
+                                    vote = item.optString("vote").ifBlank { null },
                                 ),
                             )
                         }
@@ -153,7 +155,7 @@ class AccountSyncManager(
     ) {
         withContext(Dispatchers.IO) {
             val token = authManager.getAccessToken(baseUrl) ?: return@withContext
-            val syncId = UUID.randomUUID().toString()
+            val syncId = entry.serverId?.takeIf { it.isNotBlank() } ?: UUID.randomUUID().toString()
             val body = JSONObject()
                 .put("id", syncId)
                 .put("trackKey", entry.trackKey)
@@ -162,6 +164,7 @@ class AccountSyncManager(
                 .put("script", entry.script)
                 .put("angle", entry.angle)
                 .put("playedAt", entry.playedAt)
+            entry.vote?.let { body.put("vote", it) }
                 .toString()
 
             fun postOnce(): Int {

@@ -10,8 +10,29 @@ interface StoryHistoryDao {
     @Query("SELECT COUNT(*) FROM story_history WHERE trackKey = :trackKey AND playedAt = :playedAt")
     suspend fun countByTrackAndTime(trackKey: String, playedAt: Long): Int
 
+    @Query("SELECT COUNT(*) FROM story_history WHERE serverId = :serverId")
+    suspend fun countByServerId(serverId: String): Int
+
+    @Query("SELECT * FROM story_history WHERE serverId = :serverId LIMIT 1")
+    suspend fun findByServerId(serverId: String): StoryHistoryEntry?
+
+    @Query(
+        """
+        SELECT * FROM story_history
+        WHERE trackKey = :trackKey AND script = :script
+        ORDER BY playedAt DESC LIMIT 1
+        """,
+    )
+    suspend fun findLatestByTrackAndScript(trackKey: String, script: String): StoryHistoryEntry?
+
     @Insert
     suspend fun insert(entry: StoryHistoryEntry)
+
+    @Query("UPDATE story_history SET vote = :vote WHERE id = :localId")
+    suspend fun updateVote(localId: Long, vote: String)
+
+    @Query("UPDATE story_history SET serverId = :serverId WHERE id = :localId")
+    suspend fun updateServerId(localId: Long, serverId: String)
 
     @Query("SELECT * FROM story_history ORDER BY playedAt DESC")
     fun observeAll(): Flow<List<StoryHistoryEntry>>

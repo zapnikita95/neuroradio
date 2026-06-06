@@ -190,7 +190,7 @@ export async function translateWikiLeadToStory(input: IndieWikiStoryInput): Prom
       });
     }
   }
-  if (process.env.GROQ_API_KEY?.trim() || input.clientGroqApiKey?.trim()) {
+  if (input.clientGroqApiKey?.trim()) {
     attempts.push({
       label: 'groq',
       run: () => callGroqTranslate(TRANSLATE_SYSTEM, user, input.clientGroqApiKey, true),

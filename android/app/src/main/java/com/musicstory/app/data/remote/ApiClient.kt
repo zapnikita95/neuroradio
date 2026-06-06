@@ -250,6 +250,7 @@ class ApiClient(
         vote: String,
         reasons: List<String>,
         script: String?,
+        historyId: String? = null,
     ): Boolean {
         if (reasons.isEmpty()) return false
         val body = StoryFeedbackRequest(
@@ -259,6 +260,7 @@ class ApiClient(
             reason = reasons.first(),
             reasons = reasons,
             script = script,
+            historyId = historyId,
         )
         return try {
             getApi(baseUrl).submitStoryFeedback(body)

@@ -20,7 +20,7 @@ import {
 } from './llm-provider.js';
 
 export interface StoryGenerationOptions {
-  /** Free tier on Railway — OpenRouter :free chain, then server Groq if exhausted. */
+  /** Free tier on Railway — OpenRouter :free model chain only (no server Groq). */
   serverManaged?: boolean;
 }
 
@@ -82,7 +82,10 @@ export async function generateStoryWithFallback(
     clientOwnKey
       ? [preferred]
       : [preferred, ...alternateStoryLlmProviders(preferred, clientKeys, clientLocal, options)]
-  ).filter((provider) => hasLlmKeyForProvider(provider, clientKeys, clientLocal));
+  ).filter((provider) => {
+    if (provider === 'groq' && !clientKeys.groq?.trim()) return false;
+    return hasLlmKeyForProvider(provider, clientKeys, clientLocal);
+  });
 
   if (chain.length === 0) {
     throw new Error('No LLM API keys configured on server');
@@ -91,10 +94,7 @@ export async function generateStoryWithFallback(
   if (clientOwnKey && chain.length === 1) {
     console.log(`[story-llm] own_key=true provider=${preferred} — no server fallback chain`);
   } else if (options.serverManaged) {
-    const groqFallback = chain.includes('groq');
-    console.log(
-      `[story-llm] serverManaged=true — OpenRouter :free chain${groqFallback ? ', Groq if 429' : ''}`,
-    );
+    console.log('[story-llm] serverManaged=true — OpenRouter model chain only (no server Groq)');
   }
 
   let lastError: unknown;

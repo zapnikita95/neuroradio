@@ -107,7 +107,7 @@ export function resolveOpenRouterFactModelsForTier(
   return [TIER_OPENROUTER_FACT_MODEL];
 }
 
-/** Free story: user pick → Liquid LFM → Nemotron; Groq fallback in story-llm-router if all 429. */
+/** Free story: user pick → Liquid LFM → Nemotron; retries stay within OpenRouter only. */
 export function resolveOpenRouterStoryModelsForTier(
   tier: UserTier,
   preferredModel?: string,

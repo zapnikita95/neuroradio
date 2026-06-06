@@ -39,7 +39,6 @@ import com.musicstory.app.ui.theme.GoldBright
 import com.musicstory.app.ui.theme.GoldWarm
 import com.musicstory.app.ui.theme.LiveGreen
 import com.musicstory.app.ui.theme.MutedLavender
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
 @Composable
@@ -160,16 +159,14 @@ fun StoryFeedbackSheet(
                     if (sending) return@SecondaryStoryButton
                     sending = true
                     scope.launch {
-                        val url = app.settingsDataStore.backendUrl.first()
-                        app.apiClient.submitStoryFeedback(
-                            baseUrl = url,
-                            artist = feedback.artist,
-                            title = feedback.title,
+                        val ok = app.storyRepository.submitPendingStoryFeedback(
+                            feedback = feedback,
                             vote = selectedVote,
                             reasons = selectedReasons.toList(),
-                            script = feedback.script,
                         )
-                        sent = true
+                        if (ok) {
+                            sent = true
+                        }
                         sending = false
                     }
                 },
