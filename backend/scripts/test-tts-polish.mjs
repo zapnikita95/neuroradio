@@ -94,4 +94,21 @@ if (!damianoSsml.includes('xml:lang="it-IT">Zitti e buoni')) {
   process.exit(1);
 }
 console.log('OK: Italian SSML it-IT lang tags');
+
+const mjScript =
+  'Michael Jackson, король поп-музыки, выпустил «Hollywood Tonight». Его движения — moonwalk, robot, anti-gravity lean — стали языком всего мира.';
+const mjMarked = prepareYandexTtsText(mjScript, {
+  artist: 'Michael Jackson',
+  title: 'Hollywood Tonight',
+});
+if (/Hollyw[уy]d|Ton[аa]йt|Mi[чc]ael/i.test(mjMarked)) {
+  console.error('FAIL: Latin must not be corrupted by stress pass');
+  console.error(mjMarked);
+  process.exit(1);
+}
+if (!mjMarked.includes('Hollywood Tonight') || !mjMarked.includes('Michael Jackson')) {
+  console.error('FAIL: artist/title Latin preserved');
+  process.exit(1);
+}
+console.log('OK: Michael Jackson Latin preserved in marked text');
 console.log('OK: all TTS polish checks passed');

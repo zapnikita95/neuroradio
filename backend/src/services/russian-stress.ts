@@ -181,6 +181,26 @@ export function applyRussianStress(text: string): string {
   return normalized.replace(/[а-яёА-ЯЁ][а-яёА-ЯЁ+\-]*/g, (word) => applyStressToWord(word));
 }
 
+const LATIN_RUN_RE =
+  /[A-Za-zÀ-ÿ][A-Za-zÀ-ÿ0-9'’.\-&]*(?:\s+[A-Za-zÀ-ÿ][A-Za-zÀ-ÿ0-9'’.\-&]*)*/g;
+const LATIN_SLOT = '\uE014L';
+const LATIN_SLOT_END = '\uE015';
+
+/** Латиница не трогается ударениями и ё-нормализацией — иначе Hollywood → Hollywуd. */
+export function applyRussianStressSafe(text: string): string {
+  const slots: string[] = [];
+  const masked = text.replace(LATIN_RUN_RE, (match) => {
+    const idx = slots.length;
+    slots.push(match);
+    return `${LATIN_SLOT}${idx}${LATIN_SLOT_END}`;
+  });
+  const stressed = applyRussianStress(masked);
+  return stressed.replace(
+    new RegExp(`${LATIN_SLOT}(\\d+)${LATIN_SLOT_END}`, 'g'),
+    (_, index) => slots[Number(index)] ?? '',
+  );
+}
+
 export function listStressEntries(): Array<{ word: string; marked: string }> {
   return Object.entries(RUSSIAN_STRESS).map(([word, marked]) => ({ word, marked }));
 }

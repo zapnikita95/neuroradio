@@ -28,6 +28,7 @@ import { requireSignedAudioAccess } from './middleware/audio-auth.js';
 import { requestLogger } from './middleware/request-logger.js';
 import { SECURITY } from './config/security.js';
 import { purgeInvalidBankFacts } from './services/fact-bank.js';
+import { ingestCuratedFactsOnBoot } from './services/curated-facts.js';
 import { initPostgres, hasPostgres, closePostgres } from './services/db.js';
 import { hydrateAccountStoreFromPostgres, migrateAccountStoryDataToPostgres } from './services/account-store.js';
 import { hydrateDevTierStoreFromPostgres } from './services/dev-tier-store.js';
@@ -163,6 +164,7 @@ async function boot(): Promise<void> {
   try {
     const purged = purgeInvalidBankFacts();
     if (purged > 0) console.log(`[boot] fact-bank cleanup removed ${purged} invalid entries`);
+    ingestCuratedFactsOnBoot();
   } catch (err) {
     console.warn('[boot] fact-bank purge failed:', err instanceof Error ? err.message : err);
   }

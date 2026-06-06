@@ -14,6 +14,8 @@ export const MUSIC_PROPER_NOUN_PHRASES: string[] = [
   'Native American',
   'Hot 100',
   'Top 40',
+  'Anti-Gravity Lean',
+  'Hollywood Tonight',
   'Epic Records',
   'Columbia Records',
   'Abbey Road',
@@ -67,6 +69,15 @@ export const MUSIC_PROPER_NOUNS = new Set([
   'elvis',
   'flow',
   'flo',
+  'moonwalk',
+  'hollywood',
+  'tonight',
+  'michael',
+  'spears',
+  'britney',
+  'gravity',
+  'lean',
+  'robot',
 ]);
 
 /** Generic English → Russian (not proper nouns). Longer phrases first. */

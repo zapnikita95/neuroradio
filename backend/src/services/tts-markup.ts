@@ -4,7 +4,7 @@
  */
 
 import { sanitizeScriptForTts } from './story-quality.js';
-import { applyRussianStress, RUSSIAN_STRESS } from './russian-stress.js';
+import { applyRussianStressSafe, RUSSIAN_STRESS } from './russian-stress.js';
 import { runTtsQualityPass } from './tts-quality-pass.js';
 import type { TtsPauseProfile } from './tts-voice-profiles.js';
 
@@ -92,7 +92,7 @@ export function prepareYandexTtsText(
   text = quality.text;
 
   text = expandQuotesForSpeech(text);
-  text = applyRussianStress(text);
+  text = applyRussianStressSafe(text);
 
   if (options.sentencePauses !== false) {
     text = addSentencePauses(text, pauseProfile);
