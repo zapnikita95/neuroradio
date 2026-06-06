@@ -13,7 +13,7 @@ import {
   sanitizeScriptForTts,
   validateStoryScript,
 } from './story-quality.js';
-import { factMentionsArtist } from './fact-relevance.js';
+import { factMentionsArtist, storyMentionsPerformingArtist } from './fact-relevance.js';
 import {
   DEFAULT_STORY_LENGTH,
   getStoryLengthPreset,
@@ -319,7 +319,7 @@ export async function generateStoryScript(
     );
     if (
       countWords(sanitized) >= 35 &&
-      factMentionsArtist(sanitized, input.artist) &&
+      storyMentionsPerformingArtist(sanitized, input.artist, input.title) &&
       !findLlmGarbage(sanitized) &&
       !findHardScriptViolation(sanitized)
     ) {

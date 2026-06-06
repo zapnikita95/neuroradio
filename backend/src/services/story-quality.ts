@@ -4,7 +4,7 @@ import {
   StoryLengthId,
   StoryLengthPreset,
 } from './story-length.js';
-import { COVER_CONTEXT_RE, factMentionsArtist, factMentionsTitle, hasTrackContextSignal, storyNamesForeignArtist } from './fact-relevance.js';
+import { COVER_CONTEXT_RE, factMentionsArtist, factMentionsTitle, hasTrackContextSignal, storyMentionsPerformingArtist, storyNamesForeignArtist } from './fact-relevance.js';
 import { hasEnglishLeak } from './story-russian-language.js';
 import { prepareStoryScriptLanguage } from './story-english-normalize.js';
 import { isTruncatedMarketingSnippet, isSpeakableReferenceFact } from './web-snippet-accept.js';
@@ -671,7 +671,7 @@ export function validateStoryScript(
   }
 
   const coverStory = referenceFacts.some((f) => COVER_CONTEXT_RE.test(f));
-  if (!coverStory && !factMentionsArtist(trimmed, artist)) {
+  if (!coverStory && !storyMentionsPerformingArtist(trimmed, artist, title)) {
     return { ok: false, reason: 'story does not mention the performing artist' };
   }
 

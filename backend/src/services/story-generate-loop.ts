@@ -12,7 +12,7 @@ import {
   trimToLastCompleteSentence,
   validateStoryScript,
 } from './story-quality.js';
-import { storyNamesForeignArtist, COVER_CONTEXT_RE, factMentionsArtist } from './fact-relevance.js';
+import { storyNamesForeignArtist, COVER_CONTEXT_RE, factMentionsArtist, storyMentionsPerformingArtist } from './fact-relevance.js';
 import { isMetadataOnlyFallbackFact } from './metadata-facts.js';
 import { logRejectedScript } from './story-reject-log.js';
 
@@ -165,7 +165,7 @@ export function finalizeAfterQualityLoop<T extends { script: string }>(
   }
   if (
     !referenceFacts.some((f) => COVER_CONTEXT_RE.test(f)) &&
-    !factMentionsArtist(sanitized, input.artist)
+    !storyMentionsPerformingArtist(sanitized, input.artist, input.title)
   ) {
     logRejectedScript('last script rejected', sanitized, 'does not mention performing artist');
     return null;

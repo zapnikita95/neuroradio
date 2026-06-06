@@ -1,7 +1,8 @@
 /** Reject Wikipedia/DDG sentences about the wrong act — no hardcoded artist blocklists. */
 
 import { collaboratorNames } from './artist-primary.js';
-import { buildTitleMatchVariants, textMentionsTitle } from './title-transliterate.js';
+import { buildTitleMatchVariants, cyrillicToLatin, fuzzyTokenMatch, textMentionsTitle } from './title-transliterate.js';
+import { latinPhraseToRussianTts } from './tts-foreign-pronounce.js';
 import { isNonMusicProfessionText } from './wikipedia-music.js';
 
 function normalize(text: string): string {
@@ -563,6 +564,72 @@ export function factMentionsArtist(fact: string, artist: string): boolean {
       }
     }
   }
+  return false;
+}
+
+/** Press / Wikipedia Cyrillic spellings that differ from TTS transliteration. */
+const PRESS_CYRILLIC_TOKEN: Record<string, string[]> = {
+  michael: ['майкл', 'микхаил'],
+  jackson: ['джексон', 'джакксон'],
+  janet: ['джанет'],
+  madonna: ['мадонн'],
+  prince: ['принс'],
+  whitney: ['уитни'],
+  houston: ['хьюстон'],
+  elvis: ['элвис'],
+  presley: ['пресли'],
+  beatles: ['битлз', 'битлс'],
+  landis: ['лэндис', 'лендис'],
+};
+
+function tokenMentionedInCyrillicScript(scriptNorm: string, token: string): boolean {
+  const t = normalize(token);
+  if (t.length >= 3 && scriptNorm.includes(t)) return true;
+
+  const ru = normalize(latinPhraseToRussianTts(token));
+  if (ru.length >= 3 && scriptNorm.includes(ru)) return true;
+
+  for (const alt of PRESS_CYRILLIC_TOKEN[t] ?? []) {
+    if (scriptNorm.includes(normalize(alt))) return true;
+  }
+
+  for (const word of scriptNorm.split(' ')) {
+    if (word.length >= 3 && fuzzyTokenMatch(word, token)) return true;
+    if (word.length >= 4 && fuzzyTokenMatch(cyrillicToLatin(word), token)) return true;
+  }
+  return false;
+}
+
+/**
+ * Story scripts are Russian — foreign artists often appear as «Майкл Джексон», not «Michael Jackson».
+ */
+export function storyMentionsPerformingArtist(
+  script: string,
+  artist: string,
+  title = '',
+): boolean {
+  if (factMentionsArtist(script, artist)) return true;
+  if (!/[\u0400-\u04FF]/.test(script)) return false;
+
+  const scriptNorm = normalize(script);
+  const cleanTitle = title.replace(/\s*\([^)]*\)\s*/g, ' ').trim();
+
+  for (const name of [artist, ...collaboratorNames(artist)]) {
+    if (!/[A-Za-zÀ-ÿ]/.test(name)) continue;
+    const tokens = artistTokens(name).filter((t) => t.length >= 3);
+    if (tokens.length === 0) continue;
+
+    let matched = 0;
+    for (const token of tokens) {
+      if (tokenMentionedInCyrillicScript(scriptNorm, token)) matched++;
+    }
+
+    const need = tokens.length === 1 ? 1 : Math.min(2, tokens.length);
+    if (matched >= need) return true;
+
+    if (matched >= 1 && cleanTitle && textMentionsTitle(script, cleanTitle)) return true;
+  }
+
   return false;
 }
 
