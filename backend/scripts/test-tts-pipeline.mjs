@@ -14,6 +14,7 @@ import { enhanceMixedLanguageText } from '../dist/services/tts-en-normalize.js';
 import { polishScriptForSpeechDelivery } from '../dist/services/tts-speech-polish.js';
 import { buildAzureSsml, preparePlainSpeechText } from '../dist/services/tts-azure-ssml.js';
 import { buildSaluteSsml } from '../dist/services/salute-ssml.js';
+import { buildYandexSsml } from '../dist/services/tts-yandex-ssml.js';
 
 let passed = 0;
 
@@ -30,14 +31,28 @@ function test(name, fn) {
 
 console.log('[test-tts-pipeline]');
 
-test('mixed EN gets articulation pauses', () => {
+test('mixed EN stays inline without articulation pauses', () => {
   const out = enhanceMixedLanguageText(
     'Трек Bohemian Rhapsody взорвал чарты.',
     'Queen',
     'Bohemian Rhapsody',
   );
-  assert.match(out, /<\[small\]>/);
+  assert.doesNotMatch(out, /<\[small\]>\s*Bohemian/i);
   assert.match(out, /Bohemian/i);
+});
+
+test('SSML does not split trailing в in трэков before Latin name', () => {
+  const ssml = buildYandexSsml(
+    'Stranger in Moscow — один из самых личных трэков Michael Jackson.',
+  );
+  assert.doesNotMatch(ssml, /трэко<lang/i);
+  assert.doesNotMatch(ssml, /трэко.*<lang xml:lang="ru-RU">в<\/lang>/i);
+  assert.match(ssml, /трэков/i);
+});
+
+test('SSML wraps standalone preposition с before Latin', () => {
+  const ssml = buildYandexSsml('работал с Michael Jackson.');
+  assert.match(ssml, /<lang xml:lang="ru-RU">с<\/lang>\s*<lang xml:lang="en-US">Michael Jackson/i);
 });
 
 test('polish splits long bureaucratic phrasing', () => {

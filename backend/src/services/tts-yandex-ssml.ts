@@ -65,10 +65,10 @@ function cyrillicForShortAccentLatin(span: string): string | null {
 
 /**
  * «с» перед <lang en-US> без ru-RU Yandex читает как букву «эс».
- * Явно фиксируем односложные предлоги/союзы в ru-RU.
+ * Только ОТДЕЛЬНОЕ слово-предлог — не последняя буква «в/к/…» в «трэков», «эпоху».
  */
 const RU_PREP_BEFORE_LATIN_RE = new RegExp(
-  `^(.*?)([,\\s${BREAK_SMALL}${BREAK_MEDIUM}${BREAK_SENTENCE}]*)([свкуо])([\\s${BREAK_SMALL}${BREAK_MEDIUM}${BREAK_SENTENCE}]+)$`,
+  `^(.*?)([,\\s${BREAK_SMALL}${BREAK_MEDIUM}${BREAK_SENTENCE}]*)(?<![а-яёА-ЯЁ])([свкуо])([\\s${BREAK_SMALL}${BREAK_MEDIUM}${BREAK_SENTENCE}]+)$`,
   'su',
 );
 
