@@ -22,7 +22,7 @@ let cachedEntries: CuratedFactEntry[] | null = null;
 
 function loadJsonEntries(filename: string): CuratedFactEntry[] {
   try {
-    const path = join(__dir, 'data', filename);
+    const path = join(__dir, '../data', filename);
     return JSON.parse(readFileSync(path, 'utf8')) as CuratedFactEntry[];
   } catch {
     return [];

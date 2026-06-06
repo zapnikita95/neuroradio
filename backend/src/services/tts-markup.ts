@@ -117,7 +117,6 @@ export function prepareYandexTtsText(
   text = normalizeYearsForRussianTts(text);
   text = expandQuotesForSpeech(text);
   text = applyRussianStressSafe(text);
-  text = applyForeignPronunciation(text, artist, title);
 
   if (options.sentencePauses !== false) {
     text = addSentencePauses(text, pauseProfile);
@@ -127,6 +126,7 @@ export function prepareYandexTtsText(
   }
 
   text = enhanceMixedLanguageText(text, artist, title);
+  text = applyForeignPronunciation(text, artist, title);
 
   return collapseMarkupWhitespace(text);
 }

@@ -6,7 +6,7 @@ import { enrichTrackMetadata } from '../services/musicbrainz.js';
 import { fetchAggregatedFactContext, emptyAggregatedFactContext, fetchIndieArtistFocusContext } from '../services/fact-aggregator.js';
 import { explainReferenceFactSelection, type SelectedReferenceFact } from '../services/fact-picker.js';
 import { formatFactPickLog, logFactCandidatePools } from '../services/fact-interest-log.js';
-import { interestScore } from '../services/reference-fact-quality.js';
+import { interestScore, isWikiBiographyLead } from '../services/reference-fact-quality.js';
 import { interestRating10 } from '../services/fact-interest-log.js';
 import {
   collectPreviousScripts,
@@ -355,20 +355,27 @@ router.post('/full', validateStoryFullBody, storyFullRateLimit, async (req: Requ
 
     ensureAccount(installId);
 
-    let bankFact = await pickBankFactForUser(installId, artist, title, coverCtx);
-    if (!bankFact) {
-      const curated = lookupCuratedFact(artist, title);
-      if (curated) {
-        ingestFacts(artist, title, [{ fact: curated.fact, scope: curated.scope, source: 'api' }]);
-        bankFact = {
-          fact: curated.fact,
-          scope: curated.scope,
-          scopeLabelRu: curated.scope === 'track' ? 'трек' : 'группа/артист',
-          interestScore: interestScore(curated.fact),
-          interestRating: interestRating10(curated.fact),
-        };
-        console.log(`[facts] curated hit artist="${artist}" title="${title}"`);
-      }
+    const curatedHit =
+      lookupCuratedFact(coverCtx.factArtist, coverCtx.factTitle) ??
+      lookupCuratedFact(artist, title);
+    let bankFact: Awaited<ReturnType<typeof pickBankFactForUser>> = null;
+    if (curatedHit) {
+      ingestFacts(coverCtx.factArtist, coverCtx.factTitle, [
+        { fact: curatedHit.fact, scope: curatedHit.scope, source: 'api' },
+      ]);
+      const curatedScore = Math.max(interestScore(curatedHit.fact), 12);
+      bankFact = {
+        fact: curatedHit.fact,
+        scope: curatedHit.scope,
+        scopeLabelRu: curatedHit.scope === 'track' ? 'трек' : 'группа/артист',
+        interestScore: curatedScore,
+        interestRating: interestRating10(curatedHit.fact),
+      };
+      console.log(
+        `[facts] curated hit artist="${coverCtx.factArtist}" title="${coverCtx.factTitle}"`,
+      );
+    } else {
+      bankFact = await pickBankFactForUser(installId, artist, title, coverCtx);
     }
 
     const factArtist = coverCtx.factArtist;
@@ -571,7 +578,7 @@ router.post('/full', validateStoryFullBody, storyFullRateLimit, async (req: Requ
         previousScripts,
         narrator: storyNarrator,
       });
-      if (wikiEarly && isMusicArtistWikiExtract(wikiEarly.text)) {
+      if (wikiEarly && isMusicArtistWikiExtract(wikiEarly.text) && !isWikiBiographyLead(wikiEarly.text)) {
         selectedFact = {
           fact: wikiEarly.text,
           scope: 'artist',
@@ -676,7 +683,7 @@ router.post('/full', validateStoryFullBody, storyFullRateLimit, async (req: Requ
         previousScripts,
         narrator: storyNarrator,
       });
-      if (wikiSalvage && isMusicArtistWikiExtract(wikiSalvage.text)) {
+      if (wikiSalvage && isMusicArtistWikiExtract(wikiSalvage.text) && !isWikiBiographyLead(wikiSalvage.text)) {
         selectedFact = {
           fact: wikiSalvage.text,
           scope: 'artist',
@@ -910,56 +917,77 @@ router.post('/full', validateStoryFullBody, storyFullRateLimit, async (req: Requ
           console.log(
             `[indie-wiki] lead lang=${wikiLead.lang} chars=${wikiLead.text.length} artist="${primaryArtistName(metadata.artist)}"`,
           );
-          const wikiScript = await translateWikiLeadToStory({
-            artist: metadata.artist,
-            title: metadata.title,
-            wikiLead: wikiLead.text,
-            wikiLang: wikiLead.lang,
-            llmProvider,
-            clientGroqApiKey: clientLlmKeys.groq,
-            clientGeminiApiKey: clientLlmKeys.gemini,
-            clientOpenRouterApiKey: clientLlmKeys.openrouter,
-            openRouterModel: openrouterModelStory,
-          });
-          const wikiScriptFinal =
-            wikiScript ??
-            (wikiLead.lang === 'ru'
-              ? sanitizeScriptForTts(wikiLead.text, metadata.artist, metadata.title, [wikiLead.text])
-              : null);
-          if (wikiScriptFinal && countWords(wikiScriptFinal) >= 35) {
-            selectedFact = {
-              fact: wikiLead.text,
-              scope: 'artist',
-              scopeLabelRu: 'группа/артист',
-              interestScore: interestScore(wikiLead.text),
-              interestRating: interestRating10(wikiLead.text),
-            };
-            const scripted: StoryScript = {
-              script: wikiScriptFinal,
-              word_count: countWords(wikiScriptFinal),
-              voiceId,
-            };
-            return { story: scripted, llmUsed: wikiScript ? `${llmProvider}+wiki` : 'wiki-ru' };
+          const skipWikiTranslate =
+            artistTier === 'major' ||
+            isWikiBiographyLead(wikiLead.text) ||
+            Boolean(curatedHit);
+          if (skipWikiTranslate) {
+            console.log(
+              `[indie-wiki] skip verbatim translate tier=${artistTier} bio=${isWikiBiographyLead(wikiLead.text)} curated=${Boolean(curatedHit)}`,
+            );
+          } else {
+            const wikiScript = await translateWikiLeadToStory({
+              artist: metadata.artist,
+              title: metadata.title,
+              wikiLead: wikiLead.text,
+              wikiLang: wikiLead.lang,
+              llmProvider,
+              clientGroqApiKey: clientLlmKeys.groq,
+              clientGeminiApiKey: clientLlmKeys.gemini,
+              clientOpenRouterApiKey: clientLlmKeys.openrouter,
+              openRouterModel: openrouterModelStory,
+            });
+            const wikiScriptFinal =
+              wikiScript ??
+              (wikiLead.lang === 'ru'
+                ? sanitizeScriptForTts(wikiLead.text, metadata.artist, metadata.title, [wikiLead.text])
+                : null);
+            if (wikiScriptFinal && countWords(wikiScriptFinal) >= 35) {
+              selectedFact = {
+                fact: wikiLead.text,
+                scope: 'artist',
+                scopeLabelRu: 'группа/артист',
+                interestScore: interestScore(wikiLead.text),
+                interestRating: interestRating10(wikiLead.text),
+              };
+              const scripted: StoryScript = {
+                script: wikiScriptFinal,
+                word_count: countWords(wikiScriptFinal),
+                voiceId,
+              };
+              return { story: scripted, llmUsed: wikiScript ? `${llmProvider}+wiki` : 'wiki-ru' };
+            }
+            if (!wikiScript) {
+              console.warn(`[indie-wiki] translate failed for "${metadata.artist}" — wiki lead → story LLM`);
+            }
           }
-          if (!wikiScript) {
-            console.warn(`[indie-wiki] translate failed for "${metadata.artist}" — wiki lead → story LLM`);
+          const llmSeedFact = curatedHit?.fact
+            ?? (isWikiBiographyLead(wikiLead.text) ? null : wikiLead.text);
+          const llmReferenceFacts = llmSeedFact
+            ? [
+                llmSeedFact,
+                ...storyReferenceFacts.filter(
+                  (f) => !isMetadataOnlyFallbackFact(f) && !isWikiBiographyLead(f),
+                ),
+              ].slice(0, 4)
+            : storyReferenceFacts.filter(
+                (f) => !isMetadataOnlyFallbackFact(f) && !isWikiBiographyLead(f),
+              ).slice(0, 4);
+          if (llmReferenceFacts.length > 0) {
+            const primary = llmReferenceFacts[0]!;
+            effectiveStoryInput = {
+              ...storyInput,
+              referenceFacts: llmReferenceFacts,
+              selectedReferenceFact: {
+                fact: primary,
+                scope: curatedHit?.scope ?? 'artist',
+                scopeLabelRu: curatedHit?.scope === 'track' ? 'трек' : 'группа/артист',
+                interestScore: interestScore(primary),
+                interestRating: interestRating10(primary),
+              },
+              rawSnippets: undefined,
+            };
           }
-          const wikiReferenceFacts = [
-            wikiLead.text,
-            ...storyReferenceFacts.filter((f) => !isMetadataOnlyFallbackFact(f)),
-          ].slice(0, 4);
-          effectiveStoryInput = {
-            ...storyInput,
-            referenceFacts: wikiReferenceFacts,
-            selectedReferenceFact: {
-              fact: wikiLead.text,
-              scope: 'artist',
-              scopeLabelRu: 'группа/артист',
-              interestScore: interestScore(wikiLead.text),
-              interestRating: interestRating10(wikiLead.text),
-            },
-            rawSnippets: undefined,
-          };
         }
         }
       }

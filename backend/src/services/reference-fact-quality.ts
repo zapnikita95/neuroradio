@@ -3,6 +3,27 @@ import { isTruncatedMarketingSnippet, isUnspeakableWebSeed } from './web-snippet
 
 /** Filters dry encyclopedia lines; ranks human drama, breakthroughs, meaning — not working titles. */
 
+/** Wikipedia lead paragraph — birthplace, label deal, EP listing; not a story hook. */
+export const WIKI_BIOGRAPHY_PATTERNS: RegExp[] = [
+  /\bis an?\s+(?:English|American|British|Canadian|Australian|Irish|Scottish|Welsh)\s+singer[- ]songwriter\b/i,
+  /\bBorn in\b.*\b(?:raised in|grew up in)\b/i,
+  /\bbegan writing songs around the age of\b/i,
+  /\bindependently released the extended play\b/i,
+  /\bsigned with\b.*\bRecords\b/i,
+  /\bconsisting of\b.*\bon vocals\b/i,
+  /\bродился в\b.*\b(?:вырос|воспитан)\b/i,
+  /\bанглийский певец,\s*автор песен\b/i,
+  /\bначал писать (?:музыку|песни) (?:ещё )?в (?:детстве|(?:раннем )?возрасте)\b/i,
+  /\bподписал контракт с\b/i,
+];
+
+export function isWikiBiographyLead(fact: string): boolean {
+  const trimmed = fact.trim();
+  if (trimmed.length < 80) return false;
+  const bioHits = WIKI_BIOGRAPHY_PATTERNS.filter((p) => p.test(trimmed)).length;
+  return bioHits >= 2 || (bioHits >= 1 && trimmed.length >= 220);
+}
+
 const BORING_FACT_PATTERNS: RegExp[] = [
   /\bconsists?\s+of\b/i,
   /\bcomposed\s+of\b/i,
@@ -59,7 +80,7 @@ export const COLLECTOR_FACT_PATTERNS: RegExp[] = [
   /\b(?:limited\s+edition|vinyl|pressing|bootleg|b[- ]?side|cassette|7[- ]?inch)\b/i,
   /\b(?:debut\s+single|lead\s+single)\b.*\b(?:since|first|only)\b/i,
   /\b(?:did\s+not\s+chart|charted)\b.*\b(?:until|following|after)\b/i,
-  /\b(?:прорыв|тикток|стрим|миллиард|миллион|хит\s+100|соавтор|бутлег|винил|лимитк)\b/i,
+  /\b(?:прорыв|тикток|стрим\w*|миллиард|миллион|хит\s+100|соавтор|бутлег|винил|лимитк)\b/i,
 ];
 
 export function isCollectorFact(fact: string): boolean {
@@ -167,6 +188,7 @@ export function isWeakChartSeed(fact: string): boolean {
 export function isBoringFact(fact: string): boolean {
   const trimmed = fact.trim();
   if (trimmed.length < 30) return true;
+  if (isWikiBiographyLead(trimmed)) return true;
   if (isCollectorFact(trimmed)) return false;
   // Promo rename, radio ban, Jimi Hendrix origin — keep even if sentence also mentions album/single.
   if (highImpactBonus(trimmed) >= 6) return false;

@@ -27,6 +27,11 @@ const PHRASE_PRONUNCIATION_RU: Record<string, string> = {
   'savage garden': 'Савидж Гарден',
   'to the moon and back': 'Ту зе Мун энд Бэк',
   'to the moon & back': 'Ту зе Мун энд Бэк',
+  'ed sheeran': 'Эд Ширан',
+  'edward christopher sheeran': 'Эдвард Кристофер Ширан',
+  'shape of you': 'Шейп ов Ю',
+  'asylum records': 'Азайлум Рекордс',
+  'no.5 collaborations project': 'Ноу Пойнт Файв Коллаборейшнс Проект',
 };
 
 const EN_WORD_RU: Record<string, string> = {
@@ -80,6 +85,15 @@ const EN_WORD_RU: Record<string, string> = {
   back: 'бэк',
   savage: 'савидж',
   garden: 'гарден',
+  sheeran: 'ширан',
+  edward: 'эдвард',
+  christopher: 'кристофер',
+  shape: 'шейп',
+  asylum: 'азайлум',
+  records: 'рекордс',
+  halifax: 'Халифакс',
+  framlingham: 'Фрамлингем',
+  collaborations: 'коллаборейшнс',
   eurovision: 'Евровидение',
   tiktok: 'ТикТок',
   youtube: 'Ютуб',
@@ -193,6 +207,9 @@ function transliterateEnglishWord(word: string): string {
   out = out.replace(/wr/g, 'р');
   out = out.replace(/kn/g, 'н');
   out = out.replace(/mb$/g, 'm');
+  if (/[A-Za-z]/.test(out)) {
+    return spellLatinWordPhonetic(bare);
+  }
   return capitalizeLike(bare, out);
 }
 
@@ -271,7 +288,7 @@ function ensureAllLatinTransliterated(text: string): string {
     const next = result.replace(
       /[A-Za-zÀ-ÿ][A-Za-zÀ-ÿ0-9''.\-&]*/g,
       (match) => {
-        if (match.length < 2) return spellLatinWordPhonetic(match);
+        if (!/[A-Za-zÀ-ÿ]/.test(match)) return match;
         const ru = lookupPhraseTts(match.replace(/\s*&\s*/g, ' and '));
         return /[A-Za-zÀ-ÿ]/.test(ru) ? spellLatinWordPhonetic(match) : ru;
       },
@@ -279,7 +296,7 @@ function ensureAllLatinTransliterated(text: string): string {
     if (next === result) break;
     result = next;
   }
-  return result.replace(/\b([A-Za-z])\b/g, (_, ch: string) => spellLatinWordPhonetic(ch));
+  return result.replace(/[A-Za-zÀ-ÿ]+/g, (match) => spellLatinWordPhonetic(match));
 }
 
 const MARKUP_SLOT = '\uE010M';

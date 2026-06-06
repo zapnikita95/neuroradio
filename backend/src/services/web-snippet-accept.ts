@@ -64,8 +64,8 @@ export function isUnspeakableWebSeed(snippet: string): boolean {
   }
   if (/\bwritten by\b/i.test(trimmed) && /\bbrowse all\b/i.test(trimmed)) return true;
   if (
-    /\d[\d,.]*K?\b/.test(trimmed) &&
-    !/\b(?:wrote|written|recorded|album|song|track|band|duo|artist|single|chart|grammy|video|directed|advertisement|newspaper|formed|met)\b/i.test(
+    /\b\d[\d,.]*K\b/i.test(trimmed) &&
+    !/\b(?:wrote|written|recorded|album|song|track|band|duo|artist|single|chart|grammy|video|directed|advertisement|newspaper|formed|met|трек|треков|песн|альбом|стрим)\b/i.test(
       trimmed,
     )
   ) {
