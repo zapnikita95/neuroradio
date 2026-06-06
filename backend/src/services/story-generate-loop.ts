@@ -6,6 +6,7 @@ import {
   findLlmGarbage,
   findWateryContent,
   anchorsReferenceFact,
+  referenceFactsAreAnchorable,
   sanitizeScriptForTts,
   stripBannedFluff,
   trimToLastCompleteSentence,
@@ -169,7 +170,9 @@ export function finalizeAfterQualityLoop<T extends { script: string }>(
     logRejectedScript('last script rejected', sanitized, 'does not mention performing artist');
     return null;
   }
-  const grounded = anchorsReferenceFact(sanitized, referenceFacts);
+  const grounded = referenceFactsAreAnchorable(referenceFacts)
+    ? anchorsReferenceFact(sanitized, referenceFacts)
+    : true;
   if (!grounded) {
     logRejectedScript('last script rejected on finalize', sanitized, 'not grounded in reference facts');
     return null;

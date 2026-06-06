@@ -136,6 +136,7 @@ async function callOpenRouter(
     useJsonMode: true,
     extraHeaders: openRouterHeaders(),
     label: 'OpenRouter',
+    timeoutMs: 75_000,
   });
 }
 

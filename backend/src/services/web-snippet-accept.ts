@@ -27,13 +27,20 @@ export function decodeHtmlEntities(text: string): string {
 }
 
 const TRUNCATED_MARKETING =
-  /^(?:It'?s easy to understand why|Delve into the|Join professional|Explore songs|The most successful and the best-known is|Getting your Trinity Audio|Watch exclusive videos)/i;
+  /^(?:It'?s easy to understand why|Delve into the|Join professional|Explore songs|The most successful and the best-known is|Getting your Trinity Audio|Watch exclusive videos|This document provides|Early Life and Career Beginnings|If history is any guide)/i;
 
 /** SEO/listicle fragment — not a speakable fact. */
 export function isTruncatedMarketingSnippet(snippet: string): boolean {
   const trimmed = decodeHtmlEntities(snippet).trim();
   if (TRUNCATED_MARKETING.test(trimmed)) return true;
+  if (/\b(?:detailed summary and analysis|provides a detailed summary)\b/i.test(trimmed)) return true;
   if (trimmed.length < 55 && !/[.!?…]["']?\s*$/.test(trimmed)) return true;
+  if (
+    !/[.!?…]["']?\s*$/.test(trimmed) &&
+    /\b(?:for|of|to|the|a|an|in|on|with|and|by|at|from|into|his|her|their)\s*$/i.test(trimmed)
+  ) {
+    return true;
+  }
   if (/\b(?:drawn to|impact of|lasting impact of|raw emotion,? poignant lyrics)\s*$/i.test(trimmed)) {
     return true;
   }

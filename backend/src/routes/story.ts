@@ -559,7 +559,32 @@ router.post('/full', validateStoryFullBody, storyFullRateLimit, async (req: Requ
 
     let referenceFacts = selectedFact
       ? [selectedFact.fact]
-      : [...factBundle.trackFacts, ...factBundle.artistFacts].slice(0, 4);
+      : [...factBundle.trackFacts, ...factBundle.artistFacts]
+          .filter((f) => !isWeakSnippetSeed(f) && !isMetadataOnlyFallbackFact(f))
+          .sort((a, b) => interestScore(b) - interestScore(a))
+          .slice(0, 4);
+
+    if (!selectedFact && referenceFacts.length === 0) {
+      const wikiEarly = await pickArtistWikiContent({
+        installId,
+        artist: metadata.artist,
+        previousScripts,
+        narrator: storyNarrator,
+      });
+      if (wikiEarly && isMusicArtistWikiExtract(wikiEarly.text)) {
+        selectedFact = {
+          fact: wikiEarly.text,
+          scope: 'artist',
+          scopeLabelRu: 'группа/артист',
+          interestScore: interestScore(wikiEarly.text),
+          interestRating: interestRating10(wikiEarly.text),
+        };
+        referenceFacts = [wikiEarly.text];
+        console.log(
+          `[facts] wiki early seed for "${metadata.artist}" chars=${wikiEarly.text.length}`,
+        );
+      }
+    }
 
     if (!selectedFact) {
       const validatedPool = [...factBundle.trackFacts, ...factBundle.artistFacts]
@@ -641,7 +666,10 @@ router.post('/full', validateStoryFullBody, storyFullRateLimit, async (req: Requ
       }
     }
 
-    if (!selectedFact && referenceFacts.filter((f) => !isMetadataOnlyFallbackFact(f)).length === 0) {
+    if (
+      !selectedFact &&
+      referenceFacts.filter((f) => !isMetadataOnlyFallbackFact(f) && !isWeakSnippetSeed(f)).length === 0
+    ) {
       const wikiSalvage = await pickArtistWikiContent({
         installId,
         artist: metadata.artist,

@@ -565,7 +565,7 @@ function matchesConceptBridge(fact: string, scriptWords: Set<string>): boolean {
 }
 
 /** Skip anchor check when reference facts are SEO junk — LLM may still produce valid lore. */
-function referenceFactsAreAnchorable(referenceFacts: string[]): boolean {
+export function referenceFactsAreAnchorable(referenceFacts: string[]): boolean {
   return referenceFacts.some(
     (f) => f.trim().length > 0 && !isTruncatedMarketingSnippet(f) && interestScore(f) >= 6,
   );

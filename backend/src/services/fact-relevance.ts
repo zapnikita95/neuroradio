@@ -98,6 +98,26 @@ function isCriticAttribution(fact: string, entity: string): boolean {
   return CRITIC_AFTER_NAME.test(after);
 }
 
+/** Actor/director/cowriter in a music-video or production context — not a «wrong artist». */
+function isCastOrCrewMention(script: string, entity: string): boolean {
+  const idx = script.indexOf(entity);
+  if (idx < 0) return false;
+  const before = script.slice(Math.max(0, idx - 72), idx);
+  const after = script.slice(idx + entity.length, idx + entity.length + 48);
+  if (
+    /(?:актрис(?:ы|а|ой|е)?|акт(?:ё|е)р(?:а|ом|ы|у)?|исполнени(?:и|е)|режисс(?:ё|е)р(?:а|ом|ы)?|directed by|featuring|соавторств(?:е|а)|cowritten|written with|produced by|продюсер(?:а|ом)?|composer|композитор(?:а|ом)?)\s*$/i.test(
+      before,
+    )
+  ) {
+    return true;
+  }
+  if (/^\s*(?:,|и|в|котор|котора|which|who|where)\b/i.test(after)) return true;
+  if (/\b(?:music video|клип|видео на трек|mv\b)/i.test(script)) {
+    if (/\b(?:геро(?:ин|ей)|рол(?:ь|и)|played|portrayed|stars?)\b/i.test(before)) return true;
+  }
+  return false;
+}
+
 /** Named entities that could be musical acts (Latin + Cyrillic). */
 function extractNamedEntities(fact: string): string[] {
   const entities: string[] = [];
@@ -334,6 +354,7 @@ export function storyNamesForeignArtist(
     for (const entity of extractNamedEntities(cleaned)) {
       if (isContextEntity(entity)) continue;
       if (isCriticAttribution(cleaned, entity)) continue;
+      if (isCastOrCrewMention(cleaned, entity)) continue;
       if (entityMatchesArtist(entity, artist, cleanTitle)) continue;
       if (entityAllowedAsCover(entity, coverAllowed)) continue;
       if (entityInReferenceFacts(entity, referenceFacts)) continue;
