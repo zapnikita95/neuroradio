@@ -11,7 +11,64 @@ import { verifyTelegramLogin, type TelegramAuthPayload } from '../services/teleg
 
 const router = Router();
 
+/** Telegram Login Widget page (WebView in Android). Domain must match @BotFather /setdomain. */
+router.get('/telegram/widget', (_req: Request, res: Response) => {
+  const botUsername = process.env.TELEGRAM_BOT_USERNAME?.trim();
+  const botToken = process.env.TELEGRAM_BOT_TOKEN?.trim();
+  if (!botUsername || !botToken) {
+    res.status(503).type('text/html; charset=utf-8').send(
+      '<!DOCTYPE html><html><body style="font-family:sans-serif;background:#1a1520;color:#fff;padding:24px">' +
+        '<p>Telegram login не настроен на сервере (TELEGRAM_BOT_TOKEN, TELEGRAM_BOT_USERNAME).</p></body></html>',
+    );
+    return;
+  }
+
+  const safeUsername = botUsername.replace(/[^a-zA-Z0-9_]/g, '');
+  res.type('text/html; charset=utf-8').send(`<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Music Story — Telegram</title>
+<style>
+  body { font-family: system-ui, sans-serif; background: #1a1520; color: #f5efe6; margin: 0; min-height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 16px; padding: 24px; box-sizing: border-box; }
+  p { color: #a89bb8; text-align: center; max-width: 320px; line-height: 1.45; }
+</style>
+</head>
+<body>
+<p>Войди через Telegram — аккаунт привяжется к этому устройству.</p>
+<script>
+function onTelegramAuth(user) {
+  if (window.MusicStoryAndroid && window.MusicStoryAndroid.onTelegramAuth) {
+    window.MusicStoryAndroid.onTelegramAuth(JSON.stringify(user));
+  } else {
+    document.body.innerHTML = '<p style="color:#f88">Открой эту страницу из приложения Music Story.</p>';
+  }
+}
+</script>
+<script async src="https://telegram.org/js/telegram-widget.js?22"
+  data-telegram-login="${safeUsername}"
+  data-size="large"
+  data-onauth="onTelegramAuth(user)"
+  data-request-access="write"></script>
+</body>
+</html>`);
+});
+
 router.use(requireAppAuth);
+
+router.get('/config', (_req: Request, res: Response) => {
+  const smtpHost = process.env.SMTP_HOST?.trim();
+  const smtpUser = process.env.SMTP_USER?.trim();
+  const smtpPass = process.env.SMTP_PASS?.trim();
+  const botToken = process.env.TELEGRAM_BOT_TOKEN?.trim();
+  const botUsername = process.env.TELEGRAM_BOT_USERNAME?.trim();
+  res.json({
+    emailEnabled: Boolean(smtpHost && smtpUser && smtpPass),
+    telegramEnabled: Boolean(botToken && botUsername),
+    telegramBotUsername: botUsername ?? null,
+  });
+});
 
 router.get('/profile', (req: Request, res: Response) => {
   const installId = req.installId!;

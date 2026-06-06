@@ -207,9 +207,10 @@
     <string name="history_collapse">Свернуть</string>
 
     <string name="settings_auth_section">Аккаунт</string>
-    <string name="settings_auth_summary">Email — 7 дней Premium, общая история</string>
-    <string name="settings_auth_hint">Войди по email: код на почту. Новый аккаунт — пробный Premium 7 дней.</string>
+    <string name="settings_auth_summary">Email или Telegram — история в облаке</string>
+    <string name="settings_auth_hint">Войди по email или Telegram. Новый аккаунт — пробный Premium 7 дней.</string>
     <string name="settings_auth_email">Email</string>
+    <string name="settings_auth_telegram">Telegram</string>
     <string name="settings_auth_send_code">Отправить код</string>
     <string name="settings_auth_code">Код из письма</string>
     <string name="settings_auth_verify">Войти</string>
@@ -220,10 +221,14 @@
     <string name="settings_auth_linked">Аккаунт активен</string>
     <string name="settings_auth_trial_until">Пробный Premium до %1$s</string>
     <string name="settings_auth_premium">Premium активен</string>
-    <string name="settings_auth_not_linked">Войди по email — 7 дней Premium и синхронизация истории.</string>
+    <string name="settings_auth_not_linked">Войди — история сохранится в облаке и восстановится на новом телефоне.</string>
     <string name="settings_auth_open_login">Войти</string>
+    <string name="settings_auth_link_hint">Можно привязать второй способ входа к этому же аккаунту.</string>
+    <string name="settings_auth_link_telegram">Привязать Telegram</string>
+    <string name="settings_auth_telegram_linked">Telegram привязан</string>
+    <string name="settings_auth_telegram_hint">Нажми кнопку Telegram — аккаунт сохранит историю в облаке.</string>
     <string name="account_login_title">Вход в аккаунт</string>
-    <string name="account_login_subtitle">Код придёт на почту. Новый аккаунт — пробный Premium 7 дней.</string>
+    <string name="account_login_subtitle">Код придёт на почту или войди через Telegram. Новый аккаунт — пробный Premium 7 дней.</string>
     <string name="account_login_skip">Продолжить без входа</string>
     <string name="account_login_trial_hint">Без входа доступен бесплатный тариф с базовыми настройками.</string>
     <string name="feedback_title">Как история?</string>

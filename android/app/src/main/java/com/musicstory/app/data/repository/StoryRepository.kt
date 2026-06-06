@@ -64,6 +64,17 @@ class StoryRepository(
 
     val storyHistory: Flow<List<StoryHistoryEntry>> = storyHistoryDao.observeAll()
 
+    /** Pull cloud history after email/Telegram login and merge into local Room DB. */
+    suspend fun mergeHistoryFromServer(baseUrl: String) {
+        val sync = accountSyncManager ?: return
+        val remote = sync.pullHistory(baseUrl.trim()) ?: return
+        for (entry in remote) {
+            if (storyHistoryDao.countByTrackAndTime(entry.trackKey, entry.playedAt) == 0) {
+                storyHistoryDao.insert(entry)
+            }
+        }
+    }
+
     suspend fun refreshQuota() {
         var backendUrl = settingsDataStore.backendUrl.first().trim()
         if (!shouldTryBackend(backendUrl)) return
@@ -452,11 +463,11 @@ class StoryRepository(
                 }
                 if (e.code() == 503) {
                     val reason = sanitizeBackendError(parsedBody, llmProvider)
-                        ?: "Сервер без ${llmProvider.labelRu} — добавь свой ключ в настройках"
+                        ?: explainError(e, llmProvider)
                     StoryLog.w("Backend LLM unavailable: $reason")
                     return StoryAttemptResult.Failed(
                         reason = reason,
-                        backendGroqDown = true,
+                        backendGroqDown = code in LLM_NOT_CONFIGURED_CODES,
                     )
                 }
             }
@@ -501,11 +512,7 @@ class StoryRepository(
             return "$providerLabel не ответил через Railway. Проверь ключ в настройках."
         }
         if (backendConfigured && !backendError.isNullOrBlank()) {
-            return if (backendGroqDown) {
-                "Сервер без $providerLabel. Добавь свой ключ в настройках."
-            } else {
-                "Сервер: $backendError"
-            }
+            return backendError
         }
         return if (backendConfigured) {
             "Сервер недоступен. Проверь интернет или добавь $providerLabel-ключ в настройках."
@@ -733,6 +740,12 @@ class StoryRepository(
     )
 
     companion object {
+        private val LLM_NOT_CONFIGURED_CODES = setOf(
+            "OPENROUTER_NOT_CONFIGURED",
+            "GROQ_NOT_CONFIGURED",
+            "GEMINI_NOT_CONFIGURED",
+            "LOCAL_OLLAMA_NOT_CONFIGURED",
+        )
         private const val BACKEND_TIMEOUT_MS = 300_000L
         /** Local Ollama: research + up to 8 narrator attempts on 35b model. */
         private const val BACKEND_LOCAL_TIMEOUT_MS = 1_200_000L

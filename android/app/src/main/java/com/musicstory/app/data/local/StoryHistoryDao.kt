@@ -7,6 +7,9 @@ import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface StoryHistoryDao {
+    @Query("SELECT COUNT(*) FROM story_history WHERE trackKey = :trackKey AND playedAt = :playedAt")
+    suspend fun countByTrackAndTime(trackKey: String, playedAt: Long): Int
+
     @Insert
     suspend fun insert(entry: StoryHistoryEntry)
 

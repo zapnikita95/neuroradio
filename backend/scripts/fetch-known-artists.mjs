@@ -8,7 +8,7 @@ import { fileURLToPath } from 'node:url';
 
 const USER_AGENT = 'MusicStoryBFF/1.0 (known-artists build)';
 const OUT = join(dirname(fileURLToPath(import.meta.url)), '../src/data/known-artists.json');
-const TARGET = 1000;
+const TARGET = 2500;
 
 const WIKI_TABLE_PAGES = [
   'List_of_best-selling_music_artists',
@@ -17,6 +17,8 @@ const WIKI_TABLE_PAGES = [
   'List_of_K-pop_artists',
   'Latin_Grammy_Award_for_Best_New_Artist',
   'List_of_highest-certified_music_artists_in_the_United_States',
+  'List_of_rock_and_roll_artists',
+  'List_of_heavy_metal_bands',
 ];
 
 const WIKI_CATEGORIES = [
@@ -37,7 +39,9 @@ const WIKI_CATEGORIES = [
   'Category:Australian_musicians',
   'Category:Swedish_musicians',
   'Category:Norwegian_musicians',
-  'Category:Dutch_musicians',
+  'Category:Finnish_musical_groups',
+  'Category:Finnish_rock_music_groups',
+  'Category:Danish_musical_groups',
   'Category:Polish_musicians',
   'Category:Turkish_musicians',
   'Category:Indian_musicians',
@@ -45,6 +49,27 @@ const WIKI_CATEGORIES = [
   'Category:Nigerian_musicians',
   'Category:Grammy_Award_winners',
   'Category:Brit_Award_winners',
+  'Category:Latin_rock_musicians',
+  'Category:Alternative_rock_groups',
+  'Category:Indie_rock_musical_groups',
+  'Category:Pop_rock_musical_groups',
+  'Category:Hard_rock_musical_groups',
+  'Category:Punk_rock_groups',
+  'Category:Grunge_musical_groups',
+  'Category:Eurodance_musicians',
+  'Category:House_music_groups',
+  'Category:Techno_musicians',
+  'Category:Trance_musicians',
+  'Category:Country_music_singers',
+  'Category:Rhythm_and_blues_singers',
+  'Category:Soul_musicians',
+  'Category:Funk_musicians',
+  'Category:Jazz_musicians',
+  'Category:Blues_musicians',
+  'Category:Classical_composers',
+  'Category:Opera_singers',
+  'Category:Musicians_from_Los_Angeles',
+  'Category:Musicians_from_London',
 ];
 
 /** Hand-picked global stars — not Latin/indie acts that should stay on wiki path. */
@@ -54,6 +79,14 @@ const SEED_MAJOR = [
   'ed sheeran', 'ariana grande', 'justin bieber', 'kanye west', 'the weeknd', 'post malone',
   'bruno mars', 'lady gaga', 'adele', 'shakira', 'bad bunny', 'j balvin', 'rosalía',
   'morgenshtern', 'oxxxymiron', 'basta', 'timati', 'miyagi', 'scriptonite',
+  'santana', 'the rasmus', 'him', 'nightwish', 'linkin park', 'red hot chili peppers',
+  'foo fighters', 'nirvana', 'pearl jam', 'soundgarden', 'alice in chains',
+  'u2', 'radiohead', 'oasis', 'blur', 'the cure', 'depeche mode', 'the smiths',
+  'bon jovi', 'aerosmith', 'guns n roses', 'ac dc', 'deep purple', 'black sabbath',
+  'iron maiden', 'judas priest', 'slayer', 'megadeth', 'anthrax', 'pantera',
+  'rammstein', 'scorpions', 'a-ha', 'ace of base', 'aqua', 'europe', 'roxette',
+  'within temptation', 'epica', 'apocalyptica', 'lordi', 'children of bodom',
+  'moby', 'arash', 'tame impala', 'the killers', 'arctic monkeys', 'muse', 'placebo',
 ];
 
 function normalize(name) {
@@ -154,7 +187,7 @@ async function main() {
   }
 
   for (const cat of WIKI_CATEGORIES) {
-    if (raw.size >= TARGET + 200) break;
+    if (raw.size >= TARGET + 300) break;
     try {
       for (const name of await fetchCategoryMembers(cat, 350)) {
         raw.add(normalize(name));

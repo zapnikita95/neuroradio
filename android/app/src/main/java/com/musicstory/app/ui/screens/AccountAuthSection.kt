@@ -15,6 +15,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -25,6 +26,7 @@ import com.musicstory.app.R
 import com.musicstory.app.data.remote.AccountAuthManager
 import com.musicstory.app.ui.components.PrimaryStoryButton
 import com.musicstory.app.ui.components.SecondaryStoryButton
+import com.musicstory.app.ui.components.TelegramLoginWebView
 import com.musicstory.app.ui.theme.CreamText
 import com.musicstory.app.ui.theme.ErrorCoral
 import com.musicstory.app.ui.theme.GoldBright
@@ -38,26 +40,39 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
+private suspend fun finishAccountLogin(app: MusicStoryApp) {
+    app.settingsDataStore.setAccountLinked(true)
+    val url = app.settingsDataStore.backendUrl.first()
+    if (url.isNotBlank()) {
+        app.storyRepository.mergeHistoryFromServer(url)
+    }
+}
+
 @Composable
 fun AccountStatusSection(
     app: MusicStoryApp,
     onOpenLogin: () -> Unit,
 ) {
     val context = LocalContext.current
+    val scope = rememberCoroutineScope()
     var profile by remember { mutableStateOf<AccountAuthManager.AccountProfile?>(null) }
+    var authConfig by remember { mutableStateOf<AccountAuthManager.AuthConfig?>(null) }
+    var showTelegram by remember { mutableStateOf(false) }
+    var message by remember { mutableStateOf<String?>(null) }
+    var busy by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) {
         val url = app.settingsDataStore.backendUrl.first()
         if (url.isNotBlank()) {
+            authConfig = app.accountAuthManager.fetchConfig(url)
             profile = app.accountAuthManager.fetchProfile(url)
         }
     }
 
     Column {
         profile?.takeIf { it.isLoggedIn }?.let { p ->
-            val status = accountStatusText(context, p)
             Text(
-                text = status,
+                text = accountStatusText(context, p),
                 style = MaterialTheme.typography.labelMedium,
                 color = LiveGreen,
             )
@@ -68,6 +83,83 @@ fun AccountStatusSection(
                     style = MaterialTheme.typography.bodyMedium,
                     color = CreamText,
                 )
+            }
+            p.telegramUsername?.let { username ->
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = "@$username",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = CreamText,
+                )
+            } ?: p.telegramId?.let {
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = context.getString(R.string.settings_auth_telegram_linked),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = CreamText,
+                )
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+            Text(
+                text = context.getString(R.string.settings_auth_link_hint),
+                style = MaterialTheme.typography.bodySmall,
+                color = MutedLavender,
+            )
+
+            if (p.email.isNullOrBlank() && authConfig?.emailEnabled == true) {
+                Spacer(modifier = Modifier.height(12.dp))
+                AccountEmailLoginContent(
+                    app = app,
+                    scope = scope,
+                    showSkip = false,
+                    compact = true,
+                    onSkip = {},
+                    onLoggedIn = {
+                        scope.launch {
+                            val url = app.settingsDataStore.backendUrl.first()
+                            profile = app.accountAuthManager.fetchProfile(url)
+                        }
+                    },
+                )
+            }
+
+            if (p.telegramId == null && authConfig?.telegramEnabled == true) {
+                Spacer(modifier = Modifier.height(12.dp))
+                if (!showTelegram) {
+                    SecondaryStoryButton(
+                        text = context.getString(R.string.settings_auth_link_telegram),
+                        onClick = { showTelegram = true },
+                    )
+                } else {
+                    val url = remember { mutableStateOf("") }
+                    LaunchedEffect(Unit) {
+                        url.value = app.settingsDataStore.backendUrl.first()
+                    }
+                    if (url.value.isNotBlank()) {
+                        TelegramLoginWebView(
+                            widgetUrl = "${url.value.trimEnd('/')}/v1/account/telegram/widget",
+                            onAuthPayload = { payload ->
+                                if (busy) return@TelegramLoginWebView
+                                scope.launch {
+                                    busy = true
+                                    message = null
+                                    val base = app.settingsDataStore.backendUrl.first()
+                                    val (newProfile, err) = app.accountAuthManager.linkTelegram(base, payload)
+                                    if (newProfile != null) {
+                                        finishAccountLogin(app)
+                                        profile = newProfile
+                                        showTelegram = false
+                                        message = context.getString(R.string.settings_auth_success)
+                                    } else {
+                                        message = err
+                                    }
+                                    busy = false
+                                }
+                            },
+                        )
+                    }
+                }
             }
         } ?: run {
             Text(
@@ -81,6 +173,15 @@ fun AccountStatusSection(
                 onClick = onOpenLogin,
             )
         }
+
+        message?.let {
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                text = it,
+                style = MaterialTheme.typography.labelMedium,
+                color = if (it.contains("ошиб", ignoreCase = true)) ErrorCoral else LiveGreen,
+            )
+        }
     }
 }
 
@@ -92,6 +193,7 @@ fun AccountEmailLoginContent(
     onSkip: () -> Unit,
     onLoggedIn: () -> Unit,
     modifier: Modifier = Modifier,
+    compact: Boolean = false,
 ) {
     val context = LocalContext.current
     var email by remember { mutableStateOf("") }
@@ -110,12 +212,14 @@ fun AccountEmailLoginContent(
     )
 
     Column(modifier = modifier) {
-        Text(
-            text = context.getString(R.string.account_login_subtitle),
-            style = MaterialTheme.typography.bodyLarge,
-            color = MutedLavender,
-        )
-        Spacer(modifier = Modifier.height(16.dp))
+        if (!compact) {
+            Text(
+                text = context.getString(R.string.account_login_subtitle),
+                style = MaterialTheme.typography.bodyLarge,
+                color = MutedLavender,
+            )
+            Spacer(modifier = Modifier.height(16.dp))
+        }
 
         OutlinedTextField(
             value = email,
@@ -173,7 +277,7 @@ fun AccountEmailLoginContent(
                         val url = app.settingsDataStore.backendUrl.first()
                         val p = app.accountAuthManager.verifyEmailLogin(url, email, code)
                         if (p != null) {
-                            app.settingsDataStore.setAccountLinked(true)
+                            finishAccountLogin(app)
                             message = context.getString(R.string.settings_auth_success)
                             onLoggedIn()
                         } else {
@@ -210,6 +314,61 @@ fun AccountEmailLoginContent(
             SecondaryStoryButton(
                 text = context.getString(R.string.account_login_skip),
                 onClick = onSkip,
+            )
+        }
+    }
+}
+
+@Composable
+fun AccountTelegramLoginSection(
+    app: MusicStoryApp,
+    scope: CoroutineScope,
+    onLoggedIn: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val context = LocalContext.current
+    var backendUrl by remember { mutableStateOf("") }
+    var message by remember { mutableStateOf<String?>(null) }
+    var busy by remember { mutableStateOf(false) }
+
+    LaunchedEffect(Unit) {
+        backendUrl = app.settingsDataStore.backendUrl.first()
+    }
+
+    Column(modifier = modifier) {
+        Text(
+            text = context.getString(R.string.settings_auth_telegram_hint),
+            style = MaterialTheme.typography.bodyMedium,
+            color = MutedLavender,
+        )
+        Spacer(modifier = Modifier.height(12.dp))
+        if (backendUrl.isNotBlank()) {
+            TelegramLoginWebView(
+                widgetUrl = "${backendUrl.trimEnd('/')}/v1/account/telegram/widget",
+                onAuthPayload = { payload ->
+                    if (busy) return@TelegramLoginWebView
+                    scope.launch {
+                        busy = true
+                        message = null
+                        val (profile, err) = app.accountAuthManager.linkTelegram(backendUrl, payload)
+                        if (profile != null) {
+                            finishAccountLogin(app)
+                            message = context.getString(R.string.settings_auth_success)
+                            onLoggedIn()
+                        } else {
+                            message = err ?: context.getString(R.string.settings_auth_verify_failed)
+                        }
+                        busy = false
+                    }
+                },
+            )
+        }
+        message?.let {
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                text = it,
+                style = MaterialTheme.typography.labelMedium,
+                color = if (it.contains("ошиб", ignoreCase = true)) ErrorCoral else LiveGreen,
             )
         }
     }

@@ -19,6 +19,37 @@ class AccountAuthManager(
         .readTimeout(25, TimeUnit.SECONDS)
         .build()
 
+    private fun parseProfile(json: JSONObject): AccountProfile =
+        AccountProfile(
+            accountId = parseOptionalString(json, "accountId"),
+            email = parseOptionalString(json, "email"),
+            telegramId = json.optLong("telegramId").takeIf { it > 0L },
+            telegramUsername = parseOptionalString(json, "telegramUsername"),
+            plan = parseOptionalString(json, "plan"),
+            trialUntil = json.optLong("trialUntil").takeIf { it > 0L },
+            premiumUntil = json.optLong("premiumUntil").takeIf { it > 0L },
+        )
+
+    suspend fun fetchConfig(baseUrl: String): AuthConfig? = withContext(Dispatchers.IO) {
+        val token = authManager.getAccessToken(baseUrl) ?: return@withContext null
+        val req = Request.Builder()
+            .url("${baseUrl.trimEnd('/')}/v1/account/config")
+            .header("Authorization", "Bearer $token")
+            .get()
+            .build()
+        runCatching {
+            http.newCall(req).execute().use { resp ->
+                if (!resp.isSuccessful) return@withContext null
+                val json = JSONObject(resp.body?.string().orEmpty())
+                AuthConfig(
+                    emailEnabled = json.optBoolean("emailEnabled"),
+                    telegramEnabled = json.optBoolean("telegramEnabled"),
+                    telegramBotUsername = parseOptionalString(json, "telegramBotUsername"),
+                )
+            }
+        }.getOrNull()
+    }
+
     suspend fun fetchProfile(baseUrl: String): AccountProfile? = withContext(Dispatchers.IO) {
         val token = authManager.getAccessToken(baseUrl) ?: return@withContext null
         val req = Request.Builder()
@@ -30,18 +61,31 @@ class AccountAuthManager(
             http.newCall(req).execute().use { resp ->
                 if (!resp.isSuccessful) return@withContext null
                 val json = JSONObject(resp.body?.string().orEmpty())
-                AccountProfile(
-                    accountId = parseOptionalString(json, "accountId"),
-                    email = parseOptionalString(json, "email"),
-                    telegramId = json.optLong("telegramId").takeIf { it > 0L },
-                    telegramUsername = parseOptionalString(json, "telegramUsername"),
-                    plan = parseOptionalString(json, "plan"),
-                    trialUntil = json.optLong("trialUntil").takeIf { it > 0L },
-                    premiumUntil = json.optLong("premiumUntil").takeIf { it > 0L },
-                )
+                parseProfile(json)
             }
         }.getOrNull()
     }
+
+    suspend fun linkTelegram(baseUrl: String, authJson: JSONObject): Pair<AccountProfile?, String?> =
+        withContext(Dispatchers.IO) {
+            val token = authManager.getAccessToken(baseUrl) ?: return@withContext null to "Нет связи с сервером"
+            val req = Request.Builder()
+                .url("${baseUrl.trimEnd('/')}/v1/account/telegram")
+                .header("Authorization", "Bearer $token")
+                .post(authJson.toString().toRequestBody("application/json".toMediaType()))
+                .build()
+            runCatching {
+                http.newCall(req).execute().use { resp ->
+                    val body = resp.body?.string().orEmpty()
+                    if (!resp.isSuccessful) {
+                        return@withContext null to JSONObject(body).optString("error").ifBlank { "Ошибка Telegram" }
+                    }
+                    val json = JSONObject(body)
+                    val profile = json.optJSONObject("profile") ?: json
+                    parseProfile(profile) to null
+                }
+            }.getOrDefault(null to "Ошибка сети")
+        }
 
     suspend fun startEmailLogin(baseUrl: String, email: String): String? = withContext(Dispatchers.IO) {
         val token = authManager.getAccessToken(baseUrl) ?: return@withContext null
@@ -79,18 +123,16 @@ class AccountAuthManager(
                     if (!resp.isSuccessful) return@withContext null
                     val json = JSONObject(resp.body?.string().orEmpty())
                     val profile = json.optJSONObject("profile") ?: json
-                    AccountProfile(
-                        accountId = parseOptionalString(profile, "accountId"),
-                        email = parseOptionalString(profile, "email"),
-                        telegramId = profile.optLong("telegramId").takeIf { it > 0L },
-                        telegramUsername = parseOptionalString(profile, "telegramUsername"),
-                        plan = parseOptionalString(profile, "plan"),
-                        trialUntil = profile.optLong("trialUntil").takeIf { it > 0L },
-                        premiumUntil = profile.optLong("premiumUntil").takeIf { it > 0L },
-                    )
+                    parseProfile(profile)
                 }
             }.getOrNull()
         }
+
+    data class AuthConfig(
+        val emailEnabled: Boolean,
+        val telegramEnabled: Boolean,
+        val telegramBotUsername: String?,
+    )
 
     data class AccountProfile(
         val accountId: String?,

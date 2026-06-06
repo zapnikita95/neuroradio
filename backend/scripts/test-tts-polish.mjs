@@ -1,7 +1,7 @@
 import { polishScriptForSpeechDelivery } from '../dist/services/tts-speech-polish.js';
 import { prepareYandexTtsText } from '../dist/services/tts-markup.js';
 import { buildYandexSsml, hasLatinForSsml } from '../dist/services/tts-yandex-ssml.js';
-import { findIncompleteEnding, trimToLastCompleteSentence } from '../dist/services/story-quality.js';
+import { findIncompleteEnding, trimToLastCompleteSentence, stripTrackTitleGuillemets } from '../dist/services/story-quality.js';
 
 const ellaScript =
   'TikTok — это не просто приложение, а лабиринт, где из спальни вырвался звук, который теперь слушатели не могут вытеснить. Ella Boh записала «babydoll» в своей маленькой комнате, а её друг, убеждённый, что шутка может стать вирусом, выложил клип без малейшего продюсерского плана. Сначала это был лишь шёпот в ночи, но алгоритм подхватил мелодию, и она начала разлетаться по ленте, как пыльца по ветру. Слышать, как в припеве звучит «lalala», но за этим скрывается не просто прикол, а попытка отразить внутренний диалог, где каждый «малыш» — это часть её собственного эха. В этом и есть суть: bedroom‑запись превратилась в глобальный трек, а безымянный друг стал тем, кто открыл дверь в мир, где талант может родиться в четырех стенах. И всё, что осталось, — это слушать, как';
@@ -111,4 +111,17 @@ if (!mjMarked.includes('Hollywood Tonight') || !mjMarked.includes('Michael Jacks
   process.exit(1);
 }
 console.log('OK: Michael Jackson Latin preserved in marked text');
+
+const smoothScript =
+  'Carlos Santana выпустил Smooth — трек, который вернул его на вершину чартов.';
+const smoothStripped = stripTrackTitleGuillemets(
+  'Carlos Santana выпустил «Smooth» — трек, который вернул его на вершину чартов.',
+  'Smooth',
+);
+if (smoothStripped.includes('«Smooth»')) {
+  console.error('FAIL: track title guillemets should be stripped');
+  process.exit(1);
+}
+console.log('OK: track title guillemets stripped');
+
 console.log('OK: all TTS polish checks passed');

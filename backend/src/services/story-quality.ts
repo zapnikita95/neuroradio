@@ -263,6 +263,22 @@ function unmaskQuotedPassages(text: string, quotes: string[]): string {
   );
 }
 
+export function stripTrackTitleGuillemets(script: string, title: string): string {
+  const variants = [
+    title.trim(),
+    title.replace(/\s*\([^)]*\)\s*/g, ' ').trim(),
+  ].filter((v, i, arr) => v.length >= 2 && arr.indexOf(v) === i);
+
+  let result = script;
+  for (const variant of variants) {
+    const escaped = variant.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    result = result.replace(new RegExp(`«\\s*${escaped}\\s*»`, 'gi'), variant);
+    result = result.replace(new RegExp(`[\\u201c""]\\s*${escaped}\\s*[\\u201d""]`, 'gi'), variant);
+    result = result.replace(new RegExp(`'\\s*${escaped}\\s*'`, 'gi'), variant);
+  }
+  return result;
+}
+
 export function sanitizeScriptForTts(
   script: string,
   artist: string,
@@ -275,7 +291,7 @@ export function sanitizeScriptForTts(
     title,
     referenceFacts,
   });
-  let result = localized;
+  let result = stripTrackTitleGuillemets(localized, title);
 
   result = result.replace(DIGIT_ORDINAL_SUFFIX, (match) => {
     const digits = match.match(/\d+/)?.[0];

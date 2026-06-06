@@ -37,7 +37,7 @@ export function hasEnglishLeak(
 }
 
 export const RUSSIAN_LANGUAGE_PROMPT_BLOCK = `ЯЗЫК — ТОЛЬКО РУССКИЙ, ДЛЯ ОЗВУЧКИ:
-- Основной текст по-русски. Имена собственные лatinицей МОЖНО и НУЖНО сохранять: Billboard, Cash Box, Rolling Stone, названия групп и треков в «кавычках».
+- Основной текст по-русски. Имена собственные лatinицей МОЖНО и НУЖНО сохранять: Billboard, Cash Box, Rolling Stone, названия групп и треков БЕЗ кавычек (просто Smooth, Hollywood Tonight).
 - НЕ переводи названия журналов, лейблов, артистов и песен — это имена собственные.
 - Знаковые термины и приёмы — тоже лatin/English, НЕ кальки: moonwalk, anti-gravity lean, robot (танец MJ). ПЛОХО: «луноход», «робот», «наклон без гравитации» вместо moonwalk.
 - Обычные английские слова (chart, band, single, live, hit, mainstream) переводи по смыслу: чарт, группа, сингл, живой, хит.

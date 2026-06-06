@@ -112,6 +112,38 @@ class AccountSyncManager(
         refreshStatus(baseUrl)?.linked == true
     }
 
+    suspend fun pullHistory(baseUrl: String, since: Long = 0): List<StoryHistoryEntry>? =
+        withContext(Dispatchers.IO) {
+            val token = authManager.getAccessToken(baseUrl) ?: return@withContext null
+            val req = Request.Builder()
+                .url("${baseUrl.trimEnd('/')}/v1/sync/history?since=$since")
+                .header("Authorization", "Bearer $token")
+                .get()
+                .build()
+            runCatching {
+                http.newCall(req).execute().use { resp ->
+                    if (!resp.isSuccessful) return@withContext null
+                    val json = JSONObject(resp.body?.string().orEmpty())
+                    val arr = json.optJSONArray("history") ?: return@withContext emptyList()
+                    buildList {
+                        for (i in 0 until arr.length()) {
+                            val item = arr.optJSONObject(i) ?: continue
+                            add(
+                                StoryHistoryEntry(
+                                    trackKey = item.optString("trackKey"),
+                                    artist = item.optString("artist"),
+                                    title = item.optString("title"),
+                                    script = item.optString("script"),
+                                    angle = item.optString("angle").ifBlank { null },
+                                    playedAt = item.optLong("playedAt", System.currentTimeMillis()),
+                                ),
+                            )
+                        }
+                    }
+                }
+            }.getOrNull()
+        }
+
     suspend fun pushHistoryEntry(
         baseUrl: String,
         entry: StoryHistoryEntry,

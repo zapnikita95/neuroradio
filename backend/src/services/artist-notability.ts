@@ -16,7 +16,12 @@ function loadCatalogMajor(): Set<string> {
   try {
     const raw = readFileSync(join(__dir, '../data/known-artists.json'), 'utf8');
     const data = JSON.parse(raw) as { artists?: string[] };
-    catalogMajor = new Set((data.artists ?? []).map(normalizeArtist));
+    catalogMajor = new Set([
+      ...(data.artists ?? []).map(normalizeArtist),
+      ...FALLBACK_MAJOR.map(normalizeArtist),
+      ...RU_REGIONAL_MAJOR.map(normalizeArtist),
+      ...EUROPEAN_ROCK_MAJOR.map(normalizeArtist),
+    ]);
     console.log(`[artist-tier] loaded ${catalogMajor.size} known artists`);
   } catch {
     catalogMajor = new Set(FALLBACK_MAJOR);
