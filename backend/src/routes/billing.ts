@@ -20,7 +20,7 @@ import {
   TRIAL_PRODUCT_MONTHLY,
   tierQuotaHintRu,
 } from '../services/tier-policy.js';
-import { getDailyStoryQuota } from '../middleware/rate-limit.js';
+import { getDailyStoryQuota, resetStoryQuotaForInstall } from '../middleware/rate-limit.js';
 import {
   getDevTierOverride,
   isDevTierSwitchEnabled,
@@ -115,6 +115,7 @@ router.post('/dev-tier', (req: Request, res: Response) => {
   }
 
   setDevTierOverride(installId, tier);
+  resetStoryQuotaForInstall(installId);
   const effective = resolveUserTier(installId);
   const limits = getStoryLimitsForTier(effective);
 
@@ -124,7 +125,7 @@ router.post('/dev-tier', (req: Request, res: Response) => {
     tier: effective,
     limits,
     quota: getDailyStoryQuota(installId),
-    hint: tierQuotaHintRu(effective),
+    hint: `${tierQuotaHintRu(effective)} Квота историй сброшена.`,
     serverLlmKeys: 'Запросы без своего API-ключа идут на ключи Railway (OPEN_ROUTER_API_KEY и др.)',
   });
 });

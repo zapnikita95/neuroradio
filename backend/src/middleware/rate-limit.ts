@@ -3,6 +3,7 @@ import { isUnlimitedInstall, SECURITY } from '../config/security.js';
 import { getQuotaSubject } from '../services/account-store.js';
 import { resolveUserTier } from '../services/entitlements.js';
 import { resolveFreeDailyLimit } from '../services/free-model-profile.js';
+import { getDevTierOverride, isDevTierSwitchEnabled } from '../services/dev-tier-store.js';
 import { getStoryLimitsForTier } from '../services/tier-policy.js';
 import { setLogDetail } from './request-logger.js';
 
@@ -121,8 +122,23 @@ function quotaKey(installId: string): string {
   return `story:day:${getQuotaSubject(installId)}`;
 }
 
+/** Dev testing: premium/trial override — без дневного лимита. */
+function isDevQuotaBypass(installId: string): boolean {
+  if (!isDevTierSwitchEnabled()) return false;
+  const override = getDevTierOverride(installId);
+  return override === 'premium' || override === 'trial';
+}
+
+/** Сброс счётчиков историй (кнопка «Сброс» / смена тест-тарифа). */
+export function resetStoryQuotaForInstall(installId: string): void {
+  const subject = getQuotaSubject(installId);
+  buckets.delete(quotaKey(installId));
+  buckets.delete(`story:burst:${subject}`);
+  buckets.delete(`story:hour:${subject}`);
+}
+
 export function getDailyStoryLimit(installId: string, options: { freeOpenRouterModel?: string } = {}): number {
-  if (isUnlimitedInstall(installId)) return UNLIMITED_QUOTA.limit;
+  if (isUnlimitedInstall(installId) || isDevQuotaBypass(installId)) return UNLIMITED_QUOTA.limit;
   const tier = resolveUserTier(installId);
   if (tier === 'free') {
     return resolveFreeDailyLimit(options.freeOpenRouterModel);
@@ -138,7 +154,9 @@ export function getDailyStoryQuota(
   installId: string,
   options: { freeOpenRouterModel?: string } = {},
 ): QuotaSnapshot {
-  if (isUnlimitedInstall(installId)) return { ...UNLIMITED_QUOTA, resetsAt: Date.now() + DAY_MS };
+  if (isUnlimitedInstall(installId) || isDevQuotaBypass(installId)) {
+    return { ...UNLIMITED_QUOTA, tier: resolveUserTier(installId), resetsAt: Date.now() + DAY_MS };
+  }
   const dailyLimit = getDailyStoryLimit(installId, options);
   return enrichQuota(
     installId,
@@ -201,7 +219,7 @@ export function rateLimitStory(
   options: { skipDailyQuota?: boolean; freeOpenRouterModel?: string } = {},
 ): (req: import('express').Request, res: import('express').Response, next: import('express').NextFunction) => void {
   return (req, res, next) => {
-    if (isUnlimitedInstall(installId) || options.skipDailyQuota) {
+    if (isUnlimitedInstall(installId) || options.skipDailyQuota || isDevQuotaBypass(installId)) {
       next();
       return;
     }
@@ -237,7 +255,7 @@ export function recordStoryGeneration(
   req: { header(name: string): string | undefined; socket: { remoteAddress?: string } },
   options: { freeOpenRouterModel?: string } = {},
 ): void {
-  if (isUnlimitedInstall(installId)) return;
+  if (isUnlimitedInstall(installId) || isDevQuotaBypass(installId)) return;
 
   const ip = clientIp(req);
   const { limits } = SECURITY;
