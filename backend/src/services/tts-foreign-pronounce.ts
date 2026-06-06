@@ -4,10 +4,12 @@
 
 const PHRASE_PRONUNCIATION_RU: Record<string, string> = {
   'zitti e buoni': 'Зитти э буони',
-  'bohemian rhapsody': 'Богемиан Рапсоди',
-  'queen': 'Квин',
+  'bohemian rhapsody': 'Бохимиан Рэпсоди',
+  queen: 'Куин',
   'ella boh': 'Элла Бо',
   'lou bega': 'Лоу Бега',
+  'damiano david': 'Дамиано Дэйвид',
+  babydoll: 'Бейбидол',
   'mambo no. 5': 'Мambo No. 5',
   'perhaps, perhaps, perhaps': 'Перхапс, перхапс, перхапс',
   silverlines: 'Силверлайнз',
@@ -34,9 +36,9 @@ const EN_WORD_RU: Record<string, string> = {
   little: 'литл',
   fears: 'фирс',
   fear: 'фир',
-  queen: 'квин',
-  bohemian: 'богемиан',
-  rhapsody: 'рапсоди',
+  queen: 'куин',
+  bohemian: 'бохимиан',
+  rhapsody: 'рэпсоди',
   ella: 'элла',
   boh: 'бо',
   bega: 'бега',
@@ -224,23 +226,84 @@ function unmaskTtsMarkup(text: string, slots: string[]): string {
 }
 
 /** Replace longest known Latin phrases first (case-insensitive). */
-function applyPhraseDictionary(text: string, extra: Record<string, string> = {}): string {
+function applyPhraseDictionaryLogged(
+  text: string,
+  extra: Record<string, string> = {},
+  replacements: LatinTtsReplacement[],
+  source: LatinTtsReplacement['source'],
+): string {
   const dict = { ...PHRASE_PRONUNCIATION_RU, ...extra };
   const keys = Object.keys(dict).sort((a, b) => b.length - a.length);
   let result = text;
   for (const key of keys) {
     const re = new RegExp(key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi');
-    result = result.replace(re, dict[key]!);
+    result = result.replace(re, (match) => {
+      const to = dict[key]!;
+      if (match !== to) {
+        replacements.push({ from: match, to, source });
+      }
+      return to;
+    });
   }
   return result;
 }
 
-function transliterateRemainingLatin(text: string): string {
+function applyPhraseDictionary(text: string, extra: Record<string, string> = {}): string {
+  return applyPhraseDictionaryLogged(text, extra, [], 'dictionary');
+}
+
+function transliterateRemainingLatinLogged(
+  text: string,
+  replacements: LatinTtsReplacement[],
+): string {
   const re = /[A-Za-zÀ-ÿ][A-Za-zÀ-ÿ0-9'’.\-]*(?:\s+[A-Za-zÀ-ÿ][A-Za-zÀ-ÿ0-9'’.\-]*)*/g;
   return text.replace(re, (match) => {
     if (match.length < 2) return match;
-    return latinPhraseToRussianTts(match);
+    const to = latinPhraseToRussianTts(match);
+    if (to !== match) {
+      replacements.push({ from: match, to, source: 'transliterate' });
+    }
+    return to;
   });
+}
+
+function transliterateRemainingLatin(text: string): string {
+  return transliterateRemainingLatinLogged(text, []);
+}
+
+export interface LatinTtsReplacement {
+  from: string;
+  to: string;
+  source: 'dictionary' | 'transliterate' | 'artist' | 'title';
+}
+
+/** Full pass with a log of Latin → Cyrillic substitutions (for Silero transcript cards). */
+export function applyForeignPronunciationWithReplacements(
+  text: string,
+  artist = '',
+  title = '',
+): { text: string; replacements: LatinTtsReplacement[] } {
+  const replacements: LatinTtsReplacement[] = [];
+  const extra: Record<string, string> = {};
+  if (artist.trim()) {
+    const to = latinPhraseToRussianTts(artist);
+    extra[artist.trim().toLowerCase()] = to;
+    if (artist.trim() !== to) {
+      replacements.push({ from: artist.trim(), to, source: 'artist' });
+    }
+  }
+  if (title.trim()) {
+    const to = latinPhraseToRussianTts(title);
+    extra[title.trim().toLowerCase()] = to;
+    if (title.trim() !== to) {
+      replacements.push({ from: title.trim(), to, source: 'title' });
+    }
+  }
+
+  const { masked, slots } = maskTtsMarkup(text);
+  let result = applyPhraseDictionaryLogged(masked, extra, replacements, 'dictionary');
+  result = transliterateRemainingLatinLogged(result, replacements);
+  return { text: unmaskTtsMarkup(result, slots), replacements };
 }
 
 /** Full pass: dictionary → word transliteration for any leftover Latin. */

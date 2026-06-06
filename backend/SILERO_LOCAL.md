@@ -32,11 +32,24 @@ START.bat
 
 ```bat
 cd backend
-set SILERO_TTS_API=legacy
+npm run build
 node scripts/test-silero-tts.mjs
 ```
 
-→ `backend/data/audio/test-silero.wav`
+→ `backend/data/audio/test-silero-{sample}-{preset}.wav` + **парный `.txt`** (карточка: исходник, латиница→кириллица, ударения, payload)
+
+Индекс: `backend/data/audio/test-silero-INDEX.txt`
+
+**Пресеты голоса** (аналог Yandex emotion):
+
+| preset | голос | настроение |
+|--------|-------|------------|
+| `calm_female` | baya | спокойный, размеренный ≈ neutral |
+| `calm_male` | aidar | ровный диктор |
+| `lively_female` | kseniya | живее ≈ good |
+| `lively_male` | eugene | бодрый ≈ good |
+
+Только один пресет: `set SILERO_PRESETS=calm_female`
 
 ## Переменные BFF
 

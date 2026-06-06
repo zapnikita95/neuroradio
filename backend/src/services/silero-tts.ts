@@ -1,12 +1,14 @@
 import { mkdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import fetch from 'node-fetch';
-import { prepareSileroTtsText } from './tts-markup.js';
+import { prepareSileroTtsTextTrace } from './tts-markup.js';
+import { formatSileroTranscriptReport } from './tts-silero-transcript.js';
+import { resolveSileroVoiceFromEnv, resolveSileroVoicePreset, type SileroVoicePresetId } from './silero-voices.js';
 import { AUDIO_DIR, type SynthesisResult } from './yandex-tts.js';
 
-export type SileroVoiceId = 'aidar' | 'baya' | 'kseniya' | 'xenia' | 'eugene';
+import type { SileroVoiceId } from './silero-voices.js';
 
-const DEFAULT_SILERO_VOICE: SileroVoiceId = 'baya';
+export type { SileroVoiceId } from './silero-voices.js';
 
 export function getSileroTtsBaseUrl(): string | null {
   const raw = process.env.SILERO_TTS_URL?.trim();
@@ -23,12 +25,7 @@ export function canUseSileroTts(): boolean {
 }
 
 export function resolveSileroVoice(): SileroVoiceId {
-  const raw = process.env.SILERO_TTS_VOICE?.trim().toLowerCase();
-  const allowed: SileroVoiceId[] = ['aidar', 'baya', 'kseniya', 'xenia', 'eugene'];
-  if (raw && allowed.includes(raw as SileroVoiceId)) {
-    return raw as SileroVoiceId;
-  }
-  return DEFAULT_SILERO_VOICE;
+  return resolveSileroVoiceFromEnv();
 }
 
 type SileroApiMode = 'openai' | 'legacy';
@@ -95,6 +92,7 @@ export interface SileroSynthesisOptions {
   artist?: string;
   title?: string;
   voice?: SileroVoiceId;
+  voicePreset?: SileroVoicePresetId;
 }
 
 /**
@@ -115,8 +113,10 @@ export async function synthesizeSpeechSilero(
 
   const artist = options.artist ?? '';
   const title = options.title ?? '';
-  const voice = options.voice ?? resolveSileroVoice();
-  const plainText = prepareSileroTtsText(script, { artist, title });
+  const preset = options.voicePreset ? resolveSileroVoicePreset(options.voicePreset) : undefined;
+  const voice = options.voice ?? preset?.voice ?? resolveSileroVoice();
+  const trace = prepareSileroTtsTextTrace(script, { artist, title });
+  const plainText = trace.prepared;
   if (!plainText.trim()) {
     throw new Error('Silero TTS: пустой текст после подготовки');
   }
@@ -148,14 +148,14 @@ export async function synthesizeSpeechSilero(
   await writeFile(filePath, buffer);
   await writeFile(
     transcriptPath,
-    [
-      `# Silero TTS transcript`,
-      `# artist=${artist || '-'} title=${title || '-'}`,
-      `# voice=${voice} chars=${plainText.length} ms=${Date.now() - synthStarted}`,
-      '',
-      plainText,
-      '',
-    ].join('\n'),
+    formatSileroTranscriptReport({
+      trace,
+      preset,
+      voice,
+      synthMs: Date.now() - synthStarted,
+      audioBytes: buffer.length,
+      audioFileName: fileName,
+    }),
     'utf8',
   );
 

@@ -3,7 +3,7 @@
  * Run: npm run build && node scripts/test-tts-pipeline.mjs
  */
 import assert from 'node:assert/strict';
-import { prepareYandexTtsText, prepareSileroTtsText } from '../dist/services/tts-markup.js';
+import { prepareYandexTtsText, prepareSileroTtsText, prepareSileroTtsTextTrace } from '../dist/services/tts-markup.js';
 import { resolveVoiceDelivery } from '../dist/services/tts-voice-profiles.js';
 import {
   PremiumTtsAccessError,
@@ -130,15 +130,17 @@ test('salute ssml uses sber voice and breaks', () => {
 test('prepareSileroTtsText transliterates Italian titles and keeps stress', () => {
   const script =
     'Damiano David победил на Евровидении с песней «Zitti e buoni». Звукорежиссёр поймал свист в колонках.';
-  const out = prepareSileroTtsText(script, {
+  const trace = prepareSileroTtsTextTrace(script, {
     artist: 'Damiano David',
     title: 'Next Summer',
   });
+  const out = trace.prepared;
   assert.match(out, /Зитти э буони/i);
   assert.doesNotMatch(out, /Zitti/i);
   assert.match(out, /св\+ист|свист/i);
   assert.match(out, /кол\+он/i);
   assert.doesNotMatch(out, /<\[/);
+  assert.ok(trace.latinReplacements.length > 0);
 });
 
 console.log(`\n[test-tts-pipeline] ${passed} passed`);
