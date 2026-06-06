@@ -554,6 +554,10 @@ class StoryOrchestrator(
     private fun supersedePreviousStoryJobOnly() {
         val hadJob = activeStoryJob?.isActive == true
         if (hadJob) {
+            if (backendFetchInFlight) {
+                StoryLog.i("Manual supersede suppressed — story HTTP in flight")
+                return
+            }
             storyRepository.cancelActiveStoryFetch("manual supersede")
             activeStoryJob?.cancel(CancellationException("superseded"))
             playbackSession++
@@ -831,6 +835,10 @@ class StoryOrchestrator(
             StoryLog.i("Keep in-flight story ($reason) — manual request active")
             return
         }
+        if (backendFetchInFlight && reason != "stopped by user") {
+            StoryLog.i("Story generation cancel suppressed during HTTP: $reason")
+            return
+        }
         if (reason == "track skipped" || reason == "stopped by user") {
             storyRepository.cancelActiveStoryFetch(reason)
         }
@@ -858,6 +866,10 @@ class StoryOrchestrator(
     private suspend fun cancelInFlightGeneration(reason: String, rollbackAutoTrigger: Boolean) {
         if (!shouldAbortInFlightStory(reason)) {
             StoryLog.i("Keep in-flight story ($reason) — manual request active")
+            return
+        }
+        if (backendFetchInFlight && reason != "stopped by user") {
+            StoryLog.i("Story generation cancel suppressed during HTTP: $reason")
             return
         }
         if (reason == "track skipped" || reason == "stopped by user") {

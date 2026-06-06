@@ -190,7 +190,7 @@ router.post('/full', validateStoryFullBody, storyFullRateLimit, async (req: Requ
   const installId = req.installId ?? 'unknown';
   let clientAbort: AbortSignal;
   try {
-    clientAbort = claimStoryGeneration(installId, req);
+    clientAbort = claimStoryGeneration(installId, req, res);
   } catch (err) {
     if (err instanceof StoryRequestDuplicateError) {
       console.log(`[story] duplicate POST ignored install=${installId.slice(0, 8)}`);

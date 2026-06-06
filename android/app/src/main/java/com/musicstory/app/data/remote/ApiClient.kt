@@ -47,12 +47,9 @@ class ApiClient(
 
     fun cancelActiveStoryRequest(reason: String = "unknown") {
         synchronized(storyCallLock) {
-            val call = activeStoryCall
-            if (call != null && !call.isCanceled()) {
-                StoryLog.w("HTTP cancel story/full reason=$reason")
-                call.cancel()
+            if (activeStoryCall != null) {
+                StoryLog.w("HTTP story/full cancel suppressed reason=$reason")
             }
-            activeStoryCall = null
         }
     }
 

@@ -1,4 +1,4 @@
-import type { Request } from 'express';
+import type { Request, Response } from 'express';
 
 const activeByInstall = new Map<string, AbortController>();
 
@@ -20,7 +20,7 @@ export class StoryRequestDuplicateError extends Error {
 }
 
 /** One in-flight story per install — duplicate POST is rejected, never aborts the active one. */
-export function claimStoryGeneration(installId: string, req: Request): AbortSignal {
+export function claimStoryGeneration(installId: string, req: Request, res: Response): AbortSignal {
   const key = installId.trim().toLowerCase();
   const existing = activeByInstall.get(key);
   if (existing && !existing.signal.aborted) {
@@ -30,11 +30,9 @@ export function claimStoryGeneration(installId: string, req: Request): AbortSign
   const ctrl = new AbortController();
   activeByInstall.set(key, ctrl);
 
-  req.on('close', () => {
-    if (activeByInstall.get(key) === ctrl) {
-      activeByInstall.delete(key);
-      if (!ctrl.signal.aborted) ctrl.abort('client_disconnect');
-    }
+  req.on('aborted', () => abortClientDisconnect(key, ctrl));
+  res.on('close', () => {
+    if (!res.writableEnded) abortClientDisconnect(key, ctrl);
   });
 
   ctrl.signal.addEventListener(
@@ -46,6 +44,12 @@ export function claimStoryGeneration(installId: string, req: Request): AbortSign
   );
 
   return ctrl.signal;
+}
+
+function abortClientDisconnect(key: string, ctrl: AbortController): void {
+  if (activeByInstall.get(key) !== ctrl) return;
+  activeByInstall.delete(key);
+  if (!ctrl.signal.aborted) ctrl.abort('client_disconnect');
 }
 
 export function releaseStoryGeneration(installId: string, signal: AbortSignal): void {
