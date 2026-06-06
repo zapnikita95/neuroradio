@@ -284,23 +284,29 @@ class StoryOrchestrator(
 
     /** UI must not stay «Готовим историю» if the coroutine already died. */
     private fun reconcileGenerationState() {
-        val jobDead = activeStoryJob?.isActive != true
-        if (manualStoryInFlight && !jobDead) return
-        if ((generationInFlight || backendFetchInFlight || _state.value == OrchestratorState.FETCHING_STORY) && jobDead) {
-            StoryLog.w("Generation stale — clearing (no active job, state=${_state.value})")
-            generationInFlight = false
-            backendFetchInFlight = false
-            if (_state.value == OrchestratorState.FETCHING_STORY ||
-                _state.value == OrchestratorState.PREPARING_PLAYBACK
-            ) {
-                _state.value = OrchestratorState.LISTENING
-            }
-            if (MonitorNotificationState.preparingStory.value) {
-                MonitorNotificationState.setPreparing(false)
-                MediaMonitorService.refreshNotification(context)
-            }
-            publishUiState()
+        if (activeStoryJob?.isActive == true) return
+        // Startup window: requestManualStory sets flags before activeStoryJob is assigned.
+        if (manualStoryInFlight || backendFetchInFlight) return
+        if (generationInFlight && activeStoryJob == null) return
+        if (!generationInFlight && !backendFetchInFlight &&
+            _state.value != OrchestratorState.FETCHING_STORY &&
+            _state.value != OrchestratorState.PREPARING_PLAYBACK
+        ) {
+            return
         }
+        StoryLog.w("Generation stale — clearing (no active job, state=${_state.value})")
+        generationInFlight = false
+        backendFetchInFlight = false
+        if (_state.value == OrchestratorState.FETCHING_STORY ||
+            _state.value == OrchestratorState.PREPARING_PLAYBACK
+        ) {
+            _state.value = OrchestratorState.LISTENING
+        }
+        if (MonitorNotificationState.preparingStory.value) {
+            MonitorNotificationState.setPreparing(false)
+            MediaMonitorService.refreshNotification(context)
+        }
+        publishUiState()
     }
 
     /** Counter already at N (e.g. restored) but story never fired — trigger on current track. */
@@ -418,11 +424,6 @@ class StoryOrchestrator(
                 return@launch
             }
             StoryLog.i("Manual story requested: ${track.artist} — ${track.title}")
-            backendFetchInFlight = true
-            MonitorNotificationState.setPreparing(true)
-            _state.value = OrchestratorState.FETCHING_STORY
-            publishUiState()
-            MediaMonitorService.refreshNotification(context)
             playStoryForTrack(track, manual = true)
         }
     }
@@ -473,6 +474,7 @@ class StoryOrchestrator(
         }
         publishUiState()
 
+        activeStoryJob?.cancel(CancellationException("replaced"))
         activeStoryJob = scope.launch {
             try {
                 if (!storyRepository.hasOwnApiKeyConfigured()) {
@@ -538,7 +540,6 @@ class StoryOrchestrator(
                         scope.launch { refreshTracksUntilNext() }
                         publishUiState()
                     }
-                    reconcileGenerationState()
                 }
             } finally {
                 if (manual && manualSession == manualStorySession) {
@@ -547,8 +548,6 @@ class StoryOrchestrator(
             }
         }
     }
-
-    /** Auto: cancel only if another track; same track — leave HTTP running. */
     private fun supersedeInFlightForAuto(requestedTrack: TrackInfo) {
         val active = generationInFlight || activeStoryJob?.isActive == true
         if (!active) return
@@ -678,15 +677,11 @@ class StoryOrchestrator(
             var fetched = runFetch()
             if (fetched.isFailure && isSessionCurrent(session) && isTrackStillCurrent(session, track)) {
                 val err = fetched.exceptionOrNull()
-                if (err is CancellationException || err?.wasStoryRequestCancelled() == true) {
-                    StoryLog.w("Story fetch interrupted — retry up to 2 (manual=$manual)")
-                    repeat(2) { attempt ->
-                        kotlinx.coroutines.delay(500L * (attempt + 1))
-                        if (!isSessionCurrent(session) || !isTrackStillCurrent(session, track)) return@repeat
+                if (err?.isBenignStoryCancel() == true) {
+                    StoryLog.w("Story fetch interrupted — one retry in 2s (manual=$manual)")
+                    kotlinx.coroutines.delay(2_000)
+                    if (isSessionCurrent(session) && isTrackStillCurrent(session, track)) {
                         fetched = runFetch()
-                        if (fetched.isSuccess || fetched.exceptionOrNull()?.isBenignStoryCancel() != true) {
-                            return@repeat
-                        }
                     }
                 }
             }
