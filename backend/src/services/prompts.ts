@@ -16,6 +16,7 @@ import {
 } from './story-narrator.js';
 import { eraContextForPrompt, resolveTrackLocale, type TrackLocale } from './track-locale.js';
 import { resolveArtistGrammarRu } from './artist-grammar.js';
+import { voiceStoryPromptHint } from './voices.js';
 
 export { eraContextForPrompt, resolveTrackLocale };
 export type { TrackLocale };
@@ -419,6 +420,8 @@ export function buildStoryUserPrompt(params: {
 
   lines.push('');
   lines.push(`Голос (voiceId): ${params.voiceId}`);
+  const voiceHint = voiceStoryPromptHint(params.voiceId);
+  if (voiceHint) lines.push(voiceHint);
   lines.push('Ответ в JSON.');
 
   return lines.join('\n');
@@ -534,6 +537,8 @@ export function buildLocalStoryUserPrompt(params: {
 
   lines.push('');
   lines.push(`Голос (voiceId): ${params.voiceId}`);
+  const localVoiceHint = voiceStoryPromptHint(params.voiceId);
+  if (localVoiceHint) lines.push(localVoiceHint);
   lines.push('Ответ в JSON.');
   return lines.join('\n');
 }

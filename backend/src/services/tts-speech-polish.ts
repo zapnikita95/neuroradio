@@ -48,6 +48,10 @@ function splitSentenceOnConjunctions(sentence: string): string[] {
   return chunks.filter((chunk) => chunk.trim().length > 0);
 }
 
+function startsWithCoordinatingConjunction(text: string): boolean {
+  return /^(?:и|а|но)\s/i.test(text.trim());
+}
+
 /** Split overly long sentences at natural conjunctions. */
 export function splitLongSentencesForSpeech(text: string): string {
   const parts = text.split(/(?<=[.!?…])\s+/).filter(Boolean);
@@ -70,6 +74,10 @@ export function splitLongSentencesForSpeech(text: string): string {
       const piece = chunks[i] ?? '';
       const candidate = `${buffer} ${piece}`.trim();
       if (countWords(candidate) > MAX_SENTENCE_WORDS && buffer.trim()) {
+        if (startsWithCoordinatingConjunction(piece)) {
+          buffer = candidate;
+          continue;
+        }
         const trimmed = buffer.trim();
         out.push(/[.!?…]$/.test(trimmed) ? trimmed : `${trimmed}.`);
         buffer = piece;
@@ -86,6 +94,12 @@ export function splitLongSentencesForSpeech(text: string): string {
   return out.join(' ');
 }
 
+const NATURAL_SPEECH_FIXES: Array<[RegExp, string]> = [
+  [/(?:^|[\s,.!?«»])меня\s+до\s+сих\s+пор\s+мурашки\s+бегут/giu, ' у меня до сих пор мурашки бегут'],
+  [/(?:^|[\s,.!?«»])меня\s+мурашки\s+бегут/giu, ' у меня мурашки бегут'],
+  [/(?:^|[\s,.!?«»])меня\s+до\s+сих\s+пор\s+мурашки\b/giu, ' у меня до сих пор мурашки'],
+];
+
 export function polishScriptForSpeechDelivery(script: string): string {
   let result = script.trim();
 
@@ -97,7 +111,11 @@ export function polishScriptForSpeechDelivery(script: string): string {
     result = result.replace(pattern, replacement);
   }
 
-  result = result.replace(/\s{2,}/g, ' ').replace(/\s+([,.!?])/g, '$1').trim();
+  for (const [pattern, replacement] of NATURAL_SPEECH_FIXES) {
+    result = result.replace(pattern, replacement);
+  }
+
+  result = result.replace(/\s{2,}/g, ' ').replace(/\s+([,.!?])/g, '$1').replace(/,\./g, '.').trim();
   result = splitLongSentencesForSpeech(result);
 
   return result;

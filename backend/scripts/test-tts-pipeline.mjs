@@ -63,6 +63,30 @@ test('polish splits long bureaucratic phrasing', () => {
   assert.ok(out.length > 10);
 });
 
+test('polish keeps coordinated adjectives without period before и', () => {
+  const raw =
+    'Помню, как впервые услышал этот трек — его ритм казался одновременно чувственным и загадочным, будто он приглашал в тайный мир, куда мало кто мог попасть, и мы тогда только начинали понимать масштаб того, что происходит в эфире каждый вечер.';
+  const out = polishScriptForSpeechDelivery(raw);
+  assert.doesNotMatch(out, /чувственным\.\s+и загадочным/i);
+  assert.match(out, /чувственным\s+и загадочным/i);
+});
+
+test('polish fixes меня мурашки бегут', () => {
+  const out = polishScriptForSpeechDelivery('Меня до сих пор мурашки бегут, когда я слышу первые ноты.');
+  assert.match(out, /у меня до сих пор мурашки бегут/i);
+  assert.doesNotMatch(out, /^меня/i);
+});
+
+test('SSML reads moonwalk as moon walk in English', () => {
+  const ssml = buildYandexSsml('Его moonwalk изменил сцену.');
+  assert.match(ssml, /<lang xml:lang="en-US">moon walk<\/lang>/i);
+});
+
+test('stress marks хаоса correctly', () => {
+  const out = prepareYandexTtsText('родился из хаоса импровизации.', { artist: 'MJ', title: 'Test' });
+  assert.match(out, /х\+аоса/i);
+});
+
 test('prepareYandexTtsText adds sentence pauses', () => {
   const out = prepareYandexTtsText('Первая фраза. Вторая фраза про джаз.', {
     artist: 'Queen',

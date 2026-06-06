@@ -120,6 +120,16 @@ export function getVoicePreset(voiceId: YandexVoiceId): YandexVoicePreset | unde
   return YANDEX_VOICE_PRESETS.find((v) => v.id === voiceId);
 }
 
+/** Prompt hint so first-person narrators match TTS voice gender. */
+export function voiceStoryPromptHint(voiceId: string): string {
+  const preset = getVoicePreset(voiceId as YandexVoiceId);
+  if (!preset) return '';
+  if (preset.genderRu === 'женский') {
+    return `ОЗВУЧКА: женский голос (${preset.labelRu}). От первого лица — женский род: «я помню», «я слышала», «я обожаю», «услышала»; не «я слышал».`;
+  }
+  return `ОЗВУЧКА: мужской голос (${preset.labelRu}). От первого лица — мужской род: «я помню», «я слышал», «я обожаю».`;
+}
+
 /** SpeechKit v1: emotion only for ru-RU voices jane and omazh. */
 const EMOTION_VOICES = new Set<YandexVoiceId>(['jane', 'omazh']);
 

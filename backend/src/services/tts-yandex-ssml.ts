@@ -108,6 +108,19 @@ function trimBreaksAroundLangTags(text: string): string {
     .replace(/(<\/lang>)\s*<break time="\d+ms"\/?>/g, '$1');
 }
 
+/** Latin spans Yandex misreads unless spaced for en-US voice. */
+const LATIN_SSML_PRONUNCIATION: Record<string, string> = {
+  moonwalk: 'moon walk',
+  'anti-gravity lean': 'anti gravity lean',
+  'anti-gravity': 'anti gravity',
+};
+
+function latinSpanForSsml(span: string): string {
+  const trimmed = span.trim();
+  const mapped = LATIN_SSML_PRONUNCIATION[trimmed.toLowerCase()];
+  return mapped ?? trimmed;
+}
+
 /** Оборачивает латинские фрагменты в SSML lang; русский текст и +ударения — как есть. */
 export function wrapMixedLanguageBody(text: string): string {
   const prepared = pausesToPlaceholders(text);
@@ -125,7 +138,7 @@ export function wrapMixedLanguageBody(text: string): string {
     if (cyrillicAccent) {
       out += escapeSsml(cyrillicAccent);
     } else {
-      out += `<lang xml:lang="${lang}">${escapeSsml(match[0])}</lang>`;
+      out += `<lang xml:lang="${lang}">${escapeSsml(latinSpanForSsml(match[0]))}</lang>`;
     }
     last = match.index + match[0].length;
   }
