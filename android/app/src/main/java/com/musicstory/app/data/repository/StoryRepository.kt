@@ -453,8 +453,12 @@ class StoryRepository(
                     code == "NO_REFERENCE_FACTS" ||
                     code == "COVER_AMBIGUOUS" ||
                     code == "STORY_QUALITY_REJECTED" ||
+                    code == "YANDEX_TTS_FAILED" ||
+                    code == "YANDEX_TTS_SPEED" ||
                     parsedBody?.contains("не получилось") == true ||
-                    parsedBody?.contains("кавер") == true
+                    parsedBody?.contains("кавер") == true ||
+                    parsedBody?.contains("Yandex", ignoreCase = true) == true ||
+                    parsedBody?.contains("озвуч", ignoreCase = true) == true
                 ) {
                     return StoryAttemptResult.Failed(
                         reason = parsedBody

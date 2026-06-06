@@ -53,6 +53,7 @@ function isRetryableTtsParamError(status: number, body: string): boolean {
   const lower = body.toLowerCase();
   return (
     /unsupported voice/i.test(lower) ||
+    /unsupported ssml|ssml tag/i.test(lower) ||
     /speed|tempo|rate/i.test(lower) ||
     /emotion/i.test(lower) ||
     /invalid.*parameter/i.test(lower)

@@ -10,7 +10,7 @@ const BREAK_SMALL = '\uE020';
 const BREAK_MEDIUM = '\uE021';
 
 const LATIN_RUN_RE =
-  /[A-Za-zÀ-ÿ][A-Za-zÀ-ÿ0-9'’.\-&]*(?:\s+[A-Za-zÀ-ÿ][A-Za-zÀ-ÿ0-9'’.\-&]*)*/g;
+  /[A-Za-zÀ-ÿ][A-Za-zÀ-ÿ0-9''\-&]*(?:\s+(?![.!?…]\s)[A-Za-zÀ-ÿ][A-Za-zÀ-ÿ0-9''\-&]*)*/g;
 
 export function hasLatinForSsml(text: string): boolean {
   return /[A-Za-zÀ-ÿ]{2,}/.test(text);
@@ -71,10 +71,11 @@ export function wrapMixedLanguageBody(text: string): string {
   return placeholdersToBreaks(out);
 }
 
-export function buildYandexSsml(markedText: string, voice: YandexVoiceId): string {
+export function buildYandexSsml(markedText: string, _voice?: YandexVoiceId): string {
   const body = wrapMixedLanguageBody(markedText);
+  // Voice is passed via HTTP `voice=` — Yandex rejects <voice> inside SSML (400 BAD_REQUEST).
   return (
     `<speak version="1.0" xmlns="http://www.w3.org/2001/10/synthesis" xml:lang="ru-RU">` +
-    `<voice name="${voice}">${body}</voice></speak>`
+    `${body}</speak>`
   );
 }

@@ -75,6 +75,10 @@ if (!ssml.includes('xml:lang="en-US">Baby One More Time</lang>')) {
   console.error(ssml);
   process.exit(1);
 }
+if (ssml.includes('<voice')) {
+  console.error('FAIL: Yandex SSML must not use <voice> tag');
+  process.exit(1);
+}
 if (!ssml.includes('xml:lang="en-US">Britney Spears</lang>')) {
   console.error('FAIL: SSML must wrap artist in en-US');
   process.exit(1);
@@ -123,5 +127,23 @@ if (smoothStripped.includes('«Smooth»')) {
   process.exit(1);
 }
 console.log('OK: track title guillemets stripped');
+
+const bepScript =
+  'Black Eyed Peas — группа. В составе will.i.am, apl.de.ap и Taboo. Хит — Let\'s Get It Started.';
+const bepMarked = prepareYandexTtsText(bepScript, {
+  artist: 'Black Eyed Peas',
+  title: "Let's Get It Started",
+});
+if (!bepMarked.includes('will.i.am') || !bepMarked.includes('apl.de.ap')) {
+  console.error('FAIL: dotted stage names must survive TTS prep');
+  console.error(bepMarked);
+  process.exit(1);
+}
+const bepSsml = buildYandexSsml(bepMarked, 'filipp');
+if (bepSsml.includes('<voice')) {
+  console.error('FAIL: no voice tag in SSML');
+  process.exit(1);
+}
+console.log('OK: stage names + SSML without voice tag');
 
 console.log('OK: all TTS polish checks passed');

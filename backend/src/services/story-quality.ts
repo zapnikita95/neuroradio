@@ -279,6 +279,27 @@ export function stripTrackTitleGuillemets(script: string, title: string): string
   return result;
 }
 
+const STAGE_NAME_RE = /\b[a-z][a-z0-9]*(?:\.[a-z][a-z0-9]*)+\b/gi;
+const STAGE_NAME_PLACEHOLDER = '\uE010SN';
+const STAGE_NAME_END = '\uE011';
+
+function maskDottedStageNames(text: string): { masked: string; names: string[] } {
+  const names: string[] = [];
+  const masked = text.replace(STAGE_NAME_RE, (name) => {
+    const idx = names.length;
+    names.push(name);
+    return `${STAGE_NAME_PLACEHOLDER}${idx}${STAGE_NAME_END}`;
+  });
+  return { masked, names };
+}
+
+function unmaskDottedStageNames(text: string, names: string[]): string {
+  return text.replace(
+    new RegExp(`${STAGE_NAME_PLACEHOLDER}(\\d+)${STAGE_NAME_END}`, 'g'),
+    (_, index) => names[Number(index)] ?? '',
+  );
+}
+
 export function sanitizeScriptForTts(
   script: string,
   artist: string,
@@ -299,11 +320,13 @@ export function sanitizeScriptForTts(
   });
   DIGIT_ORDINAL_SUFFIX.lastIndex = 0;
   result = result.replace(/\d+/g, (match) => (shouldKeepDigit(match, allowed) ? match : ''));
-  const { masked, quotes } = maskQuotedPassages(result);
+  const { masked: stageMasked, names: stageNames } = maskDottedStageNames(result);
+  const { masked, quotes } = maskQuotedPassages(stageMasked);
   result = masked.replace(/\b[a-z]{2,}\b/gi, (match) => {
     return allowedLatin.has(match.toLowerCase()) ? match : '';
   });
   result = unmaskQuotedPassages(result, quotes);
+  result = unmaskDottedStageNames(result, stageNames);
   result = result.replace(ORPHAN_ORDINAL_SUFFIX, ' тогда ');
   ORPHAN_ORDINAL_SUFFIX.lastIndex = 0;
   result = repairOrphanDatePhrases(result, referenceFacts);
