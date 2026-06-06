@@ -4,6 +4,7 @@ import path from 'node:path';
 import { interestRating10 } from './fact-interest-log.js';
 import { factMentionsArtistAsEntity, isAmbiguousCommonWordArtist } from './fact-relevance.js';
 import { interestScore } from './reference-fact-quality.js';
+import { isSpeakableReferenceFact } from './web-snippet-accept.js';
 import type { FactScope } from './fact-picker.js';
 
 export interface StoredFact {
@@ -210,6 +211,7 @@ export function pickFromBank(
     for (const fact of pools[scope] ?? []) {
       if (usedFingerprints.has(factFingerprint(fact.fact))) continue;
       if (fact.interestScore < 6) continue;
+      if (!isSpeakableReferenceFact(fact.fact)) continue;
       if (isAmbiguousCommonWordArtist(artist) && !factMentionsArtistAsEntity(fact.fact, artist)) continue;
       unused.push(fact);
     }

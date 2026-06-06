@@ -24,6 +24,9 @@ const PHRASE_PRONUNCIATION_RU: Record<string, string> = {
   'moliendo café': 'Молиэндo Кафе',
   'moliendo cafe': 'Молиэндo Кафе',
   'next summer': 'Некст Саммер',
+  'savage garden': 'Савидж Гарден',
+  'to the moon and back': 'Ту зе Мун энд Бэк',
+  'to the moon & back': 'Ту зе Мун энд Бэк',
 };
 
 const EN_WORD_RU: Record<string, string> = {
@@ -72,6 +75,11 @@ const EN_WORD_RU: Record<string, string> = {
   del: 'дель',
   san: 'сан',
   remo: 'ремо',
+  to: 'ту',
+  moon: 'мун',
+  back: 'бэк',
+  savage: 'савидж',
+  garden: 'гарден',
   eurovision: 'Евровидение',
   tiktok: 'ТикТок',
   youtube: 'Ютуб',
@@ -185,7 +193,6 @@ function transliterateEnglishWord(word: string): string {
   out = out.replace(/wr/g, 'р');
   out = out.replace(/kn/g, 'н');
   out = out.replace(/mb$/g, 'm');
-  out = out.replace(/([bcdfghjklmnpqrstvwxyz])e$/g, '$1');
   return capitalizeLike(bare, out);
 }
 
@@ -193,18 +200,86 @@ export function latinPhraseToRussianTts(phrase: string, langHint?: ForeignLang):
   const trimmed = phrase.trim();
   if (!trimmed || !hasLatinLetters(trimmed)) return trimmed;
 
-  const key = trimmed.toLowerCase().replace(/\s+/g, ' ');
+  const key = trimmed.toLowerCase().replace(/\s+/g, ' ').replace(/\s*&\s*/g, ' and ');
   if (PHRASE_PRONUNCIATION_RU[key]) return PHRASE_PRONUNCIATION_RU[key];
 
   const lang = langHint ?? detectForeignLang(trimmed);
   const words = trimmed.split(/\s+/);
   const mapped = words.map((word) => {
+    if (word === '&') return 'энд';
     if (!hasLatinLetters(word)) return word;
+    const wl = word.toLowerCase().replace(/['’]/g, '');
+    if (EN_WORD_RU[wl]) return capitalizeLike(word, EN_WORD_RU[wl]);
     if (lang === 'it') return transliterateItalianWord(word);
     if (lang === 'es') return transliterateSpanishWord(word);
-    return transliterateEnglishWord(word);
+    const t = transliterateEnglishWord(word);
+    return /[A-Za-z]/.test(t) ? spellLatinWordPhonetic(t) : t;
   });
   return mapped.join(' ');
+}
+
+const LATIN_CHAR_RU: Record<string, string> = {
+  a: 'а',
+  b: 'б',
+  c: 'к',
+  d: 'д',
+  e: 'и',
+  f: 'ф',
+  g: 'г',
+  h: 'х',
+  i: 'и',
+  j: 'дж',
+  k: 'к',
+  l: 'л',
+  m: 'м',
+  n: 'н',
+  o: 'о',
+  p: 'п',
+  q: 'к',
+  r: 'р',
+  s: 'с',
+  t: 'т',
+  u: 'у',
+  v: 'в',
+  w: 'в',
+  x: 'кс',
+  y: 'и',
+  z: 'з',
+};
+
+/** Last resort — no Latin left for Yandex SSML letter-by-letter. */
+function spellLatinWordPhonetic(word: string): string {
+  let out = '';
+  for (const ch of word) {
+    if (/[A-Za-z]/.test(ch)) {
+      out += LATIN_CHAR_RU[ch.toLowerCase()] ?? ch;
+    } else {
+      out += ch;
+    }
+  }
+  return out;
+}
+
+function lookupPhraseTts(phrase: string): string {
+  return latinPhraseToRussianTts(phrase);
+}
+
+/** Replace every Latin run with Cyrillic — Yandex ru voice, no per-letter SSML. */
+function ensureAllLatinTransliterated(text: string): string {
+  let result = text;
+  for (let pass = 0; pass < 8; pass += 1) {
+    const next = result.replace(
+      /[A-Za-zÀ-ÿ][A-Za-zÀ-ÿ0-9''.\-&]*/g,
+      (match) => {
+        if (match.length < 2) return spellLatinWordPhonetic(match);
+        const ru = lookupPhraseTts(match.replace(/\s*&\s*/g, ' and '));
+        return /[A-Za-zÀ-ÿ]/.test(ru) ? spellLatinWordPhonetic(match) : ru;
+      },
+    );
+    if (next === result) break;
+    result = next;
+  }
+  return result.replace(/\b([A-Za-z])\b/g, (_, ch: string) => spellLatinWordPhonetic(ch));
 }
 
 const MARKUP_SLOT = '\uE010M';
@@ -258,10 +333,10 @@ function transliterateRemainingLatinLogged(
   text: string,
   replacements: LatinTtsReplacement[],
 ): string {
-  const re = /[A-Za-zÀ-ÿ][A-Za-zÀ-ÿ0-9'’.\-]*(?:\s+[A-Za-zÀ-ÿ][A-Za-zÀ-ÿ0-9'’.\-]*)*/g;
+  const re = /[A-Za-zÀ-ÿ][A-Za-zÀ-ÿ0-9'’.\-&]*(?:\s+[A-Za-zÀ-ÿ][A-Za-zÀ-ÿ0-9'’.\-&]*)*/g;
   return text.replace(re, (match) => {
     if (match.length < 2) return match;
-    const to = latinPhraseToRussianTts(match);
+    const to = lookupPhraseTts(match);
     if (to !== match) {
       replacements.push({ from: match, to, source: 'transliterate' });
     }
@@ -271,6 +346,22 @@ function transliterateRemainingLatinLogged(
 
 function transliterateRemainingLatin(text: string): string {
   return transliterateRemainingLatinLogged(text, []);
+}
+
+function buildArtistTitleExtra(artist: string, title: string): Record<string, string> {
+  const extra: Record<string, string> = {};
+  const a = artist.trim();
+  const t = title.trim();
+  if (a) {
+    const ru = lookupPhraseTts(a);
+    extra[a.toLowerCase()] = ru;
+  }
+  if (t) {
+    const ru = lookupPhraseTts(t);
+    extra[t.toLowerCase()] = ru;
+    extra[t.toLowerCase().replace(/\s*&\s*/g, ' and ')] = ru;
+  }
+  return extra;
 }
 
 export interface LatinTtsReplacement {
@@ -286,42 +377,46 @@ export function applyForeignPronunciationWithReplacements(
   title = '',
 ): { text: string; replacements: LatinTtsReplacement[] } {
   const replacements: LatinTtsReplacement[] = [];
-  const extra: Record<string, string> = {};
-  if (artist.trim()) {
-    const to = latinPhraseToRussianTts(artist);
-    extra[artist.trim().toLowerCase()] = to;
-    if (artist.trim() !== to) {
-      replacements.push({ from: artist.trim(), to, source: 'artist' });
-    }
+  const extra = buildArtistTitleExtra(artist, title);
+  if (artist.trim() && extra[artist.trim().toLowerCase()]) {
+    replacements.push({
+      from: artist.trim(),
+      to: extra[artist.trim().toLowerCase()]!,
+      source: 'artist',
+    });
   }
-  if (title.trim()) {
-    const to = latinPhraseToRussianTts(title);
-    extra[title.trim().toLowerCase()] = to;
-    if (title.trim() !== to) {
-      replacements.push({ from: title.trim(), to, source: 'title' });
-    }
+  if (title.trim() && extra[title.trim().toLowerCase()]) {
+    replacements.push({
+      from: title.trim(),
+      to: extra[title.trim().toLowerCase()]!,
+      source: 'title',
+    });
   }
 
   const { masked, slots } = maskTtsMarkup(text);
   let result = applyPhraseDictionaryLogged(masked, extra, replacements, 'dictionary');
   result = transliterateRemainingLatinLogged(result, replacements);
-  return { text: unmaskTtsMarkup(result, slots), replacements };
+  result = unmaskTtsMarkup(result, slots);
+  const { masked: m2, slots: s2 } = maskTtsMarkup(result);
+  result = ensureAllLatinTransliterated(m2);
+  return { text: unmaskTtsMarkup(result, s2), replacements };
 }
 
-/** Full pass: dictionary → word transliteration for any leftover Latin. */
+/** Full pass: dictionary → transliteration → pure Cyrillic for Yandex ru voice. */
 export function applyForeignPronunciation(
   text: string,
   artist = '',
   title = '',
 ): string {
-  const extra: Record<string, string> = {};
-  if (artist.trim()) extra[artist.trim().toLowerCase()] = latinPhraseToRussianTts(artist);
-  if (title.trim()) extra[title.trim().toLowerCase()] = latinPhraseToRussianTts(title);
+  const extra = buildArtistTitleExtra(artist, title);
 
   const { masked, slots } = maskTtsMarkup(text);
   let result = applyPhraseDictionary(masked, extra);
   result = transliterateRemainingLatin(result);
-  return unmaskTtsMarkup(result, slots);
+  result = unmaskTtsMarkup(result, slots);
+  const { masked: m2, slots: s2 } = maskTtsMarkup(result);
+  result = ensureAllLatinTransliterated(m2);
+  return unmaskTtsMarkup(result, s2);
 }
 
 /** Fix LLM truncating band names in wiki translation. */
