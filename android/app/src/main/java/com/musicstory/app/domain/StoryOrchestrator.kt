@@ -333,8 +333,16 @@ class StoryOrchestrator(
             _state.value == OrchestratorState.PLAYING_STORY
     }
 
-    /** User skipped to another track — stop fetch immediately (don't wait for dwell timer). */
-    fun onPlaybackTrackSkipped() {
+    /** True while user pressed «Рассказать историю» — must not cancel on metadata flicker. */
+    private var manualStoryInFlight = false
+    private var manualStorySession = 0
+
+    /** User skipped to another track — stop auto fetch only (never kill manual button). */
+    fun onPlaybackTrackSkipped(newTitle: String) {
+        if (manualStoryInFlight) return
+        val inFlight = inFlightTrackKey ?: return
+        val current = mediaControllerManager.effectiveNowPlaying.value
+        if (current != null && current.title.equals(newTitle, ignoreCase = true)) return
         storyRepository.cancelActiveStoryFetch()
         _pendingFeedback.value = null
         scope.launch {
@@ -425,86 +433,118 @@ class StoryOrchestrator(
     }
 
     private fun playStoryForTrack(requestedTrack: TrackInfo, manual: Boolean) {
-        cancelInFlightGenerationImmediate("superseded")
-        _pendingFeedback.value = null
+        if (manual) {
+            supersedePreviousStoryJobOnly()
+            backendFetchInFlight = true
+            MonitorNotificationState.setPreparing(true)
+            _state.value = OrchestratorState.FETCHING_STORY
+        } else {
+            cancelInFlightGenerationImmediate("superseded")
+        }
+        if (!manual) {
+            _pendingFeedback.value = null
+        }
         generationInFlight = true
         _errorMessage.value = null
         _hintMessage.value = null
-        if (_state.value != OrchestratorState.PLAYING_STORY &&
+        if (!manual &&
+            _state.value != OrchestratorState.PLAYING_STORY &&
             _state.value != OrchestratorState.PREPARING_PLAYBACK
         ) {
             _state.value = OrchestratorState.LISTENING
         }
         publishUiState()
 
+        val manualSession = if (manual) ++manualStorySession else 0
         activeStoryJob = scope.launch {
-            if (!storyRepository.hasOwnApiKeyConfigured()) {
-                StoryLog.i("Story blocked: no backend and no API key")
-                backendFetchInFlight = false
-                MonitorNotificationState.setPreparing(false)
-                handleStoryBlockedNoApiKey(manual)
-                generationInFlight = false
-                if (manual) {
-                    MonitorNotificationState.setPreparing(false)
-                    MediaMonitorService.refreshNotification(context)
-                }
-                return@launch
-            }
-            if (manual) {
-                val tier = storyRepository.dailyQuota.value?.tier
-                val hasPersonalKey = storyRepository.hasPersonalApiKeyConfigured()
-                if (!TierAccess.canShowManualStoryButton(hasPersonalKey, tier)) {
-                    StoryLog.i("Manual story blocked: free tier without personal API key")
+            if (manual) manualStoryInFlight = true
+            try {
+                if (!storyRepository.hasOwnApiKeyConfigured()) {
+                    StoryLog.i("Story blocked: no backend and no API key")
                     backendFetchInFlight = false
                     MonitorNotificationState.setPreparing(false)
-                    handleStoryBlockedNoApiKey(manual = true)
+                    handleStoryBlockedNoApiKey(manual)
                     generationInFlight = false
+                    if (manual) {
+                        MonitorNotificationState.setPreparing(false)
+                        MediaMonitorService.refreshNotification(context)
+                    }
                     return@launch
                 }
-            }
-
-            val session = ++playbackSession
-            inFlightTrackKey = requestedTrack.displayKey
-            cancelGenerationPreview()
-            _tracksUntilNext.value = null
-            publishUiState()
-
-            try {
-                executeStoryPipeline(session, requestedTrack, manual)
-            } catch (e: CancellationException) {
-                if (e is TimeoutCancellationException) {
-                    StoryLog.e("Story pipeline timeout", e)
-                    val isLocal = settingsDataStore.llmProvider.first() == LlmProvider.LOCAL
-                    _errorMessage.value = if (isLocal) {
-                        "Слишком долго ждём локальную модель (лимит 20 мин). Смотри логи: Music story\\logs\\local-bff.log"
-                    } else {
-                        "Сервер не ответил за 5 мин (факты + текст + озвучка). Подожди — история может ещё готовиться на сервере."
+                if (manual) {
+                    val tier = storyRepository.dailyQuota.value?.tier
+                    val hasPersonalKey = storyRepository.hasPersonalApiKeyConfigured()
+                    if (!TierAccess.canShowManualStoryButton(hasPersonalKey, tier)) {
+                        StoryLog.i("Manual story blocked: free tier without personal API key")
+                        backendFetchInFlight = false
+                        MonitorNotificationState.setPreparing(false)
+                        handleStoryBlockedNoApiKey(manual = true)
+                        generationInFlight = false
+                        return@launch
                     }
+                }
+
+                val session = ++playbackSession
+                inFlightTrackKey = requestedTrack.displayKey
+                cancelGenerationPreview()
+                _tracksUntilNext.value = null
+                publishUiState()
+
+                try {
+                    executeStoryPipeline(session, requestedTrack, manual)
+                } catch (e: CancellationException) {
+                    if (e is TimeoutCancellationException) {
+                        StoryLog.e("Story pipeline timeout", e)
+                        val isLocal = settingsDataStore.llmProvider.first() == LlmProvider.LOCAL
+                        _errorMessage.value = if (isLocal) {
+                            "Слишком долго ждём локальную модель (лимит 20 мин). Смотри логи: Music story\\logs\\local-bff.log"
+                        } else {
+                            "Сервер не ответил за 5 мин (факты + текст + озвучка). Подожди — история может ещё готовиться на сервере."
+                        }
+                        _state.value = OrchestratorState.ERROR
+                        publishUiState()
+                    } else {
+                        StoryLog.i("Story pipeline cancelled: ${e.message}")
+                    }
+                } catch (e: Exception) {
+                    StoryLog.e("Story pipeline failed: ${e.message}", e)
+                    abortGeneration(session, manual, rollbackAutoTrigger = !manual)
+                    _errorMessage.value = e.message ?: "Не удалось получить историю"
                     _state.value = OrchestratorState.ERROR
                     publishUiState()
-                } else {
-                    StoryLog.i("Story pipeline cancelled: ${e.message}")
-                }
-            } catch (e: Exception) {
-                StoryLog.e("Story pipeline failed: ${e.message}", e)
-                abortGeneration(session, manual, rollbackAutoTrigger = !manual)
-                _errorMessage.value = e.message ?: "Не удалось получить историю"
-                _state.value = OrchestratorState.ERROR
-                publishUiState()
-            } finally {
-                generationInFlight = false
-                inFlightTrackKey = null
-                if (_state.value == OrchestratorState.FETCHING_STORY) {
-                    if (isSessionCurrent(session)) {
-                        abortGeneration(session, manual, rollbackAutoTrigger = !manual)
-                    } else {
-                        _state.value = OrchestratorState.LISTENING
-                        publishUiState()
+                } finally {
+                    generationInFlight = false
+                    inFlightTrackKey = null
+                    if (_state.value == OrchestratorState.FETCHING_STORY) {
+                        if (isSessionCurrent(session)) {
+                            abortGeneration(session, manual, rollbackAutoTrigger = !manual)
+                        } else if (activeStoryJob?.isActive != true && !manualStoryInFlight) {
+                            _state.value = OrchestratorState.LISTENING
+                            publishUiState()
+                        }
                     }
+                    reconcileGenerationState()
                 }
-                reconcileGenerationState()
+            } finally {
+                if (manual && manualSession == manualStorySession) {
+                    manualStoryInFlight = false
+                }
             }
         }
+    }
+
+    /** Manual button: drop only a previous job — do not reset «Готовим историю» for the new request. */
+    private fun supersedePreviousStoryJobOnly() {
+        val hadJob = activeStoryJob?.isActive == true
+        if (hadJob) {
+            storyRepository.cancelActiveStoryFetch()
+            activeStoryJob?.cancel(CancellationException("superseded"))
+        }
+        playbackSession++
+        activeStoryJob = null
+        inFlightTrackKey = null
+        cancelGenerationPreview()
+        generationInFlight = false
     }
 
     private suspend fun handleStoryBlockedNoApiKey(manual: Boolean) {
@@ -715,6 +755,8 @@ class StoryOrchestrator(
             onFailure = { error ->
                 if (error is CancellationException) return@fold
                 if (error.message?.contains("cancel", ignoreCase = true) == true) return@fold
+                if (error.message?.contains("отмен", ignoreCase = true) == true) return@fold
+                if (error.message?.contains("499", ignoreCase = false) == true) return@fold
                 cancelGenerationPreview()
                 if (!manual) {
                     val everyN = settingsDataStore.everyNTracks.first()
@@ -735,9 +777,19 @@ class StoryOrchestrator(
                         _state.value = OrchestratorState.LISTENING
                     }
                 } else {
-                    _errorMessage.value = error.message ?: "Не удалось получить историю"
-                    _hintMessage.value = null
-                    _state.value = OrchestratorState.ERROR
+                    val msg = error.message?.trim().orEmpty()
+                    if (
+                        msg.contains("отмен", ignoreCase = true) ||
+                        msg.contains("cancel", ignoreCase = true) ||
+                        msg.contains("499")
+                    ) {
+                        _errorMessage.value = null
+                        _state.value = OrchestratorState.LISTENING
+                    } else {
+                        _errorMessage.value = error.message ?: "Не удалось получить историю"
+                        _hintMessage.value = null
+                        _state.value = OrchestratorState.ERROR
+                    }
                 }
                 publishUiState()
             },
@@ -745,6 +797,7 @@ class StoryOrchestrator(
     }
 
     private suspend fun cancelStaleGenerationForNewTrack(track: TrackInfo, reason: String) {
+        if (manualStoryInFlight) return
         val inFlight = inFlightTrackKey
         val generating = activeStoryJob?.isActive == true || generationInFlight ||
             _state.value == OrchestratorState.PREPARING_PLAYBACK

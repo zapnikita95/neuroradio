@@ -165,13 +165,12 @@ class AccountSyncManager(
                 .put("angle", entry.angle)
                 .put("playedAt", entry.playedAt)
             entry.vote?.let { body.put("vote", it) }
-                .toString()
 
             fun postOnce(): Int {
                 val req = Request.Builder()
                     .url("${baseUrl.trimEnd('/')}/v1/sync/history")
                     .header("Authorization", "Bearer $token")
-                    .post(body.toRequestBody("application/json".toMediaType()))
+                    .post(body.toString().toRequestBody("application/json".toMediaType()))
                     .build()
                 return runCatching {
                     http.newCall(req).execute().use { it.code }

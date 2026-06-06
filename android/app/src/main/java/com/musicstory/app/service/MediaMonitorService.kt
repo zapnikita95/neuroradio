@@ -36,6 +36,7 @@ class MediaMonitorService : Service() {
     private var trackObserverJob: Job? = null
     private var listenCountJob: Job? = null
     private var lastTrackKey: String? = null
+    private var lastTrackTitle: String? = null
 
     override fun onCreate() {
         super.onCreate()
@@ -87,10 +88,14 @@ class MediaMonitorService : Service() {
                     val track = app.mediaControllerManager.resolveNowPlayingTrack()
                         ?: app.mediaControllerManager.effectiveNowPlaying.value
                     if (track != null && track.isValid() && key != null && key != lastTrackKey) {
-                        if (lastTrackKey != null) {
-                            app.storyOrchestrator.onPlaybackTrackSkipped()
+                        val titleNorm = track.title.trim().lowercase()
+                        val titleChanged = lastTrackTitle != null &&
+                            !lastTrackTitle.equals(titleNorm, ignoreCase = true)
+                        if (titleChanged) {
+                            app.storyOrchestrator.onPlaybackTrackSkipped(track.title)
                         }
                         lastTrackKey = key
+                        lastTrackTitle = titleNorm
                         scheduleTrackCounted(app, track, key)
                     }
                     updateNotification(track)
