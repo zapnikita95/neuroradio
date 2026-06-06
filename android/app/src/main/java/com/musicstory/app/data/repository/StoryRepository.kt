@@ -44,6 +44,8 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withTimeout
 import retrofit2.HttpException
 import java.io.IOException
@@ -60,14 +62,15 @@ class StoryRepository(
     private val connectionChecker: ConnectionChecker = ConnectionChecker(),
 ) {
     private val gson = Gson()
+    private val storyFetchMutex = Mutex()
 
     private val _dailyQuota = MutableStateFlow<StoryQuotaInfo?>(null)
     val dailyQuota: StateFlow<StoryQuotaInfo?> = _dailyQuota.asStateFlow()
 
     val storyHistory: Flow<List<StoryHistoryEntry>> = storyHistoryDao.observeAll()
 
-    fun cancelActiveStoryFetch() {
-        apiClient.cancelActiveStoryRequest()
+    fun cancelActiveStoryFetch(reason: String = "unknown") {
+        apiClient.cancelActiveStoryRequest(reason)
     }
 
     /** Pull cloud history after login / reinstall and merge into local Room DB. */
@@ -214,7 +217,12 @@ class StoryRepository(
         return result
     }
 
-    suspend fun fetchStory(track: TrackInfo, forceRefresh: Boolean = true): Result<StoryResponse> {
+    suspend fun fetchStory(track: TrackInfo, forceRefresh: Boolean = true): Result<StoryResponse> =
+        storyFetchMutex.withLock {
+            fetchStoryLocked(track, forceRefresh)
+        }
+
+    private suspend fun fetchStoryLocked(track: TrackInfo, forceRefresh: Boolean): Result<StoryResponse> {
         if (!track.isValid()) {
             return Result.failure(IllegalArgumentException("Некорректные метаданные трека"))
         }
@@ -281,10 +289,6 @@ class StoryRepository(
         var backendGroqDown = false
         var templateRejected = false
         var backendError: String? = null
-
-        if (useBackend) {
-            runCatching { refreshQuota() }
-        }
 
         val directApiKey = apiKeyForProvider(llmProvider, groqKey, geminiKey, openRouterKey, localOllamaUrl)
         val tier = _dailyQuota.value?.tier

@@ -80,23 +80,26 @@ class MediaMonitorService : Service() {
             combine(
                 app.mediaControllerManager.nowPlaying.map { it?.displayKey },
                 MediaNotificationListener.lastNotificationTrack.map { it?.displayKey },
-                MonitorNotificationState.preparingStory,
-                MonitorNotificationState.manualStoryUi,
-            ) { sessionKey, notificationKey, _, _ -> sessionKey ?: notificationKey }
+            ) { sessionKey, notificationKey -> sessionKey ?: notificationKey }
                 .distinctUntilChanged()
                 .collect { key ->
                     val track = app.mediaControllerManager.resolveNowPlayingTrack()
                         ?: app.mediaControllerManager.effectiveNowPlaying.value
                     if (track != null && track.isValid() && key != null && key != lastTrackKey) {
                         val titleNorm = track.title.trim().lowercase()
-                        val titleChanged = lastTrackTitle != null &&
+                        val firstTrack = lastTrackTitle == null
+                        val titleChanged = !firstTrack &&
                             !lastTrackTitle.equals(titleNorm, ignoreCase = true)
                         if (titleChanged) {
                             app.storyOrchestrator.onPlaybackTrackSkipped(track.title)
+                            scheduleTrackCounted(app, track)
+                        } else if (firstTrack) {
+                            scheduleTrackCounted(app, track)
                         }
                         lastTrackKey = key
-                        lastTrackTitle = titleNorm
-                        scheduleTrackCounted(app, track, key)
+                        if (firstTrack || titleChanged) {
+                            lastTrackTitle = titleNorm
+                        }
                     }
                     updateNotification(track)
                 }
@@ -112,8 +115,9 @@ class MediaMonitorService : Service() {
         }
     }
 
-    private fun scheduleTrackCounted(app: MusicStoryApp, track: TrackInfo, trackKey: String) {
+    private fun scheduleTrackCounted(app: MusicStoryApp, track: TrackInfo) {
         listenCountJob?.cancel()
+        val dwellTitle = track.title.trim()
         listenCountJob = serviceScope.launch {
             val countListenEnabled = app.settingsDataStore.countTrackAfterListenEnabled.first()
             val userSec = if (countListenEnabled) {
@@ -126,9 +130,9 @@ class MediaMonitorService : Service() {
             val storyDwellSec = if (autoOn) max(userSec, AUTO_STORY_MIN_DWELL_SEC) else userSec
 
             suspend fun stillOnTrack(): Boolean {
-                val currentKey = app.mediaControllerManager.resolveNowPlayingTrack()?.displayKey
-                    ?: app.mediaControllerManager.effectiveNowPlaying.value?.displayKey
-                return currentKey == trackKey
+                val current = app.mediaControllerManager.resolveNowPlayingTrack()
+                    ?: app.mediaControllerManager.effectiveNowPlaying.value
+                return current?.title?.trim()?.equals(dwellTitle, ignoreCase = true) == true
             }
 
             if (userSec > 0) {

@@ -30,11 +30,10 @@ class ApiClient(
     @Volatile
     private var activeStoryCall: okhttp3.Call? = null
 
-    /** Cancels in-flight POST /v1/story/full when user skips to another track. */
+    /** Tracks active POST /v1/story/full — cancel only via [cancelActiveStoryRequest] (track skip). */
     private val storyCancelInterceptor = Interceptor { chain ->
         val call = chain.call()
         synchronized(storyCallLock) {
-            activeStoryCall?.cancel()
             activeStoryCall = call
         }
         try {
@@ -46,9 +45,13 @@ class ApiClient(
         }
     }
 
-    fun cancelActiveStoryRequest() {
+    fun cancelActiveStoryRequest(reason: String = "unknown") {
         synchronized(storyCallLock) {
-            activeStoryCall?.cancel()
+            val call = activeStoryCall
+            if (call != null && !call.isCanceled()) {
+                StoryLog.w("HTTP cancel story/full reason=$reason")
+                call.cancel()
+            }
             activeStoryCall = null
         }
     }
