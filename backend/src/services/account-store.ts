@@ -180,6 +180,90 @@ function loadStore(): StoreFile {
   }
 }
 
+function applyStoreFromBlob(data: StoreFile): StoreFile {
+  cache = {
+    ...emptyStore(),
+    ...data,
+    emailToAccount: data.emailToAccount ?? {},
+    telegramToAccount: data.telegramToAccount ?? {},
+    pendingEmailCodes: data.pendingEmailCodes ?? {},
+  };
+  return cache;
+}
+
+async function ensureAccountStoreLoaded(): Promise<StoreFile> {
+  if (hasPostgres()) {
+    const { pgKvLoad } = await import('./db.js');
+    const data = await pgKvLoad<StoreFile>(ACCOUNTS_KV_KEY);
+    if (data) return applyStoreFromBlob(data);
+    if (!cache) cache = emptyStore();
+    return cache;
+  }
+  return loadStore();
+}
+
+function pruneStaleInstallIds(store: StoreFile, account: AccountRecord): void {
+  account.installIds = account.installIds.filter((id) => store.installToAccount[id] === account.accountId);
+}
+
+function detachInstallFromAccount(store: StoreFile, installId: string, accountId: string): void {
+  const account = store.accountsById[accountId];
+  if (!account) return;
+  account.installIds = account.installIds.filter((id) => id !== installId);
+  if (store.installToAccount[installId] === accountId) {
+    delete store.installToAccount[installId];
+  }
+  if (account.installIds.length === 0) {
+    delete store.accountsById[accountId];
+    delete store.syncCodeToAccount[account.syncCode];
+    for (const [email, id] of Object.entries(store.emailToAccount ?? {})) {
+      if (id === accountId) delete store.emailToAccount![email];
+    }
+    for (const [tg, id] of Object.entries(store.telegramToAccount ?? {})) {
+      if (id === accountId) delete store.telegramToAccount![tg];
+    }
+  }
+}
+
+function attachInstallToAccount(
+  store: StoreFile,
+  account: AccountRecord,
+  normalized: string,
+): { ok: true } | { ok: false; error: string } {
+  pruneStaleInstallIds(store, account);
+
+  const prevAccountId = store.installToAccount[normalized];
+  if (prevAccountId && prevAccountId !== account.accountId) {
+    detachInstallFromAccount(store, normalized, prevAccountId);
+  }
+
+  if (account.installIds.includes(normalized)) {
+    store.installToAccount[normalized] = account.accountId;
+    return { ok: true };
+  }
+
+  while (account.installIds.length >= MAX_DEVICES) {
+    const evictable = account.installIds.filter((id) => id !== account.ownerInstallId);
+    const victim = evictable[0] ?? account.installIds[0];
+    if (!victim) break;
+    account.installIds = account.installIds.filter((id) => id !== victim);
+    if (store.installToAccount[victim] === account.accountId) {
+      delete store.installToAccount[victim];
+    }
+  }
+
+  if (account.installIds.length >= MAX_DEVICES) {
+    return { ok: false, error: `Максимум ${MAX_DEVICES} устройств` };
+  }
+
+  account.installIds.push(normalized);
+  store.installToAccount[normalized] = account.accountId;
+  if (!account.ownerInstallId || !account.installIds.includes(account.ownerInstallId)) {
+    account.ownerInstallId = normalized;
+  }
+  return { ok: true };
+}
+
 function saveStore(store: StoreFile): void {
   cache = store;
   persistKv(ACCOUNTS_KV_KEY, store, STORE_PATH, () => {
@@ -653,12 +737,8 @@ export async function startEmailLogin(
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
     return { ok: false, error: 'Некорректный email' };
   }
-  const store = loadStore();
+  const store = await ensureAccountStoreLoaded();
   const normalized = installId.trim().toLowerCase();
-  let accountId = store.installToAccount[normalized];
-  if (!accountId) {
-    accountId = createAccount(installId).accountId;
-  }
   const code = String(crypto.randomInt(100000, 999999));
   const expiresAt = Date.now() + 15 * 60 * 1000;
   store.pendingEmailCodes = store.pendingEmailCodes ?? {};
@@ -687,7 +767,7 @@ export async function verifyEmailLogin(
   if (code.length < 4) {
     return { ok: false, error: 'Неверный код' };
   }
-  const store = loadStore();
+  const store = await ensureAccountStoreLoaded();
   store.pendingEmailCodes = store.pendingEmailCodes ?? {};
   store.emailToAccount = store.emailToAccount ?? {};
 
@@ -719,14 +799,14 @@ export async function verifyEmailLogin(
   if (isFirstRegistration) {
     grantWelcomeTrialIfEligible(account);
   }
-  if (!account.installIds.includes(normalized)) {
-    if (account.installIds.length >= MAX_DEVICES) {
-      return { ok: false, error: `Максимум ${MAX_DEVICES} устройств` };
-    }
-    account.installIds.push(normalized);
+  const attach = attachInstallToAccount(store, account, normalized);
+  if (!attach.ok) {
+    console.warn(`[email-auth] verify failed email=${email} install=${normalized} reason=${attach.error} devices=${account.installIds.length}`);
+    return attach;
   }
   store.installToAccount[normalized] = accountId;
   store.emailToAccount[email] = accountId;
+  account.ownerInstallId = normalized;
   delete store.pendingEmailCodes[email];
   await saveStoreAsync(store);
   if (hasPostgres()) {

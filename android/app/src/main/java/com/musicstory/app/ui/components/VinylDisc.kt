@@ -121,15 +121,25 @@ fun VinylDisc(
         }
 
         Canvas(modifier = Modifier.matchParentSize()) {
-            val discCenter = Offset(size.toPx() * 0.61f, size.toPx() * 0.61f)
-            val pivot = Offset(size.toPx() * 1.02f, size.toPx() * 0.14f)
-            val onDiscAngle = 2.35f
-            val offDiscAngle = 1.55f
-            val armAngle = offDiscAngle + (onDiscAngle - offDiscAngle) * armProgress
-            val armLength = size.toPx() * 0.52f
+            val discCenter = Offset(this.size.width / 2f, this.size.height / 2f)
+            val discRadius = size.toPx() / 2f
+            val grooveRadius = discRadius * 0.68f
+            val grooveAngle = Math.toRadians(38.0).toFloat()
+            val contactOnDisc = Offset(
+                discCenter.x + grooveRadius * cos(grooveAngle),
+                discCenter.y + grooveRadius * sin(grooveAngle),
+            )
+            val contactOffDisc = Offset(
+                discCenter.x + discRadius * 1.08f,
+                discCenter.y - discRadius * 0.42f,
+            )
             val tip = Offset(
-                pivot.x + armLength * cos(armAngle),
-                pivot.y + armLength * sin(armAngle),
+                contactOffDisc.x + (contactOnDisc.x - contactOffDisc.x) * armProgress,
+                contactOffDisc.y + (contactOnDisc.y - contactOffDisc.y) * armProgress,
+            )
+            val pivot = Offset(
+                discCenter.x + discRadius * 0.92f,
+                discCenter.y - discRadius * 0.82f,
             )
 
             drawCircle(
@@ -160,7 +170,7 @@ fun VinylDisc(
                 for (i in 0 until sparkCount) {
                     val phase = (sparklePhase + i.toFloat() / sparkCount) % 1f
                     val angle = phase * 2f * PI.toFloat()
-                    val orbit = size.toPx() * (0.34f + 0.06f * sin(phase * PI.toFloat() * 2f))
+                    val orbit = grooveRadius * (0.85f + 0.12f * sin(phase * PI.toFloat() * 2f))
                     val sparkCenter = Offset(
                         discCenter.x + orbit * cos(angle),
                         discCenter.y + orbit * sin(angle),
