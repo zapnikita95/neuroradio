@@ -134,18 +134,47 @@ export const GENERIC_ENGLISH_REPLACEMENTS: Array<[RegExp, string]> = [
   [/\brecommended\b/gi, 'рекомендовал'],
   [/\brecommend\b/gi, 'рекомендовал'],
   [/\bradio\b/gi, 'радио'],
-  [/\bpop\b/gi, 'поп'],
-  [/\brock\b/gi, 'рок'],
-  [/\bfunk\b/gi, 'фанк'],
-  [/\bsoul\b/gi, 'соул'],
-  [/\bjazz\b/gi, 'джаз'],
-  [/\bblues\b/gi, 'блюз'],
-  [/\bcountry\b/gi, 'кантри'],
-  [/\bdisco\b/gi, 'диско'],
-  [/\bmetal\b/gi, 'метал'],
-  [/\bpunk\b/gi, 'панк'],
-  [/\bindie\b/gi, 'инди'],
+  // Lowercase only — Pop/Rock/Rap with capital letter are stage names (Jimmy Pop, Kid Rock).
+  [/\bpop\b/g, 'поп'],
+  [/\brock\b/g, 'рок'],
+  [/\brap\b/g, 'рэп'],
+  [/\bfunk\b/g, 'фанк'],
+  [/\bsoul\b/g, 'соул'],
+  [/\bjazz\b/g, 'джаз'],
+  [/\bblues\b/g, 'блюз'],
+  [/\bcountry\b/g, 'кантри'],
+  [/\bdisco\b/g, 'диско'],
+  [/\bmetal\b/g, 'метал'],
+  [/\bpunk\b/g, 'панк'],
+  [/\bindie\b/g, 'инди'],
 ];
+
+/** Genre words that become Russian when lowercased; used to undo mistaken translation in names. */
+const GENRE_LATIN_TO_RU: Record<string, string> = {
+  pop: 'поп',
+  rock: 'рок',
+  rap: 'рэп',
+  funk: 'фанк',
+  soul: 'соул',
+  jazz: 'джаз',
+  blues: 'блюз',
+  country: 'кантри',
+  disco: 'диско',
+  metal: 'метал',
+  punk: 'панк',
+  indie: 'инди',
+};
+
+const GENRE_CAP_WORDS =
+  'Pop|Rock|Rap|Funk|Soul|Jazz|Blues|Country|Disco|Metal|Punk|Indie';
+
+const MULTI_WORD_LATIN_NAME =
+  /\b([A-Z][a-z]+(?:[''][a-z]+)?(?:\s+[A-Z][a-z]+(?:[''][a-z]+)?)+)\b/g;
+
+const STAGE_NAME_WITH_GENRE = new RegExp(
+  `\\b([A-Z][a-z]+(?:[''][a-z]+)?(?:\\s+[A-Z][a-z]+(?:[''][a-z]+)?)*)\\s+(${GENRE_CAP_WORDS})\\b`,
+  'g',
+);
 
 /** Latin phrases that must survive generic EN→RU replacement (e.g. «soul» in De La Soul). */
 const PROTECTED_LATIN_PHRASES = [
@@ -161,10 +190,13 @@ const PROTECTED_LATIN_PHRASES = [
 const PHRASE_SLOT = '\uE012P';
 const PHRASE_END = '\uE013';
 
-function maskProtectedLatinPhrases(text: string): { masked: string; phrases: string[] } {
+function maskProtectedLatinPhrases(
+  text: string,
+  phraseList: string[] = PROTECTED_LATIN_PHRASES,
+): { masked: string; phrases: string[] } {
   const phrases: string[] = [];
   let masked = text;
-  const sorted = [...PROTECTED_LATIN_PHRASES].sort((a, b) => b.length - a.length);
+  const sorted = [...new Set(phraseList.filter(Boolean))].sort((a, b) => b.length - a.length);
   for (const phrase of sorted) {
     const re = new RegExp(escapeRegExp(phrase), 'gi');
     masked = masked.replace(re, (match) => {
@@ -174,6 +206,60 @@ function maskProtectedLatinPhrases(text: string): { masked: string; phrases: str
     });
   }
   return { masked, phrases };
+}
+
+/** Capitalized Latin multi-word names and stage names with genre words (Jimmy Pop). */
+function collectCapitalizedProperNounPhrases(text: string): string[] {
+  const phrases: string[] = [];
+  for (const match of text.matchAll(STAGE_NAME_WITH_GENRE)) phrases.push(match[0]);
+  for (const match of text.matchAll(MULTI_WORD_LATIN_NAME)) phrases.push(match[1]);
+  return phrases;
+}
+
+/** Nicknames and multi-word names from wiki/fact snippets. */
+export function extractProperNamePhrasesFromFacts(referenceFacts: string[] = []): string[] {
+  const seen = new Set<string>();
+  const phrases: string[] = [];
+  const add = (raw: string) => {
+    const phrase = raw.trim().replace(/\s{2,}/g, ' ');
+    if (phrase.length < 3) return;
+    const key = phrase.toLowerCase();
+    if (seen.has(key)) return;
+    seen.add(key);
+    phrases.push(phrase);
+  };
+
+  for (const fact of referenceFacts) {
+    for (const match of fact.matchAll(/["']([A-Za-z][^"']{1,80})["']/g)) add(match[1]);
+    for (const match of fact.matchAll(MULTI_WORD_LATIN_NAME)) add(match[1]);
+    for (const match of fact.matchAll(STAGE_NAME_WITH_GENRE)) add(match[0]);
+  }
+  return phrases;
+}
+
+/** Undo «Jimmy поп» when facts/wiki still have «Jimmy Pop». */
+function restoreProperNamesCorruptedByGenreTranslation(
+  text: string,
+  namePhrases: string[],
+): string {
+  let result = text;
+  for (const name of namePhrases) {
+    const parts = name.split(/\s+/);
+    if (parts.length < 2) continue;
+    const lastLatin = parts[parts.length - 1];
+    const ruGenre = GENRE_LATIN_TO_RU[lastLatin.toLowerCase()];
+    if (!ruGenre) continue;
+    const prefix = parts.slice(0, -1).map(escapeRegExp).join('\\s+');
+    // \b fails around Cyrillic in JS — use Unicode-aware boundaries.
+    result = result.replace(
+      new RegExp(
+        `(?<![\\p{L}\\p{N}'])${prefix}\\s+${escapeRegExp(ruGenre)}(?![\\p{L}\\p{N}'])`,
+        'giu',
+      ),
+      name,
+    );
+  }
+  return result;
 }
 
 function unmaskProtectedLatinPhrases(text: string, phrases: string[]): string {
@@ -241,8 +327,16 @@ export function fixMusicalMistranslations(text: string): string {
 }
 
 /** Replace generic English; leave proper nouns intact. */
-export function replaceGenericEnglish(text: string): string {
-  const { masked, phrases } = maskProtectedLatinPhrases(text);
+export function replaceGenericEnglish(
+  text: string,
+  extraProtectedPhrases: string[] = [],
+): string {
+  const protectedPhrases = [
+    ...PROTECTED_LATIN_PHRASES,
+    ...extraProtectedPhrases,
+    ...collectCapitalizedProperNounPhrases(text),
+  ];
+  const { masked, phrases } = maskProtectedLatinPhrases(text, protectedPhrases);
   let result = masked;
   for (const [pattern, replacement] of GENERIC_ENGLISH_REPLACEMENTS) {
     result = result.replace(pattern, replacement);
@@ -269,7 +363,9 @@ export function prepareStoryScriptLanguage(
     const re = new RegExp(escapeRegExp(phrase), 'gi');
     text = text.replace(re, phrase);
   }
-  text = replaceGenericEnglish(text);
+  const namePhrases = extractProperNamePhrasesFromFacts(ctx.referenceFacts ?? []);
+  text = replaceGenericEnglish(text, namePhrases);
+  text = restoreProperNamesCorruptedByGenreTranslation(text, namePhrases);
   text = fixMusicalMistranslations(text);
   const allowedLatin = buildAllowedLatinTokens(ctx.artist, ctx.title, ctx.referenceFacts ?? [], text);
   return { text, allowedLatin };
