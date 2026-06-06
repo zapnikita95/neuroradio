@@ -62,7 +62,7 @@ class StoryPlayer(context: Context) {
     private var onErrorCallback: (() -> Unit)? = null
     private var onPlaybackStartedCallback: (() -> Unit)? = null
     private var playbackStartedNotified = false
-    private var exoRetryUsed = false
+    private var exoRetryCount = 0
     private var currentExoUrl: String? = null
     private var playbackTimeoutRunnable: Runnable? = null
 
@@ -109,17 +109,7 @@ class StoryPlayer(context: Context) {
 
                 override fun onPlayerError(error: androidx.media3.common.PlaybackException) {
                     StoryLog.e("ExoPlayer error (Yandex server audio): ${error.message}", error)
-                    if (!exoRetryUsed) {
-                        exoRetryUsed = true
-                        val retryUrl = currentExoUrl
-                        if (!retryUrl.isNullOrBlank()) {
-                            StoryLog.w("ExoPlayer error — retrying server audio once")
-                            exoPlayer.stop()
-                            exoPlayer.clearMediaItems()
-                            playWithExoPlayer(retryUrl)
-                            return
-                        }
-                    }
+                    if (retryExoSameUrl("player error")) return
                     failPlayback()
                 }
             },
@@ -142,7 +132,7 @@ class StoryPlayer(context: Context) {
         onErrorCallback = onError
         onPlaybackStartedCallback = onPlaybackStarted
         playbackStartedNotified = false
-        exoRetryUsed = false
+        exoRetryCount = 0
         activePlaybackEngine = playbackEngine
         lastAndroidSpeechRate = speechRate
         _currentScript.value = response.script
@@ -308,6 +298,18 @@ class StoryPlayer(context: Context) {
             .trim()
     }
 
+    private fun retryExoSameUrl(reason: String): Boolean {
+        if (exoRetryCount >= MAX_EXO_URL_RETRIES) return false
+        val retryUrl = currentExoUrl
+        if (retryUrl.isNullOrBlank()) return false
+        exoRetryCount++
+        StoryLog.w("ExoPlayer $reason — retry $exoRetryCount/$MAX_EXO_URL_RETRIES same URL")
+        exoPlayer.stop()
+        exoPlayer.clearMediaItems()
+        playWithExoPlayer(retryUrl)
+        return true
+    }
+
     private fun playWithExoPlayer(url: String) {
         currentExoUrl = url
         _state.value = StoryPlaybackState.PREPARING
@@ -343,18 +345,8 @@ class StoryPlayer(context: Context) {
             if (exoPlayer.isPlaying) {
                 return@Runnable
             }
-            if (!exoRetryUsed) {
-                exoRetryUsed = true
-                StoryLog.w("ExoPlayer start timeout — retrying server audio once")
-                exoPlayer.stop()
-                exoPlayer.clearMediaItems()
-                val retryUrl = currentExoUrl
-                if (!retryUrl.isNullOrBlank()) {
-                    playWithExoPlayer(retryUrl)
-                    return@Runnable
-                }
-            }
-            StoryLog.e("ExoPlayer start timeout after retry (Yandex server audio)")
+            if (retryExoSameUrl("start timeout")) return@Runnable
+            StoryLog.e("ExoPlayer start timeout after retries (Yandex server audio)")
             failPlayback()
         }
         mainHandler.postDelayed(playbackTimeoutRunnable!!, EXO_START_TIMEOUT_MS)
@@ -489,7 +481,8 @@ class StoryPlayer(context: Context) {
     }
 
     companion object {
-        private const val EXO_START_TIMEOUT_MS = 28_000L
+        private const val EXO_START_TIMEOUT_MS = 45_000L
+        private const val MAX_EXO_URL_RETRIES = 3
         private const val ANDROID_START_TIMEOUT_MS = 12_000L
         private const val UTTERANCE_ID = "music_story_script"
     }

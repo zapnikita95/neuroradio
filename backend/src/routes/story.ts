@@ -715,7 +715,7 @@ router.post('/full', validateStoryFullBody, storyFullRateLimit, async (req: Requ
             (wikiLead.lang === 'ru'
               ? sanitizeScriptForTts(wikiLead.text, metadata.artist, metadata.title, [wikiLead.text])
               : null);
-          if (wikiScriptFinal && countWords(wikiScriptFinal) >= 45) {
+          if (wikiScriptFinal && countWords(wikiScriptFinal) >= 35) {
             selectedFact = {
               fact: wikiLead.text,
               scope: 'artist',

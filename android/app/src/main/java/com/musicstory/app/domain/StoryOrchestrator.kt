@@ -326,6 +326,9 @@ class StoryOrchestrator(
 
     fun isStorySessionActive(): Boolean {
         return generationInFlight ||
+            backendFetchInFlight ||
+            activeStoryJob?.isActive == true ||
+            _state.value == OrchestratorState.FETCHING_STORY ||
             _state.value == OrchestratorState.PREPARING_PLAYBACK ||
             _state.value == OrchestratorState.PLAYING_STORY
     }
@@ -626,8 +629,6 @@ class StoryOrchestrator(
                         refreshTracksUntilNext()
                     }
 
-                    var audioRefetchAttempt = 0
-
                     fun handleAudioPlaybackFailed() {
                         mediaControllerManager.restoreSystemMusicVolumeIfNeeded()
                         if (!manual) {
@@ -690,40 +691,7 @@ class StoryOrchestrator(
                             onError = {
                                 if (!isSessionCurrent(session)) return@playStory
                                 cancelGenerationPreview()
-                                if (audioRefetchAttempt < 1) {
-                                    audioRefetchAttempt++
-                                    scope.launch {
-                                        StoryLog.w(
-                                            "Server audio failed — refetching story once (stale signed URL after redeploy?)",
-                                        )
-                                        _state.value = OrchestratorState.FETCHING_STORY
-                                        publishUiState()
-                                        val refetch = try {
-                                            withTimeout(STORY_FETCH_TIMEOUT_MS) {
-                                                storyRepository.fetchStory(track, forceRefresh = true)
-                                            }
-                                        } catch (e: CancellationException) {
-                                            throw e
-                                        } catch (e: Exception) {
-                                            Result.failure(e)
-                                        }
-                                        if (!isSessionCurrent(session) || !isTrackStillCurrent(session, track)) {
-                                            return@launch
-                                        }
-                                        refetch.fold(
-                                            onSuccess = { fresh ->
-                                                storyMutex.withLock {
-                                                    if (!isSessionCurrent(session)) return@withLock
-                                                    _state.value = OrchestratorState.PREPARING_PLAYBACK
-                                                    publishUiState()
-                                                    startStoryPlayback(fresh)
-                                                }
-                                            },
-                                            onFailure = { handleAudioPlaybackFailed() },
-                                        )
-                                    }
-                                    return@playStory
-                                }
+                                StoryLog.w("Server audio playback failed after URL retries — not refetching story")
                                 handleAudioPlaybackFailed()
                             },
                         )

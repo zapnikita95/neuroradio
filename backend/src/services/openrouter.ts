@@ -269,10 +269,12 @@ export async function generateStoryScript(
     { artist: input.artist, title: input.title },
     (s) => finalizeStory(s, { ...input, voiceId }, storyLength),
     referenceFacts,
-    { relaxForWeakLlm: referenceFacts.length > 0 },
   );
   if (fallback) return fallback;
 
+  if (referenceFacts.length > 0) {
+    throw new Error('OpenRouter could not produce a story grounded in reference facts');
+  }
   throw new Error(
     lastCandidate
       ? 'OpenRouter could not produce a usable story'

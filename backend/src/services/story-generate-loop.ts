@@ -4,7 +4,6 @@ import {
   findHardScriptViolation,
   findIncompleteEnding,
   findWateryContent,
-  hasConcreteFact,
   anchorsReferenceFact,
   sanitizeScriptForTts,
   stripBannedFluff,
@@ -157,9 +156,7 @@ export function finalizeAfterQualityLoop<T extends { script: string }>(
     logRejectedScript('last script rejected (foreign artist)', sanitized, 'wrong artist in script');
     return null;
   }
-  const grounded =
-    anchorsReferenceFact(sanitized, referenceFacts) ||
-    hasConcreteFact(sanitized, input.artist, input.title);
+  const grounded = anchorsReferenceFact(sanitized, referenceFacts);
   if (!grounded) {
     logRejectedScript('last script rejected on finalize', sanitized, 'not grounded in reference facts');
     return null;
