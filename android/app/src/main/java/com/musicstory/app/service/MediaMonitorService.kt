@@ -17,6 +17,7 @@ import com.musicstory.app.data.model.TrackInfo
 import com.musicstory.app.domain.MonitorNotificationState
 import com.musicstory.app.domain.AppPowerMode
 import com.musicstory.app.receiver.StoryActionReceiver
+import com.musicstory.app.util.TrackTitleNormalizer
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -86,7 +87,7 @@ class MediaMonitorService : Service() {
                     val track = app.mediaControllerManager.resolveNowPlayingTrack()
                         ?: app.mediaControllerManager.effectiveNowPlaying.value
                     if (track != null && track.isValid() && key != null && key != lastTrackKey) {
-                        val titleNorm = track.title.trim().lowercase()
+                        val titleNorm = TrackTitleNormalizer.normalize(track.title).trim().lowercase()
                         val firstTrack = lastTrackTitle == null
                         val titleChanged = !firstTrack &&
                             !lastTrackTitle.equals(titleNorm, ignoreCase = true)
@@ -117,7 +118,7 @@ class MediaMonitorService : Service() {
 
     private fun scheduleTrackCounted(app: MusicStoryApp, track: TrackInfo) {
         listenCountJob?.cancel()
-        val dwellTitle = track.title.trim()
+        val dwellTitle = TrackTitleNormalizer.normalize(track.title).trim()
         listenCountJob = serviceScope.launch {
             val countListenEnabled = app.settingsDataStore.countTrackAfterListenEnabled.first()
             val userSec = if (countListenEnabled) {
@@ -132,7 +133,10 @@ class MediaMonitorService : Service() {
             suspend fun stillOnTrack(): Boolean {
                 val current = app.mediaControllerManager.resolveNowPlayingTrack()
                     ?: app.mediaControllerManager.effectiveNowPlaying.value
-                return current?.title?.trim()?.equals(dwellTitle, ignoreCase = true) == true
+                return current?.title?.let {
+                    TrackTitleNormalizer.normalize(it).trim()
+                        .equals(dwellTitle, ignoreCase = true)
+                } == true
             }
 
             if (userSec > 0) {
