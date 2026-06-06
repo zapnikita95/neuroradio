@@ -97,6 +97,9 @@ class ApiClient(
             )
             response
         } catch (first: Exception) {
+            if (first is java.io.IOException && first.message?.contains("Canceled", ignoreCase = true) == true) {
+                throw kotlinx.coroutines.CancellationException("story cancelled")
+            }
             val http = first as? retrofit2.HttpException
             if (http != null && http.code() != 401) throw first
             StoryLog.w("Story fetch retry after: ${first.message}")

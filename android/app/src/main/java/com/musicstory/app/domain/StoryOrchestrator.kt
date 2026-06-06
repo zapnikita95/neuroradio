@@ -313,7 +313,8 @@ class StoryOrchestrator(
     private fun checkOverdueAutoTrigger() {
         scope.launch {
             if (settingsDataStore.appPowerMode.first() != AppPowerMode.ON) return@launch
-            if (manualStoryInFlight) return@launch
+            if (manualStoryInFlight || backendFetchInFlight || generationInFlight) return@launch
+            if (activeStoryJob?.isActive == true) return@launch
             if (_mode.value != OrchestratorMode.AUTO || isStorySessionActive()) return@launch
             if (!storyRepository.hasOwnApiKeyConfigured()) return@launch
             val track = mediaControllerManager.effectiveNowPlaying.value ?: return@launch
@@ -437,23 +438,24 @@ class StoryOrchestrator(
 
     private fun playStoryForTrack(requestedTrack: TrackInfo, manual: Boolean) {
         val manualSession = if (manual) ++manualStorySession else 0
+        val trackKey = trackTitleKey(requestedTrack)
+        val fetchRunning = backendFetchInFlight ||
+            (generationInFlight && activeStoryJob?.isActive == true)
+
+        if (fetchRunning && inFlightTrackKey == trackKey) {
+            StoryLog.i("Story fetch already running for «${requestedTrack.title}» — skip duplicate")
+            return
+        }
         if (!manual && manualStoryInFlight) {
             StoryLog.i("Auto story skipped — manual fetch in flight")
             return
         }
-        if (!manual && generationInFlight && activeStoryJob?.isActive == true &&
-            inFlightTrackKey == trackTitleKey(requestedTrack)
-        ) {
-            StoryLog.i("Auto story already fetching this track — skip duplicate")
+        if (manual && manualStoryInFlight && activeStoryJob?.isActive == true) {
+            StoryLog.i("Manual story already in flight — ignore duplicate tap")
             return
         }
         if (manual) {
-            if (manualStoryInFlight && activeStoryJob?.isActive == true) {
-                StoryLog.i("Manual story already in flight — ignore duplicate tap")
-                return
-            }
             manualStoryInFlight = true
-            supersedePreviousStoryJobOnly()
             backendFetchInFlight = true
             MonitorNotificationState.setPreparing(true)
             _state.value = OrchestratorState.FETCHING_STORY
@@ -474,7 +476,14 @@ class StoryOrchestrator(
         }
         publishUiState()
 
-        activeStoryJob?.cancel(CancellationException("replaced"))
+        if (activeStoryJob?.isActive == true && inFlightTrackKey != null && inFlightTrackKey != trackKey) {
+            storyRepository.cancelActiveStoryFetch("new track")
+            activeStoryJob?.cancel(CancellationException("replaced"))
+            playbackSession++
+            activeStoryJob = null
+        }
+        inFlightTrackKey = trackKey
+
         activeStoryJob = scope.launch {
             try {
                 if (!storyRepository.hasOwnApiKeyConfigured()) {
@@ -557,19 +566,6 @@ class StoryOrchestrator(
             return
         }
         cancelInFlightGenerationImmediate("superseded")
-    }
-
-    /** Manual button: drop only a previous job — do not reset «Готовим историю» for the new request. */
-    private fun supersedePreviousStoryJobOnly() {
-        val hadJob = activeStoryJob?.isActive == true
-        if (hadJob) {
-            storyRepository.cancelActiveStoryFetch("manual supersede")
-            activeStoryJob?.cancel(CancellationException("superseded"))
-            playbackSession++
-        }
-        activeStoryJob = null
-        inFlightTrackKey = null
-        cancelGenerationPreview()
     }
 
     /** Only real user skip/stop may kill HTTP; auto/supersede must not rip manual fetch. */
@@ -674,18 +670,7 @@ class StoryOrchestrator(
             }
         }
         val result = try {
-            var fetched = runFetch()
-            if (fetched.isFailure && isSessionCurrent(session) && isTrackStillCurrent(session, track)) {
-                val err = fetched.exceptionOrNull()
-                if (err?.isBenignStoryCancel() == true) {
-                    StoryLog.w("Story fetch interrupted — one retry in 2s (manual=$manual)")
-                    kotlinx.coroutines.delay(2_000)
-                    if (isSessionCurrent(session) && isTrackStillCurrent(session, track)) {
-                        fetched = runFetch()
-                    }
-                }
-            }
-            fetched
+            runFetch()
         } finally {
             backendFetchInFlight = false
             MonitorNotificationState.setPreparing(false)
