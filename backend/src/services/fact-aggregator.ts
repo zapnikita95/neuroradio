@@ -4,6 +4,7 @@ import { assignFactsToScopes, factAppliesToRequest, factMentionsArtist, factName
 import { filterAndRankFacts, interestScore } from './reference-fact-quality.js';
 import { WEAK_TRIVIA_PATTERNS } from './story-fact-hunt.js';
 import { fetchReferenceFactBundle as fetchWikipediaBundle } from './wikipedia-facts.js';
+import { inferRuRegionalContext } from './metadata-facts.js';
 import { fetchWebSearchFactSnippets } from './web-search-facts.js';
 
 const USER_AGENT = 'MusicStoryBFF/1.0 (contact@example.com)';
@@ -20,6 +21,30 @@ function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise
       setTimeout(() => reject(new Error(`${label} timed out after ${ms}ms`)), ms);
     }),
   ]);
+}
+
+const EMPTY_WIKI: ReferenceFactBundle = { trackFacts: [], artistFacts: [] };
+
+async function fetchWithCap<T>(
+  label: string,
+  fn: () => Promise<T>,
+  fallback: T,
+  ms = FACT_FETCH_HARD_CAP_MS,
+): Promise<T> {
+  try {
+    return await withTimeout(fn(), ms, label);
+  } catch (err) {
+    console.warn(
+      `[facts] ${label} failed for cap ${ms}ms: ${err instanceof Error ? err.message : err}`,
+    );
+    return fallback;
+  }
+}
+
+function resolveFactCountryCode(artist: string, title: string, countryCode?: string): string | undefined {
+  if (countryCode) return countryCode;
+  if (inferRuRegionalContext(artist, title)) return 'RU';
+  return undefined;
 }
 
 export type SnippetSource = 'wiki' | 'ddg' | 'web' | 'wikidata' | 'mb';
@@ -329,9 +354,42 @@ export async function fetchWikiBundleMerged(
   title: string,
   countryCode?: string,
 ): Promise<ReferenceFactBundle> {
-  let wiki = await fetchWikipediaBundle(artist, title, countryCode);
-  if (wiki.trackFacts.length + wiki.artistFacts.length < 2 && countryCode !== 'RU') {
-    const wikiEn = await fetchWikipediaBundle(artist, title, 'US');
+  const cc = resolveFactCountryCode(artist, title, countryCode);
+  let wiki = await fetchWithCap(
+    'wiki-primary',
+    () => fetchWikipediaBundle(artist, title, cc),
+    EMPTY_WIKI,
+    12_000,
+  );
+  if (wiki.trackFacts.length + wiki.artistFacts.length < 2 && cc === 'RU') {
+    const wikiEn = await fetchWithCap(
+      'wiki-en-fallback',
+      () => fetchWikipediaBundle(artist, title, 'US'),
+      EMPTY_WIKI,
+      10_000,
+    );
+    wiki = {
+      trackFacts: mergeFacts(wiki.trackFacts, wikiEn.trackFacts),
+      artistFacts: mergeFacts(wiki.artistFacts, wikiEn.artistFacts),
+    };
+  } else if (wiki.trackFacts.length + wiki.artistFacts.length < 2 && cc !== 'RU' && inferRuRegionalContext(artist, title)) {
+    const wikiRu = await fetchWithCap(
+      'wiki-ru-fallback',
+      () => fetchWikipediaBundle(artist, title, 'RU'),
+      EMPTY_WIKI,
+      10_000,
+    );
+    wiki = {
+      trackFacts: mergeFacts(wiki.trackFacts, wikiRu.trackFacts),
+      artistFacts: mergeFacts(wiki.artistFacts, wikiRu.artistFacts),
+    };
+  } else if (wiki.trackFacts.length + wiki.artistFacts.length < 2 && cc !== 'RU') {
+    const wikiEn = await fetchWithCap(
+      'wiki-en-fallback',
+      () => fetchWikipediaBundle(artist, title, 'US'),
+      EMPTY_WIKI,
+      10_000,
+    );
     wiki = {
       trackFacts: mergeFacts(wiki.trackFacts, wikiEn.trackFacts),
       artistFacts: mergeFacts(wiki.artistFacts, wikiEn.artistFacts),
@@ -403,39 +461,26 @@ export async function fetchAggregatedFactContext(
   artistMbid?: string,
 ): Promise<AggregatedFactContext> {
   const t0 = Date.now();
-  let wiki: ReferenceFactBundle;
-  let ddgUnfiltered: string[];
-  let webUnfiltered: string[];
-  let wdUnfiltered: string[];
-  let mbTrackRaw: string[];
-  let mbArtistRaw: string[];
-  try {
-    [wiki, ddgUnfiltered, webUnfiltered, wdUnfiltered, mbTrackRaw, mbArtistRaw] = await withTimeout(
-      Promise.all([
-        fetchWikiBundleMerged(artist, title, countryCode),
-        fetchDuckDuckGoUnfiltered(artist, title),
-        fetchWebSearchFactSnippets(artist, title),
-        fetchWikidataUnfiltered(artist, title, countryCode),
-        fetchMusicBrainzAnnotationsUnfiltered('recording', recordingMbid),
-        fetchMusicBrainzAnnotationsUnfiltered('artist', artistMbid),
-      ]),
-      FACT_FETCH_HARD_CAP_MS,
-      'fact parallel fetch',
-    );
-  } catch (err) {
-    console.warn(
-      `[facts] parallel fetch cap hit for "${artist}" — "${title}": ${err instanceof Error ? err.message : err}`,
-    );
-    wiki = await fetchWikiBundleMerged(artist, title, countryCode).catch(() => ({
-      trackFacts: [],
-      artistFacts: [],
-    }));
-    ddgUnfiltered = [];
-    webUnfiltered = [];
-    wdUnfiltered = [];
-    mbTrackRaw = [];
-    mbArtistRaw = [];
-  }
+  const cc = resolveFactCountryCode(artist, title, countryCode);
+  const [wiki, ddgUnfiltered, webUnfiltered, wdUnfiltered, mbTrackRaw, mbArtistRaw] =
+    await Promise.all([
+      fetchWithCap('wiki', () => fetchWikiBundleMerged(artist, title, cc), EMPTY_WIKI, 14_000),
+      fetchWithCap('ddg', () => fetchDuckDuckGoUnfiltered(artist, title), [], 12_000),
+      fetchWithCap('web', () => fetchWebSearchFactSnippets(artist, title), [], 14_000),
+      fetchWithCap('wikidata', () => fetchWikidataUnfiltered(artist, title, cc), [], 10_000),
+      fetchWithCap(
+        'mb-track',
+        () => fetchMusicBrainzAnnotationsUnfiltered('recording', recordingMbid),
+        [],
+        8_000,
+      ),
+      fetchWithCap(
+        'mb-artist',
+        () => fetchMusicBrainzAnnotationsUnfiltered('artist', artistMbid),
+        [],
+        8_000,
+      ),
+    ]);
   const elapsed = Date.now() - t0;
   if (elapsed > FACT_FETCH_BUDGET_MS) {
     console.warn(

@@ -76,7 +76,8 @@ export function shouldRunLlmFactHunt(
   artist = '',
 ): boolean {
   if (rawSnippetCount < 2) return false;
-  if (!selected) return bundleFactCount === 0;
+  if (!selected) return true;
+  if (bundleFactCount === 0) return true;
   if (selected.interestScore >= FAST_SEED_INTEREST_SCORE) {
     return false;
   }
@@ -102,7 +103,7 @@ export function explainFactHuntDecision(
   title = '',
 ): string {
   if (rawSnippetCount < 2) return 'snippets<2';
-  if (!selected) return bundleFactCount === 0 ? 'no-facts' : 'no-selection';
+  if (!selected) return bundleFactCount === 0 ? 'no-facts' : 'no-selection-snippet-hunt';
   if (selected.interestScore >= FAST_SEED_INTEREST_SCORE) {
     return `fast-seed score=${selected.interestScore}`;
   }

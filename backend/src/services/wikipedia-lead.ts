@@ -190,6 +190,10 @@ export async function fetchArtistWikiLead(
   for (const candidate of buildArtistTitleCandidates(primary)) {
     titlesToTry.add(candidate);
   }
+  for (const q of [`${primary} (музыкант)`, `${primary} (группа)`, `${primary} (певец)`, primary]) {
+    const foundRu = await searchWikiTitle('ru', q);
+    if (foundRu) titlesToTry.add(foundRu);
+  }
   for (const query of [`${primary} musician`, `${primary} singer`, `${primary} rapper`, primary]) {
     for (const q of wikiTitleVariants(query)) {
       const found = await searchWikiTitle('en', q);
@@ -198,16 +202,16 @@ export async function fetchArtistWikiLead(
   }
 
   for (const wikiTitle of titlesToTry) {
-    const en = await fetchSummaryExtract('en', wikiTitle);
-    if (en && !isDisambiguation(en) && isMusicArtistWikiExtract(en)) {
-      return { text: en, lang: 'en' };
+    const ru = await fetchSummaryExtract('ru', wikiTitle);
+    if (ru && !isDisambiguation(ru) && isMusicArtistWikiExtract(ru)) {
+      return { text: ru, lang: 'ru' };
     }
   }
 
   for (const wikiTitle of titlesToTry) {
-    const ru = await fetchSummaryExtract('ru', wikiTitle);
-    if (ru && !isDisambiguation(ru) && isMusicArtistWikiExtract(ru)) {
-      return { text: ru, lang: 'ru' };
+    const en = await fetchSummaryExtract('en', wikiTitle);
+    if (en && !isDisambiguation(en) && isMusicArtistWikiExtract(en)) {
+      return { text: en, lang: 'en' };
     }
   }
 

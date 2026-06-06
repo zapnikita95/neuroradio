@@ -20,7 +20,7 @@ import {
 } from '../services/fact-user-service.js';
 import { ingestFacts } from '../services/fact-bank.js';
 import { resolveArtistTier } from '../services/artist-notability.js';
-import { buildMetadataFallbackFacts, isMetadataOnlyFallbackFact } from '../services/metadata-facts.js';
+import { buildMetadataFallbackFacts, countGroundedFacts, isMetadataOnlyFallbackFact } from '../services/metadata-facts.js';
 import { factAppliesToRequest } from '../services/fact-relevance.js';
 import {
   explainLlmFactSelection,
@@ -396,13 +396,14 @@ router.post('/full', validateStoryFullBody, storyFullRateLimit, async (req: Requ
 
     let factHuntLlm = false;
     const bundleFactCount = trackFactCount + artistFactCount;
+    const groundedFactCount = countGroundedFacts(factBundle);
 
     if (
       !factFromBank &&
       shouldRunLlmFactHunt(
         selectedFact,
         factCtx.rawSnippets.length,
-        bundleFactCount,
+        groundedFactCount,
         trackFactCount,
         metadata.title,
         metadata.artist,
@@ -440,7 +441,7 @@ router.post('/full', validateStoryFullBody, storyFullRateLimit, async (req: Requ
         `[fact-hunt-llm] skip reason=${explainFactHuntDecision(
           selectedFact,
           factCtx.rawSnippets.length,
-          bundleFactCount,
+          groundedFactCount,
           trackFactCount,
           metadata.title,
         )} interest=${selectedFact.interestRating}/10 score=${selectedFact.interestScore} snippets=${factCtx.rawSnippets.length}`,

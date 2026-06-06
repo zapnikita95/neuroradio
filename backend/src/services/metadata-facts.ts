@@ -1,3 +1,4 @@
+import type { ReferenceFactBundle } from './fact-picker.js';
 import type { TrackMetadata } from './musicbrainz.js';
 
 const COUNTRY_RU: Record<string, string> = {
@@ -44,4 +45,15 @@ export function buildMetadataFallbackFacts(metadata: TrackMetadata): string[] {
 /** Generic MusicBrainz-only placeholder — not enough to ground a story. */
 export function isMetadataOnlyFallbackFact(fact: string): boolean {
   return /независимый артист|в каталоге есть трек|в музыкальных каталогах/i.test(fact);
+}
+
+export function countGroundedFacts(bundle: ReferenceFactBundle): number {
+  return [...bundle.trackFacts, ...bundle.artistFacts].filter((f) => !isMetadataOnlyFallbackFact(f))
+    .length;
+}
+
+/** Cyrillic title / RU context — MusicBrainz often empty; prefer ru.wikipedia and RU web. */
+export function inferRuRegionalContext(artist: string, title: string, countryCode?: string): boolean {
+  if (countryCode === 'RU') return true;
+  return /[\u0400-\u04FF]/.test(`${artist} ${title}`);
 }

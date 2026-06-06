@@ -32,7 +32,8 @@ function isAmbiguousArtistName(artist: string): boolean {
 export function buildWebOnlyQueries(artist: string, title: string): string[] {
   const cleanTitle = title.replace(/\s*\([^)]*\)\s*/g, ' ').trim();
   const cyrillic = /[\u0400-\u04FF]/.test(artist + title);
-  if (cyrillic) {
+  const ruTitle = /[\u0400-\u04FF]/.test(title);
+  if (cyrillic || ruTitle) {
     const lead = artist.trim().toLowerCase() === 'кино' ? 'Виктор Цой Кино' : artist;
     return [
       `${lead} (музыкант) ${cleanTitle}`,

@@ -40,6 +40,13 @@ const FALLBACK_MAJOR = [
   'moby', 'arash', 'tame impala',
 ];
 
+/** Популярны в РФ, но часто без MusicBrainz / en.wikipedia. */
+const RU_REGIONAL_MAJOR = [
+  'soltwine', 'oxxxymiron', 'morgenshtern', 'kizaru', 'pharaoh', 'saluki', 'knyaz',
+  'kino', 'кино', 'виктор цой', 'bi 2', 'баста', 'макан', 'anacondaz', 'loqiemean',
+  'pyrokinesis', 'face', 'feduk', 'scriptonite', 'eldzhey', 'эльджей',
+];
+
 const KPOP_PATTERN =
   /\b(bts|blackpink|twice|stray kids|newjeans|aespa|itzy|seventeen|nct|exo|bigbang|super junior|girls'? generation|red velvet|ive|le sserafim|txt|enhypen|ateez|gidle|mamamoo)\b/i;
 
@@ -53,10 +60,16 @@ function validatedFactCount(
   return { track, artist: artistN };
 }
 
+function isRuRegionalMajorArtist(artist: string): boolean {
+  const n = normalizeArtist(artist);
+  return RU_REGIONAL_MAJOR.some((name) => n === normalizeArtist(name) || n.includes(normalizeArtist(name)));
+}
+
 export function isCatalogMajorArtist(artist: string): boolean {
   const catalog = loadCatalogMajor();
   const n = normalizeArtist(artist);
   if (catalog.has(n)) return true;
+  if (isRuRegionalMajorArtist(artist)) return true;
   return KPOP_PATTERN.test(artist);
 }
 
