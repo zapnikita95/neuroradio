@@ -1,6 +1,7 @@
 package com.musicstory.app.data.remote
 
 import com.musicstory.app.data.local.StoryHistoryEntry
+import java.util.UUID
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.MediaType.Companion.toMediaType
@@ -152,7 +153,7 @@ class AccountSyncManager(
     ) {
         withContext(Dispatchers.IO) {
             val token = authManager.getAccessToken(baseUrl) ?: return@withContext
-            val syncId = if (entry.id > 0) "android-${entry.id}" else "${entry.trackKey}-${entry.playedAt}"
+            val syncId = UUID.randomUUID().toString()
             val body = JSONObject()
                 .put("id", syncId)
                 .put("trackKey", entry.trackKey)

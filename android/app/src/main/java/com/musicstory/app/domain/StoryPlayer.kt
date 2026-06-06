@@ -299,13 +299,20 @@ class StoryPlayer(context: Context) {
     }
 
     private fun retryExoSameUrl(reason: String): Boolean {
+        if (playbackStartedNotified || exoPlayer.currentPosition > 1_500L) {
+            StoryLog.w(
+                "ExoPlayer $reason after playback started (pos=${exoPlayer.currentPosition}ms) — no restart",
+            )
+            return false
+        }
         if (exoRetryCount >= MAX_EXO_URL_RETRIES) return false
         val retryUrl = currentExoUrl
         if (retryUrl.isNullOrBlank()) return false
         exoRetryCount++
-        StoryLog.w("ExoPlayer $reason — retry $exoRetryCount/$MAX_EXO_URL_RETRIES same URL")
+        StoryLog.w("ExoPlayer $reason — retry $exoRetryCount/$MAX_EXO_URL_RETRIES before first audio")
         exoPlayer.stop()
         exoPlayer.clearMediaItems()
+        playbackStartedNotified = false
         playWithExoPlayer(retryUrl)
         return true
     }
@@ -482,7 +489,8 @@ class StoryPlayer(context: Context) {
 
     companion object {
         private const val EXO_START_TIMEOUT_MS = 45_000L
-        private const val MAX_EXO_URL_RETRIES = 3
+        /** One retry only if audio never started — avoids triple restart mid-playback. */
+        private const val MAX_EXO_URL_RETRIES = 1
         private const val ANDROID_START_TIMEOUT_MS = 12_000L
         private const val UTTERANCE_ID = "music_story_script"
     }

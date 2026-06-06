@@ -6,6 +6,7 @@ import { hasPostgres } from './db.js';
 import { hydrateKvFromPostgres, persistKv } from './pg-kv.js';
 import {
   migrateStoryDataFromAccountsBlob,
+  normalizeStoryHistoryId,
   pgGetUsedSeedFingerprints,
   pgInsertStoryHistory,
   pgInsertUsedSeed,
@@ -379,7 +380,8 @@ export async function pushHistoryAsync(
   if (!accountId) return [];
 
   if (hasPostgres()) {
-    await pgInsertStoryHistory(normalized, accountId, entry);
+    const normalizedEntry = { ...entry, id: normalizeStoryHistoryId(entry.id) };
+    await pgInsertStoryHistory(normalized, accountId, normalizedEntry);
     return pgListStoryHistory(normalized, accountId, 0);
   }
 

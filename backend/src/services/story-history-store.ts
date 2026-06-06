@@ -3,6 +3,15 @@ import { factFingerprint } from './fact-bank.js';
 import { getPool, hasPostgres } from './db.js';
 import type { SyncHistoryEntry, UsedSeedRecord } from './account-store.js';
 
+const UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+export function normalizeStoryHistoryId(id: string): string {
+  const trimmed = id.trim();
+  if (UUID_RE.test(trimmed)) return trimmed;
+  return crypto.randomUUID();
+}
+
 export async function migrateStoryDataFromAccountsBlob(
   accountsById: Record<
     string,
@@ -47,6 +56,7 @@ export async function pgInsertStoryHistory(
   accountId: string | null,
   entry: SyncHistoryEntry,
 ): Promise<boolean> {
+  const historyId = normalizeStoryHistoryId(entry.id);
   const res = await getPool().query(
     `INSERT INTO story_history (
       id, install_id, account_id, track_key, artist, title, script, angle,
@@ -54,7 +64,7 @@ export async function pgInsertStoryHistory(
     ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
     ON CONFLICT (id) DO NOTHING`,
     [
-      entry.id,
+      historyId,
       installId.trim().toLowerCase(),
       accountId,
       entry.trackKey,
