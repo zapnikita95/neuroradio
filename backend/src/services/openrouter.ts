@@ -7,6 +7,7 @@ import { resolveStoryNarrator, StoryNarratorId } from './story-narrator.js';
 import { YandexVoiceId, voiceForYear } from './voices.js';
 import {
   countWords,
+  findHardScriptViolation,
   findLlmGarbage,
   referenceFactsAreAnchorable,
   sanitizeScriptForTts,
@@ -272,7 +273,7 @@ export async function generateStoryScript(
         }
         if (
           rejectReason === 'story ignores reference facts' &&
-          !referenceFactsAreAnchorable(referenceFacts) &&
+          !referenceFactsAreAnchorable(referenceFacts, input.artist, input.title) &&
           factMentionsArtist(sanitized, input.artist) &&
           !findLlmGarbage(sanitized)
         ) {
@@ -308,6 +309,26 @@ export async function generateStoryScript(
     referenceFacts,
   );
   if (fallback) return fallback;
+
+  if (lastCandidate?.script?.trim()) {
+    const sanitized = sanitizeScriptForTts(
+      lastCandidate.script,
+      input.artist,
+      input.title,
+      referenceFacts,
+    );
+    if (
+      countWords(sanitized) >= 35 &&
+      factMentionsArtist(sanitized, input.artist) &&
+      !findLlmGarbage(sanitized) &&
+      !findHardScriptViolation(sanitized)
+    ) {
+      console.warn(
+        `[openrouter] last-resort ship — quality gate waived (${countWords(sanitized)} words) artist="${input.artist}"`,
+      );
+      return finalizeStory({ ...lastCandidate, script: sanitized }, { ...input, voiceId }, storyLength);
+    }
+  }
 
   if (referenceFacts.length > 0) {
     throw new Error('OpenRouter could not produce a story grounded in reference facts');

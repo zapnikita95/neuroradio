@@ -99,7 +99,7 @@ function collapseMarkupWhitespace(text: string): string {
 
 /**
  * Prepare story script for Yandex SpeechKit TTS:
- * sanitize → speech quality pass → stress → RU/EN articulation → prosody pauses
+ * sanitize → polish → stress → pauses → keep Latin for SSML <lang en-US> (no transliteration).
  */
 export function prepareYandexTtsText(
   script: string,
@@ -126,7 +126,6 @@ export function prepareYandexTtsText(
   }
 
   text = enhanceMixedLanguageText(text, artist, title);
-  text = applyForeignPronunciation(text, artist, title);
 
   return collapseMarkupWhitespace(text);
 }

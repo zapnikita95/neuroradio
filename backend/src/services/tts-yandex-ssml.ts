@@ -11,11 +11,11 @@ const BREAK_MEDIUM = '\uE021';
 const BREAK_SENTENCE = '\uE022';
 
 const LATIN_RUN_RE =
-  /[A-Za-zÀ-ÿ][A-Za-zÀ-ÿ0-9''\-&]{1,}(?:\s+(?![.!?…]\s)[A-Za-zÀ-ÿ][A-Za-zÀ-ÿ0-9''\-&]{1,})*/g;
+  /[A-Za-zÀ-ÿ][A-Za-zÀ-ÿ0-9''.\-&]{0,}(?:\s+(?![.!?…]\s)[A-Za-zÀ-ÿ][A-Za-zÀ-ÿ0-9''.\-&]{0,})*/g;
 
 export function hasLatinForSsml(text: string): boolean {
   const stripped = text.replace(/<\[(?:small|medium|large|tiny|huge|sentence)\]>/g, '');
-  return /[A-Za-zÀ-ÿ]{3,}/.test(stripped);
+  return /[A-Za-zÀ-ÿ]{2,}/.test(stripped);
 }
 
 export function escapeSsml(text: string): string {

@@ -74,12 +74,33 @@ export function isUnspeakableWebSeed(snippet: string): boolean {
   return false;
 }
 
+/** Playlist / multi-track SEO line — not a fact about the requested artist. */
+export function isPlaylistJunkSnippet(snippet: string, artist: string, title: string): boolean {
+  const trimmed = decodeHtmlEntities(snippet).trim();
+  if (factMentionsArtist(trimmed, artist) || factMentionsTitle(trimmed, title)) return false;
+  const dashPairs = (trimmed.match(/\s[-–—]\s/g) ?? []).length;
+  if (dashPairs >= 2) return true;
+  if (/\bOfficial Music Video\b/i.test(trimmed) && dashPairs >= 1) return true;
+  if (
+    /\b(?:Kate Bush|Lana Del Rey|Lykke Li|Taylor Swift|Adele|Nirvana|Coldplay)\b/i.test(trimmed) &&
+    dashPairs >= 1
+  ) {
+    return true;
+  }
+  return false;
+}
+
 /** Fact strong enough to anchor LLM output + quality gate. */
-export function isSpeakableReferenceFact(fact: string): boolean {
+export function isSpeakableReferenceFact(
+  fact: string,
+  artist = '',
+  title = '',
+): boolean {
   const trimmed = decodeHtmlEntities(fact).trim();
   if (trimmed.length < 35) return false;
   if (isUnspeakableWebSeed(trimmed)) return false;
   if (isWebListicleJunk(trimmed)) return false;
+  if (artist && isPlaylistJunkSnippet(trimmed, artist, title)) return false;
   if (isBoringFact(trimmed) && !isBackstoryFact(trimmed)) return false;
   return interestScore(trimmed) >= 6 || isBackstoryFact(trimmed);
 }
@@ -125,6 +146,7 @@ export function acceptSearchGroundedSnippet(
   const trimmed = decodeHtmlEntities(snippet).trim();
   if (isLowQualityWebSnippet(trimmed)) return false;
   if (isWebListicleJunk(trimmed)) return false;
+  if (isPlaylistJunkSnippet(trimmed, artist, title)) return false;
   if (factMentionsOtherTrackTitle(trimmed, title)) return false;
 
   const explicit =

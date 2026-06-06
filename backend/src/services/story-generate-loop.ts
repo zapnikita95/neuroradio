@@ -170,12 +170,12 @@ export function finalizeAfterQualityLoop<T extends { script: string }>(
     logRejectedScript('last script rejected', sanitized, 'does not mention performing artist');
     return null;
   }
-  const grounded = referenceFactsAreAnchorable(referenceFacts)
+  const grounded = referenceFactsAreAnchorable(referenceFacts, input.artist, input.title)
     ? anchorsReferenceFact(sanitized, referenceFacts)
     : true;
   if (!grounded) {
     if (
-      !referenceFactsAreAnchorable(referenceFacts) &&
+      !referenceFactsAreAnchorable(referenceFacts, input.artist, input.title) &&
       factMentionsArtist(sanitized, input.artist) &&
       !findLlmGarbage(sanitized)
     ) {

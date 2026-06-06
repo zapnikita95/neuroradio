@@ -97,6 +97,9 @@ export const MUSIC_LATIN_ALLOWLIST = new Set([
   'viral',
 ]);
 
+const LATIN_RUN_RE =
+  /[A-Za-zÀ-ÿ][A-Za-zÀ-ÿ0-9''.\-&]{0,}(?:\s+(?![.!?…]\s)[A-Za-zÀ-ÿ][A-Za-zÀ-ÿ0-9''.\-&]{0,})*/g;
+
 export function collectLatinTokens(artist: string, title: string): Set<string> {
   const tokens = new Set<string>();
   const collect = (value: string) => {
@@ -114,22 +117,26 @@ export function collectLatinTokens(artist: string, title: string): Set<string> {
   return tokens;
 }
 
-/** Short pause before/after Latin runs so Yandex articulates names clearly. */
+/** Short pause before/after whole Latin phrases — never split multi-word names. */
 export function addLatinArticulationPauses(text: string): string {
   const quotes: string[] = [];
-  const masked = text.replace(/«[^»]+»/g, (quote) => {
+  const maskedQuotes = text.replace(/«[^»]+»/g, (quote) => {
     const idx = quotes.length;
     quotes.push(quote);
     return `\uE000LQ${idx}\uE001`;
   });
-  let result = masked
-    .replace(
-      /(\s)([A-Za-z][A-Za-z0-9&'’.-]{1,}(?:\s+[A-Za-z][A-Za-z0-9&'’.-]{1,}){0,4})(\s|[,.!?…])/g,
-      '$1<[small]> $2 <[small]>$3',
-    )
-    .replace(/<\[small\]>\s*<\[small\]>/g, '<[small]>');
-  result = result.replace(/\uE000LQ(\d+)\uE001/g, (_, index) => quotes[Number(index)] ?? '');
-  return result;
+  const runs: string[] = [];
+  const masked = maskedQuotes.replace(LATIN_RUN_RE, (run) => {
+    const idx = runs.length;
+    runs.push(run);
+    return `\uE016L${idx}\uE017`;
+  });
+  let result = masked.replace(/\uE016L(\d+)\uE017/g, (_, index) => {
+    const run = runs[Number(index)] ?? '';
+    return `<[small]> ${run} <[small]>`;
+  });
+  result = result.replace(/<\[small\]>\s*<\[small\]>/g, '<[small]>');
+  return result.replace(/\uE000LQ(\d+)\uE001/g, (_, index) => quotes[Number(index)] ?? '');
 }
 
 /** Normalize punctuation around Latin tokens (no spaces inside hyphenated names). */
@@ -143,8 +150,12 @@ export function normalizeLatinPunctuation(text: string): string {
 
 export function enhanceMixedLanguageText(
   text: string,
-  _artist: string,
-  _title: string,
+  artist: string,
+  title: string,
 ): string {
-  return normalizeLatinPunctuation(text);
+  let result = normalizeLatinPunctuation(text);
+  result = addLatinArticulationPauses(result);
+  void artist;
+  void title;
+  return result;
 }

@@ -4,7 +4,7 @@ import {
   StoryLengthId,
   StoryLengthPreset,
 } from './story-length.js';
-import { COVER_CONTEXT_RE, factMentionsArtist, storyNamesForeignArtist } from './fact-relevance.js';
+import { COVER_CONTEXT_RE, factMentionsArtist, factMentionsTitle, hasTrackContextSignal, storyNamesForeignArtist } from './fact-relevance.js';
 import { hasEnglishLeak } from './story-russian-language.js';
 import { prepareStoryScriptLanguage } from './story-english-normalize.js';
 import { isTruncatedMarketingSnippet, isSpeakableReferenceFact } from './web-snippet-accept.js';
@@ -567,8 +567,20 @@ function matchesConceptBridge(fact: string, scriptWords: Set<string>): boolean {
 }
 
 /** Skip anchor check when reference facts are SEO junk — LLM may still produce valid lore. */
-export function referenceFactsAreAnchorable(referenceFacts: string[]): boolean {
-  return referenceFacts.some((f) => isSpeakableReferenceFact(f));
+export function referenceFactsAreAnchorable(
+  referenceFacts: string[],
+  artist = '',
+  title = '',
+): boolean {
+  return referenceFacts.some((f) => {
+    if (!isSpeakableReferenceFact(f, artist, title)) return false;
+    if (artist.trim() && title.trim()) {
+      const mentionsArtist = factMentionsArtist(f, artist);
+      const mentionsTitle = factMentionsTitle(f, title);
+      if (!mentionsArtist && !mentionsTitle && !hasTrackContextSignal(f)) return false;
+    }
+    return true;
+  });
 }
 
 /** Script must reflect at least one reference fact (Wikipedia anchor). */
@@ -715,13 +727,13 @@ export function validateStoryScript(
 
   if (
     !skipReferenceAnchor &&
-    referenceFactsAreAnchorable(referenceFacts) &&
+    referenceFactsAreAnchorable(referenceFacts, artist, title) &&
     !anchorsReferenceFact(trimmed, referenceFacts)
   ) {
     return { ok: false, reason: 'story ignores reference facts' };
   }
   if (
-    referenceFactsAreAnchorable(referenceFacts) &&
+    referenceFactsAreAnchorable(referenceFacts, artist, title) &&
     !skipFirstSentenceAnchor &&
     !firstSentenceAnchoredToFact(trimmed, referenceFacts)
   ) {

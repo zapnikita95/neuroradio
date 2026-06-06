@@ -3,7 +3,7 @@ import { factMentionsArtist, factMentionsTitle, hasTrackContextSignal } from './
 import { interestRating10 } from './fact-interest-log.js';
 import { isMetadataOnlyFallbackFact } from './metadata-facts.js';
 import { interestScore, isWikiBiographyLead } from './reference-fact-quality.js';
-import { acceptSearchGroundedSnippet, isSpeakableReferenceFact, isUnspeakableWebSeed } from './web-snippet-accept.js';
+import { acceptSearchGroundedSnippet, isPlaylistJunkSnippet, isSpeakableReferenceFact, isUnspeakableWebSeed } from './web-snippet-accept.js';
 
 /** Seed too weak to ground LLM + quality gate — upgrade to wiki/better facts. */
 export function isWeakSnippetSeed(fact: string, score = interestScore(fact)): boolean {
@@ -28,6 +28,7 @@ export function pickSalvageSnippetSeed(
     .map((snippet) => snippet.trim())
     .filter((snippet) => snippet.length >= 35 && snippet.length <= 480)
     .filter((snippet) => acceptSearchGroundedSnippet(snippet, artist, title))
+    .filter((snippet) => !isPlaylistJunkSnippet(snippet, artist, title))
     .filter((snippet) => !isWeakSnippetSeed(snippet))
     .sort((a, b) => {
       const boost = (s: string) =>
