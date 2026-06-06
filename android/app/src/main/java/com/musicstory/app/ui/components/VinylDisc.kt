@@ -129,17 +129,24 @@ fun VinylDisc(
                 discCenter.x + grooveRadius * cos(grooveAngle),
                 discCenter.y + grooveRadius * sin(grooveAngle),
             )
-            val contactOffDisc = Offset(
-                discCenter.x + discRadius * 1.08f,
-                discCenter.y - discRadius * 0.42f,
-            )
-            val tip = Offset(
-                contactOffDisc.x + (contactOnDisc.x - contactOffDisc.x) * armProgress,
-                contactOffDisc.y + (contactOnDisc.y - contactOffDisc.y) * armProgress,
-            )
             val pivot = Offset(
                 discCenter.x + discRadius * 0.92f,
                 discCenter.y - discRadius * 0.82f,
+            )
+            val armLength = kotlin.math.hypot(
+                (contactOnDisc.x - pivot.x).toDouble(),
+                (contactOnDisc.y - pivot.y).toDouble(),
+            ).toFloat()
+            val onDiscAngle = kotlin.math.atan2(
+                (contactOnDisc.y - pivot.y).toDouble(),
+                (contactOnDisc.x - pivot.x).toDouble(),
+            ).toFloat()
+            val swingRad = Math.toRadians(25.0).toFloat()
+            val offDiscAngle = onDiscAngle - swingRad
+            val armAngle = offDiscAngle + swingRad * armProgress
+            val tip = Offset(
+                pivot.x + armLength * cos(armAngle),
+                pivot.y + armLength * sin(armAngle),
             )
 
             drawCircle(

@@ -62,4 +62,13 @@ interface StoryHistoryDao {
 
     @Query("SELECT COUNT(*) FROM story_history WHERE trackKey = :trackKey")
     suspend fun countForTrack(trackKey: String): Int
+
+    @Query(
+        """
+        SELECT vote FROM story_history
+        WHERE trackKey = :trackKey AND vote IS NOT NULL AND TRIM(vote) != ''
+        ORDER BY playedAt DESC LIMIT 1
+        """,
+    )
+    suspend fun findLatestVoteForTrack(trackKey: String): String?
 }

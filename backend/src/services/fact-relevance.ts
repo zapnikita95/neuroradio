@@ -1,6 +1,7 @@
 /** Reject Wikipedia/DDG sentences about the wrong act — no hardcoded artist blocklists. */
 
 import { collaboratorNames } from './artist-primary.js';
+import { buildTitleMatchVariants, textMentionsTitle } from './title-transliterate.js';
 import { isNonMusicProfessionText } from './wikipedia-music.js';
 
 function normalize(text: string): string {
@@ -502,49 +503,12 @@ export function factMentionsArtist(fact: string, artist: string): boolean {
 }
 
 export function factMentionsTitle(fact: string, title: string): boolean {
-  const clean = title.replace(/\s*\([^)]*\)\s*/g, ' ').trim();
-  const titleNorm = normalize(clean);
-  if (titleNorm.length < 2) return false;
-  const factNorm = normalize(fact);
-  if (titleNorm.length >= 4 && factNorm.includes(titleNorm)) return true;
-
-  for (const variant of titleMentionVariants(clean)) {
-    if (variant.length >= 4 && factNorm.includes(variant)) return true;
-  }
-
-  if (titleNorm.length < 4) {
-    const escaped = clean.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    if (new RegExp(`[«""']\\s*${escaped}\\s*[»""']`, 'i').test(fact)) return true;
-    if (new RegExp(`\\b(?:song|track|single|titled?)\\s+[«""']?${escaped}[«""']?`, 'i').test(fact)) return true;
-  }
-  return false;
+  return textMentionsTitle(fact, title);
 }
 
-/** Cyrillic ↔ Latin / alternate spellings for well-known tracks. */
-function titleMentionVariants(title: string): string[] {
-  const clean = title.replace(/\s*\([^)]*\)\s*/g, ' ').trim();
-  const base = normalize(clean);
-  const variants = new Set<string>();
-  if (base.length >= 2) variants.add(base);
-
-  const aliasGroups: string[][] = [
-    ['я сошла с ума', 'ya soshla s uma', 'ya soshla s umu'],
-    ['my favourite game', 'my favorite game'],
-    ['feel good inc', 'feel good inc.'],
-    ['all the things she said'],
-  ];
-  for (const group of aliasGroups) {
-    if (group.some((alias) => base.includes(alias) || alias.includes(base))) {
-      for (const alias of group) variants.add(alias);
-    }
-  }
-  if (/сошл/.test(base) && /ум/.test(base)) {
-    variants.add('ya soshla s uma');
-    variants.add('ya soshla s umu');
-  }
-  if (base.includes('favourite')) variants.add(base.replace('favourite', 'favorite'));
-  if (base.includes('favorite')) variants.add(base.replace('favorite', 'favourite'));
-  return [...variants];
+/** @deprecated Use buildTitleMatchVariants from title-transliterate.ts */
+export function titleMentionVariants(title: string): string[] {
+  return buildTitleMatchVariants(title);
 }
 
 /** Snippet clearly about the song/video/recording even without repeating artist/title. */

@@ -114,6 +114,7 @@ fun HomeScreen(
     var tourStep by remember { mutableStateOf<Int?>(null) }
     var tourBoundsByStep by remember { mutableStateOf<Map<Int, Rect>>(emptyMap()) }
     var tourOverlayReady by remember { mutableStateOf(false) }
+    var feedbackAlreadyVoted by remember { mutableStateOf(false) }
     val homeScrollState = rememberScrollState()
     val density = LocalDensity.current
     val screenHeightPx = with(density) { LocalConfiguration.current.screenHeightDp.dp.toPx() }
@@ -149,6 +150,15 @@ fun HomeScreen(
 
     LaunchedEffect(homeTourPending) {
         if (homeTourPending) tourStep = 0
+    }
+
+    LaunchedEffect(uiState.pendingFeedback?.trackKey) {
+        val trackKey = uiState.pendingFeedback?.trackKey
+        feedbackAlreadyVoted = if (trackKey.isNullOrBlank()) {
+            false
+        } else {
+            app.storyRepository.findLatestVoteForTrack(trackKey) != null
+        }
     }
 
     fun recordTourBounds(stepIndex: Int, coords: LayoutCoordinates, padDp: androidx.compose.ui.unit.Dp = 0.dp) {
@@ -518,6 +528,7 @@ fun HomeScreen(
             }
 
             if (uiState.pendingFeedback != null &&
+                !feedbackAlreadyVoted &&
                 (uiState.state == OrchestratorState.PLAYING_STORY ||
                     uiState.state == OrchestratorState.LISTENING)
             ) {

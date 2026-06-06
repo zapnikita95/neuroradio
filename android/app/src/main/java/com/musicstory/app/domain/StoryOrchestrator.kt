@@ -691,9 +691,7 @@ class StoryOrchestrator(
                     return@fold
                 }
 
-                if (manual) {
-                    startGenerationPreview(response.script, session)
-                }
+                startGenerationPreview(response.script, session)
 
                 if (!isSessionCurrent(session)) return@fold
 
@@ -705,6 +703,7 @@ class StoryOrchestrator(
 
                     withContext(Dispatchers.Main.immediate) {
                         mediaControllerManager.fadeOutAndPause(fadeSeconds)
+                        mediaControllerManager.restoreSystemMusicVolumeIfNeeded()
                     }
                     musicPausedForStory.set(true)
                     if (!manual) {
@@ -762,15 +761,23 @@ class StoryOrchestrator(
                                     }
                                 }
                                 _errorMessage.value = null
-                                _pendingFeedback.value = PendingStoryFeedback(
-                                    artist = response.artist,
-                                    title = response.title,
-                                    script = response.script,
-                                    trackKey = requestedTrack.displayKey,
-                                )
-                                _state.value = OrchestratorState.LISTENING
-                                scope.launch { refreshTracksUntilNext() }
-                                publishUiState()
+                                scope.launch {
+                                    val trackKey = requestedTrack.displayKey
+                                    val existingVote = storyRepository.findLatestVoteForTrack(trackKey)
+                                    _pendingFeedback.value = if (existingVote.isNullOrBlank()) {
+                                        PendingStoryFeedback(
+                                            artist = response.artist,
+                                            title = response.title,
+                                            script = response.script,
+                                            trackKey = trackKey,
+                                        )
+                                    } else {
+                                        null
+                                    }
+                                    _state.value = OrchestratorState.LISTENING
+                                    refreshTracksUntilNext()
+                                    publishUiState()
+                                }
                             },
                             onError = {
                                 if (!isSessionCurrent(session)) return@playStory
@@ -956,6 +963,12 @@ class StoryOrchestrator(
     fun clearFeedbackPrompt() {
         _pendingFeedback.value = null
         publishUiState()
+    }
+
+    fun clearFeedbackIfTrack(trackKey: String) {
+        if (_pendingFeedback.value?.trackKey == trackKey) {
+            clearFeedbackPrompt()
+        }
     }
 
     /** Сброс залипшего «Готовим историю» при открытии главного экрана. */

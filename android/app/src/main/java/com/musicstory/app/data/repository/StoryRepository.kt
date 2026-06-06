@@ -73,7 +73,6 @@ class StoryRepository(
         apiClient.cancelActiveStoryRequest(reason)
     }
 
-    /** Pull cloud history after login / reinstall and merge into local Room DB. */
     suspend fun mergeHistoryFromServer(baseUrl: String) {
         val sync = accountSyncManager ?: return
         val remote = sync.pullHistory(baseUrl.trim()) ?: return
@@ -104,6 +103,9 @@ class StoryRepository(
         mergeHistoryFromServer(baseUrl)
         pushAllLocalHistoryToServer(baseUrl)
     }
+
+    suspend fun findLatestVoteForTrack(trackKey: String): String? =
+        storyHistoryDao.findLatestVoteForTrack(trackKey)
 
     private suspend fun pushAllLocalHistoryToServer(baseUrl: String) {
         val sync = accountSyncManager ?: return

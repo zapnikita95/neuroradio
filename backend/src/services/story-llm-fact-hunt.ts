@@ -1,4 +1,5 @@
 import fetch from 'node-fetch';
+import { fuzzyTokenMatch } from './title-transliterate.js';
 import type { SelectedReferenceFact } from './fact-picker.js';
 import { factNamesForeignEntity, factMentionsArtist, factMentionsTitle, hasTrackContextSignal } from './fact-relevance.js';
 import { interestScore, isBoringFact, MIN_PICK_INTEREST_SCORE, isWeakChartSeed } from './reference-fact-quality.js';
@@ -132,7 +133,10 @@ export function verifyLlmSeedEvidence(
   if (snippetNorm.includes(quoteNorm)) return true;
   const quoteTokens = significantTokens(evidenceQuote);
   if (quoteTokens.length === 0) return false;
-  const hits = quoteTokens.filter((t) => snippetNorm.includes(t)).length;
+  const snippetTokens = significantTokens(snippet);
+  const hits = quoteTokens.filter((qt) =>
+    snippetTokens.some((st) => fuzzyTokenMatch(qt, st)) || snippetNorm.includes(qt),
+  ).length;
   return hits >= Math.min(3, quoteTokens.length);
 }
 
