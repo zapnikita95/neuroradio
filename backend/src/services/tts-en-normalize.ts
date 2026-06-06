@@ -3,6 +3,10 @@
  * Keeps artist/title Latin intact and adds micro-pauses around foreign tokens.
  */
 
+import { normalizeLatinApostrophes } from './tts-yandex-normalize.js';
+
+export { normalizeLatinApostrophes };
+
 /** Common music/tech Latin tokens that may appear in Russian narration. */
 export const MUSIC_LATIN_ALLOWLIST = new Set([
   'tiktok',
@@ -146,7 +150,7 @@ export function addLatinArticulationPauses(text: string): string {
 
 /** Normalize punctuation around Latin tokens (no spaces inside hyphenated names). */
 export function normalizeLatinPunctuation(text: string): string {
-  return text
+  return normalizeLatinApostrophes(text)
     .replace(/\s+([’'])\s+/g, '$1')
     .replace(/\s+-\s+/g, '-')
     .replace(/\s{2,}/g, ' ')

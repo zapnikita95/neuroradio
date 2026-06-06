@@ -223,6 +223,7 @@ router.post('/full', validateStoryFullBody, storyFullRateLimit, async (req: Requ
   };
   const userTtsCredentials = parseUserTtsCredentials(body);
   if (body.user_tts_provider && !hasUserTtsCredentials(userTtsCredentials)) {
+    setLogDetail(res, `code=USER_TTS_CREDENTIALS_INVALID provider=${body.user_tts_provider}`);
     res.status(400).json({
       error: 'Invalid user TTS credentials',
       code: 'USER_TTS_CREDENTIALS_INVALID',

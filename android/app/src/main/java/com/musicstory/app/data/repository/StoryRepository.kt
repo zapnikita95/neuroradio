@@ -264,7 +264,13 @@ class StoryRepository(
         val previousScripts = (
             storyHistoryDao.getRecentScripts(trackKey) +
                 storyHistoryDao.getRecentScriptsForArtist(track.artist)
-            ).distinct()
+            )
+            .asSequence()
+            .map { it.trim() }
+            .filter { it.isNotEmpty() }
+            .distinct()
+            .take(MAX_PREVIOUS_SCRIPTS)
+            .toList()
 
         if (!forceRefresh && previousScripts.isEmpty()) {
             val cached = storyDao.getByTrackKey(trackKey)
@@ -604,6 +610,20 @@ class StoryRepository(
             if (e is IOException && e.message?.contains("cancel", ignoreCase = true) == true) {
                 throw CancellationException("story cancelled")
             }
+            if (e is HttpException && e.code() == 400) {
+                val rawBody = e.response()?.errorBody()?.string().orEmpty()
+                val parsedBody = parseHttpErrorBodyFromRaw(rawBody, llmProvider)
+                val code = runCatching {
+                    gson.fromJson(rawBody, Map::class.java)["code"] as? String
+                }.getOrNull()
+                val reason = when (code) {
+                    "USER_TTS_CREDENTIALS_INVALID" ->
+                        parsedBody ?: "Укажи ключи озвучки в настройках приложения."
+                    else -> parsedBody ?: "Неверный запрос к серверу (400)."
+                }
+                StoryLog.w("Backend rejected request (400) code=$code")
+                return StoryAttemptResult.Failed(reason)
+            }
             if (e is HttpException && e.code() == 429) {
                 val parsed = parseServerRateLimit(e)
                 parsed.quota?.let { _dailyQuota.value = it }
@@ -932,6 +952,8 @@ class StoryRepository(
         /** Local Ollama: research + up to 8 narrator attempts on 35b model. */
         private const val BACKEND_LOCAL_TIMEOUT_MS = 1_200_000L
         private const val METADATA_TIMEOUT_MS = 15_000L
+        /** Must match backend SECURITY.maxPreviousScripts. */
+        private const val MAX_PREVIOUS_SCRIPTS = 8
     }
 }
 

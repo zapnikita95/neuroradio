@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import { SECURITY } from '../config/security.js';
+import { setLogDetail } from './request-logger.js';
 import { resolveStoryLength, StoryLengthId } from '../services/story-length.js';
 import { resolveStoryNarrator, StoryNarratorId } from '../services/story-narrator.js';
 import { resolveTtsVoice, TtsVoiceSetting } from '../services/voices.js';
@@ -98,6 +99,9 @@ export function validateStoryFullBody(req: Request, res: Response, next: NextFun
   const artist = asTrimmedString(body.artist, SECURITY.maxArtistLength);
   const title = asTrimmedString(body.title, SECURITY.maxTitleLength);
   if (!artist || !title) {
+    const artistLen = typeof body.artist === 'string' ? body.artist.trim().length : -1;
+    const titleLen = typeof body.title === 'string' ? body.title.trim().length : -1;
+    setLogDetail(res, `validate: artist/title artistLen=${artistLen} titleLen=${titleLen}`);
     res.status(400).json({ error: 'Invalid artist or title (required, max 200 chars each)' });
     return;
   }
@@ -105,21 +109,20 @@ export function validateStoryFullBody(req: Request, res: Response, next: NextFun
   let previousScripts: string[] = [];
   if (body.previous_scripts !== undefined) {
     if (!Array.isArray(body.previous_scripts)) {
+      setLogDetail(res, 'validate: previous_scripts not array');
       res.status(400).json({ error: 'previous_scripts must be an array' });
-      return;
-    }
-    if (body.previous_scripts.length > SECURITY.maxPreviousScripts) {
-      res.status(400).json({ error: `previous_scripts max ${SECURITY.maxPreviousScripts} items` });
       return;
     }
     previousScripts = [];
     for (const item of body.previous_scripts) {
       const script = asTrimmedString(item, SECURITY.maxPreviousScriptLength);
-      if (!script) {
-        res.status(400).json({ error: 'Invalid previous_scripts entry' });
-        return;
-      }
-      previousScripts.push(script);
+      if (script) previousScripts.push(script);
+    }
+    if (previousScripts.length > SECURITY.maxPreviousScripts) {
+      console.warn(
+        `[validate] previous_scripts truncated ${previousScripts.length} -> ${SECURITY.maxPreviousScripts}`,
+      );
+      previousScripts = previousScripts.slice(0, SECURITY.maxPreviousScripts);
     }
   }
 

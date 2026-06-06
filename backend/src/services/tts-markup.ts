@@ -13,6 +13,7 @@ import {
 } from './tts-foreign-pronounce.js';
 import { stripYandexPauseMarkup } from './tts-azure-ssml.js';
 import { enhanceMixedLanguageText } from './tts-en-normalize.js';
+import { normalizeYandexSpeechTokens } from './tts-yandex-normalize.js';
 import { normalizeYearsForRussianTts } from './tts-russian-years.js';
 import type { SileroTtsTextTrace } from './tts-silero-transcript.js';
 import type { TtsPauseProfile } from './tts-voice-profiles.js';
@@ -116,6 +117,7 @@ export function prepareYandexTtsText(
 
   text = normalizeYearsForRussianTts(text);
   text = expandQuotesForSpeech(text);
+  text = normalizeYandexSpeechTokens(text, artist, title);
   text = applyRussianStressSafe(text);
 
   if (options.sentencePauses !== false) {

@@ -50,9 +50,49 @@ test('SSML does not split trailing в in трэков before Latin name', () => 
   assert.match(ssml, /трэков/i);
 });
 
-test('SSML wraps standalone preposition с before Latin', () => {
-  const ssml = buildYandexSsml('работал с Michael Jackson.');
-  assert.match(ssml, /<lang xml:lang="ru-RU">с<\/lang>\s*<lang xml:lang="en-US">Michael Jackson/i);
+test('SSML keeps preposition с in Russian stream before Latin', () => {
+  const ssml = buildYandexSsml('подписал контракт с лейблом Young Money Entertainment.');
+  assert.doesNotMatch(ssml, /<lang xml:lang="ru-RU">с<\/lang>/i);
+  assert.match(ssml, /с лейблом/i);
+  assert.match(ssml, /<lang xml:lang="en-US">Young Money Entertainment/i);
+});
+
+test('SSML keeps Don\'t Matter To Me as one English phrase', () => {
+  const ssml = buildYandexSsml('В треке Don\u2019t Matter To Me он использует рэп-сингинг.');
+  assert.doesNotMatch(ssml, />Don<\/lang>/i);
+  assert.match(ssml, /Don&apos;t Matter To Me|Don't Matter To Me/i);
+});
+
+test('prepareYandexTtsText reads R&B as рэ-энд-би not letter-by-letter', () => {
+  const out = prepareYandexTtsText('перенёс R&B в мейнстримный хип-хоп.', {
+    artist: 'Drake',
+    title: 'Test',
+  });
+  assert.match(out, /рэ-энд-би/i);
+  assert.doesNotMatch(out, /\bR\s*&\s*B\b/i);
+});
+
+test('prepareYandexTtsText stresses микстейпы', () => {
+  const out = prepareYandexTtsText('он выпускал микстейпы Room for Improvement.', {
+    artist: 'Drake',
+    title: 'Test',
+  });
+  assert.match(out, /микст\+ейпы/i);
+});
+
+test('prepareYandexTtsText keeps preposition в after R&B cyrillic', () => {
+  const marked = prepareYandexTtsText('перенёс R&B в мейнстримный хип-хоп.', {
+    artist: 'Drake',
+    title: 'Test',
+  });
+  assert.match(marked, /рэ-энд-би в мейнстримный/i);
+  const ssml = buildYandexSsml(marked);
+  assert.doesNotMatch(ssml, /R&amp;B/i);
+});
+
+test('SSML pause after English block before Russian preposition', () => {
+  const ssml = buildYandexSsml('уровень Drake в мейнстриме.');
+  assert.match(ssml, /<\/lang><break time="60ms"\/>в /i);
 });
 
 test('polish splits long bureaucratic phrasing', () => {

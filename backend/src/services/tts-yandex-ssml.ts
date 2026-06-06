@@ -5,13 +5,19 @@
  */
 
 import type { YandexVoiceId } from './voices.js';
+import { normalizeLatinApostrophes } from './tts-yandex-normalize.js';
 
 const BREAK_SMALL = '\uE020';
 const BREAK_MEDIUM = '\uE021';
 const BREAK_SENTENCE = '\uE022';
 
-const LATIN_RUN_RE =
-  /[A-Za-zÀ-ÿ][A-Za-zÀ-ÿ0-9''.\-&]{0,}(?:\s+(?![.!?…]\s)[A-Za-zÀ-ÿ][A-Za-zÀ-ÿ0-9''.\-&]{0,})*/g;
+/** Latin runs incl. curly apostrophe in Don't / Don't Matter To Me. */
+const LATIN_APOSTROPHE = "''\u2018\u2019\u02BC\u0060";
+
+const LATIN_RUN_RE = new RegExp(
+  `[A-Za-zÀ-ÿ][A-Za-zÀ-ÿ0-9${LATIN_APOSTROPHE}.\\-&]{0,}(?:\\s+(?![.!?…]\\s)[A-Za-zÀ-ÿ][A-Za-zÀ-ÿ0-9${LATIN_APOSTROPHE}.\\-&]{0,})*`,
+  'g',
+);
 
 export function hasLatinForSsml(text: string): boolean {
   const stripped = text.replace(/<\[(?:small|medium|large|tiny|huge|sentence)\]>/g, '');
@@ -64,25 +70,18 @@ function cyrillicForShortAccentLatin(span: string): string | null {
 }
 
 /**
- * «с» перед <lang en-US> без ru-RU Yandex читает как букву «эс».
- * Только ОТДЕЛЬНОЕ слово-предлог — не последняя буква «в/к/…» в «трэков», «эпоху».
+ * «с/в/к» перед <lang en-US> Yandex иногда читает как буквы.
+ * Предлог остаётся в русском потоке; для «контракт с Young…» — bridge в tts-yandex-normalize.
  */
-const RU_PREP_BEFORE_LATIN_RE = new RegExp(
-  `^(.*?)([,\\s${BREAK_SMALL}${BREAK_MEDIUM}${BREAK_SENTENCE}]*)(?<![а-яёА-ЯЁ])([свкуо])([\\s${BREAK_SMALL}${BREAK_MEDIUM}${BREAK_SENTENCE}]+)$`,
-  'su',
-);
-
 function escapeRussianChunkBeforeLatin(chunk: string): string {
-  const m = chunk.match(RU_PREP_BEFORE_LATIN_RE);
-  if (!m?.[3]) return escapeSsml(chunk);
-  const head = m[1] ?? '';
-  const mid = m[2] ?? '';
-  const word = m[3];
-  const tail = m[4] ?? '';
-  return (
-    escapeSsml(head + mid) +
-    `<lang xml:lang="ru-RU">${escapeSsml(word)}</lang>` +
-    escapeSsml(tail)
+  return escapeSsml(chunk);
+}
+
+/** После en-US блока ru-предлог может прочитаться как буква — короткая пауза сбрасывает язык. */
+function fixRussianPrepositionsAfterLangTags(text: string): string {
+  return text.replace(
+    /(<\/lang>)(\s*)([вскуо])(\s+)(?=[а-яёА-ЯЁ])/g,
+    '$1<break time="60ms"/>$3$4',
   );
 }
 
@@ -123,7 +122,7 @@ function latinSpanForSsml(span: string): string {
 
 /** Оборачивает латинские фрагменты в SSML lang; русский текст и +ударения — как есть. */
 export function wrapMixedLanguageBody(text: string): string {
-  const prepared = pausesToPlaceholders(text);
+  const prepared = pausesToPlaceholders(normalizeLatinApostrophes(text));
   let last = 0;
   let out = '';
   const re = new RegExp(LATIN_RUN_RE.source, 'g');
@@ -145,7 +144,7 @@ export function wrapMixedLanguageBody(text: string): string {
   if (last < prepared.length) {
     out += escapeSsml(prepared.slice(last));
   }
-  return trimBreaksAroundLangTags(placeholdersToBreaks(out));
+  return fixRussianPrepositionsAfterLangTags(trimBreaksAroundLangTags(placeholdersToBreaks(out)));
 }
 
 export function buildYandexSsml(markedText: string, _voice?: YandexVoiceId): string {
