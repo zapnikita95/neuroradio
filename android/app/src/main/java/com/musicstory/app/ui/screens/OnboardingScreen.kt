@@ -36,6 +36,7 @@ import androidx.lifecycle.LifecycleEventObserver
 import com.musicstory.app.MusicStoryApp
 import com.musicstory.app.R
 import com.musicstory.app.service.MediaNotificationListener
+import com.musicstory.app.ui.components.BrandTitle
 import com.musicstory.app.ui.components.GlassCard
 import com.musicstory.app.ui.components.MusicStoryBackground
 import com.musicstory.app.ui.components.PrimaryStoryButton
@@ -96,11 +97,7 @@ fun OnboardingScreen(
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            Text(
-                text = "Music Story",
-                style = MaterialTheme.typography.labelLarge,
-                color = GoldBright,
-            )
+            BrandTitle()
             Text(
                 text = context.getString(R.string.onboarding_title),
                 style = MaterialTheme.typography.displaySmall,

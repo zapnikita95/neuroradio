@@ -39,9 +39,9 @@ router.get('/profile', (req: Request, res: Response) => {
   res.json({ ...sync, ...profile });
 });
 
-router.post('/email/start', (req: Request, res: Response) => {
+router.post('/email/start', async (req: Request, res: Response) => {
   const email = typeof req.body?.email === 'string' ? req.body.email : '';
-  const result = startEmailLogin(req.installId!, email);
+  const result = await startEmailLogin(req.installId!, email);
   if (!result.ok) {
     res.status(400).json({ error: result.error });
     return;
@@ -49,10 +49,10 @@ router.post('/email/start', (req: Request, res: Response) => {
   res.json({ ok: true, expiresInSec: result.expiresInSec });
 });
 
-router.post('/email/verify', (req: Request, res: Response) => {
+router.post('/email/verify', async (req: Request, res: Response) => {
   const email = typeof req.body?.email === 'string' ? req.body.email : '';
   const code = typeof req.body?.code === 'string' ? req.body.code : '';
-  const result = verifyEmailLogin(req.installId!, email, code);
+  const result = await verifyEmailLogin(req.installId!, email, code);
   if (!result.ok) {
     res.status(400).json({ error: result.error });
     return;

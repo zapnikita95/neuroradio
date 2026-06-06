@@ -71,6 +71,7 @@ import com.musicstory.app.ui.components.MusicStoryBackground
 import com.musicstory.app.ui.components.PrimaryStoryButton
 import com.musicstory.app.ui.components.SecondaryStoryButton
 import com.musicstory.app.ui.components.SourceBadge
+import com.musicstory.app.ui.components.BrandTitle
 import com.musicstory.app.ui.components.VinylDisc
 import com.musicstory.app.ui.theme.CreamText
 import com.musicstory.app.ui.theme.DeepVoid
@@ -275,23 +276,18 @@ fun HomeScreen(
                 uiState.state == OrchestratorState.PLAYING_STORY
             )
 
+    val tonearmOnDisc = isListening &&
+        uiState.currentTrack != null &&
+        uiState.state != OrchestratorState.PLAYING_STORY &&
+        uiState.state != OrchestratorState.PREPARING_PLAYBACK &&
+        (isPlaying || uiState.state == OrchestratorState.FETCHING_STORY)
+    val aiSparkle = uiState.state == OrchestratorState.FETCHING_STORY || uiState.isBackendFetching
+
     MusicStoryBackground(modifier = modifier) {
         Box(modifier = Modifier.fillMaxSize()) {
         Column(modifier = Modifier.fillMaxSize()) {
             TopAppBar(
-                title = {
-                    Column {
-                        Text(
-                            text = "Music Story",
-                            style = MaterialTheme.typography.labelMedium,
-                            color = GoldBright,
-                        )
-                        Text(
-                            text = context.getString(R.string.home_title),
-                            style = MaterialTheme.typography.titleLarge,
-                        )
-                    }
-                },
+                title = { BrandTitle() },
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = DeepVoid.copy(alpha = 0.65f),
                     titleContentColor = CreamText,
@@ -344,6 +340,8 @@ fun HomeScreen(
 
                 VinylDisc(
                     isSpinning = isSpinning,
+                    tonearmOnDisc = tonearmOnDisc,
+                    aiSparkle = aiSparkle,
                     size = 172.dp,
                 )
 

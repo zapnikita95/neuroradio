@@ -95,6 +95,13 @@ CREATE UNIQUE INDEX IF NOT EXISTS used_seeds_install_fp_uq
   WHERE account_id IS NULL;
 
 CREATE INDEX IF NOT EXISTS used_seeds_lookup_idx ON used_seeds (account_id, lower(artist));
+
+CREATE TABLE IF NOT EXISTS pending_email_codes (
+  email TEXT PRIMARY KEY,
+  code TEXT NOT NULL,
+  install_id TEXT NOT NULL,
+  expires_at BIGINT NOT NULL
+);
 `;
 
 export async function initPostgres(): Promise<void> {

@@ -3,6 +3,7 @@ package com.musicstory.app.ui.components
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
@@ -17,6 +18,7 @@ import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -25,12 +27,17 @@ import com.musicstory.app.ui.theme.GoldBright
 import com.musicstory.app.ui.theme.GoldWarm
 import com.musicstory.app.ui.theme.VinylBlack
 import com.musicstory.app.ui.theme.VinylGroove
+import kotlin.math.PI
+import kotlin.math.cos
+import kotlin.math.sin
 
 @Composable
 fun VinylDisc(
     modifier: Modifier = Modifier,
     size: Dp = 160.dp,
     isSpinning: Boolean = false,
+    tonearmOnDisc: Boolean = true,
+    aiSparkle: Boolean = false,
 ) {
     val infiniteTransition = rememberInfiniteTransition(label = "vinyl")
     val rotation by infiniteTransition.animateFloat(
@@ -42,9 +49,23 @@ fun VinylDisc(
         ),
         label = "rotation",
     )
+    val sparklePhase by infiniteTransition.animateFloat(
+        initialValue = 0f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 1400, easing = LinearEasing),
+            repeatMode = RepeatMode.Restart,
+        ),
+        label = "sparkle",
+    )
+    val armProgress by animateFloatAsState(
+        targetValue = if (tonearmOnDisc) 1f else 0f,
+        animationSpec = tween(durationMillis = 650),
+        label = "tonearm",
+    )
 
     Box(
-        modifier = modifier.size(size),
+        modifier = modifier.size(size * 1.22f),
         contentAlignment = Alignment.Center,
     ) {
         Canvas(
@@ -90,12 +111,66 @@ fun VinylDisc(
         }
 
         if (isSpinning) {
-            Canvas(modifier = Modifier.size(size * 1.15f)) {
+            Canvas(modifier = Modifier.size(size * 1.08f)) {
                 drawCircle(
                     color = GoldBright.copy(alpha = 0.12f),
                     radius = this.size.minDimension / 2f,
                     style = Stroke(width = 2f),
                 )
+            }
+        }
+
+        Canvas(modifier = Modifier.matchParentSize()) {
+            val discCenter = Offset(size.toPx() * 0.61f, size.toPx() * 0.61f)
+            val pivot = Offset(size.toPx() * 1.02f, size.toPx() * 0.14f)
+            val onDiscAngle = 2.35f
+            val offDiscAngle = 1.55f
+            val armAngle = offDiscAngle + (onDiscAngle - offDiscAngle) * armProgress
+            val armLength = size.toPx() * 0.52f
+            val tip = Offset(
+                pivot.x + armLength * cos(armAngle),
+                pivot.y + armLength * sin(armAngle),
+            )
+
+            drawCircle(
+                color = GoldWarm.copy(alpha = 0.85f),
+                radius = size.toPx() * 0.028f,
+                center = pivot,
+            )
+            drawLine(
+                color = Color(0xFFE8E0D4),
+                start = pivot,
+                end = tip,
+                strokeWidth = size.toPx() * 0.018f,
+                cap = StrokeCap.Round,
+            )
+            drawCircle(
+                color = VinylBlack,
+                radius = size.toPx() * 0.034f,
+                center = tip,
+            )
+            drawCircle(
+                color = GoldBright.copy(alpha = 0.7f),
+                radius = size.toPx() * 0.012f,
+                center = tip,
+            )
+
+            if (aiSparkle) {
+                val sparkCount = 6
+                for (i in 0 until sparkCount) {
+                    val phase = (sparklePhase + i.toFloat() / sparkCount) % 1f
+                    val angle = phase * 2f * PI.toFloat()
+                    val orbit = size.toPx() * (0.34f + 0.06f * sin(phase * PI.toFloat() * 2f))
+                    val sparkCenter = Offset(
+                        discCenter.x + orbit * cos(angle),
+                        discCenter.y + orbit * sin(angle),
+                    )
+                    drawCircle(
+                        color = GoldBright.copy(alpha = 0.25f + 0.55f * (1f - phase)),
+                        radius = size.toPx() * 0.014f,
+                        center = sparkCenter,
+                    )
+                }
             }
         }
     }

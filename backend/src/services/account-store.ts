@@ -3,7 +3,12 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { factFingerprint } from './fact-bank.js';
 import { hasPostgres } from './db.js';
-import { hydrateKvFromPostgres, persistKv } from './pg-kv.js';
+import { hydrateKvFromPostgres, persistKv, persistKvAsync } from './pg-kv.js';
+import {
+  pgDeletePendingEmailCode,
+  pgLoadPendingEmailCode,
+  pgSavePendingEmailCode,
+} from './pending-email-codes.js';
 import {
   migrateStoryDataFromAccountsBlob,
   normalizeStoryHistoryId,
@@ -178,6 +183,14 @@ function loadStore(): StoreFile {
 function saveStore(store: StoreFile): void {
   cache = store;
   persistKv(ACCOUNTS_KV_KEY, store, STORE_PATH, () => {
+    fs.mkdirSync(DATA_DIR, { recursive: true });
+    fs.writeFileSync(STORE_PATH, JSON.stringify(store, null, 2), 'utf8');
+  });
+}
+
+async function saveStoreAsync(store: StoreFile): Promise<void> {
+  cache = store;
+  await persistKvAsync(ACCOUNTS_KV_KEY, store, STORE_PATH, () => {
     fs.mkdirSync(DATA_DIR, { recursive: true });
     fs.writeFileSync(STORE_PATH, JSON.stringify(store, null, 2), 'utf8');
   });
@@ -632,7 +645,10 @@ export function getAccountProfile(installId: string): {
   };
 }
 
-export function startEmailLogin(installId: string, emailRaw: string): { ok: true; expiresInSec: number } | { ok: false; error: string } {
+export async function startEmailLogin(
+  installId: string,
+  emailRaw: string,
+): Promise<{ ok: true; expiresInSec: number } | { ok: false; error: string }> {
   const email = normalizeEmail(emailRaw);
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
     return { ok: false, error: 'Некорректный email' };
@@ -647,7 +663,10 @@ export function startEmailLogin(installId: string, emailRaw: string): { ok: true
   const expiresAt = Date.now() + 15 * 60 * 1000;
   store.pendingEmailCodes = store.pendingEmailCodes ?? {};
   store.pendingEmailCodes[email] = { code, installId: normalized, email, expiresAt };
-  saveStore(store);
+  await saveStoreAsync(store);
+  if (hasPostgres()) {
+    await pgSavePendingEmailCode(email, code, normalized, expiresAt);
+  }
   if (isEmailConfigured()) {
     void import('./email-sender.js').then((m) => m.sendLoginCodeEmail(email, code)).catch((err) => {
       console.warn('[email-auth] send failed:', err instanceof Error ? err.message : err);
@@ -658,17 +677,25 @@ export function startEmailLogin(installId: string, emailRaw: string): { ok: true
   return { ok: true, expiresInSec: 900 };
 }
 
-export function verifyEmailLogin(
+export async function verifyEmailLogin(
   installId: string,
   emailRaw: string,
   codeRaw: string,
-): { ok: true; accountId: string } | { ok: false; error: string } {
+): Promise<{ ok: true; accountId: string } | { ok: false; error: string }> {
   const email = normalizeEmail(emailRaw);
-  const code = codeRaw.trim();
+  const code = codeRaw.replace(/\D/g, '').trim();
+  if (code.length < 4) {
+    return { ok: false, error: 'Неверный код' };
+  }
   const store = loadStore();
   store.pendingEmailCodes = store.pendingEmailCodes ?? {};
   store.emailToAccount = store.emailToAccount ?? {};
-  const pending = store.pendingEmailCodes[email];
+
+  let pending = store.pendingEmailCodes[email] ?? null;
+  if (hasPostgres()) {
+    const fromPg = await pgLoadPendingEmailCode(email);
+    if (fromPg) pending = fromPg;
+  }
   if (!pending || pending.expiresAt < Date.now()) {
     return { ok: false, error: 'Код истёк — запроси новый' };
   }
@@ -701,7 +728,10 @@ export function verifyEmailLogin(
   store.installToAccount[normalized] = accountId;
   store.emailToAccount[email] = accountId;
   delete store.pendingEmailCodes[email];
-  saveStore(store);
+  await saveStoreAsync(store);
+  if (hasPostgres()) {
+    await pgDeletePendingEmailCode(email);
+  }
   return { ok: true, accountId };
 }
 

@@ -1,12 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">Music Story</string>
-    <string name="notification_listener_label">Music Story — мониторинг медиа</string>
+    <string name="app_name">Эфир AI</string>
+    <string name="notification_listener_label">Эфир AI — мониторинг медиа</string>
 
     <string name="channel_monitor_name">Мониторинг музыки</string>
     <string name="channel_monitor_description">Фоновое отслеживание воспроизведения Spotify и Яндекс Музыки</string>
 
-    <string name="home_title">Радио-истории</string>
+    <string name="home_title">Эфир AI</string>
     <string name="settings_title">Настройки</string>
     <string name="history_title">История</string>
     <string name="history_tab_stories">Рассказы</string>
@@ -23,11 +23,11 @@
     <string name="nav_settings">Настройки</string>
 
     <string name="onboarding_title">Доступ к уведомлениям</string>
-    <string name="onboarding_description">Music Story читает метаданные треков из Spotify и Яндекс Музыки через специальный доступ к уведомлениям. Без него приложение не видит, что сейчас играет.</string>
-    <string name="onboarding_steps">1. Нажми «Открыть настройки» ниже.\n2. Найди в списке «Music Story — мониторинг медиа».\n3. Включи переключатель.\n4. Вернись сюда и нажми «Проверить и войти».\n\nЕсли список не открылся: Настройки → Приложения → Особые права → Доступ к уведомлениям (на Huawei: Настройки → Уведомления → Управление доступом).</string>
+    <string name="onboarding_description">Эфир AI читает метаданные треков из Spotify и Яндекс Музыки через специальный доступ к уведомлениям. Без него приложение не видит, что сейчас играет.</string>
+    <string name="onboarding_steps">1. Нажми «Открыть настройки» ниже.\n2. Найди в списке «Эфир AI — мониторинг медиа».\n3. Включи переключатель.\n4. Вернись сюда и нажми «Проверить и войти».\n\nЕсли список не открылся: Настройки → Приложения → Особые права → Доступ к уведомлениям (на Huawei: Настройки → Уведомления → Управление доступом).</string>
     <string name="onboarding_open_settings">Открыть настройки доступа</string>
     <string name="onboarding_check_access">Проверить и войти</string>
-    <string name="onboarding_not_granted_yet">Сначала включи «Music Story — мониторинг медиа» в настройках доступа к уведомлениям.</string>
+    <string name="onboarding_not_granted_yet">Сначала включи «Эфир AI — мониторинг медиа» в настройках доступа к уведомлениям.</string>
 
     <string name="home_tour_welcome_title">Вас приветствует нейрорадио</string>
     <string name="home_tour_welcome_body">Слушайте любимые треки, узнавайте новое об артистах, их истории и интересных фактах.</string>

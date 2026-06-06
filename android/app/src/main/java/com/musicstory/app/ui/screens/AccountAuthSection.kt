@@ -18,6 +18,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import android.content.Context
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
@@ -46,6 +48,12 @@ private suspend fun finishAccountLogin(app: MusicStoryApp) {
     if (url.isNotBlank()) {
         app.storyRepository.mergeHistoryFromServer(url)
     }
+}
+
+private fun authMessageColor(context: Context, message: String): Color {
+    val successSent = context.getString(R.string.settings_auth_code_sent)
+    val successLogin = context.getString(R.string.settings_auth_success)
+    return if (message == successSent || message == successLogin) LiveGreen else ErrorCoral
 }
 
 @Composable
@@ -165,7 +173,7 @@ fun AccountStatusSection(
             Text(
                 text = it,
                 style = MaterialTheme.typography.labelMedium,
-                color = if (it.contains("ошиб", ignoreCase = true)) ErrorCoral else LiveGreen,
+                color = authMessageColor(context, it),
             )
         }
     }
@@ -261,13 +269,13 @@ fun AccountEmailLoginContent(
                         busy = true
                         message = null
                         val url = app.settingsDataStore.backendUrl.first()
-                        val p = app.accountAuthManager.verifyEmailLogin(url, email, code)
+                        val (p, err) = app.accountAuthManager.verifyEmailLogin(url, email, code)
                         if (p != null) {
                             finishAccountLogin(app)
                             message = context.getString(R.string.settings_auth_success)
                             onLoggedIn()
                         } else {
-                            message = context.getString(R.string.settings_auth_verify_failed)
+                            message = err ?: context.getString(R.string.settings_auth_verify_failed)
                         }
                         busy = false
                     }
@@ -285,13 +293,7 @@ fun AccountEmailLoginContent(
             Text(
                 text = it,
                 style = MaterialTheme.typography.labelMedium,
-                color = if (it.contains("ошиб", ignoreCase = true) ||
-                    it.contains("не удал", ignoreCase = true)
-                ) {
-                    ErrorCoral
-                } else {
-                    LiveGreen
-                },
+                color = authMessageColor(context, it),
             )
         }
 
@@ -371,7 +373,7 @@ fun AccountTelegramLoginSection(
             Text(
                 text = it,
                 style = MaterialTheme.typography.labelMedium,
-                color = if (it.contains("ошиб", ignoreCase = true)) ErrorCoral else LiveGreen,
+                color = authMessageColor(context, it),
             )
         }
     }

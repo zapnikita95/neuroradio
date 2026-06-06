@@ -22,8 +22,8 @@ export async function sendLoginCodeEmail(to: string, code: string): Promise<void
     body: JSON.stringify({
       from,
       to: [to],
-      subject: 'Music Story — код входа',
-      text: `Код для входа: ${code}\n\nДействует 15 минут.`,
+      subject: 'Эфир AI — код входа',
+      text: `Код для входа в Эфир AI: ${code}\n\nДействует 15 минут.`,
     }),
   });
 

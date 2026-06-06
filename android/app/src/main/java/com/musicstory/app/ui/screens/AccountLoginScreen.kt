@@ -27,6 +27,7 @@ import androidx.compose.ui.unit.dp
 import com.musicstory.app.MusicStoryApp
 import com.musicstory.app.R
 import com.musicstory.app.data.remote.AccountAuthManager
+import com.musicstory.app.ui.components.BrandTitle
 import com.musicstory.app.ui.components.GlassCard
 import com.musicstory.app.ui.components.MusicStoryBackground
 import com.musicstory.app.ui.components.SecondaryStoryButton
@@ -69,11 +70,7 @@ fun AccountLoginScreen(
             verticalArrangement = Arrangement.Center,
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            Text(
-                text = "Music Story",
-                style = MaterialTheme.typography.labelLarge,
-                color = GoldBright,
-            )
+            BrandTitle(fontSize = MaterialTheme.typography.labelLarge.fontSize)
             Spacer(modifier = Modifier.height(8.dp))
             Text(
                 text = context.getString(R.string.account_login_title),

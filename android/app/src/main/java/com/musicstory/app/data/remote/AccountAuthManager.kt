@@ -106,9 +106,9 @@ class AccountAuthManager(
         }.getOrNull()
     }
 
-    suspend fun verifyEmailLogin(baseUrl: String, email: String, code: String): AccountProfile? =
+    suspend fun verifyEmailLogin(baseUrl: String, email: String, code: String): Pair<AccountProfile?, String?> =
         withContext(Dispatchers.IO) {
-            val token = authManager.getAccessToken(baseUrl) ?: return@withContext null
+            val token = authManager.getAccessToken(baseUrl) ?: return@withContext null to "Нет связи с сервером"
             val body = JSONObject()
                 .put("email", email.trim())
                 .put("code", code.trim())
@@ -120,12 +120,16 @@ class AccountAuthManager(
                 .build()
             runCatching {
                 http.newCall(req).execute().use { resp ->
-                    if (!resp.isSuccessful) return@withContext null
-                    val json = JSONObject(resp.body?.string().orEmpty())
+                    val raw = resp.body?.string().orEmpty()
+                    if (!resp.isSuccessful) {
+                        val err = JSONObject(raw).optString("error").ifBlank { "Не удалось войти" }
+                        return@withContext null to err
+                    }
+                    val json = JSONObject(raw)
                     val profile = json.optJSONObject("profile") ?: json
-                    parseProfile(profile)
+                    parseProfile(profile) to null
                 }
-            }.getOrNull()
+            }.getOrDefault(null to "Ошибка сети")
         }
 
     data class AuthConfig(

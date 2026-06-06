@@ -11,7 +11,7 @@ export function buildTelegramWidgetPageHtml(botUsername: string): string {
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Music Story — Telegram</title>
+<title>Эфир AI — Telegram</title>
 <style>
   html,body{margin:0;min-height:100%;background:#1a1520;color:#f5efe6;font:16px system-ui,sans-serif}
   body{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:32px 16px;box-sizing:border-box;text-align:center}
@@ -21,11 +21,11 @@ export function buildTelegramWidgetPageHtml(botUsername: string): string {
 </head>
 <body>
 <div id="tg-wrap"></div>
-<p>Music Story — вход через Telegram</p>
+<p>Эфир AI — вход через Telegram</p>
 <script>
 function onTelegramAuth(user) {
   if (user && user.hash) {
-    document.body.innerHTML = '<p style="padding:24px">Готово. Вернитесь в приложение Music Story.</p>';
+    document.body.innerHTML = '<p style="padding:24px">Готово. Вернитесь в приложение Эфир AI.</p>';
   }
 }
 var s = document.createElement('script');
