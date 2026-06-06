@@ -18,7 +18,7 @@ const PHRASE_PRONUNCIATION_RU: Record<string, string> = {
   maneskin: 'Måneskin',
   gorillaz: 'Gorillaz',
   'de la soul': 'De La Soul',
-  'damon albarn': 'Деймон Элборн',
+  'damon albarn': 'Damon Albarn',
   'jamie hewlett': 'Jamie Hewlett',
   'mambo italiano': 'Мambo Italiano',
   'moliendo café': 'Молиэндo Кафе',

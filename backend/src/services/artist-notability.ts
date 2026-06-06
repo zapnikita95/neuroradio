@@ -57,6 +57,7 @@ const EUROPEAN_ROCK_MAJOR = [
   'the rasmus', 'him', 'nightwish', 'children of bodom', 'lordi', 'apocalyptica',
   'within temptation', 'epica', 'rammstein', 'scorpions', 'aqua', 'ace of base',
   'a-ha', 'robbie williams', 'placebo', 'muse', 'the killers',
+  'the cardigans', 'cardigans', 't a t u', 'tatu',
   'arctic monkeys', 'the strokes', 'linkin park', 'green day', 'blink-182',
 ];
 

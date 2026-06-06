@@ -1,6 +1,6 @@
 import fetch from 'node-fetch';
 import type { SelectedReferenceFact } from './fact-picker.js';
-import { factNamesForeignEntity, factMentionsArtist, factMentionsTitle } from './fact-relevance.js';
+import { factNamesForeignEntity, factMentionsArtist, factMentionsTitle, hasTrackContextSignal } from './fact-relevance.js';
 import { interestScore, isBoringFact, MIN_PICK_INTEREST_SCORE, isWeakChartSeed } from './reference-fact-quality.js';
 import { interestRating10 } from './fact-interest-log.js';
 import { MIN_GOOD_SCOPE_INTEREST } from './fact-picker.js';
@@ -164,8 +164,11 @@ export function validateLlmSeedCandidate(
   if (isBoringFact(fact)) {
     return { ok: false, reason: 'boring encyclopedia fact' };
   }
-  if (interestScore(fact) < MIN_PICK_INTEREST_SCORE) {
-    return { ok: false, reason: `low interest score (${interestScore(fact)} < ${MIN_PICK_INTEREST_SCORE})` };
+  if (interestScore(fact) < (hasTrackContextSignal(fact) ? 5 : MIN_PICK_INTEREST_SCORE)) {
+    return {
+      ok: false,
+      reason: `low interest score (${interestScore(fact)} < ${hasTrackContextSignal(fact) ? 5 : MIN_PICK_INTEREST_SCORE})`,
+    };
   }
   if (factNamesForeignEntity(fact, artist, title)) {
     return { ok: false, reason: 'foreign entity in fact' };

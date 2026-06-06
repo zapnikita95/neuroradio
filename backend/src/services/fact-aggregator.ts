@@ -1,6 +1,14 @@
 import fetch from 'node-fetch';
 import type { ReferenceFactBundle } from './fact-picker.js';
-import { assignFactsToScopes, factAppliesToRequest, factMentionsArtist, factNamesForeignEntity, isWebListicleJunk } from './fact-relevance.js';
+import {
+  assignFactsToScopes,
+  factAppliesToRequest,
+  factMentionsArtist,
+  factMentionsTitle,
+  factNamesForeignEntity,
+  hasTrackContextSignal,
+  isWebListicleJunk,
+} from './fact-relevance.js';
 import { filterAndRankFacts, interestScore } from './reference-fact-quality.js';
 import { WEAK_TRIVIA_PATTERNS } from './story-fact-hunt.js';
 import { fetchReferenceFactBundle as fetchWikipediaBundle } from './wikipedia-facts.js';
@@ -75,6 +83,35 @@ function splitByMention(facts: string[], title: string, artist: string): { track
     else artistFacts.push(fact);
   }
   return { track, artist: artistFacts };
+}
+
+function salvageWebSearchSnippets(
+  webSnippets: string[],
+  artist: string,
+  title: string,
+): ReferenceFactBundle {
+  const track: string[] = [];
+  const artistFacts: string[] = [];
+  const seen = new Set<string>();
+
+  for (const raw of webSnippets) {
+    const snippet = raw.trim();
+    if (snippet.length < 35 || isWebListicleJunk(snippet)) continue;
+    const key = normalize(snippet);
+    if (seen.has(key)) continue;
+    seen.add(key);
+
+    if (hasTrackContextSignal(snippet) || factMentionsTitle(snippet, title)) {
+      track.push(snippet);
+    } else if (factMentionsArtist(snippet, artist) || artistSurnameInFact(snippet, artist)) {
+      artistFacts.push(snippet);
+    }
+  }
+
+  return {
+    trackFacts: filterAndRankFacts(track, 4),
+    artistFacts: filterAndRankFacts(artistFacts, 3),
+  };
 }
 
 function mergeFacts(...pools: string[][]): string[] {
@@ -387,28 +424,28 @@ export async function fetchWikiBundleMerged(
       'wiki-primary',
       () => fetchWikipediaBundle(artist, title, primaryLang === 'RU' ? 'RU' : cc),
       EMPTY_WIKI,
-      18_000,
+      11_000,
     ),
     cc === 'RU'
       ? fetchWithCap(
           'wiki-en-fallback',
           () => fetchWikipediaBundle(artist, title, 'US'),
           EMPTY_WIKI,
-          18_000,
+          11_000,
         )
       : inferRuRegionalContext(artist, title)
         ? fetchWithCap(
             'wiki-ru-fallback',
             () => fetchWikipediaBundle(artist, title, 'RU'),
             EMPTY_WIKI,
-            18_000,
+            11_000,
           )
         : primaryLang !== 'RU'
           ? fetchWithCap(
               'wiki-en-fallback',
               () => fetchWikipediaBundle(artist, title, 'US'),
               EMPTY_WIKI,
-              18_000,
+              11_000,
             )
           : Promise.resolve(EMPTY_WIKI),
   ]);
@@ -563,6 +600,17 @@ export async function fetchAggregatedFactContext(
   const finalized = finalizeFactBundle(trackCandidates, artistCandidates, artist, title);
   let trackFacts = finalized.trackFacts;
   let artistFacts = finalized.artistFacts;
+
+  if (trackFacts.length + artistFacts.length === 0 && webUnfiltered.length > 0) {
+    const salvaged = salvageWebSearchSnippets(webUnfiltered, artist, title);
+    trackFacts = salvaged.trackFacts;
+    artistFacts = salvaged.artistFacts;
+    if (trackFacts.length + artistFacts.length > 0) {
+      console.log(
+        `[facts] web-search salvage for "${artist}" — "${title}": track=${trackFacts.length} artist=${artistFacts.length}`,
+      );
+    }
+  }
 
   if (trackFacts.length + artistFacts.length === 0) {
     console.warn(

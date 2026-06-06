@@ -115,6 +115,9 @@ export function interestScore(fact: string): number {
   if (/\b(million|billion|decade|generation)\b/i.test(fact)) score += 2;
   const isPromoRename = /\b(?:promo track under the name|originally released as a promo)\b/i.test(fact);
   const isRadioEdit = /\b(?:single cut is significantly shorter|album version featuring an introductory)\b/i.test(fact);
+  if (/\b(?:directed by|music video|controversial nature|five different versions|banned by|refused to)\b/i.test(fact)) {
+    score += 10;
+  }
   if (isPromoRename || isRadioEdit) score += 10;
   if (/\b(?:avoid discrimination|appeal to (?:a )?white|change their name|stage name|heritage)\b/i.test(fact)) {
     score += 12;

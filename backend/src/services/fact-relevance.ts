@@ -407,6 +407,8 @@ export function factNamesForeignEntity(
     if (isContextEntity(entity)) continue;
     if (isCriticAttribution(fact, entity)) continue;
     if (entityMatchesArtist(entity, artist, title)) continue;
+    if (isMusicProductionCredit(fact)) continue;
+    if (entityOnlyInParentheses(fact, entity)) continue;
 
     const eNorm = normalize(entity);
     if (eNorm.length < 3) continue;
@@ -505,12 +507,70 @@ export function factMentionsTitle(fact: string, title: string): boolean {
   if (titleNorm.length < 2) return false;
   const factNorm = normalize(fact);
   if (titleNorm.length >= 4 && factNorm.includes(titleNorm)) return true;
+
+  for (const variant of titleMentionVariants(clean)) {
+    if (variant.length >= 4 && factNorm.includes(variant)) return true;
+  }
+
   if (titleNorm.length < 4) {
     const escaped = clean.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     if (new RegExp(`[«""']\\s*${escaped}\\s*[»""']`, 'i').test(fact)) return true;
     if (new RegExp(`\\b(?:song|track|single|titled?)\\s+[«""']?${escaped}[«""']?`, 'i').test(fact)) return true;
   }
   return false;
+}
+
+/** Cyrillic ↔ Latin / alternate spellings for well-known tracks. */
+function titleMentionVariants(title: string): string[] {
+  const clean = title.replace(/\s*\([^)]*\)\s*/g, ' ').trim();
+  const base = normalize(clean);
+  const variants = new Set<string>();
+  if (base.length >= 2) variants.add(base);
+
+  const aliasGroups: string[][] = [
+    ['я сошла с ума', 'ya soshla s uma', 'ya soshla s umu'],
+    ['my favourite game', 'my favorite game'],
+    ['feel good inc', 'feel good inc.'],
+    ['all the things she said'],
+  ];
+  for (const group of aliasGroups) {
+    if (group.some((alias) => base.includes(alias) || alias.includes(base))) {
+      for (const alias of group) variants.add(alias);
+    }
+  }
+  if (/сошл/.test(base) && /ум/.test(base)) {
+    variants.add('ya soshla s uma');
+    variants.add('ya soshla s umu');
+  }
+  if (base.includes('favourite')) variants.add(base.replace('favourite', 'favorite'));
+  if (base.includes('favorite')) variants.add(base.replace('favorite', 'favourite'));
+  return [...variants];
+}
+
+/** Snippet clearly about the song/video/recording even without repeating artist/title. */
+export function hasTrackContextSignal(fact: string): boolean {
+  const trimmed = fact.trim();
+  return (
+    /^(?:The song|The video|The single|It|This track|This single|The single cut|The lyrics|Recording|Mercury|He |They |Upon |During |After |When |While |In an interview)\b/i.test(
+      trimmed,
+    ) ||
+    /\b(?:music video|directed by|controversial nature|five different versions|operatic section|studio session|composed the|wrote the|recorded at|took three weeks|no chorus|gained popularity|viral|tiktok|signed with|influenced by|first single|lead single|hidden meaning|origin story|radio banned|refused to play|censored|banned by)\b/i.test(
+      trimmed,
+    ) ||
+    /\b(?:single cut is significantly shorter|promo track under the name)\b/i.test(trimmed)
+  );
+}
+
+function isMusicProductionCredit(fact: string): boolean {
+  return /\b(?:directed by|music video|produced by|written by|composed by|video was|filmed by)\b/i.test(fact);
+}
+
+function entityOnlyInParentheses(fact: string, entity: string): boolean {
+  const eNorm = normalize(entity);
+  if (eNorm.length < 3) return false;
+  const withoutParens = normalize(fact.replace(/\([^)]*\)/g, ' '));
+  const full = normalize(fact);
+  return full.includes(eNorm) && !withoutParens.includes(eNorm);
 }
 
 /** Другая песня того же артиста в кавычках — не семя для запрошенного трека. */
@@ -582,10 +642,11 @@ export function factAppliesToRequest(
   const mentionsTitle = factMentionsTitle(trimmed, title);
 
   if (scope === 'track') {
-    // Title-only snippets describe the composition (covers, critic quotes) — not this performer.
     if (mentionsTitle && !mentionsArtist) return false;
-    // Unrelated events (awards lists, year-in-review) without artist or title.
-    if (!mentionsArtist && !mentionsTitle) return false;
+    if (!mentionsArtist && !mentionsTitle) {
+      if (hasTrackContextSignal(trimmed)) return true;
+      return false;
+    }
     if (isMisattributedBandTrackFact(trimmed, title)) return false;
   }
 

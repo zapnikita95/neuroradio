@@ -11,6 +11,7 @@ import {
   preserveMusicProperNames,
 } from './tts-foreign-pronounce.js';
 import { stripYandexPauseMarkup } from './tts-azure-ssml.js';
+import { enhanceMixedLanguageText } from './tts-en-normalize.js';
 import { normalizeYearsForRussianTts } from './tts-russian-years.js';
 import type { SileroTtsTextTrace } from './tts-silero-transcript.js';
 import type { TtsPauseProfile } from './tts-voice-profiles.js';
@@ -122,6 +123,8 @@ export function prepareYandexTtsText(
     text = addDashPauses(text, pauseProfile);
     text = addQuotePauses(text, pauseProfile);
   }
+
+  text = enhanceMixedLanguageText(text, artist, title);
 
   return collapseMarkupWhitespace(text);
 }

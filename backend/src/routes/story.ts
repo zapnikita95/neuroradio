@@ -28,6 +28,7 @@ import {
   shouldRunLlmFactHunt,
   explainFactHuntDecision,
 } from '../services/story-llm-fact-hunt.js';
+import { pickSalvageSnippetSeed } from '../services/search-snippet-salvage.js';
 import { hasLlmKeyForProvider, resolveLlmProvider, resolveEffectiveStoryLlmProvider, clientKeyForProvider, type ClientLlmKeys, type ClientLocalOllama } from '../services/llm-provider.js';
 import { generateStoryWithFallback } from '../services/story-llm-router.js';
 import { fetchArtistWikiLead } from '../services/wikipedia-lead.js';
@@ -516,6 +517,19 @@ router.post('/full', validateStoryFullBody, storyFullRateLimit, async (req: Requ
           { fact: hunted.fact, scope: hunted.scope, source: 'llm' },
         ]);
         console.log(formatFactPickLog(selectedFact, 'llm'));
+      } else if (factCtx.rawSnippets.length > 0) {
+        const snippetSeed = pickSalvageSnippetSeed(
+          factCtx.rawSnippets,
+          metadata.artist,
+          metadata.title,
+        );
+        if (snippetSeed) {
+          selectedFact = snippetSeed;
+          ingestFacts(metadata.artist, metadata.title, [
+            { fact: snippetSeed.fact, scope: snippetSeed.scope, source: 'api' },
+          ]);
+          console.log(formatFactPickLog(selectedFact, 'rules') + ' (web-snippet salvage)');
+        }
       }
     } else if (selectedFact) {
       console.log(
@@ -635,6 +649,18 @@ router.post('/full', validateStoryFullBody, storyFullRateLimit, async (req: Requ
           `[facts] wiki salvage seed for "${metadata.artist}" chars=${wikiSalvage.text.length}`,
         );
       } else {
+        const snippetSeed = pickSalvageSnippetSeed(
+          factCtx.rawSnippets,
+          metadata.artist,
+          metadata.title,
+        );
+        if (snippetSeed) {
+          selectedFact = snippetSeed;
+          referenceFacts = [snippetSeed.fact];
+          console.log(
+            `[facts] search-snippet salvage for "${metadata.artist}" — "${metadata.title}"`,
+          );
+        } else {
         recordFactMiss({
           installId,
           artist: metadata.artist,
@@ -643,6 +669,7 @@ router.post('/full', validateStoryFullBody, storyFullRateLimit, async (req: Requ
           artistTier,
         });
         throw new NoReferenceFactsError(metadata.artist, metadata.title);
+        }
       }
     }
 
@@ -828,7 +855,23 @@ router.post('/full', validateStoryFullBody, storyFullRateLimit, async (req: Requ
         !hasRealSeed &&
         (refFacts.length === 0 || refFacts.every(isMetadataOnlyFallbackFact))
       ) {
+        const snippetSeed = pickSalvageSnippetSeed(
+          factCtx.rawSnippets,
+          metadata.artist,
+          metadata.title,
+        );
+        if (snippetSeed) {
+          effectiveStoryInput = {
+            ...effectiveStoryInput,
+            referenceFacts: [snippetSeed.fact],
+            selectedReferenceFact: snippetSeed,
+          };
+          console.log(
+            `[facts] late search-snippet salvage for "${metadata.artist}" — "${metadata.title}"`,
+          );
+        } else {
         throw new NoReferenceFactsError(metadata.artist, metadata.title);
+        }
       }
 
       return generateStoryWithFallback(effectiveStoryInput, llmProvider, {
