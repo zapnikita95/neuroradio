@@ -336,6 +336,7 @@ class StoryOrchestrator(
     /** User skipped to another track — stop fetch immediately (don't wait for dwell timer). */
     fun onPlaybackTrackSkipped() {
         storyRepository.cancelActiveStoryFetch()
+        _pendingFeedback.value = null
         scope.launch {
             cancelInFlightGeneration("track skipped", rollbackAutoTrigger = true)
         }
@@ -345,7 +346,9 @@ class StoryOrchestrator(
         if (!track.isValid()) return
 
         _hintMessage.value = null
-        _pendingFeedback.value = null
+        _pendingFeedback.value?.takeIf { it.trackKey != track.displayKey }?.let {
+            _pendingFeedback.value = null
+        }
         mediaControllerManager.restoreSystemMusicVolumeIfNeeded()
 
         cancelStaleGenerationForNewTrack(track, reason = "track changed")
@@ -673,12 +676,6 @@ class StoryOrchestrator(
                                 if (!isSessionCurrent(session)) return@playStory
                                 lastStoryStartedAtMs = System.currentTimeMillis()
                                 _state.value = OrchestratorState.PLAYING_STORY
-                                _pendingFeedback.value = PendingStoryFeedback(
-                                    artist = response.artist,
-                                    title = response.title,
-                                    script = response.script,
-                                    trackKey = requestedTrack.displayKey,
-                                )
                                 publishUiState()
                             },
                             onFinished = {
@@ -691,7 +688,12 @@ class StoryOrchestrator(
                                     }
                                 }
                                 _errorMessage.value = null
-                                _pendingFeedback.value = null
+                                _pendingFeedback.value = PendingStoryFeedback(
+                                    artist = response.artist,
+                                    title = response.title,
+                                    script = response.script,
+                                    trackKey = requestedTrack.displayKey,
+                                )
                                 _state.value = OrchestratorState.LISTENING
                                 scope.launch { refreshTracksUntilNext() }
                                 publishUiState()
@@ -712,6 +714,7 @@ class StoryOrchestrator(
             },
             onFailure = { error ->
                 if (error is CancellationException) return@fold
+                if (error.message?.contains("cancel", ignoreCase = true) == true) return@fold
                 cancelGenerationPreview()
                 if (!manual) {
                     val everyN = settingsDataStore.everyNTracks.first()

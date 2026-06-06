@@ -558,6 +558,12 @@ class StoryRepository(
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
+            if (e is HttpException && e.code() == 499) {
+                throw CancellationException("story cancelled")
+            }
+            if (e is IOException && e.message?.contains("cancel", ignoreCase = true) == true) {
+                throw CancellationException("story cancelled")
+            }
             if (e is HttpException && e.code() == 429) {
                 val parsed = parseServerRateLimit(e)
                 parsed.quota?.let { _dailyQuota.value = it }
@@ -727,11 +733,14 @@ class StoryRepository(
         is SocketTimeoutException -> "Сервер долго отвечает — подожди и попробуй ещё раз"
         is HttpException -> when (e.code()) {
             429 -> "Лимит сервера Music Story (не Gemini)"
+            499 -> "Отменено"
             503 -> "${llmProvider.labelRu} на сервере недоступен"
             else -> "HTTP ${e.code()}"
         }
         is IOException -> {
-            if (e.message?.contains("timeout", ignoreCase = true) == true) {
+            if (e.message?.contains("cancel", ignoreCase = true) == true) {
+                "Отменено"
+            } else if (e.message?.contains("timeout", ignoreCase = true) == true) {
                 "Сервер долго отвечает — подожди и попробуй ещё раз"
             } else {
                 "Нет связи с сервером — проверь интернет"

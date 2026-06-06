@@ -519,7 +519,10 @@ fun HomeScreen(
                 }
             }
 
-            if (uiState.state == OrchestratorState.PLAYING_STORY) {
+            if (uiState.pendingFeedback != null &&
+                (uiState.state == OrchestratorState.PLAYING_STORY ||
+                    uiState.state == OrchestratorState.LISTENING)
+            ) {
                 uiState.pendingFeedback?.let { feedback ->
                     StoryFeedbackSheet(
                         feedback = feedback,

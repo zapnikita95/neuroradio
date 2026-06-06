@@ -324,6 +324,9 @@ export function buildStoryUserPrompt(params: {
   lines.push('Если меньше минимума слов — продолжи историю конкретикой из того же seed-факта.');
   lines.push(buildLengthStructurePlan(length));
   lines.push('В script — никаких цифр и годов, кроме цифр из имени артиста или названия трека.');
+  lines.push(
+    'Не перечисляй годы альбомов, сериалов и релизов списком — максимум один временной ориентир словами («в те годы», «позже»).',
+  );
 
   const facts = params.referenceFacts?.filter(Boolean) ?? [];
   const selected = params.selectedReferenceFact;

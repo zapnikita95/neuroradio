@@ -15,6 +15,7 @@ import com.musicstory.app.MusicStoryApp
 import com.musicstory.app.R
 import com.musicstory.app.data.model.TrackInfo
 import com.musicstory.app.domain.MonitorNotificationState
+import com.musicstory.app.domain.AppPowerMode
 import com.musicstory.app.receiver.StoryActionReceiver
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -27,6 +28,7 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import kotlin.math.max
 
 class MediaMonitorService : Service() {
 
@@ -108,22 +110,45 @@ class MediaMonitorService : Service() {
     private fun scheduleTrackCounted(app: MusicStoryApp, track: TrackInfo, trackKey: String) {
         listenCountJob?.cancel()
         listenCountJob = serviceScope.launch {
-            val thresholdSec = app.settingsDataStore.trackListenThresholdSeconds.first()
-            if (thresholdSec > 0) {
-                delay(thresholdSec * 1000L)
+            val countListenEnabled = app.settingsDataStore.countTrackAfterListenEnabled.first()
+            val userSec = if (countListenEnabled) {
+                app.settingsDataStore.countTrackAfterListenSeconds.first().coerceIn(0, 300)
+            } else {
+                0
+            }
+            val powerOn = app.settingsDataStore.appPowerMode.first() == AppPowerMode.ON
+            val autoOn = app.settingsDataStore.autoIntercept.first() && powerOn
+            val storyDwellSec = if (autoOn) max(userSec, AUTO_STORY_MIN_DWELL_SEC) else userSec
+
+            suspend fun stillOnTrack(): Boolean {
                 val currentKey = app.mediaControllerManager.resolveNowPlayingTrack()?.displayKey
                     ?: app.mediaControllerManager.effectiveNowPlaying.value?.displayKey
-                if (currentKey != trackKey) return@launch
+                return currentKey == trackKey
             }
-            onTrackCounted(app, track)
+
+            if (userSec > 0) {
+                delay(userSec * 1000L)
+                if (!stillOnTrack()) return@launch
+                scrobbleIfNeeded(app, track)
+            }
+
+            val remaining = (storyDwellSec - userSec).coerceAtLeast(0)
+            if (remaining > 0) {
+                delay(remaining * 1000L)
+                if (!stillOnTrack()) return@launch
+            }
+
+            if (userSec == 0) {
+                scrobbleIfNeeded(app, track)
+            }
+            app.storyOrchestrator.onTrackChanged(track)
         }
     }
 
-    private suspend fun onTrackCounted(app: MusicStoryApp, track: TrackInfo) {
+    private suspend fun scrobbleIfNeeded(app: MusicStoryApp, track: TrackInfo) {
         if (!app.scrobbleRepository.wasRecentlyScrobbled(track)) {
             app.scrobbleRepository.scrobbleTrack(track)
         }
-        app.storyOrchestrator.onTrackChanged(track)
     }
 
     private fun updateNotification(track: TrackInfo?) {
@@ -207,6 +232,8 @@ class MediaMonitorService : Service() {
 
     companion object {
         const val NOTIFICATION_ID = 1001
+        /** Auto-story only after this many seconds on the same track (even if scrobble counts on switch). */
+        const val AUTO_STORY_MIN_DWELL_SEC = 10
 
         @Volatile
         private var instance: MediaMonitorService? = null
