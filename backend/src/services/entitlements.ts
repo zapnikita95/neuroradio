@@ -1,6 +1,7 @@
 import { isUnlimitedInstall } from '../config/security.js';
 import { getEntitlementForInstall, type AccountPlan } from './account-store.js';
-import { getDevTierOverride, isDevTierSwitchEnabled } from './dev-tier-store.js';
+import { getDevTierOverride } from './dev-tier-store.js';
+import { canUseDevTierSwitch } from './admin-users.js';
 
 export type UserTier = 'free' | 'trial' | 'premium' | 'unlimited';
 
@@ -36,7 +37,7 @@ export function isTrialActive(plan: AccountPlan, trialUntil: number): boolean {
 
 export function resolveUserTier(installId: string): UserTier {
   if (isUnlimitedInstall(installId)) return 'unlimited';
-  if (isDevTierSwitchEnabled()) {
+  if (canUseDevTierSwitch(installId)) {
     const devTier = getDevTierOverride(installId);
     if (devTier) return devTier;
   }

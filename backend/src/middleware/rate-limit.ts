@@ -3,7 +3,8 @@ import { isUnlimitedInstall, SECURITY } from '../config/security.js';
 import { getQuotaSubject } from '../services/account-store.js';
 import { resolveUserTier } from '../services/entitlements.js';
 import { resolveFreeDailyLimit } from '../services/free-model-profile.js';
-import { getDevTierOverride, isDevTierSwitchEnabled } from '../services/dev-tier-store.js';
+import { getDevTierOverride } from '../services/dev-tier-store.js';
+import { canUseDevTierSwitch } from '../services/admin-users.js';
 import { getStoryLimitsForTier } from '../services/tier-policy.js';
 import { setLogDetail } from './request-logger.js';
 
@@ -122,9 +123,8 @@ function quotaKey(installId: string): string {
   return `story:day:${getQuotaSubject(installId)}`;
 }
 
-/** Dev testing: premium/trial override — без дневного лимита. */
 function isDevQuotaBypass(installId: string): boolean {
-  if (!isDevTierSwitchEnabled()) return false;
+  if (!canUseDevTierSwitch(installId)) return false;
   const override = getDevTierOverride(installId);
   return override === 'premium' || override === 'trial';
 }

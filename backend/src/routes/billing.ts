@@ -23,9 +23,9 @@ import {
 import { getDailyStoryQuota, resetStoryQuotaForInstall } from '../middleware/rate-limit.js';
 import {
   getDevTierOverride,
-  isDevTierSwitchEnabled,
   setDevTierOverride,
 } from '../services/dev-tier-store.js';
+import { canUseDevTierSwitch } from '../services/admin-users.js';
 import type { UserTier } from '../services/entitlements.js';
 
 const router = Router();
@@ -77,8 +77,8 @@ router.get('/status', (req: Request, res: Response) => {
     premiumTtsProvider: 'sber',
     premiumTtsReady: canUseSaluteSpeechProduction(),
     saluteSpeech: hasSaluteSpeechCredentials() && isSaluteSpeechEnabled(),
-    devTierSwitchEnabled: isDevTierSwitchEnabled(),
-    devTierOverride: isDevTierSwitchEnabled() ? getDevTierOverride(installId) : null,
+    devTierSwitchEnabled: canUseDevTierSwitch(installId),
+    devTierOverride: canUseDevTierSwitch(installId) ? getDevTierOverride(installId) : null,
   });
 });
 
@@ -88,18 +88,17 @@ router.get('/status', (req: Request, res: Response) => {
  * Railway: ALLOW_DEV_TIER_SWITCH=true
  */
 router.post('/dev-tier', (req: Request, res: Response) => {
-  if (!isDevTierSwitchEnabled()) {
-    res.status(403).json({
-      error: 'Dev tier switch disabled',
-      code: 'DEV_TIER_DISABLED',
-      hint: 'Set ALLOW_DEV_TIER_SWITCH=true on Railway',
-    });
-    return;
-  }
-
   const installId = req.installId ?? '';
   if (!installId) {
     res.status(400).json({ error: 'Missing install id' });
+    return;
+  }
+  if (!canUseDevTierSwitch(installId)) {
+    res.status(403).json({
+      error: 'Admin only',
+      code: 'DEV_TIER_FORBIDDEN',
+      hint: 'Переключатель тарифа доступен только администратору.',
+    });
     return;
   }
 

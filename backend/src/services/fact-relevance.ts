@@ -275,6 +275,19 @@ function entityInReferenceFacts(entity: string, referenceFacts: string[]): boole
   return false;
 }
 
+/** Band/album fact without the requested track — must not seed a solo track story. */
+export function isMisattributedBandTrackFact(fact: string, title: string): boolean {
+  const trimmed = fact.trim();
+  if (factMentionsTitle(trimmed, title)) return false;
+  if (/\bthe band\b|\bthe group\b|\bthey (?:chose|recorded|decided|flirted)\b/i.test(trimmed)) {
+    return true;
+  }
+  if (/\bnot written by\b|\bsong not written\b|\brecorded a song not written\b/i.test(trimmed)) {
+    return true;
+  }
+  return false;
+}
+
 /** Story validation: ignore song titles in «quotes» when checking for wrong artists. */
 export function storyNamesForeignArtist(
   script: string,
@@ -290,6 +303,10 @@ export function storyNamesForeignArtist(
 
   // Grounded story already names the artist — only reject clear other *bands* (2+ words), not member surnames.
   if (factMentionsArtist(cleaned, artist)) {
+    const seedBlob = normalize(referenceFacts.join(' '));
+    const bandContextInSeed = /\bthe band\b|\bband members?\b|\bmatchbox\b|\btheir (?:album|debut|song)\b/i.test(
+      seedBlob,
+    );
     for (const entity of extractNamedEntities(cleaned)) {
       if (isContextEntity(entity)) continue;
       if (isCriticAttribution(cleaned, entity)) continue;
@@ -297,6 +314,7 @@ export function storyNamesForeignArtist(
       if (entityAllowedAsCover(entity, coverAllowed)) continue;
       if (entityInReferenceFacts(entity, referenceFacts)) continue;
       const eNorm = normalize(entity);
+      if (bandContextInSeed && eNorm.split(' ').length >= 2) continue;
       if (eNorm.length < 3) continue;
       if (seedTokens.has(eNorm)) continue;
       if (allowed.length >= 8 && normalize(allowed).includes(eNorm)) continue;
@@ -568,6 +586,7 @@ export function factAppliesToRequest(
     if (mentionsTitle && !mentionsArtist) return false;
     // Unrelated events (awards lists, year-in-review) without artist or title.
     if (!mentionsArtist && !mentionsTitle) return false;
+    if (isMisattributedBandTrackFact(trimmed, title)) return false;
   }
 
   if (scope === 'artist') {

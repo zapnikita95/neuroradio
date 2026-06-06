@@ -12,7 +12,7 @@ import { interestRating10 } from './fact-interest-log.js';
 import { WEAK_TRIVIA_PATTERNS } from './story-fact-hunt.js';
 import { isMetadataOnlyFallbackFact } from './metadata-facts.js';
 import { splitBundleByScope, type RankedFactScope } from './fact-ranking.js';
-import { isAlbumScopeFact, factMentionsOtherTrackTitle } from './fact-relevance.js';
+import { isAlbumScopeFact, factMentionsOtherTrackTitle, isMisattributedBandTrackFact } from './fact-relevance.js';
 
 export type FactScope = RankedFactScope;
 
@@ -69,8 +69,9 @@ function factOverlapsPrevious(fact: string, previousScripts: string[]): boolean 
   return false;
 }
 
-function isRejectedSeed(fact: string): boolean {
+function isRejectedSeed(fact: string, title = ''): boolean {
   if (isMetadataOnlyFallbackFact(fact)) return true;
+  if (title && isMisattributedBandTrackFact(fact, title)) return true;
   if (WEAK_TRIVIA_PATTERNS.some((p) => p.test(fact))) return true;
   if (isWeakChartSeed(fact)) return true;
   if (isBoringFact(fact)) return true;
@@ -91,9 +92,10 @@ function pickBestByInterest(
   previousScripts: string[],
   usedFingerprints: Set<string>,
   minScore = MIN_PICK_INTEREST_SCORE,
+  title = '',
 ): string | null {
   for (const fact of sortByInterest(facts)) {
-    if (isRejectedSeed(fact)) continue;
+    if (isRejectedSeed(fact, title)) continue;
     if (interestScore(fact) < minScore) continue;
     if (isUsedFact(fact, usedFingerprints)) continue;
     if (factOverlapsPrevious(fact, previousScripts)) continue;
@@ -138,7 +140,7 @@ export function pickReferenceFact(
   for (const scope of scopeOrder) {
     const pool = pools[scope];
     if (pool.length === 0) continue;
-    const picked = pickBestByInterest(pool, previousScripts, usedFingerprints, MIN_PICK_INTEREST_SCORE);
+    const picked = pickBestByInterest(pool, previousScripts, usedFingerprints, MIN_PICK_INTEREST_SCORE, title);
     if (picked && interestScore(picked) >= MIN_GOOD_SCOPE_INTEREST) {
       return wrapSelected(picked, scope);
     }
@@ -149,6 +151,7 @@ export function pickReferenceFact(
     previousScripts,
     usedFingerprints,
     MIN_PICK_INTEREST_SCORE,
+    title,
   );
   if (globalBest) {
     const scope: FactScope = pools.track.includes(globalBest)
@@ -162,6 +165,7 @@ export function pickReferenceFact(
   const anyPool = [...pools.track, ...pools.album, ...pools.artist];
   for (const fact of sortByInterest(anyPool)) {
     if (isMetadataOnlyFallbackFact(fact)) continue;
+    if (isMisattributedBandTrackFact(fact, title)) continue;
     if (isBoringFact(fact)) continue;
     if (isUsedFact(fact, usedFingerprints)) continue;
     if (!factOverlapsPrevious(fact, previousScripts)) {
