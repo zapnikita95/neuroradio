@@ -165,7 +165,8 @@ APK → JWT → POST /v1/story/full only
    (корневой `railway.toml` задаёт BFF Dockerfile — поле Dockerfile в UI **не кликается**, это нормально)
 3. У сервиса **silero** убери лишние Variables (GROQ, YANDEX, LLM) — они только на BFF
 4. **Generate Domain** на silero → скопируй URL
-5. Проверка: `curl https://ТВОЙ-SILERO.up.railway.app/voices` → `aidar`, `baya`, `kseniya`, …
+5. **Networking → Public → Port: `9898`** (образ Silero не слушает 8080 — healthcheck упадёт)
+6. Проверка: `curl https://ТВОЙ-SILERO.up.railway.app/voices` → `aidar`, `baya`, …
 
 **Связать BFF и Silero (Variables на music-story):**
 ```
@@ -223,7 +224,7 @@ curl -s https://ТВОЙ-BFF.up.railway.app/v1/public/tts-config
 | `RESEND_FROM` | `Эфир AI <hello@efir-ai.ru>` |
 | `RECEIPT_ADMIN_EMAIL` | `zap.nikita95@gmail.com` — запрос чека после оплаты |
 | `BILLING_ADMIN_SECRET` | Секрет для `POST /v1/billing/admin/receipt` |
-| `PUBLIC_BFF_URL` | `https://neuroradio-production-3966.up.railway.app` |
+| `PUBLIC_BFF_URL` | `https://www.efir-ai.ru` (BFF/music-story, **не** silero!) |
 | `DATABASE_URL` | `${{Postgres.DATABASE_URL}}` — **обязательно**, иначе premium сбросится при редеплое |
 
 **Webhook в ЮKassa:** `https://ТВОЙ-BFF.up.railway.app/v1/public/yookassa/webhook`  

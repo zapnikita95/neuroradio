@@ -11,8 +11,11 @@ import type { SileroVoiceId } from './silero-voices.js';
 export type { SileroVoiceId } from './silero-voices.js';
 
 export function getSileroTtsBaseUrl(): string | null {
-  const raw = process.env.SILERO_TTS_URL?.trim();
+  let raw = process.env.SILERO_TTS_URL?.trim();
   if (!raw) return null;
+  if (!/^https?:\/\//i.test(raw)) {
+    raw = `https://${raw}`;
+  }
   return raw.replace(/\/$/, '');
 }
 

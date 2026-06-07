@@ -1,12 +1,12 @@
-# Silero TTS — ОТДЕЛЬНЫЙ сервис Railway (не neuroradio BFF).
+# Silero TTS — ОТДЕЛЬНЫЙ сервис Railway.
 #
-# В сервисе silero → Settings → Config-as-code → File path: silero-railway.toml
-# (корневой railway.toml остаётся для BFF — иначе оба сервиса соберут один Dockerfile)
+# silero → Settings → Config-as-code → silero-railway.toml
+# silero → Settings → Networking → Public → Port: 9898  ← ОБЯЗАТЕЛЬНО (не 8080)
 #
-# SILERO_TTS_URL — ТОЛЬКО на сервисе music-story (BFF), НЕ на silero!
+# music-story Variables (НЕ на silero!):
 #   SILERO_TTS_URL=https://${{silero.RAILWAY_PUBLIC_DOMAIN}}
-# Значение = публичный URL silero (напр. neuroradio-production-3966.up.railway.app).
-# BFF (www.efir-ai.ru) сам ходит на silero при озвучке free tier.
+#   PUBLIC_BFF_URL=https://www.efir-ai.ru
+#   BILLING_ADMIN_SECRET=<секрет>
 
 [build]
 builder = "DOCKERFILE"
@@ -14,6 +14,6 @@ dockerfilePath = "Dockerfile.silero"
 
 [deploy]
 healthcheckPath = "/voices"
-healthcheckTimeout = 300
+healthcheckTimeout = 600
 restartPolicyType = "ON_FAILURE"
 restartPolicyMaxRetries = 10

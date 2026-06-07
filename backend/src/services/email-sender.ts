@@ -134,7 +134,7 @@ export async function sendReceiptRequestEmail(options: {
   const baseUrl =
     process.env.PUBLIC_BFF_URL?.trim() ||
     process.env.TELEGRAM_WIDGET_BASE_URL?.trim() ||
-    'https://neuroradio-production-3966.up.railway.app';
+    'https://www.efir-ai.ru';
   const secretHint = process.env.BILLING_ADMIN_SECRET?.trim()
     ? 'Заголовок x-billing-admin-secret из Railway Variables.'
     : 'Задайте BILLING_ADMIN_SECRET на сервере.';

@@ -1,3 +1,5 @@
 # Silero TTS sidecar for Railway (navatusein/silero-tts-service).
-# PORT задаёт Railway (обычно 8080) — не хардкодить.
+# Образ ВСЕГДА слушает порт 9898 (не читает $PORT).
+# Railway → silero → Settings → Networking → Public → Port: 9898 (не 8080!)
 FROM navatusein/silero-tts-service:latest
+EXPOSE 9898
