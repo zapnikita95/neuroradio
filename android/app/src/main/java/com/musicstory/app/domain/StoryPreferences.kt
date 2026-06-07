@@ -63,12 +63,12 @@ enum class TtsPlaybackEngine(val id: String, val labelRu: String, val descriptio
     YANDEX_SERVER(
         id = "yandex",
         labelRu = "Yandex SpeechKit (сервер)",
-        descriptionRu = "Озвучка на Railway — основной режим",
+        descriptionRu = "Озвучка на сервере приложения — основной режим",
     ),
     ANDROID_DEVICE(
         id = "android",
         labelRu = "Android TTS (тест)",
-        descriptionRu = "Голос телефона. Нужен Google TTS + русский; Poco/Huawei часто не подходят",
+        descriptionRu = "Системный голос телефона — экспериментальный режим",
     ),
     ;
 
@@ -85,7 +85,7 @@ enum class UserTtsBilling(val id: String, val labelRu: String, val descriptionRu
     SERVER(
         id = "server",
         labelRu = "Сервер приложения",
-        descriptionRu = "Yandex SpeechKit на Railway — как у всех",
+        descriptionRu = "Yandex SpeechKit на сервере приложения",
     ),
     YANDEX(
         id = "yandex",

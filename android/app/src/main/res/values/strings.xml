@@ -24,7 +24,7 @@
 
     <string name="onboarding_title">Доступ к уведомлениям</string>
     <string name="onboarding_description">Эфир AI читает метаданные треков из Spotify и Яндекс Музыки через специальный доступ к уведомлениям. Без него приложение не видит, что сейчас играет.</string>
-    <string name="onboarding_steps">1. Нажми «Открыть настройки» ниже.\n2. Найди в списке «Эфир AI — мониторинг медиа».\n3. Включи переключатель.\n4. Вернись сюда и нажми «Проверить и войти».\n\nЕсли список не открылся: Настройки → Приложения → Особые права → Доступ к уведомлениям (на Huawei: Настройки → Уведомления → Управление доступом).</string>
+    <string name="onboarding_steps">1. Нажми «Открыть настройки» ниже.\n2. Найди в списке «Эфир AI — мониторинг медиа».\n3. Включи переключатель.\n4. Вернись сюда и нажми «Проверить и войти».\n\nЕсли список не открылся: Настройки → Приложения → Особые права → Доступ к уведомлениям.</string>
     <string name="onboarding_open_settings">Открыть настройки доступа</string>
     <string name="onboarding_check_access">Проверить и войти</string>
     <string name="onboarding_not_granted_yet">Сначала включи «Эфир AI — мониторинг медиа» в настройках доступа к уведомлениям.</string>
@@ -173,7 +173,7 @@
     <string name="settings_gemini_get_key">Получить Gemini-ключ</string>
     <string name="settings_tts_voice">Голос</string>
     <string name="settings_tts_playback_engine">Озвучка</string>
-    <string name="settings_tts_playback_engine_hint">Android TTS — только телефоны с Google Speech Services и русским языком. Poco/Huawei обычно не подходят. Для теста озвучки лучше Silero на ПК + локальный BFF.</string>
+    <string name="settings_tts_playback_engine_hint">Системный голос телефона — экспериментальный режим. Для стабильной озвучки используйте Yandex SpeechKit (сервер).</string>
     <string name="settings_story_length">Длина истории</string>
     <string name="settings_tts_speed">Скорость речи</string>
     <string name="settings_tts_emotion">Интонация</string>
@@ -198,7 +198,7 @@
     <string name="settings_free_quota">Сегодня: %1$d из %2$d</string>
     <string name="settings_trial_quota">Пробный: %1$d из %2$d в месяце · сегодня %3$d из %4$d</string>
     <string name="settings_dev_tier_section">Тест тарифа (сервер)</string>
-    <string name="settings_dev_tier_hint">Без своих API-ключей запросы идут на Railway. На Railway: ALLOW_DEV_TIER_SWITCH=true</string>
+    <string name="settings_dev_tier_hint">Только для отладки: переключение тарифа на сервере разработки.</string>
     <string name="settings_dev_tier_current">Сейчас: %1$s</string>
     <string name="settings_dev_tier_free">Бесплатно</string>
     <string name="settings_dev_tier_trial">Trial</string>
@@ -207,7 +207,7 @@
     <string name="settings_unlimited_groq">Без дневного лимита</string>
     <string name="settings_groq_status_ok">Ключ сохранён</string>
     <string name="settings_groq_status_missing">Без своего ключа — до 10 историй в день на сервере</string>
-    <string name="settings_own_api_key_hint">Ключ передаётся на Railway по HTTPS, используется только для запроса и не сохраняется на сервере. Из РФ Groq и Gemini напрямую недоступны — только через сервер.</string>
+    <string name="settings_own_api_key_hint">Ключ передаётся на сервер по HTTPS, используется только для запроса и не сохраняется. Из РФ Groq и Gemini с телефона часто недоступны — используйте сервер приложения.</string>
     <string name="story_source_ai">AI</string>
 
     <string name="trigger_every_n">Каждые N треков</string>
@@ -271,7 +271,7 @@
     <string name="billing_email_required">Укажите email для активации подписки</string>
     <string name="billing_no_backend">Укажите адрес сервера в настройках</string>
     <string name="billing_payment_failed">Не удалось создать платёж</string>
-    <string name="billing_fine">Оплата через ЮKassa. Доступ сохраняется до конца оплаченного периода.</string>
+    <string name="billing_fine">Оплата через ЮKassa на защищённой странице. Автопродление не подключается — каждый период оплачивается отдельно. Доступ сохраняется до конца оплаченного срока.</string>
     <string name="feedback_title">Как история?</string>
     <string name="feedback_like">👍</string>
     <string name="feedback_dislike">👎</string>

@@ -20,7 +20,7 @@ object GeminiErrorParser {
         if (lower.contains("user location is not supported") ||
             lower.contains("location is not supported")
         ) {
-            return "Gemini недоступен из вашего региона. Попробуйте Groq или генерацию через сервер Railway."
+            return "Gemini недоступен из вашего региона. Попробуйте Groq или генерацию через сервер приложения."
         }
 
         if (httpCode == 404 || lower.contains("not found")) {

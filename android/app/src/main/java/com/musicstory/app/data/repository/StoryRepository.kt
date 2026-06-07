@@ -358,7 +358,7 @@ class StoryRepository(
         if (llmProvider == LlmProvider.OPENROUTER && openRouterKey.isEmpty() && !useBackend) {
             return Result.failure(
                 IOException(
-                    "Выбран OpenRouter, но ключ не сохранён. Добавь OPEN_ROUTER_API_KEY на Railway или свой ключ в настройках.",
+                    "Выбран OpenRouter, но ключ не сохранён. Укажи свой ключ в настройках или обратись в поддержку.",
                 ),
             )
         }
@@ -409,7 +409,7 @@ class StoryRepository(
         if (!useBackend) {
             return Result.failure(
                 IOException(
-                    "Нужен Railway BFF — из РФ нейросети работают только через сервер. Укажи URL в настройках.",
+                    "Нужен сервер приложения — из РФ нейросети работают только через него. Укажи адрес в настройках.",
                 ),
             )
         }
@@ -583,7 +583,7 @@ class StoryRepository(
                         UserTtsBilling.SBER ->
                             "Не удалось озвучить через SaluteSpeech. Проверь Authorization Key и лимит на developers.sber.ru."
                         UserTtsBilling.SERVER ->
-                            "Сервер не отдал озвучку. Проверь YANDEX_API_KEY на Railway или укажи свой ключ в настройках."
+                            "Сервер не отдал озвучку. Попробуй ещё раз или укажи свой ключ Yandex SpeechKit в настройках."
                     }
                     StoryAttemptResult.Failed(ttsHint)
                 }
@@ -709,7 +709,7 @@ class StoryRepository(
             return backendError
         }
         if (llmKeyPresent) {
-            return "$providerLabel не ответил через Railway. Проверь ключ в настройках."
+            return "$providerLabel не ответил через сервер. Проверь ключ в настройках."
         }
         if (backendConfigured && !backendError.isNullOrBlank()) {
             return backendError
@@ -717,7 +717,7 @@ class StoryRepository(
         return if (backendConfigured) {
             "Сервер недоступен. Проверь интернет или добавь $providerLabel-ключ в настройках."
         } else {
-            "Укажи URL Railway в настройках."
+            "Укажи адрес сервера в настройках."
         }
     }
 

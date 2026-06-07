@@ -15,7 +15,7 @@ object GroqApiErrorParser {
         }
 
         if (httpCode == 403 || lower.contains("forbidden")) {
-            return "Groq отклонил запрос. Из РФ Groq с телефона часто недоступен — попробуйте Gemini или сервер Railway."
+            return "Groq отклонил запрос. Из РФ Groq с телефона часто недоступен — попробуйте Gemini или сервер приложения."
         }
 
         if (httpCode == 429 || errorCode == "rate_limit_exceeded" || lower.contains("rate limit")) {

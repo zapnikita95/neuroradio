@@ -20,7 +20,7 @@
 
   var FACT_REGISTRY = 'Thriller — единственный музыкальный клип в National Film Registry США: его сохраняют как культурное наследие наравне с художественным кино.';
   var FACT_BUDGET = 'Michael Jackson вложил в съёмки Thriller полмиллиона долларов из своего кармана — продюсеры крутили пальцем у виска, а после премьеры продажи альбома подскочили в семь раз.';
-  var BACKSTAGE_STORY_MINUTE = FACT_BUDGET + ' Vincent Price записал закадровый монолог за один день — режиссёр John Landis привёз в проект кинематографический масштаб. Хореограф Michael Peters добивался сцены с зомби-танцами: её изначально вырезали из сценария, а потом она стала визитной карточкой клипа. На съёмках Jackson настаивал на деталях, которые продюсеры считали лишними — и именно они потом взорвали MTV. Об этом редко говорят вслух.';
+  var BACKSTAGE_STORY_SHORT = 'Только между нами. ' + FACT_BUDGET + ' Vincent Price уложил закадровый монолог в один день — без его голоса клип был бы совсем другим. Об этом редко говорят вслух.';
 
   var STUDIO_VOICES = {
     radio_host: ['zahar', 'ermil', 'alexander'],
@@ -89,7 +89,7 @@
       quote: '«Только между нами…»',
       pal: ['#8f1d3a', '#2a1145'], skin: ['#f0c9d4', '#c87a96'], eye: '#2a0e1c', accent: '#ff6b8a',
       voice: 'omazh', rate: 0.96, pitch: 0.98,
-      script: 'Только между нами. ' + BACKSTAGE_STORY_MINUTE,
+      script: BACKSTAGE_STORY_SHORT,
       audio: 'assets/demos/persona-backstage.wav'
     }
   ];
@@ -253,8 +253,6 @@ acc +
     tryNext();
   }
 
-  var DEMO_LEAD_SKIP_SEC = 0.32;
-
   function playDemo(src, rate, btn, statusEl) {
     if (!src) {
       if (statusEl) statusEl.textContent = 'Демо-аудио скоро будет доступно.';
@@ -266,9 +264,7 @@ acc +
     demoAudio.muted = false;
     demoAudio.src = src;
     demoAudio.playbackRate = rate || 1;
-    demoAudio.onplaying = function () {
-      if (demoAudio.currentTime < 0.05) demoAudio.currentTime = DEMO_LEAD_SKIP_SEC;
-    };
+    demoAudio.onplaying = null;
     currentBtn = btn || null;
     if (btn) btn.classList.add('playing');
     if (statusEl) statusEl.textContent = '● В эфире…';
