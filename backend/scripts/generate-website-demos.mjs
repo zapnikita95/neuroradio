@@ -30,6 +30,16 @@ const FACTS = [
 
 const FOCUS_ALL = ' Чистый поп-инжиниринг эпохи MTV.';
 
+/** ~1 мин — как в приложении для contemporary / Thriller. */
+const THRILLER_STORY_MINUTE =
+  'Michael Jackson записал Thriller в эпоху, когда музыкальные клипы только начинали менять правила игры. Это был не просто трек — целый кинематографический опыт, растянутый на четырнадцать минут. В те годы MTV крутил в основном рок, но клип Thriller взломал систему: его ставили в эфир целиком, прерывая регулярное вещание — случай беспрецедентный. Джексон понимал, что будущее за визуальными историями, и вложил в съёмки полмиллиона долларов из своего кармана. Бюджет казался безумием, но окупился сполна: продажи альбома подскочили в семь раз после премьеры видео. Клип снял John Landis, режиссёр «Американского оборотня в Лондоне» — столкновение двух вселенных. Сцена с зомби-танцами изначально не входила в сценарий: хореограф Michael Peters убеждал Landis, что это не испортит хоррор-эстетику. В итоге танец стал визитной карточкой ролика.';
+
+/** ~2+ мин — полный контекст. */
+const THRILLER_STORY_FULL =
+  THRILLER_STORY_MINUTE +
+  ' Thriller — единственный музыкальный клип в National Film Registry США: его сохраняют как культурное наследие наравне с художественным кино. Vincent Price записал зловещий закадровый текст, а съёмки танца с зомби длились неделями. Танцующие зомби, превращение в оборотня, культовая moon walk походка — всё это стало новой религией поп-культуры. Когда Thriller вышел, видеомагнитофоны в магазинах разлетались как горячие пирожки — люди пересматривали его снова и снова. Так родился первый вирусный хит до эпохи интернета.' +
+  FOCUS_ALL;
+
 const PERSONAS = [
   {
     id: 'radio_host',
@@ -76,12 +86,32 @@ const VOICES = [
 
 const TEST_IDS = ['radio_host', 'night_dj', 'expert'];
 
-/** Образцы длинных версий — не полная сетка, только для прослушивания на сайте. */
+/** Образцы длинных версий — полноценные тексты, не урезанные факты. */
 const STUDIO_LONG_SAMPLES = [
-  { persona: 'radio_host', voice: 'zahar', factCount: 2, suffix: '-len2' },
-  { persona: 'expert', voice: 'ermil', factCount: 2, suffix: '-len2' },
-  { persona: 'night_dj', voice: 'filipp', factCount: 4, suffix: '-len4', focus: FOCUS_ALL },
-  { persona: 'fan', voice: 'jane', factCount: 4, suffix: '-len4', focus: FOCUS_ALL },
+  {
+    persona: 'radio_host',
+    voice: 'zahar',
+    suffix: '-len2',
+    script: 'А вот это — личное. ' + THRILLER_STORY_MINUTE + ' Именно этот клип взорвал MTV!',
+  },
+  {
+    persona: 'expert',
+    voice: 'ermil',
+    suffix: '-len2',
+    script: 'Разберём, почему это работает. ' + THRILLER_STORY_MINUTE + ' Это эталон поп-хоррора восьмидесятых.',
+  },
+  {
+    persona: 'night_dj',
+    voice: 'filipp',
+    suffix: '-len4',
+    script: 'Тихо. Только вы и эта песня. ' + THRILLER_STORY_FULL + ' Оставайтесь на нашей волне до утра.',
+  },
+  {
+    persona: 'fan',
+    voice: 'jane',
+    suffix: '-len4',
+    script: 'Обожаю этот момент! ' + THRILLER_STORY_FULL + ' И да — я знаю каждую секунду этого клипа наизусть!',
+  },
 ];
 
 function studioScript(persona, factCount = 1, focus = '') {
@@ -136,8 +166,7 @@ async function writePreview() {
       };
     }),
     studioSamples: STUDIO_LONG_SAMPLES.map((s) => {
-      const p = PERSONAS.find((x) => x.id === s.persona);
-      const raw = studioScript(p, s.factCount, s.focus ?? '');
+      const raw = s.script;
       const marked = prepareYandexTtsText(raw, {
         artist: 'Michael Jackson',
         title: 'Thriller',
@@ -147,7 +176,6 @@ async function writePreview() {
       return {
         persona: s.persona,
         voice: s.voice,
-        factCount: s.factCount,
         raw,
         marked,
         speakable: stripYandexMarkup(marked),
@@ -180,8 +208,8 @@ async function synthPersona(p, synthesizeSpeech) {
 }
 
 async function synthStudio(persona, voice, synthesizeSpeech, options = {}) {
-  const { factCount = 1, suffix = '', focus = '', speed } = options;
-  const raw = studioScript(persona, factCount, focus);
+  const { factCount = 1, suffix = '', focus = '', speed, script: scriptOverride } = options;
+  const raw = scriptOverride ?? studioScript(persona, factCount, focus);
   const tmp = `_tmp-studio-${persona.id}-${voice}${suffix}`;
   const result = await synthesizeSpeech(raw, voice, tmp, {
     speed: speed ?? (voice === persona.voice ? persona.speed : 1.08),
@@ -237,9 +265,8 @@ async function main() {
     for (const s of STUDIO_LONG_SAMPLES) {
       const p = PERSONAS.find((x) => x.id === s.persona);
       await synthStudio(p, s.voice, synthesizeSpeech, {
-        factCount: s.factCount,
         suffix: s.suffix,
-        focus: s.focus ?? '',
+        script: s.script,
       });
     }
   }

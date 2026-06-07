@@ -100,7 +100,7 @@ function collapseMarkupWhitespace(text: string): string {
 
 /**
  * Prepare story script for Yandex SpeechKit TTS:
- * sanitize → polish → stress → pauses → Cyrillic transliteration (no <lang> pauses).
+ * sanitize → polish → stress → pauses → Latin kept for SSML <lang en-US>.
  */
 export function prepareYandexTtsText(
   script: string,
@@ -128,7 +128,6 @@ export function prepareYandexTtsText(
   }
 
   text = enhanceMixedLanguageText(text, artist, title);
-  text = applyForeignPronunciation(text, artist, title);
 
   return collapseMarkupWhitespace(text);
 }

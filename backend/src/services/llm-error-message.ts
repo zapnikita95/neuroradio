@@ -152,7 +152,11 @@ export function classifyStoryLlmError(
   }
 
   if (/yandex tts|speechkit|tts\.api\.cloud\.yandex/i.test(lower)) {
-    if (/speed|tempo|rate/i.test(lower)) {
+    if (
+      /speed|tempo|rate/i.test(lower) &&
+      (/error 400|invalid|unsupported|bad request/i.test(lower) ||
+        /yandex tts error 400/i.test(lower))
+    ) {
       return {
         code: 'YANDEX_TTS_SPEED',
         message:

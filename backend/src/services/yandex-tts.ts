@@ -100,6 +100,11 @@ function isRetryableTtsParamError(status: number, body: string): boolean {
   );
 }
 
+function clampYandexSpeed(speed: number): number {
+  if (!Number.isFinite(speed)) return DEFAULT_TTS_SPEED;
+  return Math.min(3, Math.max(0.1, Math.round(speed * 100) / 100));
+}
+
 function buildTtsParams(
   markedText: string,
   voiceId: YandexVoiceId,
@@ -113,7 +118,7 @@ function buildTtsParams(
     voice: voiceId,
     format: audioFormat === 'lpcm-wav' ? 'lpcm' : 'oggopus',
     folderId,
-    speed: String(options.speed),
+    speed: String(clampYandexSpeed(options.speed)),
   });
   if (audioFormat === 'lpcm-wav') {
     params.set('sampleRateHertz', String(YANDEX_LPCM_SAMPLE_RATE));
@@ -139,9 +144,13 @@ function buildTtsParams(
 const TTS_FALLBACK_CHAIN: YandexVoiceId[] = ['zahar', 'alena', 'filipp', 'marina'];
 
 async function requestTts(apiKey: string, params: URLSearchParams) {
-  return fetch(`${TTS_URL}?${params.toString()}`, {
+  return fetch(TTS_URL, {
     method: 'POST',
-    headers: { Authorization: `Api-Key ${apiKey}` },
+    headers: {
+      Authorization: `Api-Key ${apiKey}`,
+      'Content-Type': 'application/x-www-form-urlencoded',
+    },
+    body: params.toString(),
     signal: AbortSignal.timeout(45000),
   });
 }

@@ -384,8 +384,21 @@ acc +
       });
     });
 
+    var THRILLER_STORY_MINUTE = 'Michael Jackson записал Thriller в эпоху, когда музыкальные клипы только начинали менять правила игры. Это был не просто трек — целый кинематографический опыт, растянутый на четырнадцать минут. В те годы MTV крутил в основном рок, но клип Thriller взломал систему: его ставили в эфир целиком, прерывая регулярное вещание. Джексон вложил в съёмки полмиллиона долларов — продажи альбома подскочили в семь раз после премьеры. Клип снял John Landis. Сцена с зомби-танцами изначально не входила в сценарий — и стала визитной карточкой ролика.';
+    var THRILLER_STORY_FULL = THRILLER_STORY_MINUTE + ' Thriller — единственный музыкальный клип в National Film Registry США. Vincent Price записал зловещий закадровый текст. Когда Thriller вышел, видеомагнитофоны разлетались — так родился первый вирусный хит до интернета.';
+
     function buildStory() {
       var p = state.persona, n = LENS[+length.value].n;
+      if (n >= 4) {
+        var op4 = p.script.split('.')[0] + '.';
+        var cl4 = p.script.split('. ').slice(-1)[0];
+        return op4 + ' ' + THRILLER_STORY_FULL + (cl4 ? ' ' + cl4 : '');
+      }
+      if (n >= 2) {
+        var op2 = p.script.split('.')[0] + '.';
+        var cl2 = p.script.split('. ').slice(-1)[0];
+        return op2 + ' ' + THRILLER_STORY_MINUTE + (cl2 ? ' ' + cl2 : '');
+      }
       var op = p.script.split('.')[0] + '.';
       var body = FACTS.slice(0, n).map(function (f) { return f + '.'; }).join(' ');
       var tail = FOCUS[state.focus] || '';
