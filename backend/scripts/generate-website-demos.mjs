@@ -1,285 +1,279 @@
-/**
- * Offline Yandex TTS demos for efir-ai.ru — nothing is synthesized in the browser.
- *
- *   node scripts/generate-website-demos.mjs --preview       # texts only → preview-texts.json
- *   node scripts/generate-website-demos.mjs --test          # 3 persona WAVs (smoke test)
- *   node scripts/generate-website-demos.mjs --personas      # 6 persona WAVs
- *   node scripts/generate-website-demos.mjs --studio        # 6×13 studio WAVs (~30 с)
- *   node scripts/generate-website-demos.mjs --studio-long   # 4 длинных образца (1 мин + без лимита)
- *   node scripts/generate-website-demos.mjs --all             # personas + studio + long samples
- *
- * Requires YANDEX_API_KEY + YANDEX_FOLDER_ID in backend/.env (не коммить ключи в .env.example).
- */
-import fs from 'node:fs';
-import path from 'node:path';
-import { fileURLToPath } from 'node:url';
-import '../dist/load-env.js';
-
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const OUT_DIR = path.resolve(__dirname, '../../website/assets/demos');
-
-const THRILLER_CORE =
-  'Thriller — единственный музыкальный клип в National Film Registry США: его сохраняют как культурное наследие наравне с художественным кино. Vincent Price записал зловещий закадровый текст, а съёмки танца с зомби длились неделями.';
-
-const FACTS = [
-  'National Film Registry включил этот клип в список культурного наследия США',
-  'Vincent Price записал зловещий закадровый монолог',
-  'съёмки танца с зомби заняли недели',
-  'именно этот ролик сделал короткометражку главным событием эры MTV',
-];
-
-const FOCUS_ALL = ' Чистый поп-инжиниринг эпохи MTV.';
-
-/** ~1 мин — как в приложении для contemporary / Thriller. */
-const THRILLER_STORY_MINUTE =
-  'Michael Jackson записал Thriller в эпоху, когда музыкальные клипы только начинали менять правила игры. Это был не просто трек — целый кинематографический опыт, растянутый на четырнадцать минут. В те годы MTV крутил в основном рок, но клип Thriller взломал систему: его ставили в эфир целиком, прерывая регулярное вещание — случай беспрецедентный. Джексон понимал, что будущее за визуальными историями, и вложил в съёмки полмиллиона долларов из своего кармана. Бюджет казался безумием, но окупился сполна: продажи альбома подскочили в семь раз после премьеры видео. Клип снял John Landis, режиссёр «Американского оборотня в Лондоне» — столкновение двух вселенных. Сцена с зомби-танцами изначально не входила в сценарий: хореограф Michael Peters убеждал Landis, что это не испортит хоррор-эстетику. В итоге танец стал визитной карточкой ролика.';
-
-/** ~2+ мин — полный контекст. */
-const THRILLER_STORY_FULL =
-  THRILLER_STORY_MINUTE +
-  ' Thriller — единственный музыкальный клип в National Film Registry США: его сохраняют как культурное наследие наравне с художественным кино. Vincent Price записал зловещий закадровый текст, а съёмки танца с зомби длились неделями. Танцующие зомби, превращение в оборотня, культовая moon walk походка — всё это стало новой религией поп-культуры. Когда Thriller вышел, видеомагнитофоны в магазинах разлетались как горячие пирожки — люди пересматривали его снова и снова. Так родился первый вирусный хит до эпохи интернета.' +
-  FOCUS_ALL;
-
-const PERSONAS = [
-  {
-    id: 'radio_host',
-    voice: 'zahar',
-    speed: 1.08,
-    script: 'А вот это — личное. ' + THRILLER_CORE + ' Именно этот клип взорвал MTV!',
-  },
-  {
-    id: 'night_dj',
-    voice: 'filipp',
-    speed: 0.92,
-    script: 'Тихо. Только вы и эта песня. ' + THRILLER_CORE + ' Оставайтесь на нашей волне до утра.',
-  },
-  {
-    id: 'expert',
-    voice: 'ermil',
-    speed: 1.0,
-    script: 'Разберём, почему это работает. ' + THRILLER_CORE + ' Это эталон поп-хоррора восьмидесятых.',
-  },
-  {
-    id: 'contemporary',
-    voice: 'alena',
-    speed: 0.98,
-    script: 'Я помню это время. ' + THRILLER_CORE,
-  },
-  {
-    id: 'fan',
-    voice: 'jane',
-    speed: 1.12,
-    script: 'Обожаю этот момент! ' + THRILLER_CORE + ' И да — я знаю каждую секунду этого клипа наизусть!',
-  },
-  {
-    id: 'backstage',
-    voice: 'omazh',
-    speed: 0.96,
-    script: 'Только между нами. ' + THRILLER_CORE + ' Об этом редко рассказывают вслух.',
-  },
-];
-
-const VOICES = [
-  'zahar', 'ermil', 'filipp', 'alexander', 'kirill',
-  'alena', 'jane', 'omazh', 'marina', 'dasha', 'julia', 'masha', 'lera',
-];
-
-const TEST_IDS = ['radio_host', 'night_dj', 'expert'];
-
-/** Образцы длинных версий — полноценные тексты, не урезанные факты. */
-const STUDIO_LONG_SAMPLES = [
-  {
-    persona: 'radio_host',
-    voice: 'zahar',
-    suffix: '-len2',
-    script: 'А вот это — личное. ' + THRILLER_STORY_MINUTE + ' Именно этот клип взорвал MTV!',
-  },
-  {
-    persona: 'expert',
-    voice: 'ermil',
-    suffix: '-len2',
-    script: 'Разберём, почему это работает. ' + THRILLER_STORY_MINUTE + ' Это эталон поп-хоррора восьмидесятых.',
-  },
-  {
-    persona: 'night_dj',
-    voice: 'filipp',
-    suffix: '-len4',
-    script: 'Тихо. Только вы и эта песня. ' + THRILLER_STORY_FULL + ' Оставайтесь на нашей волне до утра.',
-  },
-  {
-    persona: 'fan',
-    voice: 'jane',
-    suffix: '-len4',
-    script: 'Обожаю этот момент! ' + THRILLER_STORY_FULL + ' И да — я знаю каждую секунду этого клипа наизусть!',
-  },
-];
-
-function studioScript(persona, factCount = 1, focus = '') {
-  const opener = persona.script.split('.')[0] + '.';
-  const body = FACTS.slice(0, factCount).map((f) => f + '.').join(' ');
-  const parts = persona.script.split('. ');
-  const closer = factCount > 1 && parts.length ? ' ' + parts[parts.length - 1] : '';
-  return opener + ' ' + body + focus + closer;
-}
-
-function studioFileName(personaId, voiceId, suffix = '') {
-  return `studio-${personaId}-${voiceId}${suffix}.wav`;
-}
-
-async function loadTts() {
-  const { prepareYandexTtsText } = await import('../dist/services/tts-markup.js');
-  const { stripYandexMarkup } = await import('../dist/services/tts-azure-ssml.js');
-  const { synthesizeSpeech } = await import('../dist/services/yandex-tts.js');
-  return { prepareYandexTtsText, stripYandexMarkup, synthesizeSpeech };
-}
-
-function ensureKeys() {
-  if (!process.env.YANDEX_API_KEY?.trim() || !process.env.YANDEX_FOLDER_ID?.trim()) {
-    throw new Error(
-      'YANDEX_API_KEY и YANDEX_FOLDER_ID не найдены. Раскомментируйте в backend/.env или создайте backend/.env',
-    );
-  }
-}
-
-async function writePreview() {
-  const { prepareYandexTtsText, stripYandexMarkup } = await loadTts();
-  fs.mkdirSync(OUT_DIR, { recursive: true });
-
-  const out = {
-    generatedAt: new Date().toISOString(),
-    note: 'Проверьте тексты перед --all. Озвучка только из статических WAV, не с сайта.',
-    personas: PERSONAS.map((p) => {
-      const marked = prepareYandexTtsText(p.script, {
-        artist: 'Michael Jackson',
-        title: 'Thriller',
-        sentencePauses: true,
-        pauseProfile: 'tight',
-      });
-      return {
-        id: p.id,
-        voice: p.voice,
-        speed: p.speed,
-        raw: p.script,
-        marked,
-        speakable: stripYandexMarkup(marked),
-        file: `persona-${p.id}.wav`,
-      };
-    }),
-    studioSamples: STUDIO_LONG_SAMPLES.map((s) => {
-      const raw = s.script;
-      const marked = prepareYandexTtsText(raw, {
-        artist: 'Michael Jackson',
-        title: 'Thriller',
-        sentencePauses: true,
-        pauseProfile: 'tight',
-      });
-      return {
-        persona: s.persona,
-        voice: s.voice,
-        raw,
-        marked,
-        speakable: stripYandexMarkup(marked),
-        file: studioFileName(s.persona, s.voice, s.suffix),
-      };
-    }),
-  };
-
-  const jsonPath = path.join(OUT_DIR, 'preview-texts.json');
-  fs.writeFileSync(jsonPath, JSON.stringify(out, null, 2), 'utf8');
-  console.log('wrote', jsonPath);
-  for (const p of out.personas) {
-    console.log('\n---', p.id, '---\n', p.speakable);
-  }
-}
-
-async function synthPersona(p, synthesizeSpeech) {
-  const tmp = `_tmp-${p.id}`;
-  const result = await synthesizeSpeech(p.script, p.voice, tmp, {
-    speed: p.speed,
-    artist: 'Michael Jackson',
-    title: 'Thriller',
-    pauseProfile: 'tight',
-  });
-  const buf = fs.readFileSync(result.filePath);
-  fs.unlinkSync(result.filePath);
-  const out = path.join(OUT_DIR, `persona-${p.id}.wav`);
-  fs.writeFileSync(out, buf);
-  console.log('wrote', out, buf.length, 'bytes');
-}
-
-async function synthStudio(persona, voice, synthesizeSpeech, options = {}) {
-  const { factCount = 1, suffix = '', focus = '', speed, script: scriptOverride } = options;
-  const raw = scriptOverride ?? studioScript(persona, factCount, focus);
-  const tmp = `_tmp-studio-${persona.id}-${voice}${suffix}`;
-  const result = await synthesizeSpeech(raw, voice, tmp, {
-    speed: speed ?? (voice === persona.voice ? persona.speed : 1.08),
-    artist: 'Michael Jackson',
-    title: 'Thriller',
-    pauseProfile: 'tight',
-  });
-  const buf = fs.readFileSync(result.filePath);
-  fs.unlinkSync(result.filePath);
-  const out = path.join(OUT_DIR, studioFileName(persona.id, voice, suffix));
-  fs.writeFileSync(out, buf);
-  console.log('wrote', out, buf.length, 'bytes');
-}
-
-async function main() {
-  const arg = process.argv[2] ?? '--preview';
-
-  if (arg === '--preview') {
-    await writePreview();
-    return;
-  }
-
-  ensureKeys();
-  fs.mkdirSync(OUT_DIR, { recursive: true });
-  const { synthesizeSpeech } = await loadTts();
-
-  if (arg === '--test') {
-    for (const id of TEST_IDS) {
-      const p = PERSONAS.find((x) => x.id === id);
-      await synthPersona(p, synthesizeSpeech);
-    }
-    console.log('test done — 3 files in', OUT_DIR);
-    return;
-  }
-
-  if (arg === '--personas' || arg === '--all') {
-    for (const p of PERSONAS) {
-      await synthPersona(p, synthesizeSpeech);
-    }
-  }
-
-  if (arg === '--studio' || arg === '--all') {
-    console.log('studio base: 6 personas × 13 voices (~30 с)');
-    for (const p of PERSONAS) {
-      for (const voice of VOICES) {
-        await synthStudio(p, voice, synthesizeSpeech, { factCount: 1 });
-      }
-    }
-  }
-
-  if (arg === '--studio-long' || arg === '--all') {
-    console.log('studio long samples:', STUDIO_LONG_SAMPLES.length);
-    for (const s of STUDIO_LONG_SAMPLES) {
-      const p = PERSONAS.find((x) => x.id === s.persona);
-      await synthStudio(p, s.voice, synthesizeSpeech, {
-        suffix: s.suffix,
-        script: s.script,
-      });
-    }
-  }
-
-  if (!['--test', '--personas', '--studio', '--studio-long', '--all'].includes(arg)) {
-    console.error('Unknown flag:', arg);
-    process.exit(1);
-  }
-
-  console.log('done');
-}
-
-main().catch((err) => {
-  console.error(err);
-  process.exit(1);
-});
+/**
+ * Offline Yandex TTS demos for efir-ai.ru — nothing is synthesized in the browser.
+ * Превью: websitePreview=true (русская транслитерация + ударения, без «в кавычках»).
+ * Приложение: обычный пайплайн с SSML <lang en-US> — здесь не используется.
+ *
+ *   node scripts/generate-website-demos.mjs --preview
+ *   node scripts/generate-website-demos.mjs --personas
+ *   node scripts/generate-website-demos.mjs --studio        # короткие, выбранные голоса
+ *   node scripts/generate-website-demos.mjs --studio-long   # по 1 длинной на амплуа (len2 + len4)
+ *   node scripts/generate-website-demos.mjs --all
+ */
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+import '../dist/load-env.js';
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const OUT_DIR = path.resolve(__dirname, '../../website/assets/demos');
+
+const FACT_REGISTRY =
+  'Thriller — единственный музыкальный клип в National Film Registry США: его сохраняют как культурное наследие наравне с художественным кино.';
+
+const FACT_BUDGET =
+  'Michael Jackson вложил в съёмки Thriller полмиллиона долларов из своего кармана — продюсеры крутили пальцем у виска, а после премьеры продажи альбома подскочили в семь раз.';
+
+const THRILLER_STORY_MINUTE =
+  'Michael Jackson записал Thriller в эпоху, когда музыкальные клипы только начинали менять правила игры. Это был не просто трек — целый кинематографический опыт, растянутый на четырнадцать минут. В те годы MTV крутил в основном рок, но клип Thriller взломал систему: его ставили в эфир целиком, прерывая регулярное вещание — случай беспрецедентный. Джексон понимал, что будущее за визуальными историями, и вложил в съёмки полмиллиона долларов из своего кармана. Бюджет казался безумием, но окупился сполна: продажи альбома подскочили в семь раз после премьеры видео. Клип снял John Landis, режиссёр «Американского оборотня в Лондоне» — столкновение двух вселенных. Сцена с зомби-танцами изначально не входила в сценарий: хореограф Michael Peters убеждал Landis, что это не испортит хоррор-эстетику. В итоге танец стал визитной карточкой ролика.';
+
+const THRILLER_STORY_FULL =
+  THRILLER_STORY_MINUTE +
+  ' Thriller — единственный музыкальный клип в National Film Registry США: его сохраняют как культурное наследие наравне с художественным кино. Vincent Price записал зловещий закадровый текст, а съёмки танца с зомби длились неделями. Танцующие зомби, превращение в оборотня, культовая moon walk походка — всё это стало новой религией поп-культуры. Когда Thriller вышел, видеомагнитофоны в магазинах разлетались как горячие пирожки — люди пересматривали его снова и снова. Так родился первый вирусный хит до эпохи интернета.';
+
+const BACKSTAGE_STORY_MINUTE =
+  FACT_BUDGET +
+  ' Vincent Price записал закадровый монолог за один день — режиссёр John Landis привёз в проект кинематографический масштаб. Хореограф Michael Peters добивался сцены с зомби-танцами: её изначально вырезали из сценария, а потом она стала визитной карточкой клипа. На съёмках Jackson настаивал на деталях, которые продюсеры считали лишними — и именно они потом взорвали MTV. Об этом редко говорят вслух.';
+
+/** Карточки амплуа + студия: короткий / минута / без лимита. */
+const PERSONAS = [
+  {
+    id: 'radio_host',
+    voice: 'zahar',
+    speed: 1.08,
+    studioVoices: ['zahar', 'ermil', 'alexander'],
+    short: 'А вот это — личное. ' + FACT_REGISTRY + ' Именно этот клип взорвал MTV!',
+    minute: 'А вот это — личное. ' + THRILLER_STORY_MINUTE + ' Именно этот клип взорвал MTV!',
+    full: 'А вот это — личное. ' + THRILLER_STORY_FULL + ' Именно этот клип взорвал MTV!',
+  },
+  {
+    id: 'night_dj',
+    voice: 'ermil',
+    speed: 0.92,
+    studioVoices: ['ermil'],
+    short: 'Доброй ночи! Интересный факт: ' + FACT_REGISTRY + ' Оставайтесь на нашей волне до утра.',
+    minute: 'Доброй ночи! Интересный факт: ' + THRILLER_STORY_MINUTE + ' Оставайтесь на нашей волне до утра.',
+    full: 'Доброй ночи! Интересный факт: ' + THRILLER_STORY_FULL + ' Оставайтесь на нашей волне до утра.',
+  },
+  {
+    id: 'expert',
+    voice: 'ermil',
+    speed: 1.0,
+    studioVoices: ['ermil', 'zahar', 'filipp'],
+    short: 'Уникальный факт: ' + FACT_REGISTRY + ' Это эталон поп-хоррора восьмидесятых.',
+    minute: 'Уникальный факт: ' + THRILLER_STORY_MINUTE + ' Это эталон поп-хоррора восьмидесятых.',
+    full: 'Уникальный факт: ' + THRILLER_STORY_FULL + ' Это эталон поп-хоррора восьмидесятых.',
+  },
+  {
+    id: 'contemporary',
+    voice: 'alena',
+    speed: 0.98,
+    studioVoices: ['alena', 'omazh', 'marina'],
+    short: 'Я помню это время. ' + FACT_REGISTRY,
+    minute: 'Я помню это время. ' + THRILLER_STORY_MINUTE,
+    full: 'Я помню это время. ' + THRILLER_STORY_FULL,
+  },
+  {
+    id: 'fan',
+    voice: 'jane',
+    speed: 1.12,
+    studioVoices: ['jane', 'dasha', 'lera'],
+    short: 'Обожаю этот момент! ' + FACT_REGISTRY + ' И да — я знаю каждую секунду этого клипа наизусть!',
+    minute: 'Обожаю этот момент! ' + THRILLER_STORY_MINUTE + ' И да — я знаю каждую секунду этого клипа наизусть!',
+    full: 'Обожаю этот момент! ' + THRILLER_STORY_FULL + ' И да — я знаю каждую секунду этого клипа наизусть!',
+  },
+  {
+    id: 'backstage',
+    voice: 'omazh',
+    speed: 0.96,
+    studioVoices: ['omazh', 'jane'],
+    /** ~1 мин — инсайд про бюджет, не реестр наследия. */
+    short: 'Только между нами. ' + BACKSTAGE_STORY_MINUTE,
+    minute: 'Только между нами. ' + BACKSTAGE_STORY_MINUTE,
+    full: 'Только между нами. ' + BACKSTAGE_STORY_MINUTE + ' ' + THRILLER_STORY_FULL,
+  },
+];
+
+const TEST_IDS = ['radio_host', 'night_dj', 'expert'];
+
+function studioShortFile(personaId, voiceId) {
+  return `studio-${personaId}-${voiceId}.wav`;
+}
+
+function studioLongFile(personaId, suffix) {
+  return `studio-${personaId}${suffix}.wav`;
+}
+
+async function loadTts() {
+  const { prepareYandexTtsText } = await import('../dist/services/tts-markup.js');
+  const { stripYandexMarkup } = await import('../dist/services/tts-azure-ssml.js');
+  const { synthesizeSpeech } = await import('../dist/services/yandex-tts.js');
+  return { prepareYandexTtsText, stripYandexMarkup, synthesizeSpeech };
+}
+
+function previewMarkup(raw) {
+  return {
+    artist: 'Michael Jackson',
+    title: 'Thriller',
+    sentencePauses: true,
+    pauseProfile: 'tight',
+    websitePreview: true,
+  };
+}
+
+function ensureKeys() {
+  if (!process.env.YANDEX_API_KEY?.trim() || !process.env.YANDEX_FOLDER_ID?.trim()) {
+    throw new Error('YANDEX_API_KEY и YANDEX_FOLDER_ID не найдены в backend/.env');
+  }
+}
+
+async function writePreview() {
+  const { prepareYandexTtsText, stripYandexMarkup } = await loadTts();
+  fs.mkdirSync(OUT_DIR, { recursive: true });
+
+  const out = {
+    generatedAt: new Date().toISOString(),
+    note: 'websitePreview: кириллица + ударения. Приложение — отдельный SSML-пайплайн.',
+    personas: PERSONAS.map((p) => {
+      const marked = prepareYandexTtsText(p.short, previewMarkup());
+      return {
+        id: p.id,
+        voice: p.voice,
+        speed: p.speed,
+        studioVoices: p.studioVoices,
+        raw: p.short,
+        marked,
+        speakable: stripYandexMarkup(marked),
+        file: `persona-${p.id}.wav`,
+      };
+    }),
+    studioLong: PERSONAS.map((p) => ({
+      persona: p.id,
+      voice: p.voice,
+      len2: { raw: p.minute, file: studioLongFile(p.id, '-len2') },
+      len4: { raw: p.full, file: studioLongFile(p.id, '-len4') },
+    })),
+  };
+
+  const jsonPath = path.join(OUT_DIR, 'preview-texts.json');
+  fs.writeFileSync(jsonPath, JSON.stringify(out, null, 2), 'utf8');
+  console.log('wrote', jsonPath);
+  for (const p of out.personas) {
+    console.log('\n---', p.id, '---\n', p.speakable);
+  }
+}
+
+async function synthPersona(p, synthesizeSpeech) {
+  const tmp = `_tmp-${p.id}`;
+  const result = await synthesizeSpeech(p.short, p.voice, tmp, {
+    speed: p.speed,
+    artist: 'Michael Jackson',
+    title: 'Thriller',
+    pauseProfile: 'tight',
+    websitePreview: true,
+  });
+  const buf = fs.readFileSync(result.filePath);
+  fs.unlinkSync(result.filePath);
+  const out = path.join(OUT_DIR, `persona-${p.id}.wav`);
+  fs.writeFileSync(out, buf);
+  console.log('wrote', out, buf.length, 'bytes');
+}
+
+async function synthStudioShort(persona, voice, synthesizeSpeech) {
+  const tmp = `_tmp-studio-${persona.id}-${voice}`;
+  const result = await synthesizeSpeech(persona.short, voice, tmp, {
+    speed: voice === persona.voice ? persona.speed : 1.08,
+    artist: 'Michael Jackson',
+    title: 'Thriller',
+    pauseProfile: 'tight',
+    websitePreview: true,
+  });
+  const buf = fs.readFileSync(result.filePath);
+  fs.unlinkSync(result.filePath);
+  const out = path.join(OUT_DIR, studioShortFile(persona.id, voice));
+  fs.writeFileSync(out, buf);
+  console.log('wrote', out, buf.length, 'bytes');
+}
+
+async function synthStudioLong(persona, synthesizeSpeech, suffix, script) {
+  const tmp = `_tmp-studio-${persona.id}${suffix}`;
+  const result = await synthesizeSpeech(script, persona.voice, tmp, {
+    speed: persona.speed,
+    artist: 'Michael Jackson',
+    title: 'Thriller',
+    pauseProfile: 'tight',
+    websitePreview: true,
+  });
+  const buf = fs.readFileSync(result.filePath);
+  fs.unlinkSync(result.filePath);
+  const out = path.join(OUT_DIR, studioLongFile(persona.id, suffix));
+  fs.writeFileSync(out, buf);
+  console.log('wrote', out, buf.length, 'bytes');
+}
+
+function purgeOldStudioWavs() {
+  if (!fs.existsSync(OUT_DIR)) return;
+  for (const name of fs.readdirSync(OUT_DIR)) {
+    if (name.startsWith('studio-') && name.endsWith('.wav')) {
+      fs.unlinkSync(path.join(OUT_DIR, name));
+      console.log('removed', name);
+    }
+  }
+}
+
+async function main() {
+  const arg = process.argv[2] ?? '--preview';
+
+  if (arg === '--preview') {
+    await writePreview();
+    return;
+  }
+
+  ensureKeys();
+  fs.mkdirSync(OUT_DIR, { recursive: true });
+  const { synthesizeSpeech } = await loadTts();
+
+  if (arg === '--test') {
+    for (const id of TEST_IDS) {
+      await synthPersona(PERSONAS.find((x) => x.id === id), synthesizeSpeech);
+    }
+    console.log('test done');
+    return;
+  }
+
+  if (arg === '--personas' || arg === '--all') {
+    for (const p of PERSONAS) {
+      await synthPersona(p, synthesizeSpeech);
+    }
+  }
+
+  if (arg === '--studio' || arg === '--all') {
+    purgeOldStudioWavs();
+    console.log('studio short: selected voices per persona');
+    for (const p of PERSONAS) {
+      for (const voice of p.studioVoices) {
+        await synthStudioShort(p, voice, synthesizeSpeech);
+      }
+    }
+  }
+
+  if (arg === '--studio-long' || arg === '--all') {
+    console.log('studio long: 1× len2 + 1× len4 per persona (default voice)');
+    for (const p of PERSONAS) {
+      await synthStudioLong(p, synthesizeSpeech, '-len2', p.minute);
+      await synthStudioLong(p, synthesizeSpeech, '-len4', p.full);
+    }
+  }
+
+  if (!['--test', '--personas', '--studio', '--studio-long', '--all'].includes(arg)) {
+    console.error('Unknown flag:', arg);
+    process.exit(1);
+  }
+
+  console.log('done');
+}
+
+main().catch((err) => {
+  console.error(err);
+  process.exit(1);
+});
+

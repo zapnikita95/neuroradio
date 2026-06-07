@@ -198,6 +198,8 @@ export async function synthesizeSpeech(
     artist?: string;
     title?: string;
     pauseProfile?: TtsPauseProfile;
+    /** efir-ai.ru offline demos — кириллица + ударения, без SSML lang. */
+    websitePreview?: boolean;
     logContext?: YandexTtsLogContext;
     credentials?: { apiKey: string; folderId: string };
   } = {},
@@ -209,7 +211,7 @@ export async function synthesizeSpeech(
     throw new Error('YANDEX_API_KEY and YANDEX_FOLDER_ID are required');
   }
 
-  const { logContext, artist, title, ...ttsPartial } = options;
+  const { logContext, artist, title, websitePreview, ...ttsPartial } = options;
   const ttsOptions: TtsOptions = {
     speed: ttsPartial.speed ?? DEFAULT_TTS_SPEED,
     emotion: ttsPartial.emotion ?? DEFAULT_TTS_EMOTION,
@@ -228,6 +230,7 @@ export async function synthesizeSpeech(
     title: title ?? logContext?.title,
     sentencePauses: true,
     pauseProfile: options.pauseProfile ?? 'tight',
+    websitePreview: websitePreview === true,
   });
   const ttsTranscript = stripYandexMarkup(markedText);
 

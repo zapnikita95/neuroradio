@@ -18,6 +18,19 @@
   /* ---------------- Personas ---------------- */
   var THRILLER_CORE = 'Thriller — единственный музыкальный клип в National Film Registry США: его сохраняют как культурное наследие наравне с художественным кино. Vincent Price записал зловещий закадровый текст, а съёмки танца с зомби длились неделями.';
 
+  var FACT_REGISTRY = 'Thriller — единственный музыкальный клип в National Film Registry США: его сохраняют как культурное наследие наравне с художественным кино.';
+  var FACT_BUDGET = 'Michael Jackson вложил в съёмки Thriller полмиллиона долларов из своего кармана — продюсеры крутили пальцем у виска, а после премьеры продажи альбома подскочили в семь раз.';
+  var BACKSTAGE_STORY_MINUTE = FACT_BUDGET + ' Vincent Price записал закадровый монолог за один день — режиссёр John Landis привёз в проект кинематографический масштаб. Хореограф Michael Peters добивался сцены с зомби-танцами: её изначально вырезали из сценария, а потом она стала визитной карточкой клипа. На съёмках Jackson настаивал на деталях, которые продюсеры считали лишними — и именно они потом взорвали MTV. Об этом редко говорят вслух.';
+
+  var STUDIO_VOICES = {
+    radio_host: ['zahar', 'ermil', 'alexander'],
+    night_dj: ['ermil'],
+    expert: ['ermil', 'zahar', 'filipp'],
+    contemporary: ['alena', 'omazh', 'marina'],
+    fan: ['jane', 'dasha', 'lera'],
+    backstage: ['omazh', 'jane']
+  };
+
   var PERSONAS = [
     {
       id: 'radio_host', tag: 'Заводной эфир', name: 'Радиоведущий',
@@ -33,20 +46,20 @@
       id: 'night_dj', tag: 'Ночной подкаст', name: 'Ночной диджей',
       desc: 'Тихий ночной эфир: факт чёткий, темп медленный, голос почти на ухо. Для поздних плейлистов и долгой дороги.',
       traits: ['спокойно', 'интимно', 'медленно'],
-      quote: '«Тихо… только вы и эта песня.»',
+      quote: '«Доброй ночи! Интересный факт…»',
       pal: ['#3b2c8f', '#1e2a78'], skin: ['#cfd6ff', '#8aa0ff'], eye: '#10163a', accent: '#9ad7ff',
-      voice: 'filipp', rate: 0.92, pitch: 0.95,
-      script: 'Тихо. Только вы и эта песня. ' + THRILLER_CORE + ' Оставайтесь на нашей волне до утра.',
+      voice: 'ermil', rate: 0.92, pitch: 0.95,
+      script: 'Доброй ночи! Интересный факт: ' + FACT_REGISTRY + ' Оставайтесь на нашей волне до утра.',
       audio: 'assets/demos/persona-night_dj.wav'
     },
     {
       id: 'expert', tag: 'Эксперт жанра', name: 'Эксперт жанра',
       desc: 'Подкастовая экспертиза: механика жанра без занудства. Объясняет, почему трек устроен именно так и за счёт чего работает.',
       traits: ['разбор', 'контекст', 'точность'],
-      quote: '«Разберём, почему это работает.»',
+      quote: '«Уникальный факт:»',
       pal: ['#7b2fff', '#2bd4ff'], skin: ['#e7d9ff', '#b89aff'], eye: '#1a1140', accent: '#5ef0ff',
       voice: 'ermil', rate: 1.0, pitch: 1.0,
-      script: 'Разберём, почему это работает. ' + THRILLER_CORE + ' Это эталон поп-хоррора восьмидесятых.',
+      script: 'Уникальный факт: ' + FACT_REGISTRY + ' Это эталон поп-хоррора восьмидесятых.',
       audio: 'assets/demos/persona-expert.wav'
     },
     {
@@ -76,7 +89,7 @@
       quote: '«Только между нами…»',
       pal: ['#8f1d3a', '#2a1145'], skin: ['#f0c9d4', '#c87a96'], eye: '#2a0e1c', accent: '#ff6b8a',
       voice: 'omazh', rate: 0.96, pitch: 0.98,
-      script: 'Только между нами. ' + THRILLER_CORE + ' Об этом редко рассказывают вслух.',
+      script: 'Только между нами. ' + BACKSTAGE_STORY_MINUTE,
       audio: 'assets/demos/persona-backstage.wav'
     }
   ];
@@ -219,8 +232,8 @@ acc +
   }
 
   function demoStudioSrc(personaId, voiceId, lenN) {
-    if (lenN === 4) return 'assets/demos/studio-' + personaId + '-' + voiceId + '-len4.wav';
-    if (lenN === 2) return 'assets/demos/studio-' + personaId + '-' + voiceId + '-len2.wav';
+    if (lenN === 4) return 'assets/demos/studio-' + personaId + '-len4.wav';
+    if (lenN === 2) return 'assets/demos/studio-' + personaId + '-len2.wav';
     return 'assets/demos/studio-' + personaId + '-' + voiceId + '.wav';
   }
 
@@ -369,13 +382,13 @@ acc +
       b.addEventListener('click', function () {
         $$('.chip', ampluaChips).forEach(function (c) { c.classList.remove('on'); });
         b.classList.add('on'); state.persona = PERSONAS[i];
-        if (voiceSel) voiceSel.value = state.persona.voice;
+        syncVoiceSelect();
         render();
       });
       ampluaChips.appendChild(b);
     });
     VOICES.forEach(function (v) { var o = document.createElement('option'); o.value = v.id; o.textContent = v.label; voiceSel.appendChild(o); });
-    voiceSel.value = PERSONAS[0].voice;
+    syncVoiceSelect();
 
     $$('#focusChips .chip').forEach(function (c) {
       c.addEventListener('click', function () {
@@ -387,25 +400,61 @@ acc +
     var THRILLER_STORY_MINUTE = 'Michael Jackson записал Thriller в эпоху, когда музыкальные клипы только начинали менять правила игры. Это был не просто трек — целый кинематографический опыт, растянутый на четырнадцать минут. В те годы MTV крутил в основном рок, но клип Thriller взломал систему: его ставили в эфир целиком, прерывая регулярное вещание. Джексон вложил в съёмки полмиллиона долларов — продажи альбома подскочили в семь раз после премьеры. Клип снял John Landis. Сцена с зомби-танцами изначально не входила в сценарий — и стала визитной карточкой ролика.';
     var THRILLER_STORY_FULL = THRILLER_STORY_MINUTE + ' Thriller — единственный музыкальный клип в National Film Registry США. Vincent Price записал зловещий закадровый текст. Когда Thriller вышел, видеомагнитофоны разлетались — так родился первый вирусный хит до интернета.';
 
+    function personaMinuteBody(p) {
+      if (p.id === 'backstage') return BACKSTAGE_STORY_MINUTE;
+      return THRILLER_STORY_MINUTE;
+    }
+
+    function personaFullBody(p) {
+      if (p.id === 'backstage') return BACKSTAGE_STORY_MINUTE + ' ' + THRILLER_STORY_FULL;
+      return THRILLER_STORY_FULL;
+    }
+
+    function personaShortBody(p, n) {
+      if (p.id === 'backstage') return BACKSTAGE_STORY_MINUTE;
+      if (p.id === 'expert') return FACT_REGISTRY + ' Это эталон поп-хоррора восьмидесятых.';
+      if (p.id === 'night_dj') return FACT_REGISTRY + ' Оставайтесь на нашей волне до утра.';
+      var facts = [
+        FACT_REGISTRY,
+        'Vincent Price записал зловещий закадровый монолог',
+        'съёмки танца с зомби заняли недели',
+        'именно этот ролик сделал короткометражку главным событием эры MTV'
+      ];
+      return facts.slice(0, n).map(function (f) { return f + (f.endsWith('.') ? '' : '.'); }).join(' ');
+    }
+
+    function personaOpener(p) {
+      return p.script.split('.')[0] + '.';
+    }
+
+    function personaCloser(p) {
+      var parts = p.script.split('. ');
+      return parts.length ? parts[parts.length - 1] : '';
+    }
+
     function buildStory() {
       var p = state.persona, n = LENS[+length.value].n;
-      if (n >= 4) {
-        var op4 = p.script.split('.')[0] + '.';
-        var cl4 = p.script.split('. ').slice(-1)[0];
-        return op4 + ' ' + THRILLER_STORY_FULL + (cl4 ? ' ' + cl4 : '');
-      }
-      if (n >= 2) {
-        var op2 = p.script.split('.')[0] + '.';
-        var cl2 = p.script.split('. ').slice(-1)[0];
-        return op2 + ' ' + THRILLER_STORY_MINUTE + (cl2 ? ' ' + cl2 : '');
-      }
-      var op = p.script.split('.')[0] + '.';
-      var body = FACTS.slice(0, n).map(function (f) { return f + '.'; }).join(' ');
-      var tail = FOCUS[state.focus] || '';
-      var closer = '';
-      var s = p.script.split('. ');
-      if (s.length) closer = ' ' + s[s.length - 1];
-      return op + ' ' + body + tail + (n > 1 ? closer : '');
+      var op = personaOpener(p);
+      if (n >= 4) return op + ' ' + personaFullBody(p) + (personaCloser(p) ? ' ' + personaCloser(p) : '');
+      if (n >= 2) return op + ' ' + personaMinuteBody(p) + (personaCloser(p) ? ' ' + personaCloser(p) : '');
+      if (p.id === 'backstage') return op + ' ' + BACKSTAGE_STORY_MINUTE;
+      return op + ' ' + personaShortBody(p, n) + (FOCUS[state.focus] || '') + (n > 1 && p.id !== 'expert' && p.id !== 'night_dj' ? ' ' + personaCloser(p) : '');
+    }
+
+    function syncVoiceSelect() {
+      if (!voiceSel) return;
+      var allowed = STUDIO_VOICES[state.persona.id] || [state.persona.voice];
+      var prev = voiceSel.value;
+      voiceSel.innerHTML = '';
+      VOICES.forEach(function (v) {
+        if (allowed.indexOf(v.id) === -1) return;
+        var o = document.createElement('option');
+        o.value = v.id;
+        o.textContent = v.label;
+        voiceSel.appendChild(o);
+      });
+      if (allowed.indexOf(prev) !== -1) voiceSel.value = prev;
+      else voiceSel.value = allowed[0];
     }
 
     function render() {
@@ -417,7 +466,7 @@ acc +
       tagLen.textContent = LENS[+length.value].s;
       tagTempo.textContent = 'Темп: ' + TEMPOS[+tempo.value].l.toLowerCase();
       scriptEl.style.opacity = '0';
-      setTimeout(function () { scriptEl.textContent = '«' + buildStory() + '»'; scriptEl.style.opacity = '1'; }, 130);
+      setTimeout(function () { scriptEl.textContent = buildStory(); scriptEl.style.opacity = '1'; }, 130);
     }
 
     [tempo, length].forEach(function (r) { r.addEventListener('input', render); });
@@ -430,8 +479,8 @@ acc +
       var voice = voiceSel.value;
       var primary = demoStudioSrc(p.id, voice, lenN);
       var fallbacks = [primary];
-      if (lenN === 4) fallbacks.push(demoStudioSrc(p.id, voice, 2));
-      fallbacks.push(demoStudioSrc(p.id, voice, 1), p.audio);
+      if (lenN >= 2) fallbacks.push(demoStudioSrc(p.id, voice, lenN === 4 ? 2 : 1));
+      else fallbacks.push(demoStudioSrc(p.id, voice, 2), p.audio);
       playStudioDemo(fallbacks, TEMPOS[+tempo.value].r, playBtn);
     });
 

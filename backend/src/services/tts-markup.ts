@@ -26,6 +26,8 @@ export interface TtsMarkupOptions {
   title?: string;
   sentencePauses?: boolean;
   pauseProfile?: TtsPauseProfile;
+  /** Статические демо efir-ai.ru: кириллическая транслитерация, без «в кавычках» и без SSML lang. */
+  websitePreview?: boolean;
 }
 
 function pauseTag(profile: TtsPauseProfile, size: 'small' | 'medium'): string {
@@ -63,6 +65,11 @@ function isForeignSongTitleQuote(phrase: string): boolean {
 /** «слово» → «в кавычках слово» для русских цитат; иностранные треки — без обёртки. */
 const SONG_CONTEXT_BEFORE_QUOTE =
   /(?:песн\S*|трек\S*|хит\S*|сингл\S*|композици\S*|альбом\S*)\s*$/i;
+
+/** Превью на сайте: убираем кавычки, без фразы «в кавычках». */
+function stripGuillemetsForPreview(text: string): string {
+  return text.replace(/«([^»]+)»/g, (_m, inner: string) => inner.trim());
+}
 
 function expandQuotesForSpeech(text: string): string {
   return text.replace(/«([^»]+)»/g, (_match, inner: string, offset: number, whole: string) => {
@@ -116,7 +123,7 @@ export function prepareYandexTtsText(
   text = quality.text;
 
   text = normalizeYearsForRussianTts(text);
-  text = expandQuotesForSpeech(text);
+  text = options.websitePreview ? stripGuillemetsForPreview(text) : expandQuotesForSpeech(text);
   text = normalizeYandexSpeechTokens(text, artist, title);
   text = applyRussianStressSafe(text);
 
@@ -124,10 +131,12 @@ export function prepareYandexTtsText(
     text = addSentencePauses(text, pauseProfile);
     text = addCommaPauses(text, pauseProfile);
     text = addDashPauses(text, pauseProfile);
-    text = addQuotePauses(text, pauseProfile);
+    if (!options.websitePreview) text = addQuotePauses(text, pauseProfile);
   }
 
-  text = enhanceMixedLanguageText(text, artist, title);
+  text = options.websitePreview
+    ? applyForeignPronunciation(text, artist, title)
+    : enhanceMixedLanguageText(text, artist, title);
 
   return collapseMarkupWhitespace(text);
 }
