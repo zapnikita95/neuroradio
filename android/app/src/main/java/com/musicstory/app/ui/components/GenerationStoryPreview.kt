@@ -2,6 +2,7 @@ package com.musicstory.app.ui.components
 
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -51,12 +52,11 @@ fun GenerationStoryPreview(
 
     val previewHeight = (LocalConfiguration.current.screenHeightDp * 0.22f).coerceIn(96f, 200f).dp
     val scrollState = rememberScrollState()
-    val wordRatio = preview.visibleWordCount.toFloat() / preview.words.size.coerceAtLeast(1)
 
-    LaunchedEffect(wordRatio, scrollState.maxValue) {
-        if (scrollState.maxValue <= 0) return@LaunchedEffect
-        val target = (scrollState.maxValue * wordRatio).toInt().coerceIn(0, scrollState.maxValue)
-        scrollState.animateScrollTo(target)
+    LaunchedEffect(preview.visibleWordCount, scrollState.maxValue) {
+        if (scrollState.maxValue > 0) {
+            scrollState.scrollTo(scrollState.maxValue)
+        }
     }
 
     Surface(
@@ -85,17 +85,22 @@ fun GenerationStoryPreview(
                     textAlign = TextAlign.Center,
                 )
             }
-            Text(
-                text = visibleText,
+            Column(
                 modifier = Modifier
+                    .weight(1f)
                     .fillMaxWidth()
-                    .weight(1f, fill = false)
                     .verticalScroll(scrollState),
-                style = MaterialTheme.typography.bodyLarge,
-                color = CreamText,
-                textAlign = TextAlign.Center,
-                softWrap = true,
-            )
+                verticalArrangement = Arrangement.Bottom,
+            ) {
+                Text(
+                    text = visibleText,
+                    modifier = Modifier.fillMaxWidth(),
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = CreamText,
+                    textAlign = TextAlign.Center,
+                    softWrap = true,
+                )
+            }
         }
     }
 }

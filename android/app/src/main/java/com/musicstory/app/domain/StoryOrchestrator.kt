@@ -1055,6 +1055,7 @@ class StoryOrchestrator(
             val revealMaxMs = PREVIEW_REVEAL_MAX_MS
             val wordDelayMs = wordRevealDelayMs(words.size, revealMaxMs)
             val bufferCapWords = (words.size * 0.15f).toInt().coerceIn(2, 12)
+            val estimatedDurationMs = estimatedStoryDurationMs(words.size)
             val waitStartMs = System.currentTimeMillis()
 
             _generationPreview.value = GenerationPreviewState(
@@ -1074,12 +1075,12 @@ class StoryOrchestrator(
                 val count = when (playerState) {
                     StoryPlaybackState.COMPLETED -> words.size
                     StoryPlaybackState.PLAYING, StoryPlaybackState.PAUSED -> {
-                        if (progress > 0.01f) {
-                            (progress * words.size).toInt().coerceIn(1, words.size)
-                        } else {
-                            val elapsed = System.currentTimeMillis() - waitStartMs
-                            (elapsed / wordDelayMs).toInt().coerceIn(1, words.size)
-                        }
+                        visibleWordsFromPlayback(
+                            wordCount = words.size,
+                            progress = progress,
+                            elapsedMs = System.currentTimeMillis() - waitStartMs,
+                            estimatedDurationMs = estimatedDurationMs,
+                        )
                     }
                     else -> {
                         val elapsed = System.currentTimeMillis() - waitStartMs
@@ -1110,6 +1111,26 @@ class StoryOrchestrator(
     private fun wordRevealDelayMs(wordCount: Int, revealMaxMs: Long = PREVIEW_REVEAL_MAX_MS): Long {
         if (wordCount <= 1) return 0L
         return (revealMaxMs / wordCount).coerceIn(40L, 160L)
+    }
+
+    /** Rough TTS length for word-by-word preview when ExoPlayer progress is unavailable. */
+    private fun estimatedStoryDurationMs(wordCount: Int): Long =
+        (wordCount * 320L).coerceIn(5_000L, 240_000L)
+
+    /** Keep visible text in sync with speech — never lag behind audio. */
+    private fun visibleWordsFromPlayback(
+        wordCount: Int,
+        progress: Float,
+        elapsedMs: Long,
+        estimatedDurationMs: Long,
+    ): Int {
+        val fromProgress = if (progress > 0.001f) {
+            (progress * wordCount).toInt()
+        } else {
+            0
+        }
+        val fromClock = ((elapsedMs.toFloat() / estimatedDurationMs) * wordCount).toInt()
+        return (maxOf(fromProgress, fromClock) + 2).coerceIn(1, wordCount)
     }
 
     companion object {
