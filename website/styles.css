@@ -213,9 +213,16 @@ img { display: block; max-width: 100%; }
   border: 1px solid var(--line-strong); background: var(--panel-solid); min-height: 520px; display: flex; flex-direction: column;
   transition: transform .4s var(--ease), box-shadow .4s; }
 .persona-card:hover { transform: translateY(-6px); box-shadow: 0 40px 80px -40px rgba(0,0,0,.8), var(--glow); }
-.persona-portrait { position: relative; height: 320px; overflow: hidden; }
-.persona-portrait svg { width: 100%; height: 100%; display: block; }
-.persona-portrait::after { content: ""; position: absolute; inset: 0; background: linear-gradient(180deg, transparent 45%, rgba(15,11,25,.6) 78%, var(--panel-solid)); }
+.persona-portrait { position: relative; height: 320px; overflow: hidden; background: #0d0a14; }
+.persona-portrait img.persona-art { width: 100%; height: 100%; object-fit: cover; object-position: center 12%; display: block; transform: scale(1.02); transition: transform .5s var(--ease); }
+.persona-card:hover .persona-portrait img.persona-art { transform: scale(1.06); }
+.persona-portrait::after { content: ""; position: absolute; inset: 0; pointer-events: none; background: linear-gradient(180deg, transparent 38%, rgba(15,11,25,.55) 72%, var(--panel-solid)); }
+.persona-portrait[data-persona="radio_host"]::before { content: ""; position: absolute; inset: 0; pointer-events: none; background: radial-gradient(ellipse 80% 60% at 50% 0%, rgba(255,122,61,.18), transparent 70%); mix-blend-mode: screen; }
+.persona-portrait[data-persona="night_dj"]::before { content: ""; position: absolute; inset: 0; pointer-events: none; background: radial-gradient(ellipse 80% 60% at 50% 0%, rgba(154,215,255,.14), transparent 70%); mix-blend-mode: screen; }
+.persona-portrait[data-persona="expert"]::before { content: ""; position: absolute; inset: 0; pointer-events: none; background: radial-gradient(ellipse 80% 60% at 50% 0%, rgba(94,240,255,.12), transparent 70%); mix-blend-mode: screen; }
+.persona-portrait[data-persona="contemporary"]::before { content: ""; position: absolute; inset: 0; pointer-events: none; background: radial-gradient(ellipse 80% 60% at 50% 0%, rgba(255,207,138,.16), transparent 70%); mix-blend-mode: screen; }
+.persona-portrait[data-persona="fan"]::before { content: ""; position: absolute; inset: 0; pointer-events: none; background: radial-gradient(ellipse 80% 60% at 50% 0%, rgba(255,61,139,.16), transparent 70%); mix-blend-mode: screen; }
+.persona-portrait[data-persona="backstage"]::before { content: ""; position: absolute; inset: 0; pointer-events: none; background: radial-gradient(ellipse 80% 60% at 50% 0%, rgba(255,107,138,.14), transparent 70%); mix-blend-mode: screen; }
 .persona-play { position: absolute; right: 18px; bottom: 18px; z-index: 3; width: 60px; height: 60px; border-radius: 50%; border: 0; cursor: pointer;
   background: var(--grad); color: #1a0c25; display: grid; place-items: center; box-shadow: 0 12px 30px -8px rgba(255,93,162,.7); transition: transform .25s var(--ease); }
 .persona-play:hover { transform: scale(1.08); }

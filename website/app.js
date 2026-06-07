@@ -37,7 +37,6 @@
       desc: 'Тёплый эфирный тон: живо, но строго по факту. Драйв дневной радиостанции, который заряжает энергией между треками.',
       traits: ['энергично', 'тепло', 'по делу'],
       quote: '«А вот это — личное. Слушайте…»',
-      pal: ['#ff7a3d', '#ff3d8b'], skin: ['#ffd9b8', '#ff9e7a'], eye: '#3a1c2e', accent: '#ffd84d',
       voice: 'zahar', rate: 1.08, pitch: 1.05,
       script: 'А вот это — личное. ' + THRILLER_CORE + ' Именно этот клип взорвал MTV — звук на максимум, поехали!',
       audio: 'assets/demos/persona-radio_host.wav'
@@ -47,7 +46,6 @@
       desc: 'Тихий ночной эфир: факт чёткий, темп медленный, голос почти на ухо. Для поздних плейлистов и долгой дороги.',
       traits: ['спокойно', 'интимно', 'медленно'],
       quote: '«Доброй ночи! Интересный факт…»',
-      pal: ['#3b2c8f', '#1e2a78'], skin: ['#cfd6ff', '#8aa0ff'], eye: '#10163a', accent: '#9ad7ff',
       voice: 'ermil', rate: 0.92, pitch: 0.95,
       script: 'Доброй ночи! Интересный факт: ' + FACT_REGISTRY + ' Оставайтесь на нашей волне до утра.',
       audio: 'assets/demos/persona-night_dj.wav'
@@ -57,7 +55,6 @@
       desc: 'Подкастовая экспертиза: механика жанра без занудства. Объясняет, почему трек устроен именно так и за счёт чего работает.',
       traits: ['разбор', 'контекст', 'точность'],
       quote: '«Уникальный факт:»',
-      pal: ['#7b2fff', '#2bd4ff'], skin: ['#e7d9ff', '#b89aff'], eye: '#1a1140', accent: '#5ef0ff',
       voice: 'ermil', rate: 1.0, pitch: 1.0,
       script: 'Уникальный факт: ' + FACT_REGISTRY + ' Это эталон поп-хоррора восьмидесятых.',
       audio: 'assets/demos/persona-expert.wav'
@@ -67,7 +64,6 @@
       desc: 'Ностальгия от первого лица — будто вы жили, когда трек вышел. Личная память вместо энциклопедии.',
       traits: ['ностальгия', 'от первого лица', 'тепло'],
       quote: '«Я помню это время…»',
-      pal: ['#d98a2b', '#a83b6a'], skin: ['#ffe0c2', '#f0a87a'], eye: '#3a221c', accent: '#ffcf8a',
       voice: 'alena', rate: 0.98, pitch: 1.0,
       script: 'Я помню это время. Michael Jackson вложил полмиллиона в клип Thriller — и после премьеры продажи альбома выросли в семь раз. Мы смотрели четырнадцатиминутный ролик по MTV целиком, а потом скупали VHS, чтобы пересматривать дома.',
       audio: 'assets/demos/persona-contemporary.wav'
@@ -77,7 +73,6 @@
       desc: 'Восторженный фанат от первого лица: обожает артиста и знает детали, которые греют сердце коллекционера.',
       traits: ['восторг', 'детали', 'любовь к делу'],
       quote: '«Обожаю этот момент!»',
-      pal: ['#ff3d8b', '#a855f7'], skin: ['#ffd4ec', '#ff8ac4'], eye: '#3a1430', accent: '#ffe14d',
       voice: 'jane', rate: 1.12, pitch: 1.12,
       script: 'Обожаю этот момент! ' + THRILLER_CORE + ' И да — я знаю каждую секунду этого клипа наизусть!',
       audio: 'assets/demos/persona-fan.wav'
@@ -87,7 +82,6 @@
       desc: 'Инсайдерский тон — только если в факте есть курьёз. Истории, о которых обычно говорят вполголоса.',
       traits: ['инсайд', 'курьёз', 'вполголоса'],
       quote: '«Только между нами…»',
-      pal: ['#8f1d3a', '#2a1145'], skin: ['#f0c9d4', '#c87a96'], eye: '#2a0e1c', accent: '#ff6b8a',
       voice: 'omazh', rate: 0.96, pitch: 0.98,
       script: BACKSTAGE_STORY_SHORT,
       audio: 'assets/demos/persona-backstage.wav'
@@ -112,87 +106,11 @@
   ];
   function voiceLabel(id) { for (var i = 0; i < VOICES.length; i++) if (VOICES[i].id === id) return VOICES[i].label.split(' — ')[0]; return id; }
 
-  /* ---------------- Portrait SVG ---------------- */
-  function portrait(p, idx) {
-    var g = 'g' + idx;
-    var acc = accessory(p, idx);
-    return '' +
-'<svg viewBox="0 0 380 320" preserveAspectRatio="xMidYMid slice" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Амплуа: ' + p.name + '">' +
-'<defs>' +
-  '<linearGradient id="bg' + g + '" x1="0" y1="0" x2="1" y2="1">' +
-    '<stop offset="0" stop-color="' + p.pal[0] + '"/><stop offset="1" stop-color="' + p.pal[1] + '"/>' +
-  '</linearGradient>' +
-  '<radialGradient id="sk' + g + '" cx="0.5" cy="0.42" r="0.62">' +
-    '<stop offset="0" stop-color="' + p.skin[0] + '"/><stop offset="1" stop-color="' + p.skin[1] + '"/>' +
-  '</radialGradient>' +
-  '<radialGradient id="gl' + g + '" cx="0.5" cy="0.4" r="0.6">' +
-    '<stop offset="0" stop-color="#fff" stop-opacity="0.5"/><stop offset="1" stop-color="#fff" stop-opacity="0"/>' +
-  '</radialGradient>' +
-'</defs>' +
-'<rect width="380" height="320" fill="url(#bg' + g + ')"/>' +
-'<circle cx="190" cy="150" r="150" fill="url(#gl' + g + ')"/>' +
-// floating sprites
-'<g opacity="0.5" fill="' + p.accent + '">' +
-  '<circle cx="44" cy="58" r="5"/><circle cx="330" cy="44" r="7"/><circle cx="346" cy="232" r="5"/>' +
-  '<text x="300" y="120" font-size="34" font-family="Unbounded,sans-serif" opacity="0.7">♪</text>' +
-  '<text x="40" y="210" font-size="26" font-family="Unbounded,sans-serif" opacity="0.6">♫</text>' +
-'</g>' +
-// shoulders
-'<path d="M70 320 Q70 246 190 246 Q310 246 310 320 Z" fill="' + p.pal[1] + '" opacity="0.9"/>' +
-'<path d="M104 320 Q104 270 190 270 Q276 270 276 320 Z" fill="#0d0a1a" opacity="0.25"/>' +
-// head
-'<ellipse cx="190" cy="150" rx="92" ry="104" fill="url(#sk' + g + ')"/>' +
-// hair / top accent
-'<path d="M98 132 Q104 54 190 50 Q276 54 282 132 Q250 96 190 96 Q130 96 98 132 Z" fill="#0d0a1a" opacity="0.45"/>' +
-// eyes (focal point)
-eye(150, 150, p.eye) + eye(230, 150, p.eye) +
-// brows
-'<path d="M126 120 Q150 110 174 120" stroke="#0d0a1a" stroke-opacity="0.4" stroke-width="5" fill="none" stroke-linecap="round"/>' +
-'<path d="M206 120 Q230 110 254 120" stroke="#0d0a1a" stroke-opacity="0.4" stroke-width="5" fill="none" stroke-linecap="round"/>' +
-// nose + mouth
-'<path d="M190 156 Q196 178 188 186" stroke="#0d0a1a" stroke-opacity="0.25" stroke-width="4" fill="none" stroke-linecap="round"/>' +
-'<path d="M168 202 Q190 216 212 202" stroke="#0d0a1a" stroke-opacity="0.5" stroke-width="5" fill="none" stroke-linecap="round"/>' +
-acc +
-'</svg>';
-  }
-  function eye(cx, cy, iris) {
-    return '<g>' +
-      '<ellipse cx="' + cx + '" cy="' + cy + '" rx="22" ry="17" fill="#fff"/>' +
-      '<circle cx="' + cx + '" cy="' + cy + '" r="11" fill="' + iris + '"/>' +
-      '<circle cx="' + cx + '" cy="' + cy + '" r="5" fill="#000"/>' +
-      '<circle cx="' + (cx + 4) + '" cy="' + (cy - 4) + '" r="3" fill="#fff"/>' +
-    '</g>';
-  }
-  function accessory(p, idx) {
-    switch (p.id) {
-      case 'radio_host': // headphones + mic
-        return '<g stroke="' + p.accent + '" stroke-width="9" fill="none" stroke-linecap="round">' +
-          '<path d="M104 150 A86 86 0 0 1 276 150"/></g>' +
-          '<rect x="92" y="146" width="22" height="46" rx="11" fill="' + p.accent + '"/>' +
-          '<rect x="266" y="146" width="22" height="46" rx="11" fill="' + p.accent + '"/>' +
-          '<g stroke="' + p.accent + '" stroke-width="6" stroke-linecap="round"><line x1="300" y1="214" x2="300" y2="250"/></g>' +
-          '<circle cx="300" cy="206" r="13" fill="' + p.accent + '"/>';
-      case 'night_dj': // moon + headphones
-        return '<g stroke="' + p.accent + '" stroke-width="8" fill="none" stroke-linecap="round"><path d="M108 150 A82 82 0 0 1 272 150"/></g>' +
-          '<rect x="96" y="146" width="20" height="42" rx="10" fill="' + p.accent + '"/>' +
-          '<rect x="264" y="146" width="20" height="42" rx="10" fill="' + p.accent + '"/>' +
-          '<path d="M322 60 a22 22 0 1 0 20 30 a17 17 0 1 1 -20 -30 Z" fill="' + p.accent + '" opacity="0.9"/>';
-      case 'expert': // glasses
-        return '<g stroke="' + p.accent + '" stroke-width="6" fill="none">' +
-          '<circle cx="150" cy="150" r="30"/><circle cx="230" cy="150" r="30"/>' +
-          '<line x1="180" y1="150" x2="200" y2="150"/><line x1="120" y1="146" x2="100" y2="138"/><line x1="260" y1="146" x2="280" y2="138"/></g>';
-      case 'contemporary': // vinyl record
-        return '<g transform="translate(308 210)"><circle r="30" fill="#0d0a1a" opacity="0.85"/><circle r="30" fill="none" stroke="' + p.accent + '" stroke-width="2" opacity="0.6"/><circle r="9" fill="' + p.accent + '"/><circle r="3" fill="#0d0a1a"/></g>';
-      case 'fan': // sparkles / hearts
-        return '<g fill="' + p.accent + '">' +
-          '<path d="M312 196 l5 10 11 1 -8 8 2 11 -10 -5 -10 5 2 -11 -8 -8 11 -1 Z"/>' +
-          '<path d="M56 132 l4 8 9 1 -7 6 2 9 -8 -4 -8 4 2 -9 -7 -6 9 -1 Z"/></g>';
-      case 'backstage': // curtain
-        return '<g fill="' + p.accent + '" opacity="0.85">' +
-          '<path d="M0 0 H64 Q52 60 60 130 Q40 150 20 130 Q28 60 0 64 Z"/></g>' +
-          '<g fill="' + p.accent + '" opacity="0.85"><path d="M380 0 H316 Q328 60 320 130 Q340 150 360 130 Q352 60 380 64 Z"/></g>';
-      default: return '';
-    }
+  function portraitImg(p) {
+    return (
+      '<img class="persona-art" src="assets/personas/persona-' + p.id + '.png" alt="Амплуа: ' + p.name + '" ' +
+      'loading="lazy" decoding="async" width="760" height="640" />'
+    );
   }
 
   /* ---------------- Render persona cards ---------------- */
@@ -202,7 +120,7 @@ acc +
       var card = document.createElement('article');
       card.className = 'persona-card';
       card.innerHTML =
-        '<div class="persona-portrait">' + portrait(p, i) +
+        '<div class="persona-portrait" data-persona="' + p.id + '">' + portraitImg(p) +
           '<button class="persona-play" data-i="' + i + '" aria-label="Послушать пример: ' + p.name + '"><span class="play-glyph"></span></button>' +
         '</div>' +
         '<div class="persona-body">' +
