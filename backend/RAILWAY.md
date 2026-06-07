@@ -165,7 +165,7 @@ APK → JWT → POST /v1/story/full only
    (корневой `railway.toml` задаёт BFF Dockerfile — поле Dockerfile в UI **не кликается**, это нормально)
 3. У сервиса **silero** убери лишние Variables (GROQ, YANDEX, LLM) — они только на BFF
 4. **Generate Domain** на silero → скопируй URL
-5. **Networking → Public → Port: `9898`** (образ Silero не слушает 8080 — healthcheck упадёт)
+5. **Networking → Public → Port: `8080`** (Railway ставит `$PORT=8080`; если указать 9898 — снаружи будет 502)
 6. Проверка: `curl https://ТВОЙ-SILERO.up.railway.app/voices` → `aidar`, `baya`, …
 
 **Связать BFF и Silero (Variables на music-story):**

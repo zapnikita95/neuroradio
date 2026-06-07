@@ -1,7 +1,7 @@
 # Silero TTS — ОТДЕЛЬНЫЙ сервис Railway.
 #
 # silero → Settings → Config-as-code → File path: silero-railway.toml  (НЕ railway.toml!)
-# silero → Networking → Public → Port: 9898
+# silero → Networking → Public → Port: 8080  (Railway $PORT=8080, НЕ 9898!)
 # silero → Memory: минимум 2 GB
 #
 # Custom Start Command / Healthcheck — ЗДЕСЬ, не в UI (UI может показывать railway.toml — игнор)

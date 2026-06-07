@@ -12,6 +12,6 @@ import uvicorn
 from app.logger import LogConfig
 from main import get_application
 
-port = int(os.environ.get('PORT', '9898'))
+port = int(os.environ.get('PORT', '8080'))
 print(f'[silero-railway] listening on 0.0.0.0:{port}', flush=True)
 uvicorn.run(get_application(), host='0.0.0.0', port=port, log_config=LogConfig().dict())

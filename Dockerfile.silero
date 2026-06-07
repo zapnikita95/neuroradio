@@ -8,5 +8,5 @@ ENV LANGUAGE=ru
 ENV NUMBER_OF_THREADS=4
 ENV SAMPLE_RATE=48000
 
-EXPOSE 9898
+EXPOSE 8080
 CMD ["python3", "-u", "./silero-railway-entrypoint.py"]
