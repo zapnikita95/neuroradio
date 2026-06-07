@@ -3,6 +3,9 @@ package com.musicstory.app.ui.theme
 import android.app.Activity
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
+import com.musicstory.app.ui.theme.AccentCyan
+import com.musicstory.app.ui.theme.AccentPink
+import com.musicstory.app.ui.theme.AccentViolet
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.SideEffect
 import androidx.compose.ui.graphics.toArgb
@@ -10,13 +13,13 @@ import androidx.compose.ui.platform.LocalView
 import androidx.core.view.WindowCompat
 
 private val MusicStoryColorScheme = darkColorScheme(
-    primary = GoldBright,
+    primary = AccentViolet,
     onPrimary = DeepVoid,
-    primaryContainer = Copper,
+    primaryContainer = NightPlum,
     onPrimaryContainer = CreamText,
-    secondary = GoldWarm,
+    secondary = AccentPink,
     onSecondary = DeepVoid,
-    tertiary = AmberGlow,
+    tertiary = AccentCyan,
     background = DeepVoid,
     onBackground = CreamText,
     surface = SurfaceElevated,

@@ -10,8 +10,8 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.TextUnit
+import com.musicstory.app.ui.theme.AccentViolet
 import com.musicstory.app.ui.theme.CreamText
-import com.musicstory.app.ui.theme.GoldBright
 
 @Composable
 fun BrandTitle(
@@ -35,7 +35,7 @@ fun BrandTitle(
                 SpanStyle(
                     fontFamily = FontFamily.SansSerif,
                     fontWeight = FontWeight.Bold,
-                    color = GoldBright,
+                    color = AccentViolet,
                     letterSpacing = MaterialTheme.typography.labelLarge.letterSpacing,
                 ),
             ) {
