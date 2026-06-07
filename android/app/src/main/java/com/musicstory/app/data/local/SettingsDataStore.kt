@@ -561,7 +561,7 @@ class SettingsDataStore(private val context: Context) {
     }
 
     companion object {
-        const val DEFAULT_BACKEND_URL = "https://neuroradio-production-3966.up.railway.app"
+        const val DEFAULT_BACKEND_URL = "https://www.efir-ai.ru"
         const val DEFAULT_EVERY_N_TRACKS = 3
         const val DEFAULT_SAME_TRACK_STORY_EVERY_N = 3
         const val DEFAULT_AUTO_INTERCEPT = true

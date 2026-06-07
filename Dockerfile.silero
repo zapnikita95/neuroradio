@@ -1,4 +1,3 @@
 # Silero TTS sidecar for Railway (navatusein/silero-tts-service).
+# PORT задаёт Railway (обычно 8080) — не хардкодить.
 FROM navatusein/silero-tts-service:latest
-ENV PORT=9898
-EXPOSE 9898
