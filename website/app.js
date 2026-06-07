@@ -210,7 +210,7 @@
     });
   });
 
-  /* ---------------- Persona rail nav ---------------- */
+  /* ---------------- Persona rail nav + drag scroll ---------------- */
   (function () {
     if (!rail) return;
     var prev = $('#railPrev'), next = $('#railNext'), bar = $('#railProgressBar');
@@ -222,6 +222,35 @@
       var r = max > 0 ? rail.scrollLeft / max : 0;
       if (bar) { bar.style.width = '22%'; bar.style.marginLeft = (r * 78) + '%'; }
     });
+
+    var dragging = false, moved = false, startX = 0, startScroll = 0;
+    rail.addEventListener('mousedown', function (e) {
+      if (e.button !== 0 || e.target.closest('.persona-play')) return;
+      dragging = true;
+      moved = false;
+      startX = e.pageX;
+      startScroll = rail.scrollLeft;
+      rail.classList.add('is-dragging');
+    });
+    window.addEventListener('mousemove', function (e) {
+      if (!dragging) return;
+      var dx = e.pageX - startX;
+      if (Math.abs(dx) > 4) moved = true;
+      rail.scrollLeft = startScroll - dx;
+    });
+    function endDrag() {
+      if (!dragging) return;
+      dragging = false;
+      rail.classList.remove('is-dragging');
+    }
+    window.addEventListener('mouseup', endDrag);
+    rail.addEventListener('mouseleave', endDrag);
+    rail.addEventListener('click', function (e) {
+      if (!moved) return;
+      e.preventDefault();
+      e.stopPropagation();
+      moved = false;
+    }, true);
   })();
 
   /* ---------------- Header scroll + burger ---------------- */
@@ -457,8 +486,8 @@
 
   /* ---------------- GitHub latest release wiring ---------------- */
   (function () {
-    var apkEls = ['#dlApk', '#successApk'].map($).filter(Boolean);
-    var extEls = ['#dlExt', '#successExt'].map($).filter(Boolean);
+    var apkEls = ['#dlApk', '#successApk'].map(function (id) { return $(id); }).filter(Boolean);
+    var extEls = ['#dlExt', '#successExt'].map(function (id) { return $(id); }).filter(Boolean);
     var apkVer = $('#apkVersion'), extVer = $('#extVersion');
 
     fetch('https://api.github.com/repos/' + GH_REPO + '/releases/latest', { headers: { Accept: 'application/vnd.github+json' } })
