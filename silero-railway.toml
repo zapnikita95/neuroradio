@@ -1,13 +1,14 @@
 # Silero TTS — ОТДЕЛЬНЫЙ сервис Railway.
 #
-# silero → Settings → Networking → Public → Port: 9898
-# silero → Variables: НЕ добавляй RAILWAY_PUBLIC_DOMAIN вручную (Railway даёт сам)
-# silero → Memory: минимум 2 GB (модель ~1 GB)
+# silero → Settings → Config-as-code → File path: silero-railway.toml  (НЕ railway.toml!)
+# silero → Networking → Public → Port: 9898
+# silero → Memory: минимум 2 GB
 #
-# music-story Variables (НЕ на silero!):
+# Custom Start Command / Healthcheck — ЗДЕСЬ, не в UI (UI может показывать railway.toml — игнор)
+#
+# music-story:
 #   SILERO_TTS_URL=https://${{silero.RAILWAY_PUBLIC_DOMAIN}}
 #   PUBLIC_BFF_URL=https://www.efir-ai.ru
-#   BILLING_ADMIN_SECRET=<секрет>
 
 [build]
 builder = "DOCKERFILE"
@@ -15,6 +16,7 @@ dockerfilePath = "Dockerfile.silero"
 watchPatterns = ["Dockerfile.silero", "silero-railway-entrypoint.py"]
 
 [deploy]
+startCommand = "python3 -u ./silero-railway-entrypoint.py"
 healthcheckPath = "/voices"
 healthcheckTimeout = 600
 restartPolicyType = "ON_FAILURE"
