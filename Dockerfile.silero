@@ -1,5 +1,12 @@
-# Silero TTS sidecar for Railway (navatusein/silero-tts-service).
-# Образ ВСЕГДА слушает порт 9898 (не читает $PORT).
-# Railway → silero → Settings → Networking → Public → Port: 9898 (не 8080!)
+# Silero TTS for Railway (navatusein/silero-tts-service).
+# Railway healthcheck hits $PORT; upstream image ignores $PORT → custom entrypoint.
 FROM navatusein/silero-tts-service:latest
+
+COPY scripts/silero-railway-entrypoint.py /silero-railway-entrypoint.py
+
+ENV LANGUAGE=ru
+ENV NUMBER_OF_THREADS=4
+ENV SAMPLE_RATE=48000
+
 EXPOSE 9898
+ENTRYPOINT ["python", "/silero-railway-entrypoint.py"]

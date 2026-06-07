@@ -1,7 +1,8 @@
 # Silero TTS — ОТДЕЛЬНЫЙ сервис Railway.
 #
-# silero → Settings → Config-as-code → silero-railway.toml
-# silero → Settings → Networking → Public → Port: 9898  ← ОБЯЗАТЕЛЬНО (не 8080)
+# silero → Settings → Networking → Public → Port: 9898
+# silero → Variables: НЕ добавляй RAILWAY_PUBLIC_DOMAIN вручную (Railway даёт сам)
+# silero → Memory: минимум 2 GB (модель ~1 GB)
 #
 # music-story Variables (НЕ на silero!):
 #   SILERO_TTS_URL=https://${{silero.RAILWAY_PUBLIC_DOMAIN}}

@@ -77,18 +77,20 @@ async function synthesizeViaLegacy(
   return Buffer.from(await response.arrayBuffer());
 }
 
-/** GET /docs or OpenAI /v1/audio/speech — silero-api-server. */
+/** GET /voices, /settings (navatusein), /tts/model (silero-api-server). */
 export async function probeSileroTtsHealth(baseUrl?: string): Promise<boolean> {
   const url = (baseUrl ?? getSileroTtsBaseUrl())?.replace(/\/$/, '');
   if (!url) return false;
-  try {
-    const voices = await fetch(`${url}/voices`, { signal: AbortSignal.timeout(5000) });
-    if (voices.ok) return true;
-    const models = await fetch(`${url}/tts/model`, { signal: AbortSignal.timeout(5000) });
-    return models.ok;
-  } catch {
-    return false;
+  const paths = ['/voices', '/settings', '/tts/model'];
+  for (const p of paths) {
+    try {
+      const res = await fetch(`${url}${p}`, { signal: AbortSignal.timeout(8000) });
+      if (res.ok) return true;
+    } catch {
+      /* try next */
+    }
   }
+  return false;
 }
 
 export interface SileroSynthesisOptions {
