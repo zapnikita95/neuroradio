@@ -1,10 +1,12 @@
 """Generate logo assets from source PNG. Run: python scripts/process_logo.py"""
 from pathlib import Path
-from PIL import Image
+from PIL import Image, ImageDraw
 import numpy as np
 
 ROOT = Path(__file__).resolve().parents[1]
 SOURCE = Path(r"C:\Users\1\Downloads\ChatGPT Image 7 июн. 2026 г., 10_58_40.png")
+# apple-touch-icon 180×180 → radius 30 (reference in UI)
+CORNER_RADIUS_RATIO = 30 / 180
 
 if not SOURCE.exists():
     raise SystemExit(f"Logo source not found: {SOURCE}")
@@ -58,6 +60,22 @@ def fit_square(im: Image.Image, out_w: int, bg=(0, 0, 0, 255)) -> Image.Image:
     return canvas
 
 
+def round_square(im: Image.Image, out_w: int) -> Image.Image:
+    """Squircle mask — radius 30px at 180px reference size."""
+    im = fit_square(im, out_w, (0, 0, 0, 0))
+    radius = max(2, round(out_w * CORNER_RADIUS_RATIO))
+    mask = Image.new("L", (out_w, out_w), 0)
+    ImageDraw.Draw(mask).rounded_rectangle((0, 0, out_w, out_w), radius=radius, fill=255)
+    im.putalpha(Image.composite(im.split()[3], Image.new("L", (out_w, out_w), 0), mask))
+    bg = Image.new("RGBA", (out_w, out_w), (0, 0, 0, 255))
+    bg.paste(im, (0, 0), im)
+    return bg
+
+
+def save_icon(im: Image.Image, out_w: int, path: Path) -> None:
+    round_square(im, out_w).convert("RGB").save(path)
+
+
 tagline_top = find_tagline_top()
 icon_top, icon_bottom, _, _ = content_bbox(0, tagline_top)
 # Icon only: graphic above the «ЭФИР AI» wordmark (gap ~y=907 in source).
@@ -77,11 +95,11 @@ web = ROOT / "website" / "assets"
 web.mkdir(parents=True, exist_ok=True)
 
 fit_square(full_src, 1024, (0, 0, 0, 255)).convert("RGB").save(web / "logo-full.png")
-fit_square(compact_src, 1024, (0, 0, 0, 255)).convert("RGB").save(web / "logo-compact.png")
-fit_square(icon_src, 1024, (0, 0, 0, 255)).convert("RGB").save(web / "logo-icon.png")
+save_icon(compact_src, 1024, web / "logo-compact.png")
+save_icon(icon_src, 1024, web / "logo-icon.png")
 
 for size, name in [(512, "icon-512.png"), (32, "favicon-32.png"), (180, "apple-touch-icon.png")]:
-    fit_square(icon_src, size, (0, 0, 0, 255)).convert("RGB").save(web / name)
+    save_icon(icon_src, size, web / name)
 
 android_res = ROOT / "android" / "app" / "src" / "main" / "res"
 densities = {
@@ -95,13 +113,13 @@ densities = {
 for folder, px in densities.items():
     d = android_res / folder
     d.mkdir(parents=True, exist_ok=True)
-    fit_square(icon_src, px, (0, 0, 0, 0)).save(d / "ic_launcher_foreground.png")
-    fit_square(compact_src, px, (0, 0, 0, 255)).convert("RGB").save(d / "ic_launcher.png")
-    fit_square(compact_src, px, (0, 0, 0, 255)).convert("RGB").save(d / "ic_launcher_round.png")
+    round_square(icon_src, px).save(d / "ic_launcher_foreground.png")
+    save_icon(compact_src, px, d / "ic_launcher.png")
+    save_icon(compact_src, px, d / "ic_launcher_round.png")
 
 drawable = android_res / "drawable-nodpi"
 drawable.mkdir(parents=True, exist_ok=True)
-fit_square(compact_src, 512, (0, 0, 0, 255)).convert("RGB").save(drawable / "logo_efir_ai.png")
+save_icon(compact_src, 512, drawable / "logo_efir_ai.png")
 
 print(f"tagline_top={tagline_top}, icon_only_bottom={icon_only_bottom}")
 print("done")
