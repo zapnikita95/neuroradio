@@ -9,8 +9,8 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -36,15 +36,16 @@ import androidx.lifecycle.LifecycleEventObserver
 import com.musicstory.app.MusicStoryApp
 import com.musicstory.app.R
 import com.musicstory.app.service.MediaNotificationListener
-import com.musicstory.app.ui.components.BrandTitle
 import com.musicstory.app.ui.components.GlassCard
 import com.musicstory.app.ui.components.MusicStoryBackground
 import com.musicstory.app.ui.components.PrimaryStoryButton
 import com.musicstory.app.ui.components.SecondaryStoryButton
-import com.musicstory.app.ui.components.VinylDisc
 import com.musicstory.app.ui.theme.CreamText
 import com.musicstory.app.ui.theme.ErrorCoral
 import com.musicstory.app.ui.theme.MutedLavender
+
+/** Высота нижней зоны с кнопками — контент скролла не заезжает под них. */
+private val OnboardingFooterHeight = 156.dp
 
 @Composable
 fun OnboardingScreen(
@@ -78,45 +79,41 @@ fun OnboardingScreen(
     }
 
     MusicStoryBackground(modifier = modifier) {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(horizontal = 24.dp),
-        ) {
+        Box(modifier = Modifier.fillMaxSize()) {
             Column(
                 modifier = Modifier
-                    .weight(1f)
-                    .fillMaxWidth()
+                    .fillMaxSize()
+                    .padding(horizontal = 24.dp)
+                    .padding(bottom = OnboardingFooterHeight)
                     .verticalScroll(rememberScrollState()),
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
-                Spacer(modifier = Modifier.height(56.dp))
+                Spacer(modifier = Modifier.height(48.dp))
 
-                Image(
-                    painter = painterResource(R.drawable.logo_efir_ai),
-                    contentDescription = null,
+                Box(
                     modifier = Modifier
-                        .fillMaxWidth(0.58f)
-                        .heightIn(max = 96.dp)
-                        .clip(RoundedCornerShape(22.dp)),
-                    contentScale = ContentScale.Fit,
-                )
+                        .size(88.dp)
+                        .clip(RoundedCornerShape(20.dp)),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Image(
+                        painter = painterResource(R.drawable.logo_efir_ai),
+                        contentDescription = null,
+                        modifier = Modifier.fillMaxSize(),
+                        contentScale = ContentScale.Crop,
+                    )
+                }
 
                 Spacer(modifier = Modifier.height(20.dp))
 
-                BrandTitle()
                 Text(
                     text = context.getString(R.string.onboarding_title),
-                    style = MaterialTheme.typography.displaySmall,
+                    style = MaterialTheme.typography.headlineMedium,
                     textAlign = TextAlign.Center,
                     color = CreamText,
                 )
 
-                Spacer(modifier = Modifier.height(16.dp))
-
-                VinylDisc(size = 120.dp, isSpinning = true)
-
-                Spacer(modifier = Modifier.height(24.dp))
+                Spacer(modifier = Modifier.height(20.dp))
 
                 GlassCard(accentBorder = true) {
                     Text(
@@ -134,29 +131,25 @@ fun OnboardingScreen(
                     )
                 }
 
-                Spacer(modifier = Modifier.height(24.dp))
+                Spacer(modifier = Modifier.height(16.dp))
             }
 
             Column(
                 modifier = Modifier
+                    .align(Alignment.BottomCenter)
                     .fillMaxWidth()
+                    .padding(horizontal = 24.dp)
                     .padding(bottom = 20.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .heightIn(min = 48.dp),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    if (!hintMessage.isNullOrBlank()) {
-                        Text(
-                            text = hintMessage!!,
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = ErrorCoral,
-                            textAlign = TextAlign.Center,
-                        )
-                    }
+                if (!hintMessage.isNullOrBlank()) {
+                    Text(
+                        text = hintMessage!!,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = ErrorCoral,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.padding(bottom = 8.dp),
+                    )
                 }
 
                 PrimaryStoryButton(
