@@ -1,0 +1,67 @@
+# Build the Android APK + pack the browser extension and publish both to a
+# GitHub Release. The website (efir-ai.ru) reads releases/latest via the GitHub
+# API, so its "Скачать APK" / "Установить расширение" buttons always point here.
+
+name: Release APK + Extension
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Build debug APK
+        working-directory: android
+        run: |
+          chmod +x gradlew
+          ./gradlew --no-daemon assembleDebug
+
+      - name: Verify APK at repo root
+        run: |
+          if [ ! -f MusicStory.apk ]; then
+            echo "MusicStory.apk not found in repo root" >&2
+            exit 1
+          fi
+          ls -lh MusicStory.apk
+
+      - name: Pack browser extension
+        run: |
+          cd chrome-extension
+          zip -r ../efir-extension.zip . -x '*.DS_Store'
+          cd ..
+          ls -lh efir-extension.zip
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: efir-ai-build
+          path: |
+            MusicStory.apk
+            efir-extension.zip
+
+      - name: Publish to GitHub Release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            MusicStory.apk
+            efir-extension.zip
+          generate_release_notes: true

@@ -1,0 +1,49 @@
+<svg width="512" height="512" viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Эфир AI">
+  <defs>
+    <linearGradient id="efir-grad" x1="96" y1="96" x2="416" y2="432" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#A855F7"/>
+      <stop offset="0.5" stop-color="#FF5DA2"/>
+      <stop offset="1" stop-color="#FFB86B"/>
+    </linearGradient>
+    <linearGradient id="efir-grad-soft" x1="120" y1="120" x2="400" y2="400" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#C084FC"/>
+      <stop offset="1" stop-color="#FF7AB8"/>
+    </linearGradient>
+    <radialGradient id="efir-bg" cx="0.5" cy="0.42" r="0.7">
+      <stop offset="0" stop-color="#1b1430"/>
+      <stop offset="0.55" stop-color="#0d0a1a"/>
+      <stop offset="1" stop-color="#070510"/>
+    </radialGradient>
+    <radialGradient id="efir-core" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#FFE9F4"/>
+      <stop offset="0.4" stop-color="#FF7AB8"/>
+      <stop offset="1" stop-color="#A855F7"/>
+    </radialGradient>
+    <filter id="efir-glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="10" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <rect x="16" y="16" width="480" height="480" rx="116" fill="url(#efir-bg)"/>
+  <rect x="16.5" y="16.5" width="479" height="479" rx="115.5" fill="none" stroke="url(#efir-grad)" stroke-opacity="0.5" stroke-width="3"/>
+
+  <!-- broadcast waves -->
+  <g stroke-linecap="round" fill="none" filter="url(#efir-glow)">
+    <path d="M196 256a64 64 0 0 1 18.7-45.3" stroke="url(#efir-grad-soft)" stroke-width="14" opacity="0.95"/>
+    <path d="M316 256a64 64 0 0 0-18.7-45.3" stroke="url(#efir-grad-soft)" stroke-width="14" opacity="0.95"/>
+    <path d="M152 256a104 104 0 0 1 30.5-73.5" stroke="url(#efir-grad)" stroke-width="14" opacity="0.8"/>
+    <path d="M360 256a104 104 0 0 0-30.5-73.5" stroke="url(#efir-grad)" stroke-width="14" opacity="0.8"/>
+    <path d="M110 256a146 146 0 0 1 42.8-103.2" stroke="url(#efir-grad)" stroke-width="13" opacity="0.5"/>
+    <path d="M402 256a146 146 0 0 0-42.8-103.2" stroke="url(#efir-grad)" stroke-width="13" opacity="0.5"/>
+  </g>
+
+  <!-- central core / on-air node with play -->
+  <circle cx="256" cy="256" r="58" fill="url(#efir-core)" filter="url(#efir-glow)"/>
+  <circle cx="256" cy="256" r="58" fill="none" stroke="#FFFFFF" stroke-opacity="0.35" stroke-width="2"/>
+  <path d="M242 230 286 256 242 282Z" fill="#0d0a1a"/>
+
+  <!-- signal stem -->
+  <rect x="248" y="312" width="16" height="86" rx="8" fill="url(#efir-grad)"/>
+  <circle cx="256" cy="406" r="16" fill="url(#efir-grad-soft)"/>
+</svg>

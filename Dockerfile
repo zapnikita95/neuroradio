@@ -9,6 +9,9 @@ RUN npm ci
 COPY backend/ ./
 RUN npm run build && npm prune --production
 
+# Маркетинговый сайт efir-ai.ru — раздаётся бэкендом как статика (/app/website).
+COPY website/ ./website/
+
 ENV NODE_ENV=production
 EXPOSE 3000
 
