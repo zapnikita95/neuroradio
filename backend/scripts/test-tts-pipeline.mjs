@@ -42,25 +42,34 @@ test('mixed EN stays inline without articulation pauses', () => {
 });
 
 test('SSML does not split trailing в in трэков before Latin name', () => {
-  const ssml = buildYandexSsml(
+  const marked = prepareYandexTtsText(
     'Stranger in Moscow — один из самых личных трэков Michael Jackson.',
+    { artist: 'Michael Jackson', title: 'Stranger in Moscow' },
   );
-  assert.doesNotMatch(ssml, /трэко<lang/i);
-  assert.doesNotMatch(ssml, /трэко.*<lang xml:lang="ru-RU">в<\/lang>/i);
+  const ssml = buildYandexSsml(marked);
+  assert.doesNotMatch(ssml, /<lang/i);
   assert.match(ssml, /трэков/i);
 });
 
-test('SSML keeps preposition с in Russian stream before Latin', () => {
-  const ssml = buildYandexSsml('подписал контракт с лейблом Young Money Entertainment.');
-  assert.doesNotMatch(ssml, /<lang xml:lang="ru-RU">с<\/lang>/i);
-  assert.match(ssml, /с лейблом/i);
-  assert.match(ssml, /<lang xml:lang="en-US">Young Money Entertainment/i);
+test('Latin transliterated inline — preposition с stays in Russian stream', () => {
+  const marked = prepareYandexTtsText('подписал контракт с лейблом Young Money Entertainment.', {
+    artist: 'Drake',
+    title: 'Test',
+  });
+  assert.doesNotMatch(marked, /<lang/i);
+  assert.match(marked, /с лейблом/i);
+  assert.doesNotMatch(marked, /\bYoung Money/i);
+  assert.match(marked, /Янг Мани/i);
 });
 
-test('SSML keeps Don\'t Matter To Me as one English phrase', () => {
-  const ssml = buildYandexSsml('В треке Don\u2019t Matter To Me он использует рэп-сингинг.');
-  assert.doesNotMatch(ssml, />Don<\/lang>/i);
-  assert.match(ssml, /Don&apos;t Matter To Me|Don't Matter To Me/i);
+test('Latin apostrophe phrase transliterated without lang tags', () => {
+  const marked = prepareYandexTtsText('В треке Don\u2019t Matter To Me он использует рэп-сингинг.', {
+    artist: 'Michael Jackson',
+    title: 'Test',
+  });
+  assert.doesNotMatch(marked, /<lang/i);
+  assert.doesNotMatch(marked, /\bDon\b/i);
+  assert.match(marked, /рэп-сингинг/i);
 });
 
 test('prepareYandexTtsText reads R&B as ар эн би', () => {
@@ -90,9 +99,14 @@ test('prepareYandexTtsText keeps preposition в after ар эн би', () => {
   assert.doesNotMatch(ssml, /R&amp;B/i);
 });
 
-test('SSML pause after English block before Russian preposition', () => {
-  const ssml = buildYandexSsml('уровень Drake в мейнстриме.');
-  assert.match(ssml, /<\/lang><break time="60ms"\/>в /i);
+test('no lang-switch pause before Russian preposition', () => {
+  const marked = prepareYandexTtsText('уровень Drake в мейнстриме.', {
+    artist: 'Drake',
+    title: 'Test',
+  });
+  const ssml = buildYandexSsml(marked);
+  assert.doesNotMatch(ssml, /<lang/i);
+  assert.match(ssml, /в мейнстриме/i);
 });
 
 test('polish splits long bureaucratic phrasing', () => {
@@ -117,19 +131,25 @@ test('polish fixes меня мурашки бегут', () => {
   assert.doesNotMatch(out, /^меня/i);
 });
 
-test('SSML reads moonwalk as moon walk in English', () => {
-  const ssml = buildYandexSsml('Его moonwalk изменил сцену.');
-  assert.match(ssml, /<lang xml:lang="en-US">moon walk<\/lang>/i);
+test('moonwalk transliterated for continuous speech', () => {
+  const marked = prepareYandexTtsText('Его moonwalk изменил сцену.', { artist: 'MJ', title: 'Test' });
+  assert.doesNotMatch(marked, /moonwalk/i);
+  assert.match(marked, /мун уок/i);
 });
 
-test('SSML reads Xscape as X scape', () => {
-  const ssml = buildYandexSsml('альбом Xscape вышел позже.');
-  assert.match(ssml, /<lang xml:lang="en-US">X scape<\/lang>/i);
+test('Xscape transliterated for continuous speech', () => {
+  const marked = prepareYandexTtsText('альбом Xscape вышел позже.', { artist: 'MJ', title: 'Test' });
+  assert.doesNotMatch(marked, /xscape/i);
+  assert.match(marked, /икс скейп/i);
 });
 
-test('SSML reads OneRepublic split', () => {
-  const ssml = buildYandexSsml('группа OneRepublic выступала.');
-  assert.match(ssml, /<lang xml:lang="en-US">One Republic<\/lang>/i);
+test('OneRepublic transliterated for continuous speech', () => {
+  const marked = prepareYandexTtsText('группа OneRepublic выступала.', {
+    artist: 'OneRepublic',
+    title: 'Test',
+  });
+  assert.doesNotMatch(marked, /onerepublic/i);
+  assert.match(marked, /Уан Респаблик/i);
 });
 
 test('stress marks хаоса correctly', () => {

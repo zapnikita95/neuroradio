@@ -36,7 +36,7 @@
       quote: '«Тихо… только вы и эта песня.»',
       pal: ['#3b2c8f', '#1e2a78'], skin: ['#cfd6ff', '#8aa0ff'], eye: '#10163a', accent: '#9ad7ff',
       voice: 'filipp', rate: 0.92, pitch: 0.95,
-      script: 'Тихо. Только вы и эта песня. ' + THRILLER_CORE + ' Останьтесь со мной до утра.',
+      script: 'Тихо. Только вы и эта песня. ' + THRILLER_CORE + ' Оставайтесь на нашей волне до утра.',
       audio: 'assets/demos/persona-night_dj.wav'
     },
     {

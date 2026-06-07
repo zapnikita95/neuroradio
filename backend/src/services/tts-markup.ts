@@ -128,6 +128,7 @@ export function prepareYandexTtsText(
   }
 
   text = enhanceMixedLanguageText(text, artist, title);
+  text = applyForeignPronunciation(text, artist, title);
 
   return collapseMarkupWhitespace(text);
 }

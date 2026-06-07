@@ -28,6 +28,18 @@ const PHRASE_PRONUNCIATION_RU: Record<string, string> = {
   'to the moon and back': 'Ту зе Мун энд Бэк',
   'to the moon & back': 'Ту зе Мун энд Бэк',
   'ed sheeran': 'Эд Ширан',
+  thriller: 'Триллер',
+  'national film registry': 'Нэшнл Фильм Реджистри',
+  'vincent price': 'Винсент Прайс',
+  mtv: 'Эм-Ти-Ви',
+  'michael jackson': 'Майкл Джексон',
+  moonwalk: 'мун уок',
+  'moon walk': 'мун уок',
+  xscape: 'икс скейп',
+  'x scape': 'икс скейп',
+  onerepublic: 'Уан Респаблик',
+  'one republic': 'Уан Респаблик',
+  'young money entertainment': 'Янг Мани Энтертейнмент',
   'edward christopher sheeran': 'Эдвард Кристофер Ширан',
   'shape of you': 'Шейп ов Ю',
   'asylum records': 'Азайлум Рекордс',
@@ -299,8 +311,8 @@ function ensureAllLatinTransliterated(text: string): string {
   return result.replace(/[A-Za-zÀ-ÿ]+/g, (match) => spellLatinWordPhonetic(match));
 }
 
-const MARKUP_SLOT = '\uE010M';
-const MARKUP_END = '\uE011';
+const MARKUP_SLOT = '\uE000';
+const MARKUP_END = '\uE001';
 
 function maskTtsMarkup(text: string): { masked: string; slots: string[] } {
   const slots: string[] = [];

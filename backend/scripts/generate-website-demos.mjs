@@ -38,7 +38,7 @@ const PERSONAS = [
     id: 'night_dj',
     voice: 'filipp',
     speed: 0.92,
-    script: 'Тихо. Только вы и эта песня. ' + THRILLER_CORE + ' Останьтесь со мной до утра.',
+    script: 'Тихо. Только вы и эта песня. ' + THRILLER_CORE + ' Оставайтесь на нашей волне до утра.',
   },
   {
     id: 'expert',

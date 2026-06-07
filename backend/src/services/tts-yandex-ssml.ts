@@ -1,10 +1,11 @@
 /**
- * Yandex SpeechKit API v1 — SSML с переключением языка для латиницы.
- * ru-RU голос (ermil, zahar, …) читает «Baby One More Time» как русскую транскрипцию;
- * <lang xml:lang="en-US"> заставляет синтезатор произнести по-английски.
+ * Yandex SpeechKit API v1 — SSML for pause tags.
+ * Latin is transliterated to Cyrillic in prepareYandexTtsText — no <lang> switches
+ * (they cause unnatural pauses before English words).
  */
 
 import type { YandexVoiceId } from './voices.js';
+import { latinPhraseToRussianTts } from './tts-foreign-pronounce.js';
 import { normalizeLatinApostrophes } from './tts-yandex-normalize.js';
 
 const BREAK_SMALL = '\uE020';
@@ -18,6 +19,14 @@ const LATIN_RUN_RE = new RegExp(
   `[A-Za-zÀ-ÿ][A-Za-zÀ-ÿ0-9${LATIN_APOSTROPHE}.\\-&]{0,}(?:\\s+(?![.!?…]\\s)[A-Za-zÀ-ÿ][A-Za-zÀ-ÿ0-9${LATIN_APOSTROPHE}.\\-&]{0,})*`,
   'g',
 );
+
+const LATIN_SSML_PRONUNCIATION: Record<string, string> = {
+  moonwalk: 'moon walk',
+  xscape: 'X scape',
+  onerepublic: 'One Republic',
+  'anti-gravity lean': 'anti gravity lean',
+  'anti-gravity': 'anti gravity',
+};
 
 export function hasLatinForSsml(text: string): boolean {
   const stripped = text.replace(/<\[(?:small|medium|large|tiny|huge|sentence)\]>/g, '');
@@ -33,15 +42,15 @@ export function escapeSsml(text: string): string {
     .replace(/'/g, '&apos;');
 }
 
-function detectLangCode(latinSpan: string): string {
-  if (/ñ|¿|¡|[áéíóúü]/i.test(latinSpan)) return 'es-ES';
+function detectLangCode(latinSpan: string): 'en' | 'it' | 'es' {
+  if (/ñ|¿|¡|[áéíóúü]/i.test(latinSpan)) return 'es';
   if (
     /\b(zitti|buoni|buono|mambo|italiano|ciao|amore|bambino|gnocchi)\b/i.test(latinSpan) ||
     /tti\b|gn[a-z]|gli/i.test(latinSpan)
   ) {
-    return 'it-IT';
+    return 'it';
   }
-  return 'en-US';
+  return 'en';
 }
 
 /** Short Spanish/Italian tokens with accents — ru-RU voice reads es-ES lang as English «bi». */
@@ -69,20 +78,26 @@ function cyrillicForShortAccentLatin(span: string): string | null {
   return capitalizeLike(bare, mapped) + punct;
 }
 
-/**
- * «с/в/к» перед <lang en-US> Yandex иногда читает как буквы.
- * Предлог остаётся в русском потоке; для «контракт с Young…» — bridge в tts-yandex-normalize.
- */
-function escapeRussianChunkBeforeLatin(chunk: string): string {
-  return escapeSsml(chunk);
+function splitLatinTokenForTts(span: string): string {
+  const trimmed = span.trim();
+  const key = trimmed.toLowerCase();
+  if (LATIN_SSML_PRONUNCIATION[key]) return LATIN_SSML_PRONUNCIATION[key];
+  if (/^[A-Z][a-z]+[A-Z][a-z]+$/.test(trimmed)) {
+    return trimmed.replace(/([a-z])([A-Z])/g, '$1 $2');
+  }
+  if (/^X[a-z]{4,}$/i.test(trimmed)) {
+    return `X ${trimmed.slice(1)}`;
+  }
+  return trimmed;
 }
 
-/** После en-US блока ru-предлог может прочитаться как буква — короткая пауза сбрасывает язык. */
-function fixRussianPrepositionsAfterLangTags(text: string): string {
-  return text.replace(
-    /(<\/lang>)(\s*)([вскуо])(\s+)(?=[а-яёА-ЯЁ])/g,
-    '$1<break time="60ms"/>$3$4',
-  );
+function latinToCyrillicForYandex(span: string): string {
+  const lang = detectLangCode(span);
+  if (lang === 'es' || lang === 'it') {
+    const cyrillicAccent = cyrillicForShortAccentLatin(span);
+    if (cyrillicAccent) return cyrillicAccent;
+  }
+  return latinPhraseToRussianTts(splitLatinTokenForTts(span), lang);
 }
 
 function pausesToPlaceholders(text: string): string {
@@ -100,42 +115,7 @@ function placeholdersToBreaks(text: string): string {
     .replaceAll(BREAK_MEDIUM, '<break time="80ms"/>');
 }
 
-/** Strip micro-pauses hugging <lang> — foreign words should flow like in speech. */
-function trimBreaksAroundLangTags(text: string): string {
-  return text
-    .replace(/<break time="\d+ms"\/?>\s*(<lang\b)/g, '$1')
-    .replace(/(<\/lang>)\s*<break time="\d+ms"\/?>/g, '$1');
-}
-
-/** Latin spans Yandex misreads unless spaced for en-US voice. */
-const LATIN_SSML_PRONUNCIATION: Record<string, string> = {
-  moonwalk: 'moon walk',
-  xscape: 'X scape',
-  onerepublic: 'One Republic',
-  'anti-gravity lean': 'anti gravity lean',
-  'anti-gravity': 'anti gravity',
-};
-
-/** Split CamelCase album/brand tokens for en-US TTS (Xscape → X scape). */
-function splitCamelCaseLatin(span: string): string {
-  const key = span.trim().toLowerCase();
-  const mapped = LATIN_SSML_PRONUNCIATION[key];
-  if (mapped) return mapped;
-  if (/^[A-Z][a-z]+[A-Z][a-z]+$/.test(span.trim())) {
-    return span.trim().replace(/([a-z])([A-Z])/g, '$1 $2');
-  }
-  if (/^X[a-z]{4,}$/i.test(span.trim())) {
-    return `X ${span.trim().slice(1)}`;
-  }
-  return span;
-}
-
-function latinSpanForSsml(span: string): string {
-  const trimmed = span.trim();
-  return splitCamelCaseLatin(trimmed);
-}
-
-/** Оборачивает латинские фрагменты в SSML lang; русский текст и +ударения — как есть. */
+/** Remaining Latin → Cyrillic inline; Russian text and + stress marks stay as-is. */
 export function wrapMixedLanguageBody(text: string): string {
   const prepared = pausesToPlaceholders(normalizeLatinApostrophes(text));
   let last = 0;
@@ -145,26 +125,19 @@ export function wrapMixedLanguageBody(text: string): string {
 
   while ((match = re.exec(prepared)) !== null) {
     if (match.index > last) {
-      out += escapeRussianChunkBeforeLatin(prepared.slice(last, match.index));
+      out += escapeSsml(prepared.slice(last, match.index));
     }
-    const lang = detectLangCode(match[0]);
-    const cyrillicAccent = lang === 'es-ES' || lang === 'it-IT' ? cyrillicForShortAccentLatin(match[0]) : null;
-    if (cyrillicAccent) {
-      out += escapeSsml(cyrillicAccent);
-    } else {
-      out += `<lang xml:lang="${lang}">${escapeSsml(latinSpanForSsml(match[0]))}</lang>`;
-    }
+    out += escapeSsml(latinToCyrillicForYandex(match[0]));
     last = match.index + match[0].length;
   }
   if (last < prepared.length) {
     out += escapeSsml(prepared.slice(last));
   }
-  return fixRussianPrepositionsAfterLangTags(trimBreaksAroundLangTags(placeholdersToBreaks(out)));
+  return placeholdersToBreaks(out);
 }
 
 export function buildYandexSsml(markedText: string, _voice?: YandexVoiceId): string {
   const body = wrapMixedLanguageBody(markedText);
-  // Voice is passed via HTTP `voice=` — Yandex rejects <voice> inside SSML (400 BAD_REQUEST).
   return (
     `<speak version="1.0" xmlns="http://www.w3.org/2001/10/synthesis" xml:lang="ru-RU">` +
     `${body}</speak>`
