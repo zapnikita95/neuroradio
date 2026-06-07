@@ -253,6 +253,8 @@ acc +
     tryNext();
   }
 
+  var DEMO_LEAD_SKIP_SEC = 0.32;
+
   function playDemo(src, rate, btn, statusEl) {
     if (!src) {
       if (statusEl) statusEl.textContent = 'Демо-аудио скоро будет доступно.';
@@ -260,8 +262,13 @@ acc +
     }
     if (currentBtn === btn && !demoAudio.paused) { stopSpeak(); return; }
     stopSpeak();
+    demoAudio.volume = 1;
+    demoAudio.muted = false;
     demoAudio.src = src;
     demoAudio.playbackRate = rate || 1;
+    demoAudio.onplaying = function () {
+      if (demoAudio.currentTime < 0.05) demoAudio.currentTime = DEMO_LEAD_SKIP_SEC;
+    };
     currentBtn = btn || null;
     if (btn) btn.classList.add('playing');
     if (statusEl) statusEl.textContent = '● В эфире…';
@@ -361,84 +368,23 @@ acc +
     var TEMPOS = [{ l: 'Очень медленно', r: 0.85 }, { l: 'Медленно', r: 0.95 }, { l: 'Нормально', r: 1.08 }, { l: 'Быстро', r: 1.22 }, { l: 'Очень быстро', r: 1.38 }];
     var LENS = [{ l: '30 секунд', s: '~30 с', n: 1 }, { l: '1 минута', s: '~60 с', n: 2 }, { l: 'Без лимита', s: '2+ мин', n: 4 }];
 
-    var FACTS = [
-      'National Film Registry включил этот клип в список культурного наследия США',
-      'Vincent Price записал зловещий закадровый монолог',
-      'съёмки танца с зомби заняли недели',
-      'именно этот ролик сделал короткометражку главным событием эры MTV'
-    ];
-    var FOCUS = {
-      all: '', pop: ' Чистый поп-инжиниринг эпохи MTV.',
-      rock: ' Даже рокеры признавали железную ритм-секцию трека.',
-      hiphop: ' Этот бит потом сэмплировали в хип-хопе десятки раз.',
-      electronic: ' Сухой звук драм-машины Linn — мостик к электронике.'
-    };
+    var demoCopy = { short: {}, minute: {}, full: {} };
+    var state = { persona: PERSONAS[0] };
 
-    var state = { persona: PERSONAS[0], focus: 'all' };
-
-    PERSONAS.forEach(function (p, i) {
-      var b = document.createElement('button');
-      b.className = 'chip' + (i === 0 ? ' on' : ''); b.textContent = p.name; b.dataset.i = i;
-      b.addEventListener('click', function () {
-        $$('.chip', ampluaChips).forEach(function (c) { c.classList.remove('on'); });
-        b.classList.add('on'); state.persona = PERSONAS[i];
-        syncVoiceSelect();
-        render();
-      });
-      ampluaChips.appendChild(b);
-    });
-    VOICES.forEach(function (v) { var o = document.createElement('option'); o.value = v.id; o.textContent = v.label; voiceSel.appendChild(o); });
-    syncVoiceSelect();
-
-    $$('#focusChips .chip').forEach(function (c) {
-      c.addEventListener('click', function () {
-        $$('#focusChips .chip').forEach(function (x) { x.classList.remove('on'); });
-        c.classList.add('on'); state.focus = c.dataset.focus; render();
-      });
-    });
-
-    var THRILLER_STORY_MINUTE = 'Michael Jackson записал Thriller в эпоху, когда музыкальные клипы только начинали менять правила игры. Это был не просто трек — целый кинематографический опыт, растянутый на четырнадцать минут. В те годы MTV крутил в основном рок, но клип Thriller взломал систему: его ставили в эфир целиком, прерывая регулярное вещание. Джексон вложил в съёмки полмиллиона долларов — продажи альбома подскочили в семь раз после премьеры. Клип снял John Landis. Сцена с зомби-танцами изначально не входила в сценарий — и стала визитной карточкой ролика.';
-    var THRILLER_STORY_FULL = THRILLER_STORY_MINUTE + ' Thriller — единственный музыкальный клип в National Film Registry США. Vincent Price записал зловещий закадровый текст. Когда Thriller вышел, видеомагнитофоны разлетались — так родился первый вирусный хит до интернета.';
-
-    function personaMinuteBody(p) {
-      if (p.id === 'backstage') return BACKSTAGE_STORY_MINUTE;
-      return THRILLER_STORY_MINUTE;
+    function prettyDisplay(text) {
+      if (!text) return '';
+      return text
+        .replace(/\bмайкл джексон\b/gi, 'Майкл Джексон')
+        .replace(/\bджохн ландис\b/gi, 'Джон Ландис')
+        .replace(/\bвинсент прайс\b/gi, 'Винсент Прайс')
+        .replace(/\bмикхаил питерс\b/gi, 'Майкл Питерс')
+        .replace(/\bджакксон\b/gi, 'Джексон');
     }
 
-    function personaFullBody(p) {
-      if (p.id === 'backstage') return BACKSTAGE_STORY_MINUTE + ' ' + THRILLER_STORY_FULL;
-      return THRILLER_STORY_FULL;
-    }
-
-    function personaShortBody(p, n) {
-      if (p.id === 'backstage') return BACKSTAGE_STORY_MINUTE;
-      if (p.id === 'expert') return FACT_REGISTRY + ' Это эталон поп-хоррора восьмидесятых.';
-      if (p.id === 'night_dj') return FACT_REGISTRY + ' Оставайтесь на нашей волне до утра.';
-      var facts = [
-        FACT_REGISTRY,
-        'Vincent Price записал зловещий закадровый монолог',
-        'съёмки танца с зомби заняли недели',
-        'именно этот ролик сделал короткометражку главным событием эры MTV'
-      ];
-      return facts.slice(0, n).map(function (f) { return f + (f.endsWith('.') ? '' : '.'); }).join(' ');
-    }
-
-    function personaOpener(p) {
-      return p.script.split('.')[0] + '.';
-    }
-
-    function personaCloser(p) {
-      var parts = p.script.split('. ');
-      return parts.length ? parts[parts.length - 1] : '';
-    }
-
-    function buildStory() {
-      var p = state.persona, n = LENS[+length.value].n;
-      var op = personaOpener(p);
-      if (n >= 4) return op + ' ' + personaFullBody(p) + (personaCloser(p) ? ' ' + personaCloser(p) : '');
-      if (n >= 2) return op + ' ' + personaMinuteBody(p) + (personaCloser(p) ? ' ' + personaCloser(p) : '');
-      if (p.id === 'backstage') return op + ' ' + BACKSTAGE_STORY_MINUTE;
-      return op + ' ' + personaShortBody(p, n) + (FOCUS[state.focus] || '') + (n > 1 && p.id !== 'expert' && p.id !== 'night_dj' ? ' ' + personaCloser(p) : '');
+    function studioDisplayText(personaId, lenN) {
+      if (lenN >= 4) return demoCopy.full[personaId] || '';
+      if (lenN >= 2) return demoCopy.minute[personaId] || '';
+      return demoCopy.short[personaId] || '';
     }
 
     function syncVoiceSelect() {
@@ -459,15 +405,30 @@ acc +
 
     function render() {
       var p = state.persona;
+      var lenN = LENS[+length.value].n;
       hostEl.textContent = p.name;
       tempoOut.textContent = TEMPOS[+tempo.value].l;
       lengthOut.textContent = LENS[+length.value].l;
       tagVoice.textContent = 'Голос: ' + voiceLabel(voiceSel.value);
       tagLen.textContent = LENS[+length.value].s;
       tagTempo.textContent = 'Темп: ' + TEMPOS[+tempo.value].l.toLowerCase();
-      scriptEl.style.opacity = '0';
-      setTimeout(function () { scriptEl.textContent = buildStory(); scriptEl.style.opacity = '1'; }, 130);
+      var text = studioDisplayText(p.id, lenN);
+      scriptEl.textContent = text || p.script;
     }
+
+    PERSONAS.forEach(function (p, i) {
+      var b = document.createElement('button');
+      b.className = 'chip' + (i === 0 ? ' on' : ''); b.textContent = p.name; b.dataset.i = i;
+      b.addEventListener('click', function () {
+        $$('.chip', ampluaChips).forEach(function (c) { c.classList.remove('on'); });
+        b.classList.add('on'); state.persona = PERSONAS[i];
+        syncVoiceSelect();
+        render();
+      });
+      ampluaChips.appendChild(b);
+    });
+    VOICES.forEach(function (v) { var o = document.createElement('option'); o.value = v.id; o.textContent = v.label; voiceSel.appendChild(o); });
+    syncVoiceSelect();
 
     [tempo, length].forEach(function (r) { r.addEventListener('input', render); });
     voiceSel.addEventListener('change', render);
@@ -484,7 +445,19 @@ acc +
       playStudioDemo(fallbacks, TEMPOS[+tempo.value].r, playBtn);
     });
 
-    render();
+    fetch('assets/demos/preview-texts.json')
+      .then(function (r) { return r.json(); })
+      .then(function (data) {
+        (data.personas || []).forEach(function (p) {
+          demoCopy.short[p.id] = prettyDisplay(p.display || p.speakable);
+        });
+        (data.studioLong || []).forEach(function (s) {
+          demoCopy.minute[s.persona] = prettyDisplay((s.len2 && (s.len2.display || s.len2.speakable)) || '');
+          demoCopy.full[s.persona] = prettyDisplay((s.len4 && (s.len4.display || s.len4.speakable)) || '');
+        });
+        render();
+      })
+      .catch(function () { render(); });
   })();
 
   /* ---------------- Subscribe modal ---------------- */

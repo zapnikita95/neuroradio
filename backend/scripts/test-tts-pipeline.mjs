@@ -15,6 +15,7 @@ import { polishScriptForSpeechDelivery } from '../dist/services/tts-speech-polis
 import { buildAzureSsml, preparePlainSpeechText } from '../dist/services/tts-azure-ssml.js';
 import { buildSaluteSsml } from '../dist/services/salute-ssml.js';
 import { buildYandexSsml } from '../dist/services/tts-yandex-ssml.js';
+import { applyRussianStressSafe } from '../dist/services/russian-stress.js';
 
 let passed = 0;
 
@@ -154,6 +155,11 @@ test('National Film Registry stays English in SSML', () => {
 test('stress marks хаоса correctly', () => {
   const out = prepareYandexTtsText('родился из хаоса импровизации.', { artist: 'MJ', title: 'Test' });
   assert.match(out, /х\+аоса/i);
+});
+
+test('stress marks Deacon surname as д+икон', () => {
+  const out = applyRussianStressSafe('бас Джона Дикона');
+  assert.match(out, /Д\+икон/i);
 });
 
 test('prepareYandexTtsText adds sentence pauses', () => {
