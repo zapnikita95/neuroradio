@@ -69,7 +69,7 @@
       quote: '«Я помню это время…»',
       pal: ['#d98a2b', '#a83b6a'], skin: ['#ffe0c2', '#f0a87a'], eye: '#3a221c', accent: '#ffcf8a',
       voice: 'alena', rate: 0.98, pitch: 1.0,
-      script: 'Я помню это время. Когда клип Thriller показали по MTV — мы замерли у экранов. ' + THRILLER_CORE,
+      script: 'Я помню это время. Michael Jackson вложил полмиллиона в клип Thriller — и после премьеры продажи альбома выросли в семь раз. Мы смотрели четырнадцатиминутный ролик по MTV целиком, а потом скупали VHS, чтобы пересматривать дома.',
       audio: 'assets/demos/persona-contemporary.wav'
     },
     {

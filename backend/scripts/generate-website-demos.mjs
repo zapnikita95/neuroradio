@@ -68,6 +68,17 @@ const BACKSTAGE_STORY_MINUTE =
 
   ' Vincent Price записал закадровый монолог за один день — режиссёр John Landis привёз в проект кинематографический масштаб. Хореограф Michael Peters добивался сцены с зомби-танцами: её изначально вырезали из сценария, а потом она стала визитной карточкой клипа. На съёмках Jackson настаивал на деталях, которые продюсеры считали лишними — и именно они потом взорвали MTV. Об этом редко говорят вслух.';
 
+/** Современник эпохи — от первого лица, ностальгия (не энциклопедический THRILLER_STORY_MINUTE). */
+const CONTEMPORARY_STORY_MINUTE =
+  'Michael Jackson вложил пятьсот тысяч долларов из своего кармана в создание музыкального видео на трек Thriller. Мы тогда помним, как MTV в основном крутила рок, но этот четырнадцатиминутный ролик показывали целиком, прерывая обычные программы. Я помню то невероятное чувство, когда после премьеры видео продажи альбома выросли в семь раз. Режиссёр John Landis пришёл из большого кино, а хореографу Michael Peters даже пришлось убеждать его оставить ту самую сцену с танцем зомби. Это было не просто видео, а настоящее событие, которое меняло правила игры на телевидении. Позже люди начали массово скупать кассеты VHS в магазинах, чтобы пересматривать этот шедевр дома снова и снова. Весь мир замер, когда этот ролик появился в эфире, и музыка стала частью визуальной истории. Это был момент, когда поп-музыка окончательно объединилась с кинематографом.';
+
+const CONTEMPORARY_STORY_SHORT =
+  'Я помню это время. Michael Jackson вложил полмиллиона в клип Thriller — и после премьеры продажи альбома выросли в семь раз. Мы смотрели четырнадцатиминутный ролик по MTV целиком, а потом скупали VHS, чтобы пересматривать дома.';
+
+const CONTEMPORARY_STORY_FULL =
+  CONTEMPORARY_STORY_MINUTE +
+  ' Vincent Price голосом из кино читал закадровый текст — у нас мурашки по коже. Мы учили moon walk походку у телевизора, повторяли танец зомби на дискотеках. Годы спустя Thriller попал в National Film Registry — единственный музыкальный клип в списке культурного наследия США. Сейчас это кажется само собой, а тогда мы впервые поняли: песня может быть фильмом, а фильм — событием на весь мир.';
+
 
 
 /** Карточки амплуа + студия: короткий / минута / без лимита. */
@@ -138,11 +149,11 @@ const PERSONAS = [
 
     studioVoices: ['alena', 'omazh', 'marina'],
 
-    short: 'Я помню это время. ' + FACT_REGISTRY,
+    short: CONTEMPORARY_STORY_SHORT,
 
-    minute: 'Я помню это время. ' + THRILLER_STORY_MINUTE,
+    minute: 'Я помню это время. ' + CONTEMPORARY_STORY_MINUTE,
 
-    full: 'Я помню это время. ' + THRILLER_STORY_FULL,
+    full: 'Я помню это время. ' + CONTEMPORARY_STORY_FULL,
 
   },
 
@@ -510,7 +521,13 @@ function purgeOldStudioWavs() {
 
 async function main() {
 
-  const arg = process.argv[2] ?? '--preview';
+  const args = process.argv.slice(2);
+
+  const arg = args[0] ?? '--preview';
+
+  const onlyIdx = args.indexOf('--only');
+
+  const onlyPersonaId = onlyIdx >= 0 ? args[onlyIdx + 1] : null;
 
 
 
@@ -529,6 +546,48 @@ async function main() {
   fs.mkdirSync(OUT_DIR, { recursive: true });
 
   const { synthesizeSpeech } = await loadTts();
+
+  const targets = onlyPersonaId
+
+    ? PERSONAS.filter((p) => p.id === onlyPersonaId)
+
+    : PERSONAS;
+
+  if (onlyPersonaId && targets.length === 0) {
+
+    console.error('Unknown persona:', onlyPersonaId);
+
+    process.exit(1);
+
+  }
+
+
+
+  if (onlyPersonaId) {
+
+    await writePreview();
+
+    for (const p of targets) {
+
+      await synthPersona(p, synthesizeSpeech);
+
+      for (const voice of p.studioVoices) {
+
+        await synthStudioShort(p, voice, synthesizeSpeech);
+
+      }
+
+      await synthStudioLong(p, synthesizeSpeech, '-len2', p.minute);
+
+      await synthStudioLong(p, synthesizeSpeech, '-len4', p.full);
+
+    }
+
+    console.log('done —', onlyPersonaId);
+
+    return;
+
+  }
 
 
 
@@ -596,7 +655,7 @@ async function main() {
 
 
 
-  if (!['--test', '--personas', '--studio', '--studio-long', '--all'].includes(arg)) {
+  if (!['--test', '--personas', '--studio', '--studio-long', '--all', '--only'].includes(arg) && onlyIdx < 0) {
 
     console.error('Unknown flag:', arg);
 
