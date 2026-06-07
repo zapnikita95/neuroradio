@@ -220,6 +220,7 @@ curl -s https://ТВОЙ-BFF.up.railway.app/v1/public/tts-config
 | `YOOKASSA_SHOP_ID` | Shop ID из кабинета ЮKassa |
 | `YOOKASSA_SECRET_KEY` | Секретный ключ |
 | `YOOKASSA_RETURN_URL` | `https://www.efir-ai.ru/?payment=success` (или свой) |
+| `YOOKASSA_RECURRING_ENABLED` | `true` — сохранение карты и автосписания (нужно включить рекуррентные платежи в кабинете ЮMoney). По умолчанию **выкл.** — обычная разовая оплата. |
 | `RESEND_API_KEY` | Resend для писем |
 | `RESEND_FROM` | `Эфир AI <hello@efir-ai.ru>` |
 | `RECEIPT_ADMIN_EMAIL` | `zap.nikita95@gmail.com` — запрос чека после оплаты |

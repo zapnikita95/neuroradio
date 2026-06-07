@@ -5,6 +5,7 @@ import {
 import {
   createRecurringYooKassaPayment,
   isYooKassaConfigured,
+  isYooKassaRecurringEnabled,
   SUBSCRIPTION_PLANS,
 } from './yookassa.js';
 
@@ -14,7 +15,7 @@ const RETRY_COOLDOWN_MS = 20 * 60 * 60_000;
 let renewalRunning = false;
 
 export async function processRecurringPayments(): Promise<void> {
-  if (!isYooKassaConfigured() || renewalRunning) return;
+  if (!isYooKassaConfigured() || !isYooKassaRecurringEnabled() || renewalRunning) return;
   renewalRunning = true;
   try {
     const due = listAccountsDueForRenewal(RETRY_COOLDOWN_MS);
@@ -47,7 +48,7 @@ export async function processRecurringPayments(): Promise<void> {
 }
 
 export function startSubscriptionRenewalScheduler(): void {
-  if (!isYooKassaConfigured()) return;
+  if (!isYooKassaConfigured() || !isYooKassaRecurringEnabled()) return;
   void processRecurringPayments();
   setInterval(() => {
     void processRecurringPayments();

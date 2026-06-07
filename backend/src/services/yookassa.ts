@@ -17,6 +17,20 @@ export function isYooKassaConfigured(): boolean {
   return Boolean(process.env.YOOKASSA_SHOP_ID?.trim() && process.env.YOOKASSA_SECRET_KEY?.trim());
 }
 
+/** Autopay (save card + recurring charges). Off until YooMoney enables it for the shop. */
+export function isYooKassaRecurringEnabled(): boolean {
+  const raw = process.env.YOOKASSA_RECURRING_ENABLED?.trim().toLowerCase();
+  if (raw === 'true' || raw === '1' || raw === 'yes') return true;
+  if (raw === 'false' || raw === '0' || raw === 'no') return false;
+  return false;
+}
+
+function isRecurringForbiddenError(status: number, detail: string): boolean {
+  if (status !== 403) return false;
+  const lower = detail.toLowerCase();
+  return lower.includes('recurring') || lower.includes('автоплат');
+}
+
 function authHeader(): string {
   const shopId = process.env.YOOKASSA_SHOP_ID?.trim() ?? '';
   const secret = process.env.YOOKASSA_SECRET_KEY?.trim() ?? '';
@@ -61,28 +75,39 @@ export async function createYooKassaPayment(options: {
     process.env.YOOKASSA_RETURN_URL?.trim() ||
     'https://www.efir-ai.ru/?payment=success';
 
-  const idempotenceKey = crypto.randomUUID();
-  const res = await fetch(`${YOOKASSA_API}/payments`, {
-    method: 'POST',
-    headers: {
-      Authorization: authHeader(),
-      'Content-Type': 'application/json',
-      'Idempotence-Key': idempotenceKey,
-    },
-    body: JSON.stringify({
-      amount: { value: planMeta.amountRub.toFixed(2), currency: 'RUB' },
-      capture: true,
-      save_payment_method: true,
-      confirmation: { type: 'redirect', return_url: returnUrl },
-      description: `Эфир AI — ${planMeta.labelRu} (автопродление)`,
-      metadata: {
-        email: options.email.trim().toLowerCase(),
-        plan: options.plan,
-        service: 'efir-ai',
-        recurring: 'false',
-      },
-    }),
+  const wantSaveCard = isYooKassaRecurringEnabled();
+  let savePaymentMethod = wantSaveCard;
+  let idempotenceKey = crypto.randomUUID();
+  let res = await postYooKassaRedirectPayment({
+    planMeta,
+    email: options.email,
+    plan: options.plan,
+    returnUrl,
+    savePaymentMethod,
+    idempotenceKey,
   });
+
+  if (!res.ok && savePaymentMethod) {
+    const detail = await res.text().catch(() => '');
+    if (isRecurringForbiddenError(res.status, detail)) {
+      console.warn(
+        '[yookassa] shop cannot save cards yet — retrying payment without save_payment_method. ' +
+          'Enable recurring in YooMoney or set YOOKASSA_RECURRING_ENABLED=true when ready.',
+      );
+      savePaymentMethod = false;
+      idempotenceKey = crypto.randomUUID();
+      res = await postYooKassaRedirectPayment({
+        planMeta,
+        email: options.email,
+        plan: options.plan,
+        returnUrl,
+        savePaymentMethod: false,
+        idempotenceKey,
+      });
+    } else {
+      throw new Error(`YooKassa HTTP ${res.status}${detail ? `: ${detail.slice(0, 300)}` : ''}`);
+    }
+  }
 
   if (!res.ok) {
     const detail = await res.text().catch(() => '');
@@ -169,6 +194,9 @@ export async function createRecurringYooKassaPayment(options: {
   if (!isYooKassaConfigured()) {
     throw new Error('YOOKASSA_NOT_CONFIGURED');
   }
+  if (!isYooKassaRecurringEnabled()) {
+    throw new Error('YOOKASSA_RECURRING_DISABLED');
+  }
   const planMeta = SUBSCRIPTION_PLANS[options.plan];
   const idempotenceKey = crypto.randomUUID();
   const res = await fetch(`${YOOKASSA_API}/payments`, {
@@ -214,4 +242,41 @@ export async function createRecurringYooKassaPayment(options: {
 export function parseYooKassaWebhook(body: unknown): YooKassaWebhookEvent | null {
   if (!body || typeof body !== 'object') return null;
   return body as YooKassaWebhookEvent;
+}
+
+async function postYooKassaRedirectPayment(options: {
+  planMeta: (typeof SUBSCRIPTION_PLANS)[SubscriptionPlan];
+  email: string;
+  plan: SubscriptionPlan;
+  returnUrl: string;
+  savePaymentMethod: boolean;
+  idempotenceKey: string;
+}): Promise<Response> {
+  const body: Record<string, unknown> = {
+    amount: { value: options.planMeta.amountRub.toFixed(2), currency: 'RUB' },
+    capture: true,
+    confirmation: { type: 'redirect', return_url: options.returnUrl },
+    description: options.savePaymentMethod
+      ? `Эфир AI — ${options.planMeta.labelRu} (автопродление)`
+      : `Эфир AI — ${options.planMeta.labelRu}`,
+    metadata: {
+      email: options.email.trim().toLowerCase(),
+      plan: options.plan,
+      service: 'efir-ai',
+      recurring: 'false',
+    },
+  };
+  if (options.savePaymentMethod) {
+    body.save_payment_method = true;
+  }
+
+  return fetch(`${YOOKASSA_API}/payments`, {
+    method: 'POST',
+    headers: {
+      Authorization: authHeader(),
+      'Content-Type': 'application/json',
+      'Idempotence-Key': options.idempotenceKey,
+    },
+    body: JSON.stringify(body),
+  });
 }
