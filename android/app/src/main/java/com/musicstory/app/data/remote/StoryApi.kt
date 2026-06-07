@@ -60,4 +60,5 @@ data class PaymentCreateResponse(
     val ok: Boolean? = null,
     val confirmationUrl: String? = null,
     val error: String? = null,
+    val hint: String? = null,
 )

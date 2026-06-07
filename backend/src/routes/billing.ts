@@ -12,8 +12,6 @@ import {
   premiumUpsellHintRu,
   resolveUserTier,
 } from '../services/entitlements.js';
-import { canUseSaluteSpeechProduction, hasSaluteSpeechCredentials } from '../services/tts-router.js';
-import { isSaluteSpeechEnabled } from '../services/entitlements.js';
 import {
   getStoryLimitsForTier,
   TRIAL_PRICE_RUB_MONTHLY,
@@ -27,8 +25,11 @@ import {
 } from '../services/dev-tier-store.js';
 import { canUseDevTierSwitch } from '../services/admin-users.js';
 import type { UserTier } from '../services/entitlements.js';
+import { isEmailConfigured, sendReceiptToUserEmail } from '../services/email-sender.js';
 
 const router = Router();
+
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 router.use(requireAppAuth);
 
@@ -74,9 +75,10 @@ router.get('/status', (req: Request, res: Response) => {
     },
     hint: tierQuotaHintRu(tier),
     premiumVoiceHint: premiumUpsellHintRu(tier),
-    premiumTtsProvider: 'sber',
-    premiumTtsReady: canUseSaluteSpeechProduction(),
-    saluteSpeech: hasSaluteSpeechCredentials() && isSaluteSpeechEnabled(),
+    premiumTtsProvider: 'yandex',
+    premiumTtsReady: true,
+    saluteSpeech: false,
+    yookassaConfigured: Boolean(process.env.YOOKASSA_SHOP_ID?.trim() && process.env.YOOKASSA_SECRET_KEY?.trim()),
     devTierSwitchEnabled: canUseDevTierSwitch(installId),
     devTierOverride: canUseDevTierSwitch(installId) ? getDevTierOverride(installId) : null,
   });
@@ -197,6 +199,40 @@ router.post('/activate-trial-admin', (req: Request, res: Response) => {
     limits: getStoryLimitsForTier('trial'),
     hint: tierQuotaHintRu('trial'),
   });
+});
+
+/**
+ * Admin: отправить чек пользователю после оплаты.
+ * POST /v1/billing/admin/receipt  { "to", "text", "subject?", "paymentId?" }
+ * Header: x-billing-admin-secret
+ */
+router.post('/admin/receipt', async (req: Request, res: Response) => {
+  if (!billingAdminAuthorized(req)) {
+    res.status(403).json({ error: 'Forbidden', code: 'BILLING_ADMIN_FORBIDDEN' });
+    return;
+  }
+  if (!isEmailConfigured()) {
+    res.status(503).json({ error: 'Email not configured (RESEND_API_KEY, RESEND_FROM)' });
+    return;
+  }
+
+  const to = typeof req.body?.to === 'string' ? req.body.to.trim().toLowerCase() : '';
+  const text = typeof req.body?.text === 'string' ? req.body.text.trim() : '';
+  const subject = typeof req.body?.subject === 'string' ? req.body.subject.trim() : undefined;
+  const paymentId = typeof req.body?.paymentId === 'string' ? req.body.paymentId.trim() : undefined;
+
+  if (!EMAIL_RE.test(to) || !text) {
+    res.status(400).json({ error: 'Нужны to (email) и text (текст чека)' });
+    return;
+  }
+
+  try {
+    await sendReceiptToUserEmail({ to, text, subject, paymentId });
+    res.json({ ok: true, to });
+  } catch (err) {
+    console.error('[billing/admin/receipt]', err instanceof Error ? err.message : err);
+    res.status(502).json({ error: 'Не удалось отправить чек' });
+  }
 });
 
 export default router;

@@ -118,10 +118,19 @@ private fun BillingTab(app: MusicStoryApp) {
     var loading by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
     var backendUrl by remember { mutableStateOf("") }
+    var premiumActive by remember { mutableStateOf(false) }
+    var premiumUntil by remember { mutableStateOf<Long?>(null) }
 
     LaunchedEffect(Unit) {
         backendUrl = app.settingsDataStore.backendUrl.first()
         email = app.accountAuthManager.fetchProfile(backendUrl)?.email.orEmpty()
+        try {
+            val status = app.apiClient.fetchBillingStatus(backendUrl)
+            premiumActive = status.premium == true
+            premiumUntil = status.entitlement?.premiumUntil
+        } catch (_: Exception) {
+            // billing status optional until auth warms up
+        }
     }
 
     Column(
@@ -134,6 +143,42 @@ private fun BillingTab(app: MusicStoryApp) {
         Text(
             text = context.getString(R.string.billing_intro),
             style = MaterialTheme.typography.bodyMedium,
+            color = MutedLavender,
+        )
+
+        if (premiumActive) {
+            val until = premiumUntil?.let {
+                java.text.SimpleDateFormat("d MMM yyyy", java.util.Locale("ru"))
+                    .format(java.util.Date(it))
+            }
+            Text(
+                text = if (until != null) {
+                    "Расширенный доступ активен до $until"
+                } else {
+                    context.getString(R.string.settings_auth_premium)
+                },
+                style = MaterialTheme.typography.labelLarge,
+                color = GoldBright,
+            )
+        }
+
+        OutlinedTextField(
+            value = email,
+            onValueChange = { email = it.trim() },
+            modifier = Modifier.fillMaxWidth(),
+            label = { Text(context.getString(R.string.settings_auth_email)) },
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
+            colors = OutlinedTextFieldDefaults.colors(
+                focusedTextColor = CreamText,
+                unfocusedTextColor = CreamText,
+                focusedBorderColor = GoldBright,
+            ),
+            singleLine = true,
+        )
+
+        Text(
+            text = "Email нужен для активации подписки и отправки чека после оплаты.",
+            style = MaterialTheme.typography.bodySmall,
             color = MutedLavender,
         )
 
@@ -192,20 +237,6 @@ private fun BillingTab(app: MusicStoryApp) {
         ) {
             scope.launch { pay(app, backendUrl, email, "quarter", { loading = it }, { error = it }) }
         }
-
-        OutlinedTextField(
-            value = email,
-            onValueChange = { email = it.trim() },
-            modifier = Modifier.fillMaxWidth(),
-            label = { Text(context.getString(R.string.settings_auth_email)) },
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
-            colors = OutlinedTextFieldDefaults.colors(
-                focusedTextColor = CreamText,
-                unfocusedTextColor = CreamText,
-                focusedBorderColor = GoldBright,
-            ),
-            singleLine = true,
-        )
 
         if (loading) {
             CircularProgressIndicator(color = GoldBright, modifier = Modifier.padding(8.dp))

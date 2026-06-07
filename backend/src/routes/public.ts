@@ -8,7 +8,13 @@ import {
   type SubscriptionPlan,
 } from '../services/yookassa.js';
 import { grantPremiumByEmail } from '../services/account-store.js';
-import { isEmailConfigured, sendPaymentLinkEmail, sendSubscribeEmail } from '../services/email-sender.js';
+import {
+  isEmailConfigured,
+  sendPaymentLinkEmail,
+  sendPaymentSuccessEmail,
+  sendReceiptRequestEmail,
+  sendSubscribeEmail,
+} from '../services/email-sender.js';
 import {
   canUseSileroTts,
   getSileroTtsBaseUrl,
@@ -161,10 +167,30 @@ router.post('/yookassa/webhook', async (req: Request, res: Response) => {
     if (email && plan) {
       const planMeta = SUBSCRIPTION_PLANS[plan];
       try {
-        grantPremiumByEmail(email, {
+        const entitlement = grantPremiumByEmail(email, {
           months: planMeta.months,
           productId: planMeta.productId,
         });
+        const premiumUntilIso = new Date(entitlement.premiumUntil).toISOString();
+        if (isEmailConfigured()) {
+          void sendPaymentSuccessEmail({
+            to: email,
+            plan: planMeta.labelRu,
+            amountRub: planMeta.amountRub,
+            premiumUntilIso,
+          }).catch((err) => {
+            console.warn('[yookassa/webhook] user success email failed:', err instanceof Error ? err.message : err);
+          });
+          void sendReceiptRequestEmail({
+            userEmail: email,
+            plan: planMeta.labelRu,
+            amountRub: planMeta.amountRub,
+            paymentId: paymentId ?? 'unknown',
+            premiumUntilIso,
+          }).catch((err) => {
+            console.warn('[yookassa/webhook] receipt request email failed:', err instanceof Error ? err.message : err);
+          });
+        }
       } catch (err) {
         console.error('[yookassa/webhook] grant failed:', err instanceof Error ? err.message : err);
       }

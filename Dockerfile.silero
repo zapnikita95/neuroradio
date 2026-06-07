@@ -1,3 +1,4 @@
 # Silero TTS sidecar for Railway (navatusein/silero-tts-service).
 FROM navatusein/silero-tts-service:latest
+ENV PORT=9898
 EXPOSE 9898

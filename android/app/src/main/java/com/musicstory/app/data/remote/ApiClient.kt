@@ -135,7 +135,18 @@ class ApiClient(
     }
 
     suspend fun createPayment(baseUrl: String, email: String, plan: String): PaymentCreateResponse {
-        return getApi(baseUrl).createPayment(PaymentCreateRequest(email = email, plan = plan))
+        return try {
+            getApi(baseUrl).createPayment(PaymentCreateRequest(email = email, plan = plan))
+        } catch (e: retrofit2.HttpException) {
+            val body = e.response()?.errorBody()?.string().orEmpty()
+            val parsed = runCatching {
+                org.json.JSONObject(body)
+            }.getOrNull()
+            val message = parsed?.optString("error")?.takeIf { it.isNotBlank() }
+                ?: parsed?.optString("hint")?.takeIf { it.isNotBlank() }
+                ?: e.message()
+            throw IllegalStateException(message)
+        }
     }
 
     suspend fun probeLlm(baseUrl: String, request: LlmProbeRequest): LlmProbeResponse {

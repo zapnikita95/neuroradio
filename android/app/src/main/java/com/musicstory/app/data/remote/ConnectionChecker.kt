@@ -453,8 +453,18 @@ data class DevTierResponse(
     val code: String? = null,
 )
 
+data class BillingEntitlementResponse(
+    val plan: String? = null,
+    val premiumUntil: Long? = null,
+    val trialUntil: Long? = null,
+)
+
 data class BillingStatusResponse(
     val tier: String? = null,
+    val premium: Boolean? = null,
+    val entitlement: BillingEntitlementResponse? = null,
+    val yookassaConfigured: Boolean? = null,
+    val premiumTtsProvider: String? = null,
     val devTierSwitchEnabled: Boolean? = null,
     val devTierOverride: String? = null,
     val hint: String? = null,

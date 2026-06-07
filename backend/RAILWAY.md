@@ -161,13 +161,23 @@ APK → JWT → POST /v1/story/full only
 
 **Silero-сервис:**
 1. В том же Railway-проекте → **+ New** → **GitHub Repo** → тот же репозиторий
-2. Settings → Build → Dockerfile path: **`Dockerfile.silero`**
-3. **Generate Domain** → скопируй URL Silero
-4. Проверка: `curl https://ТВОЙ-SILERO.up.railway.app/voices` → `aidar`, `baya`, `kseniya`, …
+2. Settings → **Config-as-code** → File path: **`silero-railway.toml`**  
+   (корневой `railway.toml` задаёт BFF Dockerfile — поле Dockerfile в UI **не кликается**, это нормально)
+3. У сервиса **silero** убери лишние Variables (GROQ, YANDEX, LLM) — они только на BFF
+4. **Generate Domain** на silero → скопируй URL
+5. Проверка: `curl https://ТВОЙ-SILERO.up.railway.app/voices` → `aidar`, `baya`, `kseniya`, …
 
-**BFF-сервис (neuroradio):** Root Directory пустой, Start `node dist/index.js` — как на скрине, это верно.
+**Связать BFF и Silero (Variables на music-story):**
+```
+SILERO_TTS_ENABLED=true
+TTS_PREFER_SILERO=true
+SILERO_TTS_API=legacy
+SILERO_TTS_VOICE=baya
+SILERO_TTS_URL=https://${{silero.RAILWAY_PUBLIC_DOMAIN}}
+```
+Reference `${{silero.RAILWAY_PUBLIC_DOMAIN}}` — через **New Variable → Add Reference** → сервис silero.
 
-После правки Variables нажми **Deploy** (иначе «5 Changes» не попадут в рантайм).
+**Не путай URL:** если `SILERO_TTS_URL` = домен BFF (`neuroradio-production-3966…`), `/health` покажет `sileroTts:false`.
 
 ### 2. Variables на BFF (neuroradio)
 
@@ -197,5 +207,49 @@ curl -s https://ТВОЙ-BFF.up.railway.app/v1/public/tts-config
 ```
 
 В приложении (бесплатный тариф): **Настройки → Озвучка → Silero на сервере** или **Android TTS**, затем выбор амплуа (baya / aidar / kseniya / eugene).
+
+## Оплата и подписка (ЮKassa)
+
+Тарифы: **199 ₽/мес**, **499 ₽/квартал**, **1999 ₽/год** — предоплата на период (не автосписание каждый месяц, как в movie_planner_bot).
+
+### Variables на BFF (music-story)
+
+| Variable | Значение |
+|----------|----------|
+| `YOOKASSA_SHOP_ID` | Shop ID из кабинета ЮKassa |
+| `YOOKASSA_SECRET_KEY` | Секретный ключ |
+| `YOOKASSA_RETURN_URL` | `https://www.efir-ai.ru/?payment=success` (или свой) |
+| `RESEND_API_KEY` | Resend для писем |
+| `RESEND_FROM` | `Эфир AI <hello@efir-ai.ru>` |
+| `RECEIPT_ADMIN_EMAIL` | `zap.nikita95@gmail.com` — запрос чека после оплаты |
+| `BILLING_ADMIN_SECRET` | Секрет для `POST /v1/billing/admin/receipt` |
+| `PUBLIC_BFF_URL` | `https://neuroradio-production-3966.up.railway.app` |
+| `DATABASE_URL` | `${{Postgres.DATABASE_URL}}` — **обязательно**, иначе premium сбросится при редеплое |
+
+**Webhook в ЮKassa:** `https://ТВОЙ-BFF.up.railway.app/v1/public/yookassa/webhook`  
+Событие: `payment.succeeded`.
+
+### Как работает в приложении
+
+1. **Аккаунт → Подписка** → email (для активации и чека) → месяц / квартал / год
+2. Открывается браузер ЮKassa (`confirmationUrl`)
+3. Webhook → `grantPremiumByEmail` → `premiumUntil` +1/3/12 мес
+4. Пользователю: письмо «оплата прошла»; админу: письмо «нужен чек» с инструкцией API
+5. В приложении **войти тем же email** → tier `premium`, лимиты и Yandex TTS
+6. Когда `premiumUntil` истёк → tier снова `free` (доступ забирается автоматически)
+
+**Отправить чек пользователю:**
+```bash
+curl -X POST https://ТВОЙ-BFF/v1/billing/admin/receipt \
+  -H "Content-Type: application/json" \
+  -H "x-billing-admin-secret: ВАШ_СЕКРЕТ" \
+  -d '{"to":"user@mail.ru","subject":"Чек Эфир AI","text":"…","paymentId":"…"}'
+```
+
+Проверка без оплаты:
+```powershell
+Invoke-RestMethod -Uri "https://ТВОЙ-BFF/v1/public/payment/create" -Method POST -ContentType "application/json" -Body '{"email":"test@example.com","plan":"month"}'
+# ok + confirmationUrl (если YOOKASSA_* заданы)
+```
 
 Прямой вызов `api.groq.com` с телефона/ПК из РФ → 403 (геоблок).

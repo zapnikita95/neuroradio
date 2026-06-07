@@ -91,11 +91,11 @@ export function isSaluteSpeechEnabled(): boolean {
 
 export function premiumUpsellHintRu(tier: UserTier): string {
   if (tier === 'premium' || tier === 'unlimited') {
-    return 'Премиум-голос (SaluteSpeech, Сбер) активен.';
+    return 'Расширенный тариф: DeepSeek V3 и Yandex SpeechKit активны.';
   }
   if (tier === 'trial') {
     return 'Пробный период: DeepSeek V3 и расширенный лимит историй.';
   }
-  return `Профессиональный голос радиоведущего (SaluteSpeech, чистый русский) — ${PREMIUM_PRICE_RUB_MONTHLY} ₽/мес (${PREMIUM_PRODUCT_MONTHLY}).`;
+  return `Расширенный тариф — от ${PREMIUM_PRICE_RUB_MONTHLY} ₽/мес: DeepSeek V3, 25 историй/день, Yandex SpeechKit.`;
 }
 
