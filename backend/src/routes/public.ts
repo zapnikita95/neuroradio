@@ -1,21 +1,28 @@
 import { Router, Request, Response } from 'express';
-import { isEmailConfigured, sendSubscribeEmail } from '../services/email-sender.js';
+import {
+  createYooKassaPayment,
+  isYooKassaConfigured,
+  markPaymentSucceeded,
+  parseYooKassaWebhook,
+  SUBSCRIPTION_PLANS,
+  type SubscriptionPlan,
+} from '../services/yookassa.js';
+import { grantPremiumByEmail } from '../services/account-store.js';
+import { isEmailConfigured, sendPaymentLinkEmail, sendSubscribeEmail } from '../services/email-sender.js';
 
 const router = Router();
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-/** Канонические подписи тарифов по сумме — не доверяем тексту с клиента в письме. */
 const PLAN_BY_AMOUNT: Record<string, string> = {
   '199': 'Расширенный · месяц',
   '499': 'Расширенный · квартал',
   '1999': 'Расширенный · год',
 };
 
-// Простой anti-abuse лимит по IP: не больше 5 запросов за 10 минут.
 const hits = new Map<string, { count: number; resetAt: number }>();
 const WINDOW_MS = 10 * 60_000;
-const MAX_PER_WINDOW = 5;
+const MAX_PER_WINDOW = 8;
 
 function rateLimited(ip: string): boolean {
   const now = Date.now();
@@ -28,25 +35,119 @@ function rateLimited(ip: string): boolean {
   return bucket.count > MAX_PER_WINDOW;
 }
 
-setInterval(() => {
-  const now = Date.now();
-  for (const [key, bucket] of hits.entries()) {
-    if (now >= bucket.resetAt) hits.delete(key);
-  }
-}, WINDOW_MS).unref();
-
-/**
- * Публичное оформление подписки с сайта: проверяем email и отправляем письмо
- * со ссылками на загрузку APK и расширения через Resend. Оплата привязывается
- * к этому адресу — по нему подписка распознаётся в приложении и расширении.
- */
-router.post('/subscribe', async (req: Request, res: Response) => {
+function clientIp(req: Request): string {
   const forwarded = req.headers['x-forwarded-for'];
-  const ip =
+  return (
     (Array.isArray(forwarded) ? forwarded[0] : forwarded)?.split(',')[0]?.trim() ||
     req.ip ||
-    'unknown';
+    'unknown'
+  );
+}
 
+function parsePlan(raw: unknown): SubscriptionPlan | null {
+  if (raw === 'month' || raw === 'quarter' || raw === 'year') return raw;
+  const amount =
+    typeof raw === 'string' ? raw.replace(/[^\d]/g, '') : typeof raw === 'number' ? String(raw) : '';
+  if (amount === '199') return 'month';
+  if (amount === '499') return 'quarter';
+  if (amount === '1999') return 'year';
+  return null;
+}
+
+/** Создание платежа YooKassa — возвращает URL для редиректа на оплату. */
+router.post('/payment/create', async (req: Request, res: Response) => {
+  const ip = clientIp(req);
+  if (rateLimited(ip)) {
+    res.status(429).json({ error: 'Слишком много запросов, попробуйте позже' });
+    return;
+  }
+
+  const email = typeof req.body?.email === 'string' ? req.body.email.trim() : '';
+  const plan = parsePlan(req.body?.plan ?? req.body?.amount);
+
+  if (!EMAIL_RE.test(email) || email.length > 254) {
+    res.status(400).json({ error: 'Введите корректный email' });
+    return;
+  }
+  if (!plan) {
+    res.status(400).json({ error: 'Выберите тариф' });
+    return;
+  }
+
+  if (!isYooKassaConfigured()) {
+    res.status(503).json({
+      error: 'Оплата временно недоступна',
+      hint: 'Настройте YOOKASSA_SHOP_ID и YOOKASSA_SECRET_KEY на сервере',
+    });
+    return;
+  }
+
+  try {
+    const created = await createYooKassaPayment({ email, plan });
+    if (isEmailConfigured()) {
+      void sendPaymentLinkEmail({
+        to: email,
+        plan: created.planLabel,
+        amountRub: created.amountRub,
+        paymentUrl: created.confirmationUrl,
+      }).catch((err) => {
+        console.warn('[public/payment] email failed:', err instanceof Error ? err.message : err);
+      });
+    }
+    res.json({
+      ok: true,
+      paymentId: created.paymentId,
+      confirmationUrl: created.confirmationUrl,
+      amountRub: created.amountRub,
+      plan: created.planLabel,
+    });
+  } catch (err) {
+    console.error('[public/payment/create]', err instanceof Error ? err.message : err);
+    res.status(502).json({ error: 'Не удалось создать платёж, попробуйте позже' });
+  }
+});
+
+/** Webhook YooKassa — активация подписки по email после успешной оплаты. */
+router.post('/yookassa/webhook', async (req: Request, res: Response) => {
+  const event = parseYooKassaWebhook(req.body);
+  if (!event?.event) {
+    res.status(400).json({ error: 'Invalid payload' });
+    return;
+  }
+
+  if (event.event === 'payment.succeeded') {
+    const paymentId = event.object?.id?.trim();
+    const metaEmail = event.object?.metadata?.email?.trim().toLowerCase();
+    const metaPlan = parsePlan(event.object?.metadata?.plan);
+    const pending = paymentId ? markPaymentSucceeded(paymentId) : undefined;
+    const email = metaEmail || pending?.email;
+    const plan = metaPlan || pending?.plan;
+
+    if (email && plan) {
+      const planMeta = SUBSCRIPTION_PLANS[plan];
+      try {
+        grantPremiumByEmail(email, {
+          months: planMeta.months,
+          productId: planMeta.productId,
+        });
+      } catch (err) {
+        console.error('[yookassa/webhook] grant failed:', err instanceof Error ? err.message : err);
+      }
+    } else {
+      console.warn('[yookassa/webhook] payment.succeeded without email/plan metadata');
+    }
+  }
+
+  res.json({ ok: true });
+});
+
+router.get('/yookassa/webhook', (_req, res: Response) => {
+  res.json({ ok: true, message: 'YooKassa webhook endpoint active' });
+});
+
+/** Legacy: email-only subscribe (без оплаты) — оставлен для совместимости. */
+router.post('/subscribe', async (req: Request, res: Response) => {
+  const ip = clientIp(req);
   if (rateLimited(ip)) {
     res.status(429).json({ error: 'Слишком много запросов, попробуйте позже' });
     return;
@@ -54,15 +155,35 @@ router.post('/subscribe', async (req: Request, res: Response) => {
 
   const email = typeof req.body?.email === 'string' ? req.body.email.trim() : '';
   const amount = typeof req.body?.amount === 'string' ? req.body.amount.replace(/[^\d]/g, '') : '';
+  const plan = parsePlan(req.body?.plan ?? amount);
 
   if (!EMAIL_RE.test(email) || email.length > 254) {
     res.status(400).json({ error: 'Введите корректный email' });
     return;
   }
 
-  const planName = PLAN_BY_AMOUNT[amount] ?? 'Расширенный';
+  const planName = plan ? SUBSCRIPTION_PLANS[plan].labelRu : PLAN_BY_AMOUNT[amount] ?? 'Расширенный';
 
-  // Без Resend письмо не отправляем, но не ломаем сценарий — фронт покажет успех.
+  if (isYooKassaConfigured() && plan) {
+    try {
+      const created = await createYooKassaPayment({ email, plan });
+      if (isEmailConfigured()) {
+        await sendPaymentLinkEmail({
+          to: email,
+          plan: planName,
+          amountRub: created.amountRub,
+          paymentUrl: created.confirmationUrl,
+        });
+      }
+      res.json({ ok: true, emailed: isEmailConfigured(), confirmationUrl: created.confirmationUrl });
+      return;
+    } catch (err) {
+      console.error('[public/subscribe]', err instanceof Error ? err.message : err);
+      res.status(502).json({ error: 'Не удалось создать платёж' });
+      return;
+    }
+  }
+
   if (!isEmailConfigured()) {
     console.warn(`[public/subscribe] Resend not configured — no email sent (${email})`);
     res.json({ ok: true, emailed: false });

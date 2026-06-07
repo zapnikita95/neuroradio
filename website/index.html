@@ -9,7 +9,7 @@
   <meta name="author" content="Эфир AI" />
   <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1" />
   <meta name="theme-color" content="#08070F" />
-  <link rel="canonical" href="https://efir-ai.ru/" />
+  <link rel="canonical" href="https://www.efir-ai.ru/" />
 
   <link rel="icon" type="image/svg+xml" href="assets/logo-mark.svg" />
   <link rel="icon" type="image/png" sizes="32x32" href="assets/favicon-32.png" />
@@ -48,18 +48,18 @@
     "@graph": [
       {
         "@type": "Organization",
-        "@id": "https://efir-ai.ru/#organization",
+        "@id": "https://www.efir-ai.ru/#organization",
         "name": "Эфир AI",
-        "url": "https://efir-ai.ru/",
-        "logo": "https://efir-ai.ru/assets/logo-mark.svg",
+        "url": "https://www.efir-ai.ru/",
+        "logo": "https://www.efir-ai.ru/assets/logo-mark.svg",
         "email": "hello@efir-ai.ru",
         "description": "Нейросетевой радиоведущий, который рассказывает интересные факты о музыке голосом выбранного амплуа во время прослушивания.",
         "sameAs": ["https://github.com/zapnikita95/neuroradio"]
       },
       {
         "@type": "WebSite",
-        "@id": "https://efir-ai.ru/#website",
-        "url": "https://efir-ai.ru/",
+        "@id": "https://www.efir-ai.ru/#website",
+        "url": "https://www.efir-ai.ru/",
         "name": "Эфир AI",
         "inLanguage": "ru-RU",
         "publisher": { "@id": "https://efir-ai.ru/#organization" }
@@ -147,6 +147,7 @@
       <a href="#docs">Документы</a>
     </nav>
     <a href="#download" class="btn btn-primary btn-sm nav-cta">Скачать</a>
+    <a href="#pricing" class="btn btn-ghost btn-sm nav-account" aria-label="Аккаунт и оплата">👤</a>
     <button class="burger" id="burger" aria-label="Меню" aria-expanded="false">
       <span></span><span></span><span></span>
     </button>
@@ -156,13 +157,10 @@
     <!-- ============ HERO ============ -->
     <section class="hero" id="hero">
       <div class="hero-parallax" id="heroParallax" aria-hidden="true">
-        <span class="float-chip" data-depth="0.06" style="--x:8%; --y:24%">
-          <i class="dot"></i> в эфире
-        </span>
-        <span class="float-note" data-depth="0.12" style="--x:84%; --y:18%">♪</span>
-        <span class="float-note alt" data-depth="0.09" style="--x:74%; --y:64%">♫</span>
-        <span class="float-ring" data-depth="0.04" style="--x:16%; --y:70%"></span>
-        <span class="float-ring small" data-depth="0.16" style="--x:90%; --y:46%"></span>
+        <span class="float-note" data-depth="0.12" style="--x:84%; --y:12%">♪</span>
+        <span class="float-note alt" data-depth="0.09" style="--x:74%; --y:58%">♫</span>
+        <span class="float-ring" data-depth="0.04" style="--x:12%; --y:72%"></span>
+        <span class="float-ring small" data-depth="0.16" style="--x:92%; --y:38%"></span>
       </div>
 
       <div class="hero-inner">
@@ -187,8 +185,8 @@
               <span class="btn-ic">🧩</span> Расширение для браузера
             </a>
           </div>
-          <a href="#personas" class="hero-listen"><span class="play-glyph"></span> Послушать ведущих</a>
-          <div class="hero-stats">
+          <a href="#personas" class="hero-listen"><span class="scroll-arrow" aria-hidden="true"></span> Послушать ведущих</a>
+          <div class="hero-stats compact">
             <div><strong>10+</strong><span>источников фактов</span></div>
             <div><strong>6</strong><span>амплуа ведущих</span></div>
             <div><strong>~5 c</strong><span>до истории в эфире</span></div>
@@ -206,11 +204,11 @@
                 <span class="np-eq"><i></i><i></i><i></i><i></i><i></i></span>
               </div>
               <div class="np-meta">
-                <strong>Billie Jean</strong>
-                <span>Michael Jackson · 1983</span>
+                <strong>Thriller</strong>
+                <span>Michael Jackson · Thriller · 1982</span>
               </div>
             </div>
-            <p class="np-script" id="heroScript">«Billie Jean. Куинси Джонс хотел вырезать длинное вступление — Майкл уперся: под него хотелось танцевать. Спор он выиграл…»</p>
+            <p class="np-script" id="heroScript">«Thriller — единственный музыкальный клип в National Film Registry США. Vincent Price записал закадровый смех, а съёмки зомbi-танца длились неделями…»</p>
             <div class="np-wave" id="heroWave" aria-hidden="true"></div>
           </div>
         </div>
@@ -306,7 +304,7 @@
     <section class="section section-personas" id="personas">
       <div class="section-head reveal">
         <span class="kicker">Амплуа</span>
-        <h2 class="section-title">Посмотрите ведущим <span class="grad-text">в глаза</span></h2>
+        <h2 class="section-title">Рассказчик на <span class="grad-text">ваш вкус</span></h2>
         <p class="section-sub">
           Один и тот же факт звучит по-разному. Выберите характер — и послушайте,
           как меняется подача. Листайте карточки вбок.
@@ -378,10 +376,10 @@
     <section class="section section-studio" id="studio">
       <div class="section-head reveal">
         <span class="kicker">Студия</span>
-        <h2 class="section-title">Покрутите ползунки — <span class="grad-text">эфир меняется</span></h2>
+        <h2 class="section-title">Какой будет эфир — задаёте <span class="grad-text">только вы</span></h2>
         <p class="section-sub">
           Это живой пример. Двигайте настройки — и смотрите, как прямо сейчас
-          меняется история про Майкла Джексона: тон, длина и формат.
+          меняется история про Thriller: тон, голос и длина.
         </p>
       </div>
 
@@ -408,11 +406,6 @@
           </div>
 
           <div class="ctrl">
-            <div class="ctrl-head"><label for="freq">Формат: раз в N треков</label><output id="freqOut">каждые 3</output></div>
-            <input type="range" id="freq" min="1" max="10" step="1" value="3" class="range" />
-          </div>
-
-          <div class="ctrl">
             <label>Фокус</label>
             <div class="chip-row" id="focusChips">
               <button class="chip on" data-focus="all">Все жанры</button>
@@ -435,15 +428,15 @@
                 <span class="np-eq" id="previewEq"><i></i><i></i><i></i><i></i><i></i><i></i></span>
               </div>
               <div class="np-meta">
-                <strong>Billie Jean</strong>
-                <span>Michael Jackson · Thriller · 1983</span>
+                <strong>Thriller</strong>
+                <span>Michael Jackson · Thriller · 1982</span>
               </div>
             </div>
             <p class="preview-script" id="previewScript"></p>
             <div class="preview-foot">
               <span class="tag" id="tagVoice">Голос: Захар</span>
               <span class="tag" id="tagLen">~60 с</span>
-              <span class="tag" id="tagFreq">каждые 3 трека</span>
+              <span class="tag" id="tagTempo">Темп: нормально</span>
               <button class="btn btn-primary btn-sm" id="previewPlay"><span class="play-glyph"></span> Озвучить</button>
             </div>
           </div>
@@ -490,11 +483,8 @@
     <section class="section section-pricing" id="pricing">
       <div class="section-head reveal">
         <span class="kicker">Тарифы</span>
-        <h2 class="section-title">Честно и по-человечески</h2>
-        <p class="section-sub">
-          Сначала — что входит в базовый и расширенный доступ. Ниже — выберите
-          удобный период оплаты расширенной подписки.
-        </p>
+        <h2 class="section-title">Расширенные возможности</h2>
+        <p class="section-sub">для качественного опыта прослушивания</p>
       </div>
 
       <!-- base vs extended -->
@@ -647,6 +637,10 @@
         <details>
           <summary>Как работает подписка по email?</summary>
           <p>При оплате вы указываете email. По нему подписка распознаётся в приложении — войдите с тем же адресом, и расширенный доступ активируется.</p>
+        </details>
+        <details>
+          <summary>Можно ли подключить свои API-ключи?</summary>
+          <p>Да. В настройках приложения вы можете указать собственные ключи для языковых моделей и синтеза речи — тогда запросы пойдут через ваш аккаунт провайдера. Поддерживаются Groq, Google Gemini, OpenRouter (DeepSeek и другие модели), Yandex SpeechKit и SaluteSpeech (Сбер). Оплата провайдеру — на вашей стороне; лимиты сервиса зависят от тарифа.</p>
         </details>
         <details>
           <summary>Можно отменить подписку?</summary>

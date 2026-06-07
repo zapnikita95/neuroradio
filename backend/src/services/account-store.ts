@@ -627,6 +627,63 @@ export function grantPremiumSubscription(
   return entitlementFromAccount(account);
 }
 
+/** Activate or extend premium by email (website / YooKassa). Creates account if needed. */
+export function grantPremiumByEmail(
+  emailRaw: string,
+  options: { months?: number; productId?: string } = {},
+): AccountEntitlement {
+  const email = normalizeEmail(emailRaw);
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    throw new Error('Invalid email');
+  }
+  const months = Math.max(1, options.months ?? 1);
+  const store = loadStore();
+  store.emailToAccount = store.emailToAccount ?? {};
+
+  let accountId = store.emailToAccount[email];
+  if (!accountId) {
+    accountId = crypto.randomUUID();
+    let syncCode = generateSyncCode();
+    while (store.syncCodeToAccount[syncCode]) {
+      syncCode = generateSyncCode();
+    }
+    store.accountsById[accountId] = {
+      accountId,
+      syncCode,
+      ownerInstallId: '',
+      installIds: [],
+      email,
+      settings: {},
+      history: [],
+      createdAt: Date.now(),
+      plan: 'free',
+      premiumUntil: 0,
+      trialUntil: 0,
+      trialStoriesUsed: 0,
+      premiumProductId: null,
+      purchaseTokenHash: null,
+    };
+    store.emailToAccount[email] = accountId;
+    store.syncCodeToAccount[syncCode] = accountId;
+  }
+
+  const account = store.accountsById[accountId];
+  if (!account) {
+    throw new Error('Account missing after create');
+  }
+
+  account.email = email;
+  const base = Math.max(Date.now(), account.premiumUntil ?? 0);
+  account.plan = 'premium';
+  account.premiumUntil = base + months * PREMIUM_MS_MONTH;
+  account.premiumProductId = options.productId ?? PREMIUM_PRODUCT_MONTHLY;
+  saveStore(store);
+  console.log(
+    `[billing] premium by email=${email} months=${months} until=${new Date(account.premiumUntil).toISOString()}`,
+  );
+  return entitlementFromAccount(account);
+}
+
 const TRIAL_MS_MONTH = 31 * 24 * 60 * 60 * 1000;
 export const WELCOME_TRIAL_MS = 7 * 24 * 60 * 60 * 1000;
 

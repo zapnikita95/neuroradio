@@ -89,6 +89,7 @@ import kotlin.math.abs
 @Composable
 fun HomeScreen(
     onOpenSettings: () -> Unit,
+    onOpenAccount: () -> Unit,
     onOpenHistory: () -> Unit,
     onRequestNotificationAccess: () -> Unit,
     onHomeTourFinishedOpenSettings: () -> Unit,
@@ -309,6 +310,15 @@ fun HomeScreen(
                         onClick = { scope.launch { app.monitorLifecycle.cycleAppPowerMode() } },
                         tourActive = tourActive,
                     )
+                    IconButton(
+                        onClick = onOpenAccount,
+                        enabled = !tourActive,
+                    ) {
+                        Text(
+                            text = "👤",
+                            style = MaterialTheme.typography.titleLarge,
+                        )
+                    }
                     IconButton(
                         onClick = onOpenHistory,
                         enabled = !tourActive,

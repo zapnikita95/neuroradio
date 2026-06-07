@@ -110,14 +110,29 @@ function trimBreaksAroundLangTags(text: string): string {
 /** Latin spans Yandex misreads unless spaced for en-US voice. */
 const LATIN_SSML_PRONUNCIATION: Record<string, string> = {
   moonwalk: 'moon walk',
+  xscape: 'X scape',
+  onerepublic: 'One Republic',
   'anti-gravity lean': 'anti gravity lean',
   'anti-gravity': 'anti gravity',
 };
 
+/** Split CamelCase album/brand tokens for en-US TTS (Xscape → X scape). */
+function splitCamelCaseLatin(span: string): string {
+  const key = span.trim().toLowerCase();
+  const mapped = LATIN_SSML_PRONUNCIATION[key];
+  if (mapped) return mapped;
+  if (/^[A-Z][a-z]+[A-Z][a-z]+$/.test(span.trim())) {
+    return span.trim().replace(/([a-z])([A-Z])/g, '$1 $2');
+  }
+  if (/^X[a-z]{4,}$/i.test(span.trim())) {
+    return `X ${span.trim().slice(1)}`;
+  }
+  return span;
+}
+
 function latinSpanForSsml(span: string): string {
   const trimmed = span.trim();
-  const mapped = LATIN_SSML_PRONUNCIATION[trimmed.toLowerCase()];
-  return mapped ?? trimmed;
+  return splitCamelCaseLatin(trimmed);
 }
 
 /** Оборачивает латинские фрагменты в SSML lang; русский текст и +ударения — как есть. */

@@ -584,7 +584,7 @@ router.post('/full', validateStoryFullBody, storyFullRateLimit, async (req: Requ
       );
     }
 
-    if (selectedFact && isWeakSelectedFact(selectedFact)) {
+    if (selectedFact && !factFromBank && isWeakSelectedFact(selectedFact)) {
       console.warn(
         `[facts] reject weak seed score=${selectedFact.interestScore} fact="${selectedFact.fact.slice(0, 100)}"`,
       );

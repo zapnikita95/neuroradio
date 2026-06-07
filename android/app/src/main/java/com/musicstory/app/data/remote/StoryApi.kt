@@ -34,6 +34,9 @@ interface StoryApi {
     @GET("v1/billing/status")
     suspend fun billingStatus(): BillingStatusResponse
 
+    @POST("v1/public/payment/create")
+    suspend fun createPayment(@Body request: PaymentCreateRequest): PaymentCreateResponse
+
     @POST("v1/story/feedback")
     suspend fun submitStoryFeedback(@Body request: StoryFeedbackRequest): Map<String, Any?>
 }
@@ -46,4 +49,15 @@ data class StoryFeedbackRequest(
     val reasons: List<String>? = null,
     val script: String? = null,
     val historyId: String? = null,
+)
+
+data class PaymentCreateRequest(
+    val email: String,
+    val plan: String,
+)
+
+data class PaymentCreateResponse(
+    val ok: Boolean? = null,
+    val confirmationUrl: String? = null,
+    val error: String? = null,
 )

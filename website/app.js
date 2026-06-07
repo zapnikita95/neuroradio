@@ -16,6 +16,8 @@
   var $$ = function (s, r) { return Array.prototype.slice.call((r || document).querySelectorAll(s)); };
 
   /* ---------------- Personas ---------------- */
+  var THRILLER_CORE = 'Thriller — единственный музыкальный клип в National Film Registry США: его сохраняют как культурное наследие наравне с художественным кино. Vincent Price записал зловещий закадровый текст, а съёмки танца с зомби длились неделями.';
+
   var PERSONAS = [
     {
       id: 'radio_host', tag: 'Заводной эфир', name: 'Радиоведущий',
@@ -24,7 +26,8 @@
       quote: '«А вот это — личное. Слушайте…»',
       pal: ['#ff7a3d', '#ff3d8b'], skin: ['#ffd9b8', '#ff9e7a'], eye: '#3a1c2e', accent: '#ffd84d',
       voice: 'zahar', rate: 1.08, pitch: 1.05,
-      script: 'А вот это — личное. Billie Jean: бас-линию Майкл попросил повторять снова и снова, Куинси Джонс был против. Но именно этот гипноз сделал трек бессмертным. Поехали дальше, звук на максимум!'
+      script: 'А вот это — личное. ' + THRILLER_CORE + ' Именно этот клип взорвал MTV — звук на максимум, поехали!',
+      audio: 'assets/demos/persona-radio_host.wav'
     },
     {
       id: 'night_dj', tag: 'Ночной подкаст', name: 'Ночной диджей',
@@ -33,7 +36,8 @@
       quote: '«Тихо… только вы и эта песня.»',
       pal: ['#3b2c8f', '#1e2a78'], skin: ['#cfd6ff', '#8aa0ff'], eye: '#10163a', accent: '#9ad7ff',
       voice: 'filipp', rate: 0.92, pitch: 0.95,
-      script: 'Тихо. Только вы и эта песня. Вступление Billie Jean длится почти двадцать девять секунд — Майкл отказался его сокращать. Под него слишком хотелось танцевать. Останьтесь со мной до утра.'
+      script: 'Тихо. Только вы и эта песня. ' + THRILLER_CORE + ' Останьтесь со мной до утра.',
+      audio: 'assets/demos/persona-night_dj.wav'
     },
     {
       id: 'expert', tag: 'Эксперт жанра', name: 'Эксперт жанра',
@@ -42,7 +46,8 @@
       quote: '«Разберём, почему это работает.»',
       pal: ['#7b2fff', '#2bd4ff'], skin: ['#e7d9ff', '#b89aff'], eye: '#1a1140', accent: '#5ef0ff',
       voice: 'ermil', rate: 1.0, pitch: 1.0,
-      script: 'Разберём, почему это работает. В Billie Jean всё держится на одной бас-партии и сухом бите драм-машины Linn. Никаких лишних слоёв — это и есть пост-диско минимализм восьмидесятых.'
+      script: 'Разберём, почему это работает. ' + THRILLER_CORE + ' Это эталон pop-horror продакшна восьмидесятых.',
+      audio: 'assets/demos/persona-expert.wav'
     },
     {
       id: 'contemporary', tag: 'Современник эпохи', name: 'Современник эпохи',
@@ -51,7 +56,8 @@
       quote: '«Я помню это время…»',
       pal: ['#d98a2b', '#a83b6a'], skin: ['#ffe0c2', '#f0a87a'], eye: '#3a221c', accent: '#ffcf8a',
       voice: 'alena', rate: 0.98, pitch: 1.0,
-      script: 'Я помню это время. Когда на Motown 25 под Billie Jean он впервые прошёлся лунной походкой — мы замерли у экранов. Казалось, музыка больше не будет прежней. И ведь не стала.'
+      script: 'Я помню это время. Когда клип Thriller показали по MTV — мы замерли у экранов. ' + THRILLER_CORE,
+      audio: 'assets/demos/persona-contemporary.wav'
     },
     {
       id: 'fan', tag: 'Фанат-коллекционер', name: 'Фанат-коллекционер',
@@ -60,7 +66,8 @@
       quote: '«Обожаю этот момент!»',
       pal: ['#ff3d8b', '#a855f7'], skin: ['#ffd4ec', '#ff8ac4'], eye: '#3a1430', accent: '#ffe14d',
       voice: 'jane', rate: 1.12, pitch: 1.12,
-      script: 'Обожаю этот момент! Демо Billie Jean Майкл записал прямо дома, а потом микс переписывали девяносто один раз, пока Куинси не остался доволен. И да — я знаю здесь каждую секунду наизусть!'
+      script: 'Обожаю этот момент! ' + THRILLER_CORE + ' И да — я знаю каждую секунду этого клипа наизусть!',
+      audio: 'assets/demos/persona-fan.wav'
     },
     {
       id: 'backstage', tag: 'С закулисья', name: 'Инсайдер с закулисья',
@@ -69,7 +76,8 @@
       quote: '«Только между нами…»',
       pal: ['#8f1d3a', '#2a1145'], skin: ['#f0c9d4', '#c87a96'], eye: '#2a0e1c', accent: '#ff6b8a',
       voice: 'omazh', rate: 0.96, pitch: 0.98,
-      script: 'Только между нами. Куинси Джонс хотел вырезать длинное вступление, но Майкл уперся намертво. Спор выиграл артист — и именно это вступление стало одним из самых узнаваемых в истории. Об этом редко рассказывают вслух.'
+      script: 'Только между нами. ' + THRILLER_CORE + ' Об этом редко рассказывают вслух.',
+      audio: 'assets/demos/persona-backstage.wav'
     }
   ];
 
@@ -196,43 +204,57 @@ acc +
     });
   }
 
-  /* ---------------- Speech (TTS) ---------------- */
-  var synth = window.speechSynthesis;
-  var ruVoice = null;
-  function pickRuVoice() {
-    if (!synth) return;
-    var vs = synth.getVoices();
-    ruVoice = vs.filter(function (v) { return /ru|RU/.test(v.lang); })[0] || null;
-  }
-  if (synth) { pickRuVoice(); if (typeof synth.onvoiceschanged !== 'undefined') synth.onvoiceschanged = pickRuVoice; }
-
+  /* ---------------- Demo audio (Yandex TTS pre-rendered) ---------------- */
+  var demoAudio = new Audio();
+  demoAudio.preload = 'none';
   var currentBtn = null;
+
   function stopSpeak() {
-    if (synth) synth.cancel();
+    demoAudio.pause();
+    demoAudio.currentTime = 0;
     if (currentBtn) { currentBtn.classList.remove('playing'); currentBtn = null; }
     $$('.persona-status').forEach(function (s) { s.textContent = ''; });
+    var eq = $('#previewEq');
+    if (eq) eq.classList.add('paused');
   }
-  function speak(text, opts, btn, statusEl) {
-    if (!synth) { if (statusEl) statusEl.textContent = 'Голосовой движок недоступен — читайте текст ниже.'; return; }
-    if (currentBtn === btn) { stopSpeak(); return; }
+
+  function demoStudioKey(personaId, voiceId, tempoIdx, lengthIdx) {
+    return 'studio-' + personaId + '-' + voiceId + '-t' + tempoIdx + '-l' + lengthIdx + '.wav';
+  }
+
+  function playDemo(src, rate, btn, statusEl) {
+    if (!src) {
+      if (statusEl) statusEl.textContent = 'Демо-аудио скоро будет доступно.';
+      return;
+    }
+    if (currentBtn === btn && !demoAudio.paused) { stopSpeak(); return; }
     stopSpeak();
-    var u = new SpeechSynthesisUtterance(text);
-    u.lang = 'ru-RU';
-    if (ruVoice) u.voice = ruVoice;
-    u.rate = (opts && opts.rate) || 1; u.pitch = (opts && opts.pitch) || 1;
-    u.onend = function () { if (btn) btn.classList.remove('playing'); if (statusEl) statusEl.textContent = ''; if (currentBtn === btn) currentBtn = null; };
-    u.onerror = function () { if (btn) btn.classList.remove('playing'); if (statusEl) statusEl.textContent = ''; };
+    demoAudio.src = src;
+    demoAudio.playbackRate = rate || 1;
     currentBtn = btn || null;
     if (btn) btn.classList.add('playing');
     if (statusEl) statusEl.textContent = '● В эфире…';
-    synth.speak(u);
+    demoAudio.onended = function () {
+      if (btn) btn.classList.remove('playing');
+      if (statusEl) statusEl.textContent = '';
+      if (currentBtn === btn) currentBtn = null;
+      var eq = $('#previewEq');
+      if (eq) eq.classList.add('paused');
+    };
+    demoAudio.onerror = function () {
+      if (btn) btn.classList.remove('playing');
+      if (statusEl) statusEl.textContent = 'Не удалось загрузить демо — попробуйте позже.';
+    };
+    demoAudio.play().catch(function () {
+      if (statusEl) statusEl.textContent = 'Нажмите ещё раз для воспроизведения.';
+    });
   }
 
   $$('.persona-play').forEach(function (btn) {
     btn.addEventListener('click', function () {
       var p = PERSONAS[+btn.dataset.i];
       var statusEl = $('[data-status="' + btn.dataset.i + '"]');
-      speak(p.script, { rate: p.rate, pitch: p.pitch }, btn, statusEl);
+      playDemo(p.audio, p.rate, btn, statusEl);
     });
   });
 
@@ -299,21 +321,20 @@ acc +
   /* ---------------- Studio (interactive demo) ---------------- */
   (function () {
     var scriptEl = $('#previewScript'); if (!scriptEl) return;
-    var hostEl = $('#previewHost'), tagVoice = $('#tagVoice'), tagLen = $('#tagLen'), tagFreq = $('#tagFreq');
+    var hostEl = $('#previewHost'), tagVoice = $('#tagVoice'), tagLen = $('#tagLen'), tagTempo = $('#tagTempo');
     var ampluaChips = $('#ampluaChips'), voiceSel = $('#voiceSelect');
     var tempo = $('#tempo'), tempoOut = $('#tempoOut');
     var length = $('#length'), lengthOut = $('#lengthOut');
-    var freq = $('#freq'), freqOut = $('#freqOut');
     var playBtn = $('#previewPlay'), eq = $('#previewEq');
 
     var TEMPOS = [{ l: 'Очень медленно', r: 0.85 }, { l: 'Медленно', r: 0.95 }, { l: 'Нормально', r: 1.08 }, { l: 'Быстро', r: 1.22 }, { l: 'Очень быстро', r: 1.38 }];
     var LENS = [{ l: '30 секунд', s: '~30 с', n: 1 }, { l: '1 минута', s: '~60 с', n: 2 }, { l: 'Без лимита', s: '2+ мин', n: 4 }];
 
     var FACTS = [
-      'бас-линию Майкл попросил повторять снова и снова — Куинси Джонс был против, но именно этот гипноз сделал трек бессмертным',
-      'вступление длится почти двадцать девять секунд, и Майкл отказался его сокращать — под него слишком хотелось танцевать',
-      'демо песни он записал прямо дома, а финальный микс переписывали девяносто один раз',
-      'именно под Billie Jean на шоу Motown 25 он впервые показал лунную походку и проснулся знаменитым заново'
+      'National Film Registry сохранил клип Thriller как культурное наследие США — редкий случай для музыкального видео',
+      'Vincent Price записал зловещий закадровый монолог — без него хорror-атмосфера клипа не сложилась бы',
+      'съёмки танца с зомbi заняли недели и стали одним из самых дорогих клипов своего времени',
+      'именно Thriller сделал короткометражный клип главным событием эры MTV'
     ];
     var FOCUS = {
       all: '', pop: ' Чистый поп-инжиниринг эпохи MTV.',
@@ -349,7 +370,7 @@ acc +
       var p = state.persona, n = LENS[+length.value].n;
       var op = p.script.split('.')[0] + '.';
       var body = FACTS.slice(0, n).map(function (f, idx) {
-        return (idx === 0 ? 'Billie Jean: ' : '') + f + '.';
+        return (idx === 0 ? 'Thriller: ' : '') + f + '.';
       }).join(' ');
       var tail = FOCUS[state.focus] || '';
       var closer = '';
@@ -363,21 +384,25 @@ acc +
       hostEl.textContent = p.name;
       tempoOut.textContent = TEMPOS[+tempo.value].l;
       lengthOut.textContent = LENS[+length.value].l;
-      freqOut.textContent = 'каждые ' + freq.value;
       tagVoice.textContent = 'Голос: ' + voiceLabel(voiceSel.value);
       tagLen.textContent = LENS[+length.value].s;
-      tagFreq.textContent = 'каждые ' + freq.value + ' трека';
+      tagTempo.textContent = 'Темп: ' + TEMPOS[+tempo.value].l.toLowerCase();
       scriptEl.style.opacity = '0';
       setTimeout(function () { scriptEl.textContent = '«' + buildStory() + '»'; scriptEl.style.opacity = '1'; }, 130);
     }
 
-    [tempo, length, freq].forEach(function (r) { r.addEventListener('input', render); });
+    [tempo, length].forEach(function (r) { r.addEventListener('input', render); });
     voiceSel.addEventListener('change', render);
 
     playBtn.addEventListener('click', function () {
-      var statusText = buildStory();
       if (eq) eq.classList.remove('paused');
-      speak(statusText, { rate: TEMPOS[+tempo.value].r, pitch: state.persona.pitch }, playBtn, null);
+      var p = state.persona;
+      var src = 'assets/demos/' + demoStudioKey(p.id, voiceSel.value, +tempo.value, +length.value);
+      var fallback = p.audio;
+      playDemo(src, TEMPOS[+tempo.value].r, playBtn, null);
+      demoAudio.onerror = function () {
+        playDemo(fallback, TEMPOS[+tempo.value].r, playBtn, null);
+      };
     });
 
     render();
@@ -392,11 +417,13 @@ acc +
     var agreeInput = $('#agreeInput'), agreeErr = $('#agreeErr'), successEmail = $('#successEmail');
     var lastFocus = null;
     var PER = { month: '/мес', quarter: '/3 мес', year: '/год' };
+    var selectedPlanKey = 'year';
 
     function openModal(plan) {
       var price = plan.getAttribute('data-price'), old = plan.getAttribute('data-old');
       var name = plan.querySelector('.plan-name').textContent;
       var key = plan.getAttribute('data-plan');
+      selectedPlanKey = key;
       planName.textContent = name;
       amountEl.textContent = price; perEl.textContent = PER[key] || '';
       payAmount.textContent = price + ' ₽';
@@ -427,16 +454,31 @@ acc +
       if (!okEmail || !okAgree) return;
 
       var payBtn = $('#payBtn'); var prevText = payBtn.innerHTML;
-      payBtn.disabled = true; payBtn.innerHTML = 'Отправляем…';
+      payBtn.disabled = true; payBtn.innerHTML = 'Создаём платёж…';
 
-      var payload = { email: emailInput.value.trim(), plan: planName.textContent, amount: amountEl.textContent };
-      var url = (API_BASE || '') + '/v1/public/subscribe';
+      var payload = { email: emailInput.value.trim(), plan: selectedPlanKey, amount: amountEl.textContent };
+      var url = (API_BASE || '') + '/v1/public/payment/create';
       fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
-        .catch(function () { /* graceful: show success regardless, email is best-effort */ })
+        .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, body: j }; }); })
+        .then(function (res) {
+          if (res.ok && res.body.confirmationUrl) {
+            window.location.href = res.body.confirmationUrl;
+            return;
+          }
+          if (res.ok) {
+            successEmail.textContent = payload.email;
+            form.hidden = true; success.hidden = false;
+            return;
+          }
+          emailErr.hidden = false;
+          emailErr.textContent = res.body.error || 'Не удалось создать платёж';
+        })
+        .catch(function () {
+          emailErr.hidden = false;
+          emailErr.textContent = 'Сеть недоступна — попробуйте позже';
+        })
         .finally(function () {
           payBtn.disabled = false; payBtn.innerHTML = prevText;
-          successEmail.textContent = payload.email;
-          form.hidden = true; success.hidden = false;
         });
     });
   })();

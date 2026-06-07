@@ -443,16 +443,6 @@ fun SettingsScreen(
                 }
 
                 CollapsibleSettingsSection(
-                    title = context.getString(R.string.settings_auth_section),
-                    summary = context.getString(R.string.settings_auth_summary),
-                ) {
-                    AccountStatusSection(
-                        app = app,
-                        onOpenLogin = onOpenAccountLogin,
-                    )
-                }
-
-                CollapsibleSettingsSection(
                     title = context.getString(R.string.settings_trigger_mode),
                     summary = buildTriggerSummary(
                         context = context,
@@ -1142,7 +1132,13 @@ fun SettingsScreen(
                                 expanded = openRouterModelMenuExpanded,
                                 onDismissRequest = { openRouterModelMenuExpanded = false },
                             ) {
-                                OpenRouterModel.entries.forEach { model ->
+                                val settingsPresets = OpenRouterModel.entries.filter {
+                                    it != OpenRouterModel.CUSTOM &&
+                                        it != OpenRouterModel.NEMOTRON_NANO &&
+                                        it != OpenRouterModel.GEMMA_4_26B_FREE &&
+                                        it != OpenRouterModel.LIQUID_LFM
+                                }
+                                settingsPresets.forEach { model ->
                                     DropdownMenuItem(
                                         text = {
                                             Column {

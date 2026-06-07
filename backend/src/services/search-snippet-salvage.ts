@@ -15,7 +15,11 @@ export function isWeakSnippetSeed(fact: string, score = interestScore(fact)): bo
 
 export function isWeakSelectedFact(selected: SelectedReferenceFact | null): boolean {
   if (!selected) return true;
-  return isWeakSnippetSeed(selected.fact, selected.interestScore);
+  const score = Math.max(selected.interestScore ?? 0, interestScore(selected.fact));
+  if (score < 6) return true;
+  const trimmed = selected.fact.trim();
+  if (isWikiBiographyLead(trimmed)) return true;
+  return isUnspeakableWebSeed(trimmed);
 }
 
 /** Last-resort seed from HTML search snippets when wiki/MB timed out. */

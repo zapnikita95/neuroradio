@@ -18,6 +18,7 @@ import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import com.musicstory.app.MusicStoryApp
+import com.musicstory.app.ui.screens.AccountScreen
 import com.musicstory.app.ui.screens.AccountLoginScreen
 import com.musicstory.app.ui.screens.HistoryScreen
 import com.musicstory.app.ui.screens.HomeScreen
@@ -32,6 +33,7 @@ object Routes {
     const val ACCOUNT_LOGIN = "account_login"
     const val HOME = "home"
     const val SETTINGS = "settings"
+    const val ACCOUNT = "account"
     const val HISTORY = "history"
 }
 
@@ -102,6 +104,7 @@ fun MusicStoryNavGraph(
             val scope = rememberCoroutineScope()
             HomeScreen(
                 onOpenSettings = { navController.navigate(Routes.SETTINGS) },
+                onOpenAccount = { navController.navigate(Routes.ACCOUNT) },
                 onOpenHistory = { navController.navigate(Routes.HISTORY) },
                 onRequestNotificationAccess = {
                     navController.navigate(Routes.ONBOARDING)
@@ -111,6 +114,14 @@ fun MusicStoryNavGraph(
                         app.settingsDataStore.setSettingsTourPending(true)
                     }
                     navController.navigate(Routes.SETTINGS)
+                },
+            )
+        }
+        composable(Routes.ACCOUNT) {
+            AccountScreen(
+                onBack = { navController.popBackStack() },
+                onOpenAccountLogin = {
+                    navController.navigate(Routes.ACCOUNT_LOGIN) { launchSingleTop = true }
                 },
             )
         }

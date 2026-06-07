@@ -134,6 +134,10 @@ class ApiClient(
         return getApi(baseUrl).billingStatus()
     }
 
+    suspend fun createPayment(baseUrl: String, email: String, plan: String): PaymentCreateResponse {
+        return getApi(baseUrl).createPayment(PaymentCreateRequest(email = email, plan = plan))
+    }
+
     suspend fun probeLlm(baseUrl: String, request: LlmProbeRequest): LlmProbeResponse {
         return try {
             getApi(baseUrl).probeLlm(request)

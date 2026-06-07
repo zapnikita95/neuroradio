@@ -122,6 +122,16 @@ test('SSML reads moonwalk as moon walk in English', () => {
   assert.match(ssml, /<lang xml:lang="en-US">moon walk<\/lang>/i);
 });
 
+test('SSML reads Xscape as X scape', () => {
+  const ssml = buildYandexSsml('альбом Xscape вышел позже.');
+  assert.match(ssml, /<lang xml:lang="en-US">X scape<\/lang>/i);
+});
+
+test('SSML reads OneRepublic split', () => {
+  const ssml = buildYandexSsml('группа OneRepublic выступала.');
+  assert.match(ssml, /<lang xml:lang="en-US">One Republic<\/lang>/i);
+});
+
 test('stress marks хаоса correctly', () => {
   const out = prepareYandexTtsText('родился из хаоса импровизации.', { artist: 'MJ', title: 'Test' });
   assert.match(out, /х\+аоса/i);
