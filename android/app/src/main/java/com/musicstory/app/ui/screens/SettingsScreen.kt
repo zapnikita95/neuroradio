@@ -42,6 +42,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -120,6 +121,12 @@ fun SettingsScreen(
     val app = context.applicationContext as MusicStoryApp
     val scope = rememberCoroutineScope()
     val settings = app.settingsDataStore
+
+    DisposableEffect(Unit) {
+        onDispose {
+            scope.launch { app.syncSettingsWithServer() }
+        }
+    }
 
     val manualMode by settings.manualMode.collectAsState(initial = false)
     val autoIntercept by settings.autoIntercept.collectAsState(initial = SettingsDataStore.DEFAULT_AUTO_INTERCEPT)
@@ -1927,6 +1934,9 @@ private fun buildTriggerSummary(
 }
 
 private fun formatServerQuotaLabel(context: android.content.Context, quota: com.musicstory.app.data.model.StoryQuotaInfo): String {
+    if (quota.tier?.lowercase() == "unlimited" || quota.limit >= 999_000) {
+        return context.getString(R.string.settings_unlimited_groq)
+    }
     val monthlyLimit = quota.monthlyLimit
     if (monthlyLimit != null && monthlyLimit > 0) {
         val monthlyRem = quota.monthlyRemaining

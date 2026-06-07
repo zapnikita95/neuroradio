@@ -29,8 +29,8 @@
     <string name="onboarding_check_access">Проверить и войти</string>
     <string name="onboarding_not_granted_yet">Сначала включи «Эфир AI — мониторинг медиа» в настройках доступа к уведомлениям.</string>
 
-    <string name="home_tour_welcome_title">Вас приветствует нейрорадио</string>
-    <string name="home_tour_welcome_body">Слушайте любимые треки, узнавайте новое об артистах, их истории и интересных фактах.</string>
+    <string name="home_tour_welcome_title">Вас приветствует Эфир AI</string>
+    <string name="home_tour_welcome_body">Персональное нейро-радио о вашей музыке: факты находятся в реальном времени, истории озвучиваются голосом выбранного амплуа — каждый эфир уникален.</string>
     <string name="home_tour_track_title">Сейчас играет</string>
     <string name="home_tour_track_body">Когда вы включаете трек в Spotify или Яндекс Музыке, он отображается здесь — название, артист и источник.</string>
     <string name="home_tour_counter_title">Следующая история</string>

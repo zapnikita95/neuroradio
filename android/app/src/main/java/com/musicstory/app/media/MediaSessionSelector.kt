@@ -25,6 +25,11 @@ object MediaSessionSelector {
         "com.yandex.music",
     )
 
+    fun isAllowedMusicPackage(packageName: String?): Boolean {
+        if (packageName.isNullOrBlank()) return false
+        return !isBlockedPackage(packageName) && isPreferredPackage(packageName)
+    }
+
     fun isBlockedPackage(packageName: String?): Boolean {
         if (packageName.isNullOrBlank()) return false
         if (BLOCKED_PACKAGES.contains(packageName)) return true

@@ -371,7 +371,10 @@ class StoryOrchestrator(
         val trackGenre = scrobbleRepository.lookupGenre(track.artist, track.title)
         val firstTrackBonus = false
         val autoStoriesEnabled = settingsDataStore.appPowerMode.first() == AppPowerMode.ON
+        val suppressUntil = settingsDataStore.suppressAutoStoryUntilMs.first()
+        val suppressAutoStory = System.currentTimeMillis() < suppressUntil
         val shouldTrigger = autoStoriesEnabled &&
+            !suppressAutoStory &&
             _mode.value == OrchestratorMode.AUTO &&
             settings.autoIntercept &&
             !isStorySessionActive() &&

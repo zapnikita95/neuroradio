@@ -30,6 +30,16 @@ import androidx.compose.foundation.layout.width
 
 import androidx.compose.foundation.shape.RoundedCornerShape
 
+import androidx.compose.foundation.layout.size
+
+import androidx.compose.foundation.Image
+
+import androidx.compose.ui.layout.ContentScale
+
+import androidx.compose.ui.res.painterResource
+
+import androidx.compose.ui.text.style.TextAlign
+
 import androidx.compose.material3.MaterialTheme
 
 import androidx.compose.material3.Text
@@ -116,6 +126,10 @@ fun SettingsTourSpotlightOverlay(
     visible: Boolean = true,
 
     centerTooltipWhenNoHighlight: Boolean = false,
+
+    welcomeLogoResId: Int? = null,
+
+    welcomeCeremonial: Boolean = false,
 
     modifier: Modifier = Modifier,
 
@@ -223,6 +237,72 @@ fun SettingsTourSpotlightOverlay(
 
 
 
+        if (welcomeCeremonial && centerTooltipWhenNoHighlight) {
+            Column(
+                modifier = Modifier
+                    .zIndex(2f)
+                    .align(Alignment.Center)
+                    .fillMaxWidth()
+                    .padding(horizontal = 24.dp)
+                    .onGloballyPositioned { coords ->
+                        val bounds = coords.boundsInRoot()
+                        tooltipHeightPx = bounds.height
+                        onControlsTopChanged(bounds.top)
+                        onControlsBottomChanged(bounds.bottom)
+                    },
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(18.dp),
+            ) {
+                welcomeLogoResId?.let { resId ->
+                    Image(
+                        painter = painterResource(resId),
+                        contentDescription = null,
+                        modifier = Modifier
+                            .size(128.dp)
+                            .clip(RoundedCornerShape(24.dp)),
+                        contentScale = ContentScale.Crop,
+                    )
+                }
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(22.dp))
+                        .background(DeepVoid.copy(alpha = 0.98f))
+                        .border(1.5.dp, GoldBright.copy(alpha = 0.55f), RoundedCornerShape(22.dp))
+                        .padding(horizontal = 24.dp, vertical = 22.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    Text(
+                        text = step.title,
+                        style = MaterialTheme.typography.headlineSmall,
+                        color = CreamText,
+                        textAlign = TextAlign.Center,
+                    )
+                    Text(
+                        text = step.body,
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = MutedLavender,
+                        textAlign = TextAlign.Center,
+                    )
+                }
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                ) {
+                    SecondaryStoryButton(
+                        text = "Пропустить",
+                        onClick = onSkip,
+                        modifier = Modifier.weight(1f),
+                    )
+                    PrimaryStoryButton(
+                        text = if (isLast) "Готово" else "Далее",
+                        onClick = onNext,
+                        modifier = Modifier.weight(1f),
+                    )
+                }
+            }
+        } else {
         Column(
 
             modifier = Modifier
@@ -345,6 +425,8 @@ fun SettingsTourSpotlightOverlay(
                 )
 
             }
+
+        }
 
         }
 

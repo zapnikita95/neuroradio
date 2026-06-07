@@ -108,6 +108,7 @@ fun HomeScreen(
     val openRouterApiKey by app.settingsDataStore.openRouterApiKey.collectAsState(initial = "")
     val localOllamaUrl by app.settingsDataStore.localOllamaUrl.collectAsState(initial = SettingsDataStore.DEFAULT_LOCAL_OLLAMA_URL)
     val homeTourPending by app.settingsDataStore.homeTourPending.collectAsState(initial = false)
+    val homeTourCompleted by app.settingsDataStore.homeTourCompleted.collectAsState(initial = false)
     val backendUrl by app.settingsDataStore.backendUrl.collectAsState(initial = SettingsDataStore.DEFAULT_BACKEND_URL)
     val dailyQuota by app.storyRepository.dailyQuota.collectAsState(initial = null)
     val storyHistory by app.storyRepository.storyHistory.collectAsState(initial = emptyList())
@@ -150,8 +151,8 @@ fun HomeScreen(
         )
     }
 
-    LaunchedEffect(homeTourPending) {
-        if (homeTourPending) tourStep = 0
+    LaunchedEffect(homeTourPending, homeTourCompleted) {
+        if (homeTourPending && !homeTourCompleted) tourStep = 0
     }
 
     LaunchedEffect(uiState.pendingFeedback?.trackKey, uiState.pendingFeedback?.script, storyHistory) {
@@ -517,6 +518,8 @@ fun HomeScreen(
                         stepIndex = step,
                         steps = tourSteps,
                         centerTooltipWhenNoHighlight = step == 0,
+                        welcomeLogoResId = if (step == 0) R.drawable.logo_efir_ai else null,
+                        welcomeCeremonial = step == 0,
                         visible = true,
                         onControlsBottomChanged = {},
                         onNext = {

@@ -80,7 +80,9 @@ fun MusicStoryNavGraph(
             AccountLoginScreen(
                 onLoggedIn = {
                     scope.launch {
-                        app.settingsDataStore.setHomeTourPending(true)
+                        if (!app.settingsDataStore.homeTourCompleted.first()) {
+                            app.settingsDataStore.setHomeTourPending(true)
+                        }
                         navController.navigate(Routes.HOME) {
                             popUpTo(Routes.ACCOUNT_LOGIN) { inclusive = true }
                             launchSingleTop = true

@@ -53,6 +53,22 @@ export async function collectPreviousScripts(
   return scripts;
 }
 
+export async function getLastTrackSeedFingerprint(
+  installId: string,
+  artist: string,
+  title: string,
+): Promise<string | null> {
+  const history = await pullHistoryAsync(installId, 0);
+  if (!history) return null;
+  const tk = trackKey(artist, title);
+  for (const h of history) {
+    if (h.trackKey === tk && h.seedFact?.trim()) {
+      return factFingerprint(h.seedFact);
+    }
+  }
+  return null;
+}
+
 export async function getUsedFingerprints(
   installId: string,
   artist: string,
@@ -62,7 +78,27 @@ export async function getUsedFingerprints(
   for (const s of await collectPreviousScripts(installId, artist, title)) {
     fps.add(factFingerprint(s));
   }
+  const lastTrackSeed = await getLastTrackSeedFingerprint(installId, artist, title);
+  if (lastTrackSeed) fps.add(lastTrackSeed);
   return fps;
+}
+
+/** Reserve seed immediately so rapid persona/track retries cannot reuse it. */
+export async function reserveSeedForUser(
+  installId: string,
+  artist: string,
+  title: string,
+  seed: SelectedReferenceFact,
+): Promise<void> {
+  ensureAccount(installId);
+  await recordAccountUsedSeedAsync(installId, {
+    fact: seed.fact,
+    artist,
+    title,
+    scope: seed.scope,
+    interestScore: seed.interestScore,
+    interestRating: seed.interestRating,
+  });
 }
 
 export function ingestBundleToBank(artist: string, title: string, bundle: ReferenceFactBundle): number {
@@ -128,30 +164,20 @@ export async function countUnusedBankFactsForUser(
   return count;
 }
 
-function narratorFactIndexOffset(narrator: StoryNarratorId): number {
-  let hash = 0;
-  for (let i = 0; i < narrator.length; i += 1) {
-    hash = (hash * 31 + narrator.charCodeAt(i)) >>> 0;
-  }
-  return hash % 13;
-}
-
 export async function pickFactForUser(
   installId: string,
   bundle: ReferenceFactBundle,
   artist: string,
   title: string,
   storyIndex = 0,
-  narrator: StoryNarratorId = 'auto',
+  _narrator: StoryNarratorId = 'auto',
 ): Promise<SelectedReferenceFact | null> {
   const used = await getUsedFingerprints(installId, artist, title);
-  const offset = narratorFactIndexOffset(narrator);
-  const fromBank = pickFromBank(artist, title, used, ['track', 'album', 'artist'], offset);
+  const fromBank = pickFromBank(artist, title, used, ['track', 'album', 'artist'], 0);
   if (fromBank) return storedFactToSelected(fromBank);
 
   const previous = await collectPreviousScripts(installId, artist, title);
-  const effectiveIndex = storyIndex + narratorFactIndexOffset(narrator);
-  return pickReferenceFact(bundle, previous, effectiveIndex, artist, title, used);
+  return pickReferenceFact(bundle, previous, storyIndex, artist, title, used);
 }
 
 export async function recordUserStory(

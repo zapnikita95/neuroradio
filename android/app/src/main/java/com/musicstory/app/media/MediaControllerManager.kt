@@ -166,9 +166,9 @@ class MediaControllerManager(
 
     private fun selectAndBindController(controllers: List<MediaController>?) {
         val list = controllers.orEmpty()
-            .filter { !MediaSessionSelector.isBlockedPackage(it.packageName) }
+            .filter { MediaSessionSelector.isAllowedMusicPackage(it.packageName) }
 
-        val musicApps = list.filter { MediaSessionSelector.isPreferredPackage(it.packageName) }
+        val musicApps = list
 
         val controller = musicApps
             .filter { hasValidMetadata(it) && isPlaying(it) }
@@ -176,10 +176,6 @@ class MediaControllerManager(
             ?: musicApps
                 .filter { hasValidMetadata(it) }
                 .minByOrNull { MediaSessionSelector.priority(it.packageName) }
-            ?: list
-                .filter { !MediaSessionSelector.isPreferredPackage(it.packageName) }
-                .filter { hasValidMetadata(it) && isPlaying(it) }
-                .firstOrNull()
 
         if (controller?.sessionToken == activeController?.sessionToken) {
             updateFromController(controller)
@@ -260,18 +256,20 @@ class MediaControllerManager(
     )
 
     private fun pickBestTrack(session: TrackInfo?, notification: TrackInfo?): TrackInfo? {
+        val safeSession = session?.takeIf { MediaSessionSelector.isAllowedMusicPackage(it.packageName) }
+        val safeNotification = notification?.takeIf { MediaSessionSelector.isAllowedMusicPackage(it.packageName) }
         when {
-            session == null -> return notification
-            notification == null -> return session
-            session.displayKey == notification.displayKey -> return session
-            _isPlaying.value && session.packageName != null &&
-                session.packageName == _activePackage.value -> {
+            safeSession == null -> return safeNotification
+            safeNotification == null -> return safeSession
+            safeSession.displayKey == safeNotification.displayKey -> return safeSession
+            _isPlaying.value && safeSession.packageName != null &&
+                safeSession.packageName == _activePackage.value -> {
                 val notifAt = MediaNotificationListener.lastNotificationUpdateMs
-                return if (notifAt > sessionTrackUpdatedAtMs) notification else session
+                return if (notifAt > sessionTrackUpdatedAtMs) safeNotification else safeSession
             }
             else -> {
                 val notifAt = MediaNotificationListener.lastNotificationUpdateMs
-                return if (notifAt >= sessionTrackUpdatedAtMs) notification else session
+                return if (notifAt >= sessionTrackUpdatedAtMs) safeNotification else safeSession
             }
         }
     }

@@ -69,6 +69,10 @@ class SettingsDataStore(private val context: Context) {
         prefs[KEY_HOME_TOUR_COMPLETED] ?: false
     }
 
+    val suppressAutoStoryUntilMs: Flow<Long> = context.settingsDataStore.data.map { prefs ->
+        prefs[KEY_SUPPRESS_AUTO_STORY_UNTIL] ?: 0L
+    }
+
     val backendUrl: Flow<String> = context.settingsDataStore.data.map { prefs ->
         prefs[KEY_BACKEND_URL].orEmpty().trim().ifBlank { DEFAULT_BACKEND_URL }
     }
@@ -401,8 +405,10 @@ class SettingsDataStore(private val context: Context) {
     }
 
     suspend fun setStoryNarrator(narrator: StoryNarrator) {
-        context.settingsDataStore.edit { it[KEY_STORY_NARRATOR] = narrator.id }
-        notifyCloudSync()
+        context.settingsDataStore.edit {
+            it[KEY_STORY_NARRATOR] = narrator.id
+            it[KEY_SUPPRESS_AUTO_STORY_UNTIL] = System.currentTimeMillis() + 15_000L
+        }
     }
 
     suspend fun setTtsVoice(voice: TtsVoice) {
@@ -565,6 +571,7 @@ class SettingsDataStore(private val context: Context) {
         private val KEY_SETTINGS_TOUR_COMPLETED = booleanPreferencesKey("settings_tour_completed")
         private val KEY_HOME_TOUR_PENDING = booleanPreferencesKey("home_tour_pending")
         private val KEY_HOME_TOUR_COMPLETED = booleanPreferencesKey("home_tour_completed")
+        private val KEY_SUPPRESS_AUTO_STORY_UNTIL = longPreferencesKey("suppress_auto_story_until")
         private val KEY_BACKEND_URL = stringPreferencesKey("backend_url")
         private val KEY_AUTH_INSTALL_ID = stringPreferencesKey("auth_install_id")
         private val KEY_AUTH_ACCESS_TOKEN = stringPreferencesKey("auth_access_token")

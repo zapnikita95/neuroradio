@@ -13,13 +13,15 @@ import {
   collectPreviousScripts,
   countUnusedBankFactsForUser,
   ensureAccount,
+  getUsedFingerprints,
   ingestBundleToBank,
   pickBankFactForUser,
   pickFactForUser,
   prefetchArtistFactsToBank,
   recordUserStory,
+  reserveSeedForUser,
 } from '../services/fact-user-service.js';
-import { ingestFacts } from '../services/fact-bank.js';
+import { ingestFacts, factFingerprint } from '../services/fact-bank.js';
 import { resolveArtistTier } from '../services/artist-notability.js';
 import { buildMetadataFallbackFacts, countGroundedFacts, isMetadataOnlyFallbackFact } from '../services/metadata-facts.js';
 import { factAppliesToRequest } from '../services/fact-relevance.js';
@@ -359,27 +361,41 @@ router.post('/full', validateStoryFullBody, storyFullRateLimit, async (req: Requ
 
     ensureAccount(installId);
 
+    const usedFingerprints = await getUsedFingerprints(installId, artist, title);
+
     const curatedHit =
       lookupCuratedFact(coverCtx.factArtist, coverCtx.factTitle) ??
       lookupCuratedFact(artist, title);
     let bankFact: Awaited<ReturnType<typeof pickBankFactForUser>> = null;
     if (curatedHit) {
-      ingestFacts(coverCtx.factArtist, coverCtx.factTitle, [
-        { fact: curatedHit.fact, scope: curatedHit.scope, source: 'api' },
-      ]);
-      const curatedScore = Math.max(interestScore(curatedHit.fact), 12);
-      bankFact = {
-        fact: curatedHit.fact,
-        scope: curatedHit.scope,
-        scopeLabelRu: curatedHit.scope === 'track' ? 'трек' : 'группа/артист',
-        interestScore: curatedScore,
-        interestRating: interestRating10(curatedHit.fact),
-      };
-      console.log(
-        `[facts] curated hit artist="${coverCtx.factArtist}" title="${coverCtx.factTitle}"`,
-      );
+      const curatedFp = factFingerprint(curatedHit.fact);
+      if (!usedFingerprints.has(curatedFp)) {
+        ingestFacts(coverCtx.factArtist, coverCtx.factTitle, [
+          { fact: curatedHit.fact, scope: curatedHit.scope, source: 'api' },
+        ]);
+        const curatedScore = Math.max(interestScore(curatedHit.fact), 12);
+        bankFact = {
+          fact: curatedHit.fact,
+          scope: curatedHit.scope,
+          scopeLabelRu: curatedHit.scope === 'track' ? 'трек' : 'группа/артист',
+          interestScore: curatedScore,
+          interestRating: interestRating10(curatedHit.fact),
+        };
+        console.log(
+          `[facts] curated hit artist="${coverCtx.factArtist}" title="${coverCtx.factTitle}"`,
+        );
+      } else {
+        console.log(
+          `[facts] curated seed already used for "${artist}" — "${title}", fetching fresh facts`,
+        );
+      }
     } else {
       bankFact = await pickBankFactForUser(installId, artist, title, coverCtx);
+    }
+
+    if (bankFact && usedFingerprints.has(factFingerprint(bankFact.fact))) {
+      console.log(`[facts] bank seed already used for "${artist}" — "${title}", fetching fresh facts`);
+      bankFact = null;
     }
 
     const factArtist = coverCtx.factArtist;
@@ -825,6 +841,10 @@ router.post('/full', validateStoryFullBody, storyFullRateLimit, async (req: Requ
 
     if (coverCtx.isCover && coverCtx.coverNoteRu) {
       storyReferenceFacts = [coverCtx.coverNoteRu, ...storyReferenceFacts];
+    }
+
+    if (selectedFact?.fact) {
+      await reserveSeedForUser(installId, metadata.artist, metadata.title, selectedFact);
     }
 
     const storyInput = {

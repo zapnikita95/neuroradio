@@ -133,6 +133,9 @@ class MusicStoryApp : Application() {
             val profile = accountAuthManager.fetchProfile(backendUrl) ?: return@launch
             if (!profile.isLoggedIn) return@launch
             settingsDataStore.setAccountLinked(true)
+            if (!settingsDataStore.homeTourCompleted.first()) {
+                settingsDataStore.setHomeTourPending(true)
+            }
             syncAccountDataWithServer(backendUrl)
         }
     }

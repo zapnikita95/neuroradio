@@ -44,6 +44,9 @@ import java.util.Locale
 
 private suspend fun finishAccountLogin(app: MusicStoryApp) {
     app.settingsDataStore.setAccountLinked(true)
+    if (!app.settingsDataStore.homeTourCompleted.first()) {
+        app.settingsDataStore.setHomeTourPending(true)
+    }
     val url = app.settingsDataStore.backendUrl.first()
     if (url.isNotBlank()) {
         app.syncAccountDataWithServer(url)
