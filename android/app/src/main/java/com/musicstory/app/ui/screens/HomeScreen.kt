@@ -118,6 +118,7 @@ fun HomeScreen(
     val backendUrl by app.settingsDataStore.backendUrl.collectAsState(initial = SettingsDataStore.DEFAULT_BACKEND_URL)
     val dailyQuota by app.storyRepository.dailyQuota.collectAsState(initial = null)
     val trialExpiredUpsellShown by app.settingsDataStore.trialExpiredUpsellShown.collectAsState(initial = false)
+    val trialBannerDismissed by app.settingsDataStore.trialBannerDismissedMilestones.collectAsState(initial = emptySet())
     var billingEntitlement by remember { mutableStateOf<BillingEntitlementResponse?>(null) }
     var showTrialExpiredDialog by remember { mutableStateOf(false) }
     val storyHistory by app.storyRepository.storyHistory.collectAsState(initial = emptyList())
@@ -150,6 +151,7 @@ fun HomeScreen(
         }
     }
     val trialRemainingMs = remember(trialUntil, trialTick) { TrialUi.remainingMs(trialUntil) }
+    val showTrialBanner = TrialUi.shouldShowTrialBanner(trialRemainingMs, trialBannerDismissed)
     val trialExpired = TrialUi.isTrialExpired(trialUntil, effectiveTier)
 
     LaunchedEffect(trialExpired, trialExpiredUpsellShown) {
@@ -413,22 +415,25 @@ fun HomeScreen(
                 },
             )
 
-            Column(
+            Box(
                 modifier = Modifier
                     .weight(1f)
-                    .fillMaxWidth()
+                    .fillMaxWidth(),
+            ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
                     .verticalScroll(homeScrollState, enabled = !tourActive)
-                    .padding(horizontal = 24.dp),
+                    .padding(horizontal = 24.dp)
+                    .padding(
+                        top = if (showTrialBanner) 92.dp else 8.dp,
+                        bottom = 168.dp,
+                    ),
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.Top,
             ) {
-                Spacer(modifier = Modifier.height(8.dp))
-
-                trialRemainingMs?.let { remaining ->
-                    TrialCountdownBanner(
-                        remainingMs = remaining,
-                        modifier = Modifier.padding(bottom = 12.dp),
-                    )
+                if (!showTrialBanner) {
+                    Spacer(modifier = Modifier.height(0.dp))
                 }
 
                 VinylDisc(
@@ -539,6 +544,23 @@ fun HomeScreen(
                 }
 
                 Spacer(modifier = Modifier.height(16.dp))
+            }
+
+            if (showTrialBanner && trialRemainingMs != null) {
+                TrialCountdownBanner(
+                    remainingMs = trialRemainingMs,
+                    modifier = Modifier
+                        .align(Alignment.TopCenter)
+                        .padding(horizontal = 24.dp, vertical = 8.dp),
+                    onDismiss = {
+                        TrialUi.bannerMilestoneDays(trialRemainingMs)?.let { milestone ->
+                            scope.launch {
+                                app.settingsDataStore.dismissTrialBannerMilestone(milestone)
+                            }
+                        }
+                    },
+                )
+            }
             }
 
             Column(

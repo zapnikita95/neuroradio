@@ -5,7 +5,7 @@ import { validateStoryFullBody } from '../middleware/validate-story.js';
 import { enrichTrackMetadata } from '../services/musicbrainz.js';
 import { fetchAggregatedFactContext, emptyAggregatedFactContext, fetchIndieArtistFocusContext, fetchEmergencyFactRescue } from '../services/fact-aggregator.js';
 import { fetchFastTrackWikiFacts } from '../services/wikipedia-facts.js';
-import { explainReferenceFactSelection, type SelectedReferenceFact } from '../services/fact-picker.js';
+import { explainReferenceFactSelection, factsTooSimilar, type SelectedReferenceFact } from '../services/fact-picker.js';
 import { formatFactPickLog, logFactCandidatePools } from '../services/fact-interest-log.js';
 import { interestScore, isWikiBiographyLead } from '../services/reference-fact-quality.js';
 import { interestRating10 } from '../services/fact-interest-log.js';
@@ -14,6 +14,7 @@ import {
   countUnusedBankFactsForUser,
   ensureAccount,
   getUsedFingerprints,
+  getRecentSeedFactsForTrack,
   ingestBundleToBank,
   pickBankFactForUser,
   pickFactForUser,
@@ -397,6 +398,14 @@ router.post('/full', validateStoryFullBody, storyFullRateLimit, async (req: Requ
 
     if (bankFact && usedFingerprints.has(factFingerprint(bankFact.fact))) {
       console.log(`[facts] bank seed already used for "${artist}" — "${title}", fetching fresh facts`);
+      bankFact = null;
+    }
+
+    const recentTrackSeeds = await getRecentSeedFactsForTrack(installId, artist, title);
+    if (bankFact && factsTooSimilar(bankFact.fact, recentTrackSeeds)) {
+      console.log(
+        `[facts] bank seed repeats recent topic for "${artist}" — "${title}", fetching fresh facts`,
+      );
       bankFact = null;
     }
 
@@ -843,6 +852,30 @@ router.post('/full', validateStoryFullBody, storyFullRateLimit, async (req: Requ
 
     if (coverCtx.isCover && coverCtx.coverNoteRu) {
       storyReferenceFacts = [coverCtx.coverNoteRu, ...storyReferenceFacts];
+    }
+
+    if (selectedFact?.fact && factsTooSimilar(selectedFact.fact, recentTrackSeeds)) {
+      console.warn(
+        `[facts] reject consecutive similar seed for "${metadata.title}": "${selectedFact.fact.slice(0, 90)}"`,
+      );
+      const alt = await pickFactForUser(
+        installId,
+        factBundle,
+        metadata.artist,
+        metadata.title,
+        previousScripts.length + 1,
+        storyNarrator,
+      );
+      if (alt && !factsTooSimilar(alt.fact, recentTrackSeeds)) {
+        selectedFact = alt;
+        factFromBank = false;
+        factHuntLlm = false;
+        storyReferenceFacts = [selectedFact.fact];
+        if (coverCtx.isCover && coverCtx.coverNoteRu) {
+          storyReferenceFacts = [coverCtx.coverNoteRu, ...storyReferenceFacts];
+        }
+        console.log(`[facts] switched to alternate seed: "${alt.fact.slice(0, 90)}"`);
+      }
     }
 
     if (selectedFact?.fact) {

@@ -57,17 +57,41 @@ function dedupeFacts(facts: string[]): string[] {
   return filterAndRankFacts(facts);
 }
 
-function factOverlapsPrevious(fact: string, previousScripts: string[]): boolean {
+const MUSIC_VIDEO_TOPIC =
+  /\b(music video|official video|video was directed|video for|accompanying music video|клип|music video for)\b/i;
+
+function overlapThreshold(factWordCount: number, strict: boolean): number {
+  if (strict) return Math.min(2, Math.max(2, Math.ceil(factWordCount * 0.28)));
+  return Math.min(3, Math.max(2, Math.ceil(factWordCount * 0.45)));
+}
+
+function factsShareTopic(a: string, b: string): boolean {
+  if (MUSIC_VIDEO_TOPIC.test(a) && MUSIC_VIDEO_TOPIC.test(b)) return true;
+  return false;
+}
+
+export function factOverlapsPrevious(fact: string, previousScripts: string[], strict = false): boolean {
   const factWords = significantWords(fact);
   if (factWords.length === 0) return false;
 
   for (const script of previousScripts) {
+    if (factsShareTopic(fact, script)) {
+      const scriptWords = new Set(significantWords(script));
+      const hits = factWords.filter((word) => scriptWords.has(word)).length;
+      if (hits >= 2) return true;
+    }
     const scriptWords = new Set(significantWords(script));
     const hits = factWords.filter((word) => scriptWords.has(word)).length;
-    const threshold = Math.min(3, Math.max(2, Math.ceil(factWords.length * 0.45)));
+    const threshold = overlapThreshold(factWords.length, strict);
     if (hits >= threshold) return true;
   }
   return false;
+}
+
+/** Same track/artist — reject near-duplicate seeds (e.g. two «music video in Saint Lucia» facts). */
+export function factsTooSimilar(candidate: string, recentFacts: string[]): boolean {
+  if (!candidate.trim() || recentFacts.length === 0) return false;
+  return factOverlapsPrevious(candidate, recentFacts, true);
 }
 
 function isRejectedSeed(fact: string, title = ''): boolean {

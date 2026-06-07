@@ -293,6 +293,7 @@ fun SettingsScreen(
     var devTierFeedback by remember { mutableStateOf<String?>(null) }
     var billingEntitlement by remember { mutableStateOf<BillingEntitlementResponse?>(null) }
     val trialExpiredUpsellShown by settings.trialExpiredUpsellShown.collectAsState(initial = false)
+    val trialBannerDismissed by settings.trialBannerDismissedMilestones.collectAsState(initial = emptySet())
     var showTrialExpiredDialog by remember { mutableStateOf(false) }
     var isSaving by remember { mutableStateOf(false) }
     var saveFeedback by remember { mutableStateOf<String?>(null) }
@@ -327,6 +328,7 @@ fun SettingsScreen(
         }
     }
     val trialRemainingMs = remember(trialUntil, trialTick) { TrialUi.remainingMs(trialUntil) }
+    val showTrialBanner = TrialUi.shouldShowTrialBanner(trialRemainingMs, trialBannerDismissed)
     val trialExpired = TrialUi.isTrialExpired(trialUntil, effectiveTier)
 
     LaunchedEffect(trialExpired, trialExpiredUpsellShown) {
@@ -760,8 +762,17 @@ fun SettingsScreen(
                     onTourLayout = tourLayoutHandler(4),
                 ) {
                     trialRemainingMs?.let { remaining ->
-                        TrialCountdownBanner(remainingMs = remaining)
-                        Spacer(modifier = Modifier.height(8.dp))
+                        if (showTrialBanner) {
+                            TrialCountdownBanner(
+                                remainingMs = remaining,
+                                onDismiss = {
+                                    TrialUi.bannerMilestoneDays(remaining)?.let { milestone ->
+                                        scope.launch { settings.dismissTrialBannerMilestone(milestone) }
+                                    }
+                                },
+                            )
+                            Spacer(modifier = Modifier.height(8.dp))
+                        }
                     }
                     Text(
                         text = context.getString(R.string.settings_tts_playback_engine),

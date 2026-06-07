@@ -18,8 +18,8 @@ android {
         applicationId = "com.musicstory.app"
         minSdk = 26
         targetSdk = 35
-        versionCode = 72
-        versionName = "1.5.34"
+        versionCode = 73
+        versionName = "1.5.35"
 
         buildConfigField("String", "VERSION_NAME", "\"$versionName\"")
         buildConfigField("int", "VERSION_CODE", "$versionCode")

@@ -568,6 +568,24 @@ class SettingsDataStore(private val context: Context) {
         context.settingsDataStore.edit { it[KEY_TRIAL_EXPIRED_UPSELL_SHOWN] = shown }
     }
 
+    val trialBannerDismissedMilestones: Flow<Set<Int>> = context.settingsDataStore.data.map { prefs ->
+        prefs[KEY_TRIAL_BANNER_DISMISSED]?.split(',')
+            ?.mapNotNull { it.trim().toIntOrNull() }
+            ?.toSet()
+            ?: emptySet()
+    }
+
+    suspend fun dismissTrialBannerMilestone(milestoneDays: Int) {
+        context.settingsDataStore.edit { prefs ->
+            val current = prefs[KEY_TRIAL_BANNER_DISMISSED]?.split(',')
+                ?.mapNotNull { it.trim().toIntOrNull() }
+                ?.toMutableSet()
+                ?: mutableSetOf()
+            current.add(milestoneDays)
+            prefs[KEY_TRIAL_BANNER_DISMISSED] = current.sorted().joinToString(",")
+        }
+    }
+
     companion object {
         const val DEFAULT_BACKEND_URL = "https://www.efir-ai.ru"
         const val DEFAULT_EVERY_N_TRACKS = 3
@@ -633,6 +651,7 @@ class SettingsDataStore(private val context: Context) {
         private val KEY_ACCOUNT_LINKED = booleanPreferencesKey("account_linked")
         private val KEY_SETTINGS_SYNCED_AT = longPreferencesKey("settings_synced_at")
         private val KEY_TRIAL_EXPIRED_UPSELL_SHOWN = booleanPreferencesKey("trial_expired_upsell_shown")
+        private val KEY_TRIAL_BANNER_DISMISSED = stringPreferencesKey("trial_banner_dismissed_milestones")
         private const val OPENROUTER_FORCE_VERSION = 2
     }
 }

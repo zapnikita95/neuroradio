@@ -23,7 +23,56 @@ import type { CoverFactContext } from './cover-resolve.js';
 import { splitBundleByScope, rankScopedFacts } from './fact-ranking.js';
 import { factMentionsArtistAsEntity, isAmbiguousCommonWordArtist } from './fact-relevance.js';
 import type { ReferenceFactBundle } from './fact-picker.js';
-import { pickReferenceFact, type SelectedReferenceFact } from './fact-picker.js';
+
+const PENDING_SEED_TTL_MS = 3 * 60_000;
+const pendingTrackSeeds = new Map<string, { fact: string; at: number }>();
+
+function pendingTrackKey(installId: string, artist: string, title: string): string {
+  return `${installId.trim().toLowerCase()}:${trackKey(artist, title)}`;
+}
+
+export function peekPendingTrackSeed(installId: string, artist: string, title: string): string | null {
+  const key = pendingTrackKey(installId, artist, title);
+  const hit = pendingTrackSeeds.get(key);
+  if (!hit) return null;
+  if (Date.now() - hit.at > PENDING_SEED_TTL_MS) {
+    pendingTrackSeeds.delete(key);
+    return null;
+  }
+  return hit.fact;
+}
+
+export function setPendingTrackSeed(installId: string, artist: string, title: string, fact: string): void {
+  pendingTrackSeeds.set(pendingTrackKey(installId, artist, title), { fact, at: Date.now() });
+}
+
+export function clearPendingTrackSeed(installId: string, artist: string, title: string): void {
+  pendingTrackSeeds.delete(pendingTrackKey(installId, artist, title));
+}
+
+export async function getRecentSeedFactsForTrack(
+  installId: string,
+  artist: string,
+  title: string,
+  limit = 6,
+): Promise<string[]> {
+  const out: string[] = [];
+  const pending = peekPendingTrackSeed(installId, artist, title);
+  if (pending) out.push(pending);
+
+  const history = await pullHistoryAsync(installId, 0);
+  if (history) {
+    const tk = trackKey(artist, title);
+    for (const h of history) {
+      if (h.trackKey !== tk) continue;
+      if (h.seedFact?.trim()) out.push(h.seedFact.trim());
+      if (h.script?.trim()) out.push(h.script.trim());
+      if (out.length >= limit) break;
+    }
+  }
+  return [...new Set(out)].slice(0, limit);
+}
+import { pickReferenceFact, factsTooSimilar, type SelectedReferenceFact } from './fact-picker.js';
 
 export function ensureAccount(installId: string): string {
   const existing = resolveAccountId(installId);
@@ -58,15 +107,9 @@ export async function getLastTrackSeedFingerprint(
   artist: string,
   title: string,
 ): Promise<string | null> {
-  const history = await pullHistoryAsync(installId, 0);
-  if (!history) return null;
-  const tk = trackKey(artist, title);
-  for (const h of history) {
-    if (h.trackKey === tk && h.seedFact?.trim()) {
-      return factFingerprint(h.seedFact);
-    }
-  }
-  return null;
+  const recent = await getRecentSeedFactsForTrack(installId, artist, title, 1);
+  const seed = recent.find((f) => f.length > 0);
+  return seed ? factFingerprint(seed) : null;
 }
 
 export async function getUsedFingerprints(
@@ -91,6 +134,7 @@ export async function reserveSeedForUser(
   seed: SelectedReferenceFact,
 ): Promise<void> {
   ensureAccount(installId);
+  setPendingTrackSeed(installId, artist, title, seed.fact);
   await recordAccountUsedSeedAsync(installId, {
     fact: seed.fact,
     artist,
@@ -135,14 +179,17 @@ export async function pickBankFactForUser(
   cover?: CoverFactContext,
 ): Promise<SelectedReferenceFact | null> {
   ensureAccount(installId);
+  const recentForTrack = await getRecentSeedFactsForTrack(installId, artist, title);
   const used = await getUsedFingerprints(installId, artist, title);
   const keys: Array<[string, string]> = [[artist, title]];
   if (cover?.isCover) {
     keys.push([cover.factArtist, cover.factTitle]);
   }
   for (const [a, t] of keys) {
-    const fromBank = pickFromBank(a, t, used);
-    if (fromBank) return storedFactToSelected(fromBank);
+    const fromBank = pickFromBank(a, t, used, ['track', 'album', 'artist'], 0, recentForTrack);
+    if (fromBank && !factsTooSimilar(fromBank.fact, recentForTrack)) {
+      return storedFactToSelected(fromBank);
+    }
   }
   return null;
 }
@@ -172,12 +219,28 @@ export async function pickFactForUser(
   storyIndex = 0,
   _narrator: StoryNarratorId = 'auto',
 ): Promise<SelectedReferenceFact | null> {
+  const recentForTrack = await getRecentSeedFactsForTrack(installId, artist, title);
   const used = await getUsedFingerprints(installId, artist, title);
-  const fromBank = pickFromBank(artist, title, used, ['track', 'album', 'artist'], 0);
-  if (fromBank) return storedFactToSelected(fromBank);
+  for (let offset = 0; offset < 8; offset += 1) {
+    const fromBank = pickFromBank(
+      artist,
+      title,
+      used,
+      ['track', 'album', 'artist'],
+      offset,
+      recentForTrack,
+    );
+    if (fromBank && !factsTooSimilar(fromBank.fact, recentForTrack)) {
+      return storedFactToSelected(fromBank);
+    }
+    if (!fromBank) break;
+  }
 
   const previous = await collectPreviousScripts(installId, artist, title);
-  return pickReferenceFact(bundle, previous, storyIndex, artist, title, used);
+  const mergedPrevious = [...new Set([...previous, ...recentForTrack])];
+  const picked = pickReferenceFact(bundle, mergedPrevious, storyIndex, artist, title, used);
+  if (picked && factsTooSimilar(picked.fact, recentForTrack)) return null;
+  return picked;
 }
 
 export async function recordUserStory(
@@ -212,6 +275,7 @@ export async function recordUserStory(
     seedScope: input.seed.scope,
     interestRating: input.seed.interestRating,
   });
+  clearPendingTrackSeed(installId, input.artist, input.title);
 }
 
 /** 0–1: насколько вероятен повтор того же артиста (для prefetch запасных фактов). */

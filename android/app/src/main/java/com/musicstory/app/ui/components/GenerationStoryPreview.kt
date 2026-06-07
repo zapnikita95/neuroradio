@@ -3,6 +3,7 @@ package com.musicstory.app.ui.components
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -70,7 +71,7 @@ fun GenerationStoryPreview(
     ) {
         Column(
             modifier = Modifier
-                .fillMaxWidth()
+                .fillMaxSize()
                 .padding(horizontal = 12.dp, vertical = 10.dp),
         ) {
             if (preview.isSpokenTranscript) {
@@ -88,7 +89,8 @@ fun GenerationStoryPreview(
                 text = visibleText,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .verticalScroll(scrollState, enabled = false),
+                    .weight(1f, fill = false)
+                    .verticalScroll(scrollState),
                 style = MaterialTheme.typography.bodyLarge,
                 color = CreamText,
                 textAlign = TextAlign.Center,

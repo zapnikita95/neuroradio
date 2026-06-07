@@ -3,12 +3,18 @@ package com.musicstory.app.ui.components
 import android.content.Context
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.unit.dp
@@ -19,6 +25,8 @@ import com.musicstory.app.ui.theme.GoldWarm
 import com.musicstory.app.ui.theme.MutedLavender
 
 object TrialUi {
+    private const val MS_PER_DAY = 86_400_000L
+
     fun remainingMs(trialUntil: Long?): Long? {
         if (trialUntil == null || trialUntil <= 0L) return null
         val rem = trialUntil - System.currentTimeMillis()
@@ -42,11 +50,25 @@ object TrialUi {
             else -> context.getString(R.string.trial_countdown_mins, mins.coerceAtLeast(1).toInt())
         }
     }
+
+    /** Milestone banner: 3 days left and 1 day left before trial ends. */
+    fun bannerMilestoneDays(remainingMs: Long): Int? = when {
+        remainingMs <= MS_PER_DAY -> 1
+        remainingMs <= 3 * MS_PER_DAY -> 3
+        else -> null
+    }
+
+    fun shouldShowTrialBanner(remainingMs: Long?, dismissedMilestones: Set<Int>): Boolean {
+        if (remainingMs == null || remainingMs <= 0L) return false
+        val milestone = bannerMilestoneDays(remainingMs) ?: return false
+        return milestone !in dismissedMilestones
+    }
 }
 
 @Composable
 fun TrialCountdownBanner(
     remainingMs: Long,
+    onDismiss: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {
     val context = androidx.compose.ui.platform.LocalContext.current
@@ -55,27 +77,43 @@ fun TrialCountdownBanner(
             .fillMaxWidth()
             .clip(RoundedCornerShape(12.dp))
             .background(GoldWarm.copy(alpha = 0.12f))
-            .padding(horizontal = 14.dp, vertical = 10.dp),
+            .padding(start = 14.dp, end = 6.dp, top = 10.dp, bottom = 10.dp),
     ) {
-        Text(
-            text = context.getString(R.string.trial_countdown_title),
-            style = MaterialTheme.typography.labelMedium,
-            color = GoldWarm,
-        )
-        Text(
-            text = context.getString(
-                R.string.trial_countdown_body,
-                TrialUi.formatRemaining(context, remainingMs),
-            ),
-            style = MaterialTheme.typography.bodySmall,
-            color = CreamText,
-            modifier = Modifier.padding(top = 4.dp),
-        )
-        Text(
-            text = context.getString(R.string.trial_countdown_hint),
-            style = MaterialTheme.typography.bodySmall,
-            color = MutedLavender,
-            modifier = Modifier.padding(top = 4.dp),
-        )
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = context.getString(R.string.trial_countdown_title),
+                    style = MaterialTheme.typography.labelMedium,
+                    color = GoldWarm,
+                )
+                Text(
+                    text = context.getString(
+                        R.string.trial_countdown_body,
+                        TrialUi.formatRemaining(context, remainingMs),
+                    ),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = CreamText,
+                    modifier = Modifier.padding(top = 4.dp),
+                )
+                Text(
+                    text = context.getString(R.string.trial_countdown_hint),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MutedLavender,
+                    modifier = Modifier.padding(top = 4.dp),
+                )
+            }
+            if (onDismiss != null) {
+                IconButton(onClick = onDismiss) {
+                    Icon(
+                        imageVector = Icons.Default.Close,
+                        contentDescription = context.getString(R.string.trial_countdown_dismiss),
+                        tint = MutedLavender,
+                    )
+                }
+            }
+        }
     }
 }

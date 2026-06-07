@@ -181,6 +181,7 @@
     <string name="trial_countdown_days_hours">%1$d д %2$d ч</string>
     <string name="trial_countdown_hours_mins">%1$d ч %2$d мин</string>
     <string name="trial_countdown_mins">%1$d мин</string>
+    <string name="trial_countdown_dismiss">Скрыть</string>
     <string name="trial_expired_title">Пробный Premium закончился</string>
     <string name="trial_expired_message">7 дней пробного доступа завершены. Оформите подписку, чтобы снова слушать истории с Yandex SpeechKit и без ограничений бесплатного тарифа.</string>
     <string name="trial_expired_subscribe">Оформить подписку</string>

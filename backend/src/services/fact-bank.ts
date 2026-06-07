@@ -5,7 +5,7 @@ import { interestRating10 } from './fact-interest-log.js';
 import { factMentionsArtistAsEntity, isAmbiguousCommonWordArtist } from './fact-relevance.js';
 import { interestScore } from './reference-fact-quality.js';
 import { isSpeakableReferenceFact } from './web-snippet-accept.js';
-import type { FactScope } from './fact-picker.js';
+import { factsTooSimilar, type FactScope } from './fact-picker.js';
 
 export interface StoredFact {
   id: string;
@@ -198,6 +198,7 @@ export function pickFromBank(
   usedFingerprints: Set<string>,
   preferScope: FactScope[] = ['track', 'album', 'artist'],
   startOffset = 0,
+  rejectSimilarTo: string[] = [],
 ): StoredFact | null {
   const { track, artist: artistFacts } = listBankFacts(artist, title);
   const pools: Record<FactScope, StoredFact[]> = {
@@ -210,6 +211,7 @@ export function pickFromBank(
   for (const scope of preferScope) {
     for (const fact of pools[scope] ?? []) {
       if (usedFingerprints.has(factFingerprint(fact.fact))) continue;
+      if (factsTooSimilar(fact.fact, rejectSimilarTo)) continue;
       if (fact.interestScore < 6) continue;
       if (!isSpeakableReferenceFact(fact.fact, artist, title)) continue;
       if (isAmbiguousCommonWordArtist(artist) && !factMentionsArtistAsEntity(fact.fact, artist)) continue;
