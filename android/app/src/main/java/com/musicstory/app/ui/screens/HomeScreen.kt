@@ -26,12 +26,14 @@ import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Power
 import androidx.compose.material.icons.filled.PowerOff
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
@@ -39,6 +41,7 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -59,12 +62,15 @@ import androidx.core.content.ContextCompat
 import com.musicstory.app.MusicStoryApp
 import com.musicstory.app.R
 import com.musicstory.app.data.local.SettingsDataStore
+import com.musicstory.app.data.remote.BillingEntitlementResponse
 import com.musicstory.app.util.BackendUrlRules
 import com.musicstory.app.domain.AppPowerMode
 import com.musicstory.app.domain.LlmProvider
 import com.musicstory.app.domain.OrchestratorState
 import com.musicstory.app.domain.StoryNarrator
 import com.musicstory.app.domain.TierAccess
+import com.musicstory.app.ui.components.TrialCountdownBanner
+import com.musicstory.app.ui.components.TrialUi
 import com.musicstory.app.ui.components.GenerationStoryPreview
 import com.musicstory.app.ui.components.LivePulseDot
 import com.musicstory.app.ui.components.MusicStoryBackground
@@ -111,6 +117,9 @@ fun HomeScreen(
     val homeTourCompleted by app.settingsDataStore.homeTourCompleted.collectAsState(initial = false)
     val backendUrl by app.settingsDataStore.backendUrl.collectAsState(initial = SettingsDataStore.DEFAULT_BACKEND_URL)
     val dailyQuota by app.storyRepository.dailyQuota.collectAsState(initial = null)
+    val trialExpiredUpsellShown by app.settingsDataStore.trialExpiredUpsellShown.collectAsState(initial = false)
+    var billingEntitlement by remember { mutableStateOf<BillingEntitlementResponse?>(null) }
+    var showTrialExpiredDialog by remember { mutableStateOf(false) }
     val storyHistory by app.storyRepository.storyHistory.collectAsState(initial = emptyList())
     val scope = rememberCoroutineScope()
 
@@ -121,6 +130,61 @@ fun HomeScreen(
     val homeScrollState = rememberScrollState()
     val density = LocalDensity.current
     val screenHeightPx = with(density) { LocalConfiguration.current.screenHeightDp.dp.toPx() }
+
+    LaunchedEffect(backendUrl) {
+        val url = backendUrl.trim().trimEnd('/')
+        if (url.isBlank()) return@LaunchedEffect
+        runCatching {
+            billingEntitlement = app.apiClient.fetchBillingStatus(url).entitlement
+        }
+    }
+
+    val effectiveTier = dailyQuota?.tier
+    val trialUntil = billingEntitlement?.trialUntil
+    var trialTick by remember { mutableIntStateOf(0) }
+    LaunchedEffect(trialUntil) {
+        if (trialUntil == null || trialUntil <= System.currentTimeMillis()) return@LaunchedEffect
+        while (true) {
+            delay(30_000)
+            trialTick++
+        }
+    }
+    val trialRemainingMs = remember(trialUntil, trialTick) { TrialUi.remainingMs(trialUntil) }
+    val trialExpired = TrialUi.isTrialExpired(trialUntil, effectiveTier)
+
+    LaunchedEffect(trialExpired, trialExpiredUpsellShown) {
+        if (trialExpired && !trialExpiredUpsellShown) {
+            showTrialExpiredDialog = true
+        }
+    }
+
+    if (showTrialExpiredDialog) {
+        AlertDialog(
+            onDismissRequest = {
+                showTrialExpiredDialog = false
+                scope.launch { app.settingsDataStore.setTrialExpiredUpsellShown(true) }
+            },
+            title = { Text(context.getString(R.string.trial_expired_title)) },
+            text = { Text(context.getString(R.string.trial_expired_message)) },
+            confirmButton = {
+                TextButton(onClick = {
+                    showTrialExpiredDialog = false
+                    scope.launch { app.settingsDataStore.setTrialExpiredUpsellShown(true) }
+                    onOpenAccount()
+                }) {
+                    Text(context.getString(R.string.trial_expired_subscribe))
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = {
+                    showTrialExpiredDialog = false
+                    scope.launch { app.settingsDataStore.setTrialExpiredUpsellShown(true) }
+                }) {
+                    Text(context.getString(R.string.trial_expired_later))
+                }
+            },
+        )
+    }
 
     val tourSteps = remember(context) {
         listOf(
@@ -359,6 +423,13 @@ fun HomeScreen(
                 verticalArrangement = Arrangement.Top,
             ) {
                 Spacer(modifier = Modifier.height(8.dp))
+
+                trialRemainingMs?.let { remaining ->
+                    TrialCountdownBanner(
+                        remainingMs = remaining,
+                        modifier = Modifier.padding(bottom = 12.dp),
+                    )
+                }
 
                 VinylDisc(
                     isSpinning = isSpinning,

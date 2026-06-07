@@ -141,6 +141,9 @@ fun MusicStoryNavGraph(
                         launchSingleTop = true
                     }
                 },
+                onOpenAccount = {
+                    navController.navigate(Routes.ACCOUNT) { launchSingleTop = true }
+                },
             )
         }
         composable(Routes.HISTORY) {

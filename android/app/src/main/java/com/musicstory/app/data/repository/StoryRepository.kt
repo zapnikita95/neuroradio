@@ -446,6 +446,7 @@ class StoryRepository(
                 yandexTtsApiKey = yandexTtsKey,
                 yandexFolderId = yandexFolderId,
                 saluteAuthKey = saluteAuthKey,
+                serverTier = tier,
             )) {
                 is StoryAttemptResult.Success -> return Result.success(backendResult.response)
                 is StoryAttemptResult.TemplateRejected -> templateRejected = true
@@ -519,6 +520,7 @@ class StoryRepository(
         yandexTtsApiKey: String = "",
         yandexFolderId: String = "",
         saluteAuthKey: String = "",
+        serverTier: String? = null,
     ): StoryAttemptResult {
         return try {
             StoryLog.i(
@@ -555,10 +557,12 @@ class StoryRepository(
                         localOllamaUrl = localOllamaUrl.takeIf { it.isNotBlank() },
                         localOllamaModel = localOllamaModel.takeIf { it.isNotBlank() },
                         skipServerTts = skipServerTts,
+                        voiceTier = if (TierAccess.isPremiumLike(serverTier)) "premium" else "default",
                         ttsProvider = when (userTtsBilling) {
                             UserTtsBilling.YANDEX -> "yandex"
                             UserTtsBilling.SBER -> "sber"
-                            UserTtsBilling.SERVER -> null
+                            UserTtsBilling.SERVER ->
+                                if (TierAccess.isPremiumLike(serverTier)) null else "silero"
                         },
                         userTtsProvider = when (userTtsBilling) {
                             UserTtsBilling.SERVER -> null

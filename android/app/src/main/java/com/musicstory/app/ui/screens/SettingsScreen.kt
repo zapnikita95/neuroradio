@@ -28,6 +28,7 @@ import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.ExposedDropdownMenuDefaults
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -39,6 +40,7 @@ import androidx.compose.material3.RadioButtonDefaults
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
@@ -46,6 +48,7 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -74,6 +77,7 @@ import com.musicstory.app.util.BackendUrlRules
 import com.musicstory.app.R
 import com.musicstory.app.data.local.SettingsDataStore
 import com.musicstory.app.data.remote.ConnectionCheckResult
+import com.musicstory.app.data.remote.BillingEntitlementResponse
 import com.musicstory.app.domain.GeminiModel
 import com.musicstory.app.domain.GroqModel
 import com.musicstory.app.domain.LlmProvider
@@ -83,6 +87,8 @@ import com.musicstory.app.domain.StoryNarrator
 import com.musicstory.app.domain.SileroVoicePreset
 import com.musicstory.app.domain.TtsEmotion
 import com.musicstory.app.domain.TtsPlaybackEngine
+import com.musicstory.app.ui.components.TrialCountdownBanner
+import com.musicstory.app.ui.components.TrialUi
 import com.musicstory.app.domain.UserTtsBilling
 import com.musicstory.app.domain.TtsSpeed
 import com.musicstory.app.domain.TtsVoice
@@ -116,6 +122,7 @@ import java.util.Locale
 fun SettingsScreen(
     onBack: () -> Unit,
     onOpenAccountLogin: () -> Unit = {},
+    onOpenAccount: () -> Unit = onOpenAccountLogin,
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
@@ -284,6 +291,9 @@ fun SettingsScreen(
     var checkSummary by remember { mutableStateOf<String?>(null) }
     var devTierLabel by remember { mutableStateOf<String?>(null) }
     var devTierFeedback by remember { mutableStateOf<String?>(null) }
+    var billingEntitlement by remember { mutableStateOf<BillingEntitlementResponse?>(null) }
+    val trialExpiredUpsellShown by settings.trialExpiredUpsellShown.collectAsState(initial = false)
+    var showTrialExpiredDialog by remember { mutableStateOf(false) }
     var isSaving by remember { mutableStateOf(false) }
     var saveFeedback by remember { mutableStateOf<String?>(null) }
 
@@ -307,6 +317,52 @@ fun SettingsScreen(
         LlmProvider.LOCAL -> localUrlInput
     }
     val effectiveTier = devTierLabel ?: dailyQuota?.tier
+    val trialUntil = billingEntitlement?.trialUntil
+    var trialTick by remember { mutableIntStateOf(0) }
+    LaunchedEffect(trialUntil) {
+        if (trialUntil == null || trialUntil <= System.currentTimeMillis()) return@LaunchedEffect
+        while (true) {
+            delay(30_000)
+            trialTick++
+        }
+    }
+    val trialRemainingMs = remember(trialUntil, trialTick) { TrialUi.remainingMs(trialUntil) }
+    val trialExpired = TrialUi.isTrialExpired(trialUntil, effectiveTier)
+
+    LaunchedEffect(trialExpired, trialExpiredUpsellShown) {
+        if (trialExpired && !trialExpiredUpsellShown) {
+            showTrialExpiredDialog = true
+        }
+    }
+
+    if (showTrialExpiredDialog) {
+        AlertDialog(
+            onDismissRequest = {
+                showTrialExpiredDialog = false
+                scope.launch { settings.setTrialExpiredUpsellShown(true) }
+            },
+            title = { Text(context.getString(R.string.trial_expired_title)) },
+            text = { Text(context.getString(R.string.trial_expired_message)) },
+            confirmButton = {
+                TextButton(onClick = {
+                    showTrialExpiredDialog = false
+                    scope.launch { settings.setTrialExpiredUpsellShown(true) }
+                    onOpenAccount()
+                }) {
+                    Text(context.getString(R.string.trial_expired_subscribe))
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = {
+                    showTrialExpiredDialog = false
+                    scope.launch { settings.setTrialExpiredUpsellShown(true) }
+                }) {
+                    Text(context.getString(R.string.trial_expired_later))
+                }
+            },
+        )
+    }
+
     val hasPersonalKey = activeApiKey.isNotBlank()
     val canCustomizeEveryN = TierAccess.canCustomizeEveryNTracks(effectiveTier)
 
@@ -362,6 +418,7 @@ fun SettingsScreen(
         app.storyRepository.refreshQuota()
         runCatching {
             val status = app.apiClient.fetchBillingStatus(url)
+            billingEntitlement = status.entitlement
             if (status.devTierSwitchEnabled == true) {
                 devTierLabel = status.devTierOverride ?: status.tier
             } else {
@@ -692,6 +749,8 @@ fun SettingsScreen(
                                     "${sileroVoicePreset.labelRu} · ${ttsSpeed.labelRu} · ${storyLength.labelRu}"
                                 else ->
                                     "${ttsVoice.labelRu} · ${ttsSpeed.labelRu} · ${storyLength.labelRu}"
+                            }.let { voices ->
+                                "${TtsPlaybackEngine.YANDEX_SERVER.labelForTier(effectiveTier)} · $voices"
                             }
                     },
                     tourHighlight = tourStep == 4,
@@ -699,21 +758,29 @@ fun SettingsScreen(
                     tourActive = tourStep == 4,
                     onTourLayout = tourLayoutHandler(4),
                 ) {
+                    trialRemainingMs?.let { remaining ->
+                        TrialCountdownBanner(remainingMs = remaining)
+                        Spacer(modifier = Modifier.height(8.dp))
+                    }
                     Text(
                         text = context.getString(R.string.settings_tts_playback_engine),
                         style = MaterialTheme.typography.labelMedium,
                         color = MutedLavender,
                     )
                     Text(
-                        text = context.getString(R.string.settings_tts_playback_engine_hint),
+                        text = if (TierAccess.isPremiumLike(effectiveTier)) {
+                            context.getString(R.string.settings_tts_playback_engine_hint_premium)
+                        } else {
+                            context.getString(R.string.settings_tts_playback_engine_hint)
+                        },
                         style = MaterialTheme.typography.bodySmall,
                         color = MutedLavender,
                         modifier = Modifier.padding(top = 4.dp, bottom = 8.dp),
                     )
                     TtsPlaybackEngine.entries.forEach { engine ->
                         NarratorRadioRow(
-                            label = engine.labelRu,
-                            description = engine.descriptionRu,
+                            label = engine.labelForTier(effectiveTier),
+                            description = engine.descriptionForTier(effectiveTier),
                             selected = ttsPlaybackEngine == engine,
                             onSelect = { scope.launch { settings.setTtsPlaybackEngine(engine) } },
                         )

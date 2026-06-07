@@ -58,12 +58,12 @@ enum class TtsSpeed(val id: String, val labelRu: String, val yandexSpeed: Float,
     }
 }
 
-/** Тестовый переключатель: Silero/Yandex на Railway vs системный TTS на телефоне. */
+/** Серверная озвучка: Silero (free) или Yandex SpeechKit (trial/premium) — см. labelForTier. */
 enum class TtsPlaybackEngine(val id: String, val labelRu: String, val descriptionRu: String) {
     YANDEX_SERVER(
         id = "yandex",
         labelRu = "Silero на сервере",
-        descriptionRu = "Бесплатная озвучка Silero на сервере приложения",
+        descriptionRu = "Бесплатная озвучка Silero на сервере",
     ),
     ANDROID_DEVICE(
         id = "android",
@@ -73,6 +73,19 @@ enum class TtsPlaybackEngine(val id: String, val labelRu: String, val descriptio
     ;
 
     val skipsServerTts: Boolean get() = this == ANDROID_DEVICE
+
+    fun labelForTier(tier: String?): String = when {
+        this == ANDROID_DEVICE -> labelRu
+        TierAccess.isPremiumLike(tier) -> "Yandex SpeechKit"
+        else -> "Silero на сервере"
+    }
+
+    fun descriptionForTier(tier: String?): String = when {
+        this == ANDROID_DEVICE -> descriptionRu
+        TierAccess.isPremiumLike(tier) ->
+            "Профессиональная озвучка Yandex SpeechKit на сервере"
+        else -> "Бесплатная озвучка Silero на сервере"
+    }
 
     companion object {
         fun fromId(id: String?): TtsPlaybackEngine =

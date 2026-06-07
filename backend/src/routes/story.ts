@@ -1139,6 +1139,13 @@ router.post('/full', validateStoryFullBody, storyFullRateLimit, async (req: Requ
 
     const displayScript = normalizeYearsForRussianTts(story.script);
 
+    const effectiveVoiceTier: VoiceTier =
+      hasUserTtsCredentials(userTtsCredentials)
+        ? voiceTier
+        : userTier === 'premium' || userTier === 'trial' || userTier === 'unlimited'
+          ? 'premium'
+          : 'default';
+
     const response: Record<string, unknown> = {
       artist,
       title,
@@ -1152,7 +1159,7 @@ router.post('/full', validateStoryFullBody, storyFullRateLimit, async (req: Requ
       ttsStyle: delivery.styleId,
       ttsSpeed: delivery.speed,
       ttsEmotion: delivery.emotion,
-      voiceTier,
+      voiceTier: effectiveVoiceTier,
       demo: false,
       tier: resolveUserTier(installId),
       quota: getDailyStoryQuota(req.installId ?? 'unknown'),
@@ -1190,11 +1197,11 @@ router.post('/full', validateStoryFullBody, storyFullRateLimit, async (req: Requ
     } else if (canSynthesizeServerTts(userTtsCredentials)) {
       const id = uuidv4();
       console.log(
-        `[tts] queue install=${installId.slice(0, 8)} voice=${voiceId} style=${delivery.styleId} speed=${delivery.speed} emotion=${delivery.emotion} tier=${voiceTier} provider=${ttsProvider} userBilling=${hasUserTtsCredentials(userTtsCredentials) ? userTtsCredentials?.provider : 'server'} words=${story.word_count}`,
+        `[tts] queue install=${installId.slice(0, 8)} voice=${voiceId} style=${delivery.styleId} speed=${delivery.speed} emotion=${delivery.emotion} tier=${effectiveVoiceTier} userTier=${userTier} provider=${ttsProvider} userBilling=${hasUserTtsCredentials(userTtsCredentials) ? userTtsCredentials?.provider : 'server'} words=${story.word_count}`,
       );
       const audio = await synthesizeStoryAudio({
         installId,
-        voiceTier,
+        voiceTier: effectiveVoiceTier,
         ttsProvider,
         script: story.script,
         voiceId,

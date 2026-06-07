@@ -31,6 +31,7 @@ data class StoryRequest(
     @SerializedName("yandex_folder_id") val yandexFolderId: String? = null,
     @SerializedName("salute_auth_key") val saluteAuthKey: String? = null,
     @SerializedName("skip_server_tts") val skipServerTts: Boolean = false,
+    @SerializedName("voice_tier") val voiceTier: String? = null,
     @SerializedName("silero_voice_preset") val sileroVoicePreset: String? = null,
     @SerializedName("silero_voice") val sileroVoice: String? = null,
 )

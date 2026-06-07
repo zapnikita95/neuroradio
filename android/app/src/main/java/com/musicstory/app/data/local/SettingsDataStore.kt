@@ -560,6 +560,14 @@ class SettingsDataStore(private val context: Context) {
         context.settingsDataStore.edit { it[KEY_SETTINGS_SYNCED_AT] = updatedAt }
     }
 
+    val trialExpiredUpsellShown: Flow<Boolean> = context.settingsDataStore.data.map { prefs ->
+        prefs[KEY_TRIAL_EXPIRED_UPSELL_SHOWN] ?: false
+    }
+
+    suspend fun setTrialExpiredUpsellShown(shown: Boolean = true) {
+        context.settingsDataStore.edit { it[KEY_TRIAL_EXPIRED_UPSELL_SHOWN] = shown }
+    }
+
     companion object {
         const val DEFAULT_BACKEND_URL = "https://www.efir-ai.ru"
         const val DEFAULT_EVERY_N_TRACKS = 3
@@ -624,6 +632,7 @@ class SettingsDataStore(private val context: Context) {
         private val KEY_SYNC_CODE = stringPreferencesKey("sync_code")
         private val KEY_ACCOUNT_LINKED = booleanPreferencesKey("account_linked")
         private val KEY_SETTINGS_SYNCED_AT = longPreferencesKey("settings_synced_at")
+        private val KEY_TRIAL_EXPIRED_UPSELL_SHOWN = booleanPreferencesKey("trial_expired_upsell_shown")
         private const val OPENROUTER_FORCE_VERSION = 2
     }
 }

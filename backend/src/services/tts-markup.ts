@@ -152,8 +152,7 @@ export function prepareYandexTtsText(
 }
 
 /**
- * Plain Russian text for Silero / other engines without SSML:
- * same sanitize → polish → quotes → stress as Yandex, then Latin → Cyrillic transliteration.
+ * Plain Russian text for Silero: stress + sanitize, but keep Latin words (English as English).
  */
 export function prepareSileroTtsTextTrace(
   script: string,
@@ -164,10 +163,8 @@ export function prepareSileroTtsTextTrace(
 
   const originalScript = script;
   const afterProperNames = preserveMusicProperNames(script, artist, title);
-  const { text: afterLatinTransliteration, replacements: latinReplacements } =
-    applyForeignPronunciationWithReplacements(afterProperNames, artist, title);
 
-  let text = afterLatinTransliteration;
+  let text = afterProperNames;
   text = sanitizeScriptForTts(text, artist, title);
   text = runTtsQualityPass(text).text;
   text = normalizeYearsForRussianTts(text);
@@ -180,8 +177,8 @@ export function prepareSileroTtsTextTrace(
     artist,
     title,
     afterProperNames,
-    afterLatinTransliteration,
-    latinReplacements,
+    afterLatinTransliteration: afterProperNames,
+    latinReplacements: [],
     prepared,
   };
 }
