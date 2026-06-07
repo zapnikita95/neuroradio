@@ -12,6 +12,7 @@ import {
   verifyDesktopAuthSecret,
 } from '../services/jwt.js';
 import { rateLimitAuth } from '../middleware/rate-limit.js';
+import { exportTransportKeyBase64 } from '../services/client-secrets-transport.js';
 
 const router = Router();
 
@@ -41,6 +42,7 @@ function issueDesktopToken(installId: string, jwtSecret: string, ttl: number, re
     access_token: accessToken,
     token_type: 'Bearer',
     expires_in: ttl,
+    secrets_transport_key: exportTransportKeyBase64(installId),
   });
 }
 
@@ -117,6 +119,7 @@ router.post('/token', rateLimitAuth, (req: Request, res: Response) => {
     access_token: accessToken,
     token_type: 'Bearer',
     expires_in: ttl,
+    secrets_transport_key: exportTransportKeyBase64(installId),
   });
 });
 

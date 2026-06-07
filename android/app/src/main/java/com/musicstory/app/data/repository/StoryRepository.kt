@@ -35,6 +35,7 @@ import com.musicstory.app.domain.TtsSpeed
 import com.musicstory.app.domain.TtsVoice
 import com.musicstory.app.util.StoryLog
 import com.musicstory.app.util.ApiKeySanitizer
+import com.musicstory.app.security.ClientSecretsTransport
 import com.musicstory.app.util.BackendUrlRules
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -253,6 +254,7 @@ class StoryRepository(
             openRouterModel.resolveApiModelId(openRouterCustomModelId) ?: openRouterModel.id,
             localOllamaUrl = localOllamaUrl.trim(),
             localOllamaModel = localOllamaModel.trim(),
+            secretsTransportKey = settingsDataStore.readSecretsTransportKey(),
         )
         result.quota?.let { _dailyQuota.value = it }
         return result
@@ -546,7 +548,9 @@ class StoryRepository(
             ) {
                 apiClient.fetchFullStory(
                     backendUrl,
-                    StoryRequest(
+                    ClientSecretsTransport.wrapStoryRequest(
+                        settingsDataStore.readSecretsTransportKey(),
+                        StoryRequest(
                         artist = track.artist,
                         title = track.title,
                         previousScripts = previousScripts,
@@ -581,6 +585,7 @@ class StoryRepository(
                         saluteAuthKey = saluteAuthKey.takeIf { userTtsBilling == UserTtsBilling.SBER && it.isNotBlank() },
                         sileroVoicePreset = sileroVoicePreset.id.takeIf { userTtsBilling == UserTtsBilling.SERVER },
                         sileroVoice = sileroVoicePreset.voiceId.takeIf { userTtsBilling == UserTtsBilling.SERVER },
+                        ),
                     ),
                 )
             }

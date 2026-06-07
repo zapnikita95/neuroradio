@@ -1,4 +1,5 @@
 import type { NextFunction, Request, Response } from 'express';
+import { redactSecrets } from '../services/log-redact.js';
 
 declare global {
   namespace Express {
@@ -11,7 +12,7 @@ declare global {
 }
 
 export function setLogDetail(res: Response, detail: string): void {
-  res.locals.logDetail = detail.slice(0, 500);
+  res.locals.logDetail = redactSecrets(detail.slice(0, 500));
 }
 
 export function requestLogger(req: Request, res: Response, next: NextFunction): void {

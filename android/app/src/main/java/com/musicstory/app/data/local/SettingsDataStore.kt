@@ -28,6 +28,7 @@ import com.musicstory.app.domain.TtsVoice
 import com.musicstory.app.domain.TriggerMode
 import com.musicstory.app.util.StoryLog
 import com.musicstory.app.util.ApiKeySanitizer
+import com.musicstory.app.security.SecureApiKeyStore
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
@@ -37,6 +38,8 @@ private val Context.settingsDataStore: DataStore<Preferences> by preferencesData
 )
 
 class SettingsDataStore(private val context: Context) {
+
+    private val secureApiKeyStore = SecureApiKeyStore(context)
 
     val autoIntercept: Flow<Boolean> = context.settingsDataStore.data.map { prefs ->
         prefs[KEY_AUTO_INTERCEPT] ?: DEFAULT_AUTO_INTERCEPT
@@ -114,15 +117,15 @@ class SettingsDataStore(private val context: Context) {
     }
 
     val groqApiKey: Flow<String> = context.settingsDataStore.data.map { prefs ->
-        prefs[KEY_GROQ_API_KEY] ?: ""
+        secureApiKeyStore.read(SecureApiKeyStore.GROQ, prefs[KEY_GROQ_API_KEY])
     }
 
     val geminiApiKey: Flow<String> = context.settingsDataStore.data.map { prefs ->
-        prefs[KEY_GEMINI_API_KEY] ?: ""
+        secureApiKeyStore.read(SecureApiKeyStore.GEMINI, prefs[KEY_GEMINI_API_KEY])
     }
 
     val openRouterApiKey: Flow<String> = context.settingsDataStore.data.map { prefs ->
-        prefs[KEY_OPENROUTER_API_KEY] ?: ""
+        secureApiKeyStore.read(SecureApiKeyStore.OPENROUTER, prefs[KEY_OPENROUTER_API_KEY])
     }
 
     val localOllamaUrl: Flow<String> = context.settingsDataStore.data.map { prefs ->
@@ -194,7 +197,7 @@ class SettingsDataStore(private val context: Context) {
     }
 
     val yandexApiKey: Flow<String> = context.settingsDataStore.data.map { prefs ->
-        prefs[KEY_YANDEX_API_KEY] ?: ""
+        secureApiKeyStore.read(SecureApiKeyStore.YANDEX, prefs[KEY_YANDEX_API_KEY])
     }
 
     val yandexFolderId: Flow<String> = context.settingsDataStore.data.map { prefs ->
@@ -202,7 +205,7 @@ class SettingsDataStore(private val context: Context) {
     }
 
     val saluteAuthKey: Flow<String> = context.settingsDataStore.data.map { prefs ->
-        prefs[KEY_SALUTE_AUTH_KEY] ?: ""
+        secureApiKeyStore.read(SecureApiKeyStore.SALUTE, prefs[KEY_SALUTE_AUTH_KEY])
     }
 
     val appPowerMode: Flow<AppPowerMode> = context.settingsDataStore.data.map { prefs ->
@@ -288,6 +291,7 @@ class SettingsDataStore(private val context: Context) {
             installId = prefs[KEY_AUTH_INSTALL_ID].orEmpty(),
             accessToken = prefs[KEY_AUTH_ACCESS_TOKEN].orEmpty(),
             expiresAtMs = prefs[KEY_AUTH_EXPIRES_AT] ?: 0L,
+            secretsTransportKey = secureApiKeyStore.read(SecureApiKeyStore.TRANSPORT, null),
         )
     }
 
@@ -295,10 +299,29 @@ class SettingsDataStore(private val context: Context) {
         context.settingsDataStore.edit { it[KEY_AUTH_INSTALL_ID] = installId }
     }
 
-    suspend fun saveAuthToken(token: String, expiresAtMs: Long) {
+    suspend fun saveAuthToken(token: String, expiresAtMs: Long, secretsTransportKey: String? = null) {
         context.settingsDataStore.edit {
             it[KEY_AUTH_ACCESS_TOKEN] = token
             it[KEY_AUTH_EXPIRES_AT] = expiresAtMs
+        }
+        secretsTransportKey?.trim()?.takeIf { it.isNotBlank() }?.let {
+            secureApiKeyStore.write(SecureApiKeyStore.TRANSPORT, it)
+            touchSecretsRevision()
+        }
+    }
+
+    suspend fun readSecretsTransportKey(): String =
+        secureApiKeyStore.read(SecureApiKeyStore.TRANSPORT, null)
+
+    private suspend fun touchSecretsRevision() {
+        context.settingsDataStore.edit { it[KEY_SECRETS_TOUCH] = System.currentTimeMillis() }
+    }
+
+    private suspend fun persistApiKey(secureName: String, legacyKey: Preferences.Key<String>, value: String) {
+        secureApiKeyStore.write(secureName, value)
+        context.settingsDataStore.edit {
+            it.remove(legacyKey)
+            it[KEY_SECRETS_TOUCH] = System.currentTimeMillis()
         }
     }
 
@@ -334,15 +357,15 @@ class SettingsDataStore(private val context: Context) {
     }
 
     suspend fun setGroqApiKey(key: String) {
-        context.settingsDataStore.edit { it[KEY_GROQ_API_KEY] = ApiKeySanitizer.clean(key) }
+        persistApiKey(SecureApiKeyStore.GROQ, KEY_GROQ_API_KEY, key)
     }
 
     suspend fun setGeminiApiKey(key: String) {
-        context.settingsDataStore.edit { it[KEY_GEMINI_API_KEY] = ApiKeySanitizer.clean(key) }
+        persistApiKey(SecureApiKeyStore.GEMINI, KEY_GEMINI_API_KEY, key)
     }
 
     suspend fun setOpenRouterApiKey(key: String) {
-        context.settingsDataStore.edit { it[KEY_OPENROUTER_API_KEY] = ApiKeySanitizer.clean(key) }
+        persistApiKey(SecureApiKeyStore.OPENROUTER, KEY_OPENROUTER_API_KEY, key)
     }
 
     suspend fun setLocalOllamaUrl(url: String) {
@@ -446,7 +469,7 @@ class SettingsDataStore(private val context: Context) {
     }
 
     suspend fun setYandexApiKey(key: String) {
-        context.settingsDataStore.edit { it[KEY_YANDEX_API_KEY] = ApiKeySanitizer.clean(key) }
+        persistApiKey(SecureApiKeyStore.YANDEX, KEY_YANDEX_API_KEY, key)
     }
 
     suspend fun setYandexFolderId(folderId: String) {
@@ -454,7 +477,7 @@ class SettingsDataStore(private val context: Context) {
     }
 
     suspend fun setSaluteAuthKey(key: String) {
-        context.settingsDataStore.edit { it[KEY_SALUTE_AUTH_KEY] = ApiKeySanitizer.clean(key) }
+        persistApiKey(SecureApiKeyStore.SALUTE, KEY_SALUTE_AUTH_KEY, key)
     }
 
     suspend fun setAppPowerMode(mode: AppPowerMode) {
@@ -612,6 +635,7 @@ class SettingsDataStore(private val context: Context) {
         private val KEY_AUTH_INSTALL_ID = stringPreferencesKey("auth_install_id")
         private val KEY_AUTH_ACCESS_TOKEN = stringPreferencesKey("auth_access_token")
         private val KEY_AUTH_EXPIRES_AT = longPreferencesKey("auth_expires_at")
+        private val KEY_SECRETS_TOUCH = longPreferencesKey("secrets_touch")
         private val KEY_TRIGGER_MODE = stringPreferencesKey("trigger_mode")
         private val KEY_SPECIFIC_ARTISTS = stringSetPreferencesKey("specific_artists")
         private val KEY_SPECIFIC_GENRES = stringSetPreferencesKey("specific_genres")
@@ -660,4 +684,5 @@ data class AuthState(
     val installId: String,
     val accessToken: String,
     val expiresAtMs: Long,
+    val secretsTransportKey: String = "",
 )

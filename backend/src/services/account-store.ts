@@ -19,6 +19,7 @@ import {
   pgUpdateStoryHistoryVote,
 } from './story-history-store.js';
 import { isEmailConfigured } from './email-sender.js';
+import { encryptUserSecret } from './user-secrets-crypto.js';
 
 const PREMIUM_PRODUCT_MONTHLY = 'premium_voice_monthly';
 const TRIAL_PRODUCT_MONTHLY = 'trial_stories_monthly';
@@ -94,6 +95,14 @@ export interface AccountEntitlement {
   purchaseTokenHash: string | null;
 }
 
+export interface EncryptedUserSecretsRecord {
+  groq?: string;
+  gemini?: string;
+  openrouter?: string;
+  yandex?: string;
+  salute?: string;
+}
+
 interface AccountRecord {
   accountId: string;
   syncCode: string;
@@ -117,6 +126,10 @@ interface AccountRecord {
   nextPaymentAt?: number | null;
   autoRenew?: boolean;
   lastRecurringAttemptAt?: number | null;
+  /** AES-GCM blob for per-install transport key (never plain). */
+  secretsTransportEnc?: string | null;
+  /** User-supplied API keys — always encrypted blobs, never plain. */
+  encryptedUserSecrets?: EncryptedUserSecretsRecord | null;
   usedSeeds?: UsedSeedRecord[];
   listenStats?: ListenStat[];
 }
@@ -307,6 +320,71 @@ function normalizeSyncCode(value: string): string {
 export function resolveAccountId(installId: string): string | null {
   const store = loadStore();
   return store.installToAccount[installId.trim().toLowerCase()] ?? null;
+}
+
+export function getAccountByInstallId(installId: string): AccountRecord | null {
+  const store = loadStore();
+  const accountId = store.installToAccount[installId.trim().toLowerCase()];
+  if (!accountId) return null;
+  return store.accountsById[accountId] ?? null;
+}
+
+export function saveSecretsTransportEnc(installId: string, blob: string): void {
+  const store = loadStore();
+  const accountId = store.installToAccount[installId.trim().toLowerCase()];
+  if (!accountId) return;
+  const account = store.accountsById[accountId];
+  if (!account) return;
+  account.secretsTransportEnc = blob;
+  saveStore(store);
+}
+
+export function saveEncryptedUserSecrets(
+  installId: string,
+  secrets: {
+    groq_api_key?: string;
+    gemini_api_key?: string;
+    openrouter_api_key?: string;
+    yandex_api_key?: string;
+    yandex_folder_id?: string;
+    salute_auth_key?: string;
+    salute_client_id?: string;
+    salute_client_secret?: string;
+  },
+): void {
+  const store = loadStore();
+  const accountId = store.installToAccount[installId.trim().toLowerCase()];
+  if (!accountId) return;
+  const account = store.accountsById[accountId];
+  if (!account) return;
+
+  const current: EncryptedUserSecretsRecord = { ...(account.encryptedUserSecrets ?? {}) };
+  if (secrets.groq_api_key?.trim()) current.groq = encryptUserSecret(secrets.groq_api_key.trim());
+  if (secrets.gemini_api_key?.trim()) current.gemini = encryptUserSecret(secrets.gemini_api_key.trim());
+  if (secrets.openrouter_api_key?.trim()) {
+    current.openrouter = encryptUserSecret(secrets.openrouter_api_key.trim());
+  }
+  if (secrets.yandex_api_key?.trim() && secrets.yandex_folder_id?.trim()) {
+    current.yandex = encryptUserSecret(
+      JSON.stringify({
+        apiKey: secrets.yandex_api_key.trim(),
+        folderId: secrets.yandex_folder_id.trim(),
+      }),
+    );
+  }
+  const saluteDirect = secrets.salute_auth_key?.trim();
+  const salutePair =
+    secrets.salute_client_id?.trim() && secrets.salute_client_secret?.trim()
+      ? Buffer.from(
+          `${secrets.salute_client_id.trim()}:${secrets.salute_client_secret.trim()}`,
+          'utf8',
+        ).toString('base64')
+      : undefined;
+  if (saluteDirect) current.salute = encryptUserSecret(saluteDirect);
+  else if (salutePair) current.salute = encryptUserSecret(salutePair);
+
+  account.encryptedUserSecrets = current;
+  saveStore(store);
 }
 
 export function getQuotaSubject(installId: string): string {

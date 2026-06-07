@@ -151,16 +151,17 @@ export function validateStoryFullBody(req: Request, res: Response, next: NextFun
   const geminiModel = resolveGeminiModel(body.gemini_model);
   const groqModel = asOptionalModelId(body.groq_model);
   const openrouterModel = asOptionalModelId(body.openrouter_model);
-  const groqApiKey = asOptionalApiKey(body.groq_api_key);
-  const geminiApiKey = asOptionalApiKey(body.gemini_api_key);
-  const openrouterApiKey = asOptionalApiKey(body.openrouter_api_key);
+  const secretSource = req.clientSecrets ?? body;
+  const groqApiKey = asOptionalApiKey(secretSource.groq_api_key);
+  const geminiApiKey = asOptionalApiKey(secretSource.gemini_api_key);
+  const openrouterApiKey = asOptionalApiKey(secretSource.openrouter_api_key);
   const localOllamaUrl = asOptionalOllamaUrl(body.local_ollama_url);
   const localOllamaModel = asOptionalModelId(body.local_ollama_model, 128);
-  const yandexApiKey = asOptionalApiKey(body.yandex_api_key);
-  const yandexFolderId = asOptionalFolderId(body.yandex_folder_id);
-  const saluteAuthKey = asOptionalApiKey(body.salute_auth_key);
-  const saluteClientId = asOptionalApiKey(body.salute_client_id);
-  const saluteClientSecret = asOptionalApiKey(body.salute_client_secret);
+  const yandexApiKey = asOptionalApiKey(secretSource.yandex_api_key);
+  const yandexFolderId = asOptionalFolderId(secretSource.yandex_folder_id);
+  const saluteAuthKey = asOptionalApiKey(secretSource.salute_auth_key);
+  const saluteClientId = asOptionalApiKey(secretSource.salute_client_id);
+  const saluteClientSecret = asOptionalApiKey(secretSource.salute_client_secret);
   const userTtsProvider =
     typeof body.user_tts_provider === 'string' &&
     (body.user_tts_provider === 'yandex' || body.user_tts_provider === 'sber')

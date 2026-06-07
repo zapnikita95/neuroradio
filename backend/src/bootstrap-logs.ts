@@ -1,5 +1,6 @@
 import { appendFileSync, mkdirSync } from 'node:fs';
 import { dirname } from 'node:path';
+import { redactSecrets, redactUnknown } from './services/log-redact.js';
 
 const logPath = process.env.LOCAL_LOG_FILE?.trim();
 if (logPath) {
@@ -7,17 +8,19 @@ if (logPath) {
   mkdirSync(dirname(filePath), { recursive: true });
 
   function formatArgs(args: unknown[]): string {
-    return args
-      .map((a) => {
-        if (typeof a === 'string') return a;
-        if (a instanceof Error) return a.stack ?? a.message;
-        try {
-          return JSON.stringify(a);
-        } catch {
-          return String(a);
-        }
-      })
-      .join(' ');
+    return redactSecrets(
+      args
+        .map((a) => {
+          if (typeof a === 'string') return a;
+          if (a instanceof Error) return a.stack ?? a.message;
+          try {
+            return JSON.stringify(redactUnknown(a));
+          } catch {
+            return String(a);
+          }
+        })
+        .join(' '),
+    );
   }
 
   function tee(level: string, args: unknown[]): void {

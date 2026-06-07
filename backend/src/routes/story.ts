@@ -2,6 +2,7 @@ import { Router, Request, Response } from 'express';
 import { v4 as uuidv4 } from 'uuid';
 import { requireAppAuth } from '../middleware/app-auth.js';
 import { validateStoryFullBody } from '../middleware/validate-story.js';
+import { extractClientSecrets } from '../middleware/client-secrets.js';
 import { enrichTrackMetadata } from '../services/musicbrainz.js';
 import { fetchAggregatedFactContext, emptyAggregatedFactContext, fetchIndieArtistFocusContext, fetchEmergencyFactRescue } from '../services/fact-aggregator.js';
 import { fetchFastTrackWikiFacts } from '../services/wikipedia-facts.js';
@@ -196,7 +197,7 @@ function storyFullRateLimit(req: Request, res: Response, next: import('express')
   })(req, res, next);
 }
 
-router.post('/full', validateStoryFullBody, storyFullRateLimit, async (req: Request, res: Response) => {
+router.post('/full', extractClientSecrets, validateStoryFullBody, storyFullRateLimit, async (req: Request, res: Response) => {
   const installId = req.installId ?? 'unknown';
   let clientAbort: AbortSignal;
   try {

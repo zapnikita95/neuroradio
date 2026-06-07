@@ -8,6 +8,7 @@ data class LlmProbeRequest(
     @SerializedName("groq_api_key") val groqApiKey: String? = null,
     @SerializedName("gemini_api_key") val geminiApiKey: String? = null,
     @SerializedName("openrouter_api_key") val openRouterApiKey: String? = null,
+    @SerializedName("client_secrets_enc") val clientSecretsEnc: String? = null,
 )
 
 data class LlmProbeResponse(

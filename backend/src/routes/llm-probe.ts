@@ -5,6 +5,7 @@ import {
   probeLlmProvider,
   type LlmProbeInput,
 } from '../services/llm-probe.js';
+import { extractClientSecrets } from '../middleware/client-secrets.js';
 
 const router = Router();
 
@@ -24,8 +25,9 @@ function asOptionalKey(value: unknown): string | undefined {
   return trimmed.length > 0 ? trimmed : undefined;
 }
 
-router.post('/probe', async (req: Request, res: Response) => {
+router.post('/probe', extractClientSecrets, async (req: Request, res: Response) => {
   const body = req.body as LlmProbeBody;
+  const secrets = req.clientSecrets ?? {};
   const provider = normalizeProbeProvider(body.llm_provider);
   if (!provider || provider === 'local') {
     res.status(400).json({
@@ -37,9 +39,9 @@ router.post('/probe', async (req: Request, res: Response) => {
 
   const installId = req.installId?.slice(0, 8) ?? 'unknown';
   const ownKey = Boolean(
-    asOptionalKey(body.groq_api_key) ||
-      asOptionalKey(body.gemini_api_key) ||
-      asOptionalKey(body.openrouter_api_key),
+    asOptionalKey(secrets.groq_api_key) ||
+      asOptionalKey(secrets.gemini_api_key) ||
+      asOptionalKey(secrets.openrouter_api_key),
   );
   console.log(`[llm-probe] start provider=${provider} ownKey=${ownKey} install=${installId}`);
 
@@ -47,9 +49,9 @@ router.post('/probe', async (req: Request, res: Response) => {
     provider,
     model: typeof body.model === 'string' ? body.model : undefined,
     clientKeys: {
-      groq: asOptionalKey(body.groq_api_key),
-      gemini: asOptionalKey(body.gemini_api_key),
-      openrouter: asOptionalKey(body.openrouter_api_key),
+      groq: asOptionalKey(secrets.groq_api_key),
+      gemini: asOptionalKey(secrets.gemini_api_key),
+      openrouter: asOptionalKey(secrets.openrouter_api_key),
     },
   };
 

@@ -7,6 +7,7 @@ import com.musicstory.app.domain.GeminiModel
 import com.musicstory.app.domain.LlmProvider
 import com.musicstory.app.util.StoryLog
 import com.musicstory.app.util.ApiKeySanitizer
+import com.musicstory.app.security.ClientSecretsTransport
 import com.musicstory.app.util.BackendUrlRules
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -51,6 +52,7 @@ class ConnectionChecker(
         groqApiKey: String = "",
         geminiApiKey: String = "",
         openRouterApiKey: String = "",
+        secretsTransportKey: String = "",
     ): Pair<Boolean, String> = withContext(Dispatchers.IO) {
         val url = backendUrl.trim()
         if (url.isBlank()) {
@@ -58,7 +60,9 @@ class ConnectionChecker(
         }
 
         val cleanKey = ApiKeySanitizer.clean(apiKey)
-        val request = LlmProbeRequest(
+        val request = ClientSecretsTransport.wrapProbeRequest(
+            secretsTransportKey,
+            LlmProbeRequest(
             llmProvider = llmProvider.id,
             model = modelId.ifBlank { null },
             groqApiKey = when (llmProvider) {
@@ -73,6 +77,7 @@ class ConnectionChecker(
                 LlmProvider.OPENROUTER -> cleanKey.takeIf { it.isNotBlank() }
                 else -> openRouterApiKey.takeIf { ApiKeySanitizer.clean(it).isNotBlank() }
             },
+            ),
         )
 
         runCatching {
@@ -358,6 +363,7 @@ class ConnectionChecker(
         openRouterModelId: String,
         localOllamaUrl: String = SettingsDataStore.DEFAULT_LOCAL_OLLAMA_URL,
         localOllamaModel: String = SettingsDataStore.DEFAULT_LOCAL_OLLAMA_MODEL,
+        secretsTransportKey: String = "",
     ): ConnectionCheckResult {
         StoryLog.i(
             "Connection check: provider=${llmProvider.id} model=${
@@ -408,6 +414,7 @@ class ConnectionChecker(
                         groqApiKey = groqApiKey,
                         geminiApiKey = geminiApiKey,
                         openRouterApiKey = openRouterApiKey,
+                        secretsTransportKey = secretsTransportKey,
                     )
                 }
             }

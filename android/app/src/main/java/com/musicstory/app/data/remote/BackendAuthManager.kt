@@ -110,7 +110,11 @@ class BackendAuthManager(
 
                 val expiresInSec = tokenResponse.expiresIn ?: DEFAULT_EXPIRES_IN_SEC
                 val expiresAtMs = System.currentTimeMillis() + expiresInSec * 1000L
-                settingsDataStore.saveAuthToken(token, expiresAtMs)
+                settingsDataStore.saveAuthToken(
+                    token,
+                    expiresAtMs,
+                    tokenResponse.secretsTransportKey,
+                )
                 StoryLog.i("Auth token OK, expires in ${expiresInSec}s")
                 TokenOutcome.Success(token)
             }
@@ -128,6 +132,7 @@ class BackendAuthManager(
     private data class TokenResponse(
         @SerializedName("access_token") val accessToken: String? = null,
         @SerializedName("expires_in") val expiresIn: Long? = null,
+        @SerializedName("secrets_transport_key") val secretsTransportKey: String? = null,
     )
 
     companion object {
