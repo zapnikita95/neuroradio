@@ -2,7 +2,7 @@
 # Railway healthcheck hits $PORT; upstream image ignores $PORT → custom entrypoint.
 FROM navatusein/silero-tts-service:latest
 
-COPY scripts/silero-railway-entrypoint.py /silero-railway-entrypoint.py
+COPY silero-railway-entrypoint.py /silero-railway-entrypoint.py
 
 ENV LANGUAGE=ru
 ENV NUMBER_OF_THREADS=4

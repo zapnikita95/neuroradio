@@ -12,6 +12,7 @@
 [build]
 builder = "DOCKERFILE"
 dockerfilePath = "Dockerfile.silero"
+watchPatterns = ["Dockerfile.silero", "silero-railway-entrypoint.py"]
 
 [deploy]
 healthcheckPath = "/voices"
