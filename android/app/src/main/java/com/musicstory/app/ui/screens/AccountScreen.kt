@@ -1,7 +1,5 @@
 package com.musicstory.app.ui.screens
 
-import android.content.Intent
-import android.net.Uri
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -46,6 +44,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.musicstory.app.MusicStoryApp
 import com.musicstory.app.R
+import com.musicstory.app.ui.components.PaymentCheckoutSheet
 import com.musicstory.app.ui.components.PrimaryStoryButton
 import com.musicstory.app.ui.components.SecondaryStoryButton
 import com.musicstory.app.ui.theme.CreamText
@@ -127,6 +126,7 @@ private fun BillingTab(app: MusicStoryApp) {
     var showUnlinkConfirm by remember { mutableStateOf(false) }
     var unlinkLoading by remember { mutableStateOf(false) }
     var unlinkMessage by remember { mutableStateOf<String?>(null) }
+    var paymentUrl by remember { mutableStateOf<String?>(null) }
 
     suspend fun refreshBilling() {
         try {
@@ -177,29 +177,38 @@ private fun BillingTab(app: MusicStoryApp) {
 
         if (cardSaved || autoRenew) {
             Text(
-                text = context.getString(R.string.billing_autopay_active),
+                text = "Карта привязана — подписка продлевается автоматически.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MutedLavender,
             )
-            SecondaryStoryButton(
-                text = context.getString(R.string.billing_cancel_autopay),
-                onClick = { showUnlinkConfirm = true },
-                enabled = !unlinkLoading && !loading,
-            )
         }
 
+        SecondaryStoryButton(
+            text = context.getString(R.string.billing_unlink_card),
+            onClick = { showUnlinkConfirm = true },
+            enabled = !unlinkLoading && !loading,
+        )
+
         unlinkMessage?.let {
-            Text(text = it, color = if (it.startsWith("Карта")) GoldBright else ErrorCoral, style = MaterialTheme.typography.bodySmall)
+            Text(
+                text = it,
+                color = if (it.contains("отвязан", ignoreCase = true) || it.contains("Карта", ignoreCase = true)) {
+                    GoldBright
+                } else {
+                    ErrorCoral
+                },
+                style = MaterialTheme.typography.bodySmall,
+            )
         }
 
         if (showUnlinkConfirm) {
             AlertDialog(
                 onDismissRequest = { if (!unlinkLoading) showUnlinkConfirm = false },
-                title = { Text(context.getString(R.string.billing_cancel_autopay_title)) },
-                text = { Text(context.getString(R.string.billing_cancel_autopay_body)) },
+                title = { Text(context.getString(R.string.billing_unlink_card_title)) },
+                text = { Text(context.getString(R.string.billing_unlink_card_body)) },
                 confirmButton = {
                     PrimaryStoryButton(
-                        text = context.getString(R.string.billing_cancel_autopay_confirm),
+                        text = context.getString(R.string.billing_unlink_card_confirm),
                         onClick = {
                             scope.launch {
                                 unlinkLoading = true
@@ -207,16 +216,16 @@ private fun BillingTab(app: MusicStoryApp) {
                                 try {
                                     val resp = app.apiClient.unlinkCard(backendUrl)
                                     if (resp.ok == true) {
-                                        unlinkMessage = resp.message ?: context.getString(R.string.billing_cancel_autopay_done)
+                                        unlinkMessage = resp.message ?: context.getString(R.string.billing_unlink_card_done)
                                         autoRenew = false
                                         cardSaved = false
                                         showUnlinkConfirm = false
                                         refreshBilling()
                                     } else {
-                                        unlinkMessage = resp.error ?: context.getString(R.string.billing_cancel_autopay_failed)
+                                        unlinkMessage = resp.error ?: context.getString(R.string.billing_unlink_card_failed)
                                     }
                                 } catch (e: Exception) {
-                                    unlinkMessage = e.message ?: context.getString(R.string.billing_cancel_autopay_failed)
+                                    unlinkMessage = e.message ?: context.getString(R.string.billing_unlink_card_failed)
                                 } finally {
                                     unlinkLoading = false
                                 }
@@ -237,6 +246,16 @@ private fun BillingTab(app: MusicStoryApp) {
                 textContentColor = MutedLavender,
             )
         }
+
+        PaymentCheckoutSheet(
+            visible = paymentUrl != null,
+            checkoutUrl = paymentUrl.orEmpty(),
+            onDismiss = { paymentUrl = null },
+            onPaymentComplete = {
+                paymentUrl = null
+                scope.launch { refreshBilling() }
+            },
+        )
 
         OutlinedTextField(
             value = email,
@@ -293,7 +312,11 @@ private fun BillingTab(app: MusicStoryApp) {
             featured = false,
             enabled = !loading,
         ) {
-            scope.launch { pay(app, backendUrl, email, "month", { loading = it }, { error = it }) }
+            scope.launch {
+                pay(app, backendUrl, email, "month", { loading = it }, { error = it }) { url ->
+                    paymentUrl = url
+                }
+            }
         }
         PlanButton(
             label = context.getString(R.string.billing_plan_year),
@@ -302,7 +325,11 @@ private fun BillingTab(app: MusicStoryApp) {
             featured = true,
             enabled = !loading,
         ) {
-            scope.launch { pay(app, backendUrl, email, "year", { loading = it }, { error = it }) }
+            scope.launch {
+                pay(app, backendUrl, email, "year", { loading = it }, { error = it }) { url ->
+                    paymentUrl = url
+                }
+            }
         }
         PlanButton(
             label = context.getString(R.string.billing_plan_quarter),
@@ -311,7 +338,11 @@ private fun BillingTab(app: MusicStoryApp) {
             featured = false,
             enabled = !loading,
         ) {
-            scope.launch { pay(app, backendUrl, email, "quarter", { loading = it }, { error = it }) }
+            scope.launch {
+                pay(app, backendUrl, email, "quarter", { loading = it }, { error = it }) { url ->
+                    paymentUrl = url
+                }
+            }
         }
 
         if (loading) {
@@ -320,12 +351,6 @@ private fun BillingTab(app: MusicStoryApp) {
         error?.let {
             Text(text = it, color = ErrorCoral, style = MaterialTheme.typography.bodySmall)
         }
-
-        Text(
-            text = context.getString(R.string.billing_fine),
-            style = MaterialTheme.typography.bodySmall,
-            color = MutedLavender,
-        )
     }
 }
 
@@ -336,6 +361,7 @@ private suspend fun pay(
     plan: String,
     setLoading: (Boolean) -> Unit,
     setError: (String?) -> Unit,
+    onOpenCheckout: (String) -> Unit,
 ) {
     val context = app.applicationContext
     if (email.isBlank() || !email.contains('@')) {
@@ -354,9 +380,7 @@ private suspend fun pay(
         if (url.isNullOrBlank()) {
             setError(context.getString(R.string.billing_payment_failed))
         } else {
-            val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
-            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-            context.startActivity(intent)
+            onOpenCheckout(url)
         }
     } catch (e: Exception) {
         setError(e.message ?: context.getString(R.string.billing_payment_failed))
