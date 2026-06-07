@@ -485,6 +485,7 @@ export async function pushHistoryAsync(
   installId: string,
   entry: SyncHistoryEntry,
 ): Promise<SyncHistoryEntry[]> {
+  await ensureAccountStoreLoaded();
   const normalized = installId.trim().toLowerCase();
   const accountId = resolveAccountId(installId);
   if (!accountId) return [];
@@ -534,6 +535,7 @@ export function pullHistory(installId: string, since = 0): SyncHistoryEntry[] | 
 }
 
 export async function pullHistoryAsync(installId: string, since = 0): Promise<SyncHistoryEntry[] | null> {
+  await ensureAccountStoreLoaded();
   const normalized = installId.trim().toLowerCase();
   const accountId = resolveAccountId(installId);
   if (!accountId) return null;
@@ -544,6 +546,28 @@ export async function pullHistoryAsync(installId: string, since = 0): Promise<Sy
   }
 
   return pullHistory(installId, since);
+}
+
+export async function pullAccountCloudData(installId: string): Promise<{
+  history: SyncHistoryEntry[];
+  scrobbles: import('./scrobble-history-store.js').SyncScrobbleEntry[];
+} | null> {
+  await ensureAccountStoreLoaded();
+  const normalized = installId.trim().toLowerCase();
+  const accountId = resolveAccountId(installId);
+  if (!accountId) return null;
+
+  if (hasPostgres()) {
+    const { pgListScrobbleHistory } = await import('./scrobble-history-store.js');
+    const [history, scrobbles] = await Promise.all([
+      pgListStoryHistory(normalized, accountId, 0),
+      pgListScrobbleHistory(normalized, accountId, 0),
+    ]);
+    return { history, scrobbles };
+  }
+
+  const history = pullHistory(installId, 0) ?? [];
+  return { history, scrobbles: [] };
 }
 
 function entitlementFromAccount(account: AccountRecord | undefined): AccountEntitlement {
@@ -792,6 +816,13 @@ export function getAccountProfile(installId: string): {
   };
 }
 
+export async function getAccountProfileLoaded(
+  installId: string,
+): Promise<ReturnType<typeof getAccountProfile>> {
+  await ensureAccountStoreLoaded();
+  return getAccountProfile(installId);
+}
+
 export async function startEmailLogin(
   installId: string,
   emailRaw: string,
@@ -849,11 +880,11 @@ export async function verifyEmailLogin(
   if (pending.installId !== normalized) {
     return { ok: false, error: 'Код выдан другому устройству' };
   }
-
   let accountId = store.emailToAccount[email];
   const isFirstRegistration = !accountId;
+  const prevAnonymousAccountId = store.installToAccount[normalized] ?? null;
   if (!accountId) {
-    accountId = store.installToAccount[normalized] ?? createAccount(installId).accountId;
+    accountId = prevAnonymousAccountId ?? createAccount(installId).accountId;
   }
   const account = store.accountsById[accountId];
   if (!account) return { ok: false, error: 'Аккаунт недоступен' };
@@ -874,8 +905,27 @@ export async function verifyEmailLogin(
   await saveStoreAsync(store);
   if (hasPostgres()) {
     await pgDeletePendingEmailCode(email);
-    const { pgReassignStoryHistoryForInstall, pgReassignScrobbleHistoryForInstall } =
+    const { pgReassignScrobbleHistoryForInstall, pgMergeScrobbleHistoryAccounts } =
       await import('./scrobble-history-store.js');
+    const { pgReassignStoryHistoryForInstall, pgMergeStoryHistoryAccounts } =
+      await import('./story-history-store.js');
+    if (
+      prevAnonymousAccountId &&
+      prevAnonymousAccountId !== accountId
+    ) {
+      const mergedStories = await pgMergeStoryHistoryAccounts(prevAnonymousAccountId, accountId);
+      const mergedScrobbles = await pgMergeScrobbleHistoryAccounts(prevAnonymousAccountId, accountId);
+      if (mergedStories > 0 || mergedScrobbles > 0) {
+        console.log(
+          `[email-auth] merged anonymous account=${prevAnonymousAccountId.slice(0, 8)} → ${accountId.slice(0, 8)} stories=${mergedStories} scrobbles=${mergedScrobbles}`,
+        );
+      }
+      delete store.accountsById[prevAnonymousAccountId];
+      for (const [code, id] of Object.entries(store.syncCodeToAccount)) {
+        if (id === prevAnonymousAccountId) delete store.syncCodeToAccount[code];
+      }
+      await saveStoreAsync(store);
+    }
     const storyRows = await pgReassignStoryHistoryForInstall(normalized, accountId);
     const scrobbleRows = await pgReassignScrobbleHistoryForInstall(normalized, accountId);
     if (storyRows > 0 || scrobbleRows > 0) {

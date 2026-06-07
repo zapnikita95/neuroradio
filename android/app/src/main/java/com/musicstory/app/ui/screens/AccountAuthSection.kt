@@ -42,10 +42,19 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
-private suspend fun finishAccountLogin(app: MusicStoryApp) {
+private suspend fun finishAccountLogin(
+    app: MusicStoryApp,
+    login: AccountAuthManager.AccountLoginResult,
+) {
     app.settingsDataStore.setAccountLinked(true)
     if (!app.settingsDataStore.homeTourCompleted.first()) {
         app.settingsDataStore.setHomeTourPending(true)
+    }
+    if (login.history.isNotEmpty()) {
+        app.storyRepository.mergeHistoryEntries(login.history)
+    }
+    if (login.scrobbles.isNotEmpty()) {
+        app.scrobbleRepository.mergeScrobbleEntries(login.scrobbles)
     }
     val url = app.settingsDataStore.backendUrl.first()
     if (url.isNotBlank()) {
@@ -90,14 +99,14 @@ fun AccountStatusSection(
                 onDismiss = { showTelegramSheet = false },
                 onAuthPayload = { payload ->
                     scope.launch {
-                        val (p, err) = app.accountAuthManager.linkTelegram(backendUrl, payload)
-                        if (p != null) {
-                            finishAccountLogin(app)
+                        val login = app.accountAuthManager.linkTelegram(backendUrl, payload)
+                        if (login.profile != null) {
+                            finishAccountLogin(app, login)
                             message = context.getString(R.string.settings_auth_success)
                             showTelegramSheet = false
-                            profile = p
+                            profile = login.profile
                         } else {
-                            message = err ?: context.getString(R.string.settings_auth_verify_failed)
+                            message = login.error ?: context.getString(R.string.settings_auth_verify_failed)
                         }
                     }
                 },
@@ -272,13 +281,13 @@ fun AccountEmailLoginContent(
                         busy = true
                         message = null
                         val url = app.settingsDataStore.backendUrl.first()
-                        val (p, err) = app.accountAuthManager.verifyEmailLogin(url, email, code)
-                        if (p != null) {
-                            finishAccountLogin(app)
+                        val login = app.accountAuthManager.verifyEmailLogin(url, email, code)
+                        if (login.profile != null) {
+                            finishAccountLogin(app, login)
                             message = context.getString(R.string.settings_auth_success)
                             onLoggedIn()
                         } else {
-                            message = err ?: context.getString(R.string.settings_auth_verify_failed)
+                            message = login.error ?: context.getString(R.string.settings_auth_verify_failed)
                         }
                         busy = false
                     }
@@ -339,14 +348,14 @@ fun AccountTelegramLoginSection(
                 onDismiss = { showSheet = false },
                 onAuthPayload = { payload ->
                     scope.launch {
-                        val (p, err) = app.accountAuthManager.linkTelegram(backendUrl, payload)
-                        if (p != null) {
-                            finishAccountLogin(app)
+                        val login = app.accountAuthManager.linkTelegram(backendUrl, payload)
+                        if (login.profile != null) {
+                            finishAccountLogin(app, login)
                             message = context.getString(R.string.settings_auth_success)
                             showSheet = false
                             onLoggedIn()
                         } else {
-                            message = err ?: context.getString(R.string.settings_auth_verify_failed)
+                            message = login.error ?: context.getString(R.string.settings_auth_verify_failed)
                         }
                     }
                 },

@@ -1,9 +1,10 @@
 import { Router, Request, Response } from 'express';
 import { requireAppAuth } from '../middleware/app-auth.js';
 import {
-  getAccountProfile,
+  getAccountProfileLoaded,
   getSyncStatus,
   linkTelegramAccount,
+  pullAccountCloudData,
   startEmailLogin,
   verifyEmailLogin,
 } from '../services/account-store.js';
@@ -32,11 +33,17 @@ router.get('/config', (_req: Request, res: Response) => {
   });
 });
 
-router.get('/profile', (req: Request, res: Response) => {
+router.get('/profile', async (req: Request, res: Response) => {
   const installId = req.installId!;
   const sync = getSyncStatus(installId);
-  const profile = getAccountProfile(installId);
-  res.json({ ...sync, ...profile });
+  const profile = await getAccountProfileLoaded(installId);
+  const cloud = profile.email || profile.telegramId ? await pullAccountCloudData(installId) : null;
+  res.json({
+    ...sync,
+    ...profile,
+    history: cloud?.history ?? [],
+    scrobbles: cloud?.scrobbles ?? [],
+  });
 });
 
 router.post('/email/start', async (req: Request, res: Response) => {
@@ -57,11 +64,19 @@ router.post('/email/verify', async (req: Request, res: Response) => {
     res.status(400).json({ error: result.error });
     return;
   }
-  res.json({ ok: true, accountId: result.accountId, profile: getAccountProfile(req.installId!) });
+  const cloud = await pullAccountCloudData(req.installId!);
+  const profile = await getAccountProfileLoaded(req.installId!);
+  res.json({
+    ok: true,
+    accountId: result.accountId,
+    profile,
+    history: cloud?.history ?? [],
+    scrobbles: cloud?.scrobbles ?? [],
+  });
 });
 
 /** Telegram Login Widget — hash verified server-side (WebView in app, baseUrl = TELEGRAM_WIDGET_BASE_URL). */
-router.post('/telegram', (req: Request, res: Response) => {
+router.post('/telegram', async (req: Request, res: Response) => {
   const botToken = process.env.TELEGRAM_BOT_TOKEN?.trim();
   if (!botToken) {
     res.status(503).json({ error: 'Telegram login не настроен (TELEGRAM_BOT_TOKEN)' });
@@ -84,7 +99,15 @@ router.post('/telegram', (req: Request, res: Response) => {
     res.status(400).json({ error: result.error });
     return;
   }
-  res.json({ ok: true, accountId: result.accountId, profile: getAccountProfile(req.installId!) });
+  const cloud = await pullAccountCloudData(req.installId!);
+  const profile = await getAccountProfileLoaded(req.installId!);
+  res.json({
+    ok: true,
+    accountId: result.accountId,
+    profile,
+    history: cloud?.history ?? [],
+    scrobbles: cloud?.scrobbles ?? [],
+  });
 });
 
 export default router;

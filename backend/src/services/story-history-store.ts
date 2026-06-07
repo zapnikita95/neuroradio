@@ -213,3 +213,26 @@ export async function pgGetUsedSeedFingerprints(
   }
   return out;
 }
+
+export async function pgReassignStoryHistoryForInstall(
+  installId: string,
+  accountId: string,
+): Promise<number> {
+  const res = await getPool().query(
+    `UPDATE story_history SET account_id = $1 WHERE install_id = $2`,
+    [accountId, installId.trim().toLowerCase()],
+  );
+  return res.rowCount ?? 0;
+}
+
+export async function pgMergeStoryHistoryAccounts(
+  fromAccountId: string,
+  toAccountId: string,
+): Promise<number> {
+  if (!fromAccountId.trim() || !toAccountId.trim() || fromAccountId === toAccountId) return 0;
+  const res = await getPool().query(
+    `UPDATE story_history SET account_id = $2 WHERE account_id = $1`,
+    [fromAccountId, toAccountId],
+  );
+  return res.rowCount ?? 0;
+}

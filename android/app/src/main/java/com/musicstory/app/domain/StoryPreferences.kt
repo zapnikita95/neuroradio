@@ -99,6 +99,7 @@ enum class SileroVoicePreset(val id: String, val voiceId: String, val labelRu: S
     CALM_MALE("calm_male", "aidar", "aidar — спокойный мужской", "Ровный дикторский голос"),
     LIVELY_FEMALE("lively_female", "kseniya", "kseniya — живой женский", "Энергичнее, ближе к «радио»"),
     LIVELY_MALE("lively_male", "eugene", "eugene — бодрый мужской", "Бодрая подача для эфира"),
+    BRIGHT_FEMALE("bright_female", "xenia", "xenia — яркий женский", "Выразительный женский голос Silero"),
     ;
 
     companion object {

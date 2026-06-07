@@ -82,17 +82,6 @@ export async function pgListScrobbleHistory(
   }));
 }
 
-export async function pgReassignStoryHistoryForInstall(
-  installId: string,
-  accountId: string,
-): Promise<number> {
-  const res = await getPool().query(
-    `UPDATE story_history SET account_id = $1 WHERE install_id = $2`,
-    [accountId, installId.trim().toLowerCase()],
-  );
-  return res.rowCount ?? 0;
-}
-
 export async function pgReassignScrobbleHistoryForInstall(
   installId: string,
   accountId: string,
@@ -100,6 +89,18 @@ export async function pgReassignScrobbleHistoryForInstall(
   const res = await getPool().query(
     `UPDATE scrobble_history SET account_id = $1 WHERE install_id = $2`,
     [accountId, installId.trim().toLowerCase()],
+  );
+  return res.rowCount ?? 0;
+}
+
+export async function pgMergeScrobbleHistoryAccounts(
+  fromAccountId: string,
+  toAccountId: string,
+): Promise<number> {
+  if (!fromAccountId.trim() || !toAccountId.trim() || fromAccountId === toAccountId) return 0;
+  const res = await getPool().query(
+    `UPDATE scrobble_history SET account_id = $2 WHERE account_id = $1`,
+    [fromAccountId, toAccountId],
   );
   return res.rowCount ?? 0;
 }

@@ -130,11 +130,18 @@ class MusicStoryApp : Application() {
         appScope.launch {
             val backendUrl = settingsDataStore.backendUrl.first().trim()
             if (backendUrl.isBlank()) return@launch
-            val profile = accountAuthManager.fetchProfile(backendUrl) ?: return@launch
+            val login = accountAuthManager.fetchProfileWithCloud(backendUrl)
+            val profile = login.profile ?: return@launch
             if (!profile.isLoggedIn) return@launch
             settingsDataStore.setAccountLinked(true)
             if (!settingsDataStore.homeTourCompleted.first()) {
                 settingsDataStore.setHomeTourPending(true)
+            }
+            if (login.history.isNotEmpty()) {
+                storyRepository.mergeHistoryEntries(login.history)
+            }
+            if (login.scrobbles.isNotEmpty()) {
+                scrobbleRepository.mergeScrobbleEntries(login.scrobbles)
             }
             syncAccountDataWithServer(backendUrl)
         }

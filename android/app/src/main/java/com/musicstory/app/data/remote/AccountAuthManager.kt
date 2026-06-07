@@ -1,5 +1,7 @@
 package com.musicstory.app.data.remote
 
+import com.musicstory.app.data.local.ScrobbleEntry
+import com.musicstory.app.data.local.StoryHistoryEntry
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.MediaType.Companion.toMediaType
@@ -30,6 +32,82 @@ class AccountAuthManager(
             premiumUntil = json.optLong("premiumUntil").takeIf { it > 0L },
         )
 
+    private fun parseCloudHistory(json: JSONObject): List<StoryHistoryEntry> {
+        val arr = json.optJSONArray("history") ?: return emptyList()
+        return buildList {
+            for (i in 0 until arr.length()) {
+                val item = arr.optJSONObject(i) ?: continue
+                add(
+                    StoryHistoryEntry(
+                        serverId = item.optString("id").ifBlank { null },
+                        trackKey = item.optString("trackKey"),
+                        artist = item.optString("artist"),
+                        title = item.optString("title"),
+                        script = item.optString("script"),
+                        angle = item.optString("angle").ifBlank { null },
+                        playedAt = item.optLong("playedAt", System.currentTimeMillis()),
+                        vote = item.optString("vote").ifBlank { null },
+                    ),
+                )
+            }
+        }
+    }
+
+    private fun parseCloudScrobbles(json: JSONObject): List<ScrobbleEntry> {
+        val arr = json.optJSONArray("scrobbles") ?: return emptyList()
+        return buildList {
+            for (i in 0 until arr.length()) {
+                val item = arr.optJSONObject(i) ?: continue
+                add(
+                    ScrobbleEntry(
+                        serverId = item.optString("id").ifBlank { null },
+                        artist = item.optString("artist"),
+                        title = item.optString("title"),
+                        album = item.optString("album").ifBlank { null },
+                        genre = item.optString("genre").ifBlank { null },
+                        packageName = item.optString("packageName").ifBlank { null },
+                        storyTriggered = item.optBoolean("storyTriggered"),
+                        scrobbledAt = item.optLong("scrobbledAt", System.currentTimeMillis()),
+                    ),
+                )
+            }
+        }
+    }
+
+    private fun parseLoginResponse(raw: String, errorFallback: String): AccountLoginResult {
+        val json = JSONObject(raw)
+        if (json.has("error") && !json.optString("error").isNullOrBlank()) {
+            return AccountLoginResult(error = json.optString("error").ifBlank { errorFallback })
+        }
+        val profileJson = json.optJSONObject("profile") ?: json
+        return AccountLoginResult(
+            profile = parseProfile(profileJson),
+            history = parseCloudHistory(json),
+            scrobbles = parseCloudScrobbles(json),
+        )
+    }
+
+    suspend fun fetchProfileWithCloud(baseUrl: String): AccountLoginResult = withContext(Dispatchers.IO) {
+        val token = authManager.getAccessToken(baseUrl) ?: return@withContext AccountLoginResult(error = "Нет связи с сервером")
+        val req = Request.Builder()
+            .url("${baseUrl.trimEnd('/')}/v1/account/profile")
+            .header("Authorization", "Bearer $token")
+            .get()
+            .build()
+        runCatching {
+            http.newCall(req).execute().use { resp ->
+                val raw = resp.body?.string().orEmpty()
+                if (!resp.isSuccessful) {
+                    return@withContext AccountLoginResult(error = "Профиль недоступен")
+                }
+                parseLoginResponse(raw, "Профиль недоступен")
+            }
+        }.getOrDefault(AccountLoginResult(error = "Ошибка сети"))
+    }
+
+    suspend fun fetchProfile(baseUrl: String): AccountProfile? =
+        fetchProfileWithCloud(baseUrl).profile
+
     suspend fun fetchConfig(baseUrl: String): AuthConfig? = withContext(Dispatchers.IO) {
         val token = authManager.getAccessToken(baseUrl) ?: return@withContext null
         val req = Request.Builder()
@@ -51,24 +129,9 @@ class AccountAuthManager(
         }.getOrNull()
     }
 
-    suspend fun fetchProfile(baseUrl: String): AccountProfile? = withContext(Dispatchers.IO) {
-        val token = authManager.getAccessToken(baseUrl) ?: return@withContext null
-        val req = Request.Builder()
-            .url("${baseUrl.trimEnd('/')}/v1/account/profile")
-            .header("Authorization", "Bearer $token")
-            .get()
-            .build()
-        runCatching {
-            http.newCall(req).execute().use { resp ->
-                if (!resp.isSuccessful) return@withContext null
-                parseProfile(JSONObject(resp.body?.string().orEmpty()))
-            }
-        }.getOrNull()
-    }
-
-    suspend fun linkTelegram(baseUrl: String, authJson: JSONObject): Pair<AccountProfile?, String?> =
+    suspend fun linkTelegram(baseUrl: String, authJson: JSONObject): AccountLoginResult =
         withContext(Dispatchers.IO) {
-            val token = authManager.getAccessToken(baseUrl) ?: return@withContext null to "Нет связи с сервером"
+            val token = authManager.getAccessToken(baseUrl) ?: return@withContext AccountLoginResult(error = "Нет связи с сервером")
             val req = Request.Builder()
                 .url("${baseUrl.trimEnd('/')}/v1/account/telegram")
                 .header("Authorization", "Bearer $token")
@@ -78,13 +141,13 @@ class AccountAuthManager(
                 http.newCall(req).execute().use { resp ->
                     val body = resp.body?.string().orEmpty()
                     if (!resp.isSuccessful) {
-                        return@withContext null to JSONObject(body).optString("error").ifBlank { "Ошибка Telegram" }
+                        return@withContext AccountLoginResult(
+                            error = JSONObject(body).optString("error").ifBlank { "Ошибка Telegram" },
+                        )
                     }
-                    val json = JSONObject(body)
-                    val profile = json.optJSONObject("profile") ?: json
-                    parseProfile(profile) to null
+                    parseLoginResponse(body, "Ошибка Telegram")
                 }
-            }.getOrDefault(null to "Ошибка сети")
+            }.getOrDefault(AccountLoginResult(error = "Ошибка сети"))
         }
 
     suspend fun startEmailLogin(baseUrl: String, email: String): String? = withContext(Dispatchers.IO) {
@@ -106,9 +169,9 @@ class AccountAuthManager(
         }.getOrNull()
     }
 
-    suspend fun verifyEmailLogin(baseUrl: String, email: String, code: String): Pair<AccountProfile?, String?> =
+    suspend fun verifyEmailLogin(baseUrl: String, email: String, code: String): AccountLoginResult =
         withContext(Dispatchers.IO) {
-            val token = authManager.getAccessToken(baseUrl) ?: return@withContext null to "Нет связи с сервером"
+            val token = authManager.getAccessToken(baseUrl) ?: return@withContext AccountLoginResult(error = "Нет связи с сервером")
             val body = JSONObject()
                 .put("email", email.trim())
                 .put("code", code.trim())
@@ -122,15 +185,21 @@ class AccountAuthManager(
                 http.newCall(req).execute().use { resp ->
                     val raw = resp.body?.string().orEmpty()
                     if (!resp.isSuccessful) {
-                        val err = JSONObject(raw).optString("error").ifBlank { "Не удалось войти" }
-                        return@withContext null to err
+                        return@withContext AccountLoginResult(
+                            error = JSONObject(raw).optString("error").ifBlank { "Не удалось войти" },
+                        )
                     }
-                    val json = JSONObject(raw)
-                    val profile = json.optJSONObject("profile") ?: json
-                    parseProfile(profile) to null
+                    parseLoginResponse(raw, "Не удалось войти")
                 }
-            }.getOrDefault(null to "Ошибка сети")
+            }.getOrDefault(AccountLoginResult(error = "Ошибка сети"))
         }
+
+    data class AccountLoginResult(
+        val profile: AccountProfile? = null,
+        val history: List<StoryHistoryEntry> = emptyList(),
+        val scrobbles: List<ScrobbleEntry> = emptyList(),
+        val error: String? = null,
+    )
 
     data class AuthConfig(
         val emailEnabled: Boolean,

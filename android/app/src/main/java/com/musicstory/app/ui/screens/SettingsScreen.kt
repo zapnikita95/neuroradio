@@ -433,12 +433,13 @@ fun SettingsScreen(
     val canCustomizeListen = TierAccess.canCustomizeListenThresholdSeconds(effectiveTier)
     val isPaidServerTier = TierAccess.isPremiumLike(effectiveTier) && !hasPersonalKey
     val isFreeServerTier = TierAccess.isFreeServerTier(effectiveTier) && !hasPersonalKey
-    val showSileroVoices = ttsPlaybackEngine == TtsPlaybackEngine.YANDEX_SERVER &&
+    val serverUsesSilero = ttsPlaybackEngine == TtsPlaybackEngine.YANDEX_SERVER &&
         userTtsBilling == UserTtsBilling.SERVER &&
-        (effectiveTier == null || isFreeServerTier)
+        isFreeServerTier
+    val showSileroVoices = serverUsesSilero
     val showYandexVoices = ttsPlaybackEngine == TtsPlaybackEngine.YANDEX_SERVER &&
-        !showSileroVoices &&
-        (userTtsBilling == UserTtsBilling.YANDEX || isPaidServerTier)
+        !serverUsesSilero &&
+        (userTtsBilling == UserTtsBilling.YANDEX || (userTtsBilling == UserTtsBilling.SERVER && isPaidServerTier))
     val userTtsBillingOptions = remember {
         UserTtsBilling.entries.filter { it != UserTtsBilling.SBER }
     }

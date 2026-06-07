@@ -87,7 +87,7 @@ router.put('/settings', (req: Request, res: Response) => {
 router.get('/history', async (req: Request, res: Response) => {
   const since = parseInt(String(req.query.since ?? '0'), 10);
   const history = await pullHistoryAsync(req.installId!, Number.isNaN(since) ? 0 : since);
-  if (!history) {
+  if (history === null) {
     res.status(404).json({ error: 'Not linked' });
     return;
   }

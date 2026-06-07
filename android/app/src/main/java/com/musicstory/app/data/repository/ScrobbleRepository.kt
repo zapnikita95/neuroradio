@@ -99,15 +99,23 @@ class ScrobbleRepository(
         genreCache.clear()
     }
 
+    suspend fun mergeScrobbleEntries(remote: List<ScrobbleEntry>) {
+        for (entry in remote) {
+            insertScrobbleIfNew(entry)
+        }
+    }
+
+    private suspend fun insertScrobbleIfNew(entry: ScrobbleEntry) {
+        val serverId = entry.serverId?.takeIf { it.isNotBlank() }
+        if (serverId != null && scrobbleDao.countByServerId(serverId) > 0) return
+        if (scrobbleDao.countByTrackAndTime(entry.artist, entry.title, entry.scrobbledAt) > 0) return
+        scrobbleDao.insert(entry)
+    }
+
     suspend fun mergeFromServer(baseUrl: String) {
         val sync = accountSyncManager ?: return
         val remote = sync.pullScrobbles(baseUrl.trim()) ?: return
-        for (entry in remote) {
-            val serverId = entry.serverId?.takeIf { it.isNotBlank() }
-            if (serverId != null && scrobbleDao.countByServerId(serverId) > 0) continue
-            if (scrobbleDao.countByTrackAndTime(entry.artist, entry.title, entry.scrobbledAt) > 0) continue
-            scrobbleDao.insert(entry)
-        }
+        mergeScrobbleEntries(remote)
     }
 
     suspend fun syncAccountDataWithServer(baseUrl: String) {

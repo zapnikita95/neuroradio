@@ -74,29 +74,37 @@ class StoryRepository(
         apiClient.cancelActiveStoryRequest(reason)
     }
 
+    suspend fun mergeHistoryEntries(remote: List<StoryHistoryEntry>) {
+        for (entry in remote) {
+            insertHistoryEntryIfNew(entry)
+        }
+    }
+
+    private suspend fun insertHistoryEntryIfNew(entry: StoryHistoryEntry) {
+        val serverId = entry.serverId?.takeIf { it.isNotBlank() }
+        if (serverId != null) {
+            val existing = storyHistoryDao.findByServerId(serverId)
+            if (existing != null) {
+                val remoteVote = entry.vote?.takeIf { it.isNotBlank() }
+                if (remoteVote != null && existing.vote != remoteVote) {
+                    storyHistoryDao.updateVote(existing.id, remoteVote)
+                }
+                return
+            }
+            if (storyHistoryDao.countByServerId(serverId) == 0) {
+                storyHistoryDao.insert(entry)
+            }
+            return
+        }
+        if (storyHistoryDao.countByTrackAndTime(entry.trackKey, entry.playedAt) == 0) {
+            storyHistoryDao.insert(entry)
+        }
+    }
+
     suspend fun mergeHistoryFromServer(baseUrl: String) {
         val sync = accountSyncManager ?: return
         val remote = sync.pullHistory(baseUrl.trim()) ?: return
-        for (entry in remote) {
-            val serverId = entry.serverId?.takeIf { it.isNotBlank() }
-            if (serverId != null) {
-                val existing = storyHistoryDao.findByServerId(serverId)
-                if (existing != null) {
-                    val remoteVote = entry.vote?.takeIf { it.isNotBlank() }
-                    if (remoteVote != null && existing.vote != remoteVote) {
-                        storyHistoryDao.updateVote(existing.id, remoteVote)
-                    }
-                    continue
-                }
-                if (storyHistoryDao.countByServerId(serverId) == 0) {
-                    storyHistoryDao.insert(entry)
-                }
-                continue
-            }
-            if (storyHistoryDao.countByTrackAndTime(entry.trackKey, entry.playedAt) == 0) {
-                storyHistoryDao.insert(entry)
-            }
-        }
+        mergeHistoryEntries(remote)
     }
 
     /** Pull cloud data down, then push local entries up (login / cold start). */
