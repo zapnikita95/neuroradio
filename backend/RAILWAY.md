@@ -150,23 +150,34 @@ APK → JWT → POST /v1/story/full only
 
 На free tier BFF озвучивает через **Silero v5_ru** (если настроен), иначе — Yandex.
 
-### 1. Отдельный сервис Silero на Railway
+### 1. Два сервиса в одном проекте (важно)
 
-1. **New Project** → **Deploy from GitHub** → тот же репозиторий
-2. **Root Directory:** пустой
-3. В Settings → Build: Dockerfile path → **`Dockerfile.silero`** (или `silero-railway.toml`)
-4. **Generate Domain** → скопируй URL, напр. `https://music-story-silero.up.railway.app`
-5. Проверка: `curl https://ТВОЙ-SILERO.up.railway.app/voices` → `aidar`, `baya`, …
+| Сервис | Dockerfile | Start | Домен (пример) |
+|--------|------------|-------|----------------|
+| **neuroradio** (BFF) | корневой `Dockerfile` | `node dist/index.js` | `neuroradio-production.up.railway.app` |
+| **silero** (TTS) | **`Dockerfile.silero`** | из образа | `neuroradio-silero.up.railway.app` |
 
-### 2. Variables на основном BFF (music-story)
+**Не путай URL:** `SILERO_TTS_URL` — это **только** Silero-сервис. Если указать домен BFF (`neuroradio-production…`), `/voices` вернёт 404 и озвучка не заработает.
+
+**Silero-сервис:**
+1. В том же Railway-проекте → **+ New** → **GitHub Repo** → тот же репозиторий
+2. Settings → Build → Dockerfile path: **`Dockerfile.silero`**
+3. **Generate Domain** → скопируй URL Silero
+4. Проверка: `curl https://ТВОЙ-SILERO.up.railway.app/voices` → `aidar`, `baya`, `kseniya`, …
+
+**BFF-сервис (neuroradio):** Root Directory пустой, Start `node dist/index.js` — как на скрине, это верно.
+
+После правки Variables нажми **Deploy** (иначе «5 Changes» не попадут в рантайм).
+
+### 2. Variables на BFF (neuroradio)
 
 | Variable | Значение |
 |----------|----------|
 | `SILERO_TTS_ENABLED` | `true` |
 | `TTS_PREFER_SILERO` | `true` |
 | `SILERO_TTS_API` | `legacy` |
-| `SILERO_TTS_VOICE` | `baya` (дефолт, если клиент не передал голос) |
-| `SILERO_TTS_URL` | `https://ТВОЙ-SILERO.up.railway.app` **без** слэша в конце |
+| `SILERO_TTS_VOICE` | `baya` — **только fallback**, если приложение не передало голос; в APK выбор: baya / aidar / kseniya / eugene |
+| `SILERO_TTS_URL` | `https://ТВОЙ-SILERO.up.railway.app` (**не** домен BFF!) |
 
 Локально (Docker): `SILERO_TTS_URL=http://127.0.0.1:8001` — см. `start-silero-tts.bat`.
 

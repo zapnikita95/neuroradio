@@ -163,7 +163,6 @@ fun SettingsScreen(
     val userTtsBilling by settings.userTtsBilling.collectAsState(initial = UserTtsBilling.SERVER)
     val yandexApiKey by settings.yandexApiKey.collectAsState(initial = "")
     val yandexFolderId by settings.yandexFolderId.collectAsState(initial = "")
-    val saluteAuthKey by settings.saluteAuthKey.collectAsState(initial = "")
     val musicFadeSeconds by settings.musicFadeSeconds.collectAsState(initial = SettingsDataStore.DEFAULT_MUSIC_FADE_SECONDS)
     val countTrackListenEnabled by settings.countTrackAfterListenEnabled.collectAsState(initial = false)
     val countTrackListenSeconds by settings.countTrackAfterListenSeconds.collectAsState(
@@ -247,7 +246,6 @@ fun SettingsScreen(
     var groqInput by remember(groqApiKey) { mutableStateOf(groqApiKey) }
     var yandexKeyInput by remember(yandexApiKey) { mutableStateOf(yandexApiKey) }
     var yandexFolderInput by remember(yandexFolderId) { mutableStateOf(yandexFolderId) }
-    var saluteKeyInput by remember(saluteAuthKey) { mutableStateOf(saluteAuthKey) }
     var userTtsSaveFeedback by remember { mutableStateOf<String?>(null) }
     var geminiInput by remember(geminiApiKey) { mutableStateOf(geminiApiKey) }
     var openRouterInput by remember(openRouterApiKey) { mutableStateOf(openRouterApiKey) }
@@ -380,10 +378,19 @@ fun SettingsScreen(
     val isFreeServerTier = TierAccess.isFreeServerTier(effectiveTier) && !hasPersonalKey
     val showSileroVoices = ttsPlaybackEngine == TtsPlaybackEngine.YANDEX_SERVER &&
         userTtsBilling == UserTtsBilling.SERVER &&
-        isFreeServerTier
+        (effectiveTier == null || isFreeServerTier)
     val showYandexVoices = ttsPlaybackEngine == TtsPlaybackEngine.YANDEX_SERVER &&
         !showSileroVoices &&
         (userTtsBilling == UserTtsBilling.YANDEX || isPaidServerTier)
+    val userTtsBillingOptions = remember {
+        UserTtsBilling.entries.filter { it != UserTtsBilling.SBER }
+    }
+
+    LaunchedEffect(userTtsBilling) {
+        if (userTtsBilling == UserTtsBilling.SBER) {
+            settings.setUserTtsBilling(UserTtsBilling.SERVER)
+        }
+    }
 
     LaunchedEffect(canManualMode, manualMode) {
         if (!canManualMode && manualMode) settings.setManualMode(false)
@@ -796,7 +803,7 @@ fun SettingsScreen(
                             color = MutedLavender,
                             modifier = Modifier.padding(top = 4.dp, bottom = 8.dp),
                         )
-                        UserTtsBilling.entries.forEach { billing ->
+                        userTtsBillingOptions.forEach { billing ->
                             NarratorRadioRow(
                                 label = billing.labelRu,
                                 description = billing.descriptionRu,
@@ -861,39 +868,6 @@ fun SettingsScreen(
                                     },
                             )
                         }
-                        if (userTtsBilling == UserTtsBilling.SBER) {
-                            OutlinedTextField(
-                                value = saluteKeyInput,
-                                onValueChange = { saluteKeyInput = it; userTtsSaveFeedback = null },
-                                label = { Text(context.getString(R.string.settings_salute_auth_key)) },
-                                modifier = Modifier.fillMaxWidth(),
-                                singleLine = true,
-                                visualTransformation = PasswordVisualTransformation(),
-                                colors = fieldColors,
-                                shape = RoundedCornerShape(14.dp),
-                            )
-                            Text(
-                                text = context.getString(R.string.settings_salute_tts_hint),
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MutedLavender,
-                                modifier = Modifier.padding(top = 6.dp, bottom = 4.dp),
-                            )
-                            Text(
-                                text = context.getString(R.string.settings_salute_get_key),
-                                style = MaterialTheme.typography.bodySmall,
-                                color = GoldBright,
-                                modifier = Modifier
-                                    .padding(bottom = 8.dp)
-                                    .clickable {
-                                        context.startActivity(
-                                            Intent(
-                                                Intent.ACTION_VIEW,
-                                                Uri.parse("https://developers.sber.ru/studio"),
-                                            ),
-                                        )
-                                    },
-                            )
-                        }
                         if (userTtsBilling != UserTtsBilling.SERVER) {
                             SecondaryStoryButton(
                                 text = context.getString(R.string.settings_user_tts_save),
@@ -901,9 +875,7 @@ fun SettingsScreen(
                                     scope.launch {
                                         settings.setYandexApiKey(ApiKeySanitizer.clean(yandexKeyInput))
                                         settings.setYandexFolderId(yandexFolderInput.trim())
-                                        settings.setSaluteAuthKey(ApiKeySanitizer.clean(saluteKeyInput))
                                         yandexKeyInput = ApiKeySanitizer.clean(yandexKeyInput)
-                                        saluteKeyInput = ApiKeySanitizer.clean(saluteKeyInput)
                                         userTtsSaveFeedback = context.getString(R.string.settings_user_tts_saved)
                                     }
                                 },

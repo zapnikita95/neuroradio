@@ -179,7 +179,7 @@
     <string name="settings_tts_speed">Скорость речи</string>
     <string name="settings_tts_emotion">Интонация</string>
     <string name="settings_user_tts_section">Свои ключи озвучки</string>
-    <string name="settings_user_tts_hint">Если указать ключ — SpeechKit/Salute списывает с вашего счёта, не с сервера приложения. Тот же пайплайн ударений и транслита.</string>
+    <string name="settings_user_tts_hint">Если указать ключ Yandex — SpeechKit списывает с вашего счёта, не с сервера приложения. Тот же пайплайн ударений и транслита.</string>
     <string name="settings_user_tts_active">Озвучка идёт через ваш %1$s</string>
     <string name="settings_yandex_api_key">Yandex API Key</string>
     <string name="settings_yandex_folder_id">Yandex Folder ID</string>
