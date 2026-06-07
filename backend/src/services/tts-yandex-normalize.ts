@@ -15,6 +15,32 @@ const MIXED_TTS_REPLACEMENTS: Array<[RegExp, string]> = [
   [/(?<=[.!?…]\s+)в\s+(?=[A-Z])/g, 'в треке '],
 ];
 
+/** B-side / A-side — «сторона бэ/эй» с падежами (без \\b — кириллица не \\w в JS). */
+function normalizeVinylSideLabels(text: string): string {
+  let result = text;
+
+  result = result.replace(/(^|[\s(«"])как\s+B-(?:\s*side)?(?=\s|,|\.|;|$)/gi, '$1как сторону бэ');
+  result = result.replace(/(^|[\s(«"])на\s+B-(?:\s*side)?(?=\s|,|\.|;|$)/gi, '$1на стороне бэ');
+  result = result.replace(/(^|[\s(«"])для\s+B-(?:\s*side)?(?=\s|,|\.|;|$)/gi, '$1для стороны бэ');
+  result = result.replace(/(^|[\s(«"])со\s+B-(?:\s*side)?(?=\s|,|\.|;|$)/gi, '$1со стороной бэ');
+  result = result.replace(/(^|[\s(«"])с\s+B-(?:\s*side)?(?=\s|,|\.|;|$)/gi, '$1с стороной бэ');
+  result = result.replace(/(^|[\s(«"])в\s+B-(?:\s*side)?(?=\s|,|\.|;|$)/gi, '$1в стороне бэ');
+  result = result.replace(/(^|[\s(«"])из\s+B-(?:\s*side)?(?=\s|,|\.|;|$)/gi, '$1из стороны бэ');
+  result = result.replace(/(^|[\s(«"])от\s+B-(?:\s*side)?(?=\s|,|\.|;|$)/gi, '$1от стороны бэ');
+  result = result.replace(/\bB-side\b/gi, 'сторона бэ');
+  result = result.replace(/\bside\s+B\b/gi, 'сторона бэ');
+  result = result.replace(/\bB\s+side\b/gi, 'сторона бэ');
+  result = result.replace(/\bB-(?=\s|,|\.|;|$)/g, 'сторона бэ');
+
+  result = result.replace(/(^|[\s(«"])как\s+A-(?:\s*side)?(?=\s|,|\.|;|$)/gi, '$1как сторону эй');
+  result = result.replace(/(^|[\s(«"])на\s+A-(?:\s*side)?(?=\s|,|\.|;|$)/gi, '$1на стороне эй');
+  result = result.replace(/(^|[\s(«"])для\s+A-(?:\s*side)?(?=\s|,|\.|;|$)/gi, '$1для стороны эй');
+  result = result.replace(/\bA-side\b/gi, 'сторона эй');
+  result = result.replace(/\bA-(?=\s|,|\.|;|$)/g, 'сторона эй');
+
+  return result;
+}
+
 /** Mixed RU/EN tokens that Yandex misreads inside `<lang en-US>` or after apostrophe splits. */
 export function normalizeYandexSpeechTokens(text: string, artist = '', title = ''): string {
   let result = normalizeLatinApostrophes(text);
@@ -35,6 +61,8 @@ export function normalizeYandexSpeechTokens(text: string, artist = '', title = '
   for (const [pattern, replacement] of MIXED_TTS_REPLACEMENTS) {
     result = result.replace(pattern, replacement);
   }
+
+  result = normalizeVinylSideLabels(result);
 
   return result;
 }

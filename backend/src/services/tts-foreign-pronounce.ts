@@ -29,7 +29,7 @@ const PHRASE_PRONUNCIATION_RU: Record<string, string> = {
   'to the moon & back': 'Ту зе Мун энд Бэк',
   'ed sheeran': 'Эд Ширан',
   thriller: 'Триллер',
-  'national film registry': 'Нэшнл Фильм Реджистри',
+  'national film registry': 'Нэшнл Фильм Р+еджистри',
   'vincent price': 'Винсент Прайс',
   mtv: 'Эм-Ти-Ви',
   'michael jackson': 'Майкл Джексон',

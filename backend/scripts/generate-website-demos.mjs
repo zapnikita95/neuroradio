@@ -1,11 +1,12 @@
 /**
  * Offline Yandex TTS demos for efir-ai.ru — nothing is synthesized in the browser.
  *
- *   node scripts/generate-website-demos.mjs --preview   # texts only → preview-texts.json
- *   node scripts/generate-website-demos.mjs --test      # 3 persona WAVs (smoke test)
- *   node scripts/generate-website-demos.mjs --personas  # 6 persona WAVs
- *   node scripts/generate-website-demos.mjs --studio    # 6×13 studio WAVs (voice per persona)
- *   node scripts/generate-website-demos.mjs --all        # personas + studio
+ *   node scripts/generate-website-demos.mjs --preview       # texts only → preview-texts.json
+ *   node scripts/generate-website-demos.mjs --test          # 3 persona WAVs (smoke test)
+ *   node scripts/generate-website-demos.mjs --personas      # 6 persona WAVs
+ *   node scripts/generate-website-demos.mjs --studio        # 6×13 studio WAVs (~30 с)
+ *   node scripts/generate-website-demos.mjs --studio-long   # 4 длинных образца (1 мин + без лимита)
+ *   node scripts/generate-website-demos.mjs --all             # personas + studio + long samples
  *
  * Requires YANDEX_API_KEY + YANDEX_FOLDER_ID in backend/.env (не коммить ключи в .env.example).
  */
@@ -27,6 +28,8 @@ const FACTS = [
   'именно этот ролик сделал короткометражку главным событием эры MTV',
 ];
 
+const FOCUS_ALL = ' Чистый поп-инжиниринг эпохи MTV.';
+
 const PERSONAS = [
   {
     id: 'radio_host',
@@ -44,7 +47,7 @@ const PERSONAS = [
     id: 'expert',
     voice: 'ermil',
     speed: 1.0,
-      script: 'Разберём, почему это работает. ' + THRILLER_CORE + ' Это эталон поп-хоррора восьмидесятых.',
+    script: 'Разберём, почему это работает. ' + THRILLER_CORE + ' Это эталон поп-хоррора восьмидесятых.',
   },
   {
     id: 'contemporary',
@@ -73,10 +76,24 @@ const VOICES = [
 
 const TEST_IDS = ['radio_host', 'night_dj', 'expert'];
 
-function studioScript(persona, factCount = 2) {
+/** Образцы длинных версий — не полная сетка, только для прослушивания на сайте. */
+const STUDIO_LONG_SAMPLES = [
+  { persona: 'radio_host', voice: 'zahar', factCount: 2, suffix: '-len2' },
+  { persona: 'expert', voice: 'ermil', factCount: 2, suffix: '-len2' },
+  { persona: 'night_dj', voice: 'filipp', factCount: 4, suffix: '-len4', focus: FOCUS_ALL },
+  { persona: 'fan', voice: 'jane', factCount: 4, suffix: '-len4', focus: FOCUS_ALL },
+];
+
+function studioScript(persona, factCount = 1, focus = '') {
   const opener = persona.script.split('.')[0] + '.';
   const body = FACTS.slice(0, factCount).map((f) => f + '.').join(' ');
-  return opener + ' ' + body;
+  const parts = persona.script.split('. ');
+  const closer = factCount > 1 && parts.length ? ' ' + parts[parts.length - 1] : '';
+  return opener + ' ' + body + focus + closer;
+}
+
+function studioFileName(personaId, voiceId, suffix = '') {
+  return `studio-${personaId}-${voiceId}${suffix}.wav`;
 }
 
 async function loadTts() {
@@ -118,8 +135,9 @@ async function writePreview() {
         file: `persona-${p.id}.wav`,
       };
     }),
-    studioSamples: PERSONAS.slice(0, 3).map((p) => {
-      const raw = studioScript(p, 2);
+    studioSamples: STUDIO_LONG_SAMPLES.map((s) => {
+      const p = PERSONAS.find((x) => x.id === s.persona);
+      const raw = studioScript(p, s.factCount, s.focus ?? '');
       const marked = prepareYandexTtsText(raw, {
         artist: 'Michael Jackson',
         title: 'Thriller',
@@ -127,12 +145,13 @@ async function writePreview() {
         pauseProfile: 'tight',
       });
       return {
-        persona: p.id,
-        voice: p.voice,
+        persona: s.persona,
+        voice: s.voice,
+        factCount: s.factCount,
         raw,
         marked,
         speakable: stripYandexMarkup(marked),
-        file: `studio-${p.id}-${p.voice}.wav`,
+        file: studioFileName(s.persona, s.voice, s.suffix),
       };
     }),
   };
@@ -158,21 +177,21 @@ async function synthPersona(p, synthesizeSpeech) {
   const out = path.join(OUT_DIR, `persona-${p.id}.wav`);
   fs.writeFileSync(out, buf);
   console.log('wrote', out, buf.length, 'bytes');
-  console.log('  speakable:', result.ttsTranscript.slice(0, 120) + '…');
 }
 
-async function synthStudio(persona, voice, synthesizeSpeech) {
-  const raw = studioScript(persona, 2);
-  const tmp = `_tmp-studio-${persona.id}-${voice}`;
+async function synthStudio(persona, voice, synthesizeSpeech, options = {}) {
+  const { factCount = 1, suffix = '', focus = '', speed } = options;
+  const raw = studioScript(persona, factCount, focus);
+  const tmp = `_tmp-studio-${persona.id}-${voice}${suffix}`;
   const result = await synthesizeSpeech(raw, voice, tmp, {
-    speed: voice === persona.voice ? persona.speed : 1.08,
+    speed: speed ?? (voice === persona.voice ? persona.speed : 1.08),
     artist: 'Michael Jackson',
     title: 'Thriller',
     pauseProfile: 'tight',
   });
   const buf = fs.readFileSync(result.filePath);
   fs.unlinkSync(result.filePath);
-  const out = path.join(OUT_DIR, `studio-${persona.id}-${voice}.wav`);
+  const out = path.join(OUT_DIR, studioFileName(persona.id, voice, suffix));
   fs.writeFileSync(out, buf);
   console.log('wrote', out, buf.length, 'bytes');
 }
@@ -205,14 +224,27 @@ async function main() {
   }
 
   if (arg === '--studio' || arg === '--all') {
+    console.log('studio base: 6 personas × 13 voices (~30 с)');
     for (const p of PERSONAS) {
       for (const voice of VOICES) {
-        await synthStudio(p, voice, synthesizeSpeech);
+        await synthStudio(p, voice, synthesizeSpeech, { factCount: 1 });
       }
     }
   }
 
-  if (!['--test', '--personas', '--studio', '--all'].includes(arg)) {
+  if (arg === '--studio-long' || arg === '--all') {
+    console.log('studio long samples:', STUDIO_LONG_SAMPLES.length);
+    for (const s of STUDIO_LONG_SAMPLES) {
+      const p = PERSONAS.find((x) => x.id === s.persona);
+      await synthStudio(p, s.voice, synthesizeSpeech, {
+        factCount: s.factCount,
+        suffix: s.suffix,
+        focus: s.focus ?? '',
+      });
+    }
+  }
+
+  if (!['--test', '--personas', '--studio', '--studio-long', '--all'].includes(arg)) {
     console.error('Unknown flag:', arg);
     process.exit(1);
   }

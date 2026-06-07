@@ -152,6 +152,23 @@ test('OneRepublic transliterated for continuous speech', () => {
   assert.match(marked, /Уан Респаблик/i);
 });
 
+test('B-side reads as сторону бэ after как', () => {
+  const out = prepareYandexTtsText(
+    'группа рассматривала этот трек как B- для сингла We Are The Champions.',
+    { artist: 'Queen', title: 'We Will Rock You' },
+  );
+  assert.match(out, /как сторону бэ/i);
+  assert.doesNotMatch(out, /\bB-\b/i);
+});
+
+test('National Film Registry stressed on first syllable', () => {
+  const out = prepareYandexTtsText(
+    'клип в National Film Registry США.',
+    { artist: 'Michael Jackson', title: 'Thriller' },
+  );
+  assert.match(out, /р\+еджистри/i);
+});
+
 test('stress marks хаоса correctly', () => {
   const out = prepareYandexTtsText('родился из хаоса импровизации.', { artist: 'MJ', title: 'Test' });
   assert.match(out, /х\+аоса/i);

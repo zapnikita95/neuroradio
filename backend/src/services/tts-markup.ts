@@ -100,7 +100,7 @@ function collapseMarkupWhitespace(text: string): string {
 
 /**
  * Prepare story script for Yandex SpeechKit TTS:
- * sanitize → polish → stress → pauses → keep Latin for SSML <lang en-US> (no transliteration).
+ * sanitize → polish → stress → pauses → Cyrillic transliteration (no <lang> pauses).
  */
 export function prepareYandexTtsText(
   script: string,

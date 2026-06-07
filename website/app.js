@@ -218,8 +218,26 @@ acc +
     if (eq) eq.classList.add('paused');
   }
 
-  function demoStudioSrc(personaId, voiceId) {
+  function demoStudioSrc(personaId, voiceId, lenN) {
+    if (lenN === 4) return 'assets/demos/studio-' + personaId + '-' + voiceId + '-len4.wav';
+    if (lenN === 2) return 'assets/demos/studio-' + personaId + '-' + voiceId + '-len2.wav';
     return 'assets/demos/studio-' + personaId + '-' + voiceId + '.wav';
+  }
+
+  function playStudioDemo(srcList, rate, btn) {
+    var idx = 0;
+    function tryNext() {
+      if (idx >= srcList.length) {
+        if (btn) btn.classList.remove('playing');
+        return;
+      }
+      playDemo(srcList[idx], rate, btn, null);
+      demoAudio.onerror = function () {
+        idx += 1;
+        tryNext();
+      };
+    }
+    tryNext();
   }
 
   function playDemo(src, rate, btn, statusEl) {
@@ -395,12 +413,13 @@ acc +
     playBtn.addEventListener('click', function () {
       if (eq) eq.classList.remove('paused');
       var p = state.persona;
-      var src = demoStudioSrc(p.id, voiceSel.value);
-      var fallback = p.audio;
-      playDemo(src, TEMPOS[+tempo.value].r, playBtn, null);
-      demoAudio.onerror = function () {
-        playDemo(fallback, TEMPOS[+tempo.value].r, playBtn, null);
-      };
+      var lenN = LENS[+length.value].n;
+      var voice = voiceSel.value;
+      var primary = demoStudioSrc(p.id, voice, lenN);
+      var fallbacks = [primary];
+      if (lenN === 4) fallbacks.push(demoStudioSrc(p.id, voice, 2));
+      fallbacks.push(demoStudioSrc(p.id, voice, 1), p.audio);
+      playStudioDemo(fallbacks, TEMPOS[+tempo.value].r, playBtn);
     });
 
     render();
