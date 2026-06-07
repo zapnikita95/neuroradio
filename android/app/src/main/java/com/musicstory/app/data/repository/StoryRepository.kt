@@ -24,6 +24,7 @@ import com.musicstory.app.domain.LlmProvider
 import com.musicstory.app.domain.OpenRouterModel
 import com.musicstory.app.domain.TierAccess
 import com.musicstory.app.domain.ReferenceFactPicker
+import com.musicstory.app.domain.SileroVoicePreset
 import com.musicstory.app.domain.StoryLength
 import com.musicstory.app.domain.StoryNarrator
 import com.musicstory.app.domain.StoryPersona
@@ -299,6 +300,7 @@ class StoryRepository(
         val ttsVoice = settingsDataStore.ttsVoice.first()
         val ttsSpeed = settingsDataStore.ttsSpeed.first()
         val ttsEmotion = settingsDataStore.ttsEmotion.first()
+        val sileroVoicePreset = settingsDataStore.sileroVoicePreset.first()
         val userTtsBilling = settingsDataStore.userTtsBilling.first()
         val yandexTtsKey = ApiKeySanitizer.clean(settingsDataStore.yandexApiKey.first())
         val yandexFolderId = settingsDataStore.yandexFolderId.first().trim()
@@ -426,6 +428,7 @@ class StoryRepository(
                 ttsVoice = ttsVoice,
                 ttsSpeed = ttsSpeed,
                 ttsEmotion = ttsEmotion,
+                sileroVoicePreset = sileroVoicePreset,
                 skipServerTts = ttsPlaybackEngine.skipsServerTts,
                 llmProvider = llmProvider,
                 geminiModel = geminiModel,
@@ -498,6 +501,7 @@ class StoryRepository(
         ttsVoice: TtsVoice,
         ttsSpeed: TtsSpeed,
         ttsEmotion: TtsEmotion,
+        sileroVoicePreset: SileroVoicePreset = SileroVoicePreset.CALM_FEMALE,
         skipServerTts: Boolean = false,
         llmProvider: LlmProvider,
         geminiModel: GeminiModel,
@@ -563,6 +567,8 @@ class StoryRepository(
                         yandexApiKey = yandexTtsApiKey.takeIf { userTtsBilling == UserTtsBilling.YANDEX && it.isNotBlank() },
                         yandexFolderId = yandexFolderId.takeIf { userTtsBilling == UserTtsBilling.YANDEX && it.isNotBlank() },
                         saluteAuthKey = saluteAuthKey.takeIf { userTtsBilling == UserTtsBilling.SBER && it.isNotBlank() },
+                        sileroVoicePreset = sileroVoicePreset.id.takeIf { userTtsBilling == UserTtsBilling.SERVER },
+                        sileroVoice = sileroVoicePreset.voiceId.takeIf { userTtsBilling == UserTtsBilling.SERVER },
                     ),
                 )
             }

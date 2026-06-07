@@ -142,6 +142,8 @@ interface StoryFullBody {
   user_tts_provider?: 'yandex' | 'sber';
   /** Client-side Android TTS — skip Yandex/Salute synthesis to save cost during testing. */
   skip_server_tts?: boolean;
+  silero_voice?: string;
+  silero_voice_preset?: import('../services/silero-voices.js').SileroVoicePresetId;
 }
 
 router.get('/quota', (req: Request, res: Response) => {
@@ -1204,6 +1206,8 @@ router.post('/full', validateStoryFullBody, storyFullRateLimit, async (req: Requ
         storyNarrator,
         artist: metadata.artist,
         title: metadata.title,
+        sileroVoice: (req.body as StoryFullBody).silero_voice,
+        sileroVoicePreset: (req.body as StoryFullBody).silero_voice_preset,
         logContext: {
           installId,
           artist: metadata.artist,

@@ -142,7 +142,49 @@ APK → JWT → POST /v1/story/full only
 
 ```
 Телефон (РФ) → Railway (EU/US) → Groq API ✅
-                              → Yandex TTS ✅
+                              → Yandex TTS ✅ (premium)
+                              → Silero TTS ✅ (free tier)
 ```
+
+## Silero TTS (бесплатный тариф)
+
+На free tier BFF озвучивает через **Silero v5_ru** (если настроен), иначе — Yandex.
+
+### 1. Отдельный сервис Silero на Railway
+
+1. **New Project** → **Deploy from GitHub** → тот же репозиторий
+2. **Root Directory:** пустой
+3. В Settings → Build: Dockerfile path → **`Dockerfile.silero`** (или `silero-railway.toml`)
+4. **Generate Domain** → скопируй URL, напр. `https://music-story-silero.up.railway.app`
+5. Проверка: `curl https://ТВОЙ-SILERO.up.railway.app/voices` → `aidar`, `baya`, …
+
+### 2. Variables на основном BFF (music-story)
+
+| Variable | Значение |
+|----------|----------|
+| `SILERO_TTS_ENABLED` | `true` |
+| `TTS_PREFER_SILERO` | `true` |
+| `SILERO_TTS_API` | `legacy` |
+| `SILERO_TTS_VOICE` | `baya` (дефолт, если клиент не передал голос) |
+| `SILERO_TTS_URL` | `https://ТВОЙ-SILERO.up.railway.app` **без** слэша в конце |
+
+Локально (Docker): `SILERO_TTS_URL=http://127.0.0.1:8001` — см. `start-silero-tts.bat`.
+
+### 3. Проверка
+
+```powershell
+cd backend
+.\scripts\test-silero-tts.ps1
+```
+
+```bash
+curl -s https://ТВОЙ-BFF.up.railway.app/health
+# sileroTts: true
+
+curl -s https://ТВОЙ-BFF.up.railway.app/v1/public/tts-config
+# silero.healthy: true, presets: [...]
+```
+
+В приложении (бесплатный тариф): **Настройки → Озвучка → Silero на сервере** или **Android TTS**, затем выбор амплуа (baya / aidar / kseniya / eugene).
 
 Прямой вызов `api.groq.com` с телефона/ПК из РФ → 403 (геоблок).

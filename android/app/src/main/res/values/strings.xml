@@ -173,7 +173,8 @@
     <string name="settings_gemini_get_key">Получить Gemini-ключ</string>
     <string name="settings_tts_voice">Голос</string>
     <string name="settings_tts_playback_engine">Озвучка</string>
-    <string name="settings_tts_playback_engine_hint">Системный голос телефона — экспериментальный режим. Для стабильной озвучки используйте Yandex SpeechKit (сервер).</string>
+    <string name="settings_tts_playback_engine_hint">На бесплатном тарифе: Silero на сервере или голос Android на телефоне. Premium — Yandex SpeechKit.</string>
+    <string name="settings_silero_voice">Голос Silero (амплуа)</string>
     <string name="settings_story_length">Длина истории</string>
     <string name="settings_tts_speed">Скорость речи</string>
     <string name="settings_tts_emotion">Интонация</string>

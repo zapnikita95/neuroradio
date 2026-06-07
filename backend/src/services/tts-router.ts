@@ -19,6 +19,7 @@ import {
   canUseSileroTts,
   synthesizeSpeechSilero,
 } from './silero-tts.js';
+import type { SileroVoiceId, SileroVoicePresetId } from './silero-voices.js';
 import type { TtsEmotion } from './tts-options.js';
 import type { TtsPauseProfile, TtsVoiceStyleId } from './tts-voice-profiles.js';
 import {
@@ -54,6 +55,8 @@ export interface TtsRouteRequest {
   title?: string;
   logContext?: YandexTtsLogContext;
   userTtsCredentials?: UserTtsCredentials | null;
+  sileroVoice?: string;
+  sileroVoicePreset?: SileroVoicePresetId;
 }
 
 export interface TtsRouteResult extends SynthesisResult {
@@ -176,6 +179,8 @@ export async function synthesizeStoryAudio(request: TtsRouteRequest): Promise<Tt
     result = await synthesizeSpeechSilero(request.script, request.fileName, {
       artist: request.artist,
       title: request.title,
+      voicePreset: request.sileroVoicePreset,
+      voice: request.sileroVoice as SileroVoiceId | undefined,
     });
   } else {
     result = await synthesizeYandex(request.script, request.voiceId, request.fileName, {

@@ -9,8 +9,43 @@ import {
 } from '../services/yookassa.js';
 import { grantPremiumByEmail } from '../services/account-store.js';
 import { isEmailConfigured, sendPaymentLinkEmail, sendSubscribeEmail } from '../services/email-sender.js';
+import {
+  canUseSileroTts,
+  getSileroTtsBaseUrl,
+  probeSileroTtsHealth,
+} from '../services/silero-tts.js';
+import { SILERO_VOICE_PRESETS } from '../services/silero-voices.js';
+import { hasYandexCredentials } from '../services/yandex-tts.js';
 
 const router = Router();
+
+/** TTS options for free tier (Silero vs Android device TTS). */
+router.get('/tts-config', async (_req: Request, res: Response) => {
+  const sileroConfigured = canUseSileroTts();
+  const sileroUrl = getSileroTtsBaseUrl();
+  let sileroHealthy = false;
+  if (sileroConfigured && sileroUrl) {
+    sileroHealthy = await probeSileroTtsHealth(sileroUrl);
+  }
+  res.json({
+    freeTier: {
+      serverEngine: sileroConfigured && sileroHealthy ? 'silero' : hasYandexCredentials() ? 'yandex' : null,
+      deviceEngine: 'android',
+    },
+    silero: {
+      enabled: sileroConfigured,
+      healthy: sileroHealthy,
+      urlConfigured: Boolean(sileroUrl),
+      presets: SILERO_VOICE_PRESETS.map((p) => ({
+        id: p.id,
+        voice: p.voice,
+        labelRu: p.labelRu,
+        moodRu: p.moodRu,
+      })),
+    },
+    yandex: { configured: hasYandexCredentials() },
+  });
+});
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 

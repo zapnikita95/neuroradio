@@ -1,0 +1,3 @@
+# Silero TTS sidecar for Railway (navatusein/silero-tts-service).
+FROM navatusein/silero-tts-service:latest
+EXPOSE 9898

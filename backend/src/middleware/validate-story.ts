@@ -9,6 +9,7 @@ import { resolveLlmProvider } from '../services/llm-provider.js';
 import { resolveGeminiModel } from '../services/gemini-models.js';
 import { resolveTtsVoiceStyle, type TtsVoiceStyleId } from '../services/tts-voice-profiles.js';
 import type { TtsProviderId, VoiceTier } from '../services/tts-router.js';
+import type { SileroVoicePresetId } from '../services/silero-voices.js';
 
 interface StoryFullBody {
   artist?: unknown;
@@ -38,9 +39,19 @@ interface StoryFullBody {
   salute_client_secret?: unknown;
   user_tts_provider?: unknown;
   skip_server_tts?: unknown;
+  silero_voice?: unknown;
+  silero_voice_preset?: unknown;
 }
 
 const VALID_VOICE_TIERS = new Set<string>(['default', 'premium']);
+const VALID_SILERO_VOICE_PRESETS = new Set<string>(['calm_female', 'calm_male', 'lively_female', 'lively_male']);
+
+function resolveSileroVoicePresetId(value: unknown): SileroVoicePresetId | undefined {
+  if (typeof value !== 'string') return undefined;
+  const trimmed = value.trim();
+  if (!VALID_SILERO_VOICE_PRESETS.has(trimmed)) return undefined;
+  return trimmed as SileroVoicePresetId;
+}
 const VALID_TTS_PROVIDERS = new Set<string>(['auto', 'yandex', 'sber', 'azure', 'elevenlabs', 'silero']);
 
 function resolveVoiceTier(value: unknown): VoiceTier {
@@ -156,6 +167,9 @@ export function validateStoryFullBody(req: Request, res: Response, next: NextFun
       ? body.user_tts_provider
       : undefined;
   const skipServerTts = body.skip_server_tts === true;
+  const sileroVoicePreset = resolveSileroVoicePresetId(body.silero_voice_preset);
+  const sileroVoiceRaw = asTrimmedString(body.silero_voice, 32);
+  const sileroVoice = sileroVoiceRaw?.toLowerCase();
 
   req.body = {
     artist,
@@ -185,6 +199,8 @@ export function validateStoryFullBody(req: Request, res: Response, next: NextFun
     salute_client_secret: saluteClientSecret,
     user_tts_provider: userTtsProvider,
     skip_server_tts: skipServerTts,
+    silero_voice: sileroVoice,
+    silero_voice_preset: sileroVoicePreset,
   };
   next();
 }

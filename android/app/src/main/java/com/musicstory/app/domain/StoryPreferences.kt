@@ -58,17 +58,17 @@ enum class TtsSpeed(val id: String, val labelRu: String, val yandexSpeed: Float,
     }
 }
 
-/** Тестовый переключатель: Yandex на Railway (prod) vs системный TTS на телефоне. */
+/** Тестовый переключатель: Silero/Yandex на Railway vs системный TTS на телефоне. */
 enum class TtsPlaybackEngine(val id: String, val labelRu: String, val descriptionRu: String) {
     YANDEX_SERVER(
         id = "yandex",
-        labelRu = "Yandex SpeechKit (сервер)",
-        descriptionRu = "Озвучка на сервере приложения — основной режим",
+        labelRu = "Silero на сервере",
+        descriptionRu = "Бесплатная озвучка Silero на сервере приложения",
     ),
     ANDROID_DEVICE(
         id = "android",
-        labelRu = "Android TTS (тест)",
-        descriptionRu = "Системный голос телефона — экспериментальный режим",
+        labelRu = "Android TTS",
+        descriptionRu = "Системный голос телефона — без серверной озвучки",
     ),
     ;
 
@@ -77,6 +77,20 @@ enum class TtsPlaybackEngine(val id: String, val labelRu: String, val descriptio
     companion object {
         fun fromId(id: String?): TtsPlaybackEngine =
             entries.firstOrNull { it.id == id } ?: YANDEX_SERVER
+    }
+}
+
+/** Silero v5_ru voices on server (free tier). */
+enum class SileroVoicePreset(val id: String, val voiceId: String, val labelRu: String, val descriptionRu: String) {
+    CALM_FEMALE("calm_female", "baya", "baya — спокойный женский", "Размеренный, нейтральный тон"),
+    CALM_MALE("calm_male", "aidar", "aidar — спокойный мужской", "Ровный дикторский голос"),
+    LIVELY_FEMALE("lively_female", "kseniya", "kseniya — живой женский", "Энергичнее, ближе к «радио»"),
+    LIVELY_MALE("lively_male", "eugene", "eugene — бодрый мужской", "Бодрая подача для эфира"),
+    ;
+
+    companion object {
+        fun fromId(id: String?): SileroVoicePreset =
+            entries.firstOrNull { it.id == id } ?: CALM_FEMALE
     }
 }
 

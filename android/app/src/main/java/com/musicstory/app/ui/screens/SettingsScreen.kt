@@ -80,6 +80,7 @@ import com.musicstory.app.domain.LlmProvider
 import com.musicstory.app.domain.OpenRouterModel
 import com.musicstory.app.domain.StoryLength
 import com.musicstory.app.domain.StoryNarrator
+import com.musicstory.app.domain.SileroVoicePreset
 import com.musicstory.app.domain.TtsEmotion
 import com.musicstory.app.domain.TtsPlaybackEngine
 import com.musicstory.app.domain.UserTtsBilling
@@ -158,6 +159,7 @@ fun SettingsScreen(
     val ttsSpeed by settings.ttsSpeed.collectAsState(initial = TtsSpeed.NORMAL)
     val ttsEmotion by settings.ttsEmotion.collectAsState(initial = TtsEmotion.LIVELY)
     val ttsPlaybackEngine by settings.ttsPlaybackEngine.collectAsState(initial = TtsPlaybackEngine.YANDEX_SERVER)
+    val sileroVoicePreset by settings.sileroVoicePreset.collectAsState(initial = SileroVoicePreset.CALM_FEMALE)
     val userTtsBilling by settings.userTtsBilling.collectAsState(initial = UserTtsBilling.SERVER)
     val yandexApiKey by settings.yandexApiKey.collectAsState(initial = "")
     val yandexFolderId by settings.yandexFolderId.collectAsState(initial = "")
@@ -376,6 +378,12 @@ fun SettingsScreen(
     val canCustomizeListen = TierAccess.canCustomizeListenThresholdSeconds(effectiveTier)
     val isPaidServerTier = TierAccess.isPremiumLike(effectiveTier) && !hasPersonalKey
     val isFreeServerTier = TierAccess.isFreeServerTier(effectiveTier) && !hasPersonalKey
+    val showSileroVoices = ttsPlaybackEngine == TtsPlaybackEngine.YANDEX_SERVER &&
+        userTtsBilling == UserTtsBilling.SERVER &&
+        isFreeServerTier
+    val showYandexVoices = ttsPlaybackEngine == TtsPlaybackEngine.YANDEX_SERVER &&
+        !showSileroVoices &&
+        (userTtsBilling == UserTtsBilling.YANDEX || isPaidServerTier)
 
     LaunchedEffect(canManualMode, manualMode) {
         if (!canManualMode && manualMode) settings.setManualMode(false)
@@ -672,7 +680,12 @@ fun SettingsScreen(
                         TtsPlaybackEngine.ANDROID_DEVICE ->
                             "${ttsPlaybackEngine.labelRu} · ${ttsSpeed.labelRu} · ${storyLength.labelRu}"
                         TtsPlaybackEngine.YANDEX_SERVER ->
-                            "${ttsVoice.labelRu} · ${ttsSpeed.labelRu} · ${storyLength.labelRu}"
+                            when {
+                                showSileroVoices ->
+                                    "${sileroVoicePreset.labelRu} · ${ttsSpeed.labelRu} · ${storyLength.labelRu}"
+                                else ->
+                                    "${ttsVoice.labelRu} · ${ttsSpeed.labelRu} · ${storyLength.labelRu}"
+                            }
                     },
                     tourHighlight = tourStep == 4,
                     forceExpanded = tourStep == 4,
@@ -699,7 +712,23 @@ fun SettingsScreen(
                         )
                     }
                     Spacer(modifier = Modifier.height(8.dp))
-                    if (ttsPlaybackEngine == TtsPlaybackEngine.YANDEX_SERVER) {
+                    if (showSileroVoices) {
+                        Text(
+                            text = context.getString(R.string.settings_silero_voice),
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MutedLavender,
+                        )
+                        SileroVoicePreset.entries.forEach { preset ->
+                            NarratorRadioRow(
+                                label = preset.labelRu,
+                                description = preset.descriptionRu,
+                                selected = sileroVoicePreset == preset,
+                                onSelect = { scope.launch { settings.setSileroVoicePreset(preset) } },
+                            )
+                        }
+                        Spacer(modifier = Modifier.height(8.dp))
+                    }
+                    if (showYandexVoices) {
                     Text(
                         text = context.getString(R.string.settings_tts_voice),
                         style = MaterialTheme.typography.labelMedium,

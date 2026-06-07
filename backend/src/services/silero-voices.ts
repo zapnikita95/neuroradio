@@ -47,6 +47,23 @@ export function resolveSileroVoicePreset(id: string | undefined): SileroVoicePre
   return SILERO_VOICE_PRESETS.find((p) => p.id === id) ?? SILERO_VOICE_PRESETS[0]!;
 }
 
+export function resolveSileroVoiceFromRequest(options: {
+  sileroVoice?: string;
+  sileroVoicePreset?: string;
+}): SileroVoiceId {
+  const rawVoice = options.sileroVoice?.trim().toLowerCase();
+  const allowed: SileroVoiceId[] = ['aidar', 'baya', 'kseniya', 'xenia', 'eugene'];
+  if (rawVoice === 'xenia') return 'kseniya';
+  if (rawVoice && allowed.includes(rawVoice as SileroVoiceId)) {
+    return rawVoice as SileroVoiceId;
+  }
+  const preset = options.sileroVoicePreset?.trim();
+  if (preset) {
+    return resolveSileroVoicePreset(preset).voice;
+  }
+  return resolveSileroVoiceFromEnv();
+}
+
 export function resolveSileroVoiceFromEnv(): SileroVoiceId {
   const raw = process.env.SILERO_TTS_VOICE?.trim().toLowerCase();
   const allowed: SileroVoiceId[] = ['aidar', 'baya', 'kseniya', 'xenia', 'eugene'];

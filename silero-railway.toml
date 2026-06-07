@@ -1,0 +1,11 @@
+# Отдельный Railway-сервис для Silero TTS (Docker).
+# New Project → Deploy from GitHub → Root Directory пустой → указать этот файл как railway.toml
+# или скопировать в новый сервис вручную.
+
+[build]
+builder = "DOCKERFILE"
+dockerfilePath = "Dockerfile.silero"
+
+[deploy]
+restartPolicyType = "ON_FAILURE"
+restartPolicyMaxRetries = 10

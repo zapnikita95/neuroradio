@@ -28,7 +28,7 @@ const PHRASE_PRONUNCIATION_RU: Record<string, string> = {
   'to the moon and back': 'Ту зе Мун энд Бэк',
   'to the moon & back': 'Ту зе Мун энд Бэк',
   'ed sheeran': 'Эд Ширан',
-  thriller: 'Триллер',
+  thriller: 'Тр+иллер',
   'national film registry': 'Нэшнл Фильм Р+еджистри',
   'vincent price': 'Винсент Прайс',
   mtv: 'MTV',
@@ -497,6 +497,9 @@ export function preserveMusicProperNames(script: string, artist: string, title: 
     }
   }
 
-  void title;
+  if (title.trim() && /thriller/i.test(title.trim())) {
+    result = result.replace(/\bТриллер\b/g, 'Thriller');
+  }
+
   return result;
 }
