@@ -9,6 +9,7 @@ import authRouter from './routes/auth.js';
 import syncRouter from './routes/sync.js';
 import billingRouter from './routes/billing.js';
 import accountAuthRouter from './routes/account-auth.js';
+import publicRouter from './routes/public.js';
 import { isAppAuthEnabled } from './services/jwt.js';
 import { AUDIO_DIR } from './services/yandex-tts.js';
 import { hasGroqApiKey } from './services/groq.js';
@@ -33,6 +34,7 @@ import { initPostgres, hasPostgres, closePostgres } from './services/db.js';
 import { hydrateAccountStoreFromPostgres, migrateAccountStoryDataToPostgres } from './services/account-store.js';
 import { hydrateDevTierStoreFromPostgres } from './services/dev-tier-store.js';
 import { buildTelegramWidgetPageHtml, telegramBotUsername } from './routes/telegram-widget-page.js';
+import { resolveWebsiteDir, serveWebsite } from './serve-website.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PORT = parseInt(process.env.PORT ?? '3000', 10);
@@ -46,6 +48,15 @@ const app = express();
 
 app.disable('x-powered-by');
 app.set('trust proxy', 1);
+
+// Маркетинговый сайт (efir-ai.ru) раздаётся статикой ДО securityHeaders,
+// чтобы на страницы не попал X-Robots-Tag: noindex (важно для SEO/AEO).
+// API (/v1, /audio, /health) при этом сохраняет строгие заголовки ниже.
+const WEBSITE_DIR = resolveWebsiteDir(__dirname);
+if (WEBSITE_DIR) {
+  app.use(serveWebsite(WEBSITE_DIR));
+  console.log(`[boot] serving website from ${WEBSITE_DIR}`);
+}
 
 app.use(securityHeaders);
 app.use(requestLogger);
@@ -150,6 +161,7 @@ app.use('/v1/auth', authRouter);
 app.use('/v1/sync', syncRouter);
 app.use('/v1/billing', billingRouter);
 app.use('/v1/account', accountAuthRouter);
+app.use('/v1/public', publicRouter);
 app.use('/v1/llm', llmProbeRouter);
 app.use('/v1/story', storyRouter);
 
@@ -162,7 +174,11 @@ function sendTelegramWidgetPage(res: express.Response): void {
   }
   res.type('html').send(buildTelegramWidgetPageHtml(bot));
 }
-app.get('/', (_req, res) => sendTelegramWidgetPage(res));
+// Если сайт не найден, '/' отдаёт виджет Telegram-логина (как раньше).
+// Виджет всегда доступен по /telegram-login (BotFather /setdomain — по домену).
+if (!WEBSITE_DIR) {
+  app.get('/', (_req, res) => sendTelegramWidgetPage(res));
+}
 app.get('/telegram-login', (_req, res) => sendTelegramWidgetPage(res));
 
 app.use((_req, res) => {

@@ -1,0 +1,761 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Эфир AI — нейросетевой радиоведущий о музыке для Android и браузера</title>
+  <meta name="description" content="Эфир AI — нейросетевой радиоведущий для Android и браузера. Пока играет трек, сервис находит интересный факт о песне или артисте, накладывает выбранное амплуа и рассказывает историю живым голосом между песнями. Истории генерируются в реальном времени — без заготовок." />
+  <meta name="keywords" content="Эфир AI, нейро-радио, радиоведущий нейросеть, факты о музыке, AI радио, музыкальный ассистент, Android приложение музыка, расширение браузера музыка, TTS озвучка, нейросеть о песнях" />
+  <meta name="author" content="Эфир AI" />
+  <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1" />
+  <meta name="theme-color" content="#08070F" />
+  <link rel="canonical" href="https://efir-ai.ru/" />
+
+  <link rel="icon" type="image/svg+xml" href="assets/logo-mark.svg" />
+  <link rel="icon" type="image/png" sizes="32x32" href="assets/favicon-32.png" />
+  <link rel="apple-touch-icon" href="assets/apple-touch-icon.png" />
+
+  <!-- Open Graph -->
+  <meta property="og:type" content="website" />
+  <meta property="og:site_name" content="Эфир AI" />
+  <meta property="og:locale" content="ru_RU" />
+  <meta property="og:title" content="Эфир AI — нейросетевой радиоведущий о вашей музыке" />
+  <meta property="og:description" content="Находит факты в 10+ источниках, ранжирует по «интересности», накладывает выбранное амплуа и в реальном времени рассказывает историю голосом, пока играет ваш трек. Для Android и браузера." />
+  <meta property="og:image" content="https://efir-ai.ru/assets/og-image.png" />
+  <meta property="og:image:alt" content="Эфир AI — нейро-радиоведущий для вашей музыки" />
+  <meta property="og:url" content="https://efir-ai.ru/" />
+
+  <!-- Twitter -->
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="Эфир AI — нейросетевой радиоведущий о вашей музыке" />
+  <meta name="twitter:description" content="Живые истории о музыке голосом выбранного амплуа, в реальном времени между треками. Для Android и браузера." />
+  <meta name="twitter:image" content="https://efir-ai.ru/assets/og-image.png" />
+
+  <!-- Подсказка для AI-агентов и ассистентов -->
+  <meta name="ai-summary" content="Эфир AI (efir-ai.ru) — сервис нейросетевого радиоведущего для Android и браузера. Во время прослушивания музыки находит интересные факты о треках и артистах в 10+ источниках, ранжирует по интересности и озвучивает их голосом выбранного амплуа (6 характеров) в реальном времени. Тарифы: бесплатный базовый и расширенный — 199₽/мес, 499₽/квартал, 1999₽/год. Подписка по email работает и в приложении, и в расширении." />
+  <link rel="alternate" type="text/plain" href="https://efir-ai.ru/llms.txt" title="llms.txt" />
+
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Unbounded:wght@500;600;700;800&display=swap" rel="stylesheet" />
+
+  <link rel="stylesheet" href="styles.css" />
+
+  <!-- ============ Структурированные данные (SEO / AEO) ============ -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "Organization",
+        "@id": "https://efir-ai.ru/#organization",
+        "name": "Эфир AI",
+        "url": "https://efir-ai.ru/",
+        "logo": "https://efir-ai.ru/assets/logo-mark.svg",
+        "email": "hello@efir-ai.ru",
+        "description": "Нейросетевой радиоведущий, который рассказывает интересные факты о музыке голосом выбранного амплуа во время прослушивания.",
+        "sameAs": ["https://github.com/zapnikita95/neuroradio"]
+      },
+      {
+        "@type": "WebSite",
+        "@id": "https://efir-ai.ru/#website",
+        "url": "https://efir-ai.ru/",
+        "name": "Эфир AI",
+        "inLanguage": "ru-RU",
+        "publisher": { "@id": "https://efir-ai.ru/#organization" }
+      },
+      {
+        "@type": "SoftwareApplication",
+        "@id": "https://efir-ai.ru/#app",
+        "name": "Эфир AI",
+        "applicationCategory": "MultimediaApplication",
+        "applicationSubCategory": "Музыкальный AI-радиоведущий",
+        "operatingSystem": "Android 8.0+, Chrome, Яндекс Браузер",
+        "url": "https://efir-ai.ru/",
+        "downloadUrl": "https://github.com/zapnikita95/neuroradio/releases/latest",
+        "inLanguage": "ru-RU",
+        "description": "Сервис для Android и браузера: находит интересные факты о текущем треке в 10+ источниках, ранжирует по интересности, накладывает выбранное амплуа ведущего и озвучивает историю живым голосом в реальном времени между песнями. Заготовок нет — каждый эфир уникален.",
+        "featureList": [
+          "6 амплуа ведущих с разными характерами",
+          "Поиск фактов в 10+ источниках",
+          "Генерация и озвучка в реальном времени",
+          "Настройка голоса, темпа, длины и частоты историй",
+          "Единая подписка по email для приложения и расширения",
+          "Синхронизация настроек между устройствами"
+        ],
+        "publisher": { "@id": "https://efir-ai.ru/#organization" },
+        "offers": [
+          { "@type": "Offer", "name": "Базовый", "price": "0", "priceCurrency": "RUB", "description": "Бесплатно: до 10 историй в день, все 6 амплуа, озвучка Yandex SpeechKit." },
+          { "@type": "Offer", "name": "Расширенный · месяц", "price": "199", "priceCurrency": "RUB", "description": "Помесячная оплата расширенного доступа." },
+          { "@type": "Offer", "name": "Расширенный · квартал", "price": "499", "priceCurrency": "RUB", "description": "Оплата за 3 месяца со скидкой." },
+          { "@type": "Offer", "name": "Расширенный · год", "price": "1999", "priceCurrency": "RUB", "description": "Самый выгодный вариант, около 167 ₽ в месяц." }
+        ]
+      },
+      {
+        "@type": "HowTo",
+        "@id": "https://efir-ai.ru/#howto",
+        "name": "Как Эфир AI готовит историю о треке",
+        "description": "Путь от играющего трека до озвученной истории за несколько секунд.",
+        "step": [
+          { "@type": "HowToStep", "position": 1, "name": "Слышим трек", "text": "Приложение или расширение определяет, что играет прямо сейчас — артиста и название." },
+          { "@type": "HowToStep", "position": 2, "name": "Ищем в 10+ источниках", "text": "Wikipedia, MusicBrainz, Wikidata и другие базы — собираем десятки фактов о треке и артисте." },
+          { "@type": "HowToStep", "position": 3, "name": "Ранжируем по интересности", "text": "Выше поднимаются конфликты, прорывы, курьёзы и рекорды, энциклопедический шум уходит вниз." },
+          { "@type": "HowToStep", "position": 4, "name": "Предобрабатываем", "text": "Проверяем факт на достоверность, убираем повторы и выдумки." },
+          { "@type": "HowToStep", "position": 5, "name": "Накладываем амплуа", "text": "Подаём факт голосом выбранного характера: свой ритм, лексика и точка зрения." },
+          { "@type": "HowToStep", "position": 6, "name": "Озвучиваем и ставим на паузу", "text": "Синтезируем речь, плавно приглушаем трек и рассказываем историю." }
+        ]
+      },
+      {
+        "@type": "FAQPage",
+        "@id": "https://efir-ai.ru/#faq",
+        "mainEntity": [
+          { "@type": "Question", "name": "Что такое Эфир AI?", "acceptedAnswer": { "@type": "Answer", "text": "Эфир AI — нейросетевой радиоведущий для Android и браузера. Пока играет музыка, сервис находит интересный факт о треке или артисте и озвучивает его живым голосом выбранного амплуа между песнями." } },
+          { "@type": "Question", "name": "Это записанные заранее истории?", "acceptedAnswer": { "@type": "Answer", "text": "Нет. Факт ищется, а история генерируется в реальном времени, пока играет трек. Даже для одной песни эфир каждый раз получается новым." } },
+          { "@type": "Question", "name": "На каких платформах работает Эфир AI?", "acceptedAnswer": { "@type": "Answer", "text": "На Android (приложение, APK для Android 8.0 и новее) и в браузере (расширение для Chrome и Яндекс Браузера). Подписка единая по email и синхронизируется между устройствами." } },
+          { "@type": "Question", "name": "С какими плеерами работает?", "acceptedAnswer": { "@type": "Answer", "text": "Spotify, Яндекс Музыка, YouTube Music, Apple Music и другие приложения и веб-плееры, которые отдают метаданные текущего трека." } },
+          { "@type": "Question", "name": "Эфир AI слушает мой микрофон?", "acceptedAnswer": { "@type": "Answer", "text": "Нет. Используются только метаданные текущего трека — артист и название. Запись звука с микрофона не ведётся." } },
+          { "@type": "Question", "name": "Сколько стоит подписка?", "acceptedAnswer": { "@type": "Answer", "text": "Базовый доступ бесплатный. Расширенная подписка: 199 ₽ в месяц, 499 ₽ за квартал или 1999 ₽ за год (выгоднее всего, около 167 ₽ в месяц)." } },
+          { "@type": "Question", "name": "Как работает подписка по email?", "acceptedAnswer": { "@type": "Answer", "text": "При оплате вы указываете email. По нему подписка распознаётся в приложении и расширении — войдите с тем же адресом, и расширенный доступ активируется автоматически." } },
+          { "@type": "Question", "name": "Можно отменить подписку?", "acceptedAnswer": { "@type": "Answer", "text": "Да, в любой момент. Доступ сохраняется до конца оплаченного периода." } }
+        ]
+      }
+    ]
+  }
+  </script>
+</head>
+<body>
+  <!-- aurora / grain backdrop -->
+  <div class="bg-aurora" aria-hidden="true">
+    <span class="orb orb-1"></span>
+    <span class="orb orb-2"></span>
+    <span class="orb orb-3"></span>
+  </div>
+  <div class="bg-grain" aria-hidden="true"></div>
+
+  <!-- ============ HEADER ============ -->
+  <header class="site-header" id="siteHeader">
+    <a class="brand" href="#top" aria-label="Эфир AI — на главную">
+      <img src="assets/logo-mark.svg" alt="" class="brand-mark" width="40" height="40" />
+      <span class="brand-name">Эфир<span class="brand-ai">AI</span></span>
+    </a>
+    <nav class="nav" aria-label="Основная навигация">
+      <a href="#service">Сервис</a>
+      <a href="#personas">Амплуа</a>
+      <a href="#how">Как это работает</a>
+      <a href="#studio">Студия</a>
+      <a href="#pricing">Тарифы</a>
+      <a href="#docs">Документы</a>
+    </nav>
+    <a href="#download" class="btn btn-primary btn-sm nav-cta">Скачать</a>
+    <button class="burger" id="burger" aria-label="Меню" aria-expanded="false">
+      <span></span><span></span><span></span>
+    </button>
+  </header>
+
+  <main id="top">
+    <!-- ============ HERO ============ -->
+    <section class="hero" id="hero">
+      <div class="hero-parallax" id="heroParallax" aria-hidden="true">
+        <span class="float-chip" data-depth="0.06" style="--x:8%; --y:24%">
+          <i class="dot"></i> в эфире
+        </span>
+        <span class="float-note" data-depth="0.12" style="--x:84%; --y:18%">♪</span>
+        <span class="float-note alt" data-depth="0.09" style="--x:74%; --y:64%">♫</span>
+        <span class="float-ring" data-depth="0.04" style="--x:16%; --y:70%"></span>
+        <span class="float-ring small" data-depth="0.16" style="--x:90%; --y:46%"></span>
+      </div>
+
+      <div class="hero-inner">
+        <div class="hero-copy reveal">
+          <span class="eyebrow"><i class="live-dot"></i> Нейро-эфир в реальном времени · Android и браузер</span>
+          <h1 class="hero-title">
+            Музыка, у которой
+            <span class="grad-text">появился голос</span>
+          </h1>
+          <p class="hero-lead">
+            Эфир AI — это нейросетевой радиоведущий, который слушает вашу музыку вместе
+            с вами. Пока играет трек, он находит самый интересный факт о песне, артисте
+            или эпохе, рассказывает его голосом выбранного амплуа и снова отдаёт эфир
+            музыке. Получается личная радиостанция, собранная вокруг вашего плейлиста —
+            на Android и в браузере.
+          </p>
+          <div class="hero-actions">
+            <a href="#download" id="heroApk" class="btn btn-primary btn-lg">
+              <span class="btn-ic">▼</span> Скачать APK для Android
+            </a>
+            <a href="#download" id="heroExt" class="btn btn-ghost btn-lg">
+              <span class="btn-ic">🧩</span> Расширение для браузера
+            </a>
+          </div>
+          <a href="#personas" class="hero-listen"><span class="play-glyph"></span> Послушать ведущих</a>
+          <div class="hero-stats">
+            <div><strong>10+</strong><span>источников фактов</span></div>
+            <div><strong>6</strong><span>амплуа ведущих</span></div>
+            <div><strong>~5 c</strong><span>до истории в эфире</span></div>
+          </div>
+        </div>
+
+        <div class="hero-visual reveal" data-depth="0.05">
+          <div class="now-playing" id="heroNowPlaying">
+            <div class="np-top">
+              <span class="np-onair"><i></i> ON AIR</span>
+              <span class="np-host">Заводной радиоведущий</span>
+            </div>
+            <div class="np-track">
+              <div class="np-cover" aria-hidden="true">
+                <span class="np-eq"><i></i><i></i><i></i><i></i><i></i></span>
+              </div>
+              <div class="np-meta">
+                <strong>Billie Jean</strong>
+                <span>Michael Jackson · 1983</span>
+              </div>
+            </div>
+            <p class="np-script" id="heroScript">«Billie Jean. Куинси Джонс хотел вырезать длинное вступление — Майкл уперся: под него хотелось танцевать. Спор он выиграл…»</p>
+            <div class="np-wave" id="heroWave" aria-hidden="true"></div>
+          </div>
+        </div>
+      </div>
+      <a href="#service" class="scroll-hint" aria-label="Листайте вниз"><span></span></a>
+    </section>
+
+    <!-- ============ SERVICE / ABOUT ============ -->
+    <section class="section" id="service">
+      <div class="section-head reveal">
+        <span class="kicker">О сервисе</span>
+        <h2 class="section-title">Знакомые треки <span class="grad-text">звучат заново</span></h2>
+        <p class="section-sub">
+          Когда музыка играет фоном, детали ускользают. Эфир AI возвращает трекам
+          контекст: между песнями звучит короткая живая вставка с настоящим фактом,
+          и даже заигранная композиция открывается с новой стороны.
+        </p>
+      </div>
+      <div class="feature-grid">
+        <article class="feature-card big reveal">
+          <div class="feature-ic">⚡</div>
+          <h3>Всё в реальном времени</h3>
+          <p>
+            Эфир ничего не достаёт из заготовок: факт ищется, ранжируется и превращается
+            в историю в тот самый момент, когда играет трек. Поэтому каждый выпуск
+            получается своим — даже для одной и той же песни.
+          </p>
+        </article>
+        <article class="feature-card reveal">
+          <div class="feature-ic">🎭</div>
+          <h3>Амплуа на выбор</h3>
+          <p>Шесть характеров ведущих — от заводного эфира до ночного подкаста.</p>
+        </article>
+        <article class="feature-card reveal">
+          <div class="feature-ic">🔎</div>
+          <h3>Только проверенные факты</h3>
+          <p>Источники ранжируются по «интересности», выдумки отсекаются фильтрами качества.</p>
+        </article>
+        <article class="feature-card reveal">
+          <div class="feature-ic">⏯️</div>
+          <h3>Бесшовно с музыкой</h3>
+          <p>Плавно ставим трек на паузу, рассказываем историю и возвращаем воспроизведение.</p>
+        </article>
+        <article class="feature-card reveal">
+          <div class="feature-ic">🎚️</div>
+          <h3>Тонкая настройка</h3>
+          <p>Голос, темп, длина истории и частота — всё под вас, ползунками.</p>
+        </article>
+      </div>
+    </section>
+
+    <!-- ============ DOWNLOAD ============ -->
+    <section class="section section-download" id="download">
+      <div class="section-head reveal">
+        <span class="kicker">Скачать</span>
+        <h2 class="section-title">Две платформы — <span class="grad-text">один эфир</span></h2>
+        <p class="section-sub">
+          Эфир AI работает на Android и в браузере. Подписка единая — войдите под одним email,
+          и настройки синхронизируются между устройствами.
+        </p>
+      </div>
+      <div class="download-grid">
+        <article class="dl-card reveal">
+          <div class="dl-ic" aria-hidden="true">🤖</div>
+          <h3>Приложение для Android</h3>
+          <p>Следит за текущим треком в любом плеере (Spotify, Яндекс Музыка, YouTube Music) и озвучивает истории между песнями.</p>
+          <ul class="dl-meta">
+            <li>APK · Android 8.0+</li>
+            <li id="apkVersion">версия с GitHub</li>
+          </ul>
+          <a href="https://github.com/zapnikita95/neuroradio/releases/latest/download/MusicStory.apk" id="dlApk" class="btn btn-primary btn-block btn-lg" rel="noopener">
+            <span class="btn-ic">▼</span> Скачать APK
+          </a>
+          <p class="dl-fine">После скачивания разрешите установку из этого источника в настройках телефона.</p>
+        </article>
+        <article class="dl-card reveal">
+          <div class="dl-ic" aria-hidden="true">🧩</div>
+          <h3>Расширение для браузера</h3>
+          <p>Для Chrome и Яндекс Браузера. Работает с веб-плеерами Яндекс Музыки, Spotify и YouTube прямо во вкладке.</p>
+          <ul class="dl-meta">
+            <li>Chrome / Яндекс · MV3</li>
+            <li id="extVersion">версия с GitHub</li>
+          </ul>
+          <a href="https://github.com/zapnikita95/neuroradio/releases/latest/download/efir-extension.zip" id="dlExt" class="btn btn-ghost btn-block btn-lg" rel="noopener">
+            <span class="btn-ic">▼</span> Установить расширение
+          </a>
+          <p class="dl-fine"><a href="docs/extension.html">Как установить расширение →</a></p>
+        </article>
+      </div>
+    </section>
+
+    <!-- ============ PERSONAS ============ -->
+    <section class="section section-personas" id="personas">
+      <div class="section-head reveal">
+        <span class="kicker">Амплуа</span>
+        <h2 class="section-title">Посмотрите ведущим <span class="grad-text">в глаза</span></h2>
+        <p class="section-sub">
+          Один и тот же факт звучит по-разному. Выберите характер — и послушайте,
+          как меняется подача. Листайте карточки вбок.
+        </p>
+      </div>
+
+      <div class="persona-rail-wrap">
+        <button class="rail-btn rail-prev" id="railPrev" aria-label="Назад">‹</button>
+        <div class="persona-rail" id="personaRail" tabindex="0" aria-label="Карточки амплуа, прокрутка по горизонтали">
+          <!-- cards injected by JS -->
+        </div>
+        <button class="rail-btn rail-next" id="railNext" aria-label="Вперёд">›</button>
+      </div>
+      <p class="rail-progress"><span id="railProgressBar"></span></p>
+    </section>
+
+    <!-- ============ HOW IT WORKS ============ -->
+    <section class="section" id="how">
+      <div class="section-head reveal">
+        <span class="kicker">Как это работает</span>
+        <h2 class="section-title">От трека до истории — <span class="grad-text">за секунды</span></h2>
+        <p class="section-sub">
+          Всю тяжёлую работу берёт на себя сервер, а вам остаётся только слушать.
+          Вот что происходит за те несколько секунд, пока играет песня.
+        </p>
+      </div>
+
+      <ol class="pipeline">
+        <li class="pipe-step reveal">
+          <span class="pipe-num">01</span>
+          <h3>Слышим трек</h3>
+          <p>Приложение видит, что играет прямо сейчас — артиста и название.</p>
+        </li>
+        <li class="pipe-step reveal">
+          <span class="pipe-num">02</span>
+          <h3>Ищем в 10+ источниках</h3>
+          <p>Wikipedia, MusicBrainz, Wikidata и другие базы — собираем десятки фактов о треке и артисте.</p>
+        </li>
+        <li class="pipe-step reveal">
+          <span class="pipe-num">03</span>
+          <h3>Ранжируем по «интересности»</h3>
+          <p>Выше поднимаются конфликты, прорывы, курьёзы и рекорды, а сухой энциклопедический шум уходит вниз.</p>
+        </li>
+        <li class="pipe-step reveal">
+          <span class="pipe-num">04</span>
+          <h3>Предобрабатываем</h3>
+          <p>Чистим, проверяем на достоверность, отсеиваем повторы и выдумки.</p>
+        </li>
+        <li class="pipe-step reveal">
+          <span class="pipe-num">05</span>
+          <h3>Накладываем амплуа</h3>
+          <p>Один факт — голосом выбранного характера: ритм, лексика, точка зрения.</p>
+        </li>
+        <li class="pipe-step reveal">
+          <span class="pipe-num">06</span>
+          <h3>Озвучиваем и ставим на паузу</h3>
+          <p>В реальном времени переводим в речь, плавно приглушаем трек и рассказываем историю.</p>
+        </li>
+      </ol>
+
+      <p class="how-note reveal">
+        <strong>Важно:</strong> мы не используем заранее записанные ролики. Факт собирается
+        и превращается в историю прямо во время прослушивания, поэтому эфир всегда живой
+        и не повторяется.
+      </p>
+    </section>
+
+    <!-- ============ STUDIO / INTERACTIVE DEMO ============ -->
+    <section class="section section-studio" id="studio">
+      <div class="section-head reveal">
+        <span class="kicker">Студия</span>
+        <h2 class="section-title">Покрутите ползунки — <span class="grad-text">эфир меняется</span></h2>
+        <p class="section-sub">
+          Это живой пример. Двигайте настройки — и смотрите, как прямо сейчас
+          меняется история про Майкла Джексона: тон, длина и формат.
+        </p>
+      </div>
+
+      <div class="studio">
+        <div class="studio-controls reveal">
+          <div class="ctrl">
+            <label>Амплуа</label>
+            <div class="chip-row" id="ampluaChips"></div>
+          </div>
+
+          <div class="ctrl">
+            <label for="voiceSelect">Голос</label>
+            <select id="voiceSelect" class="select"></select>
+          </div>
+
+          <div class="ctrl">
+            <div class="ctrl-head"><label for="tempo">Темп речи</label><output id="tempoOut">Нормально</output></div>
+            <input type="range" id="tempo" min="0" max="4" step="1" value="2" class="range" />
+          </div>
+
+          <div class="ctrl">
+            <div class="ctrl-head"><label for="length">Длина истории</label><output id="lengthOut">1 минута</output></div>
+            <input type="range" id="length" min="0" max="2" step="1" value="1" class="range" />
+          </div>
+
+          <div class="ctrl">
+            <div class="ctrl-head"><label for="freq">Формат: раз в N треков</label><output id="freqOut">каждые 3</output></div>
+            <input type="range" id="freq" min="1" max="10" step="1" value="3" class="range" />
+          </div>
+
+          <div class="ctrl">
+            <label>Фокус</label>
+            <div class="chip-row" id="focusChips">
+              <button class="chip on" data-focus="all">Все жанры</button>
+              <button class="chip" data-focus="pop">Поп</button>
+              <button class="chip" data-focus="rock">Рок</button>
+              <button class="chip" data-focus="hiphop">Хип-хоп</button>
+              <button class="chip" data-focus="electronic">Электроника</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="studio-preview reveal">
+          <div class="preview-card" id="previewCard">
+            <div class="np-top">
+              <span class="np-onair"><i></i> ON AIR</span>
+              <span class="np-host" id="previewHost">Заводной радиоведущий</span>
+            </div>
+            <div class="np-track">
+              <div class="np-cover lg" aria-hidden="true">
+                <span class="np-eq" id="previewEq"><i></i><i></i><i></i><i></i><i></i><i></i></span>
+              </div>
+              <div class="np-meta">
+                <strong>Billie Jean</strong>
+                <span>Michael Jackson · Thriller · 1983</span>
+              </div>
+            </div>
+            <p class="preview-script" id="previewScript"></p>
+            <div class="preview-foot">
+              <span class="tag" id="tagVoice">Голос: Захар</span>
+              <span class="tag" id="tagLen">~60 с</span>
+              <span class="tag" id="tagFreq">каждые 3 трека</span>
+              <button class="btn btn-primary btn-sm" id="previewPlay"><span class="play-glyph"></span> Озвучить</button>
+            </div>
+          </div>
+          <p class="studio-hint">Это демонстрация подачи. В приложении факт каждый раз новый и собирается в реальном времени.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ MODELS ============ -->
+    <section class="section" id="models">
+      <div class="section-head reveal">
+        <span class="kicker">Технологии и модели</span>
+        <h2 class="section-title">Что под капотом</h2>
+        <p class="section-sub">
+          Прозрачно о том, как устроен сервис: какие модели готовят текст и голос,
+          и откуда берутся факты.
+        </p>
+      </div>
+      <div class="model-grid">
+        <article class="model-card reveal">
+          <h3>🔎 Поиск фактов</h3>
+          <p>Wikipedia, MusicBrainz, Wikidata, DuckDuckGo и веб-сниппеты. Из десятков кандидатов выбирается один проверяемый факт-семя.</p>
+          <ul><li>10+ источников</li><li>оценка «интересности»</li><li>защита от выдумок</li></ul>
+        </article>
+        <article class="model-card reveal">
+          <h3>🧠 Генерация текста</h3>
+          <p>Большие языковые модели собирают короткий сценарий радиовставки в стиле выбранного амплуа.</p>
+          <ul><li>Gemma — стабильно на базовом</li><li>DeepSeek V3 — на расширенном</li><li>авто-переключение моделей</li></ul>
+        </article>
+        <article class="model-card reveal">
+          <h3>🗣️ Синтез речи</h3>
+          <p>Текст превращается в живую речь и отдаётся в приложение как готовое аудио.</p>
+          <ul><li>Yandex SpeechKit</li><li>SaluteSpeech (Сбер) — премиум-голос</li><li>13 голосов, регулировка темпа</li></ul>
+        </article>
+        <article class="model-card reveal">
+          <h3>🔒 Приватность</h3>
+          <p>Слушаем только метаданные трека (артист и название). Истории и настройки можно синхронизировать между устройствами.</p>
+          <ul><li>без записи звука с микрофона</li><li>аудио по подписанным ссылкам</li><li>данные — по вашему email</li></ul>
+        </article>
+      </div>
+    </section>
+
+    <!-- ============ PRICING ============ -->
+    <section class="section section-pricing" id="pricing">
+      <div class="section-head reveal">
+        <span class="kicker">Тарифы</span>
+        <h2 class="section-title">Честно и по-человечески</h2>
+        <p class="section-sub">
+          Сначала — что входит в базовый и расширенный доступ. Ниже — выберите
+          удобный период оплаты расширенной подписки.
+        </p>
+      </div>
+
+      <!-- base vs extended -->
+      <div class="tiers-compare">
+        <article class="tier-explain reveal">
+          <header><h3>Базовый</h3><span class="tier-price-min">бесплатно</span></header>
+          <p class="tier-lead">
+            Чтобы вы спокойно попробовали Эфир AI и поняли, нравится ли вам формат.
+            Ничего платить не нужно.
+          </p>
+          <ul class="tick-list">
+            <li>До 10 историй в день</li>
+            <li>Все 6 амплуа ведущих</li>
+            <li>Поиск фактов в 10+ источниках</li>
+            <li>Озвучка голосами Yandex SpeechKit</li>
+            <li>Ручной и автоматический запуск</li>
+          </ul>
+        </article>
+        <article class="tier-explain accent reveal">
+          <header><h3>Расширенный</h3><span class="tier-price-min">от 167 ₽/мес</span></header>
+          <p class="tier-lead">
+            Для тех, кто слушает каждый день и хочет максимум качества: более умная
+            модель историй, профессиональный голос и больше эфира.
+          </p>
+          <ul class="tick-list">
+            <li>Всё из базового</li>
+            <li>До 25 историй в день</li>
+            <li>Истории на модели DeepSeek V3 — глубже и точнее</li>
+            <li>Премиум-голос SaluteSpeech (Сбер) — чистый русский</li>
+            <li>Тонкая настройка темпа и длины</li>
+            <li>Синхронизация между устройствами</li>
+          </ul>
+        </article>
+      </div>
+
+      <!-- 3 billing plans -->
+      <div class="plans">
+        <article class="plan reveal" data-plan="month" data-price="199" data-period="месяц">
+          <h3 class="plan-name">Месяц</h3>
+          <div class="plan-price"><span class="cur">₽</span><span class="amount">199</span><span class="per">/мес</span></div>
+          <p class="plan-note">Гибкий вариант: платите помесячно и отменяете когда угодно.</p>
+          <ul class="tick-list sm">
+            <li>Полный расширенный доступ</li>
+            <li>25 историй в день</li>
+            <li>Премиум-голос</li>
+          </ul>
+          <button class="btn btn-ghost btn-block subscribe-btn">Оформить</button>
+        </article>
+
+        <article class="plan featured reveal" data-plan="year" data-price="1999" data-old="2388" data-period="год">
+          <span class="plan-badge">Выгоднее всего · −16%</span>
+          <h3 class="plan-name">Год</h3>
+          <div class="plan-price">
+            <span class="cur">₽</span><span class="amount">1999</span><span class="per">/год</span>
+          </div>
+          <p class="plan-old">2388 ₽ <span class="save">экономия 389 ₽</span></p>
+          <p class="plan-note">Лучшее предложение: ~167 ₽ в месяц при оплате за год.</p>
+          <ul class="tick-list sm">
+            <li>Полный расширенный доступ</li>
+            <li>25 историй в день</li>
+            <li>Премиум-голос SaluteSpeech</li>
+            <li>Приоритетная поддержка</li>
+          </ul>
+          <button class="btn btn-primary btn-block subscribe-btn">Оформить за 1999 ₽</button>
+        </article>
+
+        <article class="plan reveal" data-plan="quarter" data-price="499" data-old="597" data-period="3 месяца">
+          <span class="plan-badge soft">−16%</span>
+          <h3 class="plan-name">Квартал</h3>
+          <div class="plan-price"><span class="cur">₽</span><span class="amount">499</span><span class="per">/3 мес</span></div>
+          <p class="plan-old">597 ₽ <span class="save">экономия 98 ₽</span></p>
+          <p class="plan-note">Золотая середина — попробовать вдолгую без переплаты.</p>
+          <ul class="tick-list sm">
+            <li>Полный расширенный доступ</li>
+            <li>25 историй в день</li>
+            <li>Премиум-голос</li>
+          </ul>
+          <button class="btn btn-ghost btn-block subscribe-btn">Оформить</button>
+        </article>
+      </div>
+      <p class="pricing-fine">Оплата привязывается к вашему email — по нему подписка распознаётся в приложении. Используйте тот же адрес при входе.</p>
+    </section>
+
+    <!-- ============ DOCS ============ -->
+    <section class="section section-docs" id="docs">
+      <div class="section-head reveal">
+        <span class="kicker">Документы</span>
+        <h2 class="section-title">Всё прозрачно</h2>
+        <p class="section-sub">Правовые документы сервиса Эфир AI. Перед оплатой рекомендуем ознакомиться.</p>
+      </div>
+      <div class="doc-grid">
+        <a class="doc-card reveal" href="docs/oferta.html">
+          <span class="doc-ic">📄</span>
+          <h3>Публичная оферта</h3>
+          <p>Условия использования и оказания услуг.</p>
+          <span class="doc-go">Открыть →</span>
+        </a>
+        <a class="doc-card reveal" href="docs/privacy.html">
+          <span class="doc-ic">🔒</span>
+          <h3>Политика конфиденциальности</h3>
+          <p>Как мы обрабатываем и храним данные.</p>
+          <span class="doc-go">Открыть →</span>
+        </a>
+        <a class="doc-card reveal" href="docs/terms.html">
+          <span class="doc-ic">📋</span>
+          <h3>Пользовательское соглашение</h3>
+          <p>Права и обязанности сторон.</p>
+          <span class="doc-go">Открыть →</span>
+        </a>
+        <a class="doc-card reveal" href="docs/consent.html">
+          <span class="doc-ic">✍️</span>
+          <h3>Согласие на обработку ПДн</h3>
+          <p>Обработка персональных данных при оплате.</p>
+          <span class="doc-go">Открыть →</span>
+        </a>
+      </div>
+    </section>
+
+    <!-- ============ FAQ ============ -->
+    <section class="section section-faq" id="faq">
+      <div class="section-head reveal">
+        <span class="kicker">FAQ</span>
+        <h2 class="section-title">Частые вопросы</h2>
+      </div>
+      <div class="faq-list reveal">
+        <details>
+          <summary>Что такое Эфир AI?</summary>
+          <p>Это нейросетевой радиоведущий для Android и браузера. Пока играет музыка, сервис находит интересный факт о треке или артисте и озвучивает его живым голосом выбранного амплуа между песнями.</p>
+        </details>
+        <details>
+          <summary>Это записанные заранее истории?</summary>
+          <p>Нет, факт ищется, а история генерируется в реальном времени, пока играет трек, поэтому даже для одной песни эфир каждый раз получается новым.</p>
+        </details>
+        <details>
+          <summary>На каких платформах работает Эфир AI?</summary>
+          <p>На Android (приложение, APK для версии 8.0 и новее) и в браузере (расширение для Chrome и Яндекс Браузера). Подписка единая по email и синхронизируется между устройствами.</p>
+        </details>
+        <details>
+          <summary>С какими плеерами работает?</summary>
+          <p>Spotify, Яндекс Музыка, YouTube Music, Apple Music и другие приложения и веб-плееры, которые отдают метаданные текущего трека.</p>
+        </details>
+        <details>
+          <summary>Эфир AI слушает мой микрофон?</summary>
+          <p>Нет. Используются только метаданные текущего трека — артист и название. Запись звука не ведётся.</p>
+        </details>
+        <details>
+          <summary>Сколько стоит подписка?</summary>
+          <p>Базовый доступ бесплатный. Расширенная подписка стоит 199 ₽ в месяц, 499 ₽ за квартал или 1999 ₽ за год — годовой вариант выгоднее всего, около 167 ₽ в месяц.</p>
+        </details>
+        <details>
+          <summary>Как работает подписка по email?</summary>
+          <p>При оплате вы указываете email. По нему подписка распознаётся в приложении — войдите с тем же адресом, и расширенный доступ активируется.</p>
+        </details>
+        <details>
+          <summary>Можно отменить подписку?</summary>
+          <p>Да, в любой момент. Доступ сохраняется до конца оплаченного периода.</p>
+        </details>
+      </div>
+    </section>
+
+    <!-- ============ CTA ============ -->
+    <section class="section final-cta reveal">
+      <h2>Готовы услышать музыку <span class="grad-text">по-новому?</span></h2>
+      <p>Соберите свой эфир за минуту — и пусть каждый трек расскажет историю.</p>
+      <a href="#pricing" class="btn btn-primary btn-lg">Подключить Эфир AI</a>
+    </section>
+  </main>
+
+  <!-- ============ FOOTER ============ -->
+  <footer class="site-footer">
+    <div class="footer-top">
+      <div class="footer-brand">
+        <img src="assets/logo-mark.svg" alt="" width="36" height="36" />
+        <span class="brand-name">Эфир<span class="brand-ai">AI</span></span>
+        <p>Нейро-радиоведущий для вашей музыки.</p>
+      </div>
+      <nav class="footer-nav" aria-label="Подвал">
+        <div>
+          <h4>Сервис</h4>
+          <a href="#service">О сервисе</a>
+          <a href="#personas">Амплуа</a>
+          <a href="#how">Как работает</a>
+          <a href="#studio">Студия</a>
+        </div>
+        <div>
+          <h4>Тарифы</h4>
+          <a href="#pricing">Подписка</a>
+          <a href="#models">Модели</a>
+          <a href="#faq">FAQ</a>
+        </div>
+        <div>
+          <h4>Документы</h4>
+          <a href="docs/oferta.html">Оферта</a>
+          <a href="docs/privacy.html">Конфиденциальность</a>
+          <a href="docs/terms.html">Соглашение</a>
+        </div>
+      </nav>
+    </div>
+    <div class="footer-bottom">
+      <span>© <span id="year"></span> Эфир AI · efir-ai.ru</span>
+      <a href="mailto:hello@efir-ai.ru">hello@efir-ai.ru</a>
+    </div>
+  </footer>
+
+  <!-- ============ SUBSCRIBE MODAL ============ -->
+  <div class="modal-backdrop" id="modalBackdrop" hidden>
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+      <button class="modal-close" id="modalClose" aria-label="Закрыть">×</button>
+      <div class="modal-grid">
+        <div class="modal-left">
+          <span class="kicker">Оформление подписки</span>
+          <h3 id="modalTitle">Расширенный · <span id="modalPlanName">Год</span></h3>
+          <div class="modal-price">
+            <span class="cur">₽</span><span class="amount" id="modalAmount">1999</span><span class="per" id="modalPer">/год</span>
+          </div>
+          <p class="modal-old" id="modalOld" hidden></p>
+          <ul class="tick-list sm modal-incl">
+            <li>Полный расширенный доступ</li>
+            <li>До 25 историй в день</li>
+            <li>Премиум-голос SaluteSpeech (Сбер)</li>
+            <li>DeepSeek V3 для историй</li>
+            <li>Синхронизация между устройствами</li>
+          </ul>
+        </div>
+        <div class="modal-right">
+          <form id="subscribeForm" novalidate>
+            <label class="field">
+              <span>Ваш email</span>
+              <input type="email" id="emailInput" placeholder="you@example.com" autocomplete="email" required />
+              <small class="field-err" id="emailErr" hidden>Введите корректный email</small>
+            </label>
+            <p class="modal-note">
+              По этому адресу подписка распознаётся в приложении — войдите с тем же email.
+            </p>
+            <label class="check">
+              <input type="checkbox" id="agreeInput" required />
+              <span>Я принимаю <a href="docs/oferta.html" target="_blank">оферту</a> и
+              <a href="docs/privacy.html" target="_blank">политику конфиденциальности</a>, и согласен с
+              <a href="docs/consent.html" target="_blank">обработкой персональных данных</a>.</span>
+            </label>
+            <small class="field-err" id="agreeErr" hidden>Нужно принять условия</small>
+            <button type="submit" class="btn btn-primary btn-block btn-lg" id="payBtn">
+              Оплатить <span id="payAmount">1999 ₽</span>
+            </button>
+            <p class="modal-secure">🔒 Безопасная оплата · отмена в любой момент</p>
+          </form>
+          <div class="modal-success" id="modalSuccess" hidden>
+            <div class="success-mark">✓</div>
+            <h3>Почти готово!</h3>
+            <p id="successText">Мы отправили ссылку на оплату и загрузку на <strong id="successEmail"></strong>. После оплаты войдите в приложение или расширение с этим email — расширенный доступ активируется автоматически.</p>
+            <div class="success-downloads">
+              <a href="https://github.com/zapnikita95/neuroradio/releases/latest/download/MusicStory.apk" id="successApk" class="btn btn-primary btn-block" rel="noopener"><span class="btn-ic">▼</span> Скачать APK для Android</a>
+              <a href="https://github.com/zapnikita95/neuroradio/releases/latest/download/efir-extension.zip" id="successExt" class="btn btn-ghost btn-block" rel="noopener"><span class="btn-ic">🧩</span> Скачать расширение</a>
+            </div>
+            <button class="btn btn-ghost btn-block btn-text" id="successClose">Закрыть</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
