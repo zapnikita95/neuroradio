@@ -46,7 +46,7 @@
       quote: '«Разберём, почему это работает.»',
       pal: ['#7b2fff', '#2bd4ff'], skin: ['#e7d9ff', '#b89aff'], eye: '#1a1140', accent: '#5ef0ff',
       voice: 'ermil', rate: 1.0, pitch: 1.0,
-      script: 'Разберём, почему это работает. ' + THRILLER_CORE + ' Это эталон pop-horror продакшна восьмидесятых.',
+      script: 'Разберём, почему это работает. ' + THRILLER_CORE + ' Это эталон поп-хоррора восьмидесятых.',
       audio: 'assets/demos/persona-expert.wav'
     },
     {
@@ -218,8 +218,8 @@ acc +
     if (eq) eq.classList.add('paused');
   }
 
-  function demoStudioKey(personaId, voiceId, tempoIdx, lengthIdx) {
-    return 'studio-' + personaId + '-' + voiceId + '-t' + tempoIdx + '-l' + lengthIdx + '.wav';
+  function demoStudioSrc(personaId, voiceId) {
+    return 'assets/demos/studio-' + personaId + '-' + voiceId + '.wav';
   }
 
   function playDemo(src, rate, btn, statusEl) {
@@ -331,10 +331,10 @@ acc +
     var LENS = [{ l: '30 секунд', s: '~30 с', n: 1 }, { l: '1 минута', s: '~60 с', n: 2 }, { l: 'Без лимита', s: '2+ мин', n: 4 }];
 
     var FACTS = [
-      'National Film Registry сохранил клип Thriller как культурное наследие США — редкий случай для музыкального видео',
-      'Vincent Price записал зловещий закадровый монолог — без него хорror-атмосфера клипа не сложилась бы',
-      'съёмки танца с зомbi заняли недели и стали одним из самых дорогих клипов своего времени',
-      'именно Thriller сделал короткометражный клип главным событием эры MTV'
+      'National Film Registry включил этот клип в список культурного наследия США',
+      'Vincent Price записал зловещий закадровый монолог',
+      'съёмки танца с зомби заняли недели',
+      'именно этот ролик сделал короткометражку главным событием эры MTV'
     ];
     var FOCUS = {
       all: '', pop: ' Чистый поп-инжиниринг эпохи MTV.',
@@ -369,9 +369,7 @@ acc +
     function buildStory() {
       var p = state.persona, n = LENS[+length.value].n;
       var op = p.script.split('.')[0] + '.';
-      var body = FACTS.slice(0, n).map(function (f, idx) {
-        return (idx === 0 ? 'Thriller: ' : '') + f + '.';
-      }).join(' ');
+      var body = FACTS.slice(0, n).map(function (f) { return f + '.'; }).join(' ');
       var tail = FOCUS[state.focus] || '';
       var closer = '';
       var s = p.script.split('. ');
@@ -397,7 +395,7 @@ acc +
     playBtn.addEventListener('click', function () {
       if (eq) eq.classList.remove('paused');
       var p = state.persona;
-      var src = 'assets/demos/' + demoStudioKey(p.id, voiceSel.value, +tempo.value, +length.value);
+      var src = demoStudioSrc(p.id, voiceSel.value);
       var fallback = p.audio;
       playDemo(src, TEMPOS[+tempo.value].r, playBtn, null);
       demoAudio.onerror = function () {

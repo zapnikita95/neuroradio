@@ -252,7 +252,7 @@
     <string name="account_login_trial_hint">Без входа доступен бесплатный тариф с базовыми настройками.</string>
     <string name="nav_account">Аккаунт</string>
     <string name="billing_tab">Оплата</string>
-    <string name="billing_intro">Расширенная подписка открывает больше историй в день, модель DeepSeek V3 и премиум-голос SaluteSpeech. Оплата привязывается к вашему email — войдите с тем же адресом в приложении.</string>
+    <string name="billing_intro">Расширенная подписка открывает больше историй в день, модель DeepSeek V3 и расширенный Yandex SpeechKit. Оплата привязывается к вашему email — войдите с тем же адресом в приложении.</string>
     <string name="billing_basic_title">Базовый</string>
     <string name="billing_basic_price">бесплатно</string>
     <string name="billing_basic_1">До 10 историй в день</string>
@@ -262,7 +262,7 @@
     <string name="billing_premium_from">от 167 ₽/мес</string>
     <string name="billing_premium_1">До 25 историй в день</string>
     <string name="billing_premium_2">DeepSeek V3 для историй</string>
-    <string name="billing_premium_3">Премиум-голос SaluteSpeech</string>
+    <string name="billing_premium_3">Yandex SpeechKit — расширенный набор голосов</string>
     <string name="billing_premium_4">Синхронизация между устройствами</string>
     <string name="billing_plans_heading">Выберите период</string>
     <string name="billing_plan_month">Месяц</string>
