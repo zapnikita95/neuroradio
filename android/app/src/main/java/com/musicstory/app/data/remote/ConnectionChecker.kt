@@ -464,6 +464,18 @@ data class BillingEntitlementResponse(
     val plan: String? = null,
     val premiumUntil: Long? = null,
     val trialUntil: Long? = null,
+    val autoRenew: Boolean? = null,
+    val cardSaved: Boolean? = null,
+    val subscriptionPlan: String? = null,
+    val nextPaymentAt: Long? = null,
+)
+
+data class UnlinkCardResponse(
+    val ok: Boolean? = null,
+    val message: String? = null,
+    val error: String? = null,
+    val code: String? = null,
+    val entitlement: BillingEntitlementResponse? = null,
 )
 
 data class BillingStatusResponse(

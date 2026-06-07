@@ -18,6 +18,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -46,6 +47,7 @@ import androidx.compose.ui.unit.dp
 import com.musicstory.app.MusicStoryApp
 import com.musicstory.app.R
 import com.musicstory.app.ui.components.PrimaryStoryButton
+import com.musicstory.app.ui.components.SecondaryStoryButton
 import com.musicstory.app.ui.theme.CreamText
 import com.musicstory.app.ui.theme.DeepVoid
 import com.musicstory.app.ui.theme.ErrorCoral
@@ -120,17 +122,28 @@ private fun BillingTab(app: MusicStoryApp) {
     var backendUrl by remember { mutableStateOf("") }
     var premiumActive by remember { mutableStateOf(false) }
     var premiumUntil by remember { mutableStateOf<Long?>(null) }
+    var autoRenew by remember { mutableStateOf(false) }
+    var cardSaved by remember { mutableStateOf(false) }
+    var showUnlinkConfirm by remember { mutableStateOf(false) }
+    var unlinkLoading by remember { mutableStateOf(false) }
+    var unlinkMessage by remember { mutableStateOf<String?>(null) }
 
-    LaunchedEffect(Unit) {
-        backendUrl = app.settingsDataStore.backendUrl.first()
-        email = app.accountAuthManager.fetchProfile(backendUrl)?.email.orEmpty()
+    suspend fun refreshBilling() {
         try {
             val status = app.apiClient.fetchBillingStatus(backendUrl)
             premiumActive = status.premium == true
             premiumUntil = status.entitlement?.premiumUntil
+            autoRenew = status.entitlement?.autoRenew == true
+            cardSaved = status.entitlement?.cardSaved == true
         } catch (_: Exception) {
             // billing status optional until auth warms up
         }
+    }
+
+    LaunchedEffect(Unit) {
+        backendUrl = app.settingsDataStore.backendUrl.first()
+        email = app.accountAuthManager.fetchProfile(backendUrl)?.email.orEmpty()
+        refreshBilling()
     }
 
     Column(
@@ -159,6 +172,69 @@ private fun BillingTab(app: MusicStoryApp) {
                 },
                 style = MaterialTheme.typography.labelLarge,
                 color = GoldBright,
+            )
+        }
+
+        if (cardSaved || autoRenew) {
+            Text(
+                text = context.getString(R.string.billing_autopay_active),
+                style = MaterialTheme.typography.bodySmall,
+                color = MutedLavender,
+            )
+            SecondaryStoryButton(
+                text = context.getString(R.string.billing_cancel_autopay),
+                onClick = { showUnlinkConfirm = true },
+                enabled = !unlinkLoading && !loading,
+            )
+        }
+
+        unlinkMessage?.let {
+            Text(text = it, color = if (it.startsWith("Карта")) GoldBright else ErrorCoral, style = MaterialTheme.typography.bodySmall)
+        }
+
+        if (showUnlinkConfirm) {
+            AlertDialog(
+                onDismissRequest = { if (!unlinkLoading) showUnlinkConfirm = false },
+                title = { Text(context.getString(R.string.billing_cancel_autopay_title)) },
+                text = { Text(context.getString(R.string.billing_cancel_autopay_body)) },
+                confirmButton = {
+                    PrimaryStoryButton(
+                        text = context.getString(R.string.billing_cancel_autopay_confirm),
+                        onClick = {
+                            scope.launch {
+                                unlinkLoading = true
+                                unlinkMessage = null
+                                try {
+                                    val resp = app.apiClient.unlinkCard(backendUrl)
+                                    if (resp.ok == true) {
+                                        unlinkMessage = resp.message ?: context.getString(R.string.billing_cancel_autopay_done)
+                                        autoRenew = false
+                                        cardSaved = false
+                                        showUnlinkConfirm = false
+                                        refreshBilling()
+                                    } else {
+                                        unlinkMessage = resp.error ?: context.getString(R.string.billing_cancel_autopay_failed)
+                                    }
+                                } catch (e: Exception) {
+                                    unlinkMessage = e.message ?: context.getString(R.string.billing_cancel_autopay_failed)
+                                } finally {
+                                    unlinkLoading = false
+                                }
+                            }
+                        },
+                        enabled = !unlinkLoading,
+                    )
+                },
+                dismissButton = {
+                    SecondaryStoryButton(
+                        text = context.getString(R.string.action_cancel),
+                        onClick = { showUnlinkConfirm = false },
+                        enabled = !unlinkLoading,
+                    )
+                },
+                containerColor = DeepVoid,
+                titleContentColor = CreamText,
+                textContentColor = MutedLavender,
             )
         }
 

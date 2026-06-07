@@ -93,6 +93,11 @@ export interface AccountEntitlement {
   trialStoriesUsed: number;
   premiumProductId: string | null;
   purchaseTokenHash: string | null;
+  /** Saved YooKassa card + autopay (no raw payment_method_id exposed). */
+  autoRenew?: boolean;
+  cardSaved?: boolean;
+  subscriptionPlan?: 'month' | 'quarter' | 'year' | null;
+  nextPaymentAt?: number | null;
 }
 
 export interface EncryptedUserSecretsRecord {
@@ -655,6 +660,8 @@ export async function pullAccountCloudData(installId: string): Promise<{
 }
 
 function entitlementFromAccount(account: AccountRecord | undefined): AccountEntitlement {
+  const cardSaved = Boolean(account?.yookassaPaymentMethodId?.trim());
+  const autoRenew = cardSaved && account?.autoRenew !== false;
   return {
     plan: account?.plan ?? 'free',
     premiumUntil: account?.premiumUntil ?? 0,
@@ -662,6 +669,10 @@ function entitlementFromAccount(account: AccountRecord | undefined): AccountEnti
     trialStoriesUsed: account?.trialStoriesUsed ?? 0,
     premiumProductId: account?.premiumProductId ?? null,
     purchaseTokenHash: account?.purchaseTokenHash ?? null,
+    autoRenew,
+    cardSaved,
+    subscriptionPlan: account?.subscriptionPlan ?? null,
+    nextPaymentAt: account?.nextPaymentAt ?? null,
   };
 }
 
@@ -678,6 +689,10 @@ export function getEntitlementForInstall(installId: string): AccountEntitlement 
       trialStoriesUsed: 0,
       premiumProductId: null,
       purchaseTokenHash: null,
+      autoRenew: false,
+      cardSaved: false,
+      subscriptionPlan: null,
+      nextPaymentAt: null,
     };
   }
   return entitlementFromAccount(store.accountsById[accountId]);
@@ -865,6 +880,23 @@ export function cancelAutoRenewByEmail(emailRaw: string): boolean {
   saveStore(store);
   console.log(`[billing] autopay cancelled email=${email}`);
   return true;
+}
+
+/** Отвязка карты / отмена автопродления для аккаунта устройства. */
+export function cancelAutoRenewByInstall(installId: string): { ok: boolean; error?: string } {
+  const account = getAccountByInstallId(installId);
+  if (!account) {
+    return { ok: false, error: 'NOT_LINKED' };
+  }
+  const email = account.email?.trim().toLowerCase();
+  if (!email) {
+    return { ok: false, error: 'NO_EMAIL' };
+  }
+  if (!account.yookassaPaymentMethodId?.trim() && account.autoRenew === false) {
+    return { ok: false, error: 'NO_SAVED_CARD' };
+  }
+  cancelAutoRenewByEmail(email);
+  return { ok: true };
 }
 
 const TRIAL_MS_MONTH = 31 * 24 * 60 * 60 * 1000;

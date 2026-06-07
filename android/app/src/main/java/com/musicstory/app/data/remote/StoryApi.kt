@@ -34,6 +34,9 @@ interface StoryApi {
     @GET("v1/billing/status")
     suspend fun billingStatus(): BillingStatusResponse
 
+    @POST("v1/billing/unlink-card")
+    suspend fun unlinkCard(): UnlinkCardResponse
+
     @POST("v1/public/payment/create")
     suspend fun createPayment(@Body request: PaymentCreateRequest): PaymentCreateResponse
 

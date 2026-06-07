@@ -134,6 +134,15 @@ class ApiClient(
         return getApi(baseUrl).billingStatus()
     }
 
+    suspend fun unlinkCard(baseUrl: String): UnlinkCardResponse {
+        return try {
+            getApi(baseUrl).unlinkCard()
+        } catch (first: Exception) {
+            authManager.invalidateToken()
+            getApi(baseUrl).unlinkCard()
+        }
+    }
+
     suspend fun createPayment(baseUrl: String, email: String, plan: String): PaymentCreateResponse {
         return try {
             getApi(baseUrl).createPayment(PaymentCreateRequest(email = email, plan = plan))

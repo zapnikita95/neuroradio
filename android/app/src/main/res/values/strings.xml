@@ -285,6 +285,14 @@
     <string name="billing_no_backend">Укажите адрес сервера в настройках</string>
     <string name="billing_payment_failed">Не удалось создать платёж</string>
     <string name="billing_fine">Оплата через ЮKassa на защищённой странице. Автопродление не подключается — каждый период оплачивается отдельно. Доступ сохраняется до конца оплаченного срока.</string>
+    <string name="billing_autopay_active">Карта привязана — подписка продлевается автоматически.</string>
+    <string name="billing_cancel_autopay">Прекратить подписку</string>
+    <string name="billing_cancel_autopay_title">Прекратить подписку?</string>
+    <string name="billing_cancel_autopay_body">Карта будет отвязана, автопродление отключится. Расширенный доступ сохранится до конца оплаченного периода.</string>
+    <string name="billing_cancel_autopay_confirm">Да, прекратить</string>
+    <string name="billing_cancel_autopay_done">Подписка прекращена. Доступ сохранится до конца оплаченного периода.</string>
+    <string name="billing_cancel_autopay_failed">Не удалось прекратить подписку</string>
+    <string name="action_cancel">Отмена</string>
     <string name="feedback_title">Как история?</string>
     <string name="feedback_like">👍</string>
     <string name="feedback_dislike">👎</string>

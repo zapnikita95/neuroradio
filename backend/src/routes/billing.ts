@@ -4,6 +4,7 @@ import {
   getEntitlementForInstall,
   grantPremiumSubscription,
   grantTrialSubscription,
+  cancelAutoRenewByInstall,
 } from '../services/account-store.js';
 import {
   hasPremiumEntitlement,
@@ -81,6 +82,35 @@ router.get('/status', (req: Request, res: Response) => {
     yookassaConfigured: Boolean(process.env.YOOKASSA_SHOP_ID?.trim() && process.env.YOOKASSA_SECRET_KEY?.trim()),
     devTierSwitchEnabled: canUseDevTierSwitch(installId),
     devTierOverride: canUseDevTierSwitch(installId) ? getDevTierOverride(installId) : null,
+  });
+});
+
+/** Отвязать карту и отключить автопродление (данные привязки удаляются у нас). */
+router.post('/unlink-card', (req: Request, res: Response) => {
+  const installId = req.installId ?? '';
+  if (!installId) {
+    res.status(400).json({ error: 'Missing install id' });
+    return;
+  }
+  const result = cancelAutoRenewByInstall(installId);
+  if (!result.ok) {
+    const code = result.error ?? 'UNKNOWN';
+    const message =
+      code === 'NOT_LINKED'
+        ? 'Войдите в аккаунт по email в приложении'
+        : code === 'NO_EMAIL'
+          ? 'Сначала войдите с email, которым оплачивали подписку'
+          : code === 'NO_SAVED_CARD'
+            ? 'Карта не привязана — автопродление уже отключено'
+            : 'Не удалось отвязать карту';
+    res.status(400).json({ ok: false, code, error: message });
+    return;
+  }
+  const entitlement = getEntitlementForInstall(installId);
+  res.json({
+    ok: true,
+    entitlement,
+    message: 'Карта отвязана. Автопродление отключено. Доступ сохранится до конца оплаченного периода.',
   });
 });
 
