@@ -111,11 +111,11 @@ const PERSONAS = [
 
     studioVoices: ['zahar', 'ermil', 'alexander'],
 
-    short: 'А вот это — личное. ' + FACT_REGISTRY + ' Именно этот клип взорвал MTV!',
+    short: FACT_REGISTRY + ' Именно этот клип взорвал MTV!',
 
-    minute: 'А вот это — личное. ' + THRILLER_STORY_MINUTE + ' Именно этот клип взорвал MTV!',
+    minute: THRILLER_STORY_MINUTE + ' Именно этот клип взорвал MTV!',
 
-    full: 'А вот это — личное. ' + THRILLER_STORY_FULL + ' Именно этот клип взорвал MTV!',
+    full: THRILLER_STORY_FULL + ' Именно этот клип взорвал MTV!',
 
   },
 
@@ -266,6 +266,8 @@ function previewMarkup(raw) {
 }
 
 const DISPLAY_NAME_FIXES = [
+  [/\bмтв\b/g, 'MTV'],
+  [/\bЭм-Ти-Ви\b/g, 'MTV'],
   [/\bмайкл джексон\b/gi, 'Майкл Джексон'],
   [/\bджохн\b/gi, 'Джон'],
   [/\bджохн ландис\b/gi, 'Джон Ландис'],

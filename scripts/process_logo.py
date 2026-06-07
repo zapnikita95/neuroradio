@@ -1,6 +1,7 @@
 """Generate logo assets from source PNG. Run: python scripts/process_logo.py"""
 from pathlib import Path
 from PIL import Image
+import numpy as np
 
 ROOT = Path(__file__).resolve().parents[1]
 SOURCE = Path(r"C:\Users\1\Downloads\ChatGPT Image 7 июн. 2026 г., 10_58_40.png")
@@ -9,27 +10,67 @@ if not SOURCE.exists():
     raise SystemExit(f"Logo source not found: {SOURCE}")
 
 img = Image.open(SOURCE).convert("RGBA")
-size = img.width
+w, h = img.size
+pixels = np.array(img)
 
-compact_bottom = round(size * 0.815)
-icon_bottom = round(size * 0.46)
 
-def crop_box(top: int, bottom: int) -> Image.Image:
-    return img.crop((0, top, size, bottom))
+def row_density(y: int) -> float:
+    row = pixels[y]
+    return float(((row[:, :3].max(axis=1) > 25) & (row[:, 3] > 128)).sum()) / w
+
+
+def content_bbox(y0: int, y1: int):
+    sub = pixels[y0:y1]
+    mask = (sub[:, :, :3].max(axis=2) > 25) & (sub[:, :, 3] > 128)
+    ys, xs = np.where(mask)
+    if len(ys) == 0:
+        return 0, y1 - y0, 0, w
+    return y0 + int(ys.min()), y0 + int(ys.max()) + 1, int(xs.min()), int(xs.max()) + 1
+
+
+def find_tagline_top() -> int:
+    """Bottom tagline starts after a quiet gap below «ЭФИР AI»."""
+    for y in range(int(h * 0.88), h - 8):
+        if row_density(y) > 0.12 and max(row_density(i) for i in range(max(0, y - 30), y)) < 0.04:
+            return max(0, y - 12)
+    return int(h * 0.90)
+
+
+def crop_region(y0: int, y1: int, pad: int = 24) -> Image.Image:
+    top, bottom, left, right = content_bbox(y0, y1)
+    top = max(0, top - pad)
+    bottom = min(h, bottom + pad)
+    left = max(0, left - pad)
+    right = min(w, right + pad)
+    return img.crop((left, top, right, bottom))
+
 
 def fit_square(im: Image.Image, out_w: int, bg=(0, 0, 0, 255)) -> Image.Image:
     if im.mode != "RGBA":
         im = im.convert("RGBA")
     scale = min(out_w / im.width, out_w / im.height)
-    nw, nh = max(1, round(im.width * scale)), max(1, round(im.height * scale))
+    nw = max(1, round(im.width * scale))
+    nh = max(1, round(im.height * scale))
     resized = im.resize((nw, nh), Image.Resampling.LANCZOS)
     canvas = Image.new("RGBA", (out_w, out_w), bg)
     ox, oy = (out_w - nw) // 2, (out_w - nh) // 2
     canvas.paste(resized, (ox, oy), resized)
     return canvas
 
-icon_src = crop_box(0, icon_bottom)
-compact_src = crop_box(0, compact_bottom)
+
+tagline_top = find_tagline_top()
+icon_top, icon_bottom, _, _ = content_bbox(0, tagline_top)
+# Icon only: graphic above the «ЭФИР AI» wordmark (gap ~y=907 in source).
+icon_only_bottom = tagline_top
+for y in range(int(h * 0.62), tagline_top):
+    if row_density(y) < 0.03 and row_density(y - 1) > 0.12:
+        icon_only_bottom = y + 8
+        break
+else:
+    icon_only_bottom = int(h * 0.66)
+
+icon_src = crop_region(icon_top, icon_only_bottom, pad=28)
+compact_src = crop_region(0, tagline_top, pad=20)
 full_src = img
 
 web = ROOT / "website" / "assets"
@@ -39,8 +80,8 @@ fit_square(full_src, 1024, (0, 0, 0, 255)).convert("RGB").save(web / "logo-full.
 fit_square(compact_src, 1024, (0, 0, 0, 255)).convert("RGB").save(web / "logo-compact.png")
 fit_square(icon_src, 1024, (0, 0, 0, 255)).convert("RGB").save(web / "logo-icon.png")
 
-for w, name in [(512, "icon-512.png"), (32, "favicon-32.png"), (180, "apple-touch-icon.png")]:
-    fit_square(icon_src, w, (0, 0, 0, 255)).convert("RGB").save(web / name)
+for size, name in [(512, "icon-512.png"), (32, "favicon-32.png"), (180, "apple-touch-icon.png")]:
+    fit_square(icon_src, size, (0, 0, 0, 255)).convert("RGB").save(web / name)
 
 android_res = ROOT / "android" / "app" / "src" / "main" / "res"
 densities = {
@@ -62,4 +103,5 @@ drawable = android_res / "drawable-nodpi"
 drawable.mkdir(parents=True, exist_ok=True)
 fit_square(compact_src, 512, (0, 0, 0, 255)).convert("RGB").save(drawable / "logo_efir_ai.png")
 
+print(f"tagline_top={tagline_top}, icon_only_bottom={icon_only_bottom}")
 print("done")

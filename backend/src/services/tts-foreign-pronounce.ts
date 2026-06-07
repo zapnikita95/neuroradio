@@ -31,7 +31,7 @@ const PHRASE_PRONUNCIATION_RU: Record<string, string> = {
   thriller: 'Триллер',
   'national film registry': 'Нэшнл Фильм Р+еджистри',
   'vincent price': 'Винсент Прайс',
-  mtv: 'Эм-Ти-Ви',
+  mtv: 'MTV',
   'michael jackson': 'Майкл Джексон',
   'john landis': 'Джон Ландис',
   'michael peters': 'Майкл Питерс',
@@ -312,6 +312,8 @@ function ensureAllLatinTransliterated(text: string): string {
       /[A-Za-zÀ-ÿ][A-Za-zÀ-ÿ0-9''.\-&]*/g,
       (match) => {
         if (!/[A-Za-zÀ-ÿ]/.test(match)) return match;
+        const key = match.toLowerCase().replace(/\s*&\s*/g, ' and ');
+        if (PHRASE_PRONUNCIATION_RU[key]) return PHRASE_PRONUNCIATION_RU[key]!;
         const ru = lookupPhraseTts(match.replace(/\s*&\s*/g, ' and '));
         return /[A-Za-zÀ-ÿ]/.test(ru) ? spellLatinWordPhonetic(match) : ru;
       },
@@ -319,7 +321,11 @@ function ensureAllLatinTransliterated(text: string): string {
     if (next === result) break;
     result = next;
   }
-  return result.replace(/[A-Za-zÀ-ÿ]+/g, (match) => spellLatinWordPhonetic(match));
+  return result.replace(/[A-Za-zÀ-ÿ]+/g, (match) => {
+    const key = match.toLowerCase();
+    if (PHRASE_PRONUNCIATION_RU[key]) return PHRASE_PRONUNCIATION_RU[key]!;
+    return spellLatinWordPhonetic(match);
+  });
 }
 
 const MARKUP_SLOT = '\uE000';
