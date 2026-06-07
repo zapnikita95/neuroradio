@@ -3,7 +3,6 @@ package com.musicstory.app.ui.screens
 import android.content.Intent
 import android.provider.Settings
 import androidx.compose.foundation.Image
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
@@ -13,6 +12,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -24,6 +24,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
@@ -43,7 +44,6 @@ import com.musicstory.app.ui.components.SecondaryStoryButton
 import com.musicstory.app.ui.components.VinylDisc
 import com.musicstory.app.ui.theme.CreamText
 import com.musicstory.app.ui.theme.ErrorCoral
-import com.musicstory.app.ui.theme.GoldBright
 import com.musicstory.app.ui.theme.MutedLavender
 
 @Composable
@@ -70,7 +70,6 @@ fun OnboardingScreen(
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_RESUME) {
-                // Автовход только если доступ уже выдан — без красной подсказки.
                 checkAccess(andEnter = false)
             }
         }
@@ -82,91 +81,104 @@ fun OnboardingScreen(
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .verticalScroll(rememberScrollState())
-                .padding(24.dp),
-            verticalArrangement = Arrangement.Center,
-            horizontalAlignment = Alignment.CenterHorizontally,
+                .padding(horizontal = 24.dp),
         ) {
-            Image(
-                painter = painterResource(R.drawable.logo_efir_ai),
-                contentDescription = null,
+            Column(
                 modifier = Modifier
-                    .fillMaxWidth(0.72f)
-                    .heightIn(max = 120.dp),
-                contentScale = ContentScale.Fit,
-            )
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            BrandTitle()
-            Text(
-                text = context.getString(R.string.onboarding_title),
-                style = MaterialTheme.typography.displaySmall,
-                textAlign = TextAlign.Center,
-                color = CreamText,
-            )
-
-            Spacer(modifier = Modifier.height(12.dp))
-
-            VinylDisc(size = 120.dp, isSpinning = true)
-
-            Spacer(modifier = Modifier.height(20.dp))
-
-            GlassCard(accentBorder = true) {
-                Text(
-                    text = context.getString(R.string.onboarding_description),
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = MutedLavender,
-                    textAlign = TextAlign.Start,
-                )
-                Spacer(modifier = Modifier.height(12.dp))
-                Text(
-                    text = context.getString(R.string.onboarding_steps),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = CreamText,
-                    textAlign = TextAlign.Start,
-                )
-            }
-
-            Spacer(modifier = Modifier.height(24.dp))
-
-            Box(
-                modifier = Modifier
+                    .weight(1f)
                     .fillMaxWidth()
-                    .heightIn(min = 52.dp),
-                contentAlignment = Alignment.Center,
+                    .verticalScroll(rememberScrollState()),
+                horizontalAlignment = Alignment.CenterHorizontally,
             ) {
-                if (!hintMessage.isNullOrBlank()) {
+                Spacer(modifier = Modifier.height(56.dp))
+
+                Image(
+                    painter = painterResource(R.drawable.logo_efir_ai),
+                    contentDescription = null,
+                    modifier = Modifier
+                        .fillMaxWidth(0.58f)
+                        .heightIn(max = 96.dp)
+                        .clip(RoundedCornerShape(22.dp)),
+                    contentScale = ContentScale.Fit,
+                )
+
+                Spacer(modifier = Modifier.height(20.dp))
+
+                BrandTitle()
+                Text(
+                    text = context.getString(R.string.onboarding_title),
+                    style = MaterialTheme.typography.displaySmall,
+                    textAlign = TextAlign.Center,
+                    color = CreamText,
+                )
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                VinylDisc(size = 120.dp, isSpinning = true)
+
+                Spacer(modifier = Modifier.height(24.dp))
+
+                GlassCard(accentBorder = true) {
                     Text(
-                        text = hintMessage!!,
+                        text = context.getString(R.string.onboarding_description),
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = MutedLavender,
+                        textAlign = TextAlign.Start,
+                    )
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Text(
+                        text = context.getString(R.string.onboarding_steps),
                         style = MaterialTheme.typography.bodyMedium,
-                        color = ErrorCoral,
-                        textAlign = TextAlign.Center,
+                        color = CreamText,
+                        textAlign = TextAlign.Start,
                     )
                 }
+
+                Spacer(modifier = Modifier.height(24.dp))
             }
 
-            Spacer(modifier = Modifier.height(16.dp))
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 20.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(min = 48.dp),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    if (!hintMessage.isNullOrBlank()) {
+                        Text(
+                            text = hintMessage!!,
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = ErrorCoral,
+                            textAlign = TextAlign.Center,
+                        )
+                    }
+                }
 
-            PrimaryStoryButton(
-                text = context.getString(R.string.onboarding_open_settings),
-                onClick = {
-                    hintMessage = null
-                    context.startActivity(
-                        Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS).apply {
-                            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                        },
-                    )
-                    MediaNotificationListener.requestRebind(context)
-                },
-            )
+                PrimaryStoryButton(
+                    text = context.getString(R.string.onboarding_open_settings),
+                    onClick = {
+                        hintMessage = null
+                        context.startActivity(
+                            Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS).apply {
+                                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                            },
+                        )
+                        MediaNotificationListener.requestRebind(context)
+                    },
+                )
 
-            Spacer(modifier = Modifier.height(12.dp))
+                Spacer(modifier = Modifier.height(12.dp))
 
-            SecondaryStoryButton(
-                text = context.getString(R.string.onboarding_check_access),
-                onClick = { checkAccess(andEnter = true) },
-            )
+                SecondaryStoryButton(
+                    text = context.getString(R.string.onboarding_check_access),
+                    onClick = { checkAccess(andEnter = true) },
+                )
+            }
         }
     }
 }

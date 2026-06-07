@@ -1,12 +1,18 @@
-# Build the Android APK + pack the browser extension and publish both to a
-# GitHub Release. The website (efir-ai.ru) reads releases/latest via the GitHub
-# API, so its "Скачать APK" / "Установить расширение" buttons always point here.
+# Build Android APK + browser extension ZIP and publish to GitHub Releases.
+# Website reads /v1/public/downloads (BFF) or GitHub API — tag mobile-latest on main.
 
 name: Release APK + Extension
 
 on:
   workflow_dispatch:
   push:
+    branches: [main]
+    paths:
+      - 'android/**'
+      - 'chrome-extension/**'
+      - 'website/**'
+      - 'backend/**'
+      - '.github/workflows/release.yml'
     tags:
       - 'v*'
 
@@ -49,19 +55,35 @@ jobs:
           cd ..
           ls -lh efir-extension.zip
 
-      - name: Upload build artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: efir-ai-build
-          path: |
-            MusicStory.apk
-            efir-extension.zip
+      - name: Resolve release tag
+        id: tag
+        run: |
+          if [[ "${GITHUB_REF}" == refs/tags/* ]]; then
+            echo "name=${GITHUB_REF_NAME}" >> "$GITHUB_OUTPUT"
+          else
+            echo "name=mobile-latest" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Remove previous mobile-latest release
+        if: steps.tag.outputs.name == 'mobile-latest'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release delete mobile-latest --yes --cleanup-tag 2>/dev/null || true
 
       - name: Publish to GitHub Release
-        if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: ${{ steps.tag.outputs.name }}
+          name: Efir AI — Android + Extension (${{ steps.tag.outputs.name }})
+          body: |
+            Автосборка Эфир AI · ${{ github.sha }}
+
+            - **MusicStory.apk** — Android
+            - **efir-extension.zip** — Chrome / Яндекс Браузер
           files: |
             MusicStory.apk
             efir-extension.zip
-          generate_release_notes: true
+          make_latest: true
+          draft: false
+          prerelease: false

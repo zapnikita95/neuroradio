@@ -22,8 +22,27 @@ import {
 } from '../services/silero-tts.js';
 import { SILERO_VOICE_PRESETS } from '../services/silero-voices.js';
 import { hasYandexCredentials } from '../services/yandex-tts.js';
+import { getPublicDownloadLinks } from '../services/github-downloads.js';
 
 const router = Router();
+
+/** Latest APK + browser extension URLs (GitHub Releases, cached). */
+router.get('/downloads', async (_req: Request, res: Response) => {
+  try {
+    const links = await getPublicDownloadLinks();
+    res.json(links);
+  } catch (err) {
+    console.warn('[public/downloads]', err instanceof Error ? err.message : err);
+    res.status(503).json({
+      repo: 'zapnikita95/neuroradio',
+      tag: null,
+      apkUrl: null,
+      extensionUrl: null,
+      publishedAt: null,
+      error: 'releases_unavailable',
+    });
+  }
+});
 
 /** TTS options for free tier (Silero vs Android device TTS). */
 router.get('/tts-config', async (_req: Request, res: Response) => {

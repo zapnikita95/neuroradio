@@ -9,8 +9,8 @@
   // override with window.EFIR_API_BASE if the site is hosted separately.
   var API_BASE = (window.EFIR_API_BASE || '').replace(/\/$/, '');
   var GH_REPO = 'zapnikita95/neuroradio';
-  var APK_FALLBACK = 'https://github.com/' + GH_REPO + '/releases/latest/download/MusicStory.apk';
-  var EXT_FALLBACK = 'https://github.com/' + GH_REPO + '/releases/latest/download/efir-extension.zip';
+  var APK_FALLBACK = 'https://github.com/' + GH_REPO + '/releases/download/mobile-latest/MusicStory.apk';
+  var EXT_FALLBACK = 'https://github.com/' + GH_REPO + '/releases/download/mobile-latest/efir-extension.zip';
 
   var $ = function (s, r) { return (r || document).querySelector(s); };
   var $$ = function (s, r) { return Array.prototype.slice.call((r || document).querySelectorAll(s)); };
@@ -484,28 +484,90 @@
     });
   })();
 
-  /* ---------------- GitHub latest release wiring ---------------- */
+  /* ---------------- Download links (BFF → GitHub API → mobile-latest) ---------------- */
   (function () {
-    var apkEls = ['#dlApk', '#successApk'].map(function (id) { return $(id); }).filter(Boolean);
-    var extEls = ['#dlExt', '#successExt'].map(function (id) { return $(id); }).filter(Boolean);
-    var apkVer = $('#apkVersion'), extVer = $('#extVersion');
+    var apkEls = ['#dlApk', '#successApk', '#heroApk'].map(function (id) { return $(id); }).filter(Boolean);
+    var extEls = ['#dlExt', '#successExt', '#heroExt'].map(function (id) { return $(id); }).filter(Boolean);
+    var apkVer = $('#apkVersion');
+    var extVer = $('#extVersion');
 
-    fetch('https://api.github.com/repos/' + GH_REPO + '/releases/latest', { headers: { Accept: 'application/vnd.github+json' } })
-      .then(function (r) { if (!r.ok) throw new Error('no release'); return r.json(); })
-      .then(function (rel) {
-        var assets = rel.assets || [];
-        var apk = assets.filter(function (a) { return /\.apk$/i.test(a.name); })[0];
-        var ext = assets.filter(function (a) { return /\.(zip|crx)$/i.test(a.name); })[0];
-        if (apk) { apkEls.forEach(function (e) { e.href = apk.browser_download_url; }); if (apkVer) apkVer.textContent = 'версия ' + (rel.tag_name || ''); }
-        if (ext) { extEls.forEach(function (e) { e.href = ext.browser_download_url; }); if (extVer) extVer.textContent = 'версия ' + (rel.tag_name || ''); }
-        if (!apk) apkEls.forEach(function (e) { e.href = APK_FALLBACK; });
-        if (!ext) extEls.forEach(function (e) { e.href = EXT_FALLBACK; });
-      })
+    function pickAssets(rel) {
+      var assets = rel.assets || [];
+      var apk = assets.filter(function (a) { return /\.apk$/i.test(a.name); })[0];
+      var ext = assets.filter(function (a) { return /\.(zip|crx)$/i.test(a.name); })[0];
+      return {
+        apkUrl: apk ? apk.browser_download_url : null,
+        extensionUrl: ext ? ext.browser_download_url : null,
+        tag: rel.tag_name || null,
+      };
+    }
+
+    function applyLinks(links) {
+      var tagLabel = links.tag ? ('версия ' + links.tag) : 'последняя сборка';
+      var apkUrl = links.apkUrl || APK_FALLBACK;
+      var extUrl = links.extensionUrl || EXT_FALLBACK;
+      apkEls.forEach(function (e) {
+        e.href = apkUrl;
+        e.setAttribute('download', 'MusicStory.apk');
+        e.removeAttribute('target');
+      });
+      extEls.forEach(function (e) {
+        e.href = extUrl;
+        e.setAttribute('download', 'efir-extension.zip');
+        e.removeAttribute('target');
+      });
+      if (apkVer) apkVer.textContent = links.apkUrl ? tagLabel : tagLabel + ' (ожидает сборку)';
+      if (extVer) extVer.textContent = links.extensionUrl ? tagLabel : tagLabel + ' (ожидает сборку)';
+    }
+
+    function fetchGhLatest() {
+      return fetch('https://api.github.com/repos/' + GH_REPO + '/releases/latest', {
+        headers: { Accept: 'application/vnd.github+json' },
+      }).then(function (r) {
+        if (!r.ok) throw new Error('no latest');
+        return r.json();
+      }).then(pickAssets);
+    }
+
+    function fetchGhList() {
+      return fetch('https://api.github.com/repos/' + GH_REPO + '/releases?per_page=15', {
+        headers: { Accept: 'application/vnd.github+json' },
+      }).then(function (r) {
+        if (!r.ok) throw new Error('no list');
+        return r.json();
+      }).then(function (list) {
+        for (var i = 0; i < list.length; i += 1) {
+          var picked = pickAssets(list[i]);
+          if (picked.apkUrl || picked.extensionUrl) return picked;
+        }
+        throw new Error('no assets');
+      });
+    }
+
+    function fetchBffDownloads() {
+      var base = API_BASE;
+      if (!base) return Promise.reject(new Error('no api base'));
+      return fetch(base + '/v1/public/downloads', { headers: { Accept: 'application/json' } })
+        .then(function (r) {
+          if (!r.ok) throw new Error('bff ' + r.status);
+          return r.json();
+        })
+        .then(function (d) {
+          if (!d.apkUrl && !d.extensionUrl) throw new Error('empty bff');
+          return {
+            apkUrl: d.apkUrl,
+            extensionUrl: d.extensionUrl,
+            tag: d.tag,
+          };
+        });
+    }
+
+    fetchBffDownloads()
+      .catch(function () { return fetchGhLatest(); })
+      .catch(function () { return fetchGhList(); })
+      .then(applyLinks)
       .catch(function () {
-        apkEls.forEach(function (e) { e.href = APK_FALLBACK; });
-        extEls.forEach(function (e) { e.href = EXT_FALLBACK; });
-        if (apkVer) apkVer.textContent = 'последняя сборка';
-        if (extVer) extVer.textContent = 'последняя сборка';
+        applyLinks({ apkUrl: null, extensionUrl: null, tag: null });
       });
   })();
 
