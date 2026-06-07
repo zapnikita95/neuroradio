@@ -109,25 +109,42 @@ class AccountAuthManager(
         fetchProfileWithCloud(baseUrl).profile
 
     suspend fun fetchConfig(baseUrl: String): AuthConfig? = withContext(Dispatchers.IO) {
-        val token = authManager.getAccessToken(baseUrl) ?: return@withContext null
+        fetchPublicConfig(baseUrl) ?: run {
+            val token = authManager.getAccessToken(baseUrl) ?: return@withContext null
+            val req = Request.Builder()
+                .url("${baseUrl.trimEnd('/')}/v1/account/config")
+                .header("Authorization", "Bearer $token")
+                .get()
+                .build()
+            runCatching {
+                http.newCall(req).execute().use { resp ->
+                    if (!resp.isSuccessful) return@withContext null
+                    parseAuthConfig(JSONObject(resp.body?.string().orEmpty()))
+                }
+            }.getOrNull()
+        }
+    }
+
+    private fun fetchPublicConfig(baseUrl: String): AuthConfig? {
         val req = Request.Builder()
-            .url("${baseUrl.trimEnd('/')}/v1/account/config")
-            .header("Authorization", "Bearer $token")
+            .url("${baseUrl.trimEnd('/')}/v1/public/auth-config")
             .get()
             .build()
-        runCatching {
+        return runCatching {
             http.newCall(req).execute().use { resp ->
-                if (!resp.isSuccessful) return@withContext null
-                val json = JSONObject(resp.body?.string().orEmpty())
-                AuthConfig(
-                    emailEnabled = json.optBoolean("emailEnabled"),
-                    telegramEnabled = json.optBoolean("telegramEnabled"),
-                    telegramBotUsername = parseOptionalString(json, "telegramBotUsername"),
-                    telegramWidgetBaseUrl = parseOptionalString(json, "telegramWidgetBaseUrl"),
-                )
+                if (!resp.isSuccessful) return null
+                parseAuthConfig(JSONObject(resp.body?.string().orEmpty()))
             }
         }.getOrNull()
     }
+
+    private fun parseAuthConfig(json: JSONObject): AuthConfig =
+        AuthConfig(
+            emailEnabled = json.optBoolean("emailEnabled"),
+            telegramEnabled = json.optBoolean("telegramEnabled"),
+            telegramBotUsername = parseOptionalString(json, "telegramBotUsername"),
+            telegramWidgetBaseUrl = parseOptionalString(json, "telegramWidgetBaseUrl"),
+        )
 
     suspend fun linkTelegram(baseUrl: String, authJson: JSONObject): AccountLoginResult =
         withContext(Dispatchers.IO) {

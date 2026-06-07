@@ -9,28 +9,14 @@ import {
   verifyEmailLogin,
 } from '../services/account-store.js';
 import { verifyTelegramLogin, type TelegramAuthPayload } from '../services/telegram-auth.js';
-import { isEmailConfigured } from '../services/email-sender.js';
-
-function telegramBotUsername(): string | null {
-  return process.env.TELEGRAM_BOT_USERNAME?.trim().replace(/^@/, '') ?? null;
-}
-
-function isTelegramConfigured(): boolean {
-  return Boolean(process.env.TELEGRAM_BOT_TOKEN?.trim() && telegramBotUsername());
-}
+import { getPublicAuthConfig } from '../services/auth-config.js';
 
 const router = Router();
 
 router.use(requireAppAuth);
 
 router.get('/config', (_req: Request, res: Response) => {
-  const widgetBase = process.env.TELEGRAM_WIDGET_BASE_URL?.trim().replace(/\/$/, '') ?? null;
-  res.json({
-    emailEnabled: isEmailConfigured(),
-    telegramEnabled: isTelegramConfigured(),
-    telegramBotUsername: telegramBotUsername(),
-    telegramWidgetBaseUrl: widgetBase,
-  });
+  res.json(getPublicAuthConfig());
 });
 
 router.get('/profile', async (req: Request, res: Response) => {

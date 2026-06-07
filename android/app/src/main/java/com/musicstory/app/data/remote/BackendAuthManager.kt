@@ -55,22 +55,30 @@ class BackendAuthManager(
 
     private suspend fun fetchTokenWithRetry(baseUrl: String, existingInstallId: String): String? {
         repeat(MAX_FETCH_ATTEMPTS) { attempt ->
-            val token = fetchToken(baseUrl, existingInstallId)
-            if (token != null) return token
-            if (attempt < MAX_FETCH_ATTEMPTS - 1) {
-                delay(RETRY_DELAY_MS * (attempt + 1))
+            when (val outcome = fetchToken(baseUrl, existingInstallId)) {
+                is TokenOutcome.Success -> return outcome.token
+                is TokenOutcome.Fatal -> return null
+                is TokenOutcome.Retry -> if (attempt < MAX_FETCH_ATTEMPTS - 1) {
+                    delay(RETRY_DELAY_MS * (attempt + 1))
+                }
             }
         }
         return null
     }
 
-    private suspend fun fetchToken(baseUrl: String, existingInstallId: String): String? {
+    private sealed class TokenOutcome {
+        data class Success(val token: String) : TokenOutcome()
+        data object Retry : TokenOutcome()
+        data object Fatal : TokenOutcome()
+    }
+
+    private suspend fun fetchToken(baseUrl: String, existingInstallId: String): TokenOutcome {
         val installId = existingInstallId.ifBlank { UUID.randomUUID().toString() }
         if (existingInstallId.isBlank()) {
             settingsDataStore.saveInstallId(installId)
         }
 
-        val certSha256 = AppSigning.certSha256(context) ?: return null
+        val certSha256 = AppSigning.certSha256(context) ?: return TokenOutcome.Fatal
         val body = JSONObject()
             .put("install_id", installId)
             .put("package_name", context.packageName)
@@ -88,22 +96,27 @@ class BackendAuthManager(
             httpClient.newCall(request).execute().use { response ->
                 if (!response.isSuccessful) {
                     StoryLog.e("Auth token failed: HTTP ${response.code} ${response.message}")
-                    return null
+                    return when (response.code) {
+                        400, 403 -> TokenOutcome.Fatal
+                        429 -> TokenOutcome.Retry
+                        in 500..599 -> TokenOutcome.Retry
+                        else -> TokenOutcome.Fatal
+                    }
                 }
-                val payload = response.body?.string() ?: return null
+                val payload = response.body?.string() ?: return TokenOutcome.Retry
                 val tokenResponse = gson.fromJson(payload, TokenResponse::class.java)
                 val token = tokenResponse.accessToken?.trim().orEmpty()
-                if (token.isEmpty()) return null
+                if (token.isEmpty()) return TokenOutcome.Retry
 
                 val expiresInSec = tokenResponse.expiresIn ?: DEFAULT_EXPIRES_IN_SEC
                 val expiresAtMs = System.currentTimeMillis() + expiresInSec * 1000L
                 settingsDataStore.saveAuthToken(token, expiresAtMs)
                 StoryLog.i("Auth token OK, expires in ${expiresInSec}s")
-                token
+                TokenOutcome.Success(token)
             }
         } catch (e: Exception) {
             StoryLog.e("Auth token error", e)
-            null
+            TokenOutcome.Retry
         }
     }
 

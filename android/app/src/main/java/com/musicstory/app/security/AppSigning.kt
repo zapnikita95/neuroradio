@@ -1,6 +1,7 @@
 package com.musicstory.app.security
 
 import android.content.Context
+import android.content.pm.Signature
 import android.content.pm.PackageManager
 import android.os.Build
 import java.io.ByteArrayInputStream
@@ -27,13 +28,10 @@ object AppSigning {
 
             val certBytes = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
                 val signatures = packageInfo.signingInfo?.apkContentsSigners
-                signatures?.firstOrNull()?.toByteArray()
+                signatures?.firstOrNull()?.let { certBytesFromSignature(it) }
             } else {
                 @Suppress("DEPRECATION")
-                val signature = packageInfo.signatures?.firstOrNull() ?: return null
-                val factory = CertificateFactory.getInstance("X509")
-                val cert = factory.generateCertificate(ByteArrayInputStream(signature.toByteArray())) as X509Certificate
-                cert.encoded
+                packageInfo.signatures?.firstOrNull()?.let { certBytesFromSignature(it) }
             } ?: return null
 
             val digest = MessageDigest.getInstance("SHA-256")
@@ -41,5 +39,11 @@ object AppSigning {
         } catch (_: Exception) {
             null
         }
+    }
+
+    private fun certBytesFromSignature(signature: Signature): ByteArray {
+        val factory = CertificateFactory.getInstance("X509")
+        val cert = factory.generateCertificate(ByteArrayInputStream(signature.toByteArray())) as X509Certificate
+        return cert.encoded
     }
 }

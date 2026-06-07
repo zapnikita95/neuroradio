@@ -8,8 +8,11 @@ interface JwtPayload {
   [key: string]: unknown;
 }
 
-/** Android debug keystore — only when ALLOW_DEBUG_CERT is not false. */
+/** Android debug keystore (project / local dev) — only when ALLOW_DEBUG_CERT is not false. */
 const DEBUG_CERT_SHA256 = 'a0105c5f4b340597d107f440356ffc9fcfa8c3fbdf002646a67d0a4ed733a8fc';
+
+/** GitHub Actions ubuntu-latest default debug.keystore (mobile-latest APK before shared keystore). */
+const CI_DEBUG_CERT_SHA256 = 'c5b7363ebcaf8808b02e1bb766c8d688c7a542fc60d840bc6d3651452c537d48';
 
 function base64UrlEncode(input: Buffer | string): string {
   const buffer = typeof input === 'string' ? Buffer.from(input, 'utf8') : input;
@@ -108,6 +111,9 @@ export function iosAttestationHash(bundleId: string, teamId: string): string {
 
 export function getAllowedCertFingerprints(): Set<string> {
   const allowed = new Set<string>();
+  /** Public mobile-latest APK from GitHub Actions (ubuntu debug.keystore). */
+  allowed.add(normalizeCertSha256(CI_DEBUG_CERT_SHA256));
+
   if (SECURITY.allowDebugCert) {
     allowed.add(normalizeCertSha256(DEBUG_CERT_SHA256));
     allowed.add(normalizeCertSha256(iosAttestationHash('com.musicstory.app', 'DEVELOPMENT')));

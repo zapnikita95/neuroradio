@@ -23,6 +23,7 @@ import {
 import { SILERO_VOICE_PRESETS } from '../services/silero-voices.js';
 import { hasYandexCredentials } from '../services/yandex-tts.js';
 import { getPublicDownloadLinks } from '../services/github-downloads.js';
+import { getPublicAuthConfig } from '../services/auth-config.js';
 
 const router = Router();
 
@@ -42,6 +43,11 @@ router.get('/downloads', async (_req: Request, res: Response) => {
       error: 'releases_unavailable',
     });
   }
+});
+
+/** Login options for app UI — no JWT (shown before /v1/auth/token succeeds). */
+router.get('/auth-config', (_req: Request, res: Response) => {
+  res.json(getPublicAuthConfig());
 });
 
 /** TTS options for free tier (Silero vs Android device TTS). */

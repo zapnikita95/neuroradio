@@ -80,6 +80,9 @@ router.post('/token', rateLimitAuth, (req: Request, res: Response) => {
 
   const expectedPackage = getAllowedPackageName();
   if (packageName?.trim() !== expectedPackage) {
+    console.warn(
+      `[auth] 403 package mismatch install=${installId.slice(0, 8)} got=${packageName ?? '-'} expected=${expectedPackage}`,
+    );
     res.status(403).json({ error: 'Forbidden' });
     return;
   }
@@ -92,6 +95,9 @@ router.post('/token', rateLimitAuth, (req: Request, res: Response) => {
 
   const allowedCerts = getAllowedCertFingerprints();
   if (allowedCerts.size === 0 || !allowedCerts.has(normalizedCert)) {
+    console.warn(
+      `[auth] 403 cert not allowed install=${installId.slice(0, 8)} cert=${normalizedCert.slice(0, 12)}…`,
+    );
     res.status(403).json({ error: 'Forbidden' });
     return;
   }

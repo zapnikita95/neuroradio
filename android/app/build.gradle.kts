@@ -18,8 +18,8 @@ android {
         applicationId = "com.musicstory.app"
         minSdk = 26
         targetSdk = 35
-        versionCode = 71
-        versionName = "1.5.33"
+        versionCode = 72
+        versionName = "1.5.34"
 
         buildConfigField("String", "VERSION_NAME", "\"$versionName\"")
         buildConfigField("int", "VERSION_CODE", "$versionCode")
@@ -28,6 +28,9 @@ android {
     }
 
     buildTypes {
+        debug {
+            signingConfig = signingConfigs.getByName("debug")
+        }
         release {
             isMinifyEnabled = false
             proguardFiles(
@@ -49,6 +52,15 @@ android {
     buildFeatures {
         compose = true
         buildConfig = true
+    }
+
+    signingConfigs {
+        getByName("debug") {
+            storeFile = file("keystore/debug.keystore")
+            storePassword = "android"
+            keyAlias = "androiddebugkey"
+            keyPassword = "android"
+        }
     }
 }
 

@@ -15,7 +15,7 @@ export const SECURITY = {
   allowDebugCert: process.env.ALLOW_DEBUG_CERT?.trim() !== 'false',
 
   limits: {
-    authPerIpPerMinute: 5,
+    authPerIpPerMinute: 20,
     authPerIpPerDay: 40,
     authPerInstallPerDay: 12,
 
