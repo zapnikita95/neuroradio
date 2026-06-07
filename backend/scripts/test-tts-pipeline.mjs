@@ -162,6 +162,31 @@ test('stress marks Deacon surname as д+икон', () => {
   assert.match(out, /Д\+икон/i);
 });
 
+test('websitePreview: John Landis → Джон Ландис (not джохн)', () => {
+  const out = prepareYandexTtsText('John Landis снял клип.', {
+    artist: 'Michael Jackson',
+    title: 'Thriller',
+    websitePreview: true,
+  });
+  assert.match(out, /Джон Ландис/i);
+  assert.doesNotMatch(out, /джохн/i);
+});
+
+test('websitePreview: хореографу Майклу Питерсу, убеждать Джона Ландиса', () => {
+  const out = prepareYandexTtsText(
+    'Режиссёр John Landis пришёл из кино, а хореографу Michael Peters даже пришлось убеждать его оставить сцену.',
+    {
+      artist: 'Michael Jackson',
+      title: 'Thriller',
+      websitePreview: true,
+    },
+  );
+  assert.match(out, /хореографу Майклу Питерсу/i);
+  assert.match(out, /убеждать Джона Ландиса/i);
+  assert.doesNotMatch(out, /убеждать его/i);
+  assert.doesNotMatch(out, /хореографу Майкл Питерс[^у]/i);
+});
+
 test('prepareYandexTtsText adds sentence pauses', () => {
   const out = prepareYandexTtsText('Первая фраза. Вторая фраза про джаз.', {
     artist: 'Queen',

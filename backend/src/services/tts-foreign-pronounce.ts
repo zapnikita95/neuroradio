@@ -33,6 +33,8 @@ const PHRASE_PRONUNCIATION_RU: Record<string, string> = {
   'vincent price': 'Винсент Прайс',
   mtv: 'Эм-Ти-Ви',
   'michael jackson': 'Майкл Джексон',
+  'john landis': 'Джон Ландис',
+  'michael peters': 'Майкл Питерс',
   moonwalk: 'мун уок',
   'moon walk': 'мун уок',
   xscape: 'икс скейп',
@@ -110,6 +112,12 @@ const EN_WORD_RU: Record<string, string> = {
   tiktok: 'ТикТок',
   youtube: 'Ютуб',
   spotify: 'Спotify',
+  john: 'Джон',
+  landis: 'Ландис',
+  michael: 'Майкл',
+  peters: 'Питерс',
+  vincent: 'Винсент',
+  price: 'Прайс',
 };
 
 const IT_WORD_RU: Record<string, string> = {
@@ -237,12 +245,15 @@ export function latinPhraseToRussianTts(phrase: string, langHint?: ForeignLang):
   const mapped = words.map((word) => {
     if (word === '&') return 'энд';
     if (!hasLatinLetters(word)) return word;
-    const wl = word.toLowerCase().replace(/['’]/g, '');
-    if (EN_WORD_RU[wl]) return capitalizeLike(word, EN_WORD_RU[wl]);
+    const punct = word.match(/[.!?…;:]+$/)?.[0] ?? '';
+    const core = punct ? word.slice(0, -punct.length) : word;
+    const wl = core.toLowerCase().replace(/['']/g, '');
+    if (EN_WORD_RU[wl]) return capitalizeLike(core, EN_WORD_RU[wl]) + punct;
     if (lang === 'it') return transliterateItalianWord(word);
     if (lang === 'es') return transliterateSpanishWord(word);
-    const t = transliterateEnglishWord(word);
-    return /[A-Za-z]/.test(t) ? spellLatinWordPhonetic(t) : t;
+    const t = transliterateEnglishWord(core);
+    const body = /[A-Za-z]/.test(t) ? spellLatinWordPhonetic(core) : t;
+    return capitalizeLike(core, body) + punct;
   });
   return mapped.join(' ');
 }
@@ -468,7 +479,12 @@ export function preserveMusicProperNames(script: string, artist: string, title: 
     const short = artist.trim().split(/\s+/)[0];
     if (short && short.length >= 2 && short.length < artist.trim().length) {
       const shortEsc = short.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-      const wrongShort = new RegExp(`\\b${shortEsc}\\b(?!\\s${escaped.split(/\s+/).slice(1).map((p) => p.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('\\s+')})`, 'i');
+      const rest = escaped.split(/\s+/).slice(1).map((p) => p.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('\\s+');
+      // Расширяем только одиночное «Michael», не «Michael Peters» и не полное имя артиста.
+      const wrongShort = new RegExp(
+        `\\b${shortEsc}\\b(?!\\s+${rest})(?!\\s+[A-Za-zÀ-ÿА-Яа-яЁё])`,
+        'i',
+      );
       if (wrongShort.test(result) && !result.toLowerCase().includes(artist.trim().toLowerCase())) {
         result = result.replace(wrongShort, artist.trim());
       }

@@ -105,6 +105,16 @@ function collapseMarkupWhitespace(text: string): string {
     .trim();
 }
 
+/** Превью сайта: падежи имён после транслитерации. */
+function fixWebsiteRussianInflection(text: string): string {
+  return text
+    .replace(/хореографу\s+Майкл\s+Питерс(?=\s|,|\.|!|\?|…|$)/gi, 'хореографу Майклу Питерсу')
+    .replace(/убеждать\s+его(?=\s|,|\.|!|\?|…|$)/gi, 'убеждать Джона Ландиса')
+    .replace(/убеждать\s+ландиса(?=\s|,|\.|!|\?|…|$)/gi, 'убеждать Джона Ландиса')
+    .replace(/убеждал\s+его(?=\s|,|\.|!|\?|…|$)/gi, 'убеждал Джона Ландиса')
+    .replace(/убеждал\s+ландиса(?=\s|,|\.|!|\?|…|$)/gi, 'убеждал Джона Ландиса');
+}
+
 /**
  * Prepare story script for Yandex SpeechKit TTS:
  * sanitize → polish → stress → pauses → Latin kept for SSML <lang en-US>.
@@ -135,7 +145,7 @@ export function prepareYandexTtsText(
   }
 
   text = options.websitePreview
-    ? applyForeignPronunciation(text, artist, title)
+    ? fixWebsiteRussianInflection(applyForeignPronunciation(text, artist, title))
     : enhanceMixedLanguageText(text, artist, title);
 
   return collapseMarkupWhitespace(text);
