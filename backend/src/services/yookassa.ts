@@ -72,12 +72,14 @@ export async function createYooKassaPayment(options: {
     body: JSON.stringify({
       amount: { value: planMeta.amountRub.toFixed(2), currency: 'RUB' },
       capture: true,
+      save_payment_method: true,
       confirmation: { type: 'redirect', return_url: returnUrl },
-      description: `Эфир AI — ${planMeta.labelRu}`,
+      description: `Эфир AI — ${planMeta.labelRu} (автопродление)`,
       metadata: {
         email: options.email.trim().toLowerCase(),
         plan: options.plan,
         service: 'efir-ai',
+        recurring: 'false',
       },
     }),
   });
@@ -119,9 +121,95 @@ export type YooKassaWebhookEvent = {
   object?: {
     id?: string;
     status?: string;
-    metadata?: { email?: string; plan?: string };
+    metadata?: { email?: string; plan?: string; recurring?: string | boolean };
   };
 };
+
+export type YooKassaPaymentDetails = {
+  id: string;
+  status: string;
+  paymentMethodId: string | null;
+  paymentMethodSaved: boolean;
+  metadata?: { email?: string; plan?: string; recurring?: string | boolean };
+};
+
+export async function fetchYooKassaPayment(paymentId: string): Promise<YooKassaPaymentDetails | null> {
+  if (!isYooKassaConfigured()) return null;
+  const res = await fetch(`${YOOKASSA_API}/payments/${encodeURIComponent(paymentId)}`, {
+    headers: { Authorization: authHeader() },
+  });
+  if (!res.ok) {
+    const detail = await res.text().catch(() => '');
+    console.warn(`[yookassa] fetch payment ${paymentId} HTTP ${res.status}${detail ? `: ${detail.slice(0, 200)}` : ''}`);
+    return null;
+  }
+  const data = (await res.json()) as {
+    id?: string;
+    status?: string;
+    payment_method?: { id?: string; saved?: boolean };
+    metadata?: { email?: string; plan?: string; recurring?: string | boolean };
+  };
+  const id = data.id?.trim();
+  if (!id) return null;
+  const pm = data.payment_method;
+  return {
+    id,
+    status: data.status ?? 'unknown',
+    paymentMethodId: pm?.id?.trim() ?? null,
+    paymentMethodSaved: Boolean(pm?.saved && pm?.id),
+    metadata: data.metadata,
+  };
+}
+
+export async function createRecurringYooKassaPayment(options: {
+  email: string;
+  plan: SubscriptionPlan;
+  paymentMethodId: string;
+}): Promise<{ paymentId: string; status: string }> {
+  if (!isYooKassaConfigured()) {
+    throw new Error('YOOKASSA_NOT_CONFIGURED');
+  }
+  const planMeta = SUBSCRIPTION_PLANS[options.plan];
+  const idempotenceKey = crypto.randomUUID();
+  const res = await fetch(`${YOOKASSA_API}/payments`, {
+    method: 'POST',
+    headers: {
+      Authorization: authHeader(),
+      'Content-Type': 'application/json',
+      'Idempotence-Key': idempotenceKey,
+    },
+    body: JSON.stringify({
+      amount: { value: planMeta.amountRub.toFixed(2), currency: 'RUB' },
+      capture: true,
+      payment_method_id: options.paymentMethodId,
+      description: `Эфир AI — ${planMeta.labelRu} (автопродление)`,
+      metadata: {
+        email: options.email.trim().toLowerCase(),
+        plan: options.plan,
+        service: 'efir-ai',
+        recurring: 'true',
+      },
+    }),
+  });
+  if (!res.ok) {
+    const detail = await res.text().catch(() => '');
+    throw new Error(`YooKassa recurring HTTP ${res.status}${detail ? `: ${detail.slice(0, 300)}` : ''}`);
+  }
+  const data = (await res.json()) as { id?: string; status?: string };
+  const paymentId = data.id?.trim();
+  if (!paymentId) throw new Error('YooKassa recurring response missing payment id');
+
+  pendingById.set(paymentId, {
+    yookassaPaymentId: paymentId,
+    email: options.email.trim().toLowerCase(),
+    plan: options.plan,
+    amountRub: planMeta.amountRub,
+    status: 'pending',
+    createdAt: Date.now(),
+  });
+
+  return { paymentId, status: data.status ?? 'pending' };
+}
 
 export function parseYooKassaWebhook(body: unknown): YooKassaWebhookEvent | null {
   if (!body || typeof body !== 'object') return null;

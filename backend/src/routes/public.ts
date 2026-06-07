@@ -7,12 +7,10 @@ import {
   SUBSCRIPTION_PLANS,
   type SubscriptionPlan,
 } from '../services/yookassa.js';
-import { grantPremiumByEmail } from '../services/account-store.js';
+import { applyYooKassaPaymentSucceeded } from '../services/yookassa-billing.js';
 import {
   isEmailConfigured,
   sendPaymentLinkEmail,
-  sendPaymentSuccessEmail,
-  sendReceiptRequestEmail,
   sendSubscribeEmail,
 } from '../services/email-sender.js';
 import {
@@ -189,33 +187,16 @@ router.post('/yookassa/webhook', async (req: Request, res: Response) => {
     const email = metaEmail || pending?.email;
     const plan = metaPlan || pending?.plan;
 
-    if (email && plan) {
-      const planMeta = SUBSCRIPTION_PLANS[plan];
+    if (email && plan && paymentId) {
       try {
-        const entitlement = grantPremiumByEmail(email, {
-          months: planMeta.months,
-          productId: planMeta.productId,
+        const metaRecurring =
+          event.object?.metadata?.recurring === 'true' || event.object?.metadata?.recurring === true;
+        await applyYooKassaPaymentSucceeded({
+          paymentId,
+          email,
+          plan,
+          metadataRecurring: metaRecurring,
         });
-        const premiumUntilIso = new Date(entitlement.premiumUntil).toISOString();
-        if (isEmailConfigured()) {
-          void sendPaymentSuccessEmail({
-            to: email,
-            plan: planMeta.labelRu,
-            amountRub: planMeta.amountRub,
-            premiumUntilIso,
-          }).catch((err) => {
-            console.warn('[yookassa/webhook] user success email failed:', err instanceof Error ? err.message : err);
-          });
-          void sendReceiptRequestEmail({
-            userEmail: email,
-            plan: planMeta.labelRu,
-            amountRub: planMeta.amountRub,
-            paymentId: paymentId ?? 'unknown',
-            premiumUntilIso,
-          }).catch((err) => {
-            console.warn('[yookassa/webhook] receipt request email failed:', err instanceof Error ? err.message : err);
-          });
-        }
       } catch (err) {
         console.error('[yookassa/webhook] grant failed:', err instanceof Error ? err.message : err);
       }

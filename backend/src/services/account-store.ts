@@ -111,6 +111,12 @@ interface AccountRecord {
   email?: string | null;
   telegramId?: number | null;
   telegramUsername?: string | null;
+  /** YooKassa saved card for autopay (like Movie Planner). */
+  yookassaPaymentMethodId?: string | null;
+  subscriptionPlan?: 'month' | 'quarter' | 'year' | null;
+  nextPaymentAt?: number | null;
+  autoRenew?: boolean;
+  lastRecurringAttemptAt?: number | null;
   usedSeeds?: UsedSeedRecord[];
   listenStats?: ListenStat[];
 }
@@ -652,9 +658,17 @@ export function grantPremiumSubscription(
 }
 
 /** Activate or extend premium by email (website / YooKassa). Creates account if needed. */
+export interface GrantPremiumOptions {
+  months?: number;
+  productId?: string;
+  subscriptionPlan?: 'month' | 'quarter' | 'year';
+  paymentMethodId?: string | null;
+  autoRenew?: boolean;
+}
+
 export function grantPremiumByEmail(
   emailRaw: string,
-  options: { months?: number; productId?: string } = {},
+  options: GrantPremiumOptions = {},
 ): AccountEntitlement {
   const email = normalizeEmail(emailRaw);
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
@@ -701,11 +715,78 @@ export function grantPremiumByEmail(
   account.plan = 'premium';
   account.premiumUntil = base + months * PREMIUM_MS_MONTH;
   account.premiumProductId = options.productId ?? PREMIUM_PRODUCT_MONTHLY;
+
+  if (options.subscriptionPlan) {
+    account.subscriptionPlan = options.subscriptionPlan;
+  }
+  if (options.paymentMethodId) {
+    account.yookassaPaymentMethodId = options.paymentMethodId;
+    account.autoRenew = options.autoRenew ?? true;
+  } else if (options.autoRenew === false) {
+    account.autoRenew = false;
+    account.yookassaPaymentMethodId = null;
+    account.nextPaymentAt = null;
+  }
+  if (account.autoRenew && account.yookassaPaymentMethodId && account.subscriptionPlan) {
+    account.nextPaymentAt = account.premiumUntil;
+  }
+
   saveStore(store);
   console.log(
-    `[billing] premium by email=${email} months=${months} until=${new Date(account.premiumUntil).toISOString()}`,
+    `[billing] premium by email=${email} months=${months} until=${new Date(account.premiumUntil).toISOString()}` +
+      (account.yookassaPaymentMethodId ? ` autopay=${account.subscriptionPlan}` : ' autopay=off'),
   );
   return entitlementFromAccount(account);
+}
+
+export function listAccountsDueForRenewal(retryCooldownMs: number): Array<{
+  email: string;
+  plan: 'month' | 'quarter' | 'year';
+  paymentMethodId: string;
+}> {
+  const store = loadStore();
+  const now = Date.now();
+  const out: Array<{ email: string; plan: 'month' | 'quarter' | 'year'; paymentMethodId: string }> = [];
+
+  for (const account of Object.values(store.accountsById)) {
+    const email = account.email?.trim().toLowerCase();
+    const plan = account.subscriptionPlan;
+    const paymentMethodId = account.yookassaPaymentMethodId?.trim();
+    if (!email || !plan || !paymentMethodId) continue;
+    if (account.autoRenew === false) continue;
+    const nextAt = account.nextPaymentAt ?? 0;
+    if (nextAt > now) continue;
+    const lastAttempt = account.lastRecurringAttemptAt ?? 0;
+    if (lastAttempt && now - lastAttempt < retryCooldownMs) continue;
+    out.push({ email, plan, paymentMethodId });
+  }
+  return out;
+}
+
+export function markRecurringAttempt(emailRaw: string): void {
+  const email = normalizeEmail(emailRaw);
+  const store = loadStore();
+  const accountId = store.emailToAccount?.[email];
+  if (!accountId) return;
+  const account = store.accountsById[accountId];
+  if (!account) return;
+  account.lastRecurringAttemptAt = Date.now();
+  saveStore(store);
+}
+
+export function cancelAutoRenewByEmail(emailRaw: string): boolean {
+  const email = normalizeEmail(emailRaw);
+  const store = loadStore();
+  const accountId = store.emailToAccount?.[email];
+  if (!accountId) return false;
+  const account = store.accountsById[accountId];
+  if (!account) return false;
+  account.autoRenew = false;
+  account.yookassaPaymentMethodId = null;
+  account.nextPaymentAt = null;
+  saveStore(store);
+  console.log(`[billing] autopay cancelled email=${email}`);
+  return true;
 }
 
 const TRIAL_MS_MONTH = 31 * 24 * 60 * 60 * 1000;

@@ -36,6 +36,7 @@ import { hydrateDevTierStoreFromPostgres } from './services/dev-tier-store.js';
 import { buildTelegramWidgetPageHtml, telegramBotUsername } from './routes/telegram-widget-page.js';
 import { resolveWebsiteDir, serveWebsite } from './serve-website.js';
 import publicRouter from './routes/public.js';
+import { startSubscriptionRenewalScheduler } from './services/subscription-renewal.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PORT = parseInt(process.env.PORT ?? '3000', 10);
@@ -201,6 +202,8 @@ async function boot(): Promise<void> {
   } catch (err) {
     console.warn('[boot] fact-bank purge failed:', err instanceof Error ? err.message : err);
   }
+
+  startSubscriptionRenewalScheduler();
 
   const server = app.listen(PORT, '0.0.0.0', () => {
     console.log(`Music Story BFF listening on http://0.0.0.0:${PORT}`);
