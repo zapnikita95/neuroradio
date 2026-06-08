@@ -44,6 +44,8 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.musicstory.app.MusicStoryApp
 import com.musicstory.app.R
+import com.musicstory.app.ui.components.BillingLegalFooter
+import com.musicstory.app.ui.components.BillingPaymentConsentBlock
 import com.musicstory.app.ui.components.PaymentCheckoutSheet
 import com.musicstory.app.ui.components.PrimaryStoryButton
 import com.musicstory.app.ui.components.SecondaryStoryButton
@@ -128,6 +130,10 @@ private fun BillingTab(app: MusicStoryApp) {
     var unlinkLoading by remember { mutableStateOf(false) }
     var unlinkMessage by remember { mutableStateOf<String?>(null) }
     var paymentUrl by remember { mutableStateOf<String?>(null) }
+    var agreeOferta by remember { mutableStateOf(false) }
+    var agreePrivacy by remember { mutableStateOf(false) }
+    var agreeConsent by remember { mutableStateOf(false) }
+    val paymentAgreementsOk = agreeOferta && agreePrivacy && agreeConsent
 
     suspend fun refreshBilling() {
         try {
@@ -312,17 +318,30 @@ private fun BillingTab(app: MusicStoryApp) {
             color = CreamText,
         )
 
+        BillingPaymentConsentBlock(
+            agreeOferta = agreeOferta,
+            onAgreeOfertaChange = { agreeOferta = it },
+            agreePrivacy = agreePrivacy,
+            onAgreePrivacyChange = { agreePrivacy = it },
+            agreeConsent = agreeConsent,
+            onAgreeConsentChange = { agreeConsent = it },
+            enabled = !loading,
+        )
+
         PlanButton(
             label = context.getString(R.string.billing_plan_month),
             price = "199 ₽",
             oldPrice = null,
             featured = false,
-            enabled = !loading,
+            enabled = !loading && paymentAgreementsOk,
         ) {
             scope.launch {
-                pay(app, backendUrl, email, "month", { loading = it }, { error = it }) { url ->
-                    paymentUrl = url
-                }
+                pay(
+                    app, backendUrl, email, "month",
+                    paymentAgreementsOk,
+                    { loading = it },
+                    { error = it },
+                ) { url -> paymentUrl = url }
             }
         }
         PlanButton(
@@ -330,12 +349,15 @@ private fun BillingTab(app: MusicStoryApp) {
             price = "1999 ₽",
             oldPrice = "2388 ₽",
             featured = true,
-            enabled = !loading,
+            enabled = !loading && paymentAgreementsOk,
         ) {
             scope.launch {
-                pay(app, backendUrl, email, "year", { loading = it }, { error = it }) { url ->
-                    paymentUrl = url
-                }
+                pay(
+                    app, backendUrl, email, "year",
+                    paymentAgreementsOk,
+                    { loading = it },
+                    { error = it },
+                ) { url -> paymentUrl = url }
             }
         }
         PlanButton(
@@ -343,12 +365,15 @@ private fun BillingTab(app: MusicStoryApp) {
             price = "499 ₽",
             oldPrice = "597 ₽",
             featured = false,
-            enabled = !loading,
+            enabled = !loading && paymentAgreementsOk,
         ) {
             scope.launch {
-                pay(app, backendUrl, email, "quarter", { loading = it }, { error = it }) { url ->
-                    paymentUrl = url
-                }
+                pay(
+                    app, backendUrl, email, "quarter",
+                    paymentAgreementsOk,
+                    { loading = it },
+                    { error = it },
+                ) { url -> paymentUrl = url }
             }
         }
 
@@ -358,6 +383,9 @@ private fun BillingTab(app: MusicStoryApp) {
         error?.let {
             Text(text = it, color = ErrorCoral, style = MaterialTheme.typography.bodySmall)
         }
+
+        Spacer(modifier = Modifier.height(8.dp))
+        BillingLegalFooter()
     }
 }
 
@@ -366,11 +394,16 @@ private suspend fun pay(
     backendUrl: String,
     email: String,
     plan: String,
+    agreementsAccepted: Boolean,
     setLoading: (Boolean) -> Unit,
     setError: (String?) -> Unit,
     onOpenCheckout: (String) -> Unit,
 ) {
     val context = app.applicationContext
+    if (!agreementsAccepted) {
+        setError(context.getString(R.string.billing_agreements_required))
+        return
+    }
     if (email.isBlank() || !email.contains('@')) {
         setError(context.getString(R.string.billing_email_required))
         return

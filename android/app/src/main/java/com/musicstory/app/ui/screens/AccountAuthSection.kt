@@ -28,6 +28,7 @@ import com.musicstory.app.R
 import com.musicstory.app.data.local.toCached
 import com.musicstory.app.data.local.toProfile
 import com.musicstory.app.data.remote.AccountAuthManager
+import com.musicstory.app.ui.components.AuthPrivacyConsentRow
 import com.musicstory.app.ui.components.PrimaryStoryButton
 import com.musicstory.app.ui.components.SecondaryStoryButton
 import com.musicstory.app.ui.components.TelegramLoginWidgetSheet
@@ -217,6 +218,7 @@ fun AccountEmailLoginContent(
     var codeSent by remember { mutableStateOf(false) }
     var message by remember { mutableStateOf<String?>(null) }
     var busy by remember { mutableStateOf(false) }
+    var agreePrivacy by remember { mutableStateOf(false) }
 
     val fieldColors = OutlinedTextFieldDefaults.colors(
         focusedBorderColor = GoldBright,
@@ -237,6 +239,13 @@ fun AccountEmailLoginContent(
             Spacer(modifier = Modifier.height(16.dp))
         }
 
+        AuthPrivacyConsentRow(
+            checked = agreePrivacy,
+            onCheckedChange = { agreePrivacy = it },
+            enabled = !busy,
+        )
+        Spacer(modifier = Modifier.height(8.dp))
+
         OutlinedTextField(
             value = email,
             onValueChange = { email = it.trim() },
@@ -255,6 +264,10 @@ fun AccountEmailLoginContent(
                 text = context.getString(R.string.settings_auth_send_code),
                 onClick = {
                     if (busy || email.isBlank()) return@PrimaryStoryButton
+                    if (!agreePrivacy) {
+                        message = context.getString(R.string.auth_privacy_required)
+                        return@PrimaryStoryButton
+                    }
                     scope.launch {
                         busy = true
                         message = null
@@ -287,6 +300,10 @@ fun AccountEmailLoginContent(
                 text = context.getString(R.string.settings_auth_verify),
                 onClick = {
                     if (busy || code.length < 4) return@PrimaryStoryButton
+                    if (!agreePrivacy) {
+                        message = context.getString(R.string.auth_privacy_required)
+                        return@PrimaryStoryButton
+                    }
                     scope.launch {
                         busy = true
                         message = null
@@ -341,6 +358,7 @@ fun AccountTelegramLoginSection(
     var backendUrl by remember { mutableStateOf("") }
     var message by remember { mutableStateOf<String?>(null) }
     var showSheet by remember { mutableStateOf(false) }
+    var agreePrivacy by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) {
         backendUrl = app.settingsDataStore.backendUrl.first()
@@ -380,9 +398,18 @@ fun AccountTelegramLoginSection(
             color = MutedLavender,
         )
         Spacer(modifier = Modifier.height(12.dp))
+        AuthPrivacyConsentRow(
+            checked = agreePrivacy,
+            onCheckedChange = { agreePrivacy = it },
+        )
+        Spacer(modifier = Modifier.height(12.dp))
         PrimaryStoryButton(
             text = context.getString(R.string.settings_auth_telegram),
             onClick = {
+                if (!agreePrivacy) {
+                    message = context.getString(R.string.auth_privacy_required)
+                    return@PrimaryStoryButton
+                }
                 if (authConfig?.telegramWidgetBaseUrl.isNullOrBlank()) {
                     message = context.getString(R.string.settings_auth_telegram_not_configured)
                 } else {
