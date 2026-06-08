@@ -21,6 +21,7 @@ import {
   splitMixedLanguageForSilero,
 } from '../dist/services/tts-silero-segments.js';
 import { wrapSileroRussianSsml } from '../dist/services/tts-silero-ssml.js';
+import { resolveEdgeTtsDeliveryForSilero } from '../dist/services/edge-tts-en.js';
 import { normalizeYearsForRussianTts } from '../dist/services/tts-russian-years.js';
 
 let passed = 0;
@@ -391,6 +392,12 @@ test('wrapSileroRussianSsml adds sentence breaks and prosody', () => {
   assert.match(ssml, /prosody rate="medium" pitch="x-high"/);
   assert.match(ssml, /<s>/);
   assert.doesNotMatch(ssml, /The Hit/i);
+});
+
+test('Edge TTS rate uses integer percent not +6.00%', () => {
+  const d = resolveEdgeTtsDeliveryForSilero('eugene', 1.0);
+  assert.match(d.rate, /^\+6%$/);
+  assert.doesNotMatch(d.rate, /\.00/);
 });
 
 console.log(`\n[test-tts-pipeline] ${passed} passed`);

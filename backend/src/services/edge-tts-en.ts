@@ -7,9 +7,9 @@ const EN_PROFILE_BY_SILERO: Record<
   { voice: string; rateOffset: number; pitch: string; note: string }
 > = {
   aidar: {
-    voice: 'en-US-DavisNeural',
+    voice: 'en-US-EricNeural',
     rateOffset: 0,
-    pitch: '-1Hz',
+    pitch: '+0Hz',
     note: 'спокойный мужской',
   },
   eugene: {
