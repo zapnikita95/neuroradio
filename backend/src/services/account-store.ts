@@ -1046,6 +1046,46 @@ export async function getWebCabinetStatus(
   return { ok: true, status: webCabinetStatusFromAccount(verified.email, account) };
 }
 
+export async function cancelSubscriptionViaWebCabinet(
+  emailRaw: string,
+  codeRaw: string,
+): Promise<
+  | { ok: true; status: WebCabinetStatus; message: string }
+  | { ok: false; error: string; code?: string }
+> {
+  await ensureAccountStoreLoaded();
+  const verified = verifyWebCabinetCode(emailRaw, codeRaw);
+  if (!verified.ok) return verified;
+  const account = getAccountByEmail(verified.email);
+  if (!account) {
+    return { ok: false, error: 'Аккаунт с этим email не найден', code: 'NOT_FOUND' };
+  }
+  if (!account.autoRenew && !account.yookassaPaymentMethodId?.trim()) {
+    const store = loadStore();
+    delete store.pendingWebCabinetCodes?.[verified.email];
+    saveStore(store);
+    return {
+      ok: true,
+      status: webCabinetStatusFromAccount(verified.email, account),
+      message: 'Автопродление уже отключено. Доступ сохранится до конца оплаченного периода.',
+    };
+  }
+  cancelAutoRenewByEmail(verified.email);
+  const store = loadStore();
+  delete store.pendingWebCabinetCodes?.[verified.email];
+  saveStore(store);
+  const updated = getAccountByEmail(verified.email);
+  if (!updated) {
+    return { ok: false, error: 'Аккаунт недоступен', code: 'NOT_FOUND' };
+  }
+  return {
+    ok: true,
+    status: webCabinetStatusFromAccount(verified.email, updated),
+    message:
+      'Подписка отменена. Автопродление отключено. Доступ сохранится до конца оплаченного периода.',
+  };
+}
+
 export async function unlinkCardViaWebCabinet(
   emailRaw: string,
   codeRaw: string,

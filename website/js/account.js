@@ -100,11 +100,28 @@
 
     statusEl.innerHTML = html;
 
-    if (options.unlinkBtn) {
-      var canUnlink = st.cardSaved || st.autoRenew;
-      options.unlinkBtn.hidden = !canUnlink;
-      if (options.unlinkHint) options.unlinkHint.hidden = !canUnlink;
+    if (options.cancelBtn || options.unlinkBtn) {
+      var canManage = isSubscriptionActive(st) || st.cardSaved || st.autoRenew;
+      if (options.cancelBtn) options.cancelBtn.hidden = !canManage;
+      if (options.unlinkBtn) options.unlinkBtn.hidden = !canManage;
+      if (options.actionHint) options.actionHint.hidden = !canManage;
     }
+  }
+
+  function doLogout() {
+    clearSession();
+    updateHeaderAuth();
+    window.location.href = window.EFIR_ACCOUNT_URL ? '../' : '/';
+  }
+
+  function postCabinetAction(path, email, code) {
+    return fetch(apiUrl(path), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: email, code: code }),
+    }).then(function (r) {
+      return r.json().then(function (j) { return { ok: r.ok, body: j }; });
+    });
   }
 
   function fetchStatus(email, code) {
@@ -120,9 +137,20 @@
   function updateHeaderAuth() {
     var loginBtn = $('#navLoginBtn');
     var cabinetLink = $('#navCabinetBtn');
+    var logoutBtn = $('#navLogoutBtn');
     var session = getSession();
     if (loginBtn) loginBtn.hidden = Boolean(session);
-    if (cabinetLink) cabinetLink.hidden = !session;
+    if (cabinetLink) cabinetLink.hidden = true;
+    if (logoutBtn) logoutBtn.hidden = !session;
+  }
+
+  function bindHeaderLogout() {
+    var logoutBtn = $('#navLogoutBtn');
+    if (!logoutBtn || logoutBtn.dataset.bound) return;
+    logoutBtn.dataset.bound = '1';
+    logoutBtn.addEventListener('click', function () {
+      if (window.confirm('Выйти из личного кабинета?')) doLogout();
+    });
   }
 
   function openLoginModal() {
@@ -216,6 +244,7 @@
             if (res.ok) {
               if (codeBlock) codeBlock.hidden = false;
               if (submitBtn) submitBtn.hidden = false;
+              if (codeErr) codeErr.hidden = true;
               showMsg('Код отправлен на ' + email + '. Проверьте почту (и спам).', false);
               if (codeInput) codeInput.focus();
               return;
@@ -234,12 +263,19 @@
       form.addEventListener('submit', function (e) {
         e.preventDefault();
         var email = emailInput ? emailInput.value.trim() : '';
-        var code = codeInput ? codeInput.value.trim() : '';
-        if (emailErr) emailErr.hidden = validEmail(email);
-        if (codeErr) codeErr.hidden = code.length >= 4;
-        if (!validEmail(email) || code.length < 4) return;
+        if (!validEmail(email)) {
+          if (emailErr) emailErr.hidden = false;
+          return;
+        }
+        if (emailErr) emailErr.hidden = true;
         if (codeBlock && codeBlock.hidden) {
-          showMsg('Сначала нажмите «Получить код»', true);
+          if (sendBtn) sendBtn.click();
+          return;
+        }
+        var code = codeInput ? codeInput.value.trim() : '';
+        if (codeErr) codeErr.hidden = true;
+        if (code.length < 4) {
+          if (codeErr) codeErr.hidden = false;
           return;
         }
         showMsg('', false);
@@ -276,10 +312,10 @@
     }
 
     var statusEl = $('#cabinetStatus');
+    var cancelBtn = $('#cabinetCancelBtn');
     var unlinkBtn = $('#cabinetUnlinkBtn');
-    var unlinkHint = $('#cabinetUnlinkHint');
+    var actionHint = $('#cabinetActionHint');
     var msgEl = $('#cabinetMsg');
-    var logoutBtn = $('#cabinetLogoutBtn');
     var emailEl = $('#cabinetUserEmail');
 
     function showMsg(text, isErr) {
@@ -293,7 +329,28 @@
       saveSession(session.email, session.code, st);
       session.status = st;
       if (emailEl) emailEl.textContent = st.email;
-      renderCabinetStatus(statusEl, st, { unlinkBtn: unlinkBtn, unlinkHint: unlinkHint });
+      renderCabinetStatus(statusEl, st, {
+        cancelBtn: cancelBtn,
+        unlinkBtn: unlinkBtn,
+        actionHint: actionHint,
+      });
+    }
+
+    function runCabinetAction(btn, path, confirmText, okFallback) {
+      if (!window.confirm(confirmText)) return;
+      btn.disabled = true;
+      showMsg('', false);
+      postCabinetAction(path, session.email, session.code)
+        .then(function (res) {
+          if (res.ok && res.body.status) {
+            applyStatus(res.body.status);
+            showMsg(res.body.message || okFallback, false);
+            return;
+          }
+          showMsg((res.body && res.body.error) || 'Не удалось выполнить действие', true);
+        })
+        .catch(function () { showMsg('Сеть недоступна — попробуйте позже', true); })
+        .finally(function () { btn.disabled = false; });
     }
 
     if (emailEl) emailEl.textContent = session.email;
@@ -317,41 +374,32 @@
       })
       .catch(function () { showMsg('Не удалось загрузить данные подписки', true); });
 
-    if (unlinkBtn) {
-      unlinkBtn.addEventListener('click', function () {
-        if (!window.confirm('Отвязать карту? Автопродление отключится. Доступ сохранится до конца оплаченного периода.')) return;
-        unlinkBtn.disabled = true;
-        showMsg('', false);
-        fetch(apiUrl('/account/unlink-card'), {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email: session.email, code: session.code }),
-        })
-          .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, body: j }; }); })
-          .then(function (res) {
-            if (res.ok && res.body.status) {
-              applyStatus(res.body.status);
-              showMsg(res.body.message || 'Карта отвязана', false);
-              return;
-            }
-            showMsg((res.body && res.body.error) || 'Не удалось отвязать карту', true);
-          })
-          .catch(function () { showMsg('Сеть недоступна — попробуйте позже', true); })
-          .finally(function () { unlinkBtn.disabled = false; });
+    if (cancelBtn) {
+      cancelBtn.addEventListener('click', function () {
+        runCabinetAction(
+          cancelBtn,
+          '/account/cancel-subscription',
+          'Отменить подписку? Автопродление отключится. Доступ сохранится до конца оплаченного периода.',
+          'Подписка отменена. Автопродление отключено.',
+        );
       });
     }
 
-    if (logoutBtn) {
-      logoutBtn.addEventListener('click', function () {
-        clearSession();
-        updateHeaderAuth();
-        window.location.href = '../';
+    if (unlinkBtn) {
+      unlinkBtn.addEventListener('click', function () {
+        runCabinetAction(
+          unlinkBtn,
+          '/account/unlink-card',
+          'Отвязать карту? Автопродление отключится. Доступ сохранится до конца оплаченного периода.',
+          'Карта отвязана',
+        );
       });
     }
   }
 
   function init() {
     updateHeaderAuth();
+    bindHeaderLogout();
     initLoginModal();
     initCabinetPage();
 

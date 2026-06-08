@@ -36,8 +36,8 @@
       <a href="../#docs">Документы</a>
     </nav>
     <div class="header-actions">
-      <button type="button" class="btn btn-ghost btn-sm nav-login" id="navLoginBtn">Войти</button>
-      <a href="index.html" class="btn btn-ghost btn-sm nav-cabinet" id="navCabinetBtn" hidden>Кабинет</a>
+      <button type="button" class="btn btn-ghost btn-sm nav-login" id="navLoginBtn" hidden>Войти</button>
+      <button type="button" class="btn btn-ghost btn-sm nav-logout" id="navLogoutBtn">Выйти</button>
       <a href="../#download" class="btn btn-primary btn-sm nav-cta">Скачать</a>
     </div>
     <button class="burger" id="burger" aria-label="Меню" aria-expanded="false">
@@ -59,16 +59,16 @@
         </div>
 
         <div class="cabinet-actions">
-          <button type="button" class="btn btn-ghost btn-block account-unlink" id="cabinetUnlinkBtn" hidden>
+          <button type="button" class="btn btn-ghost btn-block cabinet-cancel" id="cabinetCancelBtn">
+            Отменить подписку
+          </button>
+          <button type="button" class="btn btn-ghost btn-block account-unlink" id="cabinetUnlinkBtn">
             Отвязать карту
           </button>
-          <p class="account-hint" id="cabinetUnlinkHint" hidden>
-            Карта будет отвязана, автопродление отключится. Доступ сохранится до конца оплаченного периода.
+          <p class="account-hint" id="cabinetActionHint">
+            Автопродление отключится, карта будет отвязана. Доступ сохранится до конца оплаченного периода — это требование ЮKassa для отмены оплаты.
           </p>
           <p class="account-msg" id="cabinetMsg" hidden></p>
-          <button type="button" class="btn btn-ghost btn-block cabinet-logout" id="cabinetLogoutBtn">
-            Выйти из аккаунта
-          </button>
         </div>
 
         <p class="cabinet-url-note">

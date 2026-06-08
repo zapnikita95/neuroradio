@@ -25,6 +25,7 @@ import { getPublicAuthConfig } from '../services/auth-config.js';
 import {
   getWebCabinetStatus,
   startWebCabinetCode,
+  cancelSubscriptionViaWebCabinet,
   unlinkCardViaWebCabinet,
 } from '../services/account-store.js';
 
@@ -254,6 +255,24 @@ router.post('/account/status', async (req: Request, res: Response) => {
     return;
   }
   res.json({ ok: true, status: result.status });
+});
+
+/** Отменить подписку (автопродление) из личного кабинета на сайте. */
+router.post('/account/cancel-subscription', async (req: Request, res: Response) => {
+  const ip = clientIp(req);
+  if (rateLimited(ip)) {
+    res.status(429).json({ error: 'Слишком много запросов, попробуйте позже' });
+    return;
+  }
+  const email = typeof req.body?.email === 'string' ? req.body.email.trim() : '';
+  const code = typeof req.body?.code === 'string' ? req.body.code.trim() : '';
+  const result = await cancelSubscriptionViaWebCabinet(email, code);
+  if (!result.ok) {
+    const status = result.code === 'NOT_FOUND' ? 404 : 400;
+    res.status(status).json({ ok: false, error: result.error, code: result.code });
+    return;
+  }
+  res.json({ ok: true, status: result.status, message: result.message });
 });
 
 /** Отвязать карту из личного кабинета на сайте. */

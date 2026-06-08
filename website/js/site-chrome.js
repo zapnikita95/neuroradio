@@ -19,7 +19,7 @@
       burger.classList.toggle('open', open);
       burger.setAttribute('aria-expanded', open ? 'true' : 'false');
     });
-    $$('.nav a, .header-actions a, .header-actions button, .nav-cta').forEach(function (el) {
+    $$('.nav a, .header-actions a, .header-actions button, .nav-cta, .nav-logout').forEach(function (el) {
       el.addEventListener('click', function () {
         header.classList.remove('menu-open');
         burger.classList.remove('open');

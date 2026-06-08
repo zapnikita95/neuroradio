@@ -85,8 +85,30 @@ export function getAuthJwtSecret(): string | null {
   return crypto.createHmac('sha256', 'music-story-app-jwt-v1').update(groqKey).digest('hex');
 }
 
+const DEFAULT_PACKAGE_NAMES = ['com.efirai.myapp', 'com.musicstory.app'];
+
+export function getAllowedPackageNames(): Set<string> {
+  const allowed = new Set<string>();
+  const raw = process.env.ALLOWED_PACKAGE_NAME?.trim();
+  if (raw) {
+    for (const part of raw.split(',')) {
+      const name = part.trim();
+      if (name) allowed.add(name);
+    }
+  } else {
+    for (const name of DEFAULT_PACKAGE_NAMES) allowed.add(name);
+  }
+  return allowed;
+}
+
 export function getAllowedPackageName(): string {
-  return process.env.ALLOWED_PACKAGE_NAME?.trim() || 'com.musicstory.app';
+  return [...getAllowedPackageNames()][0] ?? 'com.efirai.myapp';
+}
+
+export function isAllowedPackageName(packageName: string | undefined | null): boolean {
+  const normalized = packageName?.trim();
+  if (!normalized) return false;
+  return getAllowedPackageNames().has(normalized);
 }
 
 export function getAllowedIosTeamIds(): Set<string> {

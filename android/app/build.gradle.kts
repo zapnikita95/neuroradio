@@ -30,11 +30,11 @@ android {
     compileSdk = 35
 
     defaultConfig {
-        applicationId = "com.musicstory.app"
+        applicationId = "com.efirai.myapp"
         minSdk = 26
         targetSdk = 35
-        versionCode = 77
-        versionName = "1.5.39"
+        versionCode = 79
+        versionName = "1.5.41"
 
         buildConfigField("String", "VERSION_NAME", "\"$versionName\"")
         buildConfigField("int", "VERSION_CODE", "$versionCode")

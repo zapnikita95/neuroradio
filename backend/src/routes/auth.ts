@@ -3,6 +3,8 @@ import {
   DESKTOP_CLIENT_ID,
   getAllowedCertFingerprints,
   getAllowedPackageName,
+  getAllowedPackageNames,
+  isAllowedPackageName,
   getAuthJwtSecret,
   getTokenTtlSeconds,
   isDesktopAuthEnabled,
@@ -80,10 +82,9 @@ router.post('/token', rateLimitAuth, (req: Request, res: Response) => {
 
   const { package_name: packageName, cert_sha256: certSha256 } = body;
 
-  const expectedPackage = getAllowedPackageName();
-  if (packageName?.trim() !== expectedPackage) {
+  if (!isAllowedPackageName(packageName)) {
     console.warn(
-      `[auth] 403 package mismatch install=${installId.slice(0, 8)} got=${packageName ?? '-'} expected=${expectedPackage}`,
+      `[auth] 403 package mismatch install=${installId.slice(0, 8)} got=${packageName ?? '-'} allowed=${[...getAllowedPackageNames()].join(',')}`,
     );
     res.status(403).json({ error: 'Forbidden' });
     return;
@@ -108,7 +109,7 @@ router.post('/token', rateLimitAuth, (req: Request, res: Response) => {
   const accessToken = signJwt(
     {
       sub: installId,
-      pkg: expectedPackage,
+      pkg: packageName?.trim() ?? getAllowedPackageName(),
       cert: normalizedCert,
     },
     jwtSecret,
