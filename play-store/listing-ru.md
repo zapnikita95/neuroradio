@@ -81,6 +81,16 @@ node scripts/generate-store-screenshots.mjs
 
 Spotify Dashboard: см. **`play-store/SPOTIFY-DASHBOARD.md`**
 
+## Безопасность данных (Google Play)
+
+Шпаргалка: **`play-store/DATA-SAFETY.md`**
+
+**URL удаления аккаунта** (обязательно, если есть вход):
+
+```
+https://www.efir-ai.ru/docs/delete-account.html
+```
+
 ## Ключ подписи в Play Console
 
 1. При **первой** загрузке AAB выбери: **«Разрешите Google защищать ключ подписи приложения»** (рекомендуется).
