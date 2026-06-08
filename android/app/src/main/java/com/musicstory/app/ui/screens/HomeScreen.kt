@@ -539,11 +539,13 @@ fun HomeScreen(
                     Spacer(modifier = Modifier.height(12.dp))
                     GenerationStoryPreview(
                         preview = uiState.generationPreview,
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(bottom = 20.dp),
                     )
                 }
 
-                Spacer(modifier = Modifier.height(16.dp))
+                Spacer(modifier = Modifier.height(if (uiState.generationPreview.isActive) 28.dp else 16.dp))
             }
 
             if (showTrialBanner && trialRemainingMs != null) {
@@ -567,8 +569,8 @@ fun HomeScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 20.dp)
-                    .padding(bottom = 28.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
+                    .padding(top = 8.dp, bottom = 32.dp),
+                verticalArrangement = Arrangement.spacedBy(14.dp),
             ) {
                 if (!hasAccess) {
                     SecondaryStoryButton(

@@ -64,7 +64,8 @@ fun GenerationStoryPreview(
             .fillMaxWidth()
             .height(previewHeight)
             .alpha(animatedAlpha)
-            .padding(horizontal = 2.dp, vertical = 6.dp),
+            .padding(horizontal = 2.dp, vertical = 6.dp)
+            .padding(bottom = 4.dp),
         shape = RoundedCornerShape(16.dp),
         color = Color.White.copy(alpha = 0.05f),
         tonalElevation = 0.dp,

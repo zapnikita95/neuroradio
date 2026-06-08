@@ -273,7 +273,8 @@
     <string name="account_login_trial_hint">Без входа доступен бесплатный тариф с базовыми настройками.</string>
     <string name="nav_account">Аккаунт</string>
     <string name="billing_tab">Оплата</string>
-    <string name="billing_intro">Расширенная подписка открывает больше историй в день, модель DeepSeek V3 и расширенный Yandex SpeechKit. Оплата привязывается к вашему email — войдите с тем же адресом в приложении.</string>
+    <string name="billing_intro">Расширенная подписка — для тех, кто слушает много: больше историй, умнее модель, больше голосов.</string>
+    <string name="billing_premium_pitch">DeepSeek V3 лучше находит факты про трек и артиста, аккуратнее формулирует текст. Yandex SpeechKit даёт расширенный набор голосов. История синхронизируется между телефонами, если войти тем же email.</string>
     <string name="billing_basic_title">Базовый</string>
     <string name="billing_basic_price">бесплатно</string>
     <string name="billing_basic_1">До 10 историй в день</string>
@@ -286,13 +287,14 @@
     <string name="billing_premium_3">Yandex SpeechKit — расширенный набор голосов</string>
     <string name="billing_premium_4">Синхронизация между устройствами</string>
     <string name="billing_plans_heading">Выберите период</string>
+    <string name="billing_subscribe_cta">Оформить подписку</string>
     <string name="billing_plan_month">Месяц</string>
     <string name="billing_plan_quarter">Квартал</string>
     <string name="billing_plan_year">Год · выгоднее всего</string>
     <string name="billing_email_required">Укажите email для активации подписки</string>
     <string name="billing_no_backend">Укажите адрес сервера в настройках</string>
     <string name="billing_payment_failed">Не удалось создать платёж</string>
-    <string name="billing_agreements_required">Примите условия оплаты — отметьте все пункты ниже</string>
+    <string name="billing_agreements_required">Примите публичную оферту</string>
     <string name="auth_privacy_required">Примите политику конфиденциальности</string>
     <string name="billing_unlink_card">Отвязать карту</string>
     <string name="billing_unlink_card_title">Отвязать карту?</string>

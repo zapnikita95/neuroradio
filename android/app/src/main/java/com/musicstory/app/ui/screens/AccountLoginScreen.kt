@@ -27,7 +27,6 @@ import androidx.compose.ui.unit.dp
 import com.musicstory.app.MusicStoryApp
 import com.musicstory.app.R
 import com.musicstory.app.data.remote.AccountAuthManager
-import com.musicstory.app.ui.components.BrandTitle
 import com.musicstory.app.ui.components.GlassCard
 import com.musicstory.app.ui.components.MusicStoryBackground
 import com.musicstory.app.ui.components.SecondaryStoryButton
@@ -65,71 +64,80 @@ fun AccountLoginScreen(
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .verticalScroll(rememberScrollState())
-                .padding(24.dp),
-            verticalArrangement = Arrangement.Center,
-            horizontalAlignment = Alignment.CenterHorizontally,
+                .padding(horizontal = 24.dp),
         ) {
-            BrandTitle(fontSize = MaterialTheme.typography.labelLarge.fontSize)
-            Spacer(modifier = Modifier.height(8.dp))
-            Text(
-                text = context.getString(R.string.account_login_title),
-                style = MaterialTheme.typography.displaySmall,
-                textAlign = TextAlign.Center,
-                color = CreamText,
-            )
-            Spacer(modifier = Modifier.height(16.dp))
-            VinylDisc(size = 96.dp, isSpinning = true)
-            Spacer(modifier = Modifier.height(20.dp))
-            GlassCard(accentBorder = true, modifier = Modifier.fillMaxWidth()) {
-                Column {
-                    if (authConfig?.emailEnabled == true && authConfig?.telegramEnabled == true) {
-                        LoginModeSwitch(
-                            mode = loginMode,
-                            onModeChange = { loginMode = it },
-                        )
-                        Spacer(modifier = Modifier.height(16.dp))
-                    }
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 28.dp, bottom = 12.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                Text(
+                    text = context.getString(R.string.account_login_title),
+                    style = MaterialTheme.typography.headlineMedium,
+                    textAlign = TextAlign.Center,
+                    color = CreamText,
+                )
+            }
+            Column(
+                modifier = Modifier
+                    .weight(1f)
+                    .verticalScroll(rememberScrollState())
+                    .padding(bottom = 24.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                VinylDisc(size = 88.dp, isSpinning = true)
+                Spacer(modifier = Modifier.height(16.dp))
+                GlassCard(accentBorder = true, modifier = Modifier.fillMaxWidth()) {
+                    Column {
+                        if (authConfig?.emailEnabled == true && authConfig?.telegramEnabled == true) {
+                            LoginModeSwitch(
+                                mode = loginMode,
+                                onModeChange = { loginMode = it },
+                            )
+                            Spacer(modifier = Modifier.height(16.dp))
+                        }
 
-                    when {
-                        loginMode == LoginMode.TELEGRAM && authConfig?.telegramEnabled == true ->
-                            AccountTelegramLoginSection(
-                                app = app,
-                                scope = scope,
-                                onLoggedIn = onLoggedIn,
-                            )
-                        authConfig?.emailEnabled == true ->
-                            AccountEmailLoginContent(
-                                app = app,
-                                scope = scope,
-                                showSkip = true,
-                                onSkip = onSkip,
-                                onLoggedIn = onLoggedIn,
-                            )
-                        authConfig?.telegramEnabled == true ->
-                            AccountTelegramLoginSection(
-                                app = app,
-                                scope = scope,
-                                onLoggedIn = onLoggedIn,
-                            )
-                        else ->
-                            AccountEmailLoginContent(
-                                app = app,
-                                scope = scope,
-                                showSkip = true,
-                                onSkip = onSkip,
-                                onLoggedIn = onLoggedIn,
-                            )
+                        when {
+                            loginMode == LoginMode.TELEGRAM && authConfig?.telegramEnabled == true ->
+                                AccountTelegramLoginSection(
+                                    app = app,
+                                    scope = scope,
+                                    onLoggedIn = onLoggedIn,
+                                )
+                            authConfig?.emailEnabled == true ->
+                                AccountEmailLoginContent(
+                                    app = app,
+                                    scope = scope,
+                                    showSkip = true,
+                                    onSkip = onSkip,
+                                    onLoggedIn = onLoggedIn,
+                                )
+                            authConfig?.telegramEnabled == true ->
+                                AccountTelegramLoginSection(
+                                    app = app,
+                                    scope = scope,
+                                    onLoggedIn = onLoggedIn,
+                                )
+                            else ->
+                                AccountEmailLoginContent(
+                                    app = app,
+                                    scope = scope,
+                                    showSkip = true,
+                                    onSkip = onSkip,
+                                    onLoggedIn = onLoggedIn,
+                                )
+                        }
                     }
                 }
+                Spacer(modifier = Modifier.height(12.dp))
+                Text(
+                    text = context.getString(R.string.account_login_trial_hint),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MutedLavender,
+                    textAlign = TextAlign.Center,
+                )
             }
-            Spacer(modifier = Modifier.height(12.dp))
-            Text(
-                text = context.getString(R.string.account_login_trial_hint),
-                style = MaterialTheme.typography.bodySmall,
-                color = MutedLavender,
-                textAlign = TextAlign.Center,
-            )
         }
     }
 }

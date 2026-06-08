@@ -45,10 +45,12 @@ import androidx.compose.ui.unit.dp
 import com.musicstory.app.MusicStoryApp
 import com.musicstory.app.R
 import com.musicstory.app.ui.components.BillingLegalFooter
-import com.musicstory.app.ui.components.BillingPaymentConsentBlock
+import com.musicstory.app.ui.components.BillingPlanCarousel
+import com.musicstory.app.ui.components.BillingSubscribeConfirmDialog
 import com.musicstory.app.ui.components.PaymentCheckoutSheet
 import com.musicstory.app.ui.components.PrimaryStoryButton
 import com.musicstory.app.ui.components.SecondaryStoryButton
+import com.musicstory.app.ui.components.defaultBillingPlans
 import com.musicstory.app.ui.theme.CreamText
 import com.musicstory.app.ui.theme.DeepVoid
 import com.musicstory.app.ui.theme.ErrorCoral
@@ -130,10 +132,10 @@ private fun BillingTab(app: MusicStoryApp) {
     var unlinkLoading by remember { mutableStateOf(false) }
     var unlinkMessage by remember { mutableStateOf<String?>(null) }
     var paymentUrl by remember { mutableStateOf<String?>(null) }
-    var agreeOferta by remember { mutableStateOf(false) }
-    var agreePrivacy by remember { mutableStateOf(false) }
-    var agreeConsent by remember { mutableStateOf(false) }
-    val paymentAgreementsOk = agreeOferta && agreePrivacy && agreeConsent
+    var showConfirmDialog by remember { mutableStateOf(false) }
+    val plans = remember { defaultBillingPlans }
+    var selectedPlanIndex by remember { mutableIntStateOf(1) }
+    val selectedPlan = plans[selectedPlanIndex]
 
     suspend fun refreshBilling() {
         try {
@@ -168,8 +170,35 @@ private fun BillingTab(app: MusicStoryApp) {
         Text(
             text = context.getString(R.string.billing_intro),
             style = MaterialTheme.typography.bodyMedium,
+            color = CreamText,
+        )
+        Text(
+            text = context.getString(R.string.billing_premium_pitch),
+            style = MaterialTheme.typography.bodySmall,
             color = MutedLavender,
         )
+
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(16.dp),
+            colors = CardDefaults.cardColors(containerColor = GoldBright.copy(alpha = 0.1f)),
+        ) {
+            Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Text(
+                    text = context.getString(R.string.billing_premium_title),
+                    style = MaterialTheme.typography.titleMedium,
+                    color = CreamText,
+                )
+                listOf(
+                    context.getString(R.string.billing_premium_1),
+                    context.getString(R.string.billing_premium_2),
+                    context.getString(R.string.billing_premium_3),
+                    context.getString(R.string.billing_premium_4),
+                ).forEach { line ->
+                    Text("• $line", style = MaterialTheme.typography.bodySmall, color = MutedLavender)
+                }
+            }
+        }
 
         if (premiumActive) {
             val until = premiumUntil?.let {
@@ -270,6 +299,26 @@ private fun BillingTab(app: MusicStoryApp) {
             },
         )
 
+        BillingSubscribeConfirmDialog(
+            plan = selectedPlan,
+            visible = showConfirmDialog,
+            loading = loading,
+            onDismiss = { if (!loading) showConfirmDialog = false },
+            onConfirmPay = {
+                scope.launch {
+                    pay(
+                        app, backendUrl, email, selectedPlan.id,
+                        agreementsAccepted = true,
+                        { loading = it },
+                        { error = it },
+                    ) { url ->
+                        showConfirmDialog = false
+                        paymentUrl = url
+                    }
+                }
+            },
+        )
+
         OutlinedTextField(
             value = email,
             onValueChange = { email = it.trim() },
@@ -290,92 +339,32 @@ private fun BillingTab(app: MusicStoryApp) {
             color = MutedLavender,
         )
 
-        TierCard(
-            title = context.getString(R.string.billing_basic_title),
-            price = context.getString(R.string.billing_basic_price),
-            bullets = listOf(
-                context.getString(R.string.billing_basic_1),
-                context.getString(R.string.billing_basic_2),
-                context.getString(R.string.billing_basic_3),
-            ),
-            highlighted = false,
-        )
-        TierCard(
-            title = context.getString(R.string.billing_premium_title),
-            price = context.getString(R.string.billing_premium_from),
-            bullets = listOf(
-                context.getString(R.string.billing_premium_1),
-                context.getString(R.string.billing_premium_2),
-                context.getString(R.string.billing_premium_3),
-                context.getString(R.string.billing_premium_4),
-            ),
-            highlighted = true,
-        )
-
         Text(
             text = context.getString(R.string.billing_plans_heading),
             style = MaterialTheme.typography.titleMedium,
             color = CreamText,
         )
 
-        BillingPaymentConsentBlock(
-            agreeOferta = agreeOferta,
-            onAgreeOfertaChange = { agreeOferta = it },
-            agreePrivacy = agreePrivacy,
-            onAgreePrivacyChange = { agreePrivacy = it },
-            agreeConsent = agreeConsent,
-            onAgreeConsentChange = { agreeConsent = it },
-            enabled = !loading,
+        BillingPlanCarousel(
+            plans = plans,
+            selectedIndex = selectedPlanIndex,
+            onSelectedIndexChange = { selectedPlanIndex = it },
+            modifier = Modifier.fillMaxWidth(),
         )
 
-        PlanButton(
-            label = context.getString(R.string.billing_plan_month),
-            price = "199 ₽",
-            oldPrice = null,
-            featured = false,
-            enabled = !loading && paymentAgreementsOk,
-        ) {
-            scope.launch {
-                pay(
-                    app, backendUrl, email, "month",
-                    paymentAgreementsOk,
-                    { loading = it },
-                    { error = it },
-                ) { url -> paymentUrl = url }
-            }
-        }
-        PlanButton(
-            label = context.getString(R.string.billing_plan_year),
-            price = "1999 ₽",
-            oldPrice = "2388 ₽",
-            featured = true,
-            enabled = !loading && paymentAgreementsOk,
-        ) {
-            scope.launch {
-                pay(
-                    app, backendUrl, email, "year",
-                    paymentAgreementsOk,
-                    { loading = it },
-                    { error = it },
-                ) { url -> paymentUrl = url }
-            }
-        }
-        PlanButton(
-            label = context.getString(R.string.billing_plan_quarter),
-            price = "499 ₽",
-            oldPrice = "597 ₽",
-            featured = false,
-            enabled = !loading && paymentAgreementsOk,
-        ) {
-            scope.launch {
-                pay(
-                    app, backendUrl, email, "quarter",
-                    paymentAgreementsOk,
-                    { loading = it },
-                    { error = it },
-                ) { url -> paymentUrl = url }
-            }
-        }
+        PrimaryStoryButton(
+            text = context.getString(R.string.billing_subscribe_cta),
+            onClick = {
+                error = null
+                if (email.isBlank() || !email.contains('@')) {
+                    error = context.getString(R.string.billing_email_required)
+                    return@PrimaryStoryButton
+                }
+                showConfirmDialog = true
+            },
+            enabled = !loading,
+            modifier = Modifier.fillMaxWidth(),
+        )
 
         if (loading) {
             CircularProgressIndicator(color = GoldBright, modifier = Modifier.padding(8.dp))
@@ -426,62 +415,5 @@ private suspend fun pay(
         setError(e.message ?: context.getString(R.string.billing_payment_failed))
     } finally {
         setLoading(false)
-    }
-}
-
-@Composable
-private fun TierCard(
-    title: String,
-    price: String,
-    bullets: List<String>,
-    highlighted: Boolean,
-) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = if (highlighted) GoldBright.copy(alpha = 0.12f) else DeepVoid.copy(alpha = 0.6f),
-        ),
-    ) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                Text(title, style = MaterialTheme.typography.titleMedium, color = CreamText)
-                Text(price, style = MaterialTheme.typography.labelLarge, color = GoldBright)
-            }
-            Spacer(modifier = Modifier.height(8.dp))
-            bullets.forEach { line ->
-                Text("• $line", style = MaterialTheme.typography.bodySmall, color = MutedLavender)
-            }
-        }
-    }
-}
-
-@Composable
-private fun PlanButton(
-    label: String,
-    price: String,
-    oldPrice: String?,
-    featured: Boolean,
-    enabled: Boolean,
-    onClick: () -> Unit,
-) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(14.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = if (featured) GoldBright.copy(alpha = 0.18f) else DeepVoid.copy(alpha = 0.5f),
-        ),
-    ) {
-        Column(modifier = Modifier.padding(14.dp)) {
-            Text(label, color = CreamText, style = MaterialTheme.typography.titleSmall)
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text(price, color = GoldBright, style = MaterialTheme.typography.titleMedium)
-                oldPrice?.let {
-                    Text(it, color = MutedLavender, style = MaterialTheme.typography.bodySmall)
-                }
-            }
-            Spacer(modifier = Modifier.height(8.dp))
-            PrimaryStoryButton(text = "Оформить", onClick = onClick, enabled = enabled)
-        }
     }
 }
