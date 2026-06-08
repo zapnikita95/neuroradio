@@ -82,25 +82,42 @@ curl -s https://ТВОЙ-DOMAIN.up.railway.app/health
 
 ### Release / Play Store — авторизация (обязательно)
 
-Сборки **не debug** подписаны **upload-ключом** (уже в коде бэкенда) или **ключом подписи приложения Google Play** (для установок из Store).
+Сборки из **Google Play** подписаны **ключом Google** (App signing key), не upload-ключом. Его SHA-256 нужен на Railway.
 
-1. Play Console → **Настройка → Целостность приложения → Подписание приложений**
-2. Скопируй **SHA-256 сертификата ключа подписи приложения** (App signing key certificate)
-3. Railway → Variables:
+**Где взять SHA-256 (актуальный Play Console, русский интерфейс):**
+
+1. Открой приложение «Эфир AI» в [Play Console](https://play.google.com/console)
+2. Слева нажми **«Защищено Google Play»** (иконка щита — видна на твоём скрине)
+3. Блок **«Распространение в Google Play»** → **«Подписание приложений в Google Play»** (или «Перейти к подписи…»)
+4. На странице два сертификата — нужен **«Сертификат ключа подписи приложения»** (App signing key), **не** «Сертификат ключа загрузки»
+5. Скопируй **SHA-256** (можно с двоеточиями или без)
+
+**Прямая ссылка** (выбери приложение, если спросит):  
+https://play.google.com/console/developers/app/keymanagement
+
+**Альтернатива:** **Тестирование и выпуск** → **Расширенные настройки** → там тоже может быть ссылка на подписание.
+
+Railway → сервис **music-story** → **Variables**:
 
 ```
-ALLOWED_CERT_SHA256=вставь_sha256_из_play_console
+ALLOWED_CERT_SHA256=sha256_из_пункта_4
 ```
 
-Несколько отпечатков через запятую: upload + Play.
+Несколько ключей через запятую (если ключ менялся — upload + новый Play):
 
-Без Play SHA-256 **вход по email/Telegram не работает** в версии из Google Play (403 Forbidden на `/v1/auth/token`).
+```
+ALLOWED_CERT_SHA256=новый_play_sha256,6c2a59abfbacc6b828d4c0c321be5f848056988558677e4123d216200c531b09
+```
 
-Upload keystore SHA-256 (уже в коде, для sideload release APK):
+Без Play SHA-256 **вход не работает** в версии из Store (403 на `/v1/auth/token`).
+
+Upload keystore SHA-256 (уже в коде бэкенда, для sideload release APK):
 
 ```
 6C:2A:59:AB:FB:AC:C6:B8:28:D4:C0:32:1B:E5:F8:48:05:69:88:55:86:77:E4:12:3D:21:62:00:C5:31:B0:09
 ```
+
+Если **сменил upload-ключ** — добавь новый SHA-256 upload-сертификата в `ALLOWED_CERT_SHA256` (или пришли мне, добавим в код).
 
 ### Опционально (дополнительные ключи)
 
