@@ -160,6 +160,7 @@ export interface SileroSynthesisOptions {
   voicePreset?: SileroVoicePresetId;
   pauseProfile?: TtsPauseProfile;
   styleId?: TtsVoiceStyleId;
+  speed?: number;
 }
 
 /**
@@ -183,6 +184,7 @@ export async function synthesizeSpeechSilero(
   const voice = options.voice ?? preset?.voice ?? resolveSileroVoice();
   const pauseProfile = effectiveSileroPause(options.pauseProfile);
   const styleId = options.styleId;
+  const speed = options.speed ?? 1.0;
 
   const trace = prepareSileroTtsTextTrace(script, { artist, title });
   let plainText = trace.prepared;
@@ -210,7 +212,7 @@ export async function synthesizeSpeechSilero(
     const chunks: Buffer[] = [];
     for (const seg of segments) {
       if (seg.lang === 'en') {
-        chunks.push(await synthesizeEnglishEdgeTts(seg.text, voice));
+        chunks.push(await synthesizeEnglishEdgeTts(seg.text, voice, { speed }));
       } else {
         const ssml = wrapSileroRussianSsml(seg.text, { pauseProfile, styleId });
         chunks.push(await fetchSileroChunk(baseUrl, ssml, voice));

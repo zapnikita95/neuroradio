@@ -200,6 +200,7 @@ export async function synthesizeStoryAudio(request: TtsRouteRequest): Promise<Tt
       voice: request.sileroVoice as SileroVoiceId | undefined,
       pauseProfile: request.pauseProfile,
       styleId: request.ttsStyle,
+      speed: request.speed,
     });
   } else {
     result = await synthesizeYandex(request.script, request.voiceId, request.fileName, {
