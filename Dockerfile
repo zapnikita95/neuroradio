@@ -1,6 +1,8 @@
 # Monorepo root — deploy only backend/ to Railway (Root Directory must be empty)
 FROM node:20-alpine
 
+RUN apk add --no-cache ffmpeg
+
 WORKDIR /app
 
 COPY backend/package.json backend/package-lock.json ./
