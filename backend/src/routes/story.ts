@@ -639,6 +639,7 @@ router.post('/full', extractClientSecrets, validateStoryFullBody, storyFullRateL
       ? [selectedFact.fact]
       : [...factBundle.trackFacts, ...factBundle.artistFacts]
           .filter((f) => !isWeakSnippetSeed(f) && !isMetadataOnlyFallbackFact(f))
+          .filter((f) => !factsTooSimilar(f, recentTrackSeeds))
           .sort((a, b) => interestScore(b) - interestScore(a))
           .slice(0, 4);
 
@@ -669,6 +670,7 @@ router.post('/full', extractClientSecrets, validateStoryFullBody, storyFullRateL
         .filter(
           (fact) =>
             !isWeakSnippetSeed(fact) &&
+            !factsTooSimilar(fact, recentTrackSeeds) &&
             interestScore(fact) >= 6 &&
             (factAppliesToRequest(fact, metadata.artist, metadata.title, 'track') ||
               factAppliesToRequest(fact, metadata.artist, metadata.title, 'artist')),
@@ -897,7 +899,12 @@ router.post('/full', extractClientSecrets, validateStoryFullBody, storyFullRateL
       console.warn(
         `[facts] reject consecutive similar seed for "${metadata.title}": "${selectedFact.fact.slice(0, 90)}"`,
       );
-      const alt = await pickFactForUser(
+      const rejectedFp = factFingerprint(selectedFact.fact);
+      usedFingerprints.add(rejectedFp);
+      selectedFact = null;
+      storyReferenceFacts = storyReferenceFacts.filter((f) => !factsTooSimilar(f, recentTrackSeeds));
+
+      let alt = await pickFactForUser(
         installId,
         factBundle,
         metadata.artist,
@@ -905,15 +912,74 @@ router.post('/full', extractClientSecrets, validateStoryFullBody, storyFullRateL
         previousScripts.length + 1,
         storyNarrator,
       );
+      let altFromCatalog = false;
+
+      if (!alt || factsTooSimilar(alt.fact, recentTrackSeeds)) {
+        const extraTrack = await fetchFastTrackWikiFacts(metadata.artist, metadata.title);
+        const artistLead = await fetchArtistWikiLead(metadata.artist);
+        const supplemental = [
+          ...extraTrack,
+          ...(artistLead?.text?.trim() ? [artistLead.text.trim().slice(0, 480)] : []),
+        ].filter(
+          (f) =>
+            !factsTooSimilar(f, recentTrackSeeds) &&
+            factFingerprint(f) !== rejectedFp &&
+            interestScore(f) >= 5,
+        );
+        if (supplemental.length > 0) {
+          factBundle = {
+            trackFacts: [...new Set([...factBundle.trackFacts, ...supplemental])],
+            artistFacts: factBundle.artistFacts,
+          };
+          trackFactCount = factBundle.trackFacts.length;
+          ingestBundleToBank(factArtist, factTitle, factBundle);
+          console.log(
+            `[facts] supplemental pool +${supplemental.length} after duplicate reject "${metadata.title}"`,
+          );
+          alt = await pickFactForUser(
+            installId,
+            factBundle,
+            metadata.artist,
+            metadata.title,
+            previousScripts.length + 2,
+            storyNarrator,
+          );
+        }
+      }
+
+      if ((!alt || factsTooSimilar(alt.fact, recentTrackSeeds)) && isCatalogMajorArtist(metadata.artist)) {
+        const factModels =
+          ownLlmKey && openrouterModelFact.includes('/')
+            ? [openrouterModelFact]
+            : resolveOpenRouterFactModelsForTier(userTier, openrouterModelRequested);
+        const catalogAlt = await huntMajorArtistCatalogFact({
+          artist: metadata.artist,
+          title: metadata.title,
+          year: metadata.year,
+          genre: metadata.genre,
+          preferredProvider: llmProvider,
+          openRouterModel: openrouterModelFact,
+          openRouterModels: factModels,
+        });
+        if (catalogAlt && !factsTooSimilar(catalogAlt.fact, recentTrackSeeds)) {
+          alt = catalogAlt;
+          altFromCatalog = true;
+        }
+      }
+
       if (alt && !factsTooSimilar(alt.fact, recentTrackSeeds)) {
         selectedFact = alt;
         factFromBank = false;
-        factHuntLlm = false;
+        factHuntLlm = altFromCatalog;
         storyReferenceFacts = [selectedFact.fact];
         if (coverCtx.isCover && coverCtx.coverNoteRu) {
           storyReferenceFacts = [coverCtx.coverNoteRu, ...storyReferenceFacts];
         }
         console.log(`[facts] switched to alternate seed: "${alt.fact.slice(0, 90)}"`);
+      } else {
+        console.warn(
+          `[facts] no alternate seed after duplicate reject for "${metadata.artist}" — "${metadata.title}"`,
+        );
       }
     }
 

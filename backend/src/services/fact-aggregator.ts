@@ -536,7 +536,7 @@ export async function fetchAggregatedFactContext(
   const cc = resolveFactCountryCode(artist, title, countryCode);
   const [wiki, wikiLead, ddgUnfiltered, webUnfiltered, wdUnfiltered, mbTrackRaw, mbArtistRaw, wikiFastTrack] =
     await Promise.all([
-      fetchWithCap('wiki', () => fetchWikiBundleMerged(artist, title, cc), EMPTY_WIKI, 14_000),
+      fetchWithCap('wiki', () => fetchWikiBundleMerged(artist, title, cc), EMPTY_WIKI, 9_000),
       fetchWithCap('wiki-lead', () => fetchArtistWikiLead(artist), null, 10_000),
       fetchWithCap('ddg', () => fetchDuckDuckGoUnfiltered(artist, title), [], 12_000),
       fetchWithCap('web', () => fetchWebSearchFactSnippets(artist, title), [], 14_000),
@@ -553,7 +553,7 @@ export async function fetchAggregatedFactContext(
         [],
         8_000,
       ),
-      fetchWithCap('wiki-fast-track', () => fetchFastTrackWikiFacts(artist, title), [], 12_000),
+      fetchWithCap('wiki-fast-track', () => fetchFastTrackWikiFacts(artist, title), [], 15_000),
     ]);
   const wikiLeadBundle = wikiLead ? wikiLeadToFacts(wikiLead, artist, title) : EMPTY_WIKI;
   if (wikiLeadBundle.trackFacts.length + wikiLeadBundle.artistFacts.length > 0) {

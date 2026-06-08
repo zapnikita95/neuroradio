@@ -313,6 +313,7 @@ class StoryOrchestrator(
             if (manualStoryInFlight) return@launch
             if (_mode.value != OrchestratorMode.AUTO || isStorySessionActive()) return@launch
             if (!storyRepository.hasOwnApiKeyConfigured()) return@launch
+            if (System.currentTimeMillis() - lastStoryStartedAtMs < AUTO_TRIGGER_COOLDOWN_MS) return@launch
             val track = mediaControllerManager.effectiveNowPlaying.value ?: return@launch
             if (!track.isValid()) return@launch
             val settings = loadTriggerSettings()
@@ -1052,9 +1053,6 @@ class StoryOrchestrator(
 
         previewJob?.cancel()
         previewJob = scope.launch {
-            val revealMaxMs = PREVIEW_REVEAL_MAX_MS
-            val wordDelayMs = wordRevealDelayMs(words.size, revealMaxMs)
-            val bufferCapWords = (words.size * 0.15f).toInt().coerceIn(2, 12)
             val estimatedDurationMs = estimatedStoryDurationMs(words.size)
             val waitStartMs = System.currentTimeMillis()
 
@@ -1082,10 +1080,7 @@ class StoryOrchestrator(
                             estimatedDurationMs = estimatedDurationMs,
                         )
                     }
-                    else -> {
-                        val elapsed = System.currentTimeMillis() - waitStartMs
-                        (elapsed / wordDelayMs).toInt().coerceIn(0, bufferCapWords)
-                    }
+                    else -> 0
                 }
 
                 if (count != lastCount) {
@@ -1117,20 +1112,19 @@ class StoryOrchestrator(
     private fun estimatedStoryDurationMs(wordCount: Int): Long =
         (wordCount * 320L).coerceIn(5_000L, 240_000L)
 
-    /** Keep visible text in sync with speech — never lag behind audio. */
+    /** Keep visible text in sync with speech — reveal from the first word, no initial burst. */
     private fun visibleWordsFromPlayback(
         wordCount: Int,
         progress: Float,
         elapsedMs: Long,
         estimatedDurationMs: Long,
     ): Int {
-        val fromProgress = if (progress > 0.001f) {
-            (progress * wordCount).toInt()
-        } else {
-            0
+        if (progress > 0.001f) {
+            return (progress * wordCount).toInt().coerceIn(0, wordCount)
         }
+        if (elapsedMs <= 0L) return 0
         val fromClock = ((elapsedMs.toFloat() / estimatedDurationMs) * wordCount).toInt()
-        return (maxOf(fromProgress, fromClock) + 2).coerceIn(1, wordCount)
+        return fromClock.coerceIn(0, minOf(2, wordCount))
     }
 
     companion object {
@@ -1140,6 +1134,8 @@ class StoryOrchestrator(
         /** Local Ollama on PC BFF — 35b model + research. */
         private const val LOCAL_STORY_FETCH_TIMEOUT_MS = 1_200_000L
         private const val PREVIEW_REVEAL_MAX_MS = 7_000L
+        /** After a story starts, ignore stale counter≥N in DataStore (manual/auto race). */
+        private const val AUTO_TRIGGER_COOLDOWN_MS = 45_000L
     }
 }
 
