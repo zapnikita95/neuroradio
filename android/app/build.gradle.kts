@@ -1,4 +1,4 @@
-import java.io.File
+﻿import java.io.File
 import java.util.Properties
 
 plugins {
@@ -33,8 +33,8 @@ android {
         applicationId = "com.efirai.myapp"
         minSdk = 26
         targetSdk = 35
-        versionCode = 85
-        versionName = "1.5.47"
+        versionCode = 86
+        versionName = "1.5.48"
 
         buildConfigField("String", "VERSION_NAME", "\"$versionName\"")
         buildConfigField("int", "VERSION_CODE", "$versionCode")

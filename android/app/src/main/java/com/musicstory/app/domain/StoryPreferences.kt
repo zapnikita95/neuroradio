@@ -58,12 +58,12 @@ enum class TtsSpeed(val id: String, val labelRu: String, val yandexSpeed: Float,
     }
 }
 
-/** Серверная озвучка: Silero (free) или Yandex SpeechKit (trial/premium) — см. labelForTier. */
+/** Серверная озвучка (Silero или Yandex — выбор в ServerTtsProvider на trial/premium). */
 enum class TtsPlaybackEngine(val id: String, val labelRu: String, val descriptionRu: String) {
     YANDEX_SERVER(
         id = "yandex",
-        labelRu = "Silero на сервере",
-        descriptionRu = "Бесплатная озвучка Silero на сервере",
+        labelRu = "Серверная озвучка",
+        descriptionRu = "Silero или Yandex SpeechKit на сервере приложения",
     ),
     ANDROID_DEVICE(
         id = "android",
@@ -74,17 +74,14 @@ enum class TtsPlaybackEngine(val id: String, val labelRu: String, val descriptio
 
     val skipsServerTts: Boolean get() = this == ANDROID_DEVICE
 
-    fun labelForTier(tier: String?): String = when {
-        this == ANDROID_DEVICE -> labelRu
-        TierAccess.isPremiumLike(tier) -> "Yandex SpeechKit"
-        else -> "Silero на сервере"
+    fun labelForTier(tier: String?): String = when (this) {
+        ANDROID_DEVICE -> labelRu
+        YANDEX_SERVER -> labelRu
     }
 
-    fun descriptionForTier(tier: String?): String = when {
-        this == ANDROID_DEVICE -> descriptionRu
-        TierAccess.isPremiumLike(tier) ->
-            "Профессиональная озвучка Yandex SpeechKit на сервере"
-        else -> "Бесплатная озвучка Silero на сервере"
+    fun descriptionForTier(tier: String?): String = when (this) {
+        ANDROID_DEVICE -> descriptionRu
+        YANDEX_SERVER -> descriptionRu
     }
 
     companion object {
@@ -93,7 +90,27 @@ enum class TtsPlaybackEngine(val id: String, val labelRu: String, val descriptio
     }
 }
 
-/** Silero v5_ru voices on server (free tier). */
+/** Движок серверной озвучки при оплате сервером (trial/premium). На free — только Silero. */
+enum class ServerTtsProvider(val id: String, val labelRu: String, val descriptionRu: String) {
+    SILERO(
+        id = "silero",
+        labelRu = "Silero",
+        descriptionRu = "Нейросетевая озвучка Silero на сервере",
+    ),
+    YANDEX(
+        id = "yandex",
+        labelRu = "Yandex SpeechKit",
+        descriptionRu = "Профессиональная озвучка с расширенным набором голосов",
+    ),
+    ;
+
+    companion object {
+        fun fromId(id: String?): ServerTtsProvider =
+            entries.firstOrNull { it.id == id } ?: YANDEX
+    }
+}
+
+/** Silero v5_ru voices on server. */
 enum class SileroVoicePreset(val id: String, val voiceId: String, val labelRu: String, val descriptionRu: String) {
     CALM_FEMALE("calm_female", "baya", "baya — спокойный женский", "Размеренный, нейтральный тон"),
     CALM_MALE("calm_male", "aidar", "aidar — спокойный мужской", "Ровный дикторский голос"),
@@ -113,7 +130,7 @@ enum class UserTtsBilling(val id: String, val labelRu: String, val descriptionRu
     SERVER(
         id = "server",
         labelRu = "Сервер приложения",
-        descriptionRu = "Silero на бесплатном тарифе; Yandex SpeechKit — на пробном и платном",
+        descriptionRu = "Silero или Yandex SpeechKit — выбор ниже на trial и подписке",
     ),
     YANDEX(
         id = "yandex",

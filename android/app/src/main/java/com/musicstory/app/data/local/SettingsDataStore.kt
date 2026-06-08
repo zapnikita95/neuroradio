@@ -19,6 +19,7 @@ import com.musicstory.app.domain.OpenRouterModel
 import com.musicstory.app.domain.MusicInterruptionMode
 import com.musicstory.app.domain.StoryLength
 import com.musicstory.app.domain.StoryNarrator
+import com.musicstory.app.domain.ServerTtsProvider
 import com.musicstory.app.domain.SileroVoicePreset
 import com.musicstory.app.domain.TtsEmotion
 import com.musicstory.app.domain.TtsPlaybackEngine
@@ -242,6 +243,10 @@ class SettingsDataStore(private val context: Context) {
 
     val sileroVoicePreset: Flow<SileroVoicePreset> = context.settingsDataStore.data.map { prefs ->
         SileroVoicePreset.fromId(prefs[KEY_SILERO_VOICE_PRESET])
+    }
+
+    val serverTtsProvider: Flow<ServerTtsProvider> = context.settingsDataStore.data.map { prefs ->
+        ServerTtsProvider.fromId(prefs[KEY_SERVER_TTS_PROVIDER])
     }
 
     val userTtsBilling: Flow<UserTtsBilling> = context.settingsDataStore.data.map { prefs ->
@@ -516,6 +521,11 @@ class SettingsDataStore(private val context: Context) {
         notifyCloudSync()
     }
 
+    suspend fun setServerTtsProvider(provider: ServerTtsProvider) {
+        context.settingsDataStore.edit { it[KEY_SERVER_TTS_PROVIDER] = provider.id }
+        notifyCloudSync()
+    }
+
     suspend fun setUserTtsBilling(billing: UserTtsBilling) {
         context.settingsDataStore.edit { it[KEY_USER_TTS_BILLING] = billing.id }
     }
@@ -713,6 +723,7 @@ class SettingsDataStore(private val context: Context) {
         private val KEY_TTS_EMOTION = stringPreferencesKey("tts_emotion")
         private val KEY_TTS_PLAYBACK_ENGINE = stringPreferencesKey("tts_playback_engine")
         private val KEY_SILERO_VOICE_PRESET = stringPreferencesKey("silero_voice_preset")
+        private val KEY_SERVER_TTS_PROVIDER = stringPreferencesKey("server_tts_provider")
         private val KEY_USER_TTS_BILLING = stringPreferencesKey("user_tts_billing")
         private val KEY_YANDEX_API_KEY = stringPreferencesKey("yandex_api_key")
         private val KEY_YANDEX_FOLDER_ID = stringPreferencesKey("yandex_folder_id")

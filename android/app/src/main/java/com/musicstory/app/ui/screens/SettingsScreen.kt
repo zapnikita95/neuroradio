@@ -86,6 +86,7 @@ import com.musicstory.app.domain.OpenRouterModel
 import com.musicstory.app.domain.StoryLength
 import com.musicstory.app.domain.StoryNarrator
 import com.musicstory.app.domain.SileroVoicePreset
+import com.musicstory.app.domain.ServerTtsProvider
 import com.musicstory.app.domain.TtsEmotion
 import com.musicstory.app.domain.TtsPlaybackEngine
 import com.musicstory.app.ui.components.TrialCountdownBanner
@@ -168,6 +169,7 @@ fun SettingsScreen(
     val ttsEmotion by settings.ttsEmotion.collectAsState(initial = TtsEmotion.LIVELY)
     val ttsPlaybackEngine by settings.ttsPlaybackEngine.collectAsState(initial = TtsPlaybackEngine.YANDEX_SERVER)
     val sileroVoicePreset by settings.sileroVoicePreset.collectAsState(initial = SileroVoicePreset.CALM_FEMALE)
+    val serverTtsProvider by settings.serverTtsProvider.collectAsState(initial = ServerTtsProvider.YANDEX)
     val userTtsBilling by settings.userTtsBilling.collectAsState(initial = UserTtsBilling.SERVER)
     val yandexApiKey by settings.yandexApiKey.collectAsState(initial = "")
     val yandexFolderId by settings.yandexFolderId.collectAsState(initial = "")
@@ -438,13 +440,18 @@ fun SettingsScreen(
     val canCustomizeListen = TierAccess.canCustomizeListenThresholdSeconds(effectiveTier)
     val isPaidServerTier = TierAccess.isPremiumLike(effectiveTier)
     val isFreeServerTier = TierAccess.isFreeServerTier(effectiveTier)
+    val effectiveServerTtsProvider = if (isFreeServerTier) ServerTtsProvider.SILERO else serverTtsProvider
     val serverUsesSilero = ttsPlaybackEngine == TtsPlaybackEngine.YANDEX_SERVER &&
         userTtsBilling == UserTtsBilling.SERVER &&
-        isFreeServerTier
+        effectiveServerTtsProvider == ServerTtsProvider.SILERO
+    val showServerTtsProviderChoice = ttsPlaybackEngine == TtsPlaybackEngine.YANDEX_SERVER &&
+        userTtsBilling == UserTtsBilling.SERVER &&
+        isPaidServerTier
     val showSileroVoices = serverUsesSilero
     val showYandexVoices = ttsPlaybackEngine == TtsPlaybackEngine.YANDEX_SERVER &&
-        !serverUsesSilero &&
-        (userTtsBilling == UserTtsBilling.YANDEX || (userTtsBilling == UserTtsBilling.SERVER && isPaidServerTier))
+        ((userTtsBilling == UserTtsBilling.YANDEX) ||
+            (userTtsBilling == UserTtsBilling.SERVER && isPaidServerTier &&
+                effectiveServerTtsProvider == ServerTtsProvider.YANDEX))
     val userTtsBillingOptions = remember {
         UserTtsBilling.entries.filter { it != UserTtsBilling.SBER }
     }
@@ -756,7 +763,13 @@ fun SettingsScreen(
                                 else ->
                                     "${ttsVoice.labelRu} · ${ttsSpeed.labelRu} · ${storyLength.labelRu}"
                             }.let { voices ->
-                                "${TtsPlaybackEngine.YANDEX_SERVER.labelForTier(effectiveTier)} · $voices"
+                                val engineLabel = when {
+                                    showSileroVoices -> ServerTtsProvider.SILERO.labelRu
+                                    showYandexVoices && userTtsBilling == UserTtsBilling.SERVER ->
+                                        ServerTtsProvider.YANDEX.labelRu
+                                    else -> TtsPlaybackEngine.YANDEX_SERVER.labelRu
+                                }
+                                "$engineLabel · $voices"
                             }
                     },
                     tourHighlight = tourStep == 4,
@@ -783,11 +796,7 @@ fun SettingsScreen(
                         color = MutedLavender,
                     )
                     Text(
-                        text = if (TierAccess.isPremiumLike(effectiveTier)) {
-                            context.getString(R.string.settings_tts_playback_engine_hint_premium)
-                        } else {
-                            context.getString(R.string.settings_tts_playback_engine_hint)
-                        },
+                        text = context.getString(R.string.settings_tts_playback_engine_hint),
                         style = MaterialTheme.typography.bodySmall,
                         color = MutedLavender,
                         modifier = Modifier.padding(top = 4.dp, bottom = 8.dp),
@@ -799,6 +808,22 @@ fun SettingsScreen(
                             selected = ttsPlaybackEngine == engine,
                             onSelect = { scope.launch { settings.setTtsPlaybackEngine(engine) } },
                         )
+                    }
+                    if (showServerTtsProviderChoice) {
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            text = context.getString(R.string.settings_server_tts_engine),
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MutedLavender,
+                        )
+                        ServerTtsProvider.entries.forEach { provider ->
+                            NarratorRadioRow(
+                                label = provider.labelRu,
+                                description = provider.descriptionRu,
+                                selected = serverTtsProvider == provider,
+                                onSelect = { scope.launch { settings.setServerTtsProvider(provider) } },
+                            )
+                        }
                     }
                     Spacer(modifier = Modifier.height(8.dp))
                     if (showSileroVoices) {

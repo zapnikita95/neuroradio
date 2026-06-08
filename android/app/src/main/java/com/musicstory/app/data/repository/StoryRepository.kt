@@ -29,6 +29,7 @@ import com.musicstory.app.domain.StoryLength
 import com.musicstory.app.domain.StoryNarrator
 import com.musicstory.app.domain.StoryPersona
 import com.musicstory.app.domain.StoryScriptQuality
+import com.musicstory.app.domain.ServerTtsProvider
 import com.musicstory.app.domain.UserTtsBilling
 import com.musicstory.app.domain.TtsEmotion
 import com.musicstory.app.domain.TtsSpeed
@@ -336,6 +337,7 @@ class StoryRepository(
         val ttsSpeed = settingsDataStore.ttsSpeed.first()
         val ttsEmotion = settingsDataStore.ttsEmotion.first()
         val sileroVoicePreset = settingsDataStore.sileroVoicePreset.first()
+        val serverTtsProvider = settingsDataStore.serverTtsProvider.first()
         val userTtsBilling = settingsDataStore.userTtsBilling.first()
         val yandexTtsKey = ApiKeySanitizer.clean(settingsDataStore.yandexApiKey.first())
         val yandexFolderId = settingsDataStore.yandexFolderId.first().trim()
@@ -482,6 +484,7 @@ class StoryRepository(
                 yandexFolderId = yandexFolderId,
                 saluteAuthKey = saluteAuthKey,
                 serverTier = tier,
+                serverTtsProvider = serverTtsProvider,
             )) {
                 is StoryAttemptResult.Success -> return Result.success(backendResult.response)
                 is StoryAttemptResult.TemplateRejected -> templateRejected = true
@@ -556,6 +559,7 @@ class StoryRepository(
         yandexFolderId: String = "",
         saluteAuthKey: String = "",
         serverTier: String? = null,
+        serverTtsProvider: ServerTtsProvider = ServerTtsProvider.YANDEX,
     ): StoryAttemptResult {
         return try {
             StoryLog.i(
@@ -599,7 +603,11 @@ class StoryRepository(
                             UserTtsBilling.YANDEX -> "yandex"
                             UserTtsBilling.SBER -> "sber"
                             UserTtsBilling.SERVER ->
-                                if (TierAccess.isPremiumLike(serverTier)) null else "silero"
+                                if (TierAccess.isPremiumLike(serverTier) && serverTtsProvider == ServerTtsProvider.YANDEX) {
+                                    null
+                                } else {
+                                    "silero"
+                                }
                         },
                         userTtsProvider = when (userTtsBilling) {
                             UserTtsBilling.SERVER -> null
@@ -608,8 +616,14 @@ class StoryRepository(
                         yandexApiKey = yandexTtsApiKey.takeIf { userTtsBilling == UserTtsBilling.YANDEX && it.isNotBlank() },
                         yandexFolderId = yandexFolderId.takeIf { userTtsBilling == UserTtsBilling.YANDEX && it.isNotBlank() },
                         saluteAuthKey = saluteAuthKey.takeIf { userTtsBilling == UserTtsBilling.SBER && it.isNotBlank() },
-                        sileroVoicePreset = sileroVoicePreset.id.takeIf { userTtsBilling == UserTtsBilling.SERVER },
-                        sileroVoice = sileroVoicePreset.voiceId.takeIf { userTtsBilling == UserTtsBilling.SERVER },
+                        sileroVoicePreset = sileroVoicePreset.id.takeIf {
+                            userTtsBilling == UserTtsBilling.SERVER &&
+                                (!TierAccess.isPremiumLike(serverTier) || serverTtsProvider == ServerTtsProvider.SILERO)
+                        },
+                        sileroVoice = sileroVoicePreset.voiceId.takeIf {
+                            userTtsBilling == UserTtsBilling.SERVER &&
+                                (!TierAccess.isPremiumLike(serverTier) || serverTtsProvider == ServerTtsProvider.SILERO)
+                        },
                         ),
                     ),
                 )

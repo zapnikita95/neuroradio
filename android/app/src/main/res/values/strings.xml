@@ -177,8 +177,9 @@
     <string name="settings_gemini_get_key">Получить Gemini-ключ</string>
     <string name="settings_tts_voice">Голос</string>
     <string name="settings_tts_playback_engine">Озвучка</string>
-    <string name="settings_tts_playback_engine_hint">На бесплатном тарифе: Silero на сервере или голос Android на телефоне.</string>
-    <string name="settings_tts_playback_engine_hint_premium">Trial и подписка: Yandex SpeechKit на сервере или голос Android на телефоне.</string>
+    <string name="settings_tts_playback_engine_hint">Silero или Yandex SpeechKit на сервере — или голос Android на телефоне. На trial и подписке можно выбрать движок серверной озвучки.</string>
+    <string name="settings_tts_playback_engine_hint_premium">Trial и подписка: Silero или Yandex SpeechKit на сервере, либо голос Android на телефоне.</string>
+    <string name="settings_server_tts_engine">Движок серверной озвучки</string>
     <string name="trial_countdown_title">Пробный Premium</string>
     <string name="trial_countdown_body">Осталось: %1$s</string>
     <string name="trial_countdown_hint">После окончания пробного периода озвучка переключится на Silero, если не оформить подписку.</string>

@@ -102,7 +102,7 @@ export function resolveEffectiveTtsProvider(
     }
   };
 
-  const requireSileroForFree = () => {
+  const requireSileroAvailable = () => {
     if (canUseSileroTts()) return 'silero' as const;
     throw new SileroRequiredForFreeTierError();
   };
@@ -115,7 +115,7 @@ export function resolveEffectiveTtsProvider(
   }
 
   if (request.ttsProvider === 'silero') {
-    return requireSileroForFree();
+    return requireSileroAvailable();
   }
 
   if (request.ttsProvider === 'sber') {
@@ -149,7 +149,7 @@ export function resolveEffectiveTtsProvider(
   }
 
   if (!serverSpeechKit) {
-    return requireSileroForFree();
+    return requireSileroAvailable();
   }
 
   if (canUseSileroTts() && process.env.TTS_PREFER_SILERO?.trim() !== 'false') {
