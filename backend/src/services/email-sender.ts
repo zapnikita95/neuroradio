@@ -6,6 +6,35 @@ export function isEmailConfigured(): boolean {
   return Boolean(apiKey && from);
 }
 
+export async function sendCabinetCodeEmail(to: string, code: string): Promise<void> {
+  const apiKey = process.env.RESEND_API_KEY?.trim();
+  const from = process.env.RESEND_FROM?.trim();
+  if (!apiKey || !from) {
+    throw new Error('Resend not configured (RESEND_API_KEY, RESEND_FROM)');
+  }
+
+  const res = await fetch(RESEND_API, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      from,
+      to: [to],
+      subject: 'Эфир AI — код для личного кабинета',
+      text:
+        `Код для входа в личный кабинет Эфир AI: ${code}\n\n` +
+        `Действует 15 минут. На сайте efir-ai.ru вы сможете посмотреть подписку и отвязать карту.`,
+    }),
+  });
+
+  if (!res.ok) {
+    const detail = await res.text().catch(() => '');
+    throw new Error(`Resend HTTP ${res.status}${detail ? `: ${detail.slice(0, 200)}` : ''}`);
+  }
+}
+
 export async function sendLoginCodeEmail(to: string, code: string): Promise<void> {
   const apiKey = process.env.RESEND_API_KEY?.trim();
   const from = process.env.RESEND_FROM?.trim();

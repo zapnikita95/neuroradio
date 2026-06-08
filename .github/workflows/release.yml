@@ -12,7 +12,7 @@ on:
       - 'chrome-extension/**'
       - 'website/**'
       - 'backend/**'
-      - 'MusicStory.apk'
+      - 'efir-ai.apk'
       - '.github/workflows/release.yml'
     tags:
       - 'v*'
@@ -69,12 +69,12 @@ jobs:
 
       - name: Verify APK at repo root
         run: |
-          if [ ! -f MusicStory.apk ]; then
-            echo "MusicStory.apk not found in repo root after Gradle build" >&2
+          if [ ! -f efir-ai.apk ]; then
+            echo "efir-ai.apk not found in repo root after Gradle build" >&2
             exit 1
           fi
-          ls -lh MusicStory.apk
-          test -s MusicStory.apk
+          ls -lh efir-ai.apk
+          test -s efir-ai.apk
 
       - name: Pack browser extension
         run: |
@@ -107,10 +107,10 @@ jobs:
           body: |
             Автосборка Эфир AI · ${{ github.sha }}
 
-            - **MusicStory.apk** — Android
+            - **efir-ai.apk** — Android
             - **efir-extension.zip** — Chrome / Яндекс Браузер
           files: |
-            MusicStory.apk
+            efir-ai.apk
             efir-extension.zip
           make_latest: true
           draft: false

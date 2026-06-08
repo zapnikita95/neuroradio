@@ -61,9 +61,9 @@ jobs:
 
       - name: Verify APK at repo root
         run: |
-          if [ ! -f MusicStory.apk ]; then
-            echo "MusicStory.apk not found in repo root" >&2
+          if [ ! -f efir-ai.apk ]; then
+            echo "efir-ai.apk not found in repo root" >&2
             exit 1
           fi
-          ls -lh MusicStory.apk
-          test -s MusicStory.apk
+          ls -lh efir-ai.apk
+          test -s efir-ai.apk

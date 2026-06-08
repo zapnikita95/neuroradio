@@ -10,7 +10,7 @@
   var API_BASE = (window.EFIR_API_BASE || '').replace(/\/$/, '');
   var GH_REPO = 'zapnikita95/neuroradio';
   var MOBILE_TAG = 'mobile-latest';
-  var APK_FALLBACK = 'https://github.com/' + GH_REPO + '/releases/download/' + MOBILE_TAG + '/MusicStory.apk';
+  var APK_FALLBACK = 'https://github.com/' + GH_REPO + '/releases/download/' + MOBILE_TAG + '/efir-ai.apk';
   var EXT_FALLBACK = 'https://github.com/' + GH_REPO + '/releases/download/' + MOBILE_TAG + '/efir-extension.zip';
 
   var $ = function (s, r) { return (r || document).querySelector(s); };
@@ -510,7 +510,7 @@
       var extUrl = (links.extensionUrl || EXT_FALLBACK) + cacheBust;
       apkEls.forEach(function (e) {
         e.href = apkUrl;
-        e.setAttribute('download', 'MusicStory.apk');
+        e.setAttribute('download', 'efir-ai.apk');
         e.removeAttribute('target');
       });
       extEls.forEach(function (e) {
@@ -581,6 +581,151 @@
       .catch(function () {
         applyLinks({ apkUrl: null, extensionUrl: null, tag: null });
       });
+  })();
+
+  /* ---------------- Account cabinet (unlink card) ---------------- */
+  (function () {
+    var form = $('#accountForm');
+    if (!form) return;
+    var emailInput = $('#accountEmail');
+    var codeInput = $('#accountCode');
+    var emailErr = $('#accountEmailErr');
+    var codeErr = $('#accountCodeErr');
+    var sendBtn = $('#accountSendCode');
+    var loginBtn = $('#accountLoginBtn');
+    var cabinet = $('#accountCabinet');
+    var statusEl = $('#accountStatus');
+    var unlinkBtn = $('#accountUnlinkBtn');
+    var unlinkHint = $('#accountUnlinkHint');
+    var msgEl = $('#accountMsg');
+
+    function validEmail(v) { return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v); }
+    function apiUrl(path) { return (API_BASE || '') + '/v1/public' + path; }
+    function showMsg(text, isErr) {
+      if (!msgEl) return;
+      msgEl.hidden = !text;
+      msgEl.textContent = text || '';
+      msgEl.style.color = isErr ? '#ff6b8a' : '#7dffa8';
+    }
+    function planLabel(plan) {
+      if (plan === 'premium') return 'Расширенный';
+      if (plan === 'trial') return 'Пробный';
+      return 'Базовый';
+    }
+    function fmtDate(ts) {
+      if (!ts) return '—';
+      try {
+        return new Date(ts).toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', year: 'numeric' });
+      } catch (e) { return '—'; }
+    }
+    function renderStatus(st) {
+      var lines = [
+        '<p><strong>Email:</strong> ' + st.email + '</p>',
+        '<p><strong>Тариф:</strong> ' + planLabel(st.plan) + '</p>'
+      ];
+      if (st.premiumUntil) lines.push('<p><strong>Расширенный до:</strong> ' + fmtDate(st.premiumUntil) + '</p>');
+      if (st.trialUntil && st.plan === 'trial') lines.push('<p><strong>Пробный до:</strong> ' + fmtDate(st.trialUntil) + '</p>');
+      if (st.nextPaymentAt && st.autoRenew) {
+        lines.push('<p><strong>Следующее списание:</strong> ' + fmtDate(st.nextPaymentAt) + '</p>');
+      }
+      lines.push('<p><strong>Карта привязана:</strong> ' + (st.cardSaved ? 'да' : 'нет') + '</p>');
+      lines.push('<p><strong>Автопродление:</strong> ' + (st.autoRenew ? 'включено' : 'отключено') + '</p>');
+      statusEl.innerHTML = lines.join('');
+      var canUnlink = st.cardSaved || st.autoRenew;
+      unlinkBtn.hidden = !canUnlink;
+      unlinkHint.hidden = !canUnlink;
+      if (!canUnlink) {
+        showMsg('Карта не привязана — автопродление уже отключено.', false);
+      } else {
+        showMsg('', false);
+      }
+    }
+
+    sendBtn.addEventListener('click', function () {
+      var email = emailInput.value.trim();
+      emailErr.hidden = validEmail(email);
+      if (!validEmail(email)) return;
+      showMsg('', false);
+      sendBtn.disabled = true;
+      sendBtn.textContent = 'Отправляем…';
+      fetch(apiUrl('/account/code'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: email })
+      })
+        .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, body: j }; }); })
+        .then(function (res) {
+          if (res.ok) {
+            showMsg('Код отправлен на ' + email + '. Проверьте почту (и спам).', false);
+            codeInput.focus();
+            return;
+          }
+          showMsg(res.body.error || 'Не удалось отправить код', true);
+        })
+        .catch(function () { showMsg('Сеть недоступна — попробуйте позже', true); })
+        .finally(function () {
+          sendBtn.disabled = false;
+          sendBtn.textContent = 'Получить код';
+        });
+    });
+
+    form.addEventListener('submit', function (e) {
+      e.preventDefault();
+      var email = emailInput.value.trim();
+      var code = codeInput.value.trim();
+      var okEmail = validEmail(email);
+      emailErr.hidden = okEmail;
+      codeErr.hidden = code.length >= 4;
+      if (!okEmail || code.length < 4) return;
+      showMsg('', false);
+      loginBtn.disabled = true;
+      loginBtn.textContent = 'Входим…';
+      fetch(apiUrl('/account/status'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: email, code: code })
+      })
+        .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, body: j }; }); })
+        .then(function (res) {
+          if (res.ok && res.body.status) {
+            form.hidden = true;
+            cabinet.hidden = false;
+            renderStatus(res.body.status);
+            return;
+          }
+          codeErr.hidden = false;
+          showMsg(res.body.error || 'Не удалось войти', true);
+        })
+        .catch(function () { showMsg('Сеть недоступна — попробуйте позже', true); })
+        .finally(function () {
+          loginBtn.disabled = false;
+          loginBtn.textContent = 'Войти в кабинет';
+        });
+    });
+
+    unlinkBtn.addEventListener('click', function () {
+      if (!window.confirm('Отвязать карту? Автопродление отключится. Доступ сохранится до конца оплаченного периода.')) return;
+      var email = emailInput.value.trim();
+      var code = codeInput.value.trim();
+      unlinkBtn.disabled = true;
+      showMsg('', false);
+      fetch(apiUrl('/account/unlink-card'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: email, code: code })
+      })
+        .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, body: j }; }); })
+        .then(function (res) {
+          if (res.ok && res.body.status) {
+            renderStatus(res.body.status);
+            showMsg(res.body.message || 'Карта отвязана', false);
+            return;
+          }
+          showMsg(res.body.error || 'Не удалось отвязать карту', true);
+        })
+        .catch(function () { showMsg('Сеть недоступна — попробуйте позже', true); })
+        .finally(function () { unlinkBtn.disabled = false; });
+    });
   })();
 
   /* ---------------- Misc ---------------- */

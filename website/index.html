@@ -72,7 +72,7 @@
         "applicationSubCategory": "Музыкальный AI-радиоведущий",
         "operatingSystem": "Android 8.0+, Chrome, Яндекс Браузер",
         "url": "https://efir-ai.ru/",
-        "downloadUrl": "https://github.com/zapnikita95/neuroradio/releases/download/mobile-latest/MusicStory.apk",
+        "downloadUrl": "https://github.com/zapnikita95/neuroradio/releases/download/mobile-latest/efir-ai.apk",
         "inLanguage": "ru-RU",
         "description": "Сервис для Android и браузера: находит интересные факты о текущем треке в 10+ источниках, ранжирует по интересности, накладывает выбранное амплуа ведущего и озвучивает историю живым голосом в реальном времени между песнями. Заготовок нет — каждый эфир уникален.",
         "featureList": [
@@ -145,6 +145,7 @@
       <a href="#how">Как это работает</a>
       <a href="#studio">Студия</a>
       <a href="#pricing">Тарифы</a>
+      <a href="#account">Кабинет</a>
       <a href="#docs">Документы</a>
     </nav>
     <a href="#download" class="btn btn-primary btn-sm nav-cta">Скачать</a>
@@ -279,7 +280,7 @@
             <li>APK · Android 8.0+</li>
             <li id="apkVersion">версия с GitHub</li>
           </ul>
-          <a href="https://github.com/zapnikita95/neuroradio/releases/download/mobile-latest/MusicStory.apk" id="dlApk" class="btn btn-primary btn-block btn-lg" rel="noopener" download="MusicStory.apk">
+          <a href="https://github.com/zapnikita95/neuroradio/releases/download/mobile-latest/efir-ai.apk" id="dlApk" class="btn btn-primary btn-block btn-lg" rel="noopener" download="efir-ai.apk">
             <span class="btn-ic site-ic ic-download" aria-hidden="true"></span> Скачать APK
           </a>
           <p class="dl-fine">После скачивания разрешите установку из этого источника в настройках телефона.</p>
@@ -557,6 +558,50 @@
       <p class="pricing-fine">Оплата привязывается к вашему email — по нему подписка распознаётся в приложении. Используйте тот же адрес при входе.</p>
     </section>
 
+    <!-- ============ ACCOUNT (YooKassa: отвязка карты) ============ -->
+    <section class="section section-account" id="account">
+      <div class="section-head reveal">
+        <span class="kicker">Личный кабинет</span>
+        <h2 class="section-title">Управление <span class="grad-text">подпиской</span></h2>
+        <p class="section-sub">
+          Войдите по email, с которым оформляли подписку на <strong>efir-ai.ru</strong>.
+          Здесь можно посмотреть статус и в любой момент <strong>отвязать карту</strong> — без обращения в поддержку.
+        </p>
+      </div>
+      <div class="account-panel reveal">
+        <div class="account-url" aria-label="Адрес личного кабинета">
+          <span class="site-ic ic-lock" aria-hidden="true"></span>
+          <span>https://www.efir-ai.ru/#account</span>
+        </div>
+        <form id="accountForm" class="account-form" novalidate>
+          <label class="field">
+            <span>Email подписки</span>
+            <input type="email" id="accountEmail" placeholder="you@example.com" autocomplete="email" required />
+            <small class="field-err" id="accountEmailErr" hidden>Введите корректный email</small>
+          </label>
+          <div class="account-code-row">
+            <label class="field account-code-field">
+              <span>Код из письма</span>
+              <input type="text" id="accountCode" inputmode="numeric" autocomplete="one-time-code" placeholder="6 цифр" maxlength="8" />
+              <small class="field-err" id="accountCodeErr" hidden>Неверный или просроченный код</small>
+            </label>
+            <button type="button" class="btn btn-ghost" id="accountSendCode">Получить код</button>
+          </div>
+          <button type="submit" class="btn btn-primary btn-block" id="accountLoginBtn">Войти в кабинет</button>
+        </form>
+        <div class="account-cabinet" id="accountCabinet" hidden>
+          <div class="account-status" id="accountStatus"></div>
+          <button type="button" class="btn btn-ghost btn-block account-unlink" id="accountUnlinkBtn">
+            Отвязать карту
+          </button>
+          <p class="account-hint" id="accountUnlinkHint">
+            Карта будет отвязана, автопродление отключится. Доступ сохранится до конца оплаченного периода.
+          </p>
+          <p class="field-err account-msg" id="accountMsg" hidden></p>
+        </div>
+      </div>
+    </section>
+
     <!-- ============ DOCS ============ -->
     <section class="section section-docs" id="docs">
       <div class="section-head reveal">
@@ -637,7 +682,7 @@
         </details>
         <details>
           <summary>Можно отменить подписку?</summary>
-          <p>Да, в любой момент. Доступ сохраняется до конца оплаченного периода.</p>
+          <p>Да, в любой момент. В <a href="#account">личном кабинете на сайте</a> или в приложении (Аккаунт → Оплата) нажмите «Отвязать карту» — автопродление отключится, доступ сохранится до конца оплаченного периода.</p>
         </details>
       </div>
     </section>
@@ -669,6 +714,7 @@
         <div>
           <h4>Тарифы</h4>
           <a href="#pricing">Подписка</a>
+          <a href="#account">Личный кабинет</a>
           <a href="#models">Модели</a>
           <a href="#faq">FAQ</a>
         </div>
@@ -733,7 +779,7 @@
             <h3>Почти готово!</h3>
             <p id="successText">Мы отправили ссылку на оплату и загрузку на <strong id="successEmail"></strong>. После оплаты войдите в приложение или расширение с этим email — расширенный доступ активируется автоматически.</p>
             <div class="success-downloads">
-              <a href="https://github.com/zapnikita95/neuroradio/releases/download/mobile-latest/MusicStory.apk" id="successApk" class="btn btn-primary btn-block" rel="noopener" download="MusicStory.apk"><span class="btn-ic site-ic ic-download" aria-hidden="true"></span> Скачать APK для Android</a>
+              <a href="https://github.com/zapnikita95/neuroradio/releases/download/mobile-latest/efir-ai.apk" id="successApk" class="btn btn-primary btn-block" rel="noopener" download="efir-ai.apk"><span class="btn-ic site-ic ic-download" aria-hidden="true"></span> Скачать APK для Android</a>
               <a href="https://github.com/zapnikita95/neuroradio/releases/download/mobile-latest/efir-extension.zip" id="successExt" class="btn btn-ghost btn-block" rel="noopener" download="efir-extension.zip"><span class="btn-ic site-ic ic-puzzle" aria-hidden="true"></span> Скачать расширение</a>
             </div>
             <button class="btn btn-ghost btn-block btn-text" id="successClose">Закрыть</button>

@@ -29,9 +29,9 @@ Thumbs.db
 *.iml
 .vscode/
 
-# Build artifacts (APK via Releases; root MusicStory.apk is committed as CI fallback)
+# Build artifacts (APK via Releases; root efir-ai.apk is committed as CI fallback)
 *.apk
-!MusicStory.apk
+!efir-ai.apk
 *.aab
 
 # Logs

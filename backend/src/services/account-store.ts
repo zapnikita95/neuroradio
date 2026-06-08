@@ -84,6 +84,23 @@ export interface PendingEmailCode {
   expiresAt: number;
 }
 
+export interface PendingWebCabinetCode {
+  code: string;
+  email: string;
+  expiresAt: number;
+}
+
+export type WebCabinetStatus = {
+  email: string;
+  plan: AccountPlan;
+  premiumUntil: number | null;
+  trialUntil: number | null;
+  cardSaved: boolean;
+  autoRenew: boolean;
+  subscriptionPlan: 'month' | 'quarter' | 'year' | null;
+  nextPaymentAt: number | null;
+};
+
 export type AccountPlan = 'free' | 'trial' | 'premium';
 
 export interface AccountEntitlement {
@@ -146,6 +163,7 @@ interface StoreFile {
   emailToAccount?: Record<string, string>;
   telegramToAccount?: Record<string, string>;
   pendingEmailCodes?: Record<string, PendingEmailCode>;
+  pendingWebCabinetCodes?: Record<string, PendingWebCabinetCode>;
 }
 
 const DATA_DIR = process.env.ACCOUNT_DATA_DIR?.trim() || path.join(process.cwd(), 'data');
@@ -166,6 +184,7 @@ export async function hydrateAccountStoreFromPostgres(): Promise<void> {
         emailToAccount: parsed.emailToAccount ?? {},
         telegramToAccount: parsed.telegramToAccount ?? {},
         pendingEmailCodes: parsed.pendingEmailCodes ?? {},
+        pendingWebCabinetCodes: parsed.pendingWebCabinetCodes ?? {},
       };
     },
     emptyStore,
@@ -180,6 +199,7 @@ function emptyStore(): StoreFile {
     emailToAccount: {},
     telegramToAccount: {},
     pendingEmailCodes: {},
+    pendingWebCabinetCodes: {},
   };
 }
 
@@ -897,6 +917,124 @@ export function cancelAutoRenewByInstall(installId: string): { ok: boolean; erro
   }
   cancelAutoRenewByEmail(email);
   return { ok: true };
+}
+
+function getAccountByEmail(emailRaw: string): AccountRecord | null {
+  const email = normalizeEmail(emailRaw);
+  const store = loadStore();
+  const accountId = store.emailToAccount?.[email];
+  if (!accountId) return null;
+  return store.accountsById[accountId] ?? null;
+}
+
+function verifyWebCabinetCode(
+  emailRaw: string,
+  codeRaw: string,
+): { ok: true; email: string } | { ok: false; error: string } {
+  const email = normalizeEmail(emailRaw);
+  const code = codeRaw.replace(/\D/g, '').trim();
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    return { ok: false, error: 'Некорректный email' };
+  }
+  if (code.length < 4) {
+    return { ok: false, error: 'Неверный код' };
+  }
+  const store = loadStore();
+  store.pendingWebCabinetCodes = store.pendingWebCabinetCodes ?? {};
+  const pending = store.pendingWebCabinetCodes[email];
+  if (!pending || pending.expiresAt < Date.now()) {
+    return { ok: false, error: 'Код истёк — запросите новый' };
+  }
+  if (pending.code !== code) {
+    return { ok: false, error: 'Неверный код' };
+  }
+  return { ok: true, email };
+}
+
+function webCabinetStatusFromAccount(email: string, account: AccountRecord): WebCabinetStatus {
+  const ent = entitlementFromAccount(account);
+  return {
+    email,
+    plan: ent.plan,
+    premiumUntil: ent.premiumUntil > 0 ? ent.premiumUntil : null,
+    trialUntil: ent.trialUntil > 0 ? ent.trialUntil : null,
+    cardSaved: ent.cardSaved ?? false,
+    autoRenew: ent.autoRenew ?? false,
+    subscriptionPlan: ent.subscriptionPlan ?? null,
+    nextPaymentAt: ent.nextPaymentAt ?? null,
+  };
+}
+
+/** Код для входа в личный кабинет на сайте (без привязки к installId). */
+export async function startWebCabinetCode(
+  emailRaw: string,
+): Promise<{ ok: true; expiresInSec: number } | { ok: false; error: string }> {
+  const email = normalizeEmail(emailRaw);
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    return { ok: false, error: 'Некорректный email' };
+  }
+  const store = await ensureAccountStoreLoaded();
+  const code = String(crypto.randomInt(100000, 999999));
+  const expiresAt = Date.now() + 15 * 60 * 1000;
+  store.pendingWebCabinetCodes = store.pendingWebCabinetCodes ?? {};
+  store.pendingWebCabinetCodes[email] = { code, email, expiresAt };
+  await saveStoreAsync(store);
+  const { isEmailConfigured, sendCabinetCodeEmail } = await import('./email-sender.js');
+  if (isEmailConfigured()) {
+    void sendCabinetCodeEmail(email, code).catch((err) => {
+      console.warn('[web-cabinet] send failed:', err instanceof Error ? err.message : err);
+    });
+  } else {
+    console.log(`[web-cabinet] code for ${email}: ${code} (set RESEND_API_KEY + RESEND_FROM)`);
+  }
+  return { ok: true, expiresInSec: 900 };
+}
+
+export async function getWebCabinetStatus(
+  emailRaw: string,
+  codeRaw: string,
+): Promise<{ ok: true; status: WebCabinetStatus } | { ok: false; error: string; code?: string }> {
+  await ensureAccountStoreLoaded();
+  const verified = verifyWebCabinetCode(emailRaw, codeRaw);
+  if (!verified.ok) return verified;
+  const account = getAccountByEmail(verified.email);
+  if (!account) {
+    return { ok: false, error: 'Аккаунт с этим email не найден', code: 'NOT_FOUND' };
+  }
+  return { ok: true, status: webCabinetStatusFromAccount(verified.email, account) };
+}
+
+export async function unlinkCardViaWebCabinet(
+  emailRaw: string,
+  codeRaw: string,
+): Promise<
+  | { ok: true; status: WebCabinetStatus; message: string }
+  | { ok: false; error: string; code?: string }
+> {
+  await ensureAccountStoreLoaded();
+  const verified = verifyWebCabinetCode(emailRaw, codeRaw);
+  if (!verified.ok) return verified;
+  const account = getAccountByEmail(verified.email);
+  if (!account) {
+    return { ok: false, error: 'Аккаунт с этим email не найден', code: 'NOT_FOUND' };
+  }
+  if (!account.yookassaPaymentMethodId?.trim() && account.autoRenew === false) {
+    return { ok: false, error: 'Карта не привязана — автопродление уже отключено', code: 'NO_SAVED_CARD' };
+  }
+  cancelAutoRenewByEmail(verified.email);
+  const store = loadStore();
+  delete store.pendingWebCabinetCodes?.[verified.email];
+  saveStore(store);
+  const updated = getAccountByEmail(verified.email);
+  if (!updated) {
+    return { ok: false, error: 'Аккаунт недоступен', code: 'NOT_FOUND' };
+  }
+  return {
+    ok: true,
+    status: webCabinetStatusFromAccount(verified.email, updated),
+    message:
+      'Карта отвязана. Автопродление отключено. Доступ сохранится до конца оплаченного периода.',
+  };
 }
 
 const TRIAL_MS_MONTH = 31 * 24 * 60 * 60 * 1000;

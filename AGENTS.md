@@ -54,7 +54,7 @@ MediaNotificationListener
 | `backend/` | Node/Express BFF, деплой Railway (Dockerfile в корне или `backend/Dockerfile`) |
 | `desktop/` | Tauri + веб (опционально) |
 | `ios/` | Swift (опционально) |
-| `MusicStory.apk` | Debug APK в **корне** после `assembleDebug` |
+| `efir-ai.apk` | Debug APK в **корне** после `assembleDebug` |
 | `railway.toml` | Root Directory **пустой** → корневой Dockerfile |
 | `backend/RAILWAY.md` | Деплой, переменные, volume для `ACCOUNT_DATA_DIR` |
 
@@ -95,7 +95,7 @@ MediaNotificationListener
 - Не менять цепочку озвучки на «локальный TTS» без явного запроса пользователя.
 - Не ломать `POST /v1/story/full` как единственный источник `audioUrl` для production.
 - Не коммитить `.env`, ключи API.
-- APK пользователю указывать как **`MusicStory.apk`** в корне репозитория.
+- APK пользователю указывать как **`efir-ai.apk`** в корне репозитория.
 
 ---
 
@@ -103,7 +103,7 @@ MediaNotificationListener
 
 ```bash
 # APK
-cd android && ./gradlew assembleDebug   # → ../MusicStory.apk
+cd android && ./gradlew assembleDebug   # → ../efir-ai.apk
 
 # Backend локально
 cd backend && npm ci && npm run build && node dist/index.js

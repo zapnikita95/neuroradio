@@ -76,11 +76,11 @@ afterEvaluate {
     }
 
     tasks.matching { it.name == "assembleDebug" }.configureEach {
-        doLast { exportApk("debug", "app-debug.apk", "MusicStory.apk") }
+        doLast { exportApk("debug", "app-debug.apk", "efir-ai.apk") }
     }
 
     tasks.matching { it.name == "assembleRelease" }.configureEach {
-        doLast { exportApk("release", "app-release.apk", "MusicStory-release.apk") }
+        doLast { exportApk("release", "app-release.apk", "efir-ai-release.apk") }
     }
 }
 

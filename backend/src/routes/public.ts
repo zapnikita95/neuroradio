@@ -22,6 +22,11 @@ import { SILERO_VOICE_PRESETS } from '../services/silero-voices.js';
 import { hasYandexCredentials } from '../services/yandex-tts.js';
 import { getPublicDownloadLinks } from '../services/github-downloads.js';
 import { getPublicAuthConfig } from '../services/auth-config.js';
+import {
+  getWebCabinetStatus,
+  startWebCabinetCode,
+  unlinkCardViaWebCabinet,
+} from '../services/account-store.js';
 
 const router = Router();
 
@@ -211,6 +216,63 @@ router.post('/yookassa/webhook', async (req: Request, res: Response) => {
 
 router.get('/yookassa/webhook', (_req, res: Response) => {
   res.json({ ok: true, message: 'YooKassa webhook endpoint active' });
+});
+
+/** Код на email для личного кабинета на сайте (отвязка карты ЮKassa). */
+router.post('/account/code', async (req: Request, res: Response) => {
+  const ip = clientIp(req);
+  if (rateLimited(ip)) {
+    res.status(429).json({ error: 'Слишком много запросов, попробуйте позже' });
+    return;
+  }
+  const email = typeof req.body?.email === 'string' ? req.body.email.trim() : '';
+  if (!EMAIL_RE.test(email) || email.length > 254) {
+    res.status(400).json({ error: 'Введите корректный email' });
+    return;
+  }
+  const result = await startWebCabinetCode(email);
+  if (!result.ok) {
+    res.status(400).json({ error: result.error });
+    return;
+  }
+  res.json({ ok: true, expiresInSec: result.expiresInSec });
+});
+
+/** Статус подписки в личном кабинете (email + код из письма). */
+router.post('/account/status', async (req: Request, res: Response) => {
+  const ip = clientIp(req);
+  if (rateLimited(ip)) {
+    res.status(429).json({ error: 'Слишком много запросов, попробуйте позже' });
+    return;
+  }
+  const email = typeof req.body?.email === 'string' ? req.body.email.trim() : '';
+  const code = typeof req.body?.code === 'string' ? req.body.code.trim() : '';
+  const result = await getWebCabinetStatus(email, code);
+  if (!result.ok) {
+    const status = result.code === 'NOT_FOUND' ? 404 : 400;
+    res.status(status).json({ ok: false, error: result.error, code: result.code });
+    return;
+  }
+  res.json({ ok: true, status: result.status });
+});
+
+/** Отвязать карту из личного кабинета на сайте. */
+router.post('/account/unlink-card', async (req: Request, res: Response) => {
+  const ip = clientIp(req);
+  if (rateLimited(ip)) {
+    res.status(429).json({ error: 'Слишком много запросов, попробуйте позже' });
+    return;
+  }
+  const email = typeof req.body?.email === 'string' ? req.body.email.trim() : '';
+  const code = typeof req.body?.code === 'string' ? req.body.code.trim() : '';
+  const result = await unlinkCardViaWebCabinet(email, code);
+  if (!result.ok) {
+    const status =
+      result.code === 'NOT_FOUND' ? 404 : result.code === 'NO_SAVED_CARD' ? 400 : 400;
+    res.status(status).json({ ok: false, error: result.error, code: result.code });
+    return;
+  }
+  res.json({ ok: true, status: result.status, message: result.message });
 });
 
 /** Legacy: email-only subscribe (без оплаты) — оставлен для совместимости. */
