@@ -33,6 +33,12 @@ jobs:
           distribution: temurin
           java-version: '17'
 
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: wrapper
+          cache-read-only: false
+
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
 
@@ -41,30 +47,34 @@ jobs:
 
       - name: Build debug APK
         id: gradle
-        continue-on-error: true
         working-directory: android
         env:
           GRADLE_OPTS: -Dorg.gradle.jvmargs=-Xmx4g -Dfile.encoding=UTF-8
         run: |
           chmod +x gradlew
-          ./gradlew --no-daemon --stacktrace assembleDebug
-
-      - name: Use committed APK if Gradle build failed
-        if: steps.gradle.outcome == 'failure'
-        run: |
-          if [ ! -f MusicStory.apk ]; then
-            echo "Gradle failed and no committed MusicStory.apk in repo root" >&2
-            exit 1
-          fi
-          echo "Using committed MusicStory.apk from repository"
+          set -e
+          for attempt in 1 2 3; do
+            echo "assembleDebug attempt ${attempt}/3"
+            if ./gradlew --no-daemon --stacktrace assembleDebug; then
+              echo "Gradle build succeeded on attempt ${attempt}"
+              exit 0
+            fi
+            if [ "${attempt}" -lt 3 ]; then
+              echo "Gradle failed, retrying in 20s..."
+              sleep 20
+            fi
+          done
+          echo "Gradle build failed after 3 attempts" >&2
+          exit 1
 
       - name: Verify APK at repo root
         run: |
           if [ ! -f MusicStory.apk ]; then
-            echo "MusicStory.apk not found in repo root" >&2
+            echo "MusicStory.apk not found in repo root after Gradle build" >&2
             exit 1
           fi
           ls -lh MusicStory.apk
+          test -s MusicStory.apk
 
       - name: Pack browser extension
         run: |
