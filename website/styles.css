@@ -82,11 +82,11 @@ main { max-width: 100%; overflow-x: clip; }
 .brand { display: flex; align-items: center; gap: 10px; font-weight: 700; min-width: 0; flex-shrink: 0; }
 .brand-mark {
   filter: drop-shadow(0 4px 16px rgba(168,90,247,.5));
-  border-radius: 16.667%;
+  border-radius: 30px;
   flex-shrink: 0;
 }
 .footer-brand > img {
-  border-radius: 16.667%;
+  border-radius: 30px;
   flex-shrink: 0;
 }
 .brand-name { font-size: 20px; font-weight: 700; }

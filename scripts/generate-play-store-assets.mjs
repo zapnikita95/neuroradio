@@ -20,11 +20,28 @@ if (!fs.existsSync(ICON)) {
 fs.mkdirSync(OUT, { recursive: true });
 
 const BG = { r: 8, g: 7, b: 15 };
+const LOGO_RADIUS = 30;
+
+async function roundLogoPng(inputBuffer, size, radius = LOGO_RADIUS) {
+  const resized = await sharp(inputBuffer)
+    .resize(size, size, { fit: 'contain', background: { r: 0, g: 0, b: 0, alpha: 0 } })
+    .png()
+    .toBuffer();
+  const mask = Buffer.from(
+    `<svg width="${size}" height="${size}" xmlns="http://www.w3.org/2000/svg">` +
+      `<rect x="0" y="0" width="${size}" height="${size}" rx="${radius}" ry="${radius}" fill="white"/>` +
+    `</svg>`,
+  );
+  return sharp(resized)
+    .composite([{ input: await sharp(mask).png().toBuffer(), blend: 'dest-in' }])
+    .png()
+    .toBuffer();
+}
 
 async function icon512() {
   const pad = 64;
   const inner = 512 - pad * 2;
-  const icon = await sharp(ICON).resize(inner, inner, { fit: 'contain', background: { r: 0, g: 0, b: 0, alpha: 0 } }).png().toBuffer();
+  const icon = await roundLogoPng(await sharp(ICON).png().toBuffer(), inner);
   await sharp({
     create: { width: 512, height: 512, channels: 4, background: BG },
   })
@@ -49,7 +66,7 @@ async function featureGraphic() {
     <rect width="100%" height="100%" fill="url(#g)"/>
   </svg>`;
   const bg = await sharp(Buffer.from(svg)).png().toBuffer();
-  const logo = await sharp(ICON).resize(220, 220, { fit: 'contain', background: { r: 0, g: 0, b: 0, alpha: 0 } }).png().toBuffer();
+  const logo = await roundLogoPng(await sharp(ICON).png().toBuffer(), 220);
   const titleSvg = Buffer.from(`<svg width="700" height="120" xmlns="http://www.w3.org/2000/svg">
     <text x="0" y="52" font-family="Arial, Helvetica, sans-serif" font-weight="700" font-size="48" fill="#f3eefb">Эфир</text>
     <text x="130" y="52" font-family="Arial, Helvetica, sans-serif" font-weight="700" font-size="48" fill="#ff5da2">AI</text>
@@ -69,7 +86,7 @@ async function featureGraphic() {
 async function promoPhone() {
   const w = 1080;
   const h = 1920;
-  const icon = await sharp(ICON).resize(360, 360, { fit: 'contain', background: { r: 0, g: 0, b: 0, alpha: 0 } }).png().toBuffer();
+  const icon = await roundLogoPng(await sharp(ICON).png().toBuffer(), 360);
   await sharp({
     create: { width: w, height: h, channels: 4, background: BG },
   })
