@@ -1,6 +1,7 @@
 import { Response } from 'express';
 import { isUnlimitedInstall, SECURITY } from '../config/security.js';
-import { getQuotaSubject } from '../services/account-store.js';
+import { getAccountProfile, getQuotaSubject } from '../services/account-store.js';
+import { getYookassaReviewerDailyLimit } from '../services/yookassa-reviewer-accounts.js';
 import { resolveUserTier } from '../services/entitlements.js';
 import { resolveFreeDailyLimit } from '../services/free-model-profile.js';
 import { getDevTierOverride } from '../services/dev-tier-store.js';
@@ -139,6 +140,11 @@ export function resetStoryQuotaForInstall(installId: string): void {
 
 export function getDailyStoryLimit(installId: string, options: { freeOpenRouterModel?: string } = {}): number {
   if (isUnlimitedInstall(installId) || isDevQuotaBypass(installId)) return UNLIMITED_QUOTA.limit;
+  const reviewerEmail = getAccountProfile(installId).email;
+  if (reviewerEmail) {
+    const reviewerLimit = getYookassaReviewerDailyLimit(reviewerEmail);
+    if (reviewerLimit != null) return reviewerLimit;
+  }
   const tier = resolveUserTier(installId);
   if (tier === 'free') {
     return resolveFreeDailyLimit(options.freeOpenRouterModel);

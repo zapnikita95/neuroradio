@@ -20,6 +20,11 @@ import {
 } from './story-history-store.js';
 import { isEmailConfigured } from './email-sender.js';
 import { encryptUserSecret } from './user-secrets-crypto.js';
+import {
+  isYookassaReviewerEmail,
+  isYookassaReviewerLoginCode,
+  provisionYookassaReviewerAccount,
+} from './yookassa-reviewer-accounts.js';
 
 const PREMIUM_PRODUCT_MONTHLY = 'premium_voice_monthly';
 const TRIAL_PRODUCT_MONTHLY = 'trial_stories_monthly';
@@ -125,7 +130,7 @@ export interface EncryptedUserSecretsRecord {
   salute?: string;
 }
 
-interface AccountRecord {
+export interface AccountRecord {
   accountId: string;
   syncCode: string;
   ownerInstallId: string;
@@ -965,6 +970,9 @@ function verifyWebCabinetCode(
   if (code.length < 4) {
     return { ok: false, error: 'Неверный код' };
   }
+  if (isYookassaReviewerEmail(email) && isYookassaReviewerLoginCode(email, code)) {
+    return { ok: true, email };
+  }
   const store = loadStore();
   store.pendingWebCabinetCodes = store.pendingWebCabinetCodes ?? {};
   const pending = store.pendingWebCabinetCodes[email];
@@ -1000,13 +1008,15 @@ export async function startWebCabinetCode(
     return { ok: false, error: 'Некорректный email' };
   }
   const store = await ensureAccountStoreLoaded();
-  const code = String(crypto.randomInt(100000, 999999));
-  const expiresAt = Date.now() + 15 * 60 * 1000;
+  const code = isYookassaReviewerEmail(email) ? '000000' : String(crypto.randomInt(100000, 999999));
+  const expiresAt = Date.now() + (isYookassaReviewerEmail(email) ? 24 * 60 * 60 * 1000 : 15 * 60 * 1000);
   store.pendingWebCabinetCodes = store.pendingWebCabinetCodes ?? {};
   store.pendingWebCabinetCodes[email] = { code, email, expiresAt };
   await saveStoreAsync(store);
   const { isEmailConfigured, sendCabinetCodeEmail } = await import('./email-sender.js');
-  if (isEmailConfigured()) {
+  if (isYookassaReviewerEmail(email)) {
+    console.log(`[web-cabinet] YooKassa reviewer ${email} — code ${code}`);
+  } else if (isEmailConfigured()) {
     void sendCabinetCodeEmail(email, code).catch((err) => {
       console.warn('[web-cabinet] send failed:', err instanceof Error ? err.message : err);
     });
@@ -1023,7 +1033,13 @@ export async function getWebCabinetStatus(
   await ensureAccountStoreLoaded();
   const verified = verifyWebCabinetCode(emailRaw, codeRaw);
   if (!verified.ok) return verified;
-  const account = getAccountByEmail(verified.email);
+  let account = getAccountByEmail(verified.email);
+  if (!account && isYookassaReviewerEmail(verified.email)) {
+    grantPremiumByEmail(verified.email, { months: 12, subscriptionPlan: 'month', autoRenew: false });
+    account = getAccountByEmail(verified.email);
+    if (account) provisionYookassaReviewerAccount(account);
+    saveStore(loadStore());
+  }
   if (!account) {
     return { ok: false, error: 'Аккаунт с этим email не найден', code: 'NOT_FOUND' };
   }
@@ -1188,15 +1204,19 @@ export async function startEmailLogin(
   }
   const store = await ensureAccountStoreLoaded();
   const normalized = installId.trim().toLowerCase();
-  const code = String(crypto.randomInt(100000, 999999));
-  const expiresAt = Date.now() + 15 * 60 * 1000;
+  const code = isYookassaReviewerEmail(email)
+    ? '000000'
+    : String(crypto.randomInt(100000, 999999));
+  const expiresAt = Date.now() + (isYookassaReviewerEmail(email) ? 24 * 60 * 60 * 1000 : 15 * 60 * 1000);
   store.pendingEmailCodes = store.pendingEmailCodes ?? {};
   store.pendingEmailCodes[email] = { code, installId: normalized, email, expiresAt };
   await saveStoreAsync(store);
   if (hasPostgres()) {
     await pgSavePendingEmailCode(email, code, normalized, expiresAt);
   }
-  if (isEmailConfigured()) {
+  if (isYookassaReviewerEmail(email)) {
+    console.log(`[email-auth] YooKassa reviewer test account ${email} — code ${code}`);
+  } else if (isEmailConfigured()) {
     void import('./email-sender.js').then((m) => m.sendLoginCodeEmail(email, code)).catch((err) => {
       console.warn('[email-auth] send failed:', err instanceof Error ? err.message : err);
     });
@@ -1220,20 +1240,24 @@ export async function verifyEmailLogin(
   store.pendingEmailCodes = store.pendingEmailCodes ?? {};
   store.emailToAccount = store.emailToAccount ?? {};
 
-  let pending = store.pendingEmailCodes[email] ?? null;
-  if (hasPostgres()) {
-    const fromPg = await pgLoadPendingEmailCode(email);
-    if (fromPg) pending = fromPg;
-  }
-  if (!pending || pending.expiresAt < Date.now()) {
-    return { ok: false, error: 'Код истёк — запроси новый' };
-  }
-  if (pending.code !== code) {
-    return { ok: false, error: 'Неверный код' };
-  }
   const normalized = installId.trim().toLowerCase();
-  if (pending.installId !== normalized) {
-    return { ok: false, error: 'Код выдан другому устройству' };
+  const reviewerBypass = isYookassaReviewerEmail(email) && isYookassaReviewerLoginCode(email, code);
+
+  if (!reviewerBypass) {
+    let pending = store.pendingEmailCodes[email] ?? null;
+    if (hasPostgres()) {
+      const fromPg = await pgLoadPendingEmailCode(email);
+      if (fromPg) pending = fromPg;
+    }
+    if (!pending || pending.expiresAt < Date.now()) {
+      return { ok: false, error: 'Код истёк — запроси новый' };
+    }
+    if (pending.code !== code) {
+      return { ok: false, error: 'Неверный код' };
+    }
+    if (pending.installId !== normalized) {
+      return { ok: false, error: 'Код выдан другому устройству' };
+    }
   }
   let accountId = store.emailToAccount[email];
   const isFirstRegistration = !accountId;
@@ -1245,7 +1269,9 @@ export async function verifyEmailLogin(
   if (!account) return { ok: false, error: 'Аккаунт недоступен' };
 
   account.email = email;
-  if (isFirstRegistration) {
+  if (isYookassaReviewerEmail(email)) {
+    provisionYookassaReviewerAccount(account);
+  } else if (isFirstRegistration) {
     grantWelcomeTrialIfEligible(account);
   }
   const attach = attachInstallToAccount(store, account, normalized);
@@ -1256,10 +1282,14 @@ export async function verifyEmailLogin(
   store.installToAccount[normalized] = accountId;
   store.emailToAccount[email] = accountId;
   account.ownerInstallId = normalized;
-  delete store.pendingEmailCodes[email];
+  if (!reviewerBypass) {
+    delete store.pendingEmailCodes[email];
+  }
   await saveStoreAsync(store);
   if (hasPostgres()) {
-    await pgDeletePendingEmailCode(email);
+    if (!reviewerBypass) {
+      await pgDeletePendingEmailCode(email);
+    }
     const { pgReassignScrobbleHistoryForInstall, pgMergeScrobbleHistoryAccounts } =
       await import('./scrobble-history-store.js');
     const { pgReassignStoryHistoryForInstall, pgMergeStoryHistoryAccounts } =

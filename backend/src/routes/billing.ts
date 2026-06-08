@@ -19,7 +19,7 @@ import {
   TRIAL_PRODUCT_MONTHLY,
   tierQuotaHintRu,
 } from '../services/tier-policy.js';
-import { getDailyStoryQuota, resetStoryQuotaForInstall } from '../middleware/rate-limit.js';
+import { getDailyStoryLimit, getDailyStoryQuota, resetStoryQuotaForInstall } from '../middleware/rate-limit.js';
 import {
   getDevTierOverride,
   setDevTierOverride,
@@ -48,6 +48,7 @@ router.get('/status', (req: Request, res: Response) => {
   const entitlement = getEntitlementForInstall(installId);
   const limits = getStoryLimitsForTier(tier);
   const quota = getDailyStoryQuota(installId);
+  const effectiveDaily = getDailyStoryLimit(installId);
 
   res.json({
     tier,
@@ -55,7 +56,7 @@ router.get('/status', (req: Request, res: Response) => {
     entitlement,
     quota,
     limits: {
-      dailyStories: limits.dailyStories,
+      dailyStories: effectiveDaily,
       monthlyStories: limits.monthlyStories,
       labelRu: limits.labelRu,
     },
