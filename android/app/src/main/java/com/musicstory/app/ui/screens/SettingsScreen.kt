@@ -292,6 +292,7 @@ fun SettingsScreen(
     var checkSummary by remember { mutableStateOf<String?>(null) }
     var devTierLabel by remember { mutableStateOf<String?>(null) }
     var devTierFeedback by remember { mutableStateOf<String?>(null) }
+    var devTierSwitchEnabled by remember { mutableStateOf(false) }
     var billingEntitlement by remember { mutableStateOf<BillingEntitlementResponse?>(null) }
     val trialExpiredUpsellShown by settings.trialExpiredUpsellShown.collectAsState(initial = false)
     val trialBannerDismissed by settings.trialBannerDismissedMilestones.collectAsState(initial = emptySet())
@@ -422,7 +423,8 @@ fun SettingsScreen(
         runCatching {
             val status = app.apiClient.fetchBillingStatus(url)
             billingEntitlement = status.entitlement
-            if (status.devTierSwitchEnabled == true) {
+            devTierSwitchEnabled = status.devTierSwitchEnabled == true
+            if (devTierSwitchEnabled) {
                 devTierLabel = status.devTierOverride ?: status.tier
             } else {
                 devTierLabel = status.tier
@@ -1673,7 +1675,7 @@ fun SettingsScreen(
                     }
                 }
 
-                if (backendUrl.trim().isNotBlank()) {
+                if (devTierSwitchEnabled) {
                     CollapsibleSettingsSection(
                         title = context.getString(R.string.settings_dev_tier_section),
                         summary = devTierLabel ?: dailyQuota?.tier ?: "—",
