@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Личный кабинет — Эфир AI</title>
+  <meta name="description" content="Управление подпиской Эфир AI: статус, отвязка карты, автопродление." />
+  <meta name="robots" content="noindex, nofollow" />
+  <meta name="theme-color" content="#08070F" />
+  <link rel="canonical" href="https://www.efir-ai.ru/account/" />
+  <link rel="icon" type="image/png" sizes="32x32" href="../assets/favicon-32.png" />
+  <link rel="apple-touch-icon" href="../assets/apple-touch-icon.png" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Unbounded:wght@500;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="../styles.css" />
+</head>
+<body>
+  <div class="bg-aurora" aria-hidden="true">
+    <span class="orb orb-1"></span>
+    <span class="orb orb-2"></span>
+    <span class="orb orb-3"></span>
+  </div>
+  <div class="bg-grain" aria-hidden="true"></div>
+
+  <header class="site-header scrolled" id="siteHeader">
+    <a class="brand" href="../" aria-label="Эфир AI — на главную">
+      <img src="../assets/logo-icon.png" alt="" class="brand-mark" width="40" height="40" />
+      <span class="brand-name">Эфир<span class="brand-ai">AI</span></span>
+    </a>
+    <nav class="nav" aria-label="Основная навигация">
+      <a href="../#service">Сервис</a>
+      <a href="../#personas">Амплуа</a>
+      <a href="../#how">Как это работает</a>
+      <a href="../#pricing">Тарифы</a>
+      <a href="../#docs">Документы</a>
+    </nav>
+    <div class="header-actions">
+      <button type="button" class="btn btn-ghost btn-sm nav-login" id="navLoginBtn">Войти</button>
+      <a href="index.html" class="btn btn-ghost btn-sm nav-cabinet" id="navCabinetBtn" hidden>Кабинет</a>
+      <a href="../#download" class="btn btn-primary btn-sm nav-cta">Скачать</a>
+    </div>
+    <button class="burger" id="burger" aria-label="Меню" aria-expanded="false">
+      <span></span><span></span><span></span>
+    </button>
+  </header>
+
+  <main class="cabinet-main" id="cabinetPage">
+    <div class="cabinet-wrap">
+      <div class="section-head">
+        <span class="kicker">Личный кабинет</span>
+        <h1 class="section-title">Управление <span class="grad-text">подпиской</span></h1>
+        <p class="section-sub cabinet-user-line">Вы вошли как <strong id="cabinetUserEmail">…</strong></p>
+      </div>
+
+      <div class="account-panel cabinet-panel">
+        <div id="cabinetStatus" class="cabinet-status-wrap">
+          <p class="cabinet-loading">Загружаем данные подписки…</p>
+        </div>
+
+        <div class="cabinet-actions">
+          <button type="button" class="btn btn-ghost btn-block account-unlink" id="cabinetUnlinkBtn" hidden>
+            Отвязать карту
+          </button>
+          <p class="account-hint" id="cabinetUnlinkHint" hidden>
+            Карта будет отвязана, автопродление отключится. Доступ сохранится до конца оплаченного периода.
+          </p>
+          <p class="account-msg" id="cabinetMsg" hidden></p>
+          <button type="button" class="btn btn-ghost btn-block cabinet-logout" id="cabinetLogoutBtn">
+            Выйти из аккаунта
+          </button>
+        </div>
+
+        <p class="cabinet-url-note">
+          <span class="site-ic ic-lock" aria-hidden="true"></span>
+          https://www.efir-ai.ru/account/
+        </p>
+      </div>
+
+      <p class="cabinet-back">
+        <a href="../#pricing" class="btn btn-primary">Оформить или продлить подписку</a>
+      </p>
+    </div>
+  </main>
+
+  <footer class="site-footer">
+    <div class="footer-top">
+      <div class="footer-brand">
+        <img src="../assets/logo-icon.png" alt="" width="36" height="36" />
+        <span class="brand-name">Эфир<span class="brand-ai">AI</span></span>
+        <p>Нейро-радиоведущий для вашей музыки</p>
+      </div>
+      <nav class="footer-nav" aria-label="Подвал">
+        <div>
+          <h4>Сервис</h4>
+          <a href="../#service">О сервисе</a>
+          <a href="../#personas">Амплуа</a>
+          <a href="../#how">Как работает</a>
+        </div>
+        <div>
+          <h4>Тарифы</h4>
+          <a href="../#pricing">Подписка</a>
+          <a href="index.html">Личный кабинет</a>
+          <a href="../#faq">FAQ</a>
+        </div>
+        <div>
+          <h4>Документы</h4>
+          <a href="../docs/oferta.html">Оферта</a>
+          <a href="../docs/privacy.html">Конфиденциальность</a>
+          <a href="../docs/terms.html">Соглашение</a>
+        </div>
+      </nav>
+    </div>
+    <div class="footer-bottom">
+      <span>© <span id="year"></span> Эфир AI · efir-ai.ru</span>
+      <a href="mailto:efir-ai@yandex.ru">efir-ai@yandex.ru</a>
+    </div>
+  </footer>
+
+  <script src="../js/site-chrome.js"></script>
+  <script>window.EFIR_ACCOUNT_URL = 'index.html';</script>
+  <script src="../js/account.js"></script>
+</body>
+</html>

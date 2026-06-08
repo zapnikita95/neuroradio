@@ -145,10 +145,14 @@
       <a href="#how">Как это работает</a>
       <a href="#studio">Студия</a>
       <a href="#pricing">Тарифы</a>
-      <a href="#account">Кабинет</a>
+      <a href="account/">Кабинет</a>
       <a href="#docs">Документы</a>
     </nav>
-    <a href="#download" class="btn btn-primary btn-sm nav-cta">Скачать</a>
+    <div class="header-actions">
+      <button type="button" class="btn btn-ghost btn-sm nav-login" id="navLoginBtn">Войти</button>
+      <a href="account/" class="btn btn-ghost btn-sm nav-cabinet" id="navCabinetBtn" hidden>Кабинет</a>
+      <a href="#download" class="btn btn-primary btn-sm nav-cta">Скачать</a>
+    </div>
     <button class="burger" id="burger" aria-label="Меню" aria-expanded="false">
       <span></span><span></span><span></span>
     </button>
@@ -558,50 +562,6 @@
       <p class="pricing-fine">Оплата привязывается к вашему email — по нему подписка распознаётся в приложении. Используйте тот же адрес при входе.</p>
     </section>
 
-    <!-- ============ ACCOUNT (YooKassa: отвязка карты) ============ -->
-    <section class="section section-account" id="account">
-      <div class="section-head reveal">
-        <span class="kicker">Личный кабинет</span>
-        <h2 class="section-title">Управление <span class="grad-text">подпиской</span></h2>
-        <p class="section-sub">
-          Войдите по email, с которым оформляли подписку на <strong>efir-ai.ru</strong>.
-          Здесь можно посмотреть статус и в любой момент <strong>отвязать карту</strong> — без обращения в поддержку.
-        </p>
-      </div>
-      <div class="account-panel reveal">
-        <div class="account-url" aria-label="Адрес личного кабинета">
-          <span class="site-ic ic-lock" aria-hidden="true"></span>
-          <span>https://www.efir-ai.ru/#account</span>
-        </div>
-        <form id="accountForm" class="account-form" novalidate>
-          <label class="field">
-            <span>Email подписки</span>
-            <input type="email" id="accountEmail" placeholder="you@example.com" autocomplete="email" required />
-            <small class="field-err" id="accountEmailErr" hidden>Введите корректный email</small>
-          </label>
-          <div class="account-code-row">
-            <label class="field account-code-field">
-              <span>Код из письма</span>
-              <input type="text" id="accountCode" inputmode="numeric" autocomplete="one-time-code" placeholder="6 цифр" maxlength="8" />
-              <small class="field-err" id="accountCodeErr" hidden>Неверный или просроченный код</small>
-            </label>
-            <button type="button" class="btn btn-ghost" id="accountSendCode">Получить код</button>
-          </div>
-          <button type="submit" class="btn btn-primary btn-block" id="accountLoginBtn">Войти в кабинет</button>
-        </form>
-        <div class="account-cabinet" id="accountCabinet" hidden>
-          <div class="account-status" id="accountStatus"></div>
-          <button type="button" class="btn btn-ghost btn-block account-unlink" id="accountUnlinkBtn">
-            Отвязать карту
-          </button>
-          <p class="account-hint" id="accountUnlinkHint">
-            Карта будет отвязана, автопродление отключится. Доступ сохранится до конца оплаченного периода.
-          </p>
-          <p class="field-err account-msg" id="accountMsg" hidden></p>
-        </div>
-      </div>
-    </section>
-
     <!-- ============ DOCS ============ -->
     <section class="section section-docs" id="docs">
       <div class="section-head reveal">
@@ -682,7 +642,7 @@
         </details>
         <details>
           <summary>Можно отменить подписку?</summary>
-          <p>Да, в любой момент. В <a href="#account">личном кабинете на сайте</a> или в приложении (Аккаунт → Оплата) нажмите «Отвязать карту» — автопродление отключится, доступ сохранится до конца оплаченного периода.</p>
+          <p>Да, в любой момент. В <a href="account/">личном кабинете на сайте</a> или в приложении (Аккаунт → Оплата) нажмите «Отвязать карту» — автопродление отключится, доступ сохранится до конца оплаченного периода.</p>
         </details>
       </div>
     </section>
@@ -714,7 +674,7 @@
         <div>
           <h4>Тарифы</h4>
           <a href="#pricing">Подписка</a>
-          <a href="#account">Личный кабинет</a>
+          <a href="account/">Личный кабинет</a>
           <a href="#models">Модели</a>
           <a href="#faq">FAQ</a>
         </div>
@@ -789,6 +749,37 @@
     </div>
   </div>
 
+  <!-- ============ LOGIN MODAL (личный кабинет) ============ -->
+  <div class="modal-backdrop" id="loginModalBackdrop" hidden>
+    <div class="modal modal-login" role="dialog" aria-modal="true" aria-labelledby="loginModalTitle">
+      <button class="modal-close" id="loginModalClose" aria-label="Закрыть">×</button>
+      <div class="modal-login-inner">
+        <span class="kicker">Личный кабинет</span>
+        <h3 id="loginModalTitle">Вход по email</h3>
+        <p class="modal-note">Укажите email, с которым оформляли подписку на efir-ai.ru</p>
+        <form id="loginModalForm" novalidate>
+          <label class="field">
+            <span>Email подписки</span>
+            <input type="email" id="loginModalEmail" placeholder="you@example.com" autocomplete="email" required />
+            <small class="field-err" id="loginModalEmailErr" hidden>Введите корректный email</small>
+          </label>
+          <button type="button" class="btn btn-ghost btn-block" id="loginModalSendCode">Получить код</button>
+          <div id="loginModalCodeBlock" class="login-code-block" hidden>
+            <label class="field">
+              <span>Код из письма</span>
+              <input type="text" id="loginModalCode" inputmode="numeric" autocomplete="one-time-code" placeholder="6 цифр" maxlength="8" />
+              <small class="field-err" id="loginModalCodeErr" hidden>Неверный или просроченный код</small>
+            </label>
+          </div>
+          <button type="submit" class="btn btn-primary btn-block btn-lg" id="loginModalSubmit" hidden>Войти в кабинет</button>
+          <p class="login-modal-msg" id="loginModalMsg" hidden></p>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <script src="js/site-chrome.js"></script>
+  <script src="js/account.js"></script>
   <script src="app.js"></script>
 </body>
 </html>
