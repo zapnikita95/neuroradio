@@ -1,10 +1,16 @@
 package com.musicstory.app.ui.screens
 
 import android.content.Intent
+import android.net.Uri
 import android.provider.Settings
-import androidx.compose.foundation.Image
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.shrinkVertically
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -14,6 +20,10 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ExpandLess
+import androidx.compose.material.icons.filled.ExpandMore
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -29,6 +39,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
@@ -42,10 +53,12 @@ import com.musicstory.app.ui.components.PrimaryStoryButton
 import com.musicstory.app.ui.components.SecondaryStoryButton
 import com.musicstory.app.ui.theme.CreamText
 import com.musicstory.app.ui.theme.ErrorCoral
+import com.musicstory.app.ui.theme.GoldBright
 import com.musicstory.app.ui.theme.MutedLavender
+import androidx.compose.foundation.Image
 
 /** Высота нижней зоны с кнопками — контент скролла не заезжает под них. */
-private val OnboardingFooterHeight = 156.dp
+private val OnboardingFooterHeight = 220.dp
 
 @Composable
 fun OnboardingScreen(
@@ -88,7 +101,7 @@ fun OnboardingScreen(
                     .verticalScroll(rememberScrollState()),
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
-                Spacer(modifier = Modifier.height(48.dp))
+                Spacer(modifier = Modifier.height(40.dp))
 
                 Box(
                     modifier = Modifier
@@ -113,7 +126,21 @@ fun OnboardingScreen(
                     color = CreamText,
                 )
 
-                Spacer(modifier = Modifier.height(20.dp))
+                Spacer(modifier = Modifier.height(16.dp))
+
+                OnboardingApkFaqCard(
+                    onOpenAppSettings = {
+                        hintMessage = null
+                        context.startActivity(
+                            Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+                                data = Uri.parse("package:${context.packageName}")
+                                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                            },
+                        )
+                    },
+                )
+
+                Spacer(modifier = Modifier.height(16.dp))
 
                 GlassCard(accentBorder = true) {
                     Text(
@@ -152,6 +179,22 @@ fun OnboardingScreen(
                     )
                 }
 
+                SecondaryStoryButton(
+                    text = context.getString(R.string.onboarding_open_app_settings),
+                    onClick = {
+                        hintMessage = null
+                        context.startActivity(
+                            Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+                                data = Uri.parse("package:${context.packageName}")
+                                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                            },
+                        )
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                )
+
+                Spacer(modifier = Modifier.height(10.dp))
+
                 PrimaryStoryButton(
                     text = context.getString(R.string.onboarding_open_settings),
                     onClick = {
@@ -163,13 +206,73 @@ fun OnboardingScreen(
                         )
                         MediaNotificationListener.requestRebind(context)
                     },
+                    modifier = Modifier.fillMaxWidth(),
                 )
 
-                Spacer(modifier = Modifier.height(12.dp))
+                Spacer(modifier = Modifier.height(10.dp))
 
                 SecondaryStoryButton(
                     text = context.getString(R.string.onboarding_check_access),
                     onClick = { checkAccess(andEnter = true) },
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun OnboardingApkFaqCard(
+    onOpenAppSettings: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val context = LocalContext.current
+    var expanded by remember { mutableStateOf(true) }
+
+    GlassCard(
+        modifier = modifier.fillMaxWidth(),
+        accentBorder = true,
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable { expanded = !expanded },
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                text = context.getString(R.string.onboarding_apk_faq_title),
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.SemiBold,
+                color = GoldBright,
+                modifier = Modifier.weight(1f),
+            )
+            Icon(
+                imageVector = if (expanded) Icons.Filled.ExpandLess else Icons.Filled.ExpandMore,
+                contentDescription = null,
+                tint = GoldBright,
+                modifier = Modifier.size(24.dp),
+            )
+        }
+
+        AnimatedVisibility(
+            visible = expanded,
+            enter = expandVertically(),
+            exit = shrinkVertically(),
+        ) {
+            Column {
+                Spacer(modifier = Modifier.height(12.dp))
+                Text(
+                    text = context.getString(R.string.onboarding_apk_faq_body),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = CreamText,
+                    textAlign = TextAlign.Start,
+                )
+                Spacer(modifier = Modifier.height(12.dp))
+                SecondaryStoryButton(
+                    text = context.getString(R.string.onboarding_open_app_settings),
+                    onClick = onOpenAppSettings,
+                    modifier = Modifier.fillMaxWidth(),
                 )
             }
         }
