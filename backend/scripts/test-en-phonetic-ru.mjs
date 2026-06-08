@@ -37,7 +37,17 @@ test('English stress: Peppers on first syllable (PEP-pers)', () => {
   const d = englishPhoneticDebug('Peppers');
   assert.match(d.ru, /\+/, `got ${d.ru}`);
   assert.match(d.ru, /^п\+э/i, `got ${d.ru}`);
+  assert.match(d.ru, /эр/i, `got ${d.ru}`);
   assert.doesNotMatch(d.ru, /пеп\+/i);
+  assert.doesNotMatch(d.ru, /[A-Za-z]/);
+  assert.match(d.ruEdge, /^ПЭ/i, `edge got ${d.ruEdge}`);
+  assert.doesNotMatch(d.ruEdge, /\+/);
+});
+
+test('Edge phonetic has no plus signs', () => {
+  const phrase = englishPhraseToRussianPhonetic('Red Hot Chili Peppers', 'edge');
+  assert.doesNotMatch(phrase, /\+/);
+  assert.match(phrase, /Э/);
 });
 
 test('English stress: Queen', () => {

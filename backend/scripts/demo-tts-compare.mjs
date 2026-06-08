@@ -17,6 +17,7 @@ import {
 import { splitMixedLanguageForSilero } from '../dist/services/tts-silero-segments.js';
 import { wrapSileroRussianSsml } from '../dist/services/tts-silero-ssml.js';
 import { prepareSileroTtsTextTrace } from '../dist/services/tts-markup.js';
+import { sileroPhoneticToEdge } from '../dist/services/en-phonetic-ru.js';
 import { sanitizeScriptForTts } from '../dist/services/story-quality.js';
 import { preserveMusicProperNames } from '../dist/services/tts-foreign-pronounce.js';
 import { runTtsQualityPass } from '../dist/services/tts-quality-pass.js';
@@ -164,13 +165,17 @@ async function main() {
   const latinText = prepareMixedLatinText();
   const segments = splitMixedLanguageForSilero(latinText, ARTIST, TITLE);
   const phoneticTrace = prepareSileroTtsTextTrace(SCRIPT, { artist: ARTIST, title: TITLE });
+  const edgePhoneticText = sileroPhoneticToEdge(phoneticTrace.prepared);
 
   console.log('[demo-tts-compare] Latin segments (Edge / Silero+Edge):');
   segments.forEach((s, i) => console.log(`  ${i + 1}. [${s.lang}] ${s.text.slice(0, 70)}…`));
   console.log('[demo-tts-compare] Silero phonetic text (prod):');
   console.log(`  ${phoneticTrace.prepared.slice(0, 140)}…`);
+  console.log('[demo-tts-compare] Edge phonetic (no +, caps stress):');
+  console.log(`  ${edgePhoneticText.slice(0, 140)}…`);
 
-  if (!(await waitSilero())) {
+  const skipSilero = process.env.SKIP_SILERO === '1';
+  if (!skipSilero && !(await waitSilero())) {
     console.error('[demo-tts-compare] Silero not ready — start-silero-tts.bat');
     process.exitCode = 1;
     return;
@@ -188,53 +193,58 @@ async function main() {
     'Silero phonetic (CMU+G2P, один голос):',
     phoneticTrace.prepared,
     '',
+    'Edge phonetic (uppercase stress, без +):',
+    edgePhoneticText,
+    '',
   ];
 
-  for (const p of EDGE_ONLY) {
-    const out = path.join(outRoot, 'edge-only', `${p.file}.wav`);
-    try {
-      await concatSegments(segmentJobs(segments, 'edge', p), out);
-      console.log('[edge-only]', out);
-      manifest.push(`edge-only/${p.file}.wav — RU ${p.ru}, EN ${p.en} (${p.rate})`);
-    } catch (err) {
-      console.error('[edge-only] FAIL', p.file, err instanceof Error ? err.message : err);
+  if (!skipSilero) {
+    for (const p of EDGE_ONLY) {
+      const out = path.join(outRoot, 'edge-only', `${p.file}.wav`);
+      try {
+        await concatSegments(segmentJobs(segments, 'edge', p), out);
+        console.log('[edge-only]', out);
+        manifest.push(`edge-only/${p.file}.wav — RU ${p.ru}, EN ${p.en} (${p.rate})`);
+      } catch (err) {
+        console.error('[edge-only] FAIL', p.file, err instanceof Error ? err.message : err);
+      }
     }
-  }
 
-  for (const p of SILERO_EDGE) {
-    const out = path.join(outRoot, 'silero-edge', `${p.file}.wav`);
-    try {
-      await concatSegments(segmentJobs(segments, 'silero-edge', p), out);
-      const en = p.enOverride ?? resolveEdgeTtsDeliveryForSilero(p.silero).voice;
-      console.log('[silero-edge]', out);
-      manifest.push(`silero-edge/${p.file}.wav — Silero ${p.silero}, EN ${en}`);
-    } catch (err) {
-      console.error('[silero-edge] FAIL', p.file, err instanceof Error ? err.message : err);
+    for (const p of SILERO_EDGE) {
+      const out = path.join(outRoot, 'silero-edge', `${p.file}.wav`);
+      try {
+        await concatSegments(segmentJobs(segments, 'silero-edge', p), out);
+        const en = p.enOverride ?? resolveEdgeTtsDeliveryForSilero(p.silero).voice;
+        console.log('[silero-edge]', out);
+        manifest.push(`silero-edge/${p.file}.wav — Silero ${p.silero}, EN ${en}`);
+      } catch (err) {
+        console.error('[silero-edge] FAIL', p.file, err instanceof Error ? err.message : err);
+      }
     }
-  }
 
-  for (const p of SILERO_PHONETIC) {
-    const out = path.join(outRoot, 'silero-phonetic', `${p.file}.wav`);
-    try {
-      const buf = await sileroRu(phoneticTrace.prepared, p.silero);
-      await writeFile(out, buf);
-      console.log('[silero-phonetic]', out);
-      manifest.push(`silero-phonetic/${p.file}.wav — Silero ${p.silero}, CMU+G2P кириллица`);
-    } catch (err) {
-      console.error('[silero-phonetic] FAIL', p.file, err instanceof Error ? err.message : err);
+    for (const p of SILERO_PHONETIC) {
+      const out = path.join(outRoot, 'silero-phonetic', `${p.file}.wav`);
+      try {
+        const buf = await sileroRu(phoneticTrace.prepared, p.silero);
+        await writeFile(out, buf);
+        console.log('[silero-phonetic]', out);
+        manifest.push(`silero-phonetic/${p.file}.wav — Silero ${p.silero}, CMU+G2P кириллица`);
+      } catch (err) {
+        console.error('[silero-phonetic] FAIL', p.file, err instanceof Error ? err.message : err);
+      }
     }
   }
 
   for (const p of EDGE_PHONETIC) {
     const out = path.join(outRoot, 'edge-phonetic', `${p.file}.wav`);
     try {
-      const buf = await edgeRu(phoneticTrace.prepared, p.voice, {
+      const buf = await edgeRu(edgePhoneticText, p.voice, {
         rate: p.rate ?? '+0%',
         pitch: p.pitch ?? '+0Hz',
       });
       await writeFile(out, buf);
       console.log('[edge-phonetic]', out);
-      manifest.push(`edge-phonetic/${p.file}.wav — Edge ${p.voice}, CMU+G2P кириллица`);
+      manifest.push(`edge-phonetic/${p.file}.wav — Edge ${p.voice}, phonetic caps stress`);
     } catch (err) {
       console.error('[edge-phonetic] FAIL', p.file, err instanceof Error ? err.message : err);
     }

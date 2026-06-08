@@ -286,6 +286,56 @@
     }
   })();
 
+  /* ---------------- Hero now-playing scroll drift (desktop) ---------------- */
+  (function () {
+    var np = document.getElementById('heroNowPlaying');
+    var inner = document.querySelector('#hero > .hero-inner');
+    if (!np || !inner) return;
+    if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+
+    var mq = window.matchMedia('(min-width: 981px)');
+    var metrics = null;
+
+    function measure() {
+      np.style.transform = '';
+      if (!mq.matches) {
+        metrics = null;
+        return;
+      }
+      var elR = np.getBoundingClientRect();
+      var innerR = inner.getBoundingClientRect();
+      metrics = {
+        trigger: window.scrollY + elR.top,
+        maxDrift: Math.max(0, innerR.bottom - elR.bottom),
+      };
+    }
+
+    function onScroll() {
+      if (!mq.matches || !metrics) {
+        np.style.transform = '';
+        return;
+      }
+      var drift = window.scrollY - metrics.trigger;
+      if (drift <= 0) {
+        np.style.transform = '';
+        return;
+      }
+      drift = Math.min(drift, metrics.maxDrift);
+      np.style.transform = 'translate3d(0,' + drift + 'px,0)';
+    }
+
+    function tick() {
+      measure();
+      onScroll();
+    }
+
+    window.addEventListener('scroll', onScroll, { passive: true });
+    window.addEventListener('resize', tick);
+    if (mq.addEventListener) mq.addEventListener('change', tick);
+    else if (mq.addListener) mq.addListener(tick);
+    tick();
+  })();
+
   /* ---------------- Studio (interactive demo) ---------------- */
   (function () {
     var scriptEl = $('#previewScript'); if (!scriptEl) return;

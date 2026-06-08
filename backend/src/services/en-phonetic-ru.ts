@@ -24,19 +24,25 @@ const ARPABET_VOWELS = new Set([
 ]);
 
 const ARPABET_TO_RU: Record<string, string> = {
+  // vowels handled with stress in arpabetTokenToRu
   AA: 'а', AE: 'э', AH: 'а', AO: 'о', AW: 'ау', AY: 'ай',
-  EH: 'э', ER: 'ер', EY: 'эй', IH: 'и', IY: 'и', OW: 'оу', OY: 'ой',
+  EH: 'э', EY: 'эй', IH: 'и', IY: 'и', OW: 'оу', OY: 'ой',
   UH: 'у', UW: 'у',
   DH: 'з', TH: 'с', SH: 'ш', CH: 'ч', JH: 'дж', ZH: 'ж', NG: 'нг', HH: 'х',
   B: 'б', D: 'д', F: 'ф', G: 'г', K: 'к', L: 'л', M: 'м', N: 'н',
   P: 'п', R: 'р', S: 'с', T: 'т', V: 'в', W: 'в', Y: 'й', Z: 'з',
 };
 
+function arpabetTokenToRu(tok: ParsedPhoneme): string {
+  if (tok.base === 'ER') return tok.stress === 1 ? 'ёр' : 'эр';
+  return ARPABET_TO_RU[tok.base] ?? '';
+}
+
 /** Longest IPA chunks first — vowels include stress-bearing nuclei. */
 const IPA_TO_RU: Array<[string, string]> = [
   ['tʃ', 'ч'], ['dʒ', 'дж'], ['aɪ', 'ай'], ['aʊ', 'ау'], ['eɪ', 'эй'], ['oʊ', 'оу'], ['ɔɪ', 'ой'],
-  ['iə', 'иа'], ['iən', 'иан'], ['uə', 'уа'], ['ɪŋ', 'инг'], ['iː', 'и'], ['uː', 'у'], ['ɜː', 'ер'],
-  ['ɔː', 'о'], ['ɑː', 'а'], ['ɝ', 'ер'], ['ɚ', 'ер'], ['ɡ', 'г'], ['ɹ', 'р'], ['ɫ', 'л'],
+  ['iə', 'иа'], ['iən', 'иан'], ['uə', 'уа'], ['ɪŋ', 'инг'], ['iː', 'и'], ['uː', 'у'], ['ɜː', 'ёр'],
+  ['ɔː', 'о'], ['ɑː', 'а'], ['ɝ', 'ёр'], ['ɚ', 'эр'], ['ɡ', 'г'], ['ɹ', 'р'], ['ɫ', 'л'],
   ['ʃ', 'ш'], ['ʒ', 'ж'], ['θ', 'с'], ['ð', 'з'], ['ŋ', 'нг'], ['j', 'й'], ['w', 'в'], ['h', 'х'],
   ['æ', 'э'], ['ɑ', 'а'], ['ɒ', 'о'], ['ə', 'а'], ['ɛ', 'э'], ['ɪ', 'и'], ['i', 'и'],
   ['ɔ', 'о'], ['ʊ', 'у'], ['u', 'у'], ['ʌ', 'а'], ['a', 'а'], ['e', 'э'], ['o', 'о'],
@@ -61,11 +67,26 @@ const PHONETIC_OVERRIDES: Record<string, string> = {
 
 const CYR_VOWEL = /[аеёиоуыэюя]/i;
 
-function insertStressBeforeVowel(chunk: string): string {
-  if (!chunk) return '+';
+export type PhoneticFormat = 'silero' | 'edge';
+
+/** Silero: + before vowel. Edge: uppercase stressed vowel (no + — Edge reads «плюс»). */
+function applyStressMark(chunk: string, format: PhoneticFormat): string {
+  if (!chunk) return format === 'silero' ? '+' : '';
   const m = chunk.match(CYR_VOWEL);
-  if (!m || m.index === undefined) return `+${chunk}`;
-  return `${chunk.slice(0, m.index)}+${chunk.slice(m.index)}`;
+  if (!m || m.index === undefined) return format === 'silero' ? `+${chunk}` : chunk;
+  if (format === 'silero') {
+    return `${chunk.slice(0, m.index)}+${chunk.slice(m.index)}`;
+  }
+  const v = chunk.charAt(m.index);
+  return (
+    chunk.slice(0, m.index) +
+    v.toUpperCase() +
+    chunk.slice(m.index + 1)
+  );
+}
+
+function insertStressBeforeVowel(chunk: string): string {
+  return applyStressMark(chunk, 'silero');
 }
 
 function collapseRu(s: string): string {
@@ -89,19 +110,20 @@ function parseArpabetTokens(arpabet: string): ParsedPhoneme[] {
     });
 }
 
-function arpabetToRussianStressed(arpabet: string): string {
+function arpabetToRussianStressed(arpabet: string, format: PhoneticFormat = 'silero'): string {
   let out = '';
   for (const tok of parseArpabetTokens(arpabet)) {
-    const chunk = ARPABET_TO_RU[tok.base];
+    const chunk = arpabetTokenToRu(tok);
     if (!chunk) continue;
-    out += ARPABET_VOWELS.has(tok.base) && tok.stress === 1
-      ? insertStressBeforeVowel(chunk)
+    const isVowel = ARPABET_VOWELS.has(tok.base) || tok.base === 'ER';
+    out += isVowel && tok.stress === 1
+      ? applyStressMark(chunk, format)
       : chunk;
   }
   return collapseRu(out);
 }
 
-function ipaToRussianStressed(ipa: string): string {
+function ipaToRussianStressed(ipa: string, format: PhoneticFormat = 'silero'): string {
   const s = ipa.toLowerCase().replace(/[ː]/g, '');
   let out = '';
   let i = 0;
@@ -124,7 +146,7 @@ function ipaToRussianStressed(ipa: string): string {
       if (!s.startsWith(from, i)) continue;
       let chunk = to;
       if (stressNext && CYR_VOWEL.test(chunk)) {
-        chunk = insertStressBeforeVowel(chunk);
+        chunk = applyStressMark(chunk, format);
         stressNext = false;
       }
       out += chunk;
@@ -135,7 +157,7 @@ function ipaToRussianStressed(ipa: string): string {
     if (!matched) i += 1;
   }
 
-  if (s === 'ðə' || s === 'ða') return 'з+э';
+  if (s === 'ðə' || s === 'ða') return format === 'silero' ? 'з+э' : 'зЭ';
   return collapseRu(out);
 }
 
@@ -178,43 +200,53 @@ function normalizeEnglishToken(raw: string): { core: string; punct: string } {
   return { core, punct };
 }
 
-function wordToRussianPhoneticCore(core: string): string {
+function wordToRussianPhoneticCore(core: string, format: PhoneticFormat = 'silero'): string {
   const override = PHONETIC_OVERRIDES[core.toLowerCase()];
-  if (override) return override;
+  if (override) {
+    return format === 'edge' ? sileroPhoneticToEdge(override) : override;
+  }
 
   if (/^[A-Z]{2,8}$/.test(core)) {
     return core
       .split('')
-      .map((ch) => wordToRussianPhoneticCore(ch.toLowerCase()))
+      .map((ch) => wordToRussianPhoneticCore(ch.toLowerCase(), format))
       .join('-');
   }
 
   const cmu = lookupCmu(core);
-  if (cmu) return arpabetToRussianStressed(cmu);
+  if (cmu) return arpabetToRussianStressed(cmu, format);
 
   const ipa = getG2p().predict(core);
   if (ipa) {
-    const ru = ipaToRussianStressed(ipa);
+    const ru = ipaToRussianStressed(ipa, format);
     if (ru && !/[A-Za-z]/.test(ru)) return ru;
   }
 
   const parts = splitCompoundWord(core);
   if (parts.length > 1) {
-    return parts.map((p) => wordToRussianPhoneticCore(p)).join('');
+    return parts.map((p) => wordToRussianPhoneticCore(p, format)).join('');
   }
 
   return '';
 }
 
-/** One English token → Cyrillic phonetic with English-aligned stress (+). */
-export function englishWordToRussianPhonetic(word: string): string {
+/** Edge TTS: strip Silero + marks, keep uppercase stress vowels. */
+export function sileroPhoneticToEdge(text: string): string {
+  return text.replace(/\+([аеёиоуыэюя])/gi, (_, v: string) => v.toUpperCase());
+}
+
+/** One English token → Cyrillic phonetic with English-aligned stress. */
+export function englishWordToRussianPhonetic(
+  word: string,
+  format: PhoneticFormat = 'silero',
+): string {
   if (!word || !/[A-Za-z]/.test(word)) return word;
   if (word === '&') return 'энд';
 
   const { core, punct } = normalizeEnglishToken(word);
   if (!core) return word;
 
-  const ru = wordToRussianPhoneticCore(core);
+  const ru = wordToRussianPhoneticCore(core, format);
   if (!ru) return word;
   return capitalizeLike(core, ru) + punct;
 }
@@ -237,10 +269,13 @@ function splitCompoundWord(word: string): string[] {
 }
 
 /** Latin phrase → Cyrillic phonetic (word-wise). */
-export function englishPhraseToRussianPhonetic(phrase: string): string {
+export function englishPhraseToRussianPhonetic(
+  phrase: string,
+  format: PhoneticFormat = 'silero',
+): string {
   const trimmed = phrase.trim();
   if (!trimmed || !/[A-Za-z]/.test(trimmed)) return trimmed;
-  return trimmed.split(/\s+/).map((token) => englishWordToRussianPhonetic(token)).join(' ');
+  return trimmed.split(/\s+/).map((token) => englishWordToRussianPhonetic(token, format)).join(' ');
 }
 
 export function hasLatinAfterPhonetic(text: string): boolean {
@@ -253,20 +288,36 @@ export function englishPhoneticDebug(word: string): {
   source: 'override' | 'cmu' | 'g2p' | 'compound' | 'none';
   phonemes: string;
   ru: string;
+  ruEdge: string;
 } {
   const { core } = normalizeEnglishToken(word);
   if (PHONETIC_OVERRIDES[core.toLowerCase()]) {
+    const ru = PHONETIC_OVERRIDES[core.toLowerCase()]!;
     return {
       word: core,
       source: 'override',
       phonemes: '',
-      ru: PHONETIC_OVERRIDES[core.toLowerCase()]!,
+      ru,
+      ruEdge: sileroPhoneticToEdge(ru),
     };
   }
   const cmu = lookupCmu(core);
   if (cmu) {
-    return { word: core, source: 'cmu', phonemes: cmu, ru: arpabetToRussianStressed(cmu) };
+    return {
+      word: core,
+      source: 'cmu',
+      phonemes: cmu,
+      ru: arpabetToRussianStressed(cmu),
+      ruEdge: arpabetToRussianStressed(cmu, 'edge'),
+    };
   }
   const ipa = getG2p().predict(core) ?? '';
-  return { word: core, source: ipa ? 'g2p' : 'none', phonemes: ipa, ru: ipa ? ipaToRussianStressed(ipa) : '' };
+  const ru = ipa ? ipaToRussianStressed(ipa) : '';
+  return {
+    word: core,
+    source: ipa ? 'g2p' : 'none',
+    phonemes: ipa,
+    ru,
+    ruEdge: ipa ? ipaToRussianStressed(ipa, 'edge') : '',
+  };
 }
