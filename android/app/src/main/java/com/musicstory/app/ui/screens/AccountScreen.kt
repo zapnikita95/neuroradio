@@ -52,6 +52,7 @@ import com.musicstory.app.ui.theme.DeepVoid
 import com.musicstory.app.ui.theme.ErrorCoral
 import com.musicstory.app.ui.theme.GoldBright
 import com.musicstory.app.ui.theme.MutedLavender
+import com.musicstory.app.data.local.toCached
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
@@ -147,7 +148,7 @@ private fun BillingTab(app: MusicStoryApp) {
         refreshBilling()
         app.accountAuthManager.fetchProfile(backendUrl)?.let { profile ->
             profile.email?.let { email = it }
-            app.settingsDataStore.saveAccountProfile(profile)
+            app.settingsDataStore.saveAccountProfile(profile.toCached())
         }
     }
 
@@ -192,6 +193,7 @@ private fun BillingTab(app: MusicStoryApp) {
             text = context.getString(R.string.billing_unlink_card),
             onClick = { showUnlinkConfirm = true },
             enabled = !unlinkLoading && !loading,
+            modifier = Modifier.fillMaxWidth(),
         )
 
         unlinkMessage?.let {

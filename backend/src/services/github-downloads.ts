@@ -1,4 +1,5 @@
 const GH_REPO = process.env.GITHUB_RELEASES_REPO?.trim() || 'zapnikita95/neuroradio';
+const MOBILE_TAG = process.env.GITHUB_MOBILE_RELEASE_TAG?.trim() || 'mobile-latest';
 const CACHE_MS = 5 * 60_000;
 
 export type PublicDownloadLinks = {
@@ -28,6 +29,17 @@ function pickAssets(release: GhRelease): { apk: string | null; ext: string | nul
   return { apk, ext };
 }
 
+function releaseToLinks(release: GhRelease): PublicDownloadLinks {
+  const picked = pickAssets(release);
+  return {
+    repo: GH_REPO,
+    tag: release.tag_name ?? null,
+    apkUrl: picked.apk,
+    extensionUrl: picked.ext,
+    publishedAt: release.published_at ?? null,
+  };
+}
+
 async function fetchJson(url: string): Promise<unknown> {
   const res = await fetch(url, {
     headers: {
@@ -40,7 +52,7 @@ async function fetchJson(url: string): Promise<unknown> {
 }
 
 async function resolveFromGitHub(): Promise<PublicDownloadLinks> {
-  const base: PublicDownloadLinks = {
+  const empty: PublicDownloadLinks = {
     repo: GH_REPO,
     tag: null,
     apkUrl: null,
@@ -48,39 +60,32 @@ async function resolveFromGitHub(): Promise<PublicDownloadLinks> {
     publishedAt: null,
   };
 
+  // Always prefer the dedicated mobile-latest tag (not GitHub "latest" which may differ).
   try {
-    const latest = (await fetchJson(`https://api.github.com/repos/${GH_REPO}/releases/latest`)) as GhRelease;
-    const picked = pickAssets(latest);
-    if (picked.apk || picked.ext) {
-      return {
-        ...base,
-        tag: latest.tag_name ?? null,
-        apkUrl: picked.apk,
-        extensionUrl: picked.ext,
-        publishedAt: latest.published_at ?? null,
-      };
-    }
+    const mobile = (await fetchJson(
+      `https://api.github.com/repos/${GH_REPO}/releases/tags/${encodeURIComponent(MOBILE_TAG)}`,
+    )) as GhRelease;
+    const picked = pickAssets(mobile);
+    if (picked.apk || picked.ext) return releaseToLinks(mobile);
   } catch {
-    /* try list */
+    /* fall through */
   }
 
   const list = (await fetchJson(
     `https://api.github.com/repos/${GH_REPO}/releases?per_page=15`,
   )) as GhRelease[];
   for (const rel of list) {
-    const picked = pickAssets(rel);
-    if (picked.apk || picked.ext) {
-      return {
-        ...base,
-        tag: rel.tag_name ?? null,
-        apkUrl: picked.apk,
-        extensionUrl: picked.ext,
-        publishedAt: rel.published_at ?? null,
-      };
+    if (rel.tag_name === MOBILE_TAG) {
+      const picked = pickAssets(rel);
+      if (picked.apk || picked.ext) return releaseToLinks(rel);
     }
   }
+  for (const rel of list) {
+    const picked = pickAssets(rel);
+    if (picked.apk || picked.ext) return releaseToLinks(rel);
+  }
 
-  return base;
+  return empty;
 }
 
 export async function getPublicDownloadLinks(): Promise<PublicDownloadLinks> {

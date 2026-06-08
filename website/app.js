@@ -9,8 +9,9 @@
   // override with window.EFIR_API_BASE if the site is hosted separately.
   var API_BASE = (window.EFIR_API_BASE || '').replace(/\/$/, '');
   var GH_REPO = 'zapnikita95/neuroradio';
-  var APK_FALLBACK = 'https://github.com/' + GH_REPO + '/releases/download/mobile-latest/MusicStory.apk';
-  var EXT_FALLBACK = 'https://github.com/' + GH_REPO + '/releases/download/mobile-latest/efir-extension.zip';
+  var MOBILE_TAG = 'mobile-latest';
+  var APK_FALLBACK = 'https://github.com/' + GH_REPO + '/releases/download/' + MOBILE_TAG + '/MusicStory.apk';
+  var EXT_FALLBACK = 'https://github.com/' + GH_REPO + '/releases/download/' + MOBILE_TAG + '/efir-extension.zip';
 
   var $ = function (s, r) { return (r || document).querySelector(s); };
   var $$ = function (s, r) { return Array.prototype.slice.call((r || document).querySelectorAll(s)); };
@@ -504,8 +505,9 @@
 
     function applyLinks(links) {
       var tagLabel = links.tag ? ('версия ' + links.tag) : 'последняя сборка';
-      var apkUrl = links.apkUrl || APK_FALLBACK;
-      var extUrl = links.extensionUrl || EXT_FALLBACK;
+      var cacheBust = links.publishedAt ? ('?t=' + encodeURIComponent(links.publishedAt)) : '';
+      var apkUrl = (links.apkUrl || APK_FALLBACK) + cacheBust;
+      var extUrl = (links.extensionUrl || EXT_FALLBACK) + cacheBust;
       apkEls.forEach(function (e) {
         e.href = apkUrl;
         e.setAttribute('download', 'MusicStory.apk');
@@ -518,6 +520,15 @@
       });
       if (apkVer) apkVer.textContent = links.apkUrl ? tagLabel : tagLabel + ' (ожидает сборку)';
       if (extVer) extVer.textContent = links.extensionUrl ? tagLabel : tagLabel + ' (ожидает сборку)';
+    }
+
+    function fetchGhMobileLatest() {
+      return fetch('https://api.github.com/repos/' + GH_REPO + '/releases/tags/' + encodeURIComponent(MOBILE_TAG), {
+        headers: { Accept: 'application/vnd.github+json' },
+      }).then(function (r) {
+        if (!r.ok) throw new Error('no mobile-latest');
+        return r.json();
+      }).then(pickAssets);
     }
 
     function fetchGhLatest() {
@@ -563,6 +574,7 @@
     }
 
     fetchBffDownloads()
+      .catch(function () { return fetchGhMobileLatest(); })
       .catch(function () { return fetchGhLatest(); })
       .catch(function () { return fetchGhList(); })
       .then(applyLinks)

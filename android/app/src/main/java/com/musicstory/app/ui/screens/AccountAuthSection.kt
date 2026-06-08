@@ -25,6 +25,8 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.musicstory.app.MusicStoryApp
 import com.musicstory.app.R
+import com.musicstory.app.data.local.toCached
+import com.musicstory.app.data.local.toProfile
 import com.musicstory.app.data.remote.AccountAuthManager
 import com.musicstory.app.ui.components.PrimaryStoryButton
 import com.musicstory.app.ui.components.SecondaryStoryButton
@@ -47,7 +49,7 @@ private suspend fun finishAccountLogin(
     login: AccountAuthManager.AccountLoginResult,
 ) {
     app.settingsDataStore.setAccountLinked(true)
-    login.profile?.let { app.settingsDataStore.saveAccountProfile(it) }
+    login.profile?.let { app.settingsDataStore.saveAccountProfile(it.toCached()) }
     if (!app.settingsDataStore.homeTourCompleted.first()) {
         app.settingsDataStore.setHomeTourPending(true)
     }
@@ -85,12 +87,12 @@ fun AccountStatusSection(
     LaunchedEffect(Unit) {
         val url = app.settingsDataStore.backendUrl.first()
         backendUrl = url
-        app.settingsDataStore.readCachedAccountProfile()?.let { profile = it }
+        app.settingsDataStore.readCachedAccountProfile()?.toProfile()?.let { profile = it }
         if (url.isNotBlank()) {
             authConfig = app.accountAuthManager.fetchConfig(url)
             app.accountAuthManager.fetchProfile(url)?.let { fresh ->
                 profile = fresh
-                app.settingsDataStore.saveAccountProfile(fresh)
+                app.settingsDataStore.saveAccountProfile(fresh.toCached())
             }
         }
     }
@@ -161,7 +163,7 @@ fun AccountStatusSection(
                         scope.launch {
                             app.accountAuthManager.fetchProfile(backendUrl)?.let { fresh ->
                                 profile = fresh
-                                app.settingsDataStore.saveAccountProfile(fresh)
+                                app.settingsDataStore.saveAccountProfile(fresh.toCached())
                             }
                         }
                     },

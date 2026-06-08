@@ -70,6 +70,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import com.musicstory.app.BuildConfig
 import com.musicstory.app.MusicStoryApp
 import com.musicstory.app.util.StoryLog
 import com.musicstory.app.util.ApiKeySanitizer
@@ -1788,6 +1789,19 @@ fun SettingsScreen(
                     },
                 )
             }
+
+                Text(
+                    text = context.getString(
+                        R.string.settings_app_version,
+                        BuildConfig.VERSION_NAME,
+                        BuildConfig.VERSION_CODE,
+                    ),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MutedLavender.copy(alpha = 0.65f),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 8.dp, bottom = 24.dp),
+                )
         }
 
             if (tourOverlayReady) {

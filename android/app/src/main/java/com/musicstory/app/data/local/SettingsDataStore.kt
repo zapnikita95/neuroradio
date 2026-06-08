@@ -109,7 +109,7 @@ class SettingsDataStore(private val context: Context) {
         prefs[KEY_ACCOUNT_EMAIL].orEmpty().trim()
     }
 
-    suspend fun readCachedAccountProfile(): com.musicstory.app.data.remote.AccountAuthManager.AccountProfile? {
+    suspend fun readCachedAccountProfile(): CachedAccountProfile? {
         val prefs = context.settingsDataStore.data.first()
         val email = prefs[KEY_ACCOUNT_EMAIL]?.trim().orEmpty()
         val telegramUsername = prefs[KEY_ACCOUNT_TELEGRAM_USERNAME]?.trim().orEmpty()
@@ -117,7 +117,7 @@ class SettingsDataStore(private val context: Context) {
         val plan = prefs[KEY_ACCOUNT_PLAN]?.trim().orEmpty()
         val premiumUntil = prefs[KEY_ACCOUNT_PREMIUM_UNTIL]?.takeIf { it > 0L }
         if (email.isBlank() && telegramId == null && telegramUsername.isBlank()) return null
-        return com.musicstory.app.data.remote.AccountAuthManager.AccountProfile(
+        return CachedAccountProfile(
             accountId = prefs[KEY_ACCOUNT_ID]?.trim()?.takeIf { it.isNotBlank() },
             email = email.takeIf { it.isNotBlank() },
             telegramId = telegramId,
@@ -128,7 +128,7 @@ class SettingsDataStore(private val context: Context) {
         )
     }
 
-    suspend fun saveAccountProfile(profile: com.musicstory.app.data.remote.AccountAuthManager.AccountProfile) {
+    suspend fun saveAccountProfile(profile: CachedAccountProfile) {
         context.settingsDataStore.edit { prefs ->
             profile.email?.trim()?.takeIf { it.isNotBlank() }?.let { prefs[KEY_ACCOUNT_EMAIL] = it }
             profile.telegramUsername?.trim()?.takeIf { it.isNotBlank() }?.let {

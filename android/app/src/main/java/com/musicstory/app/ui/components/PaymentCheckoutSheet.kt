@@ -89,6 +89,7 @@ fun PaymentCheckoutSheet(
                             }
 
                             @Deprecated("Deprecated in Java")
+                            @Suppress("DEPRECATION")
                             override fun shouldOverrideUrlLoading(view: WebView, url: String): Boolean {
                                 if (isPaymentReturnUrl(url)) {
                                     onPaymentComplete()

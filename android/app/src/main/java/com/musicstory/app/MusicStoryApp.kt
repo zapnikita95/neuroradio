@@ -28,6 +28,7 @@ import com.musicstory.app.worker.AuthRefreshWorker
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import com.musicstory.app.data.local.toCached
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import java.util.concurrent.TimeUnit
@@ -134,7 +135,7 @@ class MusicStoryApp : Application() {
             val profile = login.profile ?: return@launch
             if (!profile.isLoggedIn) return@launch
             settingsDataStore.setAccountLinked(true)
-            settingsDataStore.saveAccountProfile(profile)
+            settingsDataStore.saveAccountProfile(profile.toCached())
             if (!settingsDataStore.homeTourCompleted.first()) {
                 settingsDataStore.setHomeTourPending(true)
             }
