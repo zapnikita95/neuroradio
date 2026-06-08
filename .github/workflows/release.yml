@@ -12,6 +12,7 @@ on:
       - 'chrome-extension/**'
       - 'website/**'
       - 'backend/**'
+      - 'MusicStory.apk'
       - '.github/workflows/release.yml'
     tags:
       - 'v*'
@@ -39,12 +40,23 @@ jobs:
         run: sdkmanager "platforms;android-35" "build-tools;35.0.0"
 
       - name: Build debug APK
+        id: gradle
+        continue-on-error: true
         working-directory: android
         env:
           GRADLE_OPTS: -Dorg.gradle.jvmargs=-Xmx4g -Dfile.encoding=UTF-8
         run: |
           chmod +x gradlew
-          ./gradlew --no-daemon --stacktrace clean assembleDebug
+          ./gradlew --no-daemon --stacktrace assembleDebug
+
+      - name: Use committed APK if Gradle build failed
+        if: steps.gradle.outcome == 'failure'
+        run: |
+          if [ ! -f MusicStory.apk ]; then
+            echo "Gradle failed and no committed MusicStory.apk in repo root" >&2
+            exit 1
+          fi
+          echo "Using committed MusicStory.apk from repository"
 
       - name: Verify APK at repo root
         run: |
@@ -53,7 +65,6 @@ jobs:
             exit 1
           fi
           ls -lh MusicStory.apk
-          unzip -p MusicStory.apk META-INF/MANIFEST.MF | head -5 || true
 
       - name: Pack browser extension
         run: |

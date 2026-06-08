@@ -5,8 +5,8 @@ import android.webkit.WebResourceRequest
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -48,11 +48,7 @@ fun PaymentCheckoutSheet(
         sheetState = sheetState,
         shape = RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp),
     ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .fillMaxHeight(0.92f),
-        ) {
+        Column(modifier = Modifier.fillMaxWidth()) {
             IconButton(
                 onClick = onDismiss,
                 modifier = Modifier.padding(start = 4.dp, end = 4.dp, bottom = 4.dp),
@@ -67,7 +63,7 @@ fun PaymentCheckoutSheet(
             AndroidView(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .weight(1f)
+                    .heightIn(min = 420.dp, max = 640.dp)
                     .padding(start = 8.dp, end = 8.dp, bottom = 24.dp),
                 factory = { context ->
                     WebView(context).apply {
@@ -87,23 +83,8 @@ fun PaymentCheckoutSheet(
                                 }
                                 return false
                             }
-
-                            @Deprecated("Deprecated in Java")
-                            @Suppress("DEPRECATION")
-                            override fun shouldOverrideUrlLoading(view: WebView, url: String): Boolean {
-                                if (isPaymentReturnUrl(url)) {
-                                    onPaymentComplete()
-                                    return true
-                                }
-                                return false
-                            }
                         }
                         loadUrl(checkoutUrl)
-                    }
-                },
-                update = { webView ->
-                    if (webView.url != checkoutUrl) {
-                        webView.loadUrl(checkoutUrl)
                     }
                 },
             )
