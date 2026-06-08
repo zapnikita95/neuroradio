@@ -53,6 +53,15 @@ const SILERO_EDGE = [
   { file: '05-aidar-christopher', silero: 'aidar', enOverride: 'en-US-ChristopherNeural', rate: '+6%', pitch: '+1Hz' },
 ];
 
+/** Edge RU читает CMU+G2P кириллицу (один голос, EN имена с ударением). */
+const EDGE_PHONETIC = [
+  { file: '01-dmitry', voice: 'ru-RU-DmitryNeural' },
+  { file: '02-svetlana', voice: 'ru-RU-SvetlanaNeural' },
+  { file: '03-dmitry-fast', voice: 'ru-RU-DmitryNeural', rate: '+8%' },
+  { file: '04-svetlana-slow', voice: 'ru-RU-SvetlanaNeural', rate: '-5%' },
+  { file: '05-dmitry-warm', voice: 'ru-RU-DmitryNeural', pitch: '-2Hz' },
+];
+
 /** 5 Silero phonetic (prod default) — один голос, CMU+G2P кириллица */
 const SILERO_PHONETIC = [
   { file: '01-eugene', silero: 'eugene' },
@@ -69,11 +78,11 @@ function prepareMixedLatinText() {
   return text;
 }
 
-async function edgeRu(text, voice, speed = 1.0) {
+async function edgeRu(text, voice, opts = {}) {
   if (!text.trim()) return Buffer.alloc(0);
-  const pct = Math.round((speed - 1) * 100);
-  const rate = `${pct >= 0 ? '+' : ''}${pct}%`;
-  const tts = new EdgeTTS(text.trim(), voice, { rate, pitch: '+0Hz' });
+  const rate = opts.rate ?? '+0%';
+  const pitch = opts.pitch ?? '+0Hz';
+  const tts = new EdgeTTS(text.trim(), voice, { rate, pitch });
   return Buffer.from(await (await tts.synthesize()).audio.arrayBuffer());
 }
 
@@ -128,7 +137,12 @@ async function waitSilero(sec = 120) {
 function segmentJobs(segments, mode, preset) {
   return segments.map((seg) => async () => {
     if (seg.lang === 'ru') {
-      if (mode === 'edge') return edgeRu(seg.text, preset.ru);
+      if (mode === 'edge') {
+        return edgeRu(seg.text, preset.ru, {
+          rate: preset.rate ?? '+0%',
+          pitch: preset.pitch ?? '+0Hz',
+        });
+      }
       return sileroRu(seg.text, preset.silero);
     }
     if (mode === 'edge') {
@@ -145,6 +159,7 @@ async function main() {
   await mkdir(path.join(outRoot, 'edge-only'), { recursive: true });
   await mkdir(path.join(outRoot, 'silero-edge'), { recursive: true });
   await mkdir(path.join(outRoot, 'silero-phonetic'), { recursive: true });
+  await mkdir(path.join(outRoot, 'edge-phonetic'), { recursive: true });
 
   const latinText = prepareMixedLatinText();
   const segments = splitMixedLanguageForSilero(latinText, ARTIST, TITLE);
@@ -207,6 +222,21 @@ async function main() {
       manifest.push(`silero-phonetic/${p.file}.wav — Silero ${p.silero}, CMU+G2P кириллица`);
     } catch (err) {
       console.error('[silero-phonetic] FAIL', p.file, err instanceof Error ? err.message : err);
+    }
+  }
+
+  for (const p of EDGE_PHONETIC) {
+    const out = path.join(outRoot, 'edge-phonetic', `${p.file}.wav`);
+    try {
+      const buf = await edgeRu(phoneticTrace.prepared, p.voice, {
+        rate: p.rate ?? '+0%',
+        pitch: p.pitch ?? '+0Hz',
+      });
+      await writeFile(out, buf);
+      console.log('[edge-phonetic]', out);
+      manifest.push(`edge-phonetic/${p.file}.wav — Edge ${p.voice}, CMU+G2P кириллица`);
+    } catch (err) {
+      console.error('[edge-phonetic] FAIL', p.file, err instanceof Error ? err.message : err);
     }
   }
 

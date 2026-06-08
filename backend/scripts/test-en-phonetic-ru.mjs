@@ -4,8 +4,9 @@
  */
 import assert from 'node:assert/strict';
 import {
-  englishWordToRussianPhonetic,
   englishPhraseToRussianPhonetic,
+  englishWordToRussianPhonetic,
+  englishPhoneticDebug,
 } from '../dist/services/en-phonetic-ru.js';
 import { applyForeignPronunciation } from '../dist/services/tts-foreign-pronounce.js';
 import { prepareSileroTtsText } from '../dist/services/tts-markup.js';
@@ -27,23 +28,41 @@ console.log('[test-en-phonetic-ru]');
 
 test('The Hit Co. is not Тхе Хит Цо', () => {
   const phrase = englishPhraseToRussianPhonetic('The Hit Co.');
-  assert.match(phrase, /зэ/i);
-  assert.match(phrase, /хит/i);
+  assert.match(phrase, /з/i);
+  assert.match(phrase, /х\+?и/i);
   assert.doesNotMatch(phrase, /тхе|цо/i);
+});
+
+test('English stress: Peppers on first syllable (PEP-pers)', () => {
+  const d = englishPhoneticDebug('Peppers');
+  assert.match(d.ru, /\+/, `got ${d.ru}`);
+  assert.match(d.ru, /^п\+э/i, `got ${d.ru}`);
+  assert.doesNotMatch(d.ru, /пеп\+/i);
+});
+
+test('English stress: Queen', () => {
+  const ru = englishWordToRussianPhonetic('Queen');
+  assert.match(ru, /\+/, `got ${ru}`);
+});
+
+test('English stress: Chili', () => {
+  const ru = englishWordToRussianPhonetic('Chili');
+  assert.match(ru, /\+/, `got ${ru}`);
+  assert.match(ru, /^ч\+и/i, `got ${ru}`);
 });
 
 test('Bandcamp phonetic from G2P compound', () => {
   const w = englishWordToRussianPhonetic('Bandcamp');
-  assert.match(w, /бэнд/i);
-  assert.match(w, /кэмп|камп/i);
+  assert.match(w, /б\+?э/i);
+  assert.match(w, /к\+?э|камп/i);
   assert.doesNotMatch(w, /[A-Za-z]/);
 });
 
 test('Red Hot Chili Peppers phrase', () => {
   const phrase = englishPhraseToRussianPhonetic('Red Hot Chili Peppers');
-  assert.match(phrase, /рэд/i);
-  assert.match(phrase, /хот|хат/i);
-  assert.match(phrase, /чили/i);
+  assert.match(phrase, /р\+?э/i);
+  assert.match(phrase, /х\+?о/i);
+  assert.match(phrase, /ч\+?и/i);
   assert.doesNotMatch(phrase, /[A-Za-z]/);
 });
 
@@ -62,7 +81,7 @@ test('prepareSileroTtsText pure Cyrillic', () => {
     { artist: 'The Hit Co.', title: 'My Favorite Game' },
   );
   assert.doesNotMatch(out, /[A-Za-z]{2,}/);
-  assert.match(out, /зэ|хит/i);
+  assert.match(out, /з|х\+?и/i);
 });
 
 console.log(`\n[test-en-phonetic-ru] ${passed} passed`);

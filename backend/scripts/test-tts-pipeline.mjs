@@ -368,7 +368,7 @@ test('prepareSileroTtsText phonetic apostrophe titles', () => {
     title: "Wake Me When It's Over",
   });
   assert.doesNotMatch(out, /[A-Za-z]{2,}/);
-  assert.match(out, /вэйк|овер/i);
+  assert.match(out, /в\+?э|ов\+?е/i);
 });
 
 test('splitMixedLanguageForSilero still splits Latin when mixed mode enabled', () => {

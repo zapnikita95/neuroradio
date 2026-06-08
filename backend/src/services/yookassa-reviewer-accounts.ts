@@ -1,8 +1,9 @@
 import type { AccountRecord } from './account-store.js';
 
-/** Тестовые учётки для проверяющих ЮKassa (фиксированный код, без письма). */
+/** Тестовые учётки (фиксированный код 000000, без письма). */
 const REVIEWER_ACCOUNTS: Record<string, { code: string; dailyStories: number }> = {
   'googletester@test.ru': { code: '000000', dailyStories: 10 },
+  'appletester@test.ru': { code: '000000', dailyStories: 10 },
 };
 
 const REVIEWER_PREMIUM_MS = 365 * 24 * 60 * 60 * 1000;
