@@ -253,9 +253,9 @@ export function rateLimitStory(
 export function recordStoryGeneration(
   installId: string,
   req: { header(name: string): string | undefined; socket: { remoteAddress?: string } },
-  options: { freeOpenRouterModel?: string } = {},
+  options: { freeOpenRouterModel?: string; skipDailyQuota?: boolean } = {},
 ): void {
-  if (isUnlimitedInstall(installId) || isDevQuotaBypass(installId)) return;
+  if (isUnlimitedInstall(installId) || isDevQuotaBypass(installId) || options.skipDailyQuota) return;
 
   const ip = clientIp(req);
   const { limits } = SECURITY;

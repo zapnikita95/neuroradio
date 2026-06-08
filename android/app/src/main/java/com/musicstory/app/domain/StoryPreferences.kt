@@ -113,7 +113,7 @@ enum class UserTtsBilling(val id: String, val labelRu: String, val descriptionRu
     SERVER(
         id = "server",
         labelRu = "Сервер приложения",
-        descriptionRu = "Yandex SpeechKit на сервере приложения",
+        descriptionRu = "Silero на бесплатном тарифе; Yandex SpeechKit — на пробном и платном",
     ),
     YANDEX(
         id = "yandex",

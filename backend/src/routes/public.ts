@@ -58,8 +58,9 @@ router.get('/tts-config', async (_req: Request, res: Response) => {
   }
   res.json({
     freeTier: {
-      serverEngine: sileroConfigured && sileroHealthy ? 'silero' : hasYandexCredentials() ? 'yandex' : null,
+      serverEngine: sileroConfigured ? 'silero' : null,
       deviceEngine: 'android',
+      speechKitRequiresPaidTier: true,
     },
     silero: {
       enabled: sileroConfigured,

@@ -60,6 +60,13 @@ import { coerceVoiceForSpeechKit } from '../services/voices.js';
 import { resolveVoiceDelivery } from '../services/tts-voice-profiles.js';
 import type { TtsVoiceStyleId } from '../services/tts-voice-profiles.js';
 import {
+  assertFreeTierTtsAvailable,
+  resolveStoryTtsProvider,
+  shouldSkipDailyStoryQuota,
+  SileroRequiredForFreeTierError,
+  SpeechKitSubscriptionRequiredError,
+} from '../services/tts-access.js';
+import {
   PremiumTtsAccessError,
   synthesizeStoryAudio,
   type TtsProviderId,
@@ -75,6 +82,7 @@ import { canUseAzureSpeechProduction, hasAzureSpeechCredentials } from '../servi
 import { signAudioAccess } from '../services/audio-token.js';
 import {
   attachStoryQuotaHeaders,
+  DAY_MS,
   getDailyStoryQuota,
   rateLimitStory,
   recordStoryGeneration,
@@ -191,8 +199,9 @@ function storyFullRateLimit(req: Request, res: Response, next: import('express')
     gemini: body.gemini_api_key,
     openrouter: body.openrouter_api_key,
   }));
+  const userTtsCredentials = parseUserTtsCredentials(body);
   rateLimitStory(installId, {
-    skipDailyQuota: ownKey,
+    skipDailyQuota: shouldSkipDailyStoryQuota({ ownLlmKey: ownKey, userTtsCredentials }),
     freeOpenRouterModel: body.openrouter_model,
   })(req, res, next);
 }
@@ -1180,6 +1189,14 @@ router.post('/full', extractClientSecrets, validateStoryFullBody, storyFullRateL
           ? 'premium'
           : 'default';
 
+    const effectiveTtsProvider: TtsProviderId = resolveStoryTtsProvider(
+      installId,
+      ttsProvider,
+      userTtsCredentials,
+    );
+
+    assertFreeTierTtsAvailable(installId, userTtsCredentials);
+
     const response: Record<string, unknown> = {
       artist,
       title,
@@ -1196,7 +1213,15 @@ router.post('/full', extractClientSecrets, validateStoryFullBody, storyFullRateL
       voiceTier: effectiveVoiceTier,
       demo: false,
       tier: resolveUserTier(installId),
-      quota: getDailyStoryQuota(req.installId ?? 'unknown'),
+      quota: shouldSkipDailyStoryQuota({ ownLlmKey, userTtsCredentials })
+        ? {
+            used: 0,
+            limit: 999_999,
+            remaining: 999_999,
+            resetsAt: Date.now() + DAY_MS,
+            tier: userTier,
+          }
+        : getDailyStoryQuota(installId, { freeOpenRouterModel: openrouterModelRequested }),
       sources: {
         wikipedia: trackFactCount + artistFactCount > 0,
         factCountTrack: trackFactCount,
@@ -1231,12 +1256,12 @@ router.post('/full', extractClientSecrets, validateStoryFullBody, storyFullRateL
     } else if (canSynthesizeServerTts(userTtsCredentials)) {
       const id = uuidv4();
       console.log(
-        `[tts] queue install=${installId.slice(0, 8)} voice=${voiceId} style=${delivery.styleId} speed=${delivery.speed} emotion=${delivery.emotion} tier=${effectiveVoiceTier} userTier=${userTier} provider=${ttsProvider} userBilling=${hasUserTtsCredentials(userTtsCredentials) ? userTtsCredentials?.provider : 'server'} words=${story.word_count}`,
+        `[tts] queue install=${installId.slice(0, 8)} voice=${voiceId} style=${delivery.styleId} speed=${delivery.speed} emotion=${delivery.emotion} tier=${effectiveVoiceTier} userTier=${userTier} provider=${effectiveTtsProvider} userBilling=${hasUserTtsCredentials(userTtsCredentials) ? userTtsCredentials?.provider : 'server'} words=${story.word_count}`,
       );
       const audio = await synthesizeStoryAudio({
         installId,
         voiceTier: effectiveVoiceTier,
-        ttsProvider,
+        ttsProvider: effectiveTtsProvider,
         script: story.script,
         voiceId,
         fileName: `${id}.wav`,
@@ -1271,7 +1296,10 @@ router.post('/full', extractClientSecrets, validateStoryFullBody, storyFullRateL
 
     timing.mark('tts-ready', `audio=${Boolean(response.audioUrl)}`);
 
-    recordStoryGeneration(installId, req, { freeOpenRouterModel: openrouterModelRequested });
+    recordStoryGeneration(installId, req, {
+      freeOpenRouterModel: openrouterModelRequested,
+      skipDailyQuota: shouldSkipDailyStoryQuota({ ownLlmKey: ownLlmKey, userTtsCredentials }),
+    });
     if (selectedFact?.fact) {
       await recordUserStory(installId, {
         artist: metadata.artist,
@@ -1306,6 +1334,15 @@ router.post('/full', extractClientSecrets, validateStoryFullBody, storyFullRateL
         message: err.message,
         productId: 'premium_voice_monthly',
         priceRubMonthly: 199,
+        source: 'billing',
+      });
+      return;
+    }
+    if (err instanceof SpeechKitSubscriptionRequiredError || err instanceof SileroRequiredForFreeTierError) {
+      res.status(402).json({
+        error: err.message,
+        code: err.code,
+        message: err.message,
         source: 'billing',
       });
       return;

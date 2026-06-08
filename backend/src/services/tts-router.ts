@@ -6,9 +6,11 @@ import {
 } from './azure-tts.js';
 import { preparePlainSpeechText } from './tts-azure-ssml.js';
 import {
-  hasPremiumEntitlement,
-  isElevenLabsEnabled,
-} from './entitlements.js';
+  canUseServerSpeechKit,
+  SileroRequiredForFreeTierError,
+  SpeechKitSubscriptionRequiredError,
+} from './tts-access.js';
+import { hasPremiumEntitlement, isElevenLabsEnabled } from './entitlements.js';
 import { hasElevenLabsCredentials, synthesizeSpeechElevenLabs } from './elevenlabs-tts.js';
 import {
   synthesizeSpeechSalute,
@@ -90,6 +92,8 @@ export function resolveEffectiveTtsProvider(
   if (userProvider === 'yandex') return 'yandex';
   if (userProvider === 'sber') return 'sber';
 
+  const serverSpeechKit = canUseServerSpeechKit(request.installId, request.userTtsCredentials);
+
   const requirePremium = () => {
     if (!hasPremiumEntitlement(request.installId)) {
       throw new PremiumTtsAccessError(
@@ -98,19 +102,26 @@ export function resolveEffectiveTtsProvider(
     }
   };
 
+  const requireSileroForFree = () => {
+    if (canUseSileroTts()) return 'silero' as const;
+    throw new SileroRequiredForFreeTierError();
+  };
+
   if (request.ttsProvider === 'yandex') {
+    if (!serverSpeechKit) {
+      throw new SpeechKitSubscriptionRequiredError();
+    }
     return 'yandex';
   }
 
   if (request.ttsProvider === 'silero') {
-    if (canUseSileroTts()) return 'silero';
-    console.warn('[tts-router] silero requested but not configured — fallback to Yandex');
-    return 'yandex';
+    return requireSileroForFree();
   }
 
   if (request.ttsProvider === 'sber') {
     requirePremium();
     if (canUseSaluteSpeechProduction()) return 'sber';
+    if (!serverSpeechKit) throw new SpeechKitSubscriptionRequiredError();
     console.warn('[tts-router] sber requested but not configured — fallback to Yandex');
     return 'yandex';
   }
@@ -119,6 +130,7 @@ export function resolveEffectiveTtsProvider(
     requirePremium();
     if (canUseAzureSpeechProduction()) return 'azure';
     if (canUseSaluteSpeechProduction()) return 'sber';
+    if (!serverSpeechKit) throw new SpeechKitSubscriptionRequiredError();
     return 'yandex';
   }
 
@@ -127,12 +139,17 @@ export function resolveEffectiveTtsProvider(
     if (canUseElevenLabs()) return 'elevenlabs';
     if (canUseSaluteSpeechProduction()) return 'sber';
     if (canUseAzureSpeechProduction()) return 'azure';
+    if (!serverSpeechKit) throw new SpeechKitSubscriptionRequiredError();
     return 'yandex';
   }
 
   if (request.voiceTier === 'premium') {
     requirePremium();
     return pickPremiumAutoProvider();
+  }
+
+  if (!serverSpeechKit) {
+    return requireSileroForFree();
   }
 
   if (canUseSileroTts() && process.env.TTS_PREFER_SILERO?.trim() !== 'false') {

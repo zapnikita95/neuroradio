@@ -129,7 +129,7 @@ export function tierQuotaHintRu(tier: UserTier): string {
   const limits = getStoryLimitsForTier(tier);
   if (tier === 'unlimited') return 'Без лимитов на этом устройстве.';
   if (tier === 'free') {
-    return `Бесплатно: ${limits.dailyStories} историй в день (Gemma 4 на сервере, стабильно). Свой ключ OpenRouter — любая модель. Trial ${TRIAL_PRICE_RUB_MONTHLY} ₽/мес — ${TIER_STORY_LIMITS.trial.dailyStories}/день DeepSeek. Подписка 199 ₽/мес — ${TIER_STORY_LIMITS.premium.dailyStories}/день.`;
+    return `Бесплатно: ${limits.dailyStories} историй в день (Gemma на сервере). Свой ключ OpenRouter/Groq — без лимита историй, озвучка Silero. Свой Yandex SpeechKit — без лимита и с вашей озвучкой. Trial ${TRIAL_PRICE_RUB_MONTHLY} ₽/мес — SpeechKit на сервере.`;
   }
   if (tier === 'trial') {
     return `Пробный период: ${limits.dailyStories} историй/день. Fact-hunt: Gemma 4, история: DeepSeek V3.`;

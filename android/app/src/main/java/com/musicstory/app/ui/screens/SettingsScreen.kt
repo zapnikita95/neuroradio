@@ -434,8 +434,8 @@ fun SettingsScreen(
     val canAdvancedTriggers = TierAccess.canUseAdvancedTriggers(effectiveTier)
     val canCustomizeFade = TierAccess.canCustomizeMusicFadeSeconds(effectiveTier)
     val canCustomizeListen = TierAccess.canCustomizeListenThresholdSeconds(effectiveTier)
-    val isPaidServerTier = TierAccess.isPremiumLike(effectiveTier) && !hasPersonalKey
-    val isFreeServerTier = TierAccess.isFreeServerTier(effectiveTier) && !hasPersonalKey
+    val isPaidServerTier = TierAccess.isPremiumLike(effectiveTier)
+    val isFreeServerTier = TierAccess.isFreeServerTier(effectiveTier)
     val serverUsesSilero = ttsPlaybackEngine == TtsPlaybackEngine.YANDEX_SERVER &&
         userTtsBilling == UserTtsBilling.SERVER &&
         isFreeServerTier
