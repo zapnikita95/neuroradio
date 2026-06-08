@@ -41,7 +41,7 @@ const EN_PROFILE_BY_SILERO: Record<
 function formatRatePercent(speed: number, offset = 0): string {
   const pct = Math.round((speed - 1) * 100) + offset;
   const sign = pct >= 0 ? '+' : '';
-  return `${sign}${pct}.00%`;
+  return `${sign}${pct}%`;
 }
 
 export function resolveEdgeTtsVoiceForSilero(voice: SileroVoiceId): string {

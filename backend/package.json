@@ -14,6 +14,7 @@
     "test:quality": "npm run build && node scripts/test-story-quality.mjs",
     "test:tts": "npm run build && node scripts/test-tts-pipeline.mjs",
     "test:en-phonetic": "npm run build && node scripts/test-en-phonetic-ru.mjs",
+    "demo:hit-co": "npm run build && node scripts/demo-hit-co-tts.mjs",
     "test:tts:voices": "npm run build && node scripts/test-all-voices-tts.mjs",
     "test:fact-sources": "npm run build && node scripts/benchmark-fact-sources.mjs"
   },
