@@ -46,6 +46,10 @@ const PHRASE_PRONUNCIATION_RU: Record<string, string> = {
   'shape of you': 'Шейп ов Ю',
   'asylum records': 'Азайлум Рекордс',
   'no.5 collaborations project': 'Ноу Пойнт Файв Коллаборейшнс Проект',
+  'stressed out': 'Стрессд Аут',
+  'twenty one pilots': 'Твэнти Уан Пайлотс',
+  'crazy town': 'Крейзи Таун',
+  butterfly: 'Баттерфлай',
 };
 
 const EN_WORD_RU: Record<string, string> = {

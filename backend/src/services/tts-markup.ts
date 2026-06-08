@@ -170,15 +170,20 @@ export function prepareSileroTtsTextTrace(
   text = normalizeYearsForRussianTts(text);
   text = expandQuotesForSpeech(text);
   text = applyRussianStressSafe(text);
-  const prepared = stripYandexPauseMarkup(text);
+  const { text: transliterated, replacements } = applyForeignPronunciationWithReplacements(
+    text,
+    artist,
+    title,
+  );
+  const prepared = stripYandexPauseMarkup(transliterated);
 
   return {
     originalScript,
     artist,
     title,
     afterProperNames,
-    afterLatinTransliteration: afterProperNames,
-    latinReplacements: [],
+    afterLatinTransliteration: transliterated,
+    latinReplacements: replacements,
     prepared,
   };
 }

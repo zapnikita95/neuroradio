@@ -31,6 +31,29 @@ export function resolveSileroVoice(): SileroVoiceId {
   return resolveSileroVoiceFromEnv();
 }
 
+/** Silero legacy /process warns above 1000 symbols; keep margin for SSML wrapper on server. */
+const SILERO_MAX_INPUT_CHARS = 980;
+
+function truncateSileroInput(text: string, maxChars = SILERO_MAX_INPUT_CHARS): string {
+  const trimmed = text.trim();
+  if (trimmed.length <= maxChars) return trimmed;
+  const slice = trimmed.slice(0, maxChars);
+  const lastSentence = Math.max(
+    slice.lastIndexOf('.'),
+    slice.lastIndexOf('!'),
+    slice.lastIndexOf('?'),
+    slice.lastIndexOf('…'),
+  );
+  if (lastSentence >= Math.floor(maxChars * 0.55)) {
+    return slice.slice(0, lastSentence + 1).trim();
+  }
+  const lastSpace = slice.lastIndexOf(' ');
+  if (lastSpace >= Math.floor(maxChars * 0.7)) {
+    return `${slice.slice(0, lastSpace).trim()}…`;
+  }
+  return `${slice.trim()}…`;
+}
+
 type SileroApiMode = 'openai' | 'legacy';
 
 function resolveSileroApiMode(): SileroApiMode {
@@ -66,9 +89,10 @@ async function synthesizeViaLegacy(
   plainText: string,
   voice: SileroVoiceId,
 ): Promise<Buffer> {
+  const capped = truncateSileroInput(plainText);
   const url =
     `${baseUrl}/process?VOICE=${encodeURIComponent(voice)}` +
-    `&INPUT_TEXT=${encodeURIComponent(plainText.slice(0, 4096))}`;
+    `&INPUT_TEXT=${encodeURIComponent(capped.slice(0, SILERO_MAX_INPUT_CHARS))}`;
   const response = await fetch(url, { signal: AbortSignal.timeout(120_000) });
   if (!response.ok) {
     const body = (await response.text()).slice(0, 400);
@@ -121,7 +145,14 @@ export async function synthesizeSpeechSilero(
   const preset = options.voicePreset ? resolveSileroVoicePreset(options.voicePreset) : undefined;
   const voice = options.voice ?? preset?.voice ?? resolveSileroVoice();
   const trace = prepareSileroTtsTextTrace(script, { artist, title });
-  const plainText = trace.prepared;
+  let plainText = trace.prepared;
+  if (plainText.length > SILERO_MAX_INPUT_CHARS) {
+    const before = plainText.length;
+    plainText = truncateSileroInput(plainText);
+    console.warn(
+      `[silero-tts] truncated install=${artist ? `${artist.slice(0, 24)}…` : '-'} chars ${before}→${plainText.length}`,
+    );
+  }
   if (!plainText.trim()) {
     throw new Error('Silero TTS: пустой текст после подготовки');
   }
