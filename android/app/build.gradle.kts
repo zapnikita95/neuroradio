@@ -40,6 +40,10 @@ android {
         buildConfigField("int", "VERSION_CODE", "$versionCode")
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+
+        ndk {
+            debugSymbolLevel = "SYMBOL_TABLE"
+        }
     }
 
     signingConfigs {

@@ -77,6 +77,11 @@ try {
     Write-Host "  размер: $([math]::Round($info.Length / 1MB, 2)) MB"
     Write-Host ""
     Write-Host "Загружай в Play Console ТОЛЬКО этот файл (versionCode $newCode)."
+    Write-Host ""
+    Write-Host "Play Console (предупреждения):"
+    Write-Host "  • Native debug symbols — включены в AAB (ndk.debugSymbolLevel=SYMBOL_TABLE)."
+    Write-Host "  • Deobfuscation (mapping.txt) — только если включите isMinifyEnabled=true;"
+    Write-Host "    тогда загрузите android/app/build/outputs/mapping/release/mapping.txt к релизу."
 } finally {
     Pop-Location
 }

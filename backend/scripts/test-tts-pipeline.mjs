@@ -16,6 +16,11 @@ import { buildAzureSsml, preparePlainSpeechText } from '../dist/services/tts-azu
 import { buildSaluteSsml } from '../dist/services/salute-ssml.js';
 import { buildYandexSsml } from '../dist/services/tts-yandex-ssml.js';
 import { applyRussianStressSafe } from '../dist/services/russian-stress.js';
+import {
+  hasEnglishSegmentsForSilero,
+  splitMixedLanguageForSilero,
+} from '../dist/services/tts-silero-segments.js';
+import { wrapSileroRussianSsml } from '../dist/services/tts-silero-ssml.js';
 
 let passed = 0;
 
@@ -235,13 +240,24 @@ test('premium tier without entitlement throws', () => {
   );
 });
 
-test('free tier resolves to yandex', () => {
-  const p = resolveEffectiveTtsProvider({
-    voiceTier: 'default',
-    ttsProvider: 'auto',
-    installId: '00000000-0000-4000-8000-000000000099',
-  });
-  assert.equal(p, 'yandex');
+test('free tier resolves to silero when enabled', () => {
+  const prevEnabled = process.env.SILERO_TTS_ENABLED;
+  const prevUrl = process.env.SILERO_TTS_URL;
+  process.env.SILERO_TTS_ENABLED = 'true';
+  process.env.SILERO_TTS_URL = 'http://127.0.0.1:8001';
+  try {
+    const p = resolveEffectiveTtsProvider({
+      voiceTier: 'default',
+      ttsProvider: 'auto',
+      installId: '00000000-0000-4000-8000-000000000099',
+    });
+    assert.equal(p, 'silero');
+  } finally {
+    if (prevEnabled === undefined) delete process.env.SILERO_TTS_ENABLED;
+    else process.env.SILERO_TTS_ENABLED = prevEnabled;
+    if (prevUrl === undefined) delete process.env.SILERO_TTS_URL;
+    else process.env.SILERO_TTS_URL = prevUrl;
+  }
 });
 
 test('unknown install is free tier', () => {
@@ -309,6 +325,29 @@ test('prepareSileroTtsText strips apostrophe in Latin titles', () => {
   });
   assert.match(out, /Its Over/i);
   assert.doesNotMatch(out, /It's/i);
+});
+
+test('splitMixedLanguageForSilero keeps The Hit Co. as English', () => {
+  const segs = splitMixedLanguageForSilero(
+    'The Hit Co. — это группа, и их трэк My Favorite Game — отличный пример.',
+    'The Hit Co.',
+    'My Favorite Game',
+  );
+  const en = segs.filter((s) => s.lang === 'en').map((s) => s.text);
+  assert.ok(en.some((t) => /The Hit Co/i.test(t)));
+  assert.ok(en.some((t) => /My Favorite Game/i.test(t)));
+  assert.ok(hasEnglishSegmentsForSilero('The Hit Co. — это группа.', 'The Hit Co.', 'My Favorite Game'));
+});
+
+test('wrapSileroRussianSsml adds sentence breaks and prosody', () => {
+  const ssml = wrapSileroRussianSsml('Первая фраза. Вторая фраза.', {
+    pauseProfile: 'natural',
+    styleId: 'radio_host',
+  });
+  assert.match(ssml, /break time="420ms"/);
+  assert.match(ssml, /prosody rate="medium" pitch="x-high"/);
+  assert.match(ssml, /<s>/);
+  assert.doesNotMatch(ssml, /The Hit/i);
 });
 
 console.log(`\n[test-tts-pipeline] ${passed} passed`);

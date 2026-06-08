@@ -16,15 +16,21 @@
     "test:tts:voices": "npm run build && node scripts/test-all-voices-tts.mjs",
     "test:fact-sources": "npm run build && node scripts/benchmark-fact-sources.mjs"
   },
-  "keywords": ["music", "story", "bff", "express"],
+  "keywords": [
+    "music",
+    "story",
+    "bff",
+    "express"
+  ],
   "license": "MIT",
   "dependencies": {
     "cors": "^2.8.5",
     "dotenv": "^16.4.7",
+    "edge-tts-universal": "^1.4.0",
     "express": "^4.21.2",
     "node-fetch": "^3.3.2",
-    "uuid": "^11.0.5",
-    "pg": "^8.13.1"
+    "pg": "^8.13.1",
+    "uuid": "^11.0.5"
   },
   "devDependencies": {
     "@types/cors": "^2.8.17",
