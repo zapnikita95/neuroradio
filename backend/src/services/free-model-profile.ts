@@ -1,6 +1,7 @@
 import {
   OPENROUTER_DEFAULT_FREE_FACT_MODEL,
   OPENROUTER_FREE_FACT_MODEL_FALLBACK,
+  OPENROUTER_FREE_MID_TIER_MODEL,
   OPENROUTER_FREE_STABLE_MODEL,
 } from './openrouter-models.js';
 
@@ -25,17 +26,19 @@ export const FREE_MODEL_PROFILES: Record<FreeModelProfileId, FreeModelProfile> =
   },
   quality: {
     id: 'quality',
-    modelId: OPENROUTER_FREE_STABLE_MODEL,
+    modelId: OPENROUTER_FREE_MID_TIER_MODEL,
     dailyStories: parseInt(process.env.FREE_QUALITY_DAILY_LIMIT ?? '5', 10),
-    labelRu: 'Gemma 4',
+    labelRu: 'Llama 3.3',
     descriptionRu:
-      'Стабильная модель на сервере. До 5 историй в день. Лимиты не суммируются с Nemotron.',
+      'История на сервере — Llama 3.3 70B. До 5 историй в день. Лимиты не суммируются с Nemotron.',
   },
 };
 
 export function resolveFreeModelProfile(preferredModelId?: string): FreeModelProfile {
   const id = preferredModelId?.trim().toLowerCase() ?? '';
   if (id.includes('gemma') && id.includes(':free')) return FREE_MODEL_PROFILES.quality;
+  if (id.includes('llama') && id.includes('3.3')) return FREE_MODEL_PROFILES.quality;
+  if (id.includes('gemma') && !id.includes(':free')) return FREE_MODEL_PROFILES.quality;
   if (id.includes('nemotron') && id.includes(':free')) return FREE_MODEL_PROFILES.economy;
   return FREE_MODEL_PROFILES.quality;
 }

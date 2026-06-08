@@ -29,8 +29,15 @@ enum class OpenRouterModel(
     GEMMA_4_26B(
         id = "google/gemma-4-26b-a4b-it",
         labelRu = "Gemma 4",
-        descriptionRu = "Бесплатный тариф на сервере — стабильная модель (~$0.06/M)",
+        descriptionRu = "Free fact-hunt на сервере (~$0.06/M)",
         stable = true,
+    ),
+    LLAMA_3_3_70B(
+        id = "meta-llama/llama-3.3-70b-instruct",
+        labelRu = "Llama 3.3 70B",
+        descriptionRu = "Бесплатный тариф — история на сервере (~$0.10/M)",
+        stable = true,
+        recommended = true,
     ),
     LIQUID_LFM(
         id = "liquid/lfm-2.5-1.2b-instruct:free",
@@ -67,9 +74,9 @@ enum class OpenRouterModel(
 
         val defaultRecommended: OpenRouterModel get() = DEEPSEEK_V3
 
-        val freeServerPresets: List<OpenRouterModel> = listOf(GEMMA_4_26B)
+        val freeServerPresets: List<OpenRouterModel> = listOf(LLAMA_3_3_70B, GEMMA_4_26B)
 
-        val defaultFreeServer: OpenRouterModel get() = GEMMA_4_26B
+        val defaultFreeServer: OpenRouterModel get() = LLAMA_3_3_70B
 
         /** Presets verified stable — shown first in settings. */
         val stablePresets: List<OpenRouterModel> =

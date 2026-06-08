@@ -58,7 +58,7 @@
     <string name="tour_step_music_title">Музыка во время истории</string>
     <string name="tour_step_music_body">Пауза ставится, когда начинается озвучка, не раньше. Затухание — плавное приглушение перед речью.</string>
     <string name="tour_step_ai_title">Нейросеть</string>
-    <string name="tour_step_ai_body">DeepSeek V3 — лучшая для фактов на подписке. Бесплатно — Gemma 4 на сервере. Свой ключ OpenRouter снимает лимит сервера.</string>
+    <string name="tour_step_ai_body">DeepSeek V3 — лучшая для фактов на подписке. Бесплатно — Llama 3.3 на сервере. Свой ключ OpenRouter снимает лимит сервера.</string>
 
     <string name="power_mode_on">Включено</string>
     <string name="power_mode_parse">Только слушаем</string>
@@ -100,7 +100,7 @@
     <string name="settings_premium_locked_hint">Доступно по подписке (или укажи свой API-ключ для ручного режима)</string>
     <string name="settings_free_model_section">Модель на сервере</string>
     <string name="settings_server_llm_free">Модель сервера: %1$s</string>
-    <string name="settings_server_llm_free_hint">На бесплатном тарифе сервер всегда использует Gemma 4 — без выбора модели.</string>
+    <string name="settings_server_llm_free_hint">На бесплатном тарифе сервер использует Llama 3.3 70B — без выбора модели.</string>
     <string name="settings_ai_advanced_collapsible">Продвинутые настройки</string>
     <string name="settings_ai_advanced_summary">%1$s · %2$s</string>
     <string name="settings_ai_server_section">Модель по подписке</string>

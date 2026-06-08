@@ -216,6 +216,35 @@ async function fetchDirectWikiLead(
 export async function fetchArtistWikiLead(
   artist: string,
 ): Promise<{ text: string; lang: 'en' | 'ru' } | null> {
+  return fetchArtistWikiLeadWithRetry(artist, 1);
+}
+
+/** Retry wiki lead when Railway ↔ Wikipedia is flaky (same path premium often hits on 2nd try). */
+export async function fetchArtistWikiLeadWithRetry(
+  artist: string,
+  attempts = 3,
+): Promise<{ text: string; lang: 'en' | 'ru' } | null> {
+  const maxAttempts = Math.max(1, Math.min(attempts, 4));
+  for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
+    if (attempt > 0) {
+      await new Promise((r) => setTimeout(r, 400 * attempt));
+    }
+    const hit = await fetchArtistWikiLeadOnce(artist);
+    if (hit) {
+      if (attempt > 0) {
+        console.log(
+          `[wiki-lead] retry ok artist="${primaryArtistName(artist)}" attempt=${attempt + 1} chars=${hit.text.length}`,
+        );
+      }
+      return hit;
+    }
+  }
+  return null;
+}
+
+async function fetchArtistWikiLeadOnce(
+  artist: string,
+): Promise<{ text: string; lang: 'en' | 'ru' } | null> {
   const primary = primaryArtistName(artist);
   const cached = paragraphCache.get(cacheKey(primary));
   if (cached) return { text: cached.lead, lang: cached.lang };

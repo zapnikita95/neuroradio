@@ -44,6 +44,7 @@ import { lookupCuratedFact } from '../services/curated-facts.js';
 import { translateWikiLeadToStory } from '../services/indie-wiki-story.js';
 import {
   pickArtistWikiContent,
+  tryRetryArtistWikiSeed,
 } from '../services/artist-wiki-depth.js';
 import { primaryArtistName } from '../services/artist-primary.js';
 import { isMusicArtistWikiExtract } from '../services/wikipedia-music.js';
@@ -186,6 +187,13 @@ router.get('/quota', (req: Request, res: Response) => {
     azureSpeech: hasAzureSpeechCredentials() && isAzureSpeechEnabled(),
   });
 });
+
+/** Major artists: wiki bio is enough for story LLM when MB/wiki timed out on first pass. */
+function acceptWikiArtistSeed(text: string, tier: 'major' | 'indie'): boolean {
+  if (!isMusicArtistWikiExtract(text)) return false;
+  if (tier === 'major') return text.trim().length >= 80;
+  return !isWikiBiographyLead(text);
+}
 
 function storyFullRateLimit(req: Request, res: Response, next: import('express').NextFunction): void {
   const installId = req.installId ?? 'unknown';
@@ -651,7 +659,7 @@ router.post('/full', extractClientSecrets, validateStoryFullBody, storyFullRateL
         previousScripts,
         narrator: storyNarrator,
       });
-      if (wikiEarly && isMusicArtistWikiExtract(wikiEarly.text) && !isWikiBiographyLead(wikiEarly.text)) {
+      if (wikiEarly && acceptWikiArtistSeed(wikiEarly.text, artistTier)) {
         selectedFact = {
           fact: wikiEarly.text,
           scope: 'artist',
@@ -757,7 +765,7 @@ router.post('/full', extractClientSecrets, validateStoryFullBody, storyFullRateL
         previousScripts,
         narrator: storyNarrator,
       });
-      if (wikiSalvage && isMusicArtistWikiExtract(wikiSalvage.text) && !isWikiBiographyLead(wikiSalvage.text)) {
+      if (wikiSalvage && acceptWikiArtistSeed(wikiSalvage.text, artistTier)) {
         selectedFact = {
           fact: wikiSalvage.text,
           scope: 'artist',
@@ -846,6 +854,27 @@ router.post('/full', extractClientSecrets, validateStoryFullBody, storyFullRateL
               ]);
               console.log(formatFactPickLog(selectedFact, 'llm') + ' (major-catalog)');
             }
+          }
+        }
+        if (!selectedFact) {
+          const wikiLastResort = await tryRetryArtistWikiSeed({
+            installId,
+            artist: metadata.artist,
+            previousScripts,
+            narrator: storyNarrator,
+          });
+          if (wikiLastResort && acceptWikiArtistSeed(wikiLastResort.text, artistTier)) {
+            selectedFact = {
+              fact: wikiLastResort.text,
+              scope: 'artist',
+              scopeLabelRu: 'группа/артист',
+              interestScore: interestScore(wikiLastResort.text),
+              interestRating: interestRating10(wikiLastResort.text),
+            };
+            referenceFacts = [wikiLastResort.text];
+            console.log(
+              `[facts] wiki last-resort seed for "${metadata.artist}" chars=${wikiLastResort.text.length} tier=${artistTier}`,
+            );
           }
         }
         if (!selectedFact) {
@@ -1106,7 +1135,7 @@ router.post('/full', extractClientSecrets, validateStoryFullBody, storyFullRateL
             `[story-pipeline] use salvaged reference fact score=${interestScore(best)} fact="${best.slice(0, 120)}"`,
           );
         } else {
-        const wikiLeadRaw = await pickArtistWikiContent({
+        const wikiLeadRaw = await tryRetryArtistWikiSeed({
           installId,
           artist: metadata.artist,
           previousScripts,
@@ -1196,7 +1225,7 @@ router.post('/full', extractClientSecrets, validateStoryFullBody, storyFullRateL
             }
           }
           const llmSeedFact = curatedHit?.fact
-            ?? (isWikiBiographyLead(wikiLead.text) ? null : wikiLead.text);
+            ?? (isWikiBiographyLead(wikiLead.text) && artistTier !== 'major' ? null : wikiLead.text);
           const llmReferenceFacts = llmSeedFact
             ? [
                 llmSeedFact,
@@ -1252,7 +1281,30 @@ router.post('/full', extractClientSecrets, validateStoryFullBody, storyFullRateL
             `[facts] late search-snippet salvage for "${metadata.artist}" — "${metadata.title}"`,
           );
         } else {
+          const wikiLate = await tryRetryArtistWikiSeed({
+            installId,
+            artist: metadata.artist,
+            previousScripts,
+            narrator: storyNarrator,
+          });
+          if (wikiLate && acceptWikiArtistSeed(wikiLate.text, artistTier)) {
+            effectiveStoryInput = {
+              ...effectiveStoryInput,
+              referenceFacts: [wikiLate.text],
+              selectedReferenceFact: {
+                fact: wikiLate.text,
+                scope: 'artist',
+                scopeLabelRu: 'группа/артист',
+                interestScore: interestScore(wikiLate.text),
+                interestRating: interestRating10(wikiLate.text),
+              },
+            };
+            console.log(
+              `[facts] wiki late-resort seed for "${metadata.artist}" chars=${wikiLate.text.length} tier=${artistTier}`,
+            );
+          } else {
         throw new NoReferenceFactsError(metadata.artist, metadata.title);
+          }
         }
       }
 

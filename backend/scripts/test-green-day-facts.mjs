@@ -6,6 +6,9 @@ import assert from 'node:assert/strict';
 import { lookupCuratedFact } from '../dist/services/curated-facts.js';
 import { fetchEmergencyFactRescue } from '../dist/services/fact-aggregator.js';
 import { isCatalogMajorArtist } from '../dist/services/artist-notability.js';
+import { fetchArtistWikiLeadWithRetry } from '../dist/services/wikipedia-lead.js';
+import { tryRetryArtistWikiSeed, resetArtistWikiDepthState } from '../dist/services/artist-wiki-depth.js';
+import { isMusicArtistWikiExtract } from '../dist/services/wikipedia-music.js';
 import { validateMajorCatalogFact } from '../dist/services/story-llm-fact-hunt.js';
 
 const artist = 'Green Day';
@@ -26,4 +29,16 @@ const sampleRu =
 const validated = validateMajorCatalogFact(sampleRu, artist, title, 'track');
 assert.equal(validated.ok, true, 'Russian catalog fact with title should pass');
 
-console.log('OK: Green Day curated + emergency rescue + catalog validation');
+resetArtistWikiDepthState();
+const wikiLead = await fetchArtistWikiLeadWithRetry(artist, 3);
+if (wikiLead?.text) {
+  assert.ok(isMusicArtistWikiExtract(wikiLead.text), 'Green Day wiki lead is music extract');
+  const retry = await tryRetryArtistWikiSeed({
+    installId: 'test-install',
+    artist,
+    previousScripts: [],
+  });
+  assert.ok(retry?.text, 'tryRetryArtistWikiSeed returns Green Day bio');
+}
+
+console.log('OK: Green Day curated + emergency rescue + catalog validation + wiki retry');

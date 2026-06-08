@@ -8,6 +8,7 @@ import {
   OPENROUTER_DEFAULT_FREE_FACT_MODEL,
   OPENROUTER_DEFAULT_STORY_MODEL,
   OPENROUTER_FREE_FACT_MODEL_FALLBACK,
+  OPENROUTER_FREE_MID_TIER_MODEL,
   OPENROUTER_FREE_STABLE_MODEL,
   OPENROUTER_TRIAL_FACT_MODEL,
   buildOpenRouterFreeModelChain,
@@ -93,19 +94,15 @@ export function resolveOpenRouterModelForTier(
   return slot === 'fact' ? OPENROUTER_DEFAULT_FREE_FACT_MODEL : OPENROUTER_DEFAULT_STORY_MODEL;
 }
 
-/** Fact-hunt: free tier — user pick + Nemotron fallback on reject/429. */
+/** Fact-hunt: free tier — Gemma → Llama → Nemotron fallback. */
 export function resolveOpenRouterFactModelsForTier(
   tier: UserTier,
   preferredModel?: string,
 ): string[] {
   if (tier === 'free') {
-    const chain = buildOpenRouterFreeModelChain(
+    return buildOpenRouterFreeModelChain(
       preferredModel?.trim() || resolveFreeModelProfile(preferredModel).modelId,
     );
-    if (!chain.includes(OPENROUTER_FREE_FACT_MODEL_FALLBACK)) {
-      chain.push(OPENROUTER_FREE_FACT_MODEL_FALLBACK);
-    }
-    return chain;
   }
   if (tier === 'trial') {
     return [TIER_OPENROUTER_TRIAL_FACT_MODEL, TIER_OPENROUTER_FACT_MODEL];
@@ -113,7 +110,7 @@ export function resolveOpenRouterFactModelsForTier(
   return [TIER_OPENROUTER_FACT_MODEL];
 }
 
-/** Free story + fact: paid Gemma (no :free 429). Legacy :free if OPENROUTER_FREE_LEGACY=true. */
+/** Free story: Llama 3.3 70B → Gemma → Nemotron. Legacy :free if OPENROUTER_FREE_LEGACY=true. */
 export function resolveOpenRouterStoryModelsForTier(
   tier: UserTier,
   preferredModel?: string,
@@ -133,7 +130,7 @@ export function tierQuotaHintRu(tier: UserTier): string {
   const limits = getStoryLimitsForTier(tier);
   if (tier === 'unlimited') return 'Без лимитов на этом устройстве.';
   if (tier === 'free') {
-    return `Бесплатно: ${limits.dailyStories} историй в день (Gemma на сервере). Свой ключ OpenRouter/Groq — без лимита историй, озвучка Silero. Свой Yandex SpeechKit — без лимита и с вашей озвучкой. Trial ${TRIAL_PRICE_RUB_MONTHLY} ₽/мес — SpeechKit на сервере.`;
+    return `Бесплатно: ${limits.dailyStories} историй в день (Llama 3.3 на сервере). Свой ключ OpenRouter/Groq — без лимита историй, озвучка Silero. Свой Yandex SpeechKit — без лимита и с вашей озвучкой. Trial ${TRIAL_PRICE_RUB_MONTHLY} ₽/мес — SpeechKit на сервере.`;
   }
   if (tier === 'trial') {
     return `Пробный период: ${limits.dailyStories} историй/день. Fact-hunt: Gemma 4, история: DeepSeek V3.`;

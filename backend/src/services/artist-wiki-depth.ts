@@ -1,6 +1,7 @@
 import { normalizeArtistKey, primaryArtistName } from './artist-primary.js';
 import type { StoryNarratorId } from './story-narrator.js';
-import { fetchArtistWikiLead, fetchArtistWikiParagraphs } from './wikipedia-lead.js';
+import { fetchArtistWikiLead, fetchArtistWikiParagraphs, fetchArtistWikiLeadWithRetry } from './wikipedia-lead.js';
+import { isMusicArtistWikiExtract } from './wikipedia-music.js';
 
 const DEPTH_PREFETCH_THRESHOLD = 5;
 
@@ -83,6 +84,18 @@ export async function pickArtistWikiContent(
   }
 
   return { text: cached.lead, lang: cached.lang };
+}
+
+/** Wiki lead with retries — used before 503 when parallel fetch timed out. */
+export async function tryRetryArtistWikiSeed(
+  input: PickWikiContentInput,
+): Promise<{ text: string; lang: 'en' | 'ru' } | null> {
+  const primary = primaryArtistName(input.artist);
+  const picked = await pickArtistWikiContent(input);
+  if (picked && isMusicArtistWikiExtract(picked.text)) return picked;
+  const lead = await fetchArtistWikiLeadWithRetry(primary, 3);
+  if (lead && isMusicArtistWikiExtract(lead.text)) return lead;
+  return null;
 }
 
 /** After a successful story — track consecutive same-artist plays; prefetch depth in background. */

@@ -19,12 +19,18 @@ export const OPENROUTER_DEFAULT_FREE_FACT_MODEL = 'google/gemma-4-26b-a4b-it:fre
 /** Запасной free при 429. */
 export const OPENROUTER_FREE_FACT_MODEL_FALLBACK = 'nvidia/nemotron-3-nano-30b-a3b:free';
 
-/** Trial / free stable: Gemma 4 26B paid (~$0.06/M). */
+/** Trial / free stable fact-hunt: Gemma 4 26B paid (~$0.06/M). */
 export const OPENROUTER_TRIAL_FACT_MODEL = 'google/gemma-4-26b-a4b-it';
 
 /**
- * Стабильная модель для free tier на сервере — paid Gemma, без :free RPM/429.
- * Override: OPENROUTER_FREE_STORY_MODEL / OPENROUTER_FREE_FACT_MODEL.
+ * Free story default — Llama 3.3 70B (~$0.10/M in, $0.32/M out): лучше Gemma, дешевле DeepSeek V3.
+ * Override: OPENROUTER_FREE_STORY_MODEL.
+ */
+export const OPENROUTER_FREE_MID_TIER_MODEL = 'meta-llama/llama-3.3-70b-instruct';
+
+/**
+ * Стабильная модель для free fact-hunt на сервере — paid Gemma.
+ * Override: OPENROUTER_FREE_FACT_MODEL.
  */
 export const OPENROUTER_FREE_STABLE_MODEL = OPENROUTER_TRIAL_FACT_MODEL;
 
@@ -52,16 +58,23 @@ export const OPENROUTER_FREE_STORY_MODEL_CHAIN: readonly string[] = [
 ];
 
 export function buildOpenRouterFreeStoryModelChain(preferred?: string): string[] {
-  const stable =
-    process.env.OPENROUTER_FREE_STORY_MODEL?.trim() || OPENROUTER_FREE_STABLE_MODEL;
+  const primary =
+    process.env.OPENROUTER_FREE_STORY_MODEL?.trim() || OPENROUTER_FREE_MID_TIER_MODEL;
   const pref = preferred?.trim();
   if (process.env.OPENROUTER_FREE_LEGACY === 'true') {
     const legacy = [...OPENROUTER_FREE_STORY_MODEL_CHAIN];
-    if (pref && pref.includes(':free')) return [stable, pref, ...legacy.filter((m) => m !== pref && m !== stable)];
-    return [stable, ...legacy.filter((m) => m !== stable)];
+    if (pref && pref.includes(':free')) return [primary, pref, ...legacy.filter((m) => m !== pref && m !== primary)];
+    return [primary, ...legacy.filter((m) => m !== primary)];
   }
-  if (pref && pref.includes('/') && !pref.includes(':free')) return [pref];
-  return [stable];
+  if (pref && pref.includes('/') && !pref.includes(':free')) {
+    const chain = [pref, primary, OPENROUTER_FREE_STABLE_MODEL, OPENROUTER_FREE_FACT_MODEL_FALLBACK];
+    return [...new Set(chain)];
+  }
+  return [
+    primary,
+    OPENROUTER_FREE_STABLE_MODEL,
+    OPENROUTER_FREE_FACT_MODEL_FALLBACK,
+  ].filter((m, i, arr) => arr.indexOf(m) === i);
 }
 
 export function buildOpenRouterFreeModelChain(preferred?: string): string[] {
@@ -73,8 +86,15 @@ export function buildOpenRouterFreeModelChain(preferred?: string): string[] {
     if (pref && pref.includes(':free')) return [stable, pref, ...legacy.filter((m) => m !== pref && m !== stable)];
     return [stable, ...legacy.filter((m) => m !== stable)];
   }
-  if (pref && pref.includes('/') && !pref.includes(':free')) return [pref];
-  return [stable];
+  if (pref && pref.includes('/') && !pref.includes(':free')) {
+    const chain = [pref, stable, OPENROUTER_FREE_MID_TIER_MODEL, OPENROUTER_FREE_FACT_MODEL_FALLBACK];
+    return [...new Set(chain)];
+  }
+  return [
+    stable,
+    OPENROUTER_FREE_MID_TIER_MODEL,
+    OPENROUTER_FREE_FACT_MODEL_FALLBACK,
+  ].filter((m, i, arr) => arr.indexOf(m) === i);
 }
 
 export const OPENROUTER_FREE_MODELS: OpenRouterModelOption[] = [
@@ -94,10 +114,18 @@ export const OPENROUTER_FREE_MODELS: OpenRouterModelOption[] = [
   {
     id: OPENROUTER_TRIAL_FACT_MODEL,
     labelRu: 'Gemma 4 26B',
-    descriptionRu: 'Free/trial на сервере — стабильная paid (~$0.06/M)',
+    descriptionRu: 'Free fact-hunt на сервере — стабильная paid (~$0.06/M)',
     stable: true,
     recommended: true,
     slot: 'both',
+  },
+  {
+    id: OPENROUTER_FREE_MID_TIER_MODEL,
+    labelRu: 'Llama 3.3 70B',
+    descriptionRu: 'Free story — лучше Gemma, дешевле DeepSeek (~$0.10/M)',
+    stable: true,
+    recommended: true,
+    slot: 'story',
   },
   {
     id: OPENROUTER_DEFAULT_FACT_MODEL,

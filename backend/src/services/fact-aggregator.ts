@@ -12,7 +12,7 @@ import {
 import { filterAndRankFacts, interestScore } from './reference-fact-quality.js';
 import { WEAK_TRIVIA_PATTERNS } from './story-fact-hunt.js';
 import { fetchReferenceFactBundle as fetchWikipediaBundle, fetchFastTrackWikiFacts } from './wikipedia-facts.js';
-import { fetchArtistWikiLead } from './wikipedia-lead.js';
+import { fetchArtistWikiLead, fetchArtistWikiLeadWithRetry } from './wikipedia-lead.js';
 import { inferRuRegionalContext } from './metadata-facts.js';
 import { fetchWebSearchFactSnippets, fetchBackstoryWebSnippets } from './web-search-facts.js';
 import { acceptSearchGroundedSnippet, acceptIndieEmergingSnippet } from './web-snippet-accept.js';
@@ -537,7 +537,7 @@ export async function fetchAggregatedFactContext(
   const [wiki, wikiLead, ddgUnfiltered, webUnfiltered, wdUnfiltered, mbTrackRaw, mbArtistRaw, wikiFastTrack] =
     await Promise.all([
       fetchWithCap('wiki', () => fetchWikiBundleMerged(artist, title, cc), EMPTY_WIKI, 9_000),
-      fetchWithCap('wiki-lead', () => fetchArtistWikiLead(artist), null, 10_000),
+      fetchWithCap('wiki-lead', () => fetchArtistWikiLeadWithRetry(artist, 3), null, 14_000),
       fetchWithCap('ddg', () => fetchDuckDuckGoUnfiltered(artist, title), [], 12_000),
       fetchWithCap('web', () => fetchWebSearchFactSnippets(artist, title), [], 14_000),
       fetchWithCap('wikidata', () => fetchWikidataUnfiltered(artist, title, cc), [], 10_000),
