@@ -1,7 +1,7 @@
 import fetch from 'node-fetch';
 import { fuzzyTokenMatch } from './title-transliterate.js';
 import type { SelectedReferenceFact } from './fact-picker.js';
-import { factNamesForeignEntity, factMentionsArtist, factMentionsTitle, hasTrackContextSignal } from './fact-relevance.js';
+import { factNamesForeignEntity, factMentionsArtist, factMentionsTitle, hasTrackContextSignal, hasRussianTrackContextSignal } from './fact-relevance.js';
 import { interestScore, isBoringFact, MIN_PICK_INTEREST_SCORE, isWeakChartSeed } from './reference-fact-quality.js';
 import { interestRating10 } from './fact-interest-log.js';
 import { MIN_GOOD_SCOPE_INTEREST } from './fact-picker.js';
@@ -431,6 +431,32 @@ interface MajorCatalogFactJson {
   reason?: string;
 }
 
+export function validateMajorCatalogFact(
+  fact: string,
+  artist: string,
+  title: string,
+  scope: 'track' | 'album' | 'artist',
+): { ok: true } | { ok: false; reason: string } {
+  if (fact.length < 35) return { ok: false, reason: 'too short' };
+  if (WEAK_TRIVIA_PATTERNS.some((p) => p.test(fact))) return { ok: false, reason: 'weak trivia' };
+  if (!factMentionsArtist(fact, artist)) return { ok: false, reason: 'no artist' };
+
+  const mentionsTitle = factMentionsTitle(fact, title);
+  const trackContext = hasTrackContextSignal(fact) || hasRussianTrackContextSignal(fact);
+  if (!mentionsTitle && !trackContext) {
+    return { ok: false, reason: 'no title or track context' };
+  }
+
+  if (!mentionsTitle) {
+    const minScore = scope === 'track' && trackContext ? MIN_PICK_INTEREST_SCORE - 1 : MIN_PICK_INTEREST_SCORE;
+    if (interestScore(fact) < minScore) {
+      return { ok: false, reason: `low interest score=${interestScore(fact)}` };
+    }
+  }
+
+  return { ok: true };
+}
+
 /** Major catalog artist, all web/wiki sources dead — one widely documented fact (no snippet evidence). */
 export async function huntMajorArtistCatalogFact(
   input: Omit<LlmFactHuntInput, 'rawSnippets'>,
@@ -440,6 +466,7 @@ export async function huntMajorArtistCatalogFact(
 
   const system = `Ты — музыкальный исследователь. Артист из мирового каталога (major). Ответь ТОЛЬКО JSON.
 Нужен ОДИН общеизвестный, проверяемый факт именно про указанный трек или его создание/запись/клип/значение.
+Факт на русском. В тексте упомяни название песни в «кавычках» или явно опиши этот трек.
 Не выдумывай частные истории без опоры на публичную биографию. Не chart trivia («хит №1» без контекста).
 Успех: {"fact":"...","scope":"track"|"album"|"artist"}
 Отказ: {"reject":true,"reason":"..."}`;
@@ -480,16 +507,29 @@ export async function huntMajorArtistCatalogFact(
         raw = await callGeminiFactHunt(system, user);
       }
       const parsed = parseFactHuntJson(raw) as MajorCatalogFactJson | null;
-      if (!parsed || parsed.reject) continue;
+      if (!parsed) {
+        console.warn(`[fact-hunt-catalog] reject: invalid json model=${modelId ?? primary}`);
+        continue;
+      }
+      if (parsed.reject) {
+        console.warn(
+          `[fact-hunt-catalog] reject: llm reject model=${modelId ?? primary} reason=${parsed.reason ?? 'unknown'}`,
+        );
+        continue;
+      }
       const fact = parsed.fact?.trim();
-      if (!fact || fact.length < 35) continue;
-      if (WEAK_TRIVIA_PATTERNS.some((p) => p.test(fact))) continue;
-      if (isBoringFact(fact)) continue;
-      if (!factMentionsArtist(fact, input.artist)) continue;
-      if (!factMentionsTitle(fact, input.title) && !hasTrackContextSignal(fact)) continue;
-      if (interestScore(fact) < MIN_PICK_INTEREST_SCORE) continue;
-      if (factNamesForeignEntity(fact, input.artist, input.title)) continue;
+      if (!fact) {
+        console.warn(`[fact-hunt-catalog] reject: empty fact model=${modelId ?? primary}`);
+        continue;
+      }
       const scope = parsed.scope === 'artist' ? 'artist' : parsed.scope === 'album' ? 'album' : 'track';
+      const validated = validateMajorCatalogFact(fact, input.artist, input.title, scope);
+      if (!validated.ok) {
+        console.warn(
+          `[fact-hunt-catalog] reject: ${validated.reason} model=${modelId ?? primary} fact="${fact.slice(0, 80)}"`,
+        );
+        continue;
+      }
       console.log(`[fact-hunt-catalog] ok model=${modelId ?? primary} fact="${fact.slice(0, 90)}"`);
       return {
         fact,

@@ -93,15 +93,19 @@ export function resolveOpenRouterModelForTier(
   return slot === 'fact' ? OPENROUTER_DEFAULT_FREE_FACT_MODEL : OPENROUTER_DEFAULT_STORY_MODEL;
 }
 
-/** Fact-hunt: free tier — user pick + :free chain on 429. */
+/** Fact-hunt: free tier — user pick + Nemotron fallback on reject/429. */
 export function resolveOpenRouterFactModelsForTier(
   tier: UserTier,
   preferredModel?: string,
 ): string[] {
   if (tier === 'free') {
-    return buildOpenRouterFreeModelChain(
+    const chain = buildOpenRouterFreeModelChain(
       preferredModel?.trim() || resolveFreeModelProfile(preferredModel).modelId,
     );
+    if (!chain.includes(OPENROUTER_FREE_FACT_MODEL_FALLBACK)) {
+      chain.push(OPENROUTER_FREE_FACT_MODEL_FALLBACK);
+    }
+    return chain;
   }
   if (tier === 'trial') {
     return [TIER_OPENROUTER_TRIAL_FACT_MODEL, TIER_OPENROUTER_FACT_MODEL];

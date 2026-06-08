@@ -649,6 +649,7 @@ export function hasTrackContextSignal(fact: string): boolean {
   if (/^(?:It'?s easy to understand|Delve into the|Join professional|Explore songs|Be the first to|The most successful and the best-known is)/i.test(trimmed)) {
     return false;
   }
+  if (hasRussianTrackContextSignal(trimmed)) return true;
   return (
     /^(?:The song|The video|The single|The track|This track|This single|This song|This album|The album|The documentary|From being|Additionally)\b/i.test(
       trimmed,
@@ -660,6 +661,13 @@ export function hasTrackContextSignal(fact: string): boolean {
       trimmed,
     ) ||
     /\b(?:single cut is significantly shorter|promo track under the name)\b/i.test(trimmed)
+  );
+}
+
+/** Russian fact-hunt / catalog seed — song/album/recording context without English title tokens. */
+export function hasRussianTrackContextSignal(fact: string): boolean {
+  return /\b(?:песн(?:я|и|ю|ей|не)|трек(?:а|у|ом|е)?|сингл(?:а|ом|е)?|альбом(?:а|е|ом|у)?|клип(?:а|ом|е)?|запис(?:ал|али|ывал|ана|ыва)|написал(?:и)?|композици(?:я|и|ю)|мелоди(?:я|и)|гитар(?:а|е|у)|сингл|грэмми|grammy|american idiot|nevermind|billie joe)\b/i.test(
+    fact,
   );
 }
 

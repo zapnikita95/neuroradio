@@ -458,7 +458,8 @@ router.post('/full', extractClientSecrets, validateStoryFullBody, storyFullRateL
         const skipRetry =
           trackFactCount + artistFactCount > 0 ||
           (firstFetchMs >= 18_000 && factCtx.rawSnippets.length >= 2) ||
-          hasActionableSnippets(factCtx.rawSnippets, metadata.artist, metadata.title);
+          hasActionableSnippets(factCtx.rawSnippets, metadata.artist, metadata.title) ||
+          (isCatalogMajorArtist(metadata.artist) && factCtx.rawSnippets.length === 0);
         if (skipRetry) {
           console.warn(
             `[facts] skip empty-bundle retry for "${metadata.artist}" — ${firstFetchMs}ms snippets=${factCtx.rawSnippets.length} grounded=${countGroundedFacts(factCtx.bundle)}`,
@@ -698,7 +699,7 @@ router.post('/full', extractClientSecrets, validateStoryFullBody, storyFullRateL
       }
     }
 
-    if (!selectedFact && countGroundedFacts(factBundle) === 0) {
+    if (!selectedFact && countGroundedFacts(factBundle) === 0 && artistTier !== 'major') {
       console.log(
         `[facts] indie artist-only retry for "${metadata.artist}" — "${metadata.title}" tier=${artistTier}`,
       );
