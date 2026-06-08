@@ -1,4 +1,5 @@
 import java.io.File
+import java.util.Properties
 
 plugins {
     alias(libs.plugins.android.application)
@@ -9,6 +10,20 @@ plugins {
 
 val localBuildDir = File(System.getenv("LOCALAPPDATA") ?: System.getProperty("java.io.tmpdir"), "MusicStoryBuild/app")
 layout.buildDirectory.set(localBuildDir)
+
+val keystorePropertiesFile = rootProject.layout.projectDirectory.file("keystore.properties").asFile
+val keystoreProperties = Properties()
+val hasReleaseKeystore = keystorePropertiesFile.isFile
+if (hasReleaseKeystore) {
+    val lines = keystorePropertiesFile.readLines(Charsets.UTF_8)
+    lines.forEach { line ->
+        val clean = line.trim().removePrefix("\uFEFF")
+        val sep = clean.indexOf('=')
+        if (sep > 0) {
+            keystoreProperties[clean.substring(0, sep).trim()] = clean.substring(sep + 1).trim()
+        }
+    }
+}
 
 android {
     namespace = "com.musicstory.app"
@@ -27,6 +42,26 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
+    signingConfigs {
+        getByName("debug") {
+            storeFile = file("keystore/debug.keystore")
+            storePassword = "android"
+            keyAlias = "androiddebugkey"
+            keyPassword = "android"
+        }
+        if (hasReleaseKeystore) {
+            create("release") {
+                val storeFileProp = keystoreProperties.getProperty("storeFile")?.trim()
+                require(!storeFileProp.isNullOrBlank()) { "keystore.properties: storeFile is missing" }
+                storeFile = file(storeFileProp)
+                storePassword = keystoreProperties.getProperty("storePassword")?.trim()
+                keyAlias = keystoreProperties.getProperty("keyAlias")?.trim()
+                keyPassword = keystoreProperties.getProperty("keyPassword")?.trim()
+                require(storeFile?.exists() == true) { "Release keystore not found: ${storeFile?.absolutePath}" }
+            }
+        }
+    }
+
     buildTypes {
         debug {
             signingConfig = signingConfigs.getByName("debug")
@@ -37,6 +72,9 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro",
             )
+            if (hasReleaseKeystore) {
+                signingConfig = signingConfigs.getByName("release")
+            }
         }
     }
 
@@ -52,15 +90,6 @@ android {
     buildFeatures {
         compose = true
         buildConfig = true
-    }
-
-    signingConfigs {
-        getByName("debug") {
-            storeFile = file("keystore/debug.keystore")
-            storePassword = "android"
-            keyAlias = "androiddebugkey"
-            keyPassword = "android"
-        }
     }
 }
 
@@ -81,6 +110,16 @@ afterEvaluate {
 
     tasks.matching { it.name == "assembleRelease" }.configureEach {
         doLast { exportApk("release", "app-release.apk", "efir-ai-release.apk") }
+    }
+
+    tasks.matching { it.name == "bundleRelease" }.configureEach {
+        doLast {
+            val aab = layout.buildDirectory.file("outputs/bundle/release/app-release.aab").get().asFile
+            if (!aab.exists()) return@doLast
+            val dest = projectRoot.resolve("efir-ai.aab")
+            aab.copyTo(dest, overwrite = true)
+            logger.lifecycle("AAB → ${dest.absolutePath}")
+        }
     }
 }
 

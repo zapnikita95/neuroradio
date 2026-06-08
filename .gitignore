@@ -34,6 +34,10 @@ Thumbs.db
 !efir-ai.apk
 *.aab
 
+# Node (asset scripts)
+node_modules/
+package-lock.json
+
 # Logs
 *.log
 
