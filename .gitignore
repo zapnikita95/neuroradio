@@ -29,10 +29,11 @@ Thumbs.db
 *.iml
 .vscode/
 
-# Build artifacts (APK via Releases; root efir-ai.apk is committed as CI fallback)
+# Build artifacts (Play: efir-ai.aab in repo root; debug APK optional)
 *.apk
 !efir-ai.apk
 *.aab
+!efir-ai.aab
 
 # Node (asset scripts)
 node_modules/

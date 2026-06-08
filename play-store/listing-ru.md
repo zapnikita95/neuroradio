@@ -92,4 +92,11 @@ Spotify Dashboard: см. **`play-store/SPOTIFY-DASHBOARD.md`**
 
 Файл после сборки: **`efir-ai.aab`** в корне репозитория.
 
+```powershell
+.\scripts\build-play-aab.ps1
+# или: cd android && .\gradlew bundleRelease
+```
+
+**Перед каждой загрузкой в Play** — подними `versionCode` в `android/app/build.gradle.kts` (Play не принимает уже использованный код). Сейчас: **82** / **1.5.44**.
+
 Внутреннее тестирование → Создать выпуск → Загрузить `efir-ai.aab` → Проверить versionCode → Опубликовать.
