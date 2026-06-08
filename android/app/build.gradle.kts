@@ -33,8 +33,8 @@ android {
         applicationId = "com.efirai.myapp"
         minSdk = 26
         targetSdk = 35
-        versionCode = 87
-        versionName = "1.5.49"
+        versionCode = 88
+        versionName = "1.5.50"
 
         buildConfigField("String", "VERSION_NAME", "\"$versionName\"")
         buildConfigField("int", "VERSION_CODE", "$versionCode")
@@ -102,6 +102,11 @@ afterEvaluate {
         val dest = projectRoot.resolve(destFileName)
         apk.copyTo(dest, overwrite = true)
         logger.lifecycle("APK → ${dest.absolutePath}")
+        if (destFileName == "efir-ai.apk") {
+            val siteApk = projectRoot.resolve("website/efir-ai.apk")
+            apk.copyTo(siteApk, overwrite = true)
+            logger.lifecycle("APK → ${siteApk.absolutePath}")
+        }
     }
 
     tasks.matching { it.name == "assembleDebug" }.configureEach {
