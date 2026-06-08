@@ -46,7 +46,11 @@ function yearToSpoken(year: number, yearCase: YearCase): string {
       if (yearCase === 'gen') return `две тысячи ${UNITS.gen[tail]}`;
       return `две тысячи ${UNITS.nom[tail]}`;
     }
-    return twoDigitOrdinal(tail, yearCase);
+    const tailSpoken = twoDigitOrdinal(tail, yearCase);
+    if (tail <= 10) {
+      return `две тысячи ${tailSpoken}`;
+    }
+    return tailSpoken;
   }
   if (year >= 1900 && year <= 1999) {
     const tail = year % 100;
@@ -67,10 +71,17 @@ const PRE_V = /(^|[\s,.«"—-])([Вв])\s+((?:19|20)\d{2})\s+году(?=[\s,.!?
 const PRE_V_NOM = /(^|[\s,.«"—-])([Вв])\s+((?:19|20)\d{2})\s+год(?=[\s,.!?»"—-]|$)/gu;
 const GEN_YEAR = /(^|[\s,.«"—-])((?:19|20)\d{2})\s+года(?=[\s,.!?»"—-]|$)/gu;
 const NOM_YEAR = /(^|[\s,.«"—-])((?:19|20)\d{2})\s+год(?=[\s,.!?»"—-]|$)/gu;
+const IN_BEGINNING_YEAR =
+  /(^|[\s,.«"—-])((?:[Вв]\s+)?(?:начале|конце|середине))\s+((?:19|20)\d{2})(\s+года(?=[\s,.!?»"—-]|$))?/gu;
 
-/** «В 2021 году» → «В двадцать первом году»; «с 2020 года» → «с двадцатого года». */
+/** «В 2021 году» → «В двадцать первом году»; «в начале 2010 года» → «в начале две тысячи десятого года». */
 export function normalizeYearsForRussianTts(text: string): string {
   let result = text.replace(
+    IN_BEGINNING_YEAR,
+    (_match, lead: string, prep: string, digits: string, gada?: string) =>
+      `${lead}${prep} ${yearToSpoken(Number(digits), 'gen')}${gada ?? ''}`,
+  );
+  result = result.replace(
     PRE_V,
     (_match, lead: string, prep: string, digits: string) =>
       `${lead}${prep} ${yearToSpoken(Number(digits), 'prep')} году`,

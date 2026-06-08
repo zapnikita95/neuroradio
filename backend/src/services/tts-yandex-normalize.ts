@@ -29,6 +29,11 @@ const MIXED_TTS_REPLACEMENTS: Array<[RegExp, string]> = [
   [/\b(контракт(?:ом)?|сделк(?:а|у|ой|е)|подпис\w*)\s+с\s+(?=[A-Z])/gi, '$1 с лейблом '],
   [/(?<=[.!?…]\s+)В\s+(?=[A-Z])/g, 'В треке '],
   [/(?<=[.!?…]\s+)в\s+(?=[A-Z])/g, 'в треке '],
+  [
+    /\s+с\s+(?=(?:Bandcamp|Spotify|SoundCloud|YouTube|Apple Music|iTunes|Deezer|Tidal|Shazam)\b)/gi,
+    ' на ',
+  ],
+  [/\s+со\s+(?=(?:Spotify|SoundCloud|YouTube)\b)/gi, ' на '],
 ];
 
 /** B-side / A-side — «сторона бэ/эй» с падежами (без \\b — кириллица не \\w в JS). */

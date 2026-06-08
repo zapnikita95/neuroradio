@@ -120,8 +120,6 @@ import type { StoryLengthId } from '../services/story-length.js';
 import { getNarratorPreset, type StoryNarratorId } from '../services/story-narrator.js';
 import type { TtsVoiceSetting } from '../services/voices.js';
 import type { TtsEmotion } from '../services/tts-options.js';
-import { normalizeYearsForRussianTts } from '../services/tts-russian-years.js';
-
 const router = Router();
 
 router.use(requireAppAuth);
@@ -1332,7 +1330,7 @@ router.post('/full', extractClientSecrets, validateStoryFullBody, storyFullRateL
     console.log(story.script);
     console.log('[story-script-end]');
 
-    const displayScript = normalizeYearsForRussianTts(story.script);
+    const displayScript = story.script;
 
     const effectiveVoiceTier: VoiceTier =
       hasUserTtsCredentials(userTtsCredentials)

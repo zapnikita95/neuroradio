@@ -21,6 +21,7 @@ import {
   splitMixedLanguageForSilero,
 } from '../dist/services/tts-silero-segments.js';
 import { wrapSileroRussianSsml } from '../dist/services/tts-silero-ssml.js';
+import { normalizeYearsForRussianTts } from '../dist/services/tts-russian-years.js';
 
 let passed = 0;
 
@@ -135,6 +136,52 @@ test('polish fixes меня мурашки бегут', () => {
   const out = polishScriptForSpeechDelivery('Меня до сих пор мурашки бегут, когда я слышу первые ноты.');
   assert.match(out, /у меня до сих пор мурашки бегут/i);
   assert.doesNotMatch(out, /^меня/i);
+});
+
+test('polish fixes зациклили and duplicate тогда after year', () => {
+  const out = polishScriptForSpeechDelivery(
+    'Тогда, в начале 2010 тогда, мы зациклили этот трек.',
+  );
+  assert.match(out, /в начале 2010/i);
+  assert.doesNotMatch(out, /2010\s+тогда/i);
+  assert.match(out, /гоняли по кругу/i);
+  assert.doesNotMatch(out, /зациклили/i);
+});
+
+test('years in начале 2010 года spoken for TTS', () => {
+  const spoken = normalizeYearsForRussianTts('Тогда, в начале 2010 года, они уже были легендами.');
+  assert.match(spoken, /в начале две тысячи десятого года/i);
+  assert.doesNotMatch(spoken, /\b2010\b/);
+});
+
+test('prepareYandexTtsText rewrites с Bandcamp to на Bandcamp', () => {
+  const out = prepareYandexTtsText(
+    'можно было скачать прямо с Bandcamp — и это было ново.',
+    { artist: 'Океан Ельзи', title: 'Без бою' },
+  );
+  assert.match(out, /на Bandcamp/i);
+  assert.doesNotMatch(out, /\sс Bandcamp/i);
+});
+
+test('SSML reads на Bandcamp without letter эс', () => {
+  const marked = prepareYandexTtsText(
+    'скачать прямо с Bandcamp — ново для нас.',
+    { artist: 'Test', title: 'Test' },
+  );
+  const ssml = buildYandexSsml(marked);
+  assert.match(ssml, /на\s*<lang xml:lang="en-US">Bandcamp/i);
+  assert.doesNotMatch(ssml, /<emphasis level="reduced">[сС]<\/emphasis>/i);
+});
+
+test('SSML reads в начале две тысячи десятого года', () => {
+  const marked = prepareYandexTtsText(
+    'Тогда, в начале 2010 года, они уже были легендами.',
+    { artist: 'Red Hot Chili Peppers', title: 'Snow' },
+  );
+  assert.match(marked, /в начале две тысячи десятого года/i);
+  const ssml = buildYandexSsml(marked);
+  assert.match(ssml, /две тысячи десятого года/i);
+  assert.doesNotMatch(ssml, /\b2010\b/);
 });
 
 test('SSML reads moonwalk as moon walk in English', () => {

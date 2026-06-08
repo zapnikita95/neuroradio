@@ -73,11 +73,17 @@ function cyrillicForShortAccentLatin(span: string): string | null {
 
 /** Союзы/предлоги/местоимения вплотную перед <lang> — без лишнего акцента на стыке RU→EN. */
 const RU_GLUE_BEFORE_LATIN_RE =
-  /([,—–-]?\s+)(и|а|или|либо|но|да|же|в|во|на|с|со|к|ко|у|о|об|обо|от|до|по|за|из|под|над|при|для|без|через|между|перед|после|около|вокруг|их|его|её|ее|эту|этот|эта|это|тот|та|те|свой|свою|своё|свои|мой|мою|моё|мои|твой|как|что)\s*$/iu;
+  /([,—–-]?\s+)(и|а|или|либо|но|да|же|на|к|ко|у|о|об|обо|от|до|по|за|из|под|над|при|для|без|через|между|перед|после|около|вокруг|их|его|её|ее|эту|этот|эта|это|тот|та|те|свой|свою|свoё|свои|мой|мою|моё|мои|твой|как|что)\s*$/iu;
+
+/** «с/к/в/о/у» перед <lang> Yandex читает как буквы (эс, ка…) — не выделяем и не отрываем. */
+const LETTER_LIKE_PREP_RE = /^(?:[сС](?:[оО])?|[кК](?:[оО])?|[вВ](?:[оО])?|[уУ]|[оО](?:[бБ][оО])?|на)$/iu;
 
 function escapeRussianChunkBeforeLatin(chunk: string): string {
   const glue = chunk.match(RU_GLUE_BEFORE_LATIN_RE);
   if (!glue || glue.index === undefined) return escapeSsml(chunk);
+  if (LETTER_LIKE_PREP_RE.test(glue[2] ?? '')) {
+    return escapeSsml(chunk);
+  }
   const head = chunk.slice(0, glue.index);
   return `${escapeSsml(head)}${glue[1]}<emphasis level="reduced">${escapeSsml(glue[2])}</emphasis>`;
 }
