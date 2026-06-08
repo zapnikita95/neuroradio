@@ -67,6 +67,44 @@ export function buildWebOnlyQueries(artist: string, title: string): string[] {
   ].slice(0, MAX_HTML_QUERIES);
 }
 
+/** Title-first HTML search when artist+tier obscure — cover labels, karaoke, etc. */
+export function buildTitleFirstWebQueries(title: string): string[] {
+  const cleanTitle = title.replace(/\s*\([^)]*\)\s*/g, ' ').trim();
+  if (!cleanTitle || cleanTitle.length < 3) return [];
+  const titleQ = `"${cleanTitle}"`;
+  return [
+    `${titleQ} song wikipedia meaning`,
+    `${titleQ} single original artist album`,
+  ].slice(0, 2);
+}
+
+export async function fetchTitleFirstWebSnippets(title: string): Promise<string[]> {
+  const queries = buildTitleFirstWebQueries(title);
+  if (queries.length === 0) return [];
+  const seen = new Set<string>();
+  const collected: string[] = [];
+
+  const batches = await mapWithConcurrency(queries, HTML_PARALLEL, (query) =>
+    fetchDdgHtmlSnippets(query, SNIPPETS_PER_QUERY).catch(() => []),
+  );
+
+  for (const snippets of batches) {
+    for (const text of snippets) {
+      const key = text.toLowerCase().replace(/\s+/g, ' ');
+      if (seen.has(key)) continue;
+      seen.add(key);
+      collected.push(text);
+    }
+  }
+
+  if (collected.length > 0) {
+    console.log(
+      `[web-title] "${title}": ${collected.length} snippets from ${queries.length} title-first queries`,
+    );
+  }
+  return collected.slice(0, 8);
+}
+
 /** Backstory-focused queries when generic search returned nothing useful. */
 export function buildBackstoryWebQueries(artist: string, title: string): string[] {
   const cleanTitle = title.replace(/\s*\([^)]*\)\s*/g, ' ').trim();

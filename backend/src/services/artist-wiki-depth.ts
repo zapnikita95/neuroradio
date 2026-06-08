@@ -1,5 +1,6 @@
 import { normalizeArtistKey, primaryArtistName } from './artist-primary.js';
 import type { StoryNarratorId } from './story-narrator.js';
+import { factMentionsArtist, factMentionsArtistLoose } from './fact-relevance.js';
 import { fetchArtistWikiLead, fetchArtistWikiParagraphs, fetchArtistWikiLeadWithRetry } from './wikipedia-lead.js';
 import { isMusicArtistWikiExtract } from './wikipedia-music.js';
 
@@ -78,12 +79,24 @@ export async function pickArtistWikiContent(
 
   for (let offset = 0; offset < candidates.length; offset += 1) {
     const candidate = candidates[(start + offset) % candidates.length]!;
+    if (!factMentionsArtistLoose(candidate, primary) && !factMentionsArtist(candidate, primary)) {
+      continue;
+    }
     if (isSeedUsed(input.installId, primary, candidate)) continue;
     if (input.previousScripts.some((s) => scriptOverlapsSeed(s, candidate))) continue;
     return { text: candidate, lang: cached.lang };
   }
 
-  return { text: cached.lead, lang: cached.lang };
+  const lead = cached.lead;
+  if (
+    lead.trim().length >= 40 &&
+    (factMentionsArtistLoose(lead, primary) || factMentionsArtist(lead, primary)) &&
+    !input.previousScripts.some((s) => scriptOverlapsSeed(s, lead))
+  ) {
+    return { text: lead, lang: cached.lang };
+  }
+
+  return null;
 }
 
 /** Wiki lead with retries — used before 503 when parallel fetch timed out. */

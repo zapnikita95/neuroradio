@@ -36,6 +36,7 @@ import {
 } from '../services/story-llm-fact-hunt.js';
 import { pickSalvageSnippetSeed, pickRelaxedSnippetSeed, isWeakSelectedFact, isWeakSnippetSeed } from '../services/search-snippet-salvage.js';
 import { hasActionableSnippets } from '../services/web-snippet-accept.js';
+import { factMentionsArtistLoose } from '../services/fact-relevance.js';
 import { hasLlmKeyForProvider, resolveLlmProvider, resolveEffectiveStoryLlmProvider, clientKeyForProvider, type ClientLlmKeys, type ClientLocalOllama } from '../services/llm-provider.js';
 import { generateStoryWithFallback } from '../services/story-llm-router.js';
 import { fetchArtistWikiLead } from '../services/wikipedia-lead.js';
@@ -189,8 +190,9 @@ router.get('/quota', (req: Request, res: Response) => {
 });
 
 /** Major artists: wiki bio is enough for story LLM when MB/wiki timed out on first pass. */
-function acceptWikiArtistSeed(text: string, tier: 'major' | 'indie'): boolean {
+function acceptWikiArtistSeed(text: string, tier: 'major' | 'indie', artist: string): boolean {
   if (!isMusicArtistWikiExtract(text)) return false;
+  if (!factMentionsArtistLoose(text, artist)) return false;
   if (tier === 'major') return text.trim().length >= 80;
   return !isWikiBiographyLead(text);
 }
@@ -467,6 +469,8 @@ router.post('/full', extractClientSecrets, validateStoryFullBody, storyFullRateL
           trackFactCount + artistFactCount > 0 ||
           (firstFetchMs >= 18_000 && factCtx.rawSnippets.length >= 2) ||
           hasActionableSnippets(factCtx.rawSnippets, metadata.artist, metadata.title) ||
+          (factCtx.rawSnippets.length > 0 &&
+            !hasActionableSnippets(factCtx.rawSnippets, metadata.artist, metadata.title)) ||
           (isCatalogMajorArtist(metadata.artist) && factCtx.rawSnippets.length === 0);
         if (skipRetry) {
           console.warn(
@@ -659,7 +663,7 @@ router.post('/full', extractClientSecrets, validateStoryFullBody, storyFullRateL
         previousScripts,
         narrator: storyNarrator,
       });
-      if (wikiEarly && acceptWikiArtistSeed(wikiEarly.text, artistTier)) {
+      if (wikiEarly && acceptWikiArtistSeed(wikiEarly.text, artistTier, metadata.artist)) {
         selectedFact = {
           fact: wikiEarly.text,
           scope: 'artist',
@@ -765,7 +769,7 @@ router.post('/full', extractClientSecrets, validateStoryFullBody, storyFullRateL
         previousScripts,
         narrator: storyNarrator,
       });
-      if (wikiSalvage && acceptWikiArtistSeed(wikiSalvage.text, artistTier)) {
+      if (wikiSalvage && acceptWikiArtistSeed(wikiSalvage.text, artistTier, metadata.artist)) {
         selectedFact = {
           fact: wikiSalvage.text,
           scope: 'artist',
@@ -863,7 +867,7 @@ router.post('/full', extractClientSecrets, validateStoryFullBody, storyFullRateL
             previousScripts,
             narrator: storyNarrator,
           });
-          if (wikiLastResort && acceptWikiArtistSeed(wikiLastResort.text, artistTier)) {
+          if (wikiLastResort && acceptWikiArtistSeed(wikiLastResort.text, artistTier, metadata.artist)) {
             selectedFact = {
               fact: wikiLastResort.text,
               scope: 'artist',
@@ -1287,7 +1291,7 @@ router.post('/full', extractClientSecrets, validateStoryFullBody, storyFullRateL
             previousScripts,
             narrator: storyNarrator,
           });
-          if (wikiLate && acceptWikiArtistSeed(wikiLate.text, artistTier)) {
+          if (wikiLate && acceptWikiArtistSeed(wikiLate.text, artistTier, metadata.artist)) {
             effectiveStoryInput = {
               ...effectiveStoryInput,
               referenceFacts: [wikiLate.text],

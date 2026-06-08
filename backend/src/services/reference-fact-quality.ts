@@ -5,7 +5,7 @@ import { isTruncatedMarketingSnippet, isUnspeakableWebSeed } from './web-snippet
 
 /** Wikipedia lead paragraph — birthplace, label deal, EP listing; not a story hook. */
 export const WIKI_BIOGRAPHY_PATTERNS: RegExp[] = [
-  /\bis an?\s+(?:English|American|British|Canadian|Australian|Irish|Scottish|Welsh)\s+singer[- ]songwriter\b/i,
+  /\b(?:is|was)\s+an?\s+(?:English|American|British|Canadian|Australian|Irish|Scottish|Welsh)\s+singer[- ]songwriter\b/i,
   /\bBorn in\b.*\b(?:raised in|grew up in)\b/i,
   /\bbegan writing songs around the age of\b/i,
   /\bindependently released the extended play\b/i,
