@@ -18,6 +18,10 @@ const CI_DEBUG_CERT_SHA256 = 'c5b7363ebcaf8808b02e1bb766c8d688c7a542fc60d840bc6d
 const UPLOAD_RELEASE_CERT_SHA256 =
   '6c2a59abfbacc6b828d4c0c321be5f848056988558677e4123d216200c531b09';
 
+/** Google Play App signing key (Store installs) — from deployment_cert.der / Play Console. */
+const PLAY_APP_SIGNING_CERT_SHA256 =
+  '5f454350d54e048ef7edc7b61808337dd1bf91d94b3ccfe75043a7a5afa7f0b5';
+
 function base64UrlEncode(input: Buffer | string): string {
   const buffer = typeof input === 'string' ? Buffer.from(input, 'utf8') : input;
   return buffer.toString('base64url');
@@ -141,6 +145,8 @@ export function getAllowedCertFingerprints(): Set<string> {
   allowed.add(normalizeCertSha256(CI_DEBUG_CERT_SHA256));
   /** Release upload keystore — sideload / local release testing. */
   allowed.add(normalizeCertSha256(UPLOAD_RELEASE_CERT_SHA256));
+  /** Google Play re-signs Store builds with this key. */
+  allowed.add(normalizeCertSha256(PLAY_APP_SIGNING_CERT_SHA256));
 
   if (SECURITY.allowDebugCert) {
     allowed.add(normalizeCertSha256(DEBUG_CERT_SHA256));
