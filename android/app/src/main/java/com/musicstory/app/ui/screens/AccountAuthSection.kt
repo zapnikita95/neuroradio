@@ -47,6 +47,7 @@ private suspend fun finishAccountLogin(
     login: AccountAuthManager.AccountLoginResult,
 ) {
     app.settingsDataStore.setAccountLinked(true)
+    login.profile?.let { app.settingsDataStore.saveAccountProfile(it) }
     if (!app.settingsDataStore.homeTourCompleted.first()) {
         app.settingsDataStore.setHomeTourPending(true)
     }
@@ -84,9 +85,13 @@ fun AccountStatusSection(
     LaunchedEffect(Unit) {
         val url = app.settingsDataStore.backendUrl.first()
         backendUrl = url
+        app.settingsDataStore.readCachedAccountProfile()?.let { profile = it }
         if (url.isNotBlank()) {
             authConfig = app.accountAuthManager.fetchConfig(url)
-            profile = app.accountAuthManager.fetchProfile(url)
+            app.accountAuthManager.fetchProfile(url)?.let { fresh ->
+                profile = fresh
+                app.settingsDataStore.saveAccountProfile(fresh)
+            }
         }
     }
 
@@ -154,7 +159,10 @@ fun AccountStatusSection(
                     onSkip = {},
                     onLoggedIn = {
                         scope.launch {
-                            profile = app.accountAuthManager.fetchProfile(backendUrl)
+                            app.accountAuthManager.fetchProfile(backendUrl)?.let { fresh ->
+                                profile = fresh
+                                app.settingsDataStore.saveAccountProfile(fresh)
+                            }
                         }
                     },
                 )

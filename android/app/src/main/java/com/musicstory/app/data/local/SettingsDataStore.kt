@@ -105,6 +105,44 @@ class SettingsDataStore(private val context: Context) {
         prefs[KEY_ACCOUNT_LINKED] ?: false
     }
 
+    val cachedAccountEmail: Flow<String> = context.settingsDataStore.data.map { prefs ->
+        prefs[KEY_ACCOUNT_EMAIL].orEmpty().trim()
+    }
+
+    suspend fun readCachedAccountProfile(): com.musicstory.app.data.remote.AccountAuthManager.AccountProfile? {
+        val prefs = context.settingsDataStore.data.first()
+        val email = prefs[KEY_ACCOUNT_EMAIL]?.trim().orEmpty()
+        val telegramUsername = prefs[KEY_ACCOUNT_TELEGRAM_USERNAME]?.trim().orEmpty()
+        val telegramId = prefs[KEY_ACCOUNT_TELEGRAM_ID]?.takeIf { it > 0L }
+        val plan = prefs[KEY_ACCOUNT_PLAN]?.trim().orEmpty()
+        val premiumUntil = prefs[KEY_ACCOUNT_PREMIUM_UNTIL]?.takeIf { it > 0L }
+        if (email.isBlank() && telegramId == null && telegramUsername.isBlank()) return null
+        return com.musicstory.app.data.remote.AccountAuthManager.AccountProfile(
+            accountId = prefs[KEY_ACCOUNT_ID]?.trim()?.takeIf { it.isNotBlank() },
+            email = email.takeIf { it.isNotBlank() },
+            telegramId = telegramId,
+            telegramUsername = telegramUsername.takeIf { it.isNotBlank() },
+            plan = plan.takeIf { it.isNotBlank() },
+            trialUntil = prefs[KEY_ACCOUNT_TRIAL_UNTIL]?.takeIf { it > 0L },
+            premiumUntil = premiumUntil,
+        )
+    }
+
+    suspend fun saveAccountProfile(profile: com.musicstory.app.data.remote.AccountAuthManager.AccountProfile) {
+        context.settingsDataStore.edit { prefs ->
+            profile.email?.trim()?.takeIf { it.isNotBlank() }?.let { prefs[KEY_ACCOUNT_EMAIL] = it }
+            profile.telegramUsername?.trim()?.takeIf { it.isNotBlank() }?.let {
+                prefs[KEY_ACCOUNT_TELEGRAM_USERNAME] = it
+            }
+            profile.telegramId?.takeIf { it > 0L }?.let { prefs[KEY_ACCOUNT_TELEGRAM_ID] = it }
+            profile.accountId?.trim()?.takeIf { it.isNotBlank() }?.let { prefs[KEY_ACCOUNT_ID] = it }
+            profile.plan?.trim()?.takeIf { it.isNotBlank() }?.let { prefs[KEY_ACCOUNT_PLAN] = it }
+            profile.trialUntil?.takeIf { it > 0L }?.let { prefs[KEY_ACCOUNT_TRIAL_UNTIL] = it }
+            profile.premiumUntil?.takeIf { it > 0L }?.let { prefs[KEY_ACCOUNT_PREMIUM_UNTIL] = it }
+            if (profile.isLoggedIn) prefs[KEY_ACCOUNT_LINKED] = true
+        }
+    }
+
     suspend fun setSyncCode(code: String) {
         context.settingsDataStore.edit {
             it[KEY_SYNC_CODE] = code.trim()
@@ -673,6 +711,13 @@ class SettingsDataStore(private val context: Context) {
         private val KEY_COUNT_TRACK_LISTEN_SECONDS = intPreferencesKey("count_track_listen_seconds")
         private val KEY_SYNC_CODE = stringPreferencesKey("sync_code")
         private val KEY_ACCOUNT_LINKED = booleanPreferencesKey("account_linked")
+        private val KEY_ACCOUNT_EMAIL = stringPreferencesKey("account_email")
+        private val KEY_ACCOUNT_ID = stringPreferencesKey("account_id")
+        private val KEY_ACCOUNT_PLAN = stringPreferencesKey("account_plan")
+        private val KEY_ACCOUNT_TELEGRAM_USERNAME = stringPreferencesKey("account_telegram_username")
+        private val KEY_ACCOUNT_TELEGRAM_ID = longPreferencesKey("account_telegram_id")
+        private val KEY_ACCOUNT_TRIAL_UNTIL = longPreferencesKey("account_trial_until")
+        private val KEY_ACCOUNT_PREMIUM_UNTIL = longPreferencesKey("account_premium_until")
         private val KEY_SETTINGS_SYNCED_AT = longPreferencesKey("settings_synced_at")
         private val KEY_TRIAL_EXPIRED_UPSELL_SHOWN = booleanPreferencesKey("trial_expired_upsell_shown")
         private val KEY_TRIAL_BANNER_DISMISSED = stringPreferencesKey("trial_banner_dismissed_milestones")

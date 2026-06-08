@@ -142,8 +142,13 @@ private fun BillingTab(app: MusicStoryApp) {
 
     LaunchedEffect(Unit) {
         backendUrl = app.settingsDataStore.backendUrl.first()
-        email = app.accountAuthManager.fetchProfile(backendUrl)?.email.orEmpty()
+        email = app.settingsDataStore.cachedAccountEmail.first()
+            .ifBlank { app.settingsDataStore.readCachedAccountProfile()?.email.orEmpty() }
         refreshBilling()
+        app.accountAuthManager.fetchProfile(backendUrl)?.let { profile ->
+            profile.email?.let { email = it }
+            app.settingsDataStore.saveAccountProfile(profile)
+        }
     }
 
     Column(

@@ -134,6 +134,7 @@ class MusicStoryApp : Application() {
             val profile = login.profile ?: return@launch
             if (!profile.isLoggedIn) return@launch
             settingsDataStore.setAccountLinked(true)
+            settingsDataStore.saveAccountProfile(profile)
             if (!settingsDataStore.homeTourCompleted.first()) {
                 settingsDataStore.setHomeTourPending(true)
             }
