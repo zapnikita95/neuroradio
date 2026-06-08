@@ -261,6 +261,10 @@
     <string name="settings_auth_link_hint">Можно привязать второй способ входа к этому же аккаунту.</string>
     <string name="settings_auth_link_telegram">Привязать Telegram</string>
     <string name="settings_auth_telegram_linked">Telegram привязан</string>
+    <string name="settings_auth_logout">Выйти</string>
+    <string name="settings_auth_logout_confirm_title">Выйти из аккаунта?</string>
+    <string name="settings_auth_logout_confirm_body">Профиль на этом телефоне отвяжется. Локальная история останется — для облака войдите снова.</string>
+    <string name="settings_auth_logout_done">Вы вышли из аккаунта</string>
     <string name="settings_auth_telegram_hint">Нажмите Telegram — в приложении появится кнопка, затем «Принять» или «Отклонить».</string>
     <string name="settings_auth_telegram_not_configured">Telegram не настроен на сервере (TELEGRAM_WIDGET_BASE_URL)</string>
     <string name="account_login_title">Вход в аккаунт</string>

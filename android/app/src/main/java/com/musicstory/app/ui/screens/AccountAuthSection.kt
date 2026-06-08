@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
@@ -33,6 +34,7 @@ import com.musicstory.app.ui.components.PrimaryStoryButton
 import com.musicstory.app.ui.components.SecondaryStoryButton
 import com.musicstory.app.ui.components.TelegramLoginWidgetSheet
 import com.musicstory.app.ui.theme.CreamText
+import com.musicstory.app.ui.theme.DeepVoid
 import com.musicstory.app.ui.theme.ErrorCoral
 import com.musicstory.app.ui.theme.GoldBright
 import com.musicstory.app.ui.theme.GoldWarm
@@ -71,7 +73,12 @@ private suspend fun finishAccountLogin(
 private fun authMessageColor(context: Context, message: String): Color {
     val successSent = context.getString(R.string.settings_auth_code_sent)
     val successLogin = context.getString(R.string.settings_auth_success)
-    return if (message == successSent || message == successLogin) LiveGreen else ErrorCoral
+    val successLogout = context.getString(R.string.settings_auth_logout_done)
+    return if (message == successSent || message == successLogin || message == successLogout) {
+        LiveGreen
+    } else {
+        ErrorCoral
+    }
 }
 
 @Composable
@@ -85,6 +92,7 @@ fun AccountStatusSection(
     var authConfig by remember { mutableStateOf<AccountAuthManager.AuthConfig?>(null) }
     var message by remember { mutableStateOf<String?>(null) }
     var showTelegramSheet by remember { mutableStateOf(false) }
+    var showLogoutConfirm by remember { mutableStateOf(false) }
     var backendUrl by remember { mutableStateOf("") }
 
     LaunchedEffect(Unit) {
@@ -148,6 +156,13 @@ fun AccountStatusSection(
             }
 
             Spacer(modifier = Modifier.height(12.dp))
+            SecondaryStoryButton(
+                text = context.getString(R.string.settings_auth_logout),
+                onClick = { showLogoutConfirm = true },
+                modifier = Modifier.fillMaxWidth(),
+            )
+
+            Spacer(modifier = Modifier.height(12.dp))
             Text(
                 text = context.getString(R.string.settings_auth_link_hint),
                 style = MaterialTheme.typography.bodySmall,
@@ -201,6 +216,36 @@ fun AccountStatusSection(
                 color = authMessageColor(context, it),
             )
         }
+    }
+
+    if (showLogoutConfirm) {
+        AlertDialog(
+            onDismissRequest = { showLogoutConfirm = false },
+            title = { Text(context.getString(R.string.settings_auth_logout_confirm_title)) },
+            text = { Text(context.getString(R.string.settings_auth_logout_confirm_body)) },
+            confirmButton = {
+                PrimaryStoryButton(
+                    text = context.getString(R.string.settings_auth_logout),
+                    onClick = {
+                        scope.launch {
+                            app.settingsDataStore.clearAccountSession()
+                            profile = null
+                            message = context.getString(R.string.settings_auth_logout_done)
+                            showLogoutConfirm = false
+                        }
+                    },
+                )
+            },
+            dismissButton = {
+                SecondaryStoryButton(
+                    text = context.getString(R.string.action_cancel),
+                    onClick = { showLogoutConfirm = false },
+                )
+            },
+            containerColor = DeepVoid,
+            titleContentColor = CreamText,
+            textContentColor = MutedLavender,
+        )
     }
 }
 

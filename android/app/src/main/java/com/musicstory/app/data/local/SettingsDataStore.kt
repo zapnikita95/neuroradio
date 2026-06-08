@@ -154,6 +154,20 @@ class SettingsDataStore(private val context: Context) {
         context.settingsDataStore.edit { it[KEY_ACCOUNT_LINKED] = linked }
     }
 
+    suspend fun clearAccountSession() {
+        context.settingsDataStore.edit { prefs ->
+            prefs.remove(KEY_ACCOUNT_LINKED)
+            prefs.remove(KEY_ACCOUNT_EMAIL)
+            prefs.remove(KEY_ACCOUNT_ID)
+            prefs.remove(KEY_ACCOUNT_PLAN)
+            prefs.remove(KEY_ACCOUNT_TELEGRAM_USERNAME)
+            prefs.remove(KEY_ACCOUNT_TELEGRAM_ID)
+            prefs.remove(KEY_ACCOUNT_TRIAL_UNTIL)
+            prefs.remove(KEY_ACCOUNT_PREMIUM_UNTIL)
+            prefs.remove(KEY_SYNC_CODE)
+        }
+    }
+
     val groqApiKey: Flow<String> = context.settingsDataStore.data.map { prefs ->
         secureApiKeyStore.read(SecureApiKeyStore.GROQ, prefs[KEY_GROQ_API_KEY])
     }
