@@ -1,4 +1,5 @@
 import {
+  canChargeRecurringRenewal,
   listAccountsDueForRenewal,
   markRecurringAttempt,
 } from './account-store.js';
@@ -23,21 +24,26 @@ export async function processRecurringPayments(): Promise<void> {
 
     console.log(`[billing/recurring] due accounts=${due.length}`);
     for (const row of due) {
-      const planMeta = SUBSCRIPTION_PLANS[row.plan];
+      const eligible = canChargeRecurringRenewal(row.email);
+      if (!eligible.ok) {
+        console.log(`[billing/recurring] skip email=${row.email} (autopay off or card unlinked)`);
+        continue;
+      }
+      const planMeta = SUBSCRIPTION_PLANS[eligible.plan];
       try {
         markRecurringAttempt(row.email);
         const created = await createRecurringYooKassaPayment({
           email: row.email,
-          plan: row.plan,
-          paymentMethodId: row.paymentMethodId,
+          plan: eligible.plan,
+          paymentMethodId: eligible.paymentMethodId,
         });
         console.log(
-          `[billing/recurring] charged email=${row.email} plan=${row.plan} ` +
+          `[billing/recurring] charged email=${row.email} plan=${eligible.plan} ` +
             `paymentId=${created.paymentId} status=${created.status}`,
         );
       } catch (err) {
         console.error(
-          `[billing/recurring] failed email=${row.email} plan=${row.plan}:`,
+          `[billing/recurring] failed email=${row.email} plan=${eligible.plan}:`,
           err instanceof Error ? err.message : err,
         );
       }

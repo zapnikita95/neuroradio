@@ -832,9 +832,9 @@ export function grantPremiumByEmail(
   if (options.subscriptionPlan) {
     account.subscriptionPlan = options.subscriptionPlan;
   }
-  if (options.paymentMethodId) {
+  if (options.paymentMethodId && options.autoRenew !== false) {
     account.yookassaPaymentMethodId = options.paymentMethodId;
-    account.autoRenew = options.autoRenew ?? true;
+    account.autoRenew = true;
   } else if (options.autoRenew === false) {
     account.autoRenew = false;
     account.yookassaPaymentMethodId = null;
@@ -866,7 +866,7 @@ export function listAccountsDueForRenewal(retryCooldownMs: number): Array<{
     const plan = account.subscriptionPlan;
     const paymentMethodId = account.yookassaPaymentMethodId?.trim();
     if (!email || !plan || !paymentMethodId) continue;
-    if (account.autoRenew === false) continue;
+    if (account.autoRenew !== true) continue;
     const nextAt = account.nextPaymentAt ?? 0;
     if (nextAt > now) continue;
     const lastAttempt = account.lastRecurringAttemptAt ?? 0;
@@ -894,12 +894,34 @@ export function cancelAutoRenewByEmail(emailRaw: string): boolean {
   if (!accountId) return false;
   const account = store.accountsById[accountId];
   if (!account) return false;
+  const accessUntil = Math.max(account.premiumUntil ?? 0, account.trialUntil ?? 0);
   account.autoRenew = false;
   account.yookassaPaymentMethodId = null;
   account.nextPaymentAt = null;
+  account.lastRecurringAttemptAt = null;
   saveStore(store);
-  console.log(`[billing] autopay cancelled email=${email}`);
+  console.log(
+    `[billing] autopay cancelled email=${email} accessUntil=${accessUntil > 0 ? new Date(accessUntil).toISOString() : 'n/a'}`,
+  );
   return true;
+}
+
+/** Можно ли инициировать автосписание (карта не отвязана, автопродление явно включено). */
+export function canChargeRecurringRenewal(emailRaw: string): {
+  ok: true;
+  plan: 'month' | 'quarter' | 'year';
+  paymentMethodId: string;
+} | { ok: false } {
+  const account = getAccountByEmail(emailRaw);
+  if (!account) return { ok: false };
+  const email = account.email?.trim().toLowerCase();
+  const plan = account.subscriptionPlan;
+  const paymentMethodId = account.yookassaPaymentMethodId?.trim();
+  if (!email || !plan || !paymentMethodId) return { ok: false };
+  if (account.autoRenew !== true) return { ok: false };
+  const nextAt = account.nextPaymentAt ?? 0;
+  if (nextAt > Date.now()) return { ok: false };
+  return { ok: true, plan, paymentMethodId };
 }
 
 /** Отвязка карты / отмена автопродления для аккаунта устройства. */
@@ -925,6 +947,10 @@ function getAccountByEmail(emailRaw: string): AccountRecord | null {
   const accountId = store.emailToAccount?.[email];
   if (!accountId) return null;
   return store.accountsById[accountId] ?? null;
+}
+
+export function getAccountByEmailForBilling(emailRaw: string): AccountRecord | null {
+  return getAccountByEmail(emailRaw);
 }
 
 function verifyWebCabinetCode(

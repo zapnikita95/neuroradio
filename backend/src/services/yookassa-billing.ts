@@ -1,6 +1,10 @@
 import type { SubscriptionPlan } from './yookassa.js';
 import { fetchYooKassaPayment, SUBSCRIPTION_PLANS } from './yookassa.js';
-import { grantPremiumByEmail, type GrantPremiumOptions } from './account-store.js';
+import {
+  getAccountByEmailForBilling,
+  grantPremiumByEmail,
+  type GrantPremiumOptions,
+} from './account-store.js';
 import {
   isEmailConfigured,
   sendPaymentSuccessEmail,
@@ -28,6 +32,16 @@ export async function applyYooKassaPaymentSucceeded(options: {
       `[yookassa/billing] payment.succeeded missing email/plan paymentId=${options.paymentId}`,
     );
     return;
+  }
+
+  if (isRecurring) {
+    const existing = getAccountByEmailForBilling(email);
+    if (existing?.autoRenew === false || !existing?.yookassaPaymentMethodId?.trim()) {
+      console.warn(
+        `[yookassa/billing] recurring ignored — autopay cancelled email=${email} paymentId=${options.paymentId}`,
+      );
+      return;
+    }
   }
 
   const planMeta = SUBSCRIPTION_PLANS[plan];
