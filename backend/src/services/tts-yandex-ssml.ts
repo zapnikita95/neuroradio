@@ -5,7 +5,10 @@
  */
 
 import type { YandexVoiceId } from './voices.js';
-import { normalizeLatinApostrophes } from './tts-yandex-normalize.js';
+import {
+  normalizeLatinApostrophes,
+  stripLatinApostrophesForTts,
+} from './tts-yandex-normalize.js';
 
 const BREAK_SMALL = '\uE020';
 const BREAK_MEDIUM = '\uE021';
@@ -68,8 +71,15 @@ function cyrillicForShortAccentLatin(span: string): string | null {
   return capitalizeLike(bare, mapped) + punct;
 }
 
+/** Союзы/предлоги/местоимения вплотную перед <lang> — без лишнего акцента на стыке RU→EN. */
+const RU_GLUE_BEFORE_LATIN_RE =
+  /([,—–-]?\s+)(и|а|или|либо|но|да|же|в|во|на|с|со|к|ко|у|о|об|обо|от|до|по|за|из|под|над|при|для|без|через|между|перед|после|около|вокруг|их|его|её|ее|эту|этот|эта|это|тот|та|те|свой|свою|своё|свои|мой|мою|моё|мои|твой|как|что)\s*$/iu;
+
 function escapeRussianChunkBeforeLatin(chunk: string): string {
-  return escapeSsml(chunk);
+  const glue = chunk.match(RU_GLUE_BEFORE_LATIN_RE);
+  if (!glue || glue.index === undefined) return escapeSsml(chunk);
+  const head = chunk.slice(0, glue.index);
+  return `${escapeSsml(head)}${glue[1]}<emphasis level="reduced">${escapeSsml(glue[2])}</emphasis>`;
 }
 
 function fixRussianPrepositionsAfterLangTags(text: string): string {
@@ -124,12 +134,17 @@ function splitCamelCaseLatin(span: string): string {
 }
 
 function latinSpanForSsml(span: string): string {
-  return splitCamelCaseLatin(span.trim());
+  return stripLatinApostrophesForTts(splitCamelCaseLatin(span.trim()));
+}
+
+/** Пауза Yandex markup вплотную перед латиницей даёт рваный стык — убираем. */
+function stripPausesBeforeLatin(text: string): string {
+  return text.replace(/<\[(?:small|medium|large|tiny|huge|sentence)\]>\s*(?=[A-Za-zÀ-ÿ])/g, ' ');
 }
 
 /** Оборачивает латинские фрагменты в SSML lang; русский текст и +ударения — как есть. */
 export function wrapMixedLanguageBody(text: string): string {
-  const prepared = pausesToPlaceholders(normalizeLatinApostrophes(text));
+  const prepared = pausesToPlaceholders(stripPausesBeforeLatin(normalizeLatinApostrophes(text)));
   let last = 0;
   let out = '';
   const re = new RegExp(LATIN_RUN_RE.source, 'g');

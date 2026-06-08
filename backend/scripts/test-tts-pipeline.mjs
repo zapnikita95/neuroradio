@@ -58,10 +58,23 @@ test('SSML keeps preposition с in Russian stream before Latin', () => {
   assert.match(ssml, /<lang xml:lang="en-US">Young Money Entertainment/i);
 });
 
-test('SSML keeps Don\'t Matter To Me as one English phrase', () => {
+test('SSML keeps Don\'t Matter To Me as one English phrase without apostrophe pause', () => {
   const ssml = buildYandexSsml('В треке Don\u2019t Matter To Me он использует рэп-сингинг.');
   assert.doesNotMatch(ssml, />Don<\/lang>/i);
-  assert.match(ssml, /Don&apos;t Matter To Me|Don't Matter To Me/i);
+  assert.match(ssml, /Dont Matter To Me/i);
+  assert.doesNotMatch(ssml, /Don&apos;t|Don't/i);
+});
+
+test('SSML reads It\'s as Its without apostrophe break', () => {
+  const ssml = buildYandexSsml('трек Wake Me When It\u2019s Over — классика.');
+  assert.match(ssml, /Wake Me When Its Over/i);
+  assert.doesNotMatch(ssml, /It&apos;s|It's/i);
+});
+
+test('SSML softens Russian conjunction before English lang tag', () => {
+  const ssml = buildYandexSsml('часть моей жизни, и The Cranberries — легенда.');
+  assert.match(ssml, /<emphasis level="reduced">и<\/emphasis>\s*<lang xml:lang="en-US">The Cranberries/i);
+  assert.match(ssml, /<lang xml:lang="en-US">The Cranberries<\/lang>/i);
 });
 
 test('prepareYandexTtsText reads R&B as ар эн би', () => {
@@ -266,23 +279,36 @@ test('salute ssml uses sber voice and breaks', () => {
   assert.match(ssml, /xml:lang="en-US"/);
 });
 
-test('prepareSileroTtsText transliterates Italian titles and keeps stress', () => {
+test('prepareSileroTtsText keeps Latin titles in English (no Cyrillic transliteration)', () => {
   const script =
-    'Damiano David победил на Евровидении с песней «Zitti e buoni». Звукорежиссёр поймал свист в колонках. ' +
-    'В 2021 году коллектив победил снова.';
+    'Crazy Town выпустили Butterfly. Damiano David победил с песней «Zitti e buoni». ' +
+    'Звукорежиссёр поймал свист в колонках. В 2021 году коллектив победил снова.';
   const trace = prepareSileroTtsTextTrace(script, {
-    artist: 'Damiano David',
-    title: 'Next Summer',
+    artist: 'Crazy Town',
+    title: 'Butterfly',
   });
   const out = trace.prepared;
-  assert.match(out, /Цитти э буони/i);
-  assert.doesNotMatch(out, /Zitti/i);
+  assert.match(out, /Crazy Town/i);
+  assert.match(out, /Butterfly/i);
+  assert.match(out, /Zitti e buoni/i);
+  assert.doesNotMatch(out, /Крейзи Таун/i);
+  assert.doesNotMatch(out, /Баттерфлай/i);
+  assert.doesNotMatch(out, /Цитти/i);
   assert.doesNotMatch(out, /в\s+кavыч/i);
   assert.match(out, /двадцать первом году/i);
   assert.match(out, /св\+ист|свист/i);
   assert.match(out, /кол\+он/i);
   assert.doesNotMatch(out, /<\[/);
-  assert.ok(trace.latinReplacements.length > 0);
+  assert.equal(trace.latinReplacements.length, 0);
+});
+
+test('prepareSileroTtsText strips apostrophe in Latin titles', () => {
+  const out = prepareSileroTtsText('трек Wake Me When It\u2019s Over звучит мощно.', {
+    artist: 'The Cranberries',
+    title: "Wake Me When It's Over",
+  });
+  assert.match(out, /Its Over/i);
+  assert.doesNotMatch(out, /It's/i);
 });
 
 console.log(`\n[test-tts-pipeline] ${passed} passed`);

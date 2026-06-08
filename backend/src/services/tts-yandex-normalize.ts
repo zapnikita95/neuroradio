@@ -6,6 +6,22 @@ export function normalizeLatinApostrophes(text: string): string {
   return text.replace(CURLY_APOSTROPHE, "'");
 }
 
+const LATIN_APOSTROPHE_CLASS = "''\u2018\u2019\u02BC\u0060";
+
+/** It's → Its for TTS (display text unchanged; call only on speech pipeline). */
+export function stripLatinApostrophesForTts(span: string): string {
+  return span.replace(new RegExp(`[${LATIN_APOSTROPHE_CLASS}]`, 'g'), '');
+}
+
+const LATIN_RUN_FOR_APOSTROPHE_RE = new RegExp(
+  `[A-Za-zÀ-ÿ][A-Za-zÀ-ÿ0-9${LATIN_APOSTROPHE_CLASS}.\\-&]{0,}(?:\\s+(?![.!?…]\\s)[A-Za-zÀ-ÿ][A-Za-zÀ-ÿ0-9${LATIN_APOSTROPHE_CLASS}.\\-&]{0,})*`,
+  'g',
+);
+
+export function stripApostrophesInLatinRuns(text: string): string {
+  return text.replace(LATIN_RUN_FOR_APOSTROPHE_RE, (span) => stripLatinApostrophesForTts(span));
+}
+
 const MIXED_TTS_REPLACEMENTS: Array<[RegExp, string]> = [
   [/\bR\s*&\s*B\b/gi, 'ар эн би'],
   [/\brap[\s-]singing\b/gi, 'рэп-сингинг'],

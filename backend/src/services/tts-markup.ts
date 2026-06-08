@@ -8,12 +8,15 @@ import { applyRussianStressSafe, RUSSIAN_STRESS } from './russian-stress.js';
 import { runTtsQualityPass } from './tts-quality-pass.js';
 import {
   applyForeignPronunciation,
-  applyForeignPronunciationWithReplacements,
   preserveMusicProperNames,
 } from './tts-foreign-pronounce.js';
 import { stripYandexPauseMarkup } from './tts-azure-ssml.js';
 import { enhanceMixedLanguageText } from './tts-en-normalize.js';
-import { normalizeYandexSpeechTokens } from './tts-yandex-normalize.js';
+import {
+  normalizeLatinApostrophes,
+  normalizeYandexSpeechTokens,
+  stripApostrophesInLatinRuns,
+} from './tts-yandex-normalize.js';
 import { normalizeYearsForRussianTts } from './tts-russian-years.js';
 import type { SileroTtsTextTrace } from './tts-silero-transcript.js';
 import type { TtsPauseProfile } from './tts-voice-profiles.js';
@@ -169,21 +172,19 @@ export function prepareSileroTtsTextTrace(
   text = runTtsQualityPass(text).text;
   text = normalizeYearsForRussianTts(text);
   text = expandQuotesForSpeech(text);
+  text = normalizeLatinApostrophes(text);
   text = applyRussianStressSafe(text);
-  const { text: transliterated, replacements } = applyForeignPronunciationWithReplacements(
-    text,
-    artist,
-    title,
-  );
-  const prepared = stripYandexPauseMarkup(transliterated);
+  // Silero v5_ru: латиница остаётся английским текстом (без кириллической транслитерации).
+  const withLatin = stripApostrophesInLatinRuns(text);
+  const prepared = stripYandexPauseMarkup(withLatin);
 
   return {
     originalScript,
     artist,
     title,
     afterProperNames,
-    afterLatinTransliteration: transliterated,
-    latinReplacements: replacements,
+    afterLatinTransliteration: withLatin,
+    latinReplacements: [],
     prepared,
   };
 }
