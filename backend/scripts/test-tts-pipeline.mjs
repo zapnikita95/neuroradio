@@ -342,7 +342,7 @@ test('salute ssml uses sber voice and breaks', () => {
   assert.match(ssml, /xml:lang="en-US"/);
 });
 
-test('prepareSileroTtsText keeps Latin titles in English (no Cyrillic transliteration)', () => {
+test('prepareSileroTtsText phonetic Cyrillic for Silero (no Latin left)', () => {
   const script =
     'Crazy Town выпустили Butterfly. Damiano David победил с песней «Zitti e buoni». ' +
     'Звукорежиссёр поймал свист в колонках. В 2021 году коллектив победил снова.';
@@ -351,30 +351,26 @@ test('prepareSileroTtsText keeps Latin titles in English (no Cyrillic transliter
     title: 'Butterfly',
   });
   const out = trace.prepared;
-  assert.match(out, /Crazy Town/i);
-  assert.match(out, /Butterfly/i);
-  assert.match(out, /Zitti e buoni/i);
-  assert.doesNotMatch(out, /Крейзи Таун/i);
-  assert.doesNotMatch(out, /Баттерфлай/i);
-  assert.doesNotMatch(out, /Цитти/i);
-  assert.doesNotMatch(out, /в\s+кavыч/i);
+  assert.doesNotMatch(out, /[A-Za-z]{2,}/);
+  assert.match(out, /крейзи|таун/i);
+  assert.match(out, /баттер|флай/i);
   assert.match(out, /двадцать первом году/i);
   assert.match(out, /св\+ист|свист/i);
   assert.match(out, /кол\+он/i);
   assert.doesNotMatch(out, /<\[/);
-  assert.equal(trace.latinReplacements.length, 0);
+  assert.ok(trace.latinReplacements.length > 0);
 });
 
-test('prepareSileroTtsText strips apostrophe in Latin titles', () => {
+test('prepareSileroTtsText phonetic apostrophe titles', () => {
   const out = prepareSileroTtsText('трек Wake Me When It\u2019s Over звучит мощно.', {
     artist: 'The Cranberries',
     title: "Wake Me When It's Over",
   });
-  assert.match(out, /Its Over/i);
-  assert.doesNotMatch(out, /It's/i);
+  assert.doesNotMatch(out, /[A-Za-z]{2,}/);
+  assert.match(out, /вэйк|овер/i);
 });
 
-test('splitMixedLanguageForSilero keeps The Hit Co. as English', () => {
+test('splitMixedLanguageForSilero still splits Latin when mixed mode enabled', () => {
   const segs = splitMixedLanguageForSilero(
     'The Hit Co. — это группа, и их трэк My Favorite Game — отличный пример.',
     'The Hit Co.',

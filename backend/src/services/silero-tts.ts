@@ -41,7 +41,8 @@ export function resolveSileroVoice(): SileroVoiceId {
 
 function isSileroMixedLangEnabled(): boolean {
   const flag = process.env.SILERO_MIXED_LANG?.trim().toLowerCase();
-  return flag !== 'false' && flag !== '0' && flag !== 'off';
+  if (flag === 'true' || flag === '1' || flag === 'on' || flag === 'yes') return true;
+  return false;
 }
 
 /** Silero legacy /process warns above 1000 symbols; keep margin for SSML wrapper on server. */

@@ -27,7 +27,8 @@ function prosodyForStyle(style: TtsVoiceStyleId | undefined): { rate: string; pi
 
 /**
  * Silero v5_ru SSML — pauses + prosody (server wraps in outer <speak>).
- * Do NOT include Latin — navatusein normalizer transliterates it to «Тхе Хит Цо».
+ * Do NOT send raw Latin to Silero — navatusein letter-transliterates to garbage («Тхе Хит Цо»).
+ * BFF converts EN via CMU dict + G2P before synthesis.
  */
 export function wrapSileroRussianSsml(
   plainRussian: string,

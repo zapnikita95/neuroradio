@@ -8,6 +8,7 @@ import { applyRussianStressSafe, RUSSIAN_STRESS } from './russian-stress.js';
 import { runTtsQualityPass } from './tts-quality-pass.js';
 import {
   applyForeignPronunciation,
+  applyForeignPronunciationWithReplacements,
   preserveMusicProperNames,
 } from './tts-foreign-pronounce.js';
 import { stripYandexPauseMarkup } from './tts-azure-ssml.js';
@@ -155,7 +156,7 @@ export function prepareYandexTtsText(
 }
 
 /**
- * Plain Russian text for Silero: stress + sanitize, but keep Latin words (English as English).
+ * Silero v5_ru: CMU+G2P phonetic transliteration → pure Cyrillic (one voice, no Edge).
  */
 export function prepareSileroTtsTextTrace(
   script: string,
@@ -174,17 +175,21 @@ export function prepareSileroTtsTextTrace(
   text = expandQuotesForSpeech(text);
   text = normalizeLatinApostrophes(text);
   text = applyRussianStressSafe(text);
-  // Silero v5_ru: латиница остаётся английским текстом (без кириллической транслитерации).
-  const withLatin = stripApostrophesInLatinRuns(text);
-  const prepared = stripYandexPauseMarkup(withLatin);
+
+  const { text: cyrillic, replacements } = applyForeignPronunciationWithReplacements(
+    text,
+    artist,
+    title,
+  );
+  const prepared = stripYandexPauseMarkup(cyrillic);
 
   return {
     originalScript,
     artist,
     title,
     afterProperNames,
-    afterLatinTransliteration: withLatin,
-    latinReplacements: [],
+    afterLatinTransliteration: cyrillic,
+    latinReplacements: replacements,
     prepared,
   };
 }

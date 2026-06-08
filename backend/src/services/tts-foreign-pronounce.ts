@@ -1,4 +1,9 @@
 import { fixWikiTranslationArtifacts } from './wiki-translate-quality.js';
+import {
+  englishPhraseToRussianPhonetic,
+  englishWordToRussianPhonetic,
+  hasLatinAfterPhonetic,
+} from './en-phonetic-ru.js';
 
 const PHRASE_PRONUNCIATION_RU: Record<string, string> = {
   'zitti e buoni': 'Цитти э буони',
@@ -211,32 +216,7 @@ function transliterateSpanishWord(word: string): string {
 }
 
 function transliterateEnglishWord(word: string): string {
-  const bare = word.replace(/[^A-Za-z'’.\-]/g, '');
-  const lower = bare.toLowerCase().replace(/['’]/g, '');
-  if (EN_WORD_RU[lower]) return capitalizeLike(bare, EN_WORD_RU[lower]);
-
-  let out = lower;
-  out = out.replace(/ph/g, 'f');
-  out = out.replace(/tion/g, 'шн');
-  out = out.replace(/sion/g, 'жн');
-  out = out.replace(/ight/g, 'айт');
-  out = out.replace(/ough/g, 'аф');
-  out = out.replace(/ee/g, 'и');
-  out = out.replace(/oo/g, 'у');
-  out = out.replace(/ea/g, 'и');
-  out = out.replace(/ou/g, 'ау');
-  out = out.replace(/ow/g, 'ау');
-  out = out.replace(/th/g, 'th');
-  out = out.replace(/sh/g, 'ш');
-  out = out.replace(/ch/g, 'ч');
-  out = out.replace(/wh/g, 'у');
-  out = out.replace(/wr/g, 'р');
-  out = out.replace(/kn/g, 'н');
-  out = out.replace(/mb$/g, 'm');
-  if (/[A-Za-z]/.test(out)) {
-    return spellLatinWordPhonetic(bare);
-  }
-  return capitalizeLike(bare, out);
+  return englishWordToRussianPhonetic(word);
 }
 
 export function latinPhraseToRussianTts(phrase: string, langHint?: ForeignLang): string {
@@ -247,6 +227,9 @@ export function latinPhraseToRussianTts(phrase: string, langHint?: ForeignLang):
   if (PHRASE_PRONUNCIATION_RU[key]) return PHRASE_PRONUNCIATION_RU[key];
 
   const lang = langHint ?? detectForeignLang(trimmed);
+  if (lang === 'en') {
+    return englishPhraseToRussianPhonetic(trimmed);
+  }
   const words = trimmed.split(/\s+/);
   const mapped = words.map((word) => {
     if (word === '&') return 'энд';
@@ -254,47 +237,45 @@ export function latinPhraseToRussianTts(phrase: string, langHint?: ForeignLang):
     const punct = word.match(/[.!?…;:]+$/)?.[0] ?? '';
     const core = punct ? word.slice(0, -punct.length) : word;
     const wl = core.toLowerCase().replace(/['']/g, '');
-    if (EN_WORD_RU[wl]) return capitalizeLike(core, EN_WORD_RU[wl]) + punct;
+    if (EN_WORD_RU[wl]) return capitalizeLike(core, EN_WORD_RU[wl]!) + punct;
     if (lang === 'it') return transliterateItalianWord(word);
     if (lang === 'es') return transliterateSpanishWord(word);
-    const t = transliterateEnglishWord(core);
-    const body = /[A-Za-z]/.test(t) ? spellLatinWordPhonetic(core) : t;
-    return capitalizeLike(core, body) + punct;
+    return transliterateEnglishWord(word);
   });
   return mapped.join(' ');
 }
 
 const LATIN_CHAR_RU: Record<string, string> = {
-  a: 'а',
-  b: 'б',
-  c: 'к',
-  d: 'д',
+  a: 'эй',
+  b: 'би',
+  c: 'си',
+  d: 'ди',
   e: 'и',
-  f: 'ф',
-  g: 'г',
-  h: 'х',
-  i: 'и',
-  j: 'дж',
-  k: 'к',
-  l: 'л',
-  m: 'м',
-  n: 'н',
-  o: 'о',
-  p: 'п',
-  q: 'к',
-  r: 'р',
-  s: 'с',
-  t: 'т',
-  u: 'у',
-  v: 'в',
-  w: 'в',
-  x: 'кс',
-  y: 'и',
-  z: 'з',
+  f: 'эф',
+  g: 'джи',
+  h: 'эйч',
+  i: 'ай',
+  j: 'джей',
+  k: 'кей',
+  l: 'эл',
+  m: 'эм',
+  n: 'эн',
+  o: 'оу',
+  p: 'пи',
+  q: 'кью',
+  r: 'ар',
+  s: 'эс',
+  t: 'ти',
+  u: 'ю',
+  v: 'ви',
+  w: 'дабл-ю',
+  x: 'икс',
+  y: 'уай',
+  z: 'зи',
 };
 
-/** Last resort — no Latin left for Yandex SSML letter-by-letter. */
-function spellLatinWordPhonetic(word: string): string {
+/** Single isolated Latin letter (B-side) — letter name, not «б». */
+function spellLatinLetterName(word: string): string {
   let out = '';
   for (const ch of word) {
     if (/[A-Za-z]/.test(ch)) {
@@ -321,7 +302,8 @@ function ensureAllLatinTransliterated(text: string): string {
         const key = match.toLowerCase().replace(/\s*&\s*/g, ' and ');
         if (PHRASE_PRONUNCIATION_RU[key]) return PHRASE_PRONUNCIATION_RU[key]!;
         const ru = lookupPhraseTts(match.replace(/\s*&\s*/g, ' and '));
-        return /[A-Za-zÀ-ÿ]/.test(ru) ? spellLatinWordPhonetic(match) : ru;
+        if (hasLatinAfterPhonetic(ru)) return englishPhraseToRussianPhonetic(match);
+        return ru;
       },
     );
     if (next === result) break;
@@ -330,7 +312,7 @@ function ensureAllLatinTransliterated(text: string): string {
   return result.replace(/[A-Za-zÀ-ÿ]+/g, (match) => {
     const key = match.toLowerCase();
     if (PHRASE_PRONUNCIATION_RU[key]) return PHRASE_PRONUNCIATION_RU[key]!;
-    return spellLatinWordPhonetic(match);
+    return englishWordToRussianPhonetic(match);
   });
 }
 

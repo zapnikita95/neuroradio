@@ -13,6 +13,7 @@
     "test:gemini:prod": "node scripts/test-production-gemini.mjs",
     "test:quality": "npm run build && node scripts/test-story-quality.mjs",
     "test:tts": "npm run build && node scripts/test-tts-pipeline.mjs",
+    "test:en-phonetic": "npm run build && node scripts/test-en-phonetic-ru.mjs",
     "test:tts:voices": "npm run build && node scripts/test-all-voices-tts.mjs",
     "test:fact-sources": "npm run build && node scripts/benchmark-fact-sources.mjs"
   },
@@ -24,12 +25,14 @@
   ],
   "license": "MIT",
   "dependencies": {
+    "cmu-pronouncing-dictionary": "^3.0.0",
     "cors": "^2.8.5",
     "dotenv": "^16.4.7",
     "edge-tts-universal": "^1.4.0",
     "express": "^4.21.2",
     "node-fetch": "^3.3.2",
     "pg": "^8.13.1",
+    "phonemize": "^1.2.0",
     "uuid": "^11.0.5"
   },
   "devDependencies": {
