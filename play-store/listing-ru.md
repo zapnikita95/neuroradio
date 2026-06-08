@@ -107,8 +107,17 @@ https://www.efir-ai.ru/docs/delete-account.html
 # или: cd android && .\gradlew bundleRelease
 ```
 
-**Перед каждой загрузкой в Play** — подними `versionCode` в `android/app/build.gradle.kts` (Play не принимает уже использованный код). Сейчас: **85** / **1.5.47**.
+**Сборка AAB (Windows, versionCode сам +1 каждый раз):**
 
-Сборка: `powershell -File scripts/build-play-aab.ps1` → **`efir-ai.aab`** в корне репо.
+```powershell
+cd "C:\Users\1\OneDrive\Desktop\Music story"
+.\scripts\build-play-aab.ps1
+```
 
-Внутреннее / закрытое тестирование → Создать выпуск → Загрузить **`efir-ai.aab` из корня проекта** → убедись что versionCode **85** → Опубликовать.
+Или двойной клик по **`build-aab.bat`** в корне проекта.
+
+Результат: **`efir-ai.aab`** в корне. Перед загрузкой в Play проверь versionCode в выводе скрипта.
+
+**Перед каждой загрузкой в Play** — запусти сборку (скрипт сам поднимет `versionCode`). Сейчас в gradle: **85** / **1.5.47** (следующая сборка будет **86**).
+
+Внутреннее / закрытое тестирование → Создать выпуск → Загрузить **`efir-ai.aab` из корня проекта** → сверь versionCode в консоли Play → Опубликовать.
