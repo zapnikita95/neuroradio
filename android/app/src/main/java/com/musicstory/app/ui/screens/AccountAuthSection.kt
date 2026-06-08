@@ -60,9 +60,11 @@ private suspend fun finishAccountLogin(
     if (login.scrobbles.isNotEmpty()) {
         app.scrobbleRepository.mergeScrobbleEntries(login.scrobbles)
     }
+    app.storyRepository.dedupeStoryHistory()
     val url = app.settingsDataStore.backendUrl.first()
     if (url.isNotBlank()) {
         app.syncAccountDataWithServer(url)
+        app.storyRepository.dedupeStoryHistory()
     }
 }
 

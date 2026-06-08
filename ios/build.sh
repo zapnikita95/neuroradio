@@ -40,5 +40,5 @@ if [[ -d "$APP" ]]; then
   echo "✓ Собрано: $APP"
   echo "  Установка в booted simulator:"
   echo "  xcrun simctl install booted \"$APP\""
-  echo "  xcrun simctl launch booted com.musicstory.app"
+  echo "  xcrun simctl launch booted com.efirai.myapp"
 fi

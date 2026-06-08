@@ -139,6 +139,7 @@ export function getAllowedCertFingerprints(): Set<string> {
   if (SECURITY.allowDebugCert) {
     allowed.add(normalizeCertSha256(DEBUG_CERT_SHA256));
     allowed.add(normalizeCertSha256(iosAttestationHash('com.musicstory.app', 'DEVELOPMENT')));
+    allowed.add(normalizeCertSha256(iosAttestationHash('com.efirai.myapp', 'DEVELOPMENT')));
   }
 
   const raw = process.env.ALLOWED_CERT_SHA256?.trim();
@@ -149,9 +150,10 @@ export function getAllowedCertFingerprints(): Set<string> {
     }
   }
 
-  const bundleId = getAllowedPackageName();
-  for (const teamId of getAllowedIosTeamIds()) {
-    allowed.add(normalizeCertSha256(iosAttestationHash(bundleId, teamId)));
+  for (const bundleId of getAllowedPackageNames()) {
+    for (const teamId of getAllowedIosTeamIds()) {
+      allowed.add(normalizeCertSha256(iosAttestationHash(bundleId, teamId)));
+    }
   }
   return allowed;
 }

@@ -227,7 +227,7 @@ private fun OnboardingApkFaqCard(
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
-    var expanded by remember { mutableStateOf(true) }
+    var expanded by remember { mutableStateOf(false) }
 
     GlassCard(
         modifier = modifier.fillMaxWidth(),

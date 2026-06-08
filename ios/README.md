@@ -79,5 +79,6 @@ npm run dev
 
 ## Подробнее
 
+- **[RELEASE.md](RELEASE.md)** — чеклист TestFlight / App Store / Spotify / Railway
 - [PLAN-06: iOS — ограничения, Spotify, ShazamKit](../docs/PLAN-06-ios.md)
 - [Корневой README](../README.md)

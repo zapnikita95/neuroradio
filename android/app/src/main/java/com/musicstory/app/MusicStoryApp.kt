@@ -125,6 +125,9 @@ class MusicStoryApp : Application() {
         scheduleBackgroundAuthRefresh()
         prefetchBackendAuth()
         prefetchAccountHistory()
+        appScope.launch {
+            storyRepository.dedupeStoryHistory()
+        }
     }
 
     private fun prefetchAccountHistory() {
@@ -145,7 +148,9 @@ class MusicStoryApp : Application() {
             if (login.scrobbles.isNotEmpty()) {
                 scrobbleRepository.mergeScrobbleEntries(login.scrobbles)
             }
+            storyRepository.dedupeStoryHistory()
             syncAccountDataWithServer(backendUrl)
+            storyRepository.dedupeStoryHistory()
         }
     }
 

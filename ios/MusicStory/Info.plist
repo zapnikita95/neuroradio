@@ -5,7 +5,7 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>ru</string>
 	<key>CFBundleDisplayName</key>
-	<string>Music Story</string>
+	<string>Эфир AI</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
@@ -32,10 +32,10 @@
 	<array>
 		<dict>
 			<key>CFBundleURLName</key>
-			<string>com.musicstory.app</string>
+			<string>com.efirai.myapp</string>
 			<key>CFBundleURLSchemes</key>
 			<array>
-				<string>musicstory</string>
+				<string>efirai</string>
 			</array>
 		</dict>
 	</array>

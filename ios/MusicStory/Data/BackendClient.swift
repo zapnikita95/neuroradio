@@ -112,12 +112,12 @@ final class BackendClient {
         let teamId = Bundle.main.object(forInfoDictionaryKey: "AppleTeamIdentifier") as? String ?? "DEVELOPMENT"
         let attestation = Self.iosAttestationHash(
             teamId: teamId,
-            bundleId: Bundle.main.bundleIdentifier ?? "com.musicstory.app"
+            bundleId: Bundle.main.bundleIdentifier ?? "com.efirai.myapp"
         )
 
         let payload: [String: Any] = [
             "install_id": existingInstallId,
-            "package_name": Bundle.main.bundleIdentifier ?? "com.musicstory.app",
+            "package_name": Bundle.main.bundleIdentifier ?? "com.efirai.myapp",
             "cert_sha256": attestation,
             "app_version": Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0",
             "platform": "ios",

@@ -38,6 +38,8 @@ class MediaMonitorService : Service() {
     private var listenCountJob: Job? = null
     private var lastTrackKey: String? = null
     private var lastTrackMatchKey: String? = null
+    private var dwellTrack: TrackInfo? = null
+    private var dwellStartedAtMs: Long = 0L
 
     override fun onCreate() {
         super.onCreate()
@@ -91,9 +93,18 @@ class MediaMonitorService : Service() {
                         val firstTrack = lastTrackMatchKey == null
                         val titleChanged = !firstTrack && lastTrackMatchKey != matchKey
                         if (titleChanged) {
+                            listenCountJob?.cancel()
+                            val finished = dwellTrack
+                            if (finished != null &&
+                                System.currentTimeMillis() - dwellStartedAtMs >= MIN_SCROBBLE_LISTEN_MS
+                            ) {
+                                serviceScope.launch { scrobbleIfNeeded(app, finished) }
+                            }
                             app.storyOrchestrator.onPlaybackTrackSkipped(track.title, track.artist)
-                            scheduleTrackCounted(app, track)
-                        } else if (firstTrack) {
+                        }
+                        if (titleChanged || firstTrack) {
+                            dwellTrack = track
+                            dwellStartedAtMs = System.currentTimeMillis()
                             scheduleTrackCounted(app, track)
                         }
                         lastTrackKey = key
@@ -243,6 +254,8 @@ class MediaMonitorService : Service() {
         const val NOTIFICATION_ID = 1001
         /** Auto-story only after this many seconds on the same track (even if scrobble counts on switch). */
         const val AUTO_STORY_MIN_DWELL_SEC = 10
+        /** Minimum listen time before counting a track when switching away early. */
+        const val MIN_SCROBBLE_LISTEN_MS = 5_000L
 
         @Volatile
         private var instance: MediaMonitorService? = null

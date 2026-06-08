@@ -85,7 +85,7 @@ final class SettingsStore: ObservableObject {
         specificGenres = defaults.stringArray(forKey: Keys.specificGenres) ?? []
         autoIntercept = defaults.object(forKey: Keys.autoIntercept) as? Bool ?? true
         spotifyClientId = defaults.string(forKey: Keys.spotifyClientId) ?? ""
-        spotifyRedirectURI = defaults.string(forKey: Keys.spotifyRedirectURI) ?? "musicstory://spotify-callback"
+        spotifyRedirectURI = defaults.string(forKey: Keys.spotifyRedirectURI) ?? "efirai://spotify-callback"
     }
 
     var installId: String {

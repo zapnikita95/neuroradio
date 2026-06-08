@@ -82,24 +82,49 @@ class StoryRepository(
     }
 
     private suspend fun insertHistoryEntryIfNew(entry: StoryHistoryEntry) {
+        storyHistoryDao.findLatestByTrackAndScript(entry.trackKey, entry.script)?.let { existing ->
+            mergeHistoryVoteAndServerId(existing, entry)
+            return
+        }
         val serverId = entry.serverId?.takeIf { it.isNotBlank() }
         if (serverId != null) {
             val existing = storyHistoryDao.findByServerId(serverId)
             if (existing != null) {
-                val remoteVote = entry.vote?.takeIf { it.isNotBlank() }
-                if (remoteVote != null && existing.vote != remoteVote) {
-                    storyHistoryDao.updateVote(existing.id, remoteVote)
-                }
+                mergeHistoryVoteAndServerId(existing, entry)
                 return
             }
-            if (storyHistoryDao.countByServerId(serverId) == 0) {
+            if (storyHistoryDao.countByServerId(serverId) == 0 &&
+                storyHistoryDao.countByTrackAndTime(entry.trackKey, entry.playedAt) == 0
+            ) {
                 storyHistoryDao.insert(entry)
             }
             return
         }
         if (storyHistoryDao.countByTrackAndTime(entry.trackKey, entry.playedAt) == 0) {
-            storyHistoryDao.insert(entry)
+            val recentCutoff = entry.playedAt - 60_000
+            if (storyHistoryDao.countRecentSameScript(entry.trackKey, entry.script, recentCutoff) == 0) {
+                storyHistoryDao.insert(entry)
+            }
         }
+    }
+
+    private suspend fun mergeHistoryVoteAndServerId(
+        existing: StoryHistoryEntry,
+        incoming: StoryHistoryEntry,
+    ) {
+        val remoteVote = incoming.vote?.takeIf { it.isNotBlank() }
+        if (remoteVote != null && existing.vote != remoteVote) {
+            storyHistoryDao.updateVote(existing.id, remoteVote)
+        }
+        val remoteServerId = incoming.serverId?.takeIf { it.isNotBlank() }
+        if (remoteServerId != null && existing.serverId.isNullOrBlank()) {
+            storyHistoryDao.updateServerId(existing.id, remoteServerId)
+        }
+    }
+
+    /** Remove rows duplicated by sync (same track, script and timestamp). */
+    suspend fun dedupeStoryHistory() {
+        storyHistoryDao.deleteDuplicateHistoryRows()
     }
 
     suspend fun mergeHistoryFromServer(baseUrl: String) {
@@ -844,7 +869,7 @@ class StoryRepository(
     }
 
     suspend fun recordStoryPlayed(track: TrackInfo, response: StoryResponse, angle: String?) {
-        storyHistoryDao.insert(
+        insertHistoryEntryIfNew(
             StoryHistoryEntry(
                 trackKey = track.displayKey,
                 artist = track.artist,
@@ -889,7 +914,7 @@ class StoryRepository(
             script = response.script,
             angle = angle,
         )
-        storyHistoryDao.insert(entry)
+        insertHistoryEntryIfNew(entry)
         scopePushSyncHistory(entry)
     }
 

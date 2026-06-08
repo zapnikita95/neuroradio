@@ -17,6 +17,12 @@ import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.withStyle
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.LocalMinimumInteractiveComponentEnforcement
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.unit.dp
 import com.musicstory.app.ui.theme.CreamText
 import com.musicstory.app.ui.theme.GoldBright
@@ -30,6 +36,7 @@ object LegalUrls {
     const val CONSENT = "$BASE/consent.html"
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun LegalCheckboxRow(
     checked: Boolean,
@@ -40,20 +47,26 @@ fun LegalCheckboxRow(
 ) {
     Row(
         modifier = modifier.fillMaxWidth(),
-        verticalAlignment = Alignment.Top,
-        horizontalArrangement = Arrangement.spacedBy(4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        Checkbox(
-            checked = checked,
-            onCheckedChange = onCheckedChange,
-            enabled = enabled,
-            colors = CheckboxDefaults.colors(
-                checkedColor = GoldBright,
-                uncheckedColor = MutedLavender,
-                checkmarkColor = CreamText,
-            ),
-        )
-        Column(modifier = Modifier.weight(1f)) {
+        CompositionLocalProvider(LocalMinimumInteractiveComponentEnforcement provides false) {
+            Checkbox(
+                modifier = Modifier.size(24.dp),
+                checked = checked,
+                onCheckedChange = onCheckedChange,
+                enabled = enabled,
+                colors = CheckboxDefaults.colors(
+                    checkedColor = GoldBright,
+                    uncheckedColor = MutedLavender,
+                    checkmarkColor = CreamText,
+                ),
+            )
+        }
+        Box(
+            modifier = Modifier.weight(1f),
+            contentAlignment = Alignment.CenterStart,
+        ) {
             label()
         }
     }

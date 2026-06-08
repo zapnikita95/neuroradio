@@ -34,7 +34,7 @@ struct TellStoryEntry: TimelineEntry {
 
 struct TellStoryWidgetView: View {
     var body: some View {
-        Link(destination: URL(string: "musicstory://tell-story")!) {
+        Link(destination: URL(string: "efirai://tell-story")!) {
             ZStack {
                 ContainerRelativeShape()
                     .fill(

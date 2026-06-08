@@ -25,6 +25,14 @@ interface StoryHistoryDao {
     )
     suspend fun findLatestByTrackAndScript(trackKey: String, script: String): StoryHistoryEntry?
 
+    @Query(
+        """
+        SELECT COUNT(*) FROM story_history
+        WHERE trackKey = :trackKey AND script = :script AND playedAt >= :minPlayedAt
+        """,
+    )
+    suspend fun countRecentSameScript(trackKey: String, script: String, minPlayedAt: Long): Int
+
     @Insert
     suspend fun insert(entry: StoryHistoryEntry)
 
@@ -62,6 +70,17 @@ interface StoryHistoryDao {
 
     @Query("SELECT COUNT(*) FROM story_history WHERE trackKey = :trackKey")
     suspend fun countForTrack(trackKey: String): Int
+
+    @Query(
+        """
+        DELETE FROM story_history
+        WHERE id NOT IN (
+            SELECT MIN(id) FROM story_history
+            GROUP BY trackKey, script, playedAt
+        )
+        """,
+    )
+    suspend fun deleteDuplicateHistoryRows()
 
     @Query(
         """
