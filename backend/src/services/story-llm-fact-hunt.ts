@@ -424,6 +424,89 @@ export async function huntReferenceFactWithLlm(
   return null;
 }
 
+interface MajorCatalogFactJson {
+  fact?: string;
+  scope?: 'track' | 'album' | 'artist';
+  reject?: boolean;
+  reason?: string;
+}
+
+/** Major catalog artist, all web/wiki sources dead — one widely documented fact (no snippet evidence). */
+export async function huntMajorArtistCatalogFact(
+  input: Omit<LlmFactHuntInput, 'rawSnippets'>,
+): Promise<SelectedReferenceFact | null> {
+  const primary = resolveFactHuntProvider(input.preferredProvider);
+  if (!hasLlmKeyForProvider(primary)) return null;
+
+  const system = `Ты — музыкальный исследователь. Артист из мирового каталога (major). Ответь ТОЛЬКО JSON.
+Нужен ОДИН общеизвестный, проверяемый факт именно про указанный трек или его создание/запись/клип/значение.
+Не выдумывай частные истории без опоры на публичную биографию. Не chart trivia («хит №1» без контекста).
+Успех: {"fact":"...","scope":"track"|"album"|"artist"}
+Отказ: {"reject":true,"reason":"..."}`;
+
+  const user = [
+    `Артист: ${input.artist}`,
+    `Трек: ${input.title}`,
+    input.year ? `Год (MusicBrainz): ${input.year}` : '',
+    input.genre ? `Жанр: ${input.genre}` : '',
+    '',
+    'Верни один интересный факт на русском для озвучки радио-истории.',
+  ]
+    .filter(Boolean)
+    .join('\n');
+
+  const openRouterModels =
+    primary === 'openrouter'
+      ? [
+          ...new Set(
+            [
+              ...(input.openRouterModels ?? []),
+              input.openRouterModel,
+            ].filter((m): m is string => Boolean(m?.trim())),
+          ),
+        ]
+      : [];
+
+  const models = primary === 'openrouter' && openRouterModels.length > 0 ? openRouterModels : [undefined];
+
+  for (const modelId of models) {
+    try {
+      let raw = '';
+      if (primary === 'openrouter') {
+        raw = await callOpenRouterFactHunt(system, user, modelId!);
+      } else if (primary === 'groq') {
+        raw = await callGroqFactHunt(system, user);
+      } else {
+        raw = await callGeminiFactHunt(system, user);
+      }
+      const parsed = parseFactHuntJson(raw) as MajorCatalogFactJson | null;
+      if (!parsed || parsed.reject) continue;
+      const fact = parsed.fact?.trim();
+      if (!fact || fact.length < 35) continue;
+      if (WEAK_TRIVIA_PATTERNS.some((p) => p.test(fact))) continue;
+      if (isBoringFact(fact)) continue;
+      if (!factMentionsArtist(fact, input.artist)) continue;
+      if (!factMentionsTitle(fact, input.title) && !hasTrackContextSignal(fact)) continue;
+      if (interestScore(fact) < MIN_PICK_INTEREST_SCORE) continue;
+      if (factNamesForeignEntity(fact, input.artist, input.title)) continue;
+      const scope = parsed.scope === 'artist' ? 'artist' : parsed.scope === 'album' ? 'album' : 'track';
+      console.log(`[fact-hunt-catalog] ok model=${modelId ?? primary} fact="${fact.slice(0, 90)}"`);
+      return {
+        fact,
+        scope,
+        scopeLabelRu: scope === 'track' ? 'трек' : scope === 'album' ? 'альбом' : 'группа/артист',
+        interestScore: interestScore(fact),
+        interestRating: interestRating10(fact),
+      };
+    } catch (err) {
+      console.warn(
+        `[fact-hunt-catalog] ${primary}${modelId ? ` model=${modelId}` : ''}: ${err instanceof Error ? err.message.slice(0, 100) : err}`,
+      );
+    }
+  }
+  return null;
+}
+
 export function explainLlmFactSelection(selected: SelectedReferenceFact): string {
   return `scope=${selected.scope}, interestScore=${selected.interestScore}, interest=${selected.interestRating}/10, source=llm-fact-hunt, backstory=${/letter|apolog|family|mother|father|daughter|son|wife|husband|письм|извин|семь/i.test(selected.fact)}`;
 }

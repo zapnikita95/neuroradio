@@ -16,6 +16,7 @@ import { fetchArtistWikiLead } from './wikipedia-lead.js';
 import { inferRuRegionalContext } from './metadata-facts.js';
 import { fetchWebSearchFactSnippets, fetchBackstoryWebSnippets } from './web-search-facts.js';
 import { acceptSearchGroundedSnippet, acceptIndieEmergingSnippet } from './web-snippet-accept.js';
+import { lookupCuratedFact } from './curated-facts.js';
 const USER_AGENT = 'MusicStoryBFF/1.0 (contact@example.com)';
 const RAW_SNIPPET_MIN_LEN = 30;
 const RAW_SNIPPET_MAX = 12;
@@ -552,7 +553,7 @@ export async function fetchAggregatedFactContext(
         [],
         8_000,
       ),
-      fetchWithCap('wiki-fast-track', () => fetchFastTrackWikiFacts(artist, title), [], 8_000),
+      fetchWithCap('wiki-fast-track', () => fetchFastTrackWikiFacts(artist, title), [], 12_000),
     ]);
   const wikiLeadBundle = wikiLead ? wikiLeadToFacts(wikiLead, artist, title) : EMPTY_WIKI;
   if (wikiLeadBundle.trackFacts.length + wikiLeadBundle.artistFacts.length > 0) {
@@ -663,6 +664,20 @@ export async function fetchEmergencyFactRescue(
   title: string,
   existingSnippets: string[] = [],
 ): Promise<AggregatedFactContext> {
+  const curated = lookupCuratedFact(artist, title);
+  if (curated) {
+    console.log(`[facts] emergency curated hit "${artist}" — "${title}"`);
+    const bundle: ReferenceFactBundle =
+      curated.scope === 'track'
+        ? { trackFacts: [curated.fact], artistFacts: [] }
+        : { trackFacts: [], artistFacts: [curated.fact] };
+    return {
+      bundle,
+      rawSnippets: [curated.fact],
+      snippetSources: ['wiki'],
+    };
+  }
+
   console.log(`[facts] emergency rescue for "${artist}" — "${title}"`);
   const [wikiFast, webBack] = await Promise.all([
     fetchFastTrackWikiFacts(artist, title),

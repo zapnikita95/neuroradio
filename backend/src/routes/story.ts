@@ -24,12 +24,13 @@ import {
   reserveSeedForUser,
 } from '../services/fact-user-service.js';
 import { ingestFacts, factFingerprint } from '../services/fact-bank.js';
-import { resolveArtistTier } from '../services/artist-notability.js';
+import { resolveArtistTier, isCatalogMajorArtist } from '../services/artist-notability.js';
 import { buildMetadataFallbackFacts, countGroundedFacts, isMetadataOnlyFallbackFact } from '../services/metadata-facts.js';
 import { factAppliesToRequest } from '../services/fact-relevance.js';
 import {
   explainLlmFactSelection,
   huntReferenceFactWithLlm,
+  huntMajorArtistCatalogFact,
   shouldRunLlmFactHunt,
   explainFactHuntDecision,
 } from '../services/story-llm-fact-hunt.js';
@@ -455,8 +456,8 @@ router.post('/full', extractClientSecrets, validateStoryFullBody, storyFullRateL
       const firstFetchMs = timing.totalMs();
       if (trackFactCount + artistFactCount === 0) {
         const skipRetry =
-          firstFetchMs >= 18_000 ||
-          countGroundedFacts(factCtx.bundle) > 0 ||
+          trackFactCount + artistFactCount > 0 ||
+          (firstFetchMs >= 18_000 && factCtx.rawSnippets.length >= 2) ||
           hasActionableSnippets(factCtx.rawSnippets, metadata.artist, metadata.title);
         if (skipRetry) {
           console.warn(
@@ -814,6 +815,34 @@ router.post('/full', extractClientSecrets, validateStoryFullBody, storyFullRateL
             console.log(
               `[facts] emergency snippet salvage for "${metadata.artist}" — "${metadata.title}"`,
             );
+          }
+        }
+        if (!selectedFact) {
+          if (isCatalogMajorArtist(metadata.artist)) {
+            const factModels =
+              ownLlmKey && openrouterModelFact.includes('/')
+                ? [openrouterModelFact]
+                : resolveOpenRouterFactModelsForTier(userTier, openrouterModelRequested);
+            console.log(
+              `[fact-hunt-catalog] start artist="${metadata.artist}" title="${metadata.title}" models=${factModels.join(' → ')}`,
+            );
+            const catalogFact = await huntMajorArtistCatalogFact({
+              artist: metadata.artist,
+              title: metadata.title,
+              year: metadata.year,
+              genre: metadata.genre,
+              preferredProvider: llmProvider,
+              openRouterModel: openrouterModelFact,
+              openRouterModels: factModels,
+            });
+            if (catalogFact) {
+              selectedFact = catalogFact;
+              referenceFacts = [catalogFact.fact];
+              ingestFacts(metadata.artist, metadata.title, [
+                { fact: catalogFact.fact, scope: catalogFact.scope, source: 'llm' },
+              ]);
+              console.log(formatFactPickLog(selectedFact, 'llm') + ' (major-catalog)');
+            }
           }
         }
         if (!selectedFact) {
