@@ -40,6 +40,7 @@ import com.musicstory.app.ui.theme.GoldBright
 import com.musicstory.app.ui.theme.GoldWarm
 import com.musicstory.app.ui.theme.LiveGreen
 import com.musicstory.app.ui.theme.MutedLavender
+import com.musicstory.app.util.StoryLog
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
@@ -56,17 +57,25 @@ private suspend fun finishAccountLogin(
     if (!app.settingsDataStore.homeTourCompleted.first()) {
         app.settingsDataStore.setHomeTourPending(true)
     }
-    if (login.history.isNotEmpty()) {
-        app.storyRepository.mergeHistoryEntries(login.history)
+    runCatching {
+        if (login.history.isNotEmpty()) {
+            app.storyRepository.mergeHistoryEntries(login.history)
+        }
+        if (login.scrobbles.isNotEmpty()) {
+            app.scrobbleRepository.mergeScrobbleEntries(login.scrobbles)
+        }
+        app.storyRepository.dedupeStoryHistory()
+    }.onFailure { err ->
+        StoryLog.e("Account login: cloud merge failed (login kept)", err)
     }
-    if (login.scrobbles.isNotEmpty()) {
-        app.scrobbleRepository.mergeScrobbleEntries(login.scrobbles)
-    }
-    app.storyRepository.dedupeStoryHistory()
     val url = app.settingsDataStore.backendUrl.first()
     if (url.isNotBlank()) {
-        app.syncAccountDataWithServer(url)
-        app.storyRepository.dedupeStoryHistory()
+        runCatching {
+            app.syncAccountDataWithServer(url)
+            app.storyRepository.dedupeStoryHistory()
+        }.onFailure { err ->
+            StoryLog.e("Account login: sync failed (login kept)", err)
+        }
     }
 }
 
@@ -333,12 +342,14 @@ fun AccountEmailLoginContent(
         } else {
             OutlinedTextField(
                 value = code,
-                onValueChange = { code = it.filter { ch -> ch.isDigit() }.take(6) },
+                onValueChange = { raw ->
+                    code = raw.filter { ch -> ch.isDigit() }.take(6)
+                },
                 label = { Text(context.getString(R.string.settings_auth_code)) },
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true,
                 enabled = !busy,
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Ascii),
                 colors = fieldColors,
                 shape = RoundedCornerShape(14.dp),
             )
@@ -354,16 +365,22 @@ fun AccountEmailLoginContent(
                     scope.launch {
                         busy = true
                         message = null
-                        val url = app.settingsDataStore.backendUrl.first()
-                        val login = app.accountAuthManager.verifyEmailLogin(url, email, code)
-                        if (login.profile != null) {
-                            finishAccountLogin(app, login)
-                            message = context.getString(R.string.settings_auth_success)
-                            onLoggedIn()
-                        } else {
-                            message = login.error ?: context.getString(R.string.settings_auth_verify_failed)
+                        try {
+                            val url = app.settingsDataStore.backendUrl.first()
+                            val login = app.accountAuthManager.verifyEmailLogin(url, email, code)
+                            if (login.profile != null) {
+                                finishAccountLogin(app, login)
+                                message = context.getString(R.string.settings_auth_success)
+                                onLoggedIn()
+                            } else {
+                                message = login.error ?: context.getString(R.string.settings_auth_verify_failed)
+                            }
+                        } catch (err: Exception) {
+                            StoryLog.e("Email verify failed", err)
+                            message = context.getString(R.string.settings_auth_verify_failed)
+                        } finally {
+                            busy = false
                         }
-                        busy = false
                     }
                 },
             )

@@ -109,7 +109,8 @@ class ScrobbleRepository(
         val serverId = entry.serverId?.takeIf { it.isNotBlank() }
         if (serverId != null && scrobbleDao.countByServerId(serverId) > 0) return
         if (scrobbleDao.countByTrackAndTime(entry.artist, entry.title, entry.scrobbledAt) > 0) return
-        scrobbleDao.insert(entry)
+        runCatching { scrobbleDao.insert(entry) }
+            .onFailure { com.musicstory.app.util.StoryLog.w("Scrobble insert skipped: ${it.message}") }
     }
 
     suspend fun mergeFromServer(baseUrl: String) {

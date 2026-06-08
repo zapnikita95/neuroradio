@@ -97,14 +97,16 @@ class StoryRepository(
             if (storyHistoryDao.countByServerId(serverId) == 0 &&
                 storyHistoryDao.countByTrackAndTime(entry.trackKey, entry.playedAt) == 0
             ) {
-                storyHistoryDao.insert(entry)
+                runCatching { storyHistoryDao.insert(entry) }
+                    .onFailure { StoryLog.w("History insert skipped: ${it.message}") }
             }
             return
         }
         if (storyHistoryDao.countByTrackAndTime(entry.trackKey, entry.playedAt) == 0) {
             val recentCutoff = entry.playedAt - 60_000
             if (storyHistoryDao.countRecentSameScript(entry.trackKey, entry.script, recentCutoff) == 0) {
-                storyHistoryDao.insert(entry)
+                runCatching { storyHistoryDao.insert(entry) }
+                    .onFailure { StoryLog.w("History insert skipped: ${it.message}") }
             }
         }
     }
@@ -115,11 +117,18 @@ class StoryRepository(
     ) {
         val remoteVote = incoming.vote?.takeIf { it.isNotBlank() }
         if (remoteVote != null && existing.vote != remoteVote) {
-            storyHistoryDao.updateVote(existing.id, remoteVote)
+            runCatching { storyHistoryDao.updateVote(existing.id, remoteVote) }
+                .onFailure { StoryLog.w("History vote merge skipped: ${it.message}") }
         }
         val remoteServerId = incoming.serverId?.takeIf { it.isNotBlank() }
         if (remoteServerId != null && existing.serverId.isNullOrBlank()) {
-            storyHistoryDao.updateServerId(existing.id, remoteServerId)
+            val owner = storyHistoryDao.findByServerId(remoteServerId)
+            if (owner != null && owner.id != existing.id) {
+                StoryLog.w("History serverId merge skipped: $remoteServerId already linked")
+                return
+            }
+            runCatching { storyHistoryDao.updateServerId(existing.id, remoteServerId) }
+                .onFailure { StoryLog.w("History serverId merge failed: ${it.message}") }
         }
     }
 
