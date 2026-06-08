@@ -184,9 +184,31 @@ export const RUSSIAN_STRESS: Record<string, string> = {
   записывая: 'запис+ывая',
   придумывая: 'прид+умывая',
   смешивая: 'смеш+ивая',
+  // nu metal — «ню», ударение на «е» (не «ну» + «метал»).
+  'ну-метал': 'ню м+етал',
+  'ну-метала': 'ню м+етала',
+  'ну-металу': 'ню м+еталу',
+  'ну-металом': 'ню м+еталом',
+  'ну-метале': 'ню м+етале',
+  'ну-металы': 'ню м+еталы',
+  'ню-метал': 'ню м+етал',
+  'ню-металом': 'ню м+еталом',
 };
 
 export const FORCE_RESTRESS = new Set(Object.keys(RUSSIAN_STRESS));
+
+/** nu metal / ну-метал — «ню» (англ. nu), ударение на «е»: ню м+еталом и склонения. */
+export function normalizeNuMetalPronunciation(text: string): string {
+  let result = text.replace(/\bnu[\s-]metals?\b/gi, (match) =>
+    /\bs\b/i.test(match) ? 'ню м+еталы' : 'ню м+етал',
+  );
+  // \b не работает с кириллицей в JS — явные границы слова.
+  result = result.replace(
+    /(?<![а-яёА-ЯЁ])(?:ну|ню)[\s-]+?м([её])тал(ами|ах|ам|ом|ов|а|у|е|ы|)(?![а-яёА-ЯЁ])/gi,
+    (_full, _vowel, ending) => `ню м+етал${ending}`,
+  );
+  return result;
+}
 
 export function stripStressMarks(word: string): string {
   return word.replace(/\+/g, '');
@@ -205,7 +227,11 @@ export function applyStressToWord(word: string): string {
     return pronunciation;
   }
   const override = RUSSIAN_STRESS[lower];
-  if (!override) return bare;
+  if (!override) {
+    // Ударение из normalizeNuMetalPronunciation (м+еталом) — не снимать.
+    if (word.includes('+')) return word;
+    return bare;
+  }
 
   if (bare[0] === bare[0].toUpperCase() && bare[0] !== bare[0].toLowerCase()) {
     return override.charAt(0).toUpperCase() + override.slice(1);
@@ -225,8 +251,9 @@ const LATIN_SLOT_END = '\uE015';
 
 /** Латиница не трогается ударениями и ё-нормализацией — иначе Hollywood → Hollywуd. */
 export function applyRussianStressSafe(text: string): string {
+  const prepped = normalizeNuMetalPronunciation(text);
   const slots: string[] = [];
-  const masked = text.replace(LATIN_RUN_RE, (match) => {
+  const masked = prepped.replace(LATIN_RUN_RE, (match) => {
     const idx = slots.length;
     slots.push(match);
     return `${LATIN_SLOT}${idx}${LATIN_SLOT_END}`;

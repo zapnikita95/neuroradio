@@ -50,6 +50,8 @@ const PHRASE_PRONUNCIATION_RU: Record<string, string> = {
   'twenty one pilots': 'Твэнти Уан Пайлотс',
   'crazy town': 'Крейзи Таун',
   butterfly: 'Баттерфлай',
+  'nu metal': 'ню метал',
+  'nu-metal': 'ню метал',
 };
 
 const EN_WORD_RU: Record<string, string> = {

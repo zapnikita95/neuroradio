@@ -2,7 +2,7 @@
  * Validates Russian stress dictionary for Yandex TTS.
  * Run: npm run build && node scripts/test-stress.mjs
  */
-import { applyRussianStress, RUSSIAN_STRESS } from '../dist/services/russian-stress.js';
+import { applyRussianStress, applyRussianStressSafe, RUSSIAN_STRESS } from '../dist/services/russian-stress.js';
 import { prepareYandexTtsText } from '../dist/services/tts-markup.js';
 
 const MUST_MATCH = {
@@ -48,6 +48,21 @@ console.log('\n=== Story sample ===');
 const sample =
   'Я стоял у мониторов, звукорежиссёры краснели от свиста в колонках, инженер потом говорил, что микрофон еле остыл.';
 console.log(prepareYandexTtsText(sample, {}));
+
+console.log('\n=== nu metal pronunciation ===');
+const nuSamples = {
+  'мостом между ну-металом и поп-музыкой': 'ню м+еталом',
+  'стиль ню метала': 'ню м+етала',
+  'от ну-металу к попу': 'ню м+еталу',
+};
+for (const [input, needle] of Object.entries(nuSamples)) {
+  const got = applyRussianStressSafe(input);
+  if (!got.includes(needle)) {
+    fail(`nu metal "${input}": expected "${needle}" in "${got}"`);
+  } else {
+    ok(`${input} → …${needle}…`);
+  }
+}
 
 console.log('\n=== Dictionary size ===');
 ok(`${Object.keys(RUSSIAN_STRESS).length} stress entries`);
