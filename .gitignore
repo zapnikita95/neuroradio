@@ -32,6 +32,7 @@ Thumbs.db
 # Build artifacts (Play: efir-ai.aab in repo root; debug APK optional)
 *.apk
 !efir-ai.apk
+!website/efir-ai.apk
 *.aab
 !efir-ai.aab
 

@@ -20,7 +20,7 @@ import {
 } from '../services/silero-tts.js';
 import { SILERO_VOICE_PRESETS } from '../services/silero-voices.js';
 import { hasYandexCredentials } from '../services/yandex-tts.js';
-import { getPublicDownloadLinks } from '../services/github-downloads.js';
+import { getPublicDownloadLinks, getSiteApkUrl } from '../services/github-downloads.js';
 import { getPublicAuthConfig } from '../services/auth-config.js';
 import {
   getWebCabinetStatus,
@@ -41,7 +41,7 @@ router.get('/downloads', async (_req: Request, res: Response) => {
     res.status(503).json({
       repo: 'zapnikita95/neuroradio',
       tag: null,
-      apkUrl: null,
+      apkUrl: getSiteApkUrl(),
       extensionUrl: null,
       publishedAt: null,
       error: 'releases_unavailable',

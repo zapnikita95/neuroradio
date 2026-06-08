@@ -99,7 +99,7 @@ router.post('/token', rateLimitAuth, (req: Request, res: Response) => {
   const allowedCerts = getAllowedCertFingerprints();
   if (allowedCerts.size === 0 || !allowedCerts.has(normalizedCert)) {
     console.warn(
-      `[auth] 403 cert not allowed install=${installId.slice(0, 8)} cert=${normalizedCert.slice(0, 12)}…`,
+      `[auth] 403 cert not allowed install=${installId.slice(0, 8)} cert=${normalizedCert} — add to ALLOWED_CERT_SHA256 (Play App signing key for Store installs)`,
     );
     res.status(403).json({ error: 'Forbidden' });
     return;

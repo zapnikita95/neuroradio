@@ -41,6 +41,9 @@ export function serveWebsite(dir: string): express.RequestHandler {
       res.setHeader('X-Content-Type-Options', 'nosniff');
       if (/\.(css|js|svg|png|jpg|jpeg|webp|woff2?)$/i.test(filePath)) {
         res.setHeader('Cache-Control', 'public, max-age=86400');
+      } else if (/\.apk$/i.test(filePath)) {
+        res.setHeader('Content-Type', 'application/vnd.android.package-archive');
+        res.setHeader('Cache-Control', 'public, max-age=300');
       } else {
         res.setHeader('Cache-Control', 'public, max-age=300');
       }

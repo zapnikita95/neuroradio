@@ -80,13 +80,29 @@ curl -s https://ТВОЙ-DOMAIN.up.railway.app/health
 - `PROXY_SECRET` **удали**, если остался — больше не используется
 - **Ничего не меняй раз в месяц** — приложение само обновляет JWT в фоне
 
-### Опционально (только Play Store release)
+### Release / Play Store — авторизация (обязательно)
 
-Когда выложишь в Store с **другим** signing key — добавь release fingerprint в `ALLOWED_CERT_SHA256` **один раз**:
+Сборки **не debug** подписаны **upload-ключом** (уже в коде бэкенда) или **ключом подписи приложения Google Play** (для установок из Store).
 
-```powershell
-keytool -list -v -keystore path\to\release.keystore -alias YOUR_ALIAS
+1. Play Console → **Настройка → Целостность приложения → Подписание приложений**
+2. Скопируй **SHA-256 сертификата ключа подписи приложения** (App signing key certificate)
+3. Railway → Variables:
+
 ```
+ALLOWED_CERT_SHA256=вставь_sha256_из_play_console
+```
+
+Несколько отпечатков через запятую: upload + Play.
+
+Без Play SHA-256 **вход по email/Telegram не работает** в версии из Google Play (403 Forbidden на `/v1/auth/token`).
+
+Upload keystore SHA-256 (уже в коде, для sideload release APK):
+
+```
+6C:2A:59:AB:FB:AC:C6:B8:28:D4:C0:32:1B:E5:F8:48:05:69:88:55:86:77:E4:12:3D:21:62:00:C5:31:B0:09
+```
+
+### Опционально (дополнительные ключи)
 
 ## 3. URL
 

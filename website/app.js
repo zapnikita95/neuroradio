@@ -10,7 +10,7 @@
   var API_BASE = (window.EFIR_API_BASE || '').replace(/\/$/, '');
   var GH_REPO = 'zapnikita95/neuroradio';
   var MOBILE_TAG = 'mobile-latest';
-  var APK_FALLBACK = 'https://github.com/' + GH_REPO + '/releases/download/' + MOBILE_TAG + '/efir-ai.apk';
+  var APK_FALLBACK = '/efir-ai.apk';
   var EXT_FALLBACK = 'https://github.com/' + GH_REPO + '/releases/download/' + MOBILE_TAG + '/efir-extension.zip';
 
   var $ = function (s, r) { return (r || document).querySelector(s); };

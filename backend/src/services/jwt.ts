@@ -14,6 +14,10 @@ const DEBUG_CERT_SHA256 = 'a0105c5f4b340597d107f440356ffc9fcfa8c3fbdf002646a67d0
 /** GitHub Actions ubuntu-latest default debug.keystore (mobile-latest APK before shared keystore). */
 const CI_DEBUG_CERT_SHA256 = 'c5b7363ebcaf8808b02e1bb766c8d688c7a542fc60d840bc6d3651452c537d48';
 
+/** Play upload keystore (efir-upload) — release AAB/APK before Google Play re-signing. */
+const UPLOAD_RELEASE_CERT_SHA256 =
+  '6c2a59abfbacc6b828d4c0c321be5f848056988558677e4123d216200c531b09';
+
 function base64UrlEncode(input: Buffer | string): string {
   const buffer = typeof input === 'string' ? Buffer.from(input, 'utf8') : input;
   return buffer.toString('base64url');
@@ -59,7 +63,7 @@ export function verifyJwt(token: string, secret: string): JwtPayload | null {
       return payload;
     }
 
-    if (payload.pkg && payload.pkg !== getAllowedPackageName()) return null;
+    if (payload.pkg && !isAllowedPackageName(String(payload.pkg))) return null;
     if (payload.cert) {
       const allowed = getAllowedCertFingerprints();
       if (!allowed.has(normalizeCertSha256(String(payload.cert)))) return null;
@@ -135,6 +139,8 @@ export function getAllowedCertFingerprints(): Set<string> {
   const allowed = new Set<string>();
   /** Public mobile-latest APK from GitHub Actions (ubuntu debug.keystore). */
   allowed.add(normalizeCertSha256(CI_DEBUG_CERT_SHA256));
+  /** Release upload keystore — sideload / local release testing. */
+  allowed.add(normalizeCertSha256(UPLOAD_RELEASE_CERT_SHA256));
 
   if (SECURITY.allowDebugCert) {
     allowed.add(normalizeCertSha256(DEBUG_CERT_SHA256));
