@@ -143,8 +143,8 @@ function latinSpanForSsml(span: string): string {
   return stripLatinApostrophesForTts(splitCamelCaseLatin(span.trim()));
 }
 
-/** «Title от Artist» → одна EN-фраза для SSML — без рваного «от» между двумя <lang>. */
-function mergeLatinTitleOtArtist(text: string): string {
+/** «Title от Artist» → одна EN-фраза — без рваного «от» между двумя <lang>. */
+export function mergeLatinTitleOtArtist(text: string): string {
   const latin = LATIN_RUN_RE.source;
   const re = new RegExp(
     `(${latin})\\s*,?\\s*от\\s+(${latin})(?=[\\s,.!?…;:—–-]|$)`,

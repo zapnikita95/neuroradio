@@ -33,11 +33,16 @@ const PHRASE_PRONUNCIATION_RU: Record<string, string> = {
   'to the moon and back': 'Ту зе Мун энд Бэк',
   'to the moon & back': 'Ту зе Мун энд Бэк',
   'ed sheeran': 'Эд Ширан',
-  thriller: 'Тр+иллер',
+  thriller: 'тр+иллер',
+  'red hot chili peppers': 'р+эд х+от ч+или п+эпэрз',
+  'killing in the name': 'к+илинг ин зэ н+эйм',
+  'rage against the machine': 'р+эйдж аг+энст зэ маш+ин',
+  'stadium arcadium': 'ст+эйдиам арк+эйдиам',
+  'michael jackson': 'м+айкл дж+эксон',
+  'snow (hey oh)': 'сн+оу хей оу',
   'national film registry': 'Нэшнл Фильм Р+еджистри',
   'vincent price': 'Винсент Прайс',
-  mtv: 'MTV',
-  'michael jackson': 'Майкл Джексон',
+  mtv: 'эм-ти-ви',
   'john landis': 'Джон Ландис',
   'michael peters': 'Майкл Питерс',
   moonwalk: 'мун уок',
@@ -382,6 +387,32 @@ function transliterateRemainingLatin(text: string): string {
   return transliterateRemainingLatinLogged(text, []);
 }
 
+function escapeRegExp(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+/** «Title от Artist» → фонетика без русского «от» посередине (Silero/Edge). */
+function mergeTitleOtArtistPhonetic(text: string, artist: string, title: string): string {
+  const a = artist.trim();
+  const t = title.trim();
+  if (!a || !t || !/[A-Za-zÀ-ÿ]{2,}/.test(a) || !/[A-Za-zÀ-ÿ]{2,}/.test(t)) return text;
+  const artistRu = latinPhraseToRussianTts(a);
+  const titleVariants = [t];
+  const short = t.match(/^([A-Za-zÀ-ÿ0-9'’.-]+)\s*\(/);
+  if (short?.[1]) titleVariants.push(short[1]!);
+
+  let result = text;
+  for (const tv of titleVariants) {
+    const titleRu = latinPhraseToRussianTts(tv);
+    const re = new RegExp(
+      `${escapeRegExp(tv)}\\s*,?\\s*от\\s+${escapeRegExp(a)}`,
+      'gi',
+    );
+    result = result.replace(re, `${titleRu} ${artistRu}`);
+  }
+  return result;
+}
+
 function buildArtistTitleExtra(artist: string, title: string): Record<string, string> {
   const extra: Record<string, string> = {};
   const a = artist.trim();
@@ -427,8 +458,10 @@ export function applyForeignPronunciationWithReplacements(
     });
   }
 
-  const { masked, slots } = maskTtsMarkup(text);
-  let result = applyPhraseDictionaryLogged(masked, extra, replacements, 'dictionary');
+  let result = mergeTitleOtArtistPhonetic(text, artist, title);
+
+  const { masked, slots } = maskTtsMarkup(result);
+  result = applyPhraseDictionaryLogged(masked, extra, replacements, 'dictionary');
   result = transliterateRemainingLatinLogged(result, replacements);
   result = unmaskTtsMarkup(result, slots);
   const { masked: m2, slots: s2 } = maskTtsMarkup(result);
@@ -444,7 +477,8 @@ export function applyForeignPronunciation(
 ): string {
   const extra = buildArtistTitleExtra(artist, title);
 
-  const { masked, slots } = maskTtsMarkup(text);
+  let merged = mergeTitleOtArtistPhonetic(text, artist, title);
+  const { masked, slots } = maskTtsMarkup(merged);
   let result = applyPhraseDictionary(masked, extra);
   result = transliterateRemainingLatin(result);
   result = unmaskTtsMarkup(result, slots);

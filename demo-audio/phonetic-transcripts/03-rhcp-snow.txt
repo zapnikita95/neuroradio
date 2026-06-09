@@ -1,0 +1,39 @@
+# 03-rhcp-snow
+Artist: Red Hot Chili Peppers
+Title: Snow (Hey Oh)
+Fact: Stadium Arcadium 2006, radio repeat 2007
+
+## Script (display)
+Snow от Red Hot Chili Peppers — гитарный рифф с альбома Stadium Arcadium, две тысячи шестой год. В начале две тысячи седьмого его крутили на повторе: Peppers в эфире звучат по-английски.
+
+## Silero (+ = ударение)
+сн+оу от р+эд х+от ч+или п+эпэрз — гитарный рифф с альб+ома ст+эйдиам арк+эйдиам, две тысячи шестой год. В начале две тысячи седьмого его крутили на повторе: П+эпэрз в эф+ире звучат по-английски.
+
+## Edge (ЗАГЛАВНАЯ = ударная гласная)
+снОу от рЭд хОт чИли пЭпэрз — гитарный рифф с альбОма стЭйдиам аркЭйдиам, две тысячи шестой год. в начале две тысячи седьмого его крутили на повторе: пЭпэрз в эфИре звучат по-английски.
+
+## Latin replacements
+- [artist] Red Hot Chili Peppers → р+эд х+от ч+или п+эпэрз
+- [title] Snow (Hey Oh) → сн+оу хей оу
+- [dictionary] Red Hot Chili Peppers → р+эд х+от ч+или п+эпэрз
+- [dictionary] Stadium Arcadium → ст+эйдиам арк+эйдиам
+- [transliterate] Snow → сн+оу
+- [transliterate] Peppers → П+эпэрз
+
+## Phrase breakdown
+### Snow (Hey Oh)
+Silero: сн+оу хей оу
+Edge:   снОу хей оу
+
+### Red Hot Chili Peppers
+Silero: р+эд х+от ч+или п+эпэрз
+Edge:   рЭд хОт чИли пЭпэрз
+
+### Stadium Arcadium
+Silero: ст+эйдиам арк+эйдиам
+Edge:   стЭйдиам аркЭйдиам
+
+### MTV
+Silero: Эм-ти-ви
+Edge:   эм-ти-ви
+  MTV: [override] — → silero «эм-ти-ви» edge «эм-ти-ви»

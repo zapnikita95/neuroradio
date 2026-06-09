@@ -76,10 +76,23 @@ test('Bandcamp phonetic from G2P compound', () => {
 
 test('Red Hot Chili Peppers phrase', () => {
   const phrase = englishPhraseToRussianPhonetic('Red Hot Chili Peppers');
-  assert.match(phrase, /р\+?э/i);
-  assert.match(phrase, /х\+?о/i);
-  assert.match(phrase, /ч\+?и/i);
+  assert.match(phrase, /р\+эд х\+от ч\+или п\+эпэрз/i, `got ${phrase}`);
   assert.doesNotMatch(phrase, /[A-Za-z]/);
+});
+
+test('Killing in The Name phrase — function words unstressed', () => {
+  const phrase = englishPhraseToRussianPhonetic('Killing in The Name');
+  assert.equal(phrase, 'к+илинг ин зэ н+эйм', `got ${phrase}`);
+});
+
+test('Rage Against The Machine phrase override', () => {
+  const phrase = englishPhraseToRussianPhonetic('Rage Against The Machine');
+  assert.equal(phrase, 'р+эйдж аг+энст зэ маш+ин', `got ${phrase}`);
+});
+
+test('Stadium Arcadium not G2P garbage', () => {
+  const phrase = englishPhraseToRussianPhonetic('Stadium Arcadium');
+  assert.equal(phrase, 'ст+эйдиам арк+эйдиам', `got ${phrase}`);
 });
 
 test('applyForeignPronunciation clears Latin in story snippet', () => {
@@ -89,6 +102,16 @@ test('applyForeignPronunciation clears Latin in story snippet', () => {
     'Snow',
   );
   assert.doesNotMatch(out, /[A-Za-z]{2,}/);
+});
+
+test('Title ot Artist merges without Russian от in phonetic', () => {
+  const out = applyForeignPronunciation(
+    'Killing in The Name от Rage Against The Machine возглавил чарт.',
+    'Rage Against The Machine',
+    'Killing in The Name',
+  );
+  assert.match(out, /к\+илинг ин зэ н\+эйм р\+эйдж аг\+энст зэ маш\+ин/i);
+  assert.doesNotMatch(out, /\sот\s+р\+эйдж/i);
 });
 
 test('prepareSileroTtsText pure Cyrillic', () => {

@@ -52,10 +52,46 @@ const IPA_TO_RU: Array<[string, string]> = [
 
 const IPA_TO_RU_SORTED = [...IPA_TO_RU].sort((a, b) => b[0].length - a[0].length);
 
+/** Служебные EN-слова в названиях — без ударения, слитно с соседями. */
+const EN_FUNCTION_WORDS = new Set([
+  'a', 'an', 'the', 'in', 'on', 'at', 'to', 'for', 'of', 'by', 'and', 'or', 'from', 'with', 'as',
+]);
+
+const FUNCTION_WORD_RU: Record<string, string> = {
+  the: 'зэ',
+  in: 'ин',
+  of: 'ов',
+  by: 'бай',
+  a: 'э',
+  an: 'эн',
+  to: 'ту',
+  for: 'фор',
+  and: 'энд',
+  or: 'ор',
+  at: 'эт',
+  from: 'фром',
+  with: 'уиз',
+  on: 'он',
+  as: 'эз',
+};
+
+/** Целые фразы (артист / трек) — CMU по словам даёт мусор на «the/in/by». */
+const MUSIC_PHRASE_PHONETIC: Record<string, string> = {
+  'red hot chili peppers': 'р+эд х+от ч+или п+эпэрз',
+  'killing in the name': 'к+илинг ин зэ н+эйм',
+  'killing in the name of': 'к+илинг ин зэ н+эйм ов',
+  'rage against the machine': 'р+эйдж аг+энст зэ маш+ин',
+  'stadium arcadium': 'ст+эйдиам арк+эйдиам',
+  'michael jackson': 'м+айкл дж+эксон',
+  'snow (hey oh)': 'сн+оу хей оу',
+  'snow': 'сн+оу',
+  'hey oh': 'хей оу',
+  'thriller': 'тр+иллер',
+};
+
 const PHONETIC_OVERRIDES: Record<string, string> = {
   co: 'ко',
   hot: 'х+от',
-  the: 'з+э',
   mtv: 'эм-ти-ви',
   cd: 'си-ди',
   flac: 'флак',
@@ -63,6 +99,18 @@ const PHONETIC_OVERRIDES: Record<string, string> = {
   rb: 'ар-би',
   dj: 'ди-джей',
   feat: 'фит',
+  michael: 'м+айкл',
+  jackson: 'дж+эксон',
+  arcadium: 'арк+эйдиам',
+  stadium: 'ст+эйдиам',
+  rage: 'р+эйдж',
+  against: 'аг+энст',
+  machine: 'маш+ин',
+  killing: 'к+илинг',
+  name: 'н+эйм',
+  peppers: 'п+эпэрз',
+  chili: 'ч+или',
+  snow: 'сн+оу',
 };
 
 const CYR_VOWEL = /[аеёиоуыэюя]/i;
@@ -157,7 +205,7 @@ function ipaToRussianStressed(ipa: string, format: PhoneticFormat = 'silero'): s
     if (!matched) i += 1;
   }
 
-  if (s === 'ðə' || s === 'ða') return format === 'silero' ? 'з+э' : 'зЭ';
+  if (s === 'ðə' || s === 'ða') return 'зэ';
   return collapseRu(out);
 }
 
@@ -200,7 +248,23 @@ function normalizeEnglishToken(raw: string): { core: string; punct: string } {
   return { core, punct };
 }
 
+function functionWordPhonetic(core: string, format: PhoneticFormat): string {
+  const ru = FUNCTION_WORD_RU[core.toLowerCase()] ?? core.toLowerCase();
+  return format === 'edge' ? ru : ru;
+}
+
+function lookupMusicPhrasePhonetic(phrase: string, format: PhoneticFormat): string | null {
+  const key = phrase.trim().toLowerCase().replace(/\s+/g, ' ').replace(/\s*&\s*/g, ' and ');
+  const hit = MUSIC_PHRASE_PHONETIC[key];
+  if (!hit) return null;
+  return format === 'edge' ? sileroPhoneticToEdge(hit) : hit;
+}
+
 function wordToRussianPhoneticCore(core: string, format: PhoneticFormat = 'silero'): string {
+  if (EN_FUNCTION_WORDS.has(core.toLowerCase())) {
+    return functionWordPhonetic(core, format);
+  }
+
   const override = PHONETIC_OVERRIDES[core.toLowerCase()];
   if (override) {
     return format === 'edge' ? sileroPhoneticToEdge(override) : override;
@@ -271,14 +335,64 @@ function splitCompoundWord(word: string): string[] {
   return [word];
 }
 
-/** Latin phrase → Cyrillic phonetic (word-wise). */
+/** Latin phrase → Cyrillic phonetic (phrase dict → word-wise). */
 export function englishPhraseToRussianPhonetic(
   phrase: string,
   format: PhoneticFormat = 'silero',
 ): string {
   const trimmed = phrase.trim();
   if (!trimmed || !/[A-Za-z]/.test(trimmed)) return trimmed;
-  return trimmed.split(/\s+/).map((token) => englishWordToRussianPhonetic(token, format)).join(' ');
+
+  const phraseHit = lookupMusicPhrasePhonetic(trimmed, format);
+  if (phraseHit) return phraseHit;
+
+  return trimmed
+    .split(/\s+/)
+    .map((token) => englishWordToRussianPhonetic(token, format))
+    .join(' ');
+}
+
+export interface PhoneticTranscriptLine {
+  token: string;
+  source: string;
+  phonemes: string;
+  silero: string;
+  edge: string;
+}
+
+/** Подробная расшифровка EN→RU для отладки / demo-transcripts. */
+export function englishPhrasePhoneticTranscript(phrase: string): {
+  phrase: string;
+  phraseSilero: string;
+  phraseEdge: string;
+  words: PhoneticTranscriptLine[];
+} {
+  const trimmed = phrase.trim();
+  const phraseSilero = englishPhraseToRussianPhonetic(trimmed, 'silero');
+  const phraseEdge = englishPhraseToRussianPhonetic(trimmed, 'edge');
+  const phraseOverride = lookupMusicPhrasePhonetic(trimmed, 'silero');
+
+  const words: PhoneticTranscriptLine[] = trimmed.split(/\s+/).map((token) => {
+    if (phraseOverride) {
+      return {
+        token,
+        source: 'phrase-override',
+        phonemes: '',
+        silero: '(phrase)',
+        edge: '(phrase)',
+      };
+    }
+    const d = englishPhoneticDebug(token);
+    return {
+      token,
+      source: d.source,
+      phonemes: d.phonemes,
+      silero: d.ru,
+      edge: d.ruEdge,
+    };
+  });
+
+  return { phrase: trimmed, phraseSilero, phraseEdge, words };
 }
 
 export function hasLatinAfterPhonetic(text: string): boolean {

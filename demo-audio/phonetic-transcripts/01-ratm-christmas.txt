@@ -1,0 +1,35 @@
+# 01-ratm-christmas
+Artist: Rage Against The Machine
+Title: Killing in The Name
+Fact: UK Christmas #1 2009, fan campaign vs pop charts
+
+## Script (display)
+Killing in The Name от Rage Against The Machine неожиданно возглавил британский рождественский чарт в две тысячи девятом. Фанаты устроили кампанию в интернете, чтобы вытеснить попсу из топов — и у них получилось.
+
+## Silero (+ = ударение)
+к+илинг ин зэ н+эйм р+эйдж аг+энст зэ маш+ин неожиданно возглавил британский рождественский ч+арт в две тысячи девятом. Фанаты устроили кампанию в интернете, чтобы вытеснить попсу из топов — и у них получилось.
+
+## Edge (ЗАГЛАВНАЯ = ударная гласная)
+кИлинг ин зэ нЭйм рЭйдж агЭнст зэ машИн неожиданно возглавил британский рождественский чАрт в две тысячи девятом. фанаты устроили кампанию в интернете, чтобы вытеснить попсу из топов — и у них получилось.
+
+## Latin replacements
+- [artist] Rage Against The Machine → р+эйдж аг+энст зэ маш+ин
+- [title] Killing in The Name → к+илинг ин зэ н+эйм
+
+## Phrase breakdown
+### Killing in The Name
+Silero: к+илинг ин зэ н+эйм
+Edge:   кИлинг ин зэ нЭйм
+
+### Rage Against The Machine
+Silero: р+эйдж аг+энст зэ маш+ин
+Edge:   рЭйдж агЭнст зэ машИн
+
+### Stadium Arcadium
+Silero: ст+эйдиам арк+эйдиам
+Edge:   стЭйдиам аркЭйдиам
+
+### MTV
+Silero: Эм-ти-ви
+Edge:   эм-ти-ви
+  MTV: [override] — → silero «эм-ти-ви» edge «эм-ти-ви»
