@@ -290,11 +290,16 @@
   (function () {
     var np = document.getElementById('heroNowPlaying');
     var inner = document.querySelector('#hero > .hero-inner');
+    var header = document.getElementById('siteHeader');
     if (!np || !inner) return;
     if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
 
     var mq = window.matchMedia('(min-width: 981px)');
     var metrics = null;
+
+    function headerStopTop() {
+      return header ? header.getBoundingClientRect().bottom : 0;
+    }
 
     function measure() {
       np.style.transform = '';
@@ -304,9 +309,11 @@
       }
       var elR = np.getBoundingClientRect();
       var innerR = inner.getBoundingClientRect();
+      var scrollY = window.scrollY;
       metrics = {
-        trigger: window.scrollY + elR.top,
-        maxDrift: Math.max(0, innerR.bottom - elR.bottom),
+        elDocTop: scrollY + elR.top,
+        elHeight: elR.height,
+        innerDocBottom: scrollY + innerR.bottom,
       };
     }
 
@@ -315,12 +322,18 @@
         np.style.transform = '';
         return;
       }
-      var drift = window.scrollY - metrics.trigger;
+      var scrollY = window.scrollY;
+      var stopTop = headerStopTop();
+      var trigger = metrics.elDocTop - stopTop;
+      var drift = scrollY - trigger;
       if (drift <= 0) {
         np.style.transform = '';
         return;
       }
-      drift = Math.min(drift, metrics.maxDrift);
+      var innerBottomVp = metrics.innerDocBottom - scrollY;
+      var elNaturalBottom = metrics.elDocTop - scrollY + metrics.elHeight;
+      var maxDrift = Math.max(0, innerBottomVp - elNaturalBottom);
+      drift = Math.min(drift, maxDrift);
       np.style.transform = 'translate3d(0,' + drift + 'px,0)';
     }
 
