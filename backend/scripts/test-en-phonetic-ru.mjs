@@ -7,6 +7,7 @@ import {
   englishPhraseToRussianPhonetic,
   englishWordToRussianPhonetic,
   englishPhoneticDebug,
+  sileroPhoneticToEdge,
 } from '../dist/services/en-phonetic-ru.js';
 import { applyForeignPronunciation } from '../dist/services/tts-foreign-pronounce.js';
 import { prepareSileroTtsText } from '../dist/services/tts-markup.js';
@@ -40,14 +41,19 @@ test('English stress: Peppers on first syllable (PEP-pers)', () => {
   assert.match(d.ru, /эр/i, `got ${d.ru}`);
   assert.doesNotMatch(d.ru, /пеп\+/i);
   assert.doesNotMatch(d.ru, /[A-Za-z]/);
-  assert.match(d.ruEdge, /^ПЭ/i, `edge got ${d.ruEdge}`);
+  assert.match(d.ruEdge, /^пЭ/i, `edge got ${d.ruEdge}`);
   assert.doesNotMatch(d.ruEdge, /\+/);
 });
 
 test('Edge phonetic has no plus signs', () => {
   const phrase = englishPhraseToRussianPhonetic('Red Hot Chili Peppers', 'edge');
   assert.doesNotMatch(phrase, /\+/);
-  assert.match(phrase, /Э/);
+  assert.match(phrase, /^рэд хот чили пэпэрз$/i, `got ${phrase}`);
+});
+
+test('sileroPhoneticToEdge lowers word caps, keeps stress vowel', () => {
+  const edge = sileroPhoneticToEdge('П+эпэрз');
+  assert.equal(edge, 'пЭпэрз');
 });
 
 test('English stress: Queen', () => {

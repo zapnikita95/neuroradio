@@ -230,9 +230,11 @@ function wordToRussianPhoneticCore(core: string, format: PhoneticFormat = 'siler
   return '';
 }
 
-/** Edge TTS: strip Silero + marks, keep uppercase stress vowels. */
+/** Edge TTS: one uppercase = stressed vowel only. No word caps — Dmitry reads «ПЭ» as «пэ-плюс». */
 export function sileroPhoneticToEdge(text: string): string {
-  return text.replace(/\+([аеёиоуыэюя])/gi, (_, v: string) => v.toUpperCase());
+  return text
+    .toLowerCase()
+    .replace(/\+([аеёиоуыэюя])/gi, (_, v: string) => v.toUpperCase());
 }
 
 /** One English token → Cyrillic phonetic with English-aligned stress. */
@@ -248,6 +250,7 @@ export function englishWordToRussianPhonetic(
 
   const ru = wordToRussianPhoneticCore(core, format);
   if (!ru) return word;
+  if (format === 'edge') return ru + punct;
   return capitalizeLike(core, ru) + punct;
 }
 
