@@ -254,6 +254,9 @@
     <string name="settings_auth_code">Код из письма</string>
     <string name="settings_auth_verify">Войти</string>
     <string name="settings_auth_resend">Другой email</string>
+    <string name="settings_auth_resend_code">Отправить снова</string>
+    <string name="settings_auth_resend_in">Повтор через %1$d с</string>
+    <string name="settings_auth_change_email">Сменить email</string>
     <string name="settings_auth_code_sent">Код отправлен — проверь почту</string>
     <string name="settings_auth_success">Аккаунт привязан</string>
     <string name="settings_auth_verify_failed">Неверный код или email</string>

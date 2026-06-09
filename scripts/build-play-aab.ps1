@@ -1,12 +1,9 @@
-# Release AAB для Google Play → корень репо: efir-ai.aab
-# Автоматически +1 versionCode и patch в versionName перед каждой сборкой.
+# Release AAB for Google Play -> repo root: efir-ai.aab
+# Auto +1 versionCode and patch versionName before each build.
 #
-# Использование (из корня репо):
+# Usage (from repo root):
 #   .\scripts\build-play-aab.ps1
-# или:
-#   powershell -ExecutionPolicy Bypass -File ".\scripts\build-play-aab.ps1"
-#
-# Пересобрать без смены версии:
+# Rebuild without bumping version:
 #   .\scripts\build-play-aab.ps1 -SkipBump
 param(
     [switch]$SkipBump
@@ -17,13 +14,20 @@ $root = Split-Path -Parent $PSScriptRoot
 $gradle = Join-Path $root "android\app\build.gradle.kts"
 
 if (-not (Test-Path "$root\android\keystore.properties")) {
-    Write-Error "Нет android/keystore.properties — см. android/PLAY_SIGNING.local.md"
+    Write-Error "Missing android/keystore.properties - see android/PLAY_SIGNING.local.md"
 }
 
 function Get-GradleVersion {
     $text = Get-Content $gradle -Raw -Encoding UTF8
-    $code = if ($text -match 'versionCode\s*=\s*(\d+)') { [int]$Matches[1] } else { 0 }
-    $name = if ($text -match 'versionName\s*=\s*"([^"]+)"') { $Matches[1] } else { "1.0.0" }
+    $code = 0
+    if ($text -match 'versionCode\s*=\s*(\d+)') {
+        $code = [int]$Matches[1]
+    }
+    $name = "1.0.0"
+    $nameMatch = [regex]::Match($text, 'versionName\s*=\s*"([^"]+)"')
+    if ($nameMatch.Success) {
+        $name = $nameMatch.Groups[1].Value
+    }
     return @{ Text = $text; Code = $code; Name = $name }
 }
 
@@ -49,12 +53,12 @@ $ver = Get-GradleVersion
 if ($SkipBump) {
     $newCode = $ver.Code
     $newName = $ver.Name
-    Write-Host "Сборка без смены версии: versionCode=$newCode versionName=$newName"
+    Write-Host "Build without version bump: versionCode=$newCode versionName=$newName"
 } else {
     $newCode = $ver.Code + 1
     $newName = Bump-VersionName $ver.Name
     Set-GradleVersion $ver.Text $newCode $newName
-    Write-Host "Версия: $($ver.Code) ($($ver.Name)) -> $newCode ($newName)"
+    Write-Host "Version: $($ver.Code) ($($ver.Name)) -> $newCode ($newName)"
 }
 
 Push-Location "$root\android"
@@ -62,26 +66,21 @@ try {
     Write-Host "Gradle bundleRelease..."
     .\gradlew bundleRelease --quiet
     if ($LASTEXITCODE -ne 0) {
-        throw "gradlew bundleRelease завершился с кодом $LASTEXITCODE"
+        throw "gradlew bundleRelease failed with exit code $LASTEXITCODE"
     }
 
     $aab = Join-Path $root "efir-ai.aab"
     if (-not (Test-Path $aab)) {
-        Write-Error "Сборка прошла, но efir-ai.aab не найден в корне"
+        Write-Error "Build finished but efir-ai.aab not found in repo root"
     }
 
     $info = Get-Item $aab
     Write-Host ""
-    Write-Host "Готово: $aab"
+    Write-Host "Done: $aab"
     Write-Host "  versionCode=$newCode  versionName=$newName"
-    Write-Host "  размер: $([math]::Round($info.Length / 1MB, 2)) MB"
+    Write-Host "  size: $([math]::Round($info.Length / 1MB, 2)) MB"
     Write-Host ""
-    Write-Host "Загружай в Play Console ТОЛЬКО этот файл (versionCode $newCode)."
-    Write-Host ""
-    Write-Host "Play Console (предупреждения):"
-    Write-Host "  • Native debug symbols — включены в AAB (ndk.debugSymbolLevel=SYMBOL_TABLE)."
-    Write-Host "  • Deobfuscation (mapping.txt) — только если включите isMinifyEnabled=true;"
-    Write-Host "    тогда загрузите android/app/build/outputs/mapping/release/mapping.txt к релизу."
+    Write-Host "Upload ONLY this file to Play Console (versionCode $newCode)."
 } finally {
     Pop-Location
 }

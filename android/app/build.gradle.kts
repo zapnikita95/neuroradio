@@ -33,8 +33,8 @@ android {
         applicationId = "com.efirai.myapp"
         minSdk = 26
         targetSdk = 35
-        versionCode = 91
-        versionName = "1.5.53"
+        versionCode = 92
+        versionName = "1.5.54"
 
         buildConfigField("String", "VERSION_NAME", "\"$versionName\"")
         buildConfigField("int", "VERSION_CODE", "$versionCode")
@@ -94,6 +94,12 @@ android {
     buildFeatures {
         compose = true
         buildConfig = true
+    }
+
+    packaging {
+        jniLibs {
+            useLegacyPackaging = true
+        }
     }
 }
 

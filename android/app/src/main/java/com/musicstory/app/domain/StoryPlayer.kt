@@ -42,16 +42,9 @@ class StoryPlayer(context: Context) {
         .setAllowCrossProtocolRedirects(true)
         .setConnectTimeoutMs(30_000)
         .setReadTimeoutMs(90_000)
-    private val exoPlayer: ExoPlayer = ExoPlayer.Builder(appContext)
-        .setMediaSourceFactory(DefaultMediaSourceFactory(httpDataSourceFactory))
-        .setAudioAttributes(
-            MediaAudioAttributes.Builder()
-                .setUsage(C.USAGE_MEDIA)
-                .setContentType(C.AUDIO_CONTENT_TYPE_SPEECH)
-                .build(),
-            true,
-        )
-        .build()
+
+    /** Lazy init — ExoPlayer native libs can crash some devices at cold start (16KB page size, OEM builds). */
+    private var exoPlayer: ExoPlayer? = null
 
     private var resumeMusicOnFinish = true
     private var onFinishedCallback: (() -> Unit)? = null
@@ -74,14 +67,25 @@ class StoryPlayer(context: Context) {
 
     private var progressPollRunnable: Runnable? = null
 
-    init {
-        exoPlayer.addListener(
+    private fun ensurePlayer(): ExoPlayer {
+        exoPlayer?.let { return it }
+        val player = ExoPlayer.Builder(appContext)
+            .setMediaSourceFactory(DefaultMediaSourceFactory(httpDataSourceFactory))
+            .setAudioAttributes(
+                MediaAudioAttributes.Builder()
+                    .setUsage(C.USAGE_MEDIA)
+                    .setContentType(C.AUDIO_CONTENT_TYPE_SPEECH)
+                    .build(),
+                true,
+            )
+            .build()
+        player.addListener(
             object : Player.Listener {
                 override fun onPlaybackStateChanged(playbackState: Int) {
                     when (playbackState) {
                         Player.STATE_BUFFERING -> _state.value = StoryPlaybackState.PREPARING
                         Player.STATE_READY -> {
-                            if (exoPlayer.isPlaying) {
+                            if (player.isPlaying) {
                                 _state.value = StoryPlaybackState.PLAYING
                             }
                         }
@@ -107,7 +111,7 @@ class StoryPlayer(context: Context) {
                         notifyPlaybackStarted()
                         _state.value = StoryPlaybackState.PLAYING
                         startProgressPolling()
-                    } else if (exoPlayer.playbackState == Player.STATE_READY) {
+                    } else if (player.playbackState == Player.STATE_READY) {
                         _state.value = StoryPlaybackState.PAUSED
                         stopProgressPolling()
                     } else {
@@ -122,6 +126,8 @@ class StoryPlayer(context: Context) {
                 }
             },
         )
+        exoPlayer = player
+        return player
     }
 
     fun playStory(
@@ -153,14 +159,21 @@ class StoryPlayer(context: Context) {
             invokeError()
             return
         }
-        StoryLog.i("Playing server audio: $audioUrl")
-        playWithExoPlayer(audioUrl)
+        try {
+            StoryLog.i("Playing server audio: $audioUrl")
+            playWithExoPlayer(audioUrl)
+        } catch (e: Exception) {
+            StoryLog.e("ExoPlayer init/play failed", e)
+            _state.value = StoryPlaybackState.ERROR
+            invokeError()
+        }
     }
 
     private fun retryExoSameUrl(reason: String): Boolean {
-        if (playbackStartedNotified || exoPlayer.currentPosition > 1_500L) {
+        val player = exoPlayer ?: return false
+        if (playbackStartedNotified || player.currentPosition > 1_500L) {
             StoryLog.w(
-                "ExoPlayer $reason after playback started (pos=${exoPlayer.currentPosition}ms) — no restart",
+                "ExoPlayer $reason after playback started (pos=${player.currentPosition}ms) — no restart",
             )
             return false
         }
@@ -169,14 +182,15 @@ class StoryPlayer(context: Context) {
         if (retryUrl.isNullOrBlank()) return false
         exoRetryCount++
         StoryLog.w("ExoPlayer $reason — retry $exoRetryCount/$MAX_EXO_URL_RETRIES before first audio")
-        exoPlayer.stop()
-        exoPlayer.clearMediaItems()
+        player.stop()
+        player.clearMediaItems()
         playbackStartedNotified = false
         playWithExoPlayer(retryUrl)
         return true
     }
 
     private fun playWithExoPlayer(url: String) {
+        val player = ensurePlayer()
         currentExoUrl = url
         _state.value = StoryPlaybackState.PREPARING
         scheduleExoBufferingTimeout()
@@ -189,9 +203,9 @@ class StoryPlayer(context: Context) {
         if (mimeType != null) {
             mediaItemBuilder.setMimeType(mimeType)
         }
-        exoPlayer.setMediaItem(mediaItemBuilder.build())
-        exoPlayer.prepare()
-        exoPlayer.playWhenReady = true
+        player.setMediaItem(mediaItemBuilder.build())
+        player.prepare()
+        player.playWhenReady = true
     }
 
     private fun scheduleExoBufferingTimeout() {
@@ -202,7 +216,8 @@ class StoryPlayer(context: Context) {
             ) {
                 return@Runnable
             }
-            if (exoPlayer.isPlaying) {
+            val player = exoPlayer
+            if (player?.isPlaying == true) {
                 return@Runnable
             }
             if (retryExoSameUrl("start timeout")) return@Runnable
@@ -223,13 +238,14 @@ class StoryPlayer(context: Context) {
         stopProgressPolling()
         progressPollRunnable = object : Runnable {
             override fun run() {
-                val duration = exoPlayer.duration
+                val player = exoPlayer ?: return
+                val duration = player.duration
                 if (duration > 0L) {
                     _playbackProgress.value =
-                        (exoPlayer.currentPosition.toFloat() / duration).coerceIn(0f, 1f)
+                        (player.currentPosition.toFloat() / duration).coerceIn(0f, 1f)
                 }
-                val playing = exoPlayer.isPlaying
-                val buffering = exoPlayer.playbackState == Player.STATE_BUFFERING
+                val playing = player.isPlaying
+                val buffering = player.playbackState == Player.STATE_BUFFERING
                 if (playing || buffering) {
                     mainHandler.postDelayed(this, 50L)
                 }
@@ -246,8 +262,8 @@ class StoryPlayer(context: Context) {
     private fun stopActiveEngine() {
         cancelPlaybackTimeout()
         stopProgressPolling()
-        exoPlayer.stop()
-        exoPlayer.clearMediaItems()
+        exoPlayer?.stop()
+        exoPlayer?.clearMediaItems()
     }
 
     private fun cancelPlaybackTimeout() {
@@ -304,15 +320,17 @@ class StoryPlayer(context: Context) {
     }
 
     fun pause() {
-        if (exoPlayer.isPlaying) {
-            exoPlayer.pause()
+        val player = exoPlayer ?: return
+        if (player.isPlaying) {
+            player.pause()
             _state.value = StoryPlaybackState.PAUSED
         }
     }
 
     fun resume() {
-        if (exoPlayer.mediaItemCount > 0) {
-            exoPlayer.play()
+        val player = exoPlayer ?: return
+        if (player.mediaItemCount > 0) {
+            player.play()
         }
     }
 
@@ -338,7 +356,8 @@ class StoryPlayer(context: Context) {
 
     fun release() {
         stop()
-        exoPlayer.release()
+        exoPlayer?.release()
+        exoPlayer = null
     }
 
     companion object {

@@ -193,17 +193,21 @@ class MusicStoryApp : Application() {
     }
 
     private fun scheduleBackgroundAuthRefresh() {
-        val constraints = Constraints.Builder()
-            .setRequiredNetworkType(NetworkType.CONNECTED)
-            .build()
-        val request = PeriodicWorkRequestBuilder<AuthRefreshWorker>(3, TimeUnit.DAYS)
-            .setConstraints(constraints)
-            .build()
-        WorkManager.getInstance(this).enqueueUniquePeriodicWork(
-            AUTH_REFRESH_WORK,
-            ExistingPeriodicWorkPolicy.KEEP,
-            request,
-        )
+        try {
+            val constraints = Constraints.Builder()
+                .setRequiredNetworkType(NetworkType.CONNECTED)
+                .build()
+            val request = PeriodicWorkRequestBuilder<AuthRefreshWorker>(3, TimeUnit.DAYS)
+                .setConstraints(constraints)
+                .build()
+            WorkManager.getInstance(this).enqueueUniquePeriodicWork(
+                AUTH_REFRESH_WORK,
+                ExistingPeriodicWorkPolicy.KEEP,
+                request,
+            )
+        } catch (e: Exception) {
+            StoryLog.w("WorkManager schedule skipped: ${e.message}", e)
+        }
     }
 
     override fun onTerminate() {

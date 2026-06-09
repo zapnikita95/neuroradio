@@ -1,6 +1,8 @@
 package com.musicstory.app.ui.screens
 
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -11,6 +13,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -18,11 +21,14 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import android.content.Context
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.musicstory.app.MusicStoryApp
 import com.musicstory.app.R
@@ -43,10 +49,13 @@ import com.musicstory.app.ui.theme.MutedLavender
 import com.musicstory.app.util.StoryLog
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+
+private const val EMAIL_CODE_RESEND_COOLDOWN_SEC = 20
 
 private suspend fun finishAccountLogin(
     app: MusicStoryApp,
@@ -272,9 +281,31 @@ fun AccountEmailLoginContent(
     var email by remember { mutableStateOf("") }
     var code by remember { mutableStateOf("") }
     var codeSent by remember { mutableStateOf(false) }
+    var resendCooldown by remember { mutableStateOf(0) }
     var message by remember { mutableStateOf<String?>(null) }
     var busy by remember { mutableStateOf(false) }
     var agreePrivacy by remember { mutableStateOf(false) }
+
+    LaunchedEffect(resendCooldown) {
+        if (resendCooldown <= 0) return@LaunchedEffect
+        delay(1_000)
+        resendCooldown = (resendCooldown - 1).coerceAtLeast(0)
+    }
+
+    suspend fun sendEmailCode() {
+        busy = true
+        message = null
+        val url = app.settingsDataStore.backendUrl.first()
+        val err = app.accountAuthManager.startEmailLogin(url, email)
+        if (err == null) {
+            codeSent = true
+            resendCooldown = EMAIL_CODE_RESEND_COOLDOWN_SEC
+            message = context.getString(R.string.settings_auth_code_sent)
+        } else {
+            message = err
+        }
+        busy = false
+    }
 
     val fieldColors = OutlinedTextFieldDefaults.colors(
         focusedBorderColor = GoldBright,
@@ -324,19 +355,7 @@ fun AccountEmailLoginContent(
                         message = context.getString(R.string.auth_privacy_required)
                         return@PrimaryStoryButton
                     }
-                    scope.launch {
-                        busy = true
-                        message = null
-                        val url = app.settingsDataStore.backendUrl.first()
-                        val err = app.accountAuthManager.startEmailLogin(url, email)
-                        if (err == null) {
-                            codeSent = true
-                            message = context.getString(R.string.settings_auth_code_sent)
-                        } else {
-                            message = err
-                        }
-                        busy = false
-                    }
+                    scope.launch { sendEmailCode() }
                 },
             )
         } else {
@@ -349,10 +368,58 @@ fun AccountEmailLoginContent(
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true,
                 enabled = !busy,
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Ascii),
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
                 colors = fieldColors,
                 shape = RoundedCornerShape(14.dp),
             )
+            Spacer(modifier = Modifier.height(4.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                TextButton(
+                    onClick = {
+                        if (busy || resendCooldown > 0) return@TextButton
+                        if (!agreePrivacy) {
+                            message = context.getString(R.string.auth_privacy_required)
+                            return@TextButton
+                        }
+                        scope.launch { sendEmailCode() }
+                    },
+                    enabled = !busy && resendCooldown == 0,
+                ) {
+                    Text(
+                        text = if (resendCooldown > 0) {
+                            context.getString(R.string.settings_auth_resend_in, resendCooldown)
+                        } else {
+                            context.getString(R.string.settings_auth_resend_code)
+                        },
+                        style = MaterialTheme.typography.labelMedium,
+                        color = if (resendCooldown > 0) MutedLavender else GoldBright,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+                TextButton(
+                    onClick = {
+                        if (busy) return@TextButton
+                        codeSent = false
+                        code = ""
+                        resendCooldown = 0
+                        message = null
+                    },
+                    enabled = !busy,
+                ) {
+                    Text(
+                        text = context.getString(R.string.settings_auth_change_email),
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MutedLavender,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+            }
             Spacer(modifier = Modifier.height(8.dp))
             PrimaryStoryButton(
                 text = context.getString(R.string.settings_auth_verify),
@@ -384,19 +451,16 @@ fun AccountEmailLoginContent(
                     }
                 },
             )
-            Spacer(modifier = Modifier.height(8.dp))
-            SecondaryStoryButton(
-                text = context.getString(R.string.settings_auth_resend),
-                onClick = { codeSent = false; code = "" },
-            )
         }
 
         message?.let {
-            Spacer(modifier = Modifier.height(12.dp))
+            Spacer(modifier = Modifier.height(8.dp))
             Text(
                 text = it,
                 style = MaterialTheme.typography.labelMedium,
                 color = authMessageColor(context, it),
+                modifier = Modifier.fillMaxWidth(),
+                textAlign = TextAlign.Start,
             )
         }
 
