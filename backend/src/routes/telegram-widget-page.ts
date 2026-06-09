@@ -51,6 +51,12 @@ s.setAttribute('data-onauth', 'onTelegramAuth(user)');
 s.setAttribute('data-request-access', 'write');
 s.onerror = function () { showErr('Не удалось загрузить Telegram. Проверьте интернет.'); };
 document.getElementById('tg-wrap').appendChild(s);
+setTimeout(function () {
+  var w = document.getElementById('tg-wrap');
+  if (w && !w.querySelector('iframe, a, button, script[src*="telegram-widget"]')) {
+    showErr('Кнопка Telegram не загрузилась. В BotFather: /setdomain → efir-ai.ru');
+  }
+}, 4500);
 </script>
 </body>
 </html>`;

@@ -161,15 +161,7 @@ app.use('/v1/llm', llmProbeRouter);
 app.use('/v1/story', storyRouter);
 app.use('/v1/public', publicRouter);
 
-const websiteDir = resolveWebsiteDir(__dirname);
-if (websiteDir) {
-  console.log(`[boot] serving website from ${websiteDir}`);
-  app.use(serveWebsite(websiteDir));
-} else {
-  console.warn('[boot] website/ not found — static site disabled');
-}
-
-/** Telegram Login Widget — domain must match @BotFather /setdomain (see resolveTelegramWidgetBaseUrl). */
+/** Telegram Login Widget — before static site so /telegram-login is never swallowed. */
 function sendTelegramWidgetPage(req: express.Request, res: express.Response): void {
   const bot = telegramBotUsername();
   if (!bot) {
@@ -177,12 +169,19 @@ function sendTelegramWidgetPage(req: express.Request, res: express.Response): vo
     return;
   }
   const appEmbed = req.query.app === '1' || req.query.embed === 'android';
+  res.setHeader('Cache-Control', 'no-store');
   res.type('html').send(buildTelegramWidgetPageHtml(bot, appEmbed));
 }
-if (!websiteDir) {
+app.get('/telegram-login', (req, res) => sendTelegramWidgetPage(req, res));
+
+const websiteDir = resolveWebsiteDir(__dirname);
+if (websiteDir) {
+  console.log(`[boot] serving website from ${websiteDir}`);
+  app.use(serveWebsite(websiteDir));
+} else {
+  console.warn('[boot] website/ not found — static site disabled');
   app.get('/', (_req, res) => sendTelegramWidgetPage(_req, res));
 }
-app.get('/telegram-login', (req, res) => sendTelegramWidgetPage(req, res));
 
 app.use((_req, res) => {
   res.status(404).json({ error: 'Not found' });

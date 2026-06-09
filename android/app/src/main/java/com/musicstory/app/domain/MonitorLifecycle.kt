@@ -6,6 +6,7 @@ import com.musicstory.app.media.MediaControllerManager
 import com.musicstory.app.media.MediaSessionSelector
 import com.musicstory.app.service.MediaMonitorService
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
@@ -13,6 +14,7 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 class MonitorLifecycle(
     private val context: Context,
@@ -78,7 +80,9 @@ class MonitorLifecycle(
             when (settingsDataStore.appPowerMode.first()) {
                 AppPowerMode.OFF -> return@launch
                 AppPowerMode.PARSE_ONLY, AppPowerMode.ON -> {
-                    mediaControllerManager.start()
+                    withContext(Dispatchers.Main.immediate) {
+                        mediaControllerManager.start()
+                    }
                     syncMonitorWithMedia()
                 }
             }
@@ -94,10 +98,14 @@ class MonitorLifecycle(
                 storyOrchestrator.stopStory()
                 storyOrchestrator.setServiceRunning(false)
                 MediaMonitorService.stop(context)
-                mediaControllerManager.stop()
+                withContext(Dispatchers.Main.immediate) {
+                    mediaControllerManager.stop()
+                }
             }
             AppPowerMode.PARSE_ONLY, AppPowerMode.ON -> {
-                mediaControllerManager.start()
+                withContext(Dispatchers.Main.immediate) {
+                    mediaControllerManager.start()
+                }
                 syncMonitorWithMedia()
             }
         }
@@ -117,7 +125,9 @@ class MonitorLifecycle(
         if (!MediaSessionSelector.isPreferredPackage(packageName)) return
         scope.launch {
             if (settingsDataStore.appPowerMode.first() == AppPowerMode.OFF) return@launch
-            mediaControllerManager.refreshActiveController()
+            withContext(Dispatchers.Main.immediate) {
+                mediaControllerManager.refreshActiveController()
+            }
             syncMonitorWithMedia()
         }
     }
@@ -125,7 +135,9 @@ class MonitorLifecycle(
     fun tryWakeFromActiveMedia() {
         scope.launch {
             if (settingsDataStore.appPowerMode.first() == AppPowerMode.OFF) return@launch
-            mediaControllerManager.refreshActiveController()
+            withContext(Dispatchers.Main.immediate) {
+                mediaControllerManager.refreshActiveController()
+            }
             syncMonitorWithMedia()
         }
     }

@@ -11,6 +11,8 @@
         <package android:name="com.spotify.music" />
         <package android:name="ru.yandex.music" />
         <package android:name="com.yandex.music" />
+        <package android:name="org.telegram.messenger" />
+        <package android:name="org.telegram.messenger.web" />
     </queries>
 
     <application
