@@ -88,7 +88,6 @@ import com.musicstory.app.domain.StoryNarrator
 import com.musicstory.app.domain.EdgeVoicePreset
 import com.musicstory.app.domain.ServerTtsProvider
 import com.musicstory.app.domain.TtsEmotion
-import com.musicstory.app.domain.TtsPlaybackEngine
 import com.musicstory.app.ui.components.TrialCountdownBanner
 import com.musicstory.app.ui.components.TrialUi
 import com.musicstory.app.domain.UserTtsBilling
@@ -167,7 +166,6 @@ fun SettingsScreen(
     val ttsVoice by settings.ttsVoice.collectAsState(initial = TtsVoice.AUTO)
     val ttsSpeed by settings.ttsSpeed.collectAsState(initial = TtsSpeed.NORMAL)
     val ttsEmotion by settings.ttsEmotion.collectAsState(initial = TtsEmotion.LIVELY)
-    val ttsPlaybackEngine by settings.ttsPlaybackEngine.collectAsState(initial = TtsPlaybackEngine.YANDEX_SERVER)
     val edgeVoicePreset by settings.edgeVoicePreset.collectAsState(initial = EdgeVoicePreset.SVETLANA_CALM)
     val speakTrackNamesInVoiceover by settings.speakTrackNamesInVoiceover.collectAsState(initial = false)
     val serverTtsProvider by settings.serverTtsProvider.collectAsState(initial = ServerTtsProvider.EDGE)
@@ -442,17 +440,13 @@ fun SettingsScreen(
     val isPaidServerTier = TierAccess.isPremiumLike(effectiveTier)
     val isFreeServerTier = TierAccess.isFreeServerTier(effectiveTier)
     val effectiveServerTtsProvider = if (isFreeServerTier) ServerTtsProvider.EDGE else serverTtsProvider
-    val serverUsesEdge = ttsPlaybackEngine == TtsPlaybackEngine.YANDEX_SERVER &&
-        userTtsBilling == UserTtsBilling.SERVER &&
+    val serverUsesEdge = userTtsBilling == UserTtsBilling.SERVER &&
         effectiveServerTtsProvider == ServerTtsProvider.EDGE
-    val showServerTtsProviderChoice = ttsPlaybackEngine == TtsPlaybackEngine.YANDEX_SERVER &&
-        userTtsBilling == UserTtsBilling.SERVER &&
-        isPaidServerTier
+    val showServerTtsProviderChoice = userTtsBilling == UserTtsBilling.SERVER && isPaidServerTier
     val showEdgeVoices = serverUsesEdge
-    val showYandexVoices = ttsPlaybackEngine == TtsPlaybackEngine.YANDEX_SERVER &&
-        ((userTtsBilling == UserTtsBilling.YANDEX) ||
-            (userTtsBilling == UserTtsBilling.SERVER && isPaidServerTier &&
-                effectiveServerTtsProvider == ServerTtsProvider.YANDEX))
+    val showYandexVoices = (userTtsBilling == UserTtsBilling.YANDEX) ||
+        (userTtsBilling == UserTtsBilling.SERVER && isPaidServerTier &&
+            effectiveServerTtsProvider == ServerTtsProvider.YANDEX)
     val userTtsBillingOptions = remember {
         UserTtsBilling.entries.filter { it != UserTtsBilling.SBER }
     }
@@ -775,24 +769,19 @@ fun SettingsScreen(
 
                 CollapsibleSettingsSection(
                     title = context.getString(R.string.settings_voice_section),
-                    summary = when (ttsPlaybackEngine) {
-                        TtsPlaybackEngine.ANDROID_DEVICE ->
-                            "${ttsPlaybackEngine.labelRu} · ${ttsSpeed.labelRu} · ${storyLength.labelRu}"
-                        TtsPlaybackEngine.YANDEX_SERVER ->
-                            when {
-                                showEdgeVoices ->
-                                    "${edgeVoicePreset.labelRu} · ${ttsSpeed.labelRu} · ${storyLength.labelRu}"
-                                else ->
-                                    "${ttsVoice.labelRu} · ${ttsSpeed.labelRu} · ${storyLength.labelRu}"
-                            }.let { voices ->
-                                val engineLabel = when {
-                                    showEdgeVoices -> ServerTtsProvider.EDGE.labelRu
-                                    showYandexVoices && userTtsBilling == UserTtsBilling.SERVER ->
-                                        ServerTtsProvider.YANDEX.labelRu
-                                    else -> TtsPlaybackEngine.YANDEX_SERVER.labelRu
-                                }
-                                "$engineLabel · $voices"
-                            }
+                    summary = when {
+                        serverUsesEdge ->
+                            "${edgeVoicePreset.labelRu} · ${ttsSpeed.labelRu} · ${storyLength.labelRu}"
+                        else ->
+                            "${ttsVoice.labelRu} · ${ttsSpeed.labelRu} · ${storyLength.labelRu}"
+                    }.let { voices ->
+                        val engineLabel = when {
+                            serverUsesEdge -> ServerTtsProvider.EDGE.labelRu
+                            showYandexVoices && userTtsBilling == UserTtsBilling.SERVER ->
+                                ServerTtsProvider.YANDEX.labelRu
+                            else -> ServerTtsProvider.EDGE.labelRu
+                        }
+                        "$engineLabel · $voices"
                     },
                     tourHighlight = tourStep == 4,
                     forceExpanded = tourStep == 4,
@@ -813,31 +802,12 @@ fun SettingsScreen(
                         }
                     }
                     Text(
-                        text = context.getString(R.string.settings_tts_playback_engine),
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MutedLavender,
-                    )
-                    Text(
                         text = context.getString(R.string.settings_tts_playback_engine_hint),
                         style = MaterialTheme.typography.bodySmall,
                         color = MutedLavender,
                         modifier = Modifier.padding(top = 4.dp, bottom = 8.dp),
                     )
-                    TtsPlaybackEngine.entries.forEach { engine ->
-                        NarratorRadioRow(
-                            label = engine.labelForTier(effectiveTier),
-                            description = engine.descriptionForTier(effectiveTier),
-                            selected = ttsPlaybackEngine == engine,
-                            onSelect = { scope.launch { settings.setTtsPlaybackEngine(engine) } },
-                        )
-                    }
                     if (showServerTtsProviderChoice) {
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Text(
-                            text = context.getString(R.string.settings_server_tts_engine),
-                            style = MaterialTheme.typography.labelMedium,
-                            color = MutedLavender,
-                        )
                         ServerTtsProvider.entries.forEach { provider ->
                             NarratorRadioRow(
                                 label = provider.labelRu,
@@ -919,105 +889,103 @@ fun SettingsScreen(
                             onSelect = { scope.launch { settings.setStoryLength(length) } },
                         )
                     }
-                    if (ttsPlaybackEngine == TtsPlaybackEngine.YANDEX_SERVER) {
-                        Spacer(modifier = Modifier.height(12.dp))
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Text(
+                        text = context.getString(R.string.settings_user_tts_section),
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MutedLavender,
+                    )
+                    Text(
+                        text = context.getString(R.string.settings_user_tts_hint),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MutedLavender,
+                        modifier = Modifier.padding(top = 4.dp, bottom = 8.dp),
+                    )
+                    userTtsBillingOptions.forEach { billing ->
+                        NarratorRadioRow(
+                            label = billing.labelRu,
+                            description = billing.descriptionRu,
+                            selected = userTtsBilling == billing,
+                            onSelect = {
+                                userTtsSaveFeedback = null
+                                scope.launch { settings.setUserTtsBilling(billing) }
+                            },
+                        )
+                    }
+                    if (userTtsBilling != UserTtsBilling.SERVER) {
                         Text(
-                            text = context.getString(R.string.settings_user_tts_section),
+                            text = context.getString(
+                                R.string.settings_user_tts_active,
+                                userTtsBilling.labelRu,
+                            ),
                             style = MaterialTheme.typography.labelMedium,
-                            color = MutedLavender,
+                            color = GoldBright,
+                            modifier = Modifier.padding(top = 8.dp, bottom = 8.dp),
+                        )
+                    }
+                    if (userTtsBilling == UserTtsBilling.YANDEX) {
+                        OutlinedTextField(
+                            value = yandexKeyInput,
+                            onValueChange = { yandexKeyInput = it; userTtsSaveFeedback = null },
+                            label = { Text(context.getString(R.string.settings_yandex_api_key)) },
+                            modifier = Modifier.fillMaxWidth(),
+                            singleLine = true,
+                            visualTransformation = PasswordVisualTransformation(),
+                            colors = fieldColors,
+                            shape = RoundedCornerShape(14.dp),
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        OutlinedTextField(
+                            value = yandexFolderInput,
+                            onValueChange = { yandexFolderInput = it; userTtsSaveFeedback = null },
+                            label = { Text(context.getString(R.string.settings_yandex_folder_id)) },
+                            modifier = Modifier.fillMaxWidth(),
+                            singleLine = true,
+                            colors = fieldColors,
+                            shape = RoundedCornerShape(14.dp),
                         )
                         Text(
-                            text = context.getString(R.string.settings_user_tts_hint),
+                            text = context.getString(R.string.settings_yandex_tts_hint),
                             style = MaterialTheme.typography.bodySmall,
                             color = MutedLavender,
-                            modifier = Modifier.padding(top = 4.dp, bottom = 8.dp),
+                            modifier = Modifier.padding(top = 6.dp, bottom = 4.dp),
                         )
-                        userTtsBillingOptions.forEach { billing ->
-                            NarratorRadioRow(
-                                label = billing.labelRu,
-                                description = billing.descriptionRu,
-                                selected = userTtsBilling == billing,
-                                onSelect = {
-                                    userTtsSaveFeedback = null
-                                    scope.launch { settings.setUserTtsBilling(billing) }
+                        Text(
+                            text = context.getString(R.string.settings_yandex_get_key),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = GoldBright,
+                            modifier = Modifier
+                                .padding(bottom = 8.dp)
+                                .clickable {
+                                    context.startActivity(
+                                        Intent(
+                                            Intent.ACTION_VIEW,
+                                            Uri.parse("https://yandex.cloud/ru/docs/speechkit/quickstart"),
+                                        ),
+                                    )
                                 },
-                            )
-                        }
-                        if (userTtsBilling != UserTtsBilling.SERVER) {
+                        )
+                    }
+                    if (userTtsBilling != UserTtsBilling.SERVER) {
+                        SecondaryStoryButton(
+                            text = context.getString(R.string.settings_user_tts_save),
+                            onClick = {
+                                scope.launch {
+                                    settings.setYandexApiKey(ApiKeySanitizer.clean(yandexKeyInput))
+                                    settings.setYandexFolderId(yandexFolderInput.trim())
+                                    yandexKeyInput = ApiKeySanitizer.clean(yandexKeyInput)
+                                    userTtsSaveFeedback = context.getString(R.string.settings_user_tts_saved)
+                                }
+                            },
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                        userTtsSaveFeedback?.let { msg ->
                             Text(
-                                text = context.getString(
-                                    R.string.settings_user_tts_active,
-                                    userTtsBilling.labelRu,
-                                ),
-                                style = MaterialTheme.typography.labelMedium,
-                                color = GoldBright,
-                                modifier = Modifier.padding(top = 8.dp, bottom = 8.dp),
-                            )
-                        }
-                        if (userTtsBilling == UserTtsBilling.YANDEX) {
-                            OutlinedTextField(
-                                value = yandexKeyInput,
-                                onValueChange = { yandexKeyInput = it; userTtsSaveFeedback = null },
-                                label = { Text(context.getString(R.string.settings_yandex_api_key)) },
-                                modifier = Modifier.fillMaxWidth(),
-                                singleLine = true,
-                                visualTransformation = PasswordVisualTransformation(),
-                                colors = fieldColors,
-                                shape = RoundedCornerShape(14.dp),
-                            )
-                            Spacer(modifier = Modifier.height(8.dp))
-                            OutlinedTextField(
-                                value = yandexFolderInput,
-                                onValueChange = { yandexFolderInput = it; userTtsSaveFeedback = null },
-                                label = { Text(context.getString(R.string.settings_yandex_folder_id)) },
-                                modifier = Modifier.fillMaxWidth(),
-                                singleLine = true,
-                                colors = fieldColors,
-                                shape = RoundedCornerShape(14.dp),
-                            )
-                            Text(
-                                text = context.getString(R.string.settings_yandex_tts_hint),
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MutedLavender,
-                                modifier = Modifier.padding(top = 6.dp, bottom = 4.dp),
-                            )
-                            Text(
-                                text = context.getString(R.string.settings_yandex_get_key),
+                                text = msg,
                                 style = MaterialTheme.typography.bodySmall,
                                 color = GoldBright,
-                                modifier = Modifier
-                                    .padding(bottom = 8.dp)
-                                    .clickable {
-                                        context.startActivity(
-                                            Intent(
-                                                Intent.ACTION_VIEW,
-                                                Uri.parse("https://yandex.cloud/ru/docs/speechkit/quickstart"),
-                                            ),
-                                        )
-                                    },
+                                modifier = Modifier.padding(top = 6.dp),
                             )
-                        }
-                        if (userTtsBilling != UserTtsBilling.SERVER) {
-                            SecondaryStoryButton(
-                                text = context.getString(R.string.settings_user_tts_save),
-                                onClick = {
-                                    scope.launch {
-                                        settings.setYandexApiKey(ApiKeySanitizer.clean(yandexKeyInput))
-                                        settings.setYandexFolderId(yandexFolderInput.trim())
-                                        yandexKeyInput = ApiKeySanitizer.clean(yandexKeyInput)
-                                        userTtsSaveFeedback = context.getString(R.string.settings_user_tts_saved)
-                                    }
-                                },
-                                modifier = Modifier.fillMaxWidth(),
-                            )
-                            userTtsSaveFeedback?.let { msg ->
-                                Text(
-                                    text = msg,
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = GoldBright,
-                                    modifier = Modifier.padding(top = 6.dp),
-                                )
-                            }
                         }
                     }
                 }

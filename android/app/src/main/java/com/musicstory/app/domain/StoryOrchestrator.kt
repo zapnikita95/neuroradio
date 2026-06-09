@@ -688,7 +688,6 @@ class StoryOrchestrator(
         }
 
         val ttsSpeed = settingsDataStore.ttsSpeed.first().androidRate
-        val ttsPlaybackEngine = settingsDataStore.ttsPlaybackEngine.first()
         result.fold(
             onSuccess = { response ->
                 if (!isSessionCurrent(session) || !isTrackStillCurrent(session, track)) {
@@ -729,11 +728,7 @@ class StoryOrchestrator(
                                 )
                             }
                         }
-                        _errorMessage.value = if (ttsPlaybackEngine == TtsPlaybackEngine.ANDROID_DEVICE) {
-                            context.getString(R.string.android_tts_error_message)
-                        } else {
-                            context.getString(R.string.server_audio_error_message)
-                        }
+                        _errorMessage.value = context.getString(R.string.server_audio_error_message)
                         _hintMessage.value = null
                         _state.value = OrchestratorState.ERROR
                         if (musicPausedForStory.get()) {
@@ -748,7 +743,6 @@ class StoryOrchestrator(
                             response = response,
                             audioUrl = audioUrl,
                             speechRate = ttsSpeed,
-                            playbackEngine = ttsPlaybackEngine,
                             resumeMusic = true,
                             onPlaybackStarted = {
                                 if (!isSessionCurrent(session)) return@playStory

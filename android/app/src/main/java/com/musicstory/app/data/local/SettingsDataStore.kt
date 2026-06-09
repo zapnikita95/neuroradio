@@ -42,6 +42,12 @@ class SettingsDataStore(private val context: Context) {
 
     private val secureApiKeyStore = SecureApiKeyStore(context)
 
+    init {
+        if (secureApiKeyStore.usesPlainFallback()) {
+            StoryLog.w("SettingsDataStore: encrypted key storage unavailable — plain fallback active")
+        }
+    }
+
     val autoIntercept: Flow<Boolean> = context.settingsDataStore.data.map { prefs ->
         prefs[KEY_AUTO_INTERCEPT] ?: DEFAULT_AUTO_INTERCEPT
     }

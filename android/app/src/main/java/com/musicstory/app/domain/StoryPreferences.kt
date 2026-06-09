@@ -58,35 +58,21 @@ enum class TtsSpeed(val id: String, val labelRu: String, val yandexSpeed: Float,
     }
 }
 
-/** Серверная озвучка (Edge или Yandex SpeechKit — выбор на trial/premium). */
+/** Серверная озвучка (Edge на free, Edge или Yandex SpeechKit на trial/premium). */
 enum class TtsPlaybackEngine(val id: String, val labelRu: String, val descriptionRu: String) {
     YANDEX_SERVER(
         id = "yandex",
         labelRu = "Серверная озвучка",
         descriptionRu = "Microsoft Edge или Yandex SpeechKit на сервере",
     ),
-    ANDROID_DEVICE(
-        id = "android",
-        labelRu = "Android TTS",
-        descriptionRu = "Системный голос телефона — без серверной озвучки",
-    ),
     ;
 
-    val skipsServerTts: Boolean get() = this == ANDROID_DEVICE
-
-    fun labelForTier(tier: String?): String = when (this) {
-        ANDROID_DEVICE -> labelRu
-        YANDEX_SERVER -> labelRu
-    }
-
-    fun descriptionForTier(tier: String?): String = when (this) {
-        ANDROID_DEVICE -> descriptionRu
-        YANDEX_SERVER -> descriptionRu
-    }
-
     companion object {
-        fun fromId(id: String?): TtsPlaybackEngine =
-            entries.firstOrNull { it.id == id } ?: YANDEX_SERVER
+        fun fromId(id: String?): TtsPlaybackEngine {
+            val raw = id?.trim().orEmpty()
+            if (raw == "android") return YANDEX_SERVER
+            return entries.firstOrNull { it.id == raw } ?: YANDEX_SERVER
+        }
     }
 }
 
