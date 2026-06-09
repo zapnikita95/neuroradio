@@ -25,6 +25,7 @@ import androidx.work.NetworkType
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import com.musicstory.app.worker.AuthRefreshWorker
+import com.musicstory.app.util.StoryLog
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -75,6 +76,7 @@ class MusicStoryApp : Application() {
 
     override fun onCreate() {
         super.onCreate()
+        installCrashLogger()
         instance = this
 
         createNotificationChannels()
@@ -207,6 +209,14 @@ class MusicStoryApp : Application() {
     override fun onTerminate() {
         storyPlayer.release()
         super.onTerminate()
+    }
+
+    private fun installCrashLogger() {
+        val defaultHandler = Thread.getDefaultUncaughtExceptionHandler()
+        Thread.setDefaultUncaughtExceptionHandler { thread, throwable ->
+            StoryLog.e("FATAL uncaught on ${thread.name}", throwable)
+            defaultHandler?.uncaughtException(thread, throwable)
+        }
     }
 
     private fun createNotificationChannels() {

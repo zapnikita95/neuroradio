@@ -10,6 +10,8 @@ import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.core.stringSetPreferencesKey
+import androidx.datastore.core.handlers.ReplaceFileCorruptionHandler
+import androidx.datastore.preferences.core.emptyPreferences
 import androidx.datastore.preferences.preferencesDataStore
 import com.musicstory.app.domain.AppPowerMode
 import com.musicstory.app.domain.GeminiModel
@@ -36,6 +38,12 @@ import kotlinx.coroutines.flow.map
 
 private val Context.settingsDataStore: DataStore<Preferences> by preferencesDataStore(
     name = "music_story_settings",
+    corruptionHandler = ReplaceFileCorruptionHandler(
+        produceNewData = {
+            StoryLog.w("Settings DataStore corrupted — resetting to defaults")
+            emptyPreferences()
+        },
+    ),
 )
 
 class SettingsDataStore(private val context: Context) {
