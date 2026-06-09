@@ -71,9 +71,9 @@ function cyrillicForShortAccentLatin(span: string): string | null {
   return capitalizeLike(bare, mapped) + punct;
 }
 
-/** Союзы/предлоги/местоимения вплотную перед <lang> — без лишнего акцента на стыке RU→EN. */
+/** Союзы/предлоги вплотную перед <lang> — без лишнего акцента на стыке RU→EN. «от» не выделяем — ломает стык с EN. */
 const RU_GLUE_BEFORE_LATIN_RE =
-  /([,—–-]?\s+)(и|а|или|либо|но|да|же|на|к|ко|у|о|об|обо|от|до|по|за|из|под|над|при|для|без|через|между|перед|после|около|вокруг|их|его|её|ее|эту|этот|эта|это|тот|та|те|свой|свою|свoё|свои|мой|мою|моё|мои|твой|как|что)\s*$/iu;
+  /([,—–-]?\s+)(и|а|или|либо|но|да|же|на|к|ко|у|о|об|обо|до|по|за|из|под|над|при|для|без|через|между|перед|после|около|вокруг|их|его|её|ее|эту|этот|эта|это|тот|та|те|свой|свою|свoё|свои|мой|мою|моё|мои|твой|как|что)\s*$/iu;
 
 /** «с/к/в/о/у» перед <lang> Yandex читает как буквы (эс, ка…) — не выделяем и не отрываем. */
 const LETTER_LIKE_PREP_RE = /^(?:[сС](?:[оО])?|[кК](?:[оО])?|[вВ](?:[оО])?|[уУ]|[оО](?:[бБ][оО])?|на)$/iu;
@@ -143,6 +143,21 @@ function latinSpanForSsml(span: string): string {
   return stripLatinApostrophesForTts(splitCamelCaseLatin(span.trim()));
 }
 
+/** «Title от Artist» → одна EN-фраза для SSML — без рваного «от» между двумя <lang>. */
+function mergeLatinTitleOtArtist(text: string): string {
+  const latin = LATIN_RUN_RE.source;
+  const re = new RegExp(
+    `(${latin})\\s*,?\\s*от\\s+(${latin})(?=[\\s,.!?…;:—–-]|$)`,
+    'gi',
+  );
+  return text.replace(re, (_m, title: string, artist: string) => {
+    const t = title.trim();
+    const a = artist.trim();
+    if (t.length < 2 || a.length < 2) return _m;
+    return `${t} by ${a}`;
+  });
+}
+
 /** Пауза Yandex markup вплотную перед латиницей даёт рваный стык — убираем. */
 function stripPausesBeforeLatin(text: string): string {
   return text.replace(/<\[(?:small|medium|large|tiny|huge|sentence)\]>\s*(?=[A-Za-zÀ-ÿ])/g, ' ');
@@ -150,7 +165,9 @@ function stripPausesBeforeLatin(text: string): string {
 
 /** Оборачивает латинские фрагменты в SSML lang; русский текст и +ударения — как есть. */
 export function wrapMixedLanguageBody(text: string): string {
-  const prepared = pausesToPlaceholders(stripPausesBeforeLatin(normalizeLatinApostrophes(text)));
+  const prepared = pausesToPlaceholders(
+    stripPausesBeforeLatin(mergeLatinTitleOtArtist(normalizeLatinApostrophes(text))),
+  );
   let last = 0;
   let out = '';
   const re = new RegExp(LATIN_RUN_RE.source, 'g');

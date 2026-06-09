@@ -85,5 +85,20 @@ export function normalizeYandexSpeechTokens(text: string, artist = '', title = '
 
   result = normalizeVinylSideLabels(result);
 
+  result = mergeKnownTitleOtArtist(result, artist, title);
+
   return result;
+}
+
+function escapeRegExp(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+/** Metadata-aware: «Killing in The Name от Rage…» → «Killing in The Name by Rage…». */
+function mergeKnownTitleOtArtist(text: string, artist: string, title: string): string {
+  const a = normalizeLatinApostrophes(artist.trim());
+  const t = normalizeLatinApostrophes(title.trim());
+  if (!a || !t || !/[A-Za-zÀ-ÿ]{2,}/.test(a) || !/[A-Za-zÀ-ÿ]{2,}/.test(t)) return text;
+  const re = new RegExp(`${escapeRegExp(t)}\\s*,?\\s*от\\s+${escapeRegExp(a)}`, 'gi');
+  return text.replace(re, `${t} by ${a}`);
 }

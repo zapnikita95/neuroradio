@@ -111,6 +111,28 @@ test('prepareYandexTtsText keeps preposition в after ар эн би', () => {
   assert.doesNotMatch(ssml, /R&amp;B/i);
 });
 
+test('SSML merges Title ot Artist into one English phrase', () => {
+  const ssml = buildYandexSsml(
+    'Killing in The Name от Rage Against The Machine возглавил британский чарт.',
+  );
+  assert.match(
+    ssml,
+    /<lang xml:lang="en-US">Killing in The Name by Rage Against The Machine<\/lang>\s+возглавил/i,
+  );
+  assert.doesNotMatch(ssml, /от<\/lang>|<\/lang>\s*<emphasis[^>]*>от/i);
+  assert.doesNotMatch(ssml, /<lang xml:lang="en-US">Killing in The Name<\/lang>/i);
+});
+
+test('prepareYandexTtsText merges track ot artist from metadata', () => {
+  const out = prepareYandexTtsText(
+    'Killing in The Name от Rage Against The Machine возглавил чарт.',
+    { artist: 'Rage Against The Machine', title: 'Killing in The Name' },
+  );
+  const ssml = buildYandexSsml(out);
+  assert.match(ssml, /Killing in The Name by Rage Against The Machine/i);
+  assert.doesNotMatch(ssml, />\s*от\s*</i);
+});
+
 test('SSML no break before Russian preposition after English', () => {
   const ssml = buildYandexSsml('уровень Drake в мейнстриме.');
   assert.match(ssml, /<lang xml:lang="en-US">Drake<\/lang> в /i);
