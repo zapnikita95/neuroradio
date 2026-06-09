@@ -58,12 +58,12 @@ enum class TtsSpeed(val id: String, val labelRu: String, val yandexSpeed: Float,
     }
 }
 
-/** Серверная озвучка (Silero или Yandex — выбор в ServerTtsProvider на trial/premium). */
+/** Серверная озвучка (Edge или Yandex SpeechKit — выбор на trial/premium). */
 enum class TtsPlaybackEngine(val id: String, val labelRu: String, val descriptionRu: String) {
     YANDEX_SERVER(
         id = "yandex",
         labelRu = "Серверная озвучка",
-        descriptionRu = "Silero или Yandex SpeechKit на сервере приложения",
+        descriptionRu = "Microsoft Edge или Yandex SpeechKit на сервере",
     ),
     ANDROID_DEVICE(
         id = "android",
@@ -90,12 +90,12 @@ enum class TtsPlaybackEngine(val id: String, val labelRu: String, val descriptio
     }
 }
 
-/** Движок серверной озвучки при оплате сервером (trial/premium). На free — только Silero. */
+/** Движок серверной озвучки при оплате сервером (trial/premium). На free — только Edge. */
 enum class ServerTtsProvider(val id: String, val labelRu: String, val descriptionRu: String) {
-    SILERO(
-        id = "silero",
-        labelRu = "Silero",
-        descriptionRu = "Нейросетевая озвучка Silero на сервере",
+    EDGE(
+        id = "edge",
+        labelRu = "Microsoft Edge",
+        descriptionRu = "Нейросетевые голоса Edge — бесплатно и на подписке",
     ),
     YANDEX(
         id = "yandex",
@@ -105,23 +105,11 @@ enum class ServerTtsProvider(val id: String, val labelRu: String, val descriptio
     ;
 
     companion object {
-        fun fromId(id: String?): ServerTtsProvider =
-            entries.firstOrNull { it.id == id } ?: YANDEX
-    }
-}
-
-/** Silero v5_ru voices on server. */
-enum class SileroVoicePreset(val id: String, val voiceId: String, val labelRu: String, val descriptionRu: String) {
-    CALM_FEMALE("calm_female", "baya", "baya — спокойный женский", "Размеренный, нейтральный тон"),
-    CALM_MALE("calm_male", "aidar", "aidar — спокойный мужской", "Ровный дикторский голос"),
-    LIVELY_FEMALE("lively_female", "kseniya", "kseniya — живой женский", "Энергичнее, ближе к «радио»"),
-    LIVELY_MALE("lively_male", "eugene", "eugene — бодрый мужской", "Бодрая подача для эфира"),
-    BRIGHT_FEMALE("bright_female", "xenia", "xenia — яркий женский", "Выразительный женский голос Silero"),
-    ;
-
-    companion object {
-        fun fromId(id: String?): SileroVoicePreset =
-            entries.firstOrNull { it.id == id } ?: CALM_FEMALE
+        fun fromId(id: String?): ServerTtsProvider {
+            val raw = id?.trim().orEmpty()
+            if (raw == "silero") return EDGE
+            return entries.firstOrNull { it.id == raw } ?: EDGE
+        }
     }
 }
 
@@ -130,7 +118,7 @@ enum class UserTtsBilling(val id: String, val labelRu: String, val descriptionRu
     SERVER(
         id = "server",
         labelRu = "Сервер приложения",
-        descriptionRu = "Silero или Yandex SpeechKit — выбор ниже на trial и подписке",
+        descriptionRu = "Edge или Yandex SpeechKit — выбор ниже на trial и подписке",
     ),
     YANDEX(
         id = "yandex",

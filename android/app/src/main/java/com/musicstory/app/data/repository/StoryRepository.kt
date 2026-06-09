@@ -24,7 +24,7 @@ import com.musicstory.app.domain.LlmProvider
 import com.musicstory.app.domain.OpenRouterModel
 import com.musicstory.app.domain.TierAccess
 import com.musicstory.app.domain.ReferenceFactPicker
-import com.musicstory.app.domain.SileroVoicePreset
+import com.musicstory.app.domain.EdgeVoicePreset
 import com.musicstory.app.domain.StoryLength
 import com.musicstory.app.domain.StoryNarrator
 import com.musicstory.app.domain.StoryPersona
@@ -345,7 +345,8 @@ class StoryRepository(
         val ttsVoice = settingsDataStore.ttsVoice.first()
         val ttsSpeed = settingsDataStore.ttsSpeed.first()
         val ttsEmotion = settingsDataStore.ttsEmotion.first()
-        val sileroVoicePreset = settingsDataStore.sileroVoicePreset.first()
+        val edgeVoicePreset = settingsDataStore.edgeVoicePreset.first()
+        val speakTrackNamesInVoiceover = settingsDataStore.speakTrackNamesInVoiceover.first()
         val serverTtsProvider = settingsDataStore.serverTtsProvider.first()
         val userTtsBilling = settingsDataStore.userTtsBilling.first()
         val yandexTtsKey = ApiKeySanitizer.clean(settingsDataStore.yandexApiKey.first())
@@ -474,7 +475,8 @@ class StoryRepository(
                 ttsVoice = ttsVoice,
                 ttsSpeed = ttsSpeed,
                 ttsEmotion = ttsEmotion,
-                sileroVoicePreset = sileroVoicePreset,
+                edgeVoicePreset = edgeVoicePreset,
+                speakTrackNamesInVoiceover = speakTrackNamesInVoiceover,
                 skipServerTts = ttsPlaybackEngine.skipsServerTts,
                 llmProvider = llmProvider,
                 geminiModel = geminiModel,
@@ -549,7 +551,8 @@ class StoryRepository(
         ttsVoice: TtsVoice,
         ttsSpeed: TtsSpeed,
         ttsEmotion: TtsEmotion,
-        sileroVoicePreset: SileroVoicePreset = SileroVoicePreset.CALM_FEMALE,
+        edgeVoicePreset: EdgeVoicePreset = EdgeVoicePreset.SVETLANA_CALM,
+        speakTrackNamesInVoiceover: Boolean = false,
         skipServerTts: Boolean = false,
         llmProvider: LlmProvider,
         geminiModel: GeminiModel,
@@ -568,7 +571,7 @@ class StoryRepository(
         yandexFolderId: String = "",
         saluteAuthKey: String = "",
         serverTier: String? = null,
-        serverTtsProvider: ServerTtsProvider = ServerTtsProvider.YANDEX,
+        serverTtsProvider: ServerTtsProvider = ServerTtsProvider.EDGE,
     ): StoryAttemptResult {
         return try {
             StoryLog.i(
@@ -613,9 +616,9 @@ class StoryRepository(
                             UserTtsBilling.SBER -> "sber"
                             UserTtsBilling.SERVER ->
                                 if (TierAccess.isPremiumLike(serverTier) && serverTtsProvider == ServerTtsProvider.YANDEX) {
-                                    null
+                                    "yandex"
                                 } else {
-                                    "silero"
+                                    "edge"
                                 }
                         },
                         userTtsProvider = when (userTtsBilling) {
@@ -625,14 +628,11 @@ class StoryRepository(
                         yandexApiKey = yandexTtsApiKey.takeIf { userTtsBilling == UserTtsBilling.YANDEX && it.isNotBlank() },
                         yandexFolderId = yandexFolderId.takeIf { userTtsBilling == UserTtsBilling.YANDEX && it.isNotBlank() },
                         saluteAuthKey = saluteAuthKey.takeIf { userTtsBilling == UserTtsBilling.SBER && it.isNotBlank() },
-                        sileroVoicePreset = sileroVoicePreset.id.takeIf {
+                        edgeVoicePreset = edgeVoicePreset.id.takeIf {
                             userTtsBilling == UserTtsBilling.SERVER &&
-                                (!TierAccess.isPremiumLike(serverTier) || serverTtsProvider == ServerTtsProvider.SILERO)
+                                (!TierAccess.isPremiumLike(serverTier) || serverTtsProvider == ServerTtsProvider.EDGE)
                         },
-                        sileroVoice = sileroVoicePreset.voiceId.takeIf {
-                            userTtsBilling == UserTtsBilling.SERVER &&
-                                (!TierAccess.isPremiumLike(serverTier) || serverTtsProvider == ServerTtsProvider.SILERO)
-                        },
+                        speakTrackNamesInVoiceover = speakTrackNamesInVoiceover,
                         ),
                     ),
                 )

@@ -85,7 +85,7 @@ import com.musicstory.app.domain.LlmProvider
 import com.musicstory.app.domain.OpenRouterModel
 import com.musicstory.app.domain.StoryLength
 import com.musicstory.app.domain.StoryNarrator
-import com.musicstory.app.domain.SileroVoicePreset
+import com.musicstory.app.domain.EdgeVoicePreset
 import com.musicstory.app.domain.ServerTtsProvider
 import com.musicstory.app.domain.TtsEmotion
 import com.musicstory.app.domain.TtsPlaybackEngine
@@ -168,8 +168,9 @@ fun SettingsScreen(
     val ttsSpeed by settings.ttsSpeed.collectAsState(initial = TtsSpeed.NORMAL)
     val ttsEmotion by settings.ttsEmotion.collectAsState(initial = TtsEmotion.LIVELY)
     val ttsPlaybackEngine by settings.ttsPlaybackEngine.collectAsState(initial = TtsPlaybackEngine.YANDEX_SERVER)
-    val sileroVoicePreset by settings.sileroVoicePreset.collectAsState(initial = SileroVoicePreset.CALM_FEMALE)
-    val serverTtsProvider by settings.serverTtsProvider.collectAsState(initial = ServerTtsProvider.YANDEX)
+    val edgeVoicePreset by settings.edgeVoicePreset.collectAsState(initial = EdgeVoicePreset.SVETLANA_CALM)
+    val speakTrackNamesInVoiceover by settings.speakTrackNamesInVoiceover.collectAsState(initial = false)
+    val serverTtsProvider by settings.serverTtsProvider.collectAsState(initial = ServerTtsProvider.EDGE)
     val userTtsBilling by settings.userTtsBilling.collectAsState(initial = UserTtsBilling.SERVER)
     val yandexApiKey by settings.yandexApiKey.collectAsState(initial = "")
     val yandexFolderId by settings.yandexFolderId.collectAsState(initial = "")
@@ -440,14 +441,14 @@ fun SettingsScreen(
     val canCustomizeListen = TierAccess.canCustomizeListenThresholdSeconds(effectiveTier)
     val isPaidServerTier = TierAccess.isPremiumLike(effectiveTier)
     val isFreeServerTier = TierAccess.isFreeServerTier(effectiveTier)
-    val effectiveServerTtsProvider = if (isFreeServerTier) ServerTtsProvider.SILERO else serverTtsProvider
-    val serverUsesSilero = ttsPlaybackEngine == TtsPlaybackEngine.YANDEX_SERVER &&
+    val effectiveServerTtsProvider = if (isFreeServerTier) ServerTtsProvider.EDGE else serverTtsProvider
+    val serverUsesEdge = ttsPlaybackEngine == TtsPlaybackEngine.YANDEX_SERVER &&
         userTtsBilling == UserTtsBilling.SERVER &&
-        effectiveServerTtsProvider == ServerTtsProvider.SILERO
+        effectiveServerTtsProvider == ServerTtsProvider.EDGE
     val showServerTtsProviderChoice = ttsPlaybackEngine == TtsPlaybackEngine.YANDEX_SERVER &&
         userTtsBilling == UserTtsBilling.SERVER &&
         isPaidServerTier
-    val showSileroVoices = serverUsesSilero
+    val showEdgeVoices = serverUsesEdge
     val showYandexVoices = ttsPlaybackEngine == TtsPlaybackEngine.YANDEX_SERVER &&
         ((userTtsBilling == UserTtsBilling.YANDEX) ||
             (userTtsBilling == UserTtsBilling.SERVER && isPaidServerTier &&
@@ -500,14 +501,15 @@ fun SettingsScreen(
                     .padding(20.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp),
             ) {
-                val modeSummary = if (manualMode) {
-                    context.getString(R.string.mode_manual)
+                val autoPlaybackOn = !manualMode
+                val modeSummary = if (autoPlaybackOn) {
+                    context.getString(R.string.settings_auto_intercept)
                 } else {
-                    context.getString(R.string.mode_auto)
+                    context.getString(R.string.settings_manual_mode)
                 }
 
                 CollapsibleSettingsSection(
-                    title = context.getString(R.string.settings_mode_section),
+                    title = context.getString(R.string.settings_general_section),
                     summary = modeSummary,
                     tourHighlight = tourStep == 0,
                     forceExpanded = tourStep == 0,
@@ -515,10 +517,25 @@ fun SettingsScreen(
                     onTourLayout = tourLayoutHandler(0),
                 ) {
                     SettingSwitchRow(
-                        title = context.getString(R.string.settings_manual_mode),
-                        checked = manualMode,
-                        enabled = canManualMode,
-                        onCheckedChange = { scope.launch { settings.setManualMode(it) } },
+                        title = if (autoPlaybackOn) {
+                            context.getString(R.string.settings_auto_intercept)
+                        } else {
+                            context.getString(R.string.settings_manual_mode)
+                        },
+                        checked = autoPlaybackOn,
+                        enabled = canManualMode || autoPlaybackOn,
+                        onCheckedChange = { autoOn ->
+                            if (autoOn) {
+                                scope.launch { settings.setAutoPlaybackMode(true) }
+                            } else if (canManualMode) {
+                                scope.launch { settings.setAutoPlaybackMode(false) }
+                            }
+                        },
+                    )
+                    Text(
+                        text = context.getString(R.string.settings_playback_mode_hint),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MutedLavender,
                     )
                     if (!canManualMode) {
                         Text(
@@ -528,9 +545,14 @@ fun SettingsScreen(
                         )
                     }
                     SettingSwitchRow(
-                        title = context.getString(R.string.settings_auto_intercept),
-                        checked = autoIntercept,
-                        onCheckedChange = { scope.launch { settings.setAutoIntercept(it) } },
+                        title = context.getString(R.string.settings_speak_track_names),
+                        checked = speakTrackNamesInVoiceover,
+                        onCheckedChange = { scope.launch { settings.setSpeakTrackNamesInVoiceover(it) } },
+                    )
+                    Text(
+                        text = context.getString(R.string.settings_speak_track_names_hint),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MutedLavender,
                     )
                 }
 
@@ -758,13 +780,13 @@ fun SettingsScreen(
                             "${ttsPlaybackEngine.labelRu} · ${ttsSpeed.labelRu} · ${storyLength.labelRu}"
                         TtsPlaybackEngine.YANDEX_SERVER ->
                             when {
-                                showSileroVoices ->
-                                    "${sileroVoicePreset.labelRu} · ${ttsSpeed.labelRu} · ${storyLength.labelRu}"
+                                showEdgeVoices ->
+                                    "${edgeVoicePreset.labelRu} · ${ttsSpeed.labelRu} · ${storyLength.labelRu}"
                                 else ->
                                     "${ttsVoice.labelRu} · ${ttsSpeed.labelRu} · ${storyLength.labelRu}"
                             }.let { voices ->
                                 val engineLabel = when {
-                                    showSileroVoices -> ServerTtsProvider.SILERO.labelRu
+                                    showEdgeVoices -> ServerTtsProvider.EDGE.labelRu
                                     showYandexVoices && userTtsBilling == UserTtsBilling.SERVER ->
                                         ServerTtsProvider.YANDEX.labelRu
                                     else -> TtsPlaybackEngine.YANDEX_SERVER.labelRu
@@ -826,18 +848,18 @@ fun SettingsScreen(
                         }
                     }
                     Spacer(modifier = Modifier.height(8.dp))
-                    if (showSileroVoices) {
+                    if (showEdgeVoices) {
                         Text(
-                            text = context.getString(R.string.settings_silero_voice),
+                            text = context.getString(R.string.settings_edge_voice),
                             style = MaterialTheme.typography.labelMedium,
                             color = MutedLavender,
                         )
-                        SileroVoicePreset.entries.forEach { preset ->
+                        EdgeVoicePreset.entries.forEach { preset ->
                             NarratorRadioRow(
                                 label = preset.labelRu,
                                 description = preset.descriptionRu,
-                                selected = sileroVoicePreset == preset,
-                                onSelect = { scope.launch { settings.setSileroVoicePreset(preset) } },
+                                selected = edgeVoicePreset == preset,
+                                onSelect = { scope.launch { settings.setEdgeVoicePreset(preset) } },
                             )
                         }
                         Spacer(modifier = Modifier.height(8.dp))

@@ -19,8 +19,8 @@ import com.musicstory.app.domain.OpenRouterModel
 import com.musicstory.app.domain.MusicInterruptionMode
 import com.musicstory.app.domain.StoryLength
 import com.musicstory.app.domain.StoryNarrator
+import com.musicstory.app.domain.EdgeVoicePreset
 import com.musicstory.app.domain.ServerTtsProvider
-import com.musicstory.app.domain.SileroVoicePreset
 import com.musicstory.app.domain.TtsEmotion
 import com.musicstory.app.domain.TtsPlaybackEngine
 import com.musicstory.app.domain.UserTtsBilling
@@ -241,8 +241,12 @@ class SettingsDataStore(private val context: Context) {
         TtsPlaybackEngine.fromId(prefs[KEY_TTS_PLAYBACK_ENGINE])
     }
 
-    val sileroVoicePreset: Flow<SileroVoicePreset> = context.settingsDataStore.data.map { prefs ->
-        SileroVoicePreset.fromId(prefs[KEY_SILERO_VOICE_PRESET])
+    val edgeVoicePreset: Flow<EdgeVoicePreset> = context.settingsDataStore.data.map { prefs ->
+        EdgeVoicePreset.fromId(prefs[KEY_EDGE_VOICE_PRESET] ?: prefs[KEY_SILERO_VOICE_PRESET])
+    }
+
+    val speakTrackNamesInVoiceover: Flow<Boolean> = context.settingsDataStore.data.map { prefs ->
+        prefs[KEY_SPEAK_TRACK_NAMES_IN_VOICEOVER] ?: false
     }
 
     val serverTtsProvider: Flow<ServerTtsProvider> = context.settingsDataStore.data.map { prefs ->
@@ -298,6 +302,15 @@ class SettingsDataStore(private val context: Context) {
 
     suspend fun setAutoIntercept(enabled: Boolean) {
         context.settingsDataStore.edit { it[KEY_AUTO_INTERCEPT] = enabled }
+        notifyCloudSync()
+    }
+
+    /** Один переключатель: вкл = автоперехват, выкл = ручной режим (если доступен). */
+    suspend fun setAutoPlaybackMode(autoEnabled: Boolean) {
+        context.settingsDataStore.edit {
+            it[KEY_AUTO_INTERCEPT] = autoEnabled
+            it[KEY_MANUAL_MODE] = !autoEnabled
+        }
         notifyCloudSync()
     }
 
@@ -516,8 +529,16 @@ class SettingsDataStore(private val context: Context) {
         notifyCloudSync()
     }
 
-    suspend fun setSileroVoicePreset(preset: SileroVoicePreset) {
-        context.settingsDataStore.edit { it[KEY_SILERO_VOICE_PRESET] = preset.id }
+    suspend fun setEdgeVoicePreset(preset: EdgeVoicePreset) {
+        context.settingsDataStore.edit {
+            it[KEY_EDGE_VOICE_PRESET] = preset.id
+            it.remove(KEY_SILERO_VOICE_PRESET)
+        }
+        notifyCloudSync()
+    }
+
+    suspend fun setSpeakTrackNamesInVoiceover(enabled: Boolean) {
+        context.settingsDataStore.edit { it[KEY_SPEAK_TRACK_NAMES_IN_VOICEOVER] = enabled }
         notifyCloudSync()
     }
 
@@ -723,6 +744,8 @@ class SettingsDataStore(private val context: Context) {
         private val KEY_TTS_EMOTION = stringPreferencesKey("tts_emotion")
         private val KEY_TTS_PLAYBACK_ENGINE = stringPreferencesKey("tts_playback_engine")
         private val KEY_SILERO_VOICE_PRESET = stringPreferencesKey("silero_voice_preset")
+        private val KEY_EDGE_VOICE_PRESET = stringPreferencesKey("edge_voice_preset")
+        private val KEY_SPEAK_TRACK_NAMES_IN_VOICEOVER = booleanPreferencesKey("speak_track_names_in_voiceover")
         private val KEY_SERVER_TTS_PROVIDER = stringPreferencesKey("server_tts_provider")
         private val KEY_USER_TTS_BILLING = stringPreferencesKey("user_tts_billing")
         private val KEY_YANDEX_API_KEY = stringPreferencesKey("yandex_api_key")

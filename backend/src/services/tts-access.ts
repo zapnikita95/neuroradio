@@ -5,7 +5,7 @@ import {
 } from './user-tts-credentials.js';
 import { canUseSileroTts } from './silero-tts.js';
 
-export type StoryTtsProviderId = 'auto' | 'yandex' | 'sber' | 'azure' | 'elevenlabs' | 'silero';
+export type StoryTtsProviderId = 'auto' | 'yandex' | 'sber' | 'azure' | 'elevenlabs' | 'silero' | 'edge';
 
 /** Server Yandex SpeechKit — только trial/premium или свой ключ пользователя. */
 export function canUseServerSpeechKit(
@@ -38,7 +38,7 @@ export function resolveStoryTtsProvider(
     return requested ?? 'auto';
   }
 
-  return 'silero';
+  return 'edge';
 }
 
 export class SpeechKitSubscriptionRequiredError extends Error {
@@ -68,7 +68,5 @@ export function assertFreeTierTtsAvailable(
   userTtsCredentials: UserTtsCredentials | null | undefined,
 ): void {
   if (canUseServerSpeechKit(installId, userTtsCredentials)) return;
-  if (!canUseSileroTts()) {
-    throw new SileroRequiredForFreeTierError();
-  }
+  // Edge TTS (Microsoft) — без ключей, всегда доступен на бесплатном тарифе.
 }

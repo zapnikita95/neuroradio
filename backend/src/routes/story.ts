@@ -155,6 +155,8 @@ interface StoryFullBody {
   skip_server_tts?: boolean;
   silero_voice?: string;
   silero_voice_preset?: import('../services/silero-voices.js').SileroVoicePresetId;
+  edge_voice_preset?: string;
+  speak_track_names_in_voiceover?: boolean;
 }
 
 router.get('/quota', (req: Request, res: Response) => {
@@ -1424,6 +1426,8 @@ router.post('/full', extractClientSecrets, validateStoryFullBody, storyFullRateL
         title: metadata.title,
         sileroVoice: (req.body as StoryFullBody).silero_voice,
         sileroVoicePreset: (req.body as StoryFullBody).silero_voice_preset,
+        edgeVoicePreset: (req.body as StoryFullBody).edge_voice_preset,
+        speakTrackNamesInVoiceover: (req.body as StoryFullBody).speak_track_names_in_voiceover,
         logContext: {
           installId,
           artist: metadata.artist,
@@ -1441,7 +1445,7 @@ router.post('/full', extractClientSecrets, validateStoryFullBody, storyFullRateL
       response.audioUrl = null;
       response.audioFile = null;
       response.ttsHint =
-        'TTS не настроен: YANDEX_API_KEY, Silero (SILERO_TTS_*), или Azure premium';
+        'TTS не настроен: Edge, YANDEX_API_KEY или Azure premium';
     }
 
     timing.mark('tts-ready', `audio=${Boolean(response.audioUrl)}`);

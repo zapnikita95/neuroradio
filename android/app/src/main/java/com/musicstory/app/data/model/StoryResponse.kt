@@ -35,6 +35,8 @@ data class StoryRequest(
     @SerializedName("voice_tier") val voiceTier: String? = null,
     @SerializedName("silero_voice_preset") val sileroVoicePreset: String? = null,
     @SerializedName("silero_voice") val sileroVoice: String? = null,
+    @SerializedName("edge_voice_preset") val edgeVoicePreset: String? = null,
+    @SerializedName("speak_track_names_in_voiceover") val speakTrackNamesInVoiceover: Boolean = false,
 )
 
 data class StoryResponse(

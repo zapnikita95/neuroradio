@@ -41,6 +41,8 @@ interface StoryFullBody {
   skip_server_tts?: unknown;
   silero_voice?: unknown;
   silero_voice_preset?: unknown;
+  edge_voice_preset?: unknown;
+  speak_track_names_in_voiceover?: unknown;
 }
 
 const VALID_VOICE_TIERS = new Set<string>(['default', 'premium']);
@@ -52,7 +54,15 @@ function resolveSileroVoicePresetId(value: unknown): SileroVoicePresetId | undef
   if (!VALID_SILERO_VOICE_PRESETS.has(trimmed)) return undefined;
   return trimmed as SileroVoicePresetId;
 }
-const VALID_TTS_PROVIDERS = new Set<string>(['auto', 'yandex', 'sber', 'azure', 'elevenlabs', 'silero']);
+const VALID_TTS_PROVIDERS = new Set<string>([
+  'auto',
+  'yandex',
+  'sber',
+  'azure',
+  'elevenlabs',
+  'silero',
+  'edge',
+]);
 
 function resolveVoiceTier(value: unknown): VoiceTier {
   if (typeof value === 'string' && VALID_VOICE_TIERS.has(value)) {
@@ -171,6 +181,8 @@ export function validateStoryFullBody(req: Request, res: Response, next: NextFun
   const sileroVoicePreset = resolveSileroVoicePresetId(body.silero_voice_preset);
   const sileroVoiceRaw = asTrimmedString(body.silero_voice, 32);
   const sileroVoice = sileroVoiceRaw?.toLowerCase();
+  const edgeVoicePreset = asTrimmedString(body.edge_voice_preset, 32)?.toLowerCase();
+  const speakTrackNamesInVoiceover = body.speak_track_names_in_voiceover === true;
 
   req.body = {
     artist,
@@ -202,6 +214,8 @@ export function validateStoryFullBody(req: Request, res: Response, next: NextFun
     skip_server_tts: skipServerTts,
     silero_voice: sileroVoice,
     silero_voice_preset: sileroVoicePreset,
+    edge_voice_preset: edgeVoicePreset,
+    speak_track_names_in_voiceover: speakTrackNamesInVoiceover,
   };
   next();
 }

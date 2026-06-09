@@ -97,7 +97,7 @@ export function hasUserTtsCredentials(creds: UserTtsCredentials | null | undefin
 
 export function canSynthesizeServerTts(userCreds: UserTtsCredentials | null): boolean {
   if (hasUserTtsCredentials(userCreds)) return true;
-  return hasYandexCredentials() || canUseAzureSpeechProduction() || canUseSileroTts();
+  return true;
 }
 
 export function resolveUserTtsProvider(creds: UserTtsCredentials | null): UserTtsProviderId | null {
