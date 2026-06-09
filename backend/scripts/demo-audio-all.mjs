@@ -70,8 +70,9 @@ async function synthEdge(text, { voice, rate, pitch }) {
   return Buffer.from(await (await tts.synthesize()).audio.arrayBuffer());
 }
 
-function fname(sampleId, mode, voiceTag) {
-  return `${DATE}_${sampleId}_${mode}_${voiceTag}.wav`;
+function fname(sampleId, mode, voiceTag, variant = '') {
+  const mid = variant ? `${mode}_${variant}` : mode;
+  return `${DATE}_${sampleId}_${mid}_${voiceTag}.wav`;
 }
 
 async function concatBuffers(bufs) {
@@ -87,6 +88,112 @@ function prepareEnMixedText(script, artist, title) {
   const marked = prepareYandexTtsText(script, { artist, title, sentencePauses: false });
   return mergeLatinTitleOtArtist(marked.replace(/<\[[^\]]+\]>/g, ' ').replace(/\s+/g, ' ').trim());
 }
+
+/** Чистый русский для Edge RU — без латиницы и без + (Edge читает «плюс»). */
+function preparePureRuText(script) {
+  const marked = prepareYandexTtsText(script, { sentencePauses: false });
+  return marked.replace(/<\[[^\]]+\]>/g, ' ').replace(/\+/g, '').replace(/\s+/g, ' ').trim();
+}
+
+/** Варианты без названия трека/артиста в озвучке — только русские замены. */
+const GENERIC_BY_SAMPLE = {
+  '01-ratm-christmas': [
+    {
+      tag: 'tekushchiy-trek',
+      script:
+        'Текущий трек неожиданно возглавил британский рождественский чарт в две тысячи девятом. ' +
+        'Фанаты устроили кампанию в интернете, чтобы вытеснить попсу из топов — и у них получилось.',
+    },
+    {
+      tag: 'eta-kompoziciya',
+      script:
+        'Эта композиция неожиданно возглавила британский рождественский чарт в две тысячи девятом. ' +
+        'Фанаты устроили кампанию в интернете, чтобы вытеснить попсу из топов — и у них получилось.',
+    },
+    {
+      tag: 'eta-pesnya',
+      script:
+        'Эта песня неожиданно возглавила британский рождественский чарт в две тысячи девятом. ' +
+        'Фанаты устроили кампанию в интернете, чтобы вытеснить попсу из топов — и у них получилось.',
+    },
+    {
+      tag: 'etot-hit',
+      script:
+        'Этот хит неожиданно возглавил британский рождественский чарт в две тысячи девятом. ' +
+        'Фанаты устроили кампанию в интернете, чтобы вытеснить попсу из топов — и у них получилось.',
+    },
+    {
+      tag: 'seychas-v-efire',
+      script:
+        'То, что сейчас в эфире, неожиданно возглавило британский рождественский чарт в две тысячи девятом. ' +
+        'Фанаты устроили кампанию в интернете, чтобы вытеснить попсу из топов — и у них получилось.',
+    },
+  ],
+  '02-thriller-mtv': [
+    {
+      tag: 'tekushchiy-trek',
+      script:
+        'Текущий трек вышел, когда клипы только меняли правила игры. ' +
+        'МТВ крутил в основном рок, но эту композицию ставили в эфир целиком. Исполнитель вложил полмиллиона долларов из своего кармана.',
+    },
+    {
+      tag: 'eta-kompoziciya',
+      script:
+        'Эта композиция вышла, когда клипы только меняли правила игры. ' +
+        'МТВ крутил в основном рок, но её ставили в эфир целиком. Артист вложил полмиллиона долларов из своего кармана.',
+    },
+    {
+      tag: 'eta-pesnya',
+      script:
+        'Эта песня вышла, когда клипы только меняли правила игры. ' +
+        'МТВ крутил в основном рок, но эту песню ставили в эфир целиком. Исполнитель вложил полмиллиона долларов из своего кармана.',
+    },
+    {
+      tag: 'etot-hit',
+      script:
+        'Этот хит вышел, когда клипы только меняли правила игры. ' +
+        'МТВ крутил в основном рок, но этот трек ставили в эфир целиком. Исполнитель вложил полмиллиона долларов из своего кармана.',
+    },
+    {
+      tag: 'eta-zapis',
+      script:
+        'Эта запись вышла, когда клипы только меняли правила игры. ' +
+        'МТВ крутил в основном рок, но её крутили в эфир целиком. Исполнитель вложил полмиллиона долларов из своего кармана.',
+    },
+  ],
+  '03-rhcp-snow': [
+    {
+      tag: 'tekushchiy-trek',
+      script:
+        'Текущий трек — гитарный рифф с альбома две тысячи шестого года. ' +
+        'В начале две тысячи седьмого его крутили на повторе: в эфире название группы звучит по-английски.',
+    },
+    {
+      tag: 'eta-kompoziciya',
+      script:
+        'Эта композиция — гитарный рифф с альбома две тысячи шестого года. ' +
+        'В начале две тысячи седьмого её крутили на повторе: в эфире имя коллектива звучит по-английски.',
+    },
+    {
+      tag: 'eta-pesnya',
+      script:
+        'Эта песня — гитарный рифф с альбома две тысячи шестого года. ' +
+        'В начале две тысячи седьмого её крутили на повторе: в эфире фамилия в названии звучит по-английски.',
+    },
+    {
+      tag: 'etot-hit',
+      script:
+        'Этот хит — гитарный рифф с альбома две тысячи шестого года. ' +
+        'В начале две тысячи седьмого его крутили на повторе: в эфире всё звучит по-английски.',
+    },
+    {
+      tag: 'seychas-v-efire',
+      script:
+        'Сейчас в эфире — запоминающийся гитарный рифф с альбома две тысячи шестого года. ' +
+        'В начале две тысячи седьмого этот трек крутили на повторе.',
+    },
+  ],
+};
 
 async function writeTranscript(sample, trace, edgeText) {
   const base = `${DATE}_${sample.id}_transcript.txt`;
@@ -143,6 +250,7 @@ async function main() {
     '## Режимы',
     '- `phonetic-edge` — Edge RU читает кириллицу-фонетику (CMU+G2P)',
     '- `en-mixed` — Edge RU русский текст + Edge EN латиница (род совпадает)',
+    '- `ru-plain_{variant}` — только русский, без названия трека («текущий трек», «эта композиция»…)',
     '',
     '## Пары голосов',
     '- svetlana-jenny: ru-RU-SvetlanaNeural + en-US-JennyNeural (ж/ж)',
@@ -198,6 +306,44 @@ async function main() {
       console.log('[en-mixed]', name, `(${segments.length} segs)`);
     }
     manifest.push('');
+  }
+
+  manifest.push('## RU plain — без названия трека в озвучке', '');
+
+  for (const sample of SAMPLES) {
+    const variants = GENERIC_BY_SAMPLE[sample.id] ?? [];
+    const genericLines = [
+      `# ${sample.id} — generic scripts`,
+      `Generated: ${DATE}`,
+      '',
+    ];
+
+    for (const variant of variants) {
+      const ruText = preparePureRuText(variant.script);
+      genericLines.push(`## ${variant.tag}`);
+      genericLines.push(variant.script);
+      genericLines.push('');
+      genericLines.push(`TTS: ${ruText}`);
+      genericLines.push('');
+
+      for (const v of PHONETIC_RU) {
+        const name = fname(sample.id, 'ru-plain', v.tag, variant.tag);
+        const out = path.join(outDir, name);
+        await writeFile(out, await synthEdge(ruText, v));
+        const st = await stat(out);
+        manifest.push(
+          `${name}  (${Math.round(st.size / 1024)} KB)  ${variant.tag} / ${v.voice}`,
+        );
+        console.log('[ru-plain]', name);
+      }
+    }
+
+    await writeFile(
+      path.join(outDir, `${DATE}_${sample.id}_generic-scripts.txt`),
+      genericLines.join('\n'),
+      'utf8',
+    );
+    manifest.push(`scripts: ${DATE}_${sample.id}_generic-scripts.txt`, '');
   }
 
   await writeFile(path.join(outDir, 'README.md'), manifest.join('\n'), 'utf8');
