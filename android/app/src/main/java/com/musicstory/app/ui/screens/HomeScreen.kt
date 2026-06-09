@@ -91,6 +91,9 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlin.math.abs
 
+/** Delay before FGS + POST_NOTIFICATIONS — OEM security scan races right after email login. */
+private const val HOME_MONITOR_START_DELAY_MS = 3_500L
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeScreen(
@@ -323,6 +326,8 @@ fun HomeScreen(
             app.storyOrchestrator.setServiceRunning(false)
             return@LaunchedEffect
         }
+        // Huawei/MIUI run an OEM "security check" right after login; delay FGS + permission prompts.
+        delay(HOME_MONITOR_START_DELAY_MS)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             val granted = ContextCompat.checkSelfPermission(
                 context,

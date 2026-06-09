@@ -30,6 +30,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import com.musicstory.app.data.local.toCached
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import java.util.concurrent.TimeUnit
@@ -134,6 +135,8 @@ class MusicStoryApp : Application() {
 
     private fun prefetchAccountHistory() {
         appScope.launch {
+            // Let OEM security scanners finish before network + account sync (Huawei/MIUI after login).
+            delay(4_000)
             val backendUrl = settingsDataStore.backendUrl.first().trim()
             if (backendUrl.isBlank()) return@launch
             val login = accountAuthManager.fetchProfileWithCloud(backendUrl)
