@@ -21,4 +21,4 @@ Allow: /
 User-agent: YandexBot
 Allow: /
 
-Sitemap: https://efir-ai.ru/sitemap.xml
+Sitemap: https://www.efir-ai.ru/sitemap.xml

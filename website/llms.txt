@@ -2,9 +2,16 @@
 
 > Нейросетевой радиоведущий о музыке для Android и браузера. Пока играет трек, Эфир AI находит интересный факт о песне или артисте, накладывает выбранное «амплуа» ведущего и рассказывает историю живым голосом между песнями. Истории генерируются в реальном времени — заранее заготовленных записей нет.
 
-Сайт: https://efir-ai.ru
+Сайт: https://www.efir-ai.ru
 Контакт: hello@efir-ai.ru
 Исходный код: https://github.com/zapnikita95/neuroradio
+
+## SEO-страницы (гид для пользователей)
+
+- Нейро-радио: https://www.efir-ai.ru/docs/neuro-radio.html
+- Яндекс Музыка + факты о треках: https://www.efir-ai.ru/docs/yandex-music.html
+- Android APK: https://www.efir-ai.ru/docs/android-app.html
+- Расширение браузера: https://www.efir-ai.ru/docs/extension.html
 
 ## Что это такое
 
