@@ -159,18 +159,18 @@ fun rememberMusicStoryStartDestination(
     val context = LocalContext.current
     val app = context.applicationContext as MusicStoryApp
     val accountLinked by app.settingsDataStore.accountLinked.collectAsState(initial = null)
-    var resolved by remember { mutableStateOf<String?>(null) }
+    var lockedDestination by remember { mutableStateOf<String?>(null) }
 
     LaunchedEffect(hasNotificationAccess, accountLinked) {
-        if (accountLinked == null) return@LaunchedEffect
-        resolved = when {
+        if (accountLinked == null || lockedDestination != null) return@LaunchedEffect
+        lockedDestination = when {
             !hasNotificationAccess -> Routes.ONBOARDING
             accountLinked == true -> Routes.HOME
             else -> Routes.ACCOUNT_LOGIN
         }
     }
 
-    return resolved
+    return lockedDestination
 }
 
 @Composable

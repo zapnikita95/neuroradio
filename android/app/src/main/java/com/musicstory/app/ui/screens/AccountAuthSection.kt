@@ -48,9 +48,11 @@ import com.musicstory.app.ui.theme.LiveGreen
 import com.musicstory.app.ui.theme.MutedLavender
 import com.musicstory.app.util.StoryLog
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -61,10 +63,15 @@ private suspend fun finishAccountLogin(
     app: MusicStoryApp,
     login: AccountAuthManager.AccountLoginResult,
 ) {
-    app.settingsDataStore.setAccountLinked(true)
-    login.profile?.let { app.settingsDataStore.saveAccountProfile(it.toCached()) }
-    if (!app.settingsDataStore.homeTourCompleted.first()) {
-        app.settingsDataStore.setHomeTourPending(true)
+    runCatching {
+        app.settingsDataStore.setAccountLinked(true)
+        login.profile?.let { app.settingsDataStore.saveAccountProfile(it.toCached()) }
+        if (!app.settingsDataStore.homeTourCompleted.first()) {
+            app.settingsDataStore.setHomeTourPending(true)
+        }
+    }.onFailure { err ->
+        StoryLog.e("Account login: settings persist failed", err)
+        throw err
     }
     runCatching {
         if (login.history.isNotEmpty()) {
@@ -135,14 +142,23 @@ fun AccountStatusSection(
                 onDismiss = { showTelegramSheet = false },
                 onAuthPayload = { payload ->
                     scope.launch {
-                        val login = app.accountAuthManager.linkTelegram(backendUrl, payload)
-                        if (login.profile != null) {
-                            finishAccountLogin(app, login)
-                            message = context.getString(R.string.settings_auth_success)
-                            showTelegramSheet = false
-                            profile = login.profile
-                        } else {
-                            message = login.error ?: context.getString(R.string.settings_auth_verify_failed)
+                        try {
+                            val login = withContext(Dispatchers.IO) {
+                                app.accountAuthManager.linkTelegram(backendUrl, payload)
+                            }
+                            if (login.profile != null) {
+                                withContext(Dispatchers.IO) {
+                                    finishAccountLogin(app, login)
+                                }
+                                message = context.getString(R.string.settings_auth_success)
+                                showTelegramSheet = false
+                                profile = login.profile
+                            } else {
+                                message = login.error ?: context.getString(R.string.settings_auth_verify_failed)
+                            }
+                        } catch (err: Exception) {
+                            StoryLog.e("Telegram link failed", err)
+                            message = err.message ?: context.getString(R.string.settings_auth_verify_failed)
                         }
                     }
                 },
@@ -433,10 +449,14 @@ fun AccountEmailLoginContent(
                         busy = true
                         message = null
                         try {
-                            val url = app.settingsDataStore.backendUrl.first()
-                            val login = app.accountAuthManager.verifyEmailLogin(url, email, code)
+                            val login = withContext(Dispatchers.IO) {
+                                val url = app.settingsDataStore.backendUrl.first()
+                                app.accountAuthManager.verifyEmailLogin(url, email, code)
+                            }
                             if (login.profile != null) {
-                                finishAccountLogin(app, login)
+                                withContext(Dispatchers.IO) {
+                                    finishAccountLogin(app, login)
+                                }
                                 message = context.getString(R.string.settings_auth_success)
                                 onLoggedIn()
                             } else {
@@ -444,7 +464,8 @@ fun AccountEmailLoginContent(
                             }
                         } catch (err: Exception) {
                             StoryLog.e("Email verify failed", err)
-                            message = context.getString(R.string.settings_auth_verify_failed)
+                            message = err.message?.takeIf { it.isNotBlank() }
+                                ?: context.getString(R.string.settings_auth_verify_failed)
                         } finally {
                             busy = false
                         }
@@ -504,14 +525,23 @@ fun AccountTelegramLoginSection(
                 onDismiss = { showSheet = false },
                 onAuthPayload = { payload ->
                     scope.launch {
-                        val login = app.accountAuthManager.linkTelegram(backendUrl, payload)
-                        if (login.profile != null) {
-                            finishAccountLogin(app, login)
-                            message = context.getString(R.string.settings_auth_success)
-                            showSheet = false
-                            onLoggedIn()
-                        } else {
-                            message = login.error ?: context.getString(R.string.settings_auth_verify_failed)
+                        try {
+                            val login = withContext(Dispatchers.IO) {
+                                app.accountAuthManager.linkTelegram(backendUrl, payload)
+                            }
+                            if (login.profile != null) {
+                                withContext(Dispatchers.IO) {
+                                    finishAccountLogin(app, login)
+                                }
+                                message = context.getString(R.string.settings_auth_success)
+                                showSheet = false
+                                onLoggedIn()
+                            } else {
+                                message = login.error ?: context.getString(R.string.settings_auth_verify_failed)
+                            }
+                        } catch (err: Exception) {
+                            StoryLog.e("Telegram login failed", err)
+                            message = err.message ?: context.getString(R.string.settings_auth_verify_failed)
                         }
                     }
                 },
