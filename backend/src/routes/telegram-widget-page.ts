@@ -4,8 +4,13 @@ export function telegramBotUsername(): string | null {
   return u || null;
 }
 
-export function buildTelegramWidgetPageHtml(botUsername: string): string {
+export function buildTelegramWidgetPageHtml(botUsername: string, appEmbed = false): string {
   const bot = botUsername.replace(/[^a-zA-Z0-9_]/g, '').replace(/^_+/, '') || 'bot';
+  const onAuthDone = appEmbed
+    ? `if (window.MusicStoryAndroid && window.MusicStoryAndroid.onTelegramAuth) {
+    window.MusicStoryAndroid.onTelegramAuth(JSON.stringify(user));
+  }`
+    : `document.body.innerHTML = '<p style="padding:24px">Готово. Вернитесь в приложение Эфир AI.</p>';`;
   return `<!DOCTYPE html>
 <html lang="ru">
 <head>
@@ -17,16 +22,24 @@ export function buildTelegramWidgetPageHtml(botUsername: string): string {
   body{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:32px 16px;box-sizing:border-box;text-align:center}
   #tg-wrap{min-height:56px;display:flex;align-items:center;justify-content:center}
   p{color:rgba(245,239,230,.6);font-size:14px;line-height:1.5;max-width:320px;margin:20px 0 0}
+  .err{color:#ff6b6b;font-size:13px;margin-top:12px}
 </style>
 </head>
 <body>
 <div id="tg-wrap"></div>
-<p>Эфир AI — вход через Telegram</p>
+<p>${appEmbed ? 'Нажмите кнопку — Telegram покажет «Принять» или «Отклонить».' : 'Эфир AI — вход через Telegram'}</p>
+<p class="err" id="err" hidden></p>
 <script>
+function showErr(msg) {
+  var e = document.getElementById('err');
+  if (e) { e.textContent = msg; e.hidden = false; }
+}
 function onTelegramAuth(user) {
-  if (user && user.hash) {
-    document.body.innerHTML = '<p style="padding:24px">Готово. Вернитесь в приложение Эфир AI.</p>';
+  if (!user || !user.hash) {
+    showErr('Вход отменён.');
+    return;
   }
+  ${onAuthDone}
 }
 var s = document.createElement('script');
 s.async = true;
@@ -36,6 +49,7 @@ s.setAttribute('data-size', 'large');
 s.setAttribute('data-radius', '12');
 s.setAttribute('data-onauth', 'onTelegramAuth(user)');
 s.setAttribute('data-request-access', 'write');
+s.onerror = function () { showErr('Не удалось загрузить Telegram. Проверьте интернет.'); };
 document.getElementById('tg-wrap').appendChild(s);
 </script>
 </body>

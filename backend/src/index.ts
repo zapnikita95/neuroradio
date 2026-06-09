@@ -34,6 +34,7 @@ import { initPostgres, hasPostgres, closePostgres } from './services/db.js';
 import { hydrateAccountStoreFromPostgres, migrateAccountStoryDataToPostgres } from './services/account-store.js';
 import { hydrateDevTierStoreFromPostgres } from './services/dev-tier-store.js';
 import { buildTelegramWidgetPageHtml, telegramBotUsername } from './routes/telegram-widget-page.js';
+import { resolveTelegramWidgetBaseUrl, isTelegramConfigured } from './services/auth-config.js';
 import { resolveWebsiteDir, serveWebsite } from './serve-website.js';
 import publicRouter from './routes/public.js';
 import { startSubscriptionRenewalScheduler } from './services/subscription-renewal.js';
@@ -168,19 +169,20 @@ if (websiteDir) {
   console.warn('[boot] website/ not found — static site disabled');
 }
 
-/** Telegram Login Widget — only when site is not mounted at root. */
-function sendTelegramWidgetPage(res: express.Response): void {
+/** Telegram Login Widget — domain must match @BotFather /setdomain (see resolveTelegramWidgetBaseUrl). */
+function sendTelegramWidgetPage(req: express.Request, res: express.Response): void {
   const bot = telegramBotUsername();
   if (!bot) {
     res.status(503).type('text/plain').send('TELEGRAM_BOT_USERNAME not configured');
     return;
   }
-  res.type('html').send(buildTelegramWidgetPageHtml(bot));
+  const appEmbed = req.query.app === '1' || req.query.embed === 'android';
+  res.type('html').send(buildTelegramWidgetPageHtml(bot, appEmbed));
 }
 if (!websiteDir) {
-  app.get('/', (_req, res) => sendTelegramWidgetPage(res));
+  app.get('/', (_req, res) => sendTelegramWidgetPage(_req, res));
 }
-app.get('/telegram-login', (_req, res) => sendTelegramWidgetPage(res));
+app.get('/telegram-login', (req, res) => sendTelegramWidgetPage(req, res));
 
 app.use((_req, res) => {
   res.status(404).json({ error: 'Not found' });
@@ -204,6 +206,11 @@ async function boot(): Promise<void> {
   }
 
   startSubscriptionRenewalScheduler();
+
+  const tgWidget = resolveTelegramWidgetBaseUrl();
+  if (isTelegramConfigured() && tgWidget) {
+    console.log(`[boot] telegram widget origin=${tgWidget} (@BotFather /setdomain must match hostname)`);
+  }
 
   const server = app.listen(PORT, '0.0.0.0', () => {
     console.log(`Music Story BFF listening on http://0.0.0.0:${PORT}`);

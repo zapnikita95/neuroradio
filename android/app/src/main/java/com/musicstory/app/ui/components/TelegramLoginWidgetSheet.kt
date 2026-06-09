@@ -32,14 +32,19 @@ fun TelegramLoginWidgetSheet(
 
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val safeBot = botUsername.trim().removePrefix("@")
-    val baseUrl = widgetBaseUrl.trim().trimEnd('/') + "/"
+    val baseOrigin = widgetBaseUrl.trim().trimEnd('/')
+    // Base URL path sets WebView origin — must match @BotFather /setdomain (usually apex, not www).
+    val pageBaseUrl = "$baseOrigin/telegram-login"
     val html = buildTelegramWidgetHtml(safeBot)
-    val allowedHosts = setOf(
-        baseUrl.removePrefix("https://").removePrefix("http://").substringBefore('/'),
-        "telegram.org",
-        "oauth.telegram.org",
-        "t.me",
-    )
+    val allowedHosts = buildSet {
+        add(baseOrigin.removePrefix("https://").removePrefix("http://").substringBefore('/'))
+        add("telegram.org")
+        add("oauth.telegram.org")
+        add("t.me")
+        val host = baseOrigin.removePrefix("https://").removePrefix("http://").substringBefore('/')
+        if (host.startsWith("www.")) add(host.removePrefix("www."))
+        else add("www.$host")
+    }
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -74,7 +79,7 @@ fun TelegramLoginWidgetSheet(
                         },
                         "MusicStoryAndroid",
                     )
-                    loadDataWithBaseURL(baseUrl, html, "text/html", "UTF-8", null)
+                    loadDataWithBaseURL(pageBaseUrl, html, "text/html", "UTF-8", null)
                 }
             },
         )
