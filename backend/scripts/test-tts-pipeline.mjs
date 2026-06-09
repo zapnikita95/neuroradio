@@ -23,6 +23,7 @@ import {
 import { wrapSileroRussianSsml } from '../dist/services/tts-silero-ssml.js';
 import { resolveEdgeTtsDeliveryForSilero } from '../dist/services/edge-tts-en.js';
 import { normalizeYearsForRussianTts } from '../dist/services/tts-russian-years.js';
+import { normalizeEdgeRussianOrthography } from '../dist/services/tts-edge-normalize.js';
 
 let passed = 0;
 
@@ -310,24 +311,13 @@ test('premium tier without entitlement throws', () => {
   );
 });
 
-test('free tier resolves to silero when enabled', () => {
-  const prevEnabled = process.env.SILERO_TTS_ENABLED;
-  const prevUrl = process.env.SILERO_TTS_URL;
-  process.env.SILERO_TTS_ENABLED = 'true';
-  process.env.SILERO_TTS_URL = 'http://127.0.0.1:8001';
-  try {
-    const p = resolveEffectiveTtsProvider({
-      voiceTier: 'default',
-      ttsProvider: 'auto',
-      installId: '00000000-0000-4000-8000-000000000099',
-    });
-    assert.equal(p, 'silero');
-  } finally {
-    if (prevEnabled === undefined) delete process.env.SILERO_TTS_ENABLED;
-    else process.env.SILERO_TTS_ENABLED = prevEnabled;
-    if (prevUrl === undefined) delete process.env.SILERO_TTS_URL;
-    else process.env.SILERO_TTS_URL = prevUrl;
-  }
+test('free tier resolves to edge TTS', () => {
+  const p = resolveEffectiveTtsProvider({
+    voiceTier: 'default',
+    ttsProvider: 'auto',
+    installId: '00000000-0000-4000-8000-000000000099',
+  });
+  assert.equal(p, 'edge');
 });
 
 test('unknown install is free tier', () => {
@@ -420,6 +410,25 @@ test('Edge TTS rate uses integer percent not +6.00%', () => {
   const d = resolveEdgeTtsDeliveryForSilero('eugene', 1.0);
   assert.match(d.rate, /^\+6%$/);
   assert.doesNotMatch(d.rate, /\.00/);
+});
+
+test('normalizeEdgeRussianOrthography collapses loanword geminates', () => {
+  assert.equal(
+    normalizeEdgeRussianOrthography('Этот хит держится на гитарном риффе с альбома.'),
+    'Этот хит держится на гитарном рифе с альбома.',
+  );
+  assert.equal(
+    normalizeEdgeRussianOrthography('гитарный рифф с альбома'),
+    'гитарный риф с альбома',
+  );
+  assert.equal(
+    normalizeEdgeRussianOrthography('В классе играли басс и рифф.'),
+    'В классе играли бас и риф.',
+  );
+  assert.equal(
+    normalizeEdgeRussianOrthography('Он учился в классе и бассейне.'),
+    'Он учился в классе и бассейне.',
+  );
 });
 
 console.log(`\n[test-tts-pipeline] ${passed} passed`);

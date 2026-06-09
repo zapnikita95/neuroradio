@@ -17,6 +17,7 @@ import {
 } from '../dist/services/en-phonetic-ru.js';
 import { splitMixedLanguageForSilero } from '../dist/services/tts-silero-segments.js';
 import { mergeLatinTitleOtArtist } from '../dist/services/tts-yandex-ssml.js';
+import { prepareEdgeRussianSegment } from '../dist/services/tts-edge-normalize.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(__dirname, '../..');
@@ -100,10 +101,10 @@ function prepareEnMixedText(script, artist, title) {
   return mergeLatinTitleOtArtist(marked.replace(/<\[[^\]]+\]>/g, ' ').replace(/\s+/g, ' ').trim());
 }
 
-/** Чистый русский для Edge RU — без латиницы и без + (Edge читает «плюс»). */
+/** Чистый русский для Edge RU — глобальная нормализация geminate + без +. */
 function preparePureRuText(script) {
   const marked = prepareYandexTtsText(script, { sentencePauses: false });
-  return marked.replace(/<\[[^\]]+\]>/g, ' ').replace(/\+/g, '').replace(/\s+/g, ' ').trim();
+  return prepareEdgeRussianSegment(marked);
 }
 
 /**
@@ -197,7 +198,7 @@ const GENERIC_BY_SAMPLE = {
     {
       tag: 'etot-hit',
       script:
-        'Этот хит держится на гитарном рифе с альбома две тысячи шестого года. ' +
+        'Этот хит держится на гитарном риффе с альбома две тысячи шестого года. ' +
         'В начале две тысячи седьмого его крутили на повторе по всем станциям.',
     },
     {

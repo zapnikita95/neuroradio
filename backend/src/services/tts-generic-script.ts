@@ -10,15 +10,6 @@ function pickVariant(seed: string, count: number): number {
   return Math.abs(hash) % count;
 }
 
-/** Двойное «фф» в падежах ломает ударение Edge/Yandex — нормальная форма «рифе». */
-export function fixRiffDeclension(text: string): string {
-  return text
-    .replace(/гитарном риффе/gi, 'гитарном рифе')
-    .replace(/гитарным риффом/gi, 'гитарным рифом')
-    .replace(/на риффе/gi, 'на рифе')
-    .replace(/риффе/gi, 'рифе');
-}
-
 function stripLatinRuns(text: string, title: string, artist: string): string {
   let s = text;
   for (const token of [title, artist]) {
@@ -49,7 +40,7 @@ function rewriteLead(script: string, title: string, artist: string): string {
       `Сейчас в эфире песня с ${body.replace(/^гитарный рифф/i, 'гитарным рифом')}`,
       `Сейчас играет песня с тем самым ${body}`,
     ];
-    return fixRiffDeclension(templates[v]!);
+    return templates[v]!;
   }
 
   const templates = [
@@ -59,7 +50,7 @@ function rewriteLead(script: string, title: string, artist: string): string {
     `Текущий трек ${rest}`,
     `В эфире сейчас классика, которая ${rest.replace(/^вышел\b/i, 'вышла').replace(/^неожиданно возглавил/i, 'неожиданно возглавила')}`,
   ];
-  return fixRiffDeclension(templates[v]!);
+  return templates[v]!;
 }
 
 /**
@@ -72,7 +63,7 @@ export function genericizeScriptForVoiceover(
   title: string,
 ): string {
   const trimmed = script.trim();
-  if (!trimmed || !title.trim() || !artist.trim()) return fixRiffDeclension(trimmed);
+  if (!trimmed || !title.trim() || !artist.trim()) return trimmed;
 
   let result = rewriteLead(trimmed, title, artist);
   result = stripLatinRuns(result, title, artist);
@@ -83,5 +74,5 @@ export function genericizeScriptForVoiceover(
     .replace(/\s{2,}/g, ' ')
     .trim();
 
-  return fixRiffDeclension(result);
+  return result;
 }

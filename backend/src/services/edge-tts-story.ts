@@ -6,7 +6,8 @@ import { resolveEdgeVoicePreset, type EdgeVoicePresetId } from './edge-voices.js
 import { prepareYandexTtsText } from './tts-markup.js';
 import { mergeLatinTitleOtArtist } from './tts-yandex-ssml.js';
 import { splitMixedLanguageForSilero } from './tts-silero-segments.js';
-import { genericizeScriptForVoiceover, fixRiffDeclension } from './tts-generic-script.js';
+import { genericizeScriptForVoiceover } from './tts-generic-script.js';
+import { prepareEdgeRussianSegment } from './tts-edge-normalize.js';
 import { AUDIO_DIR, type SynthesisResult } from './yandex-tts.js';
 
 function formatRatePercent(speed: number, offsetPct = 0): string {
@@ -31,16 +32,20 @@ async function synthEdgeSegment(
 
 function prepareEdgeRuText(script: string): string {
   const marked = prepareYandexTtsText(script, { sentencePauses: false });
-  return fixRiffDeclension(
-    marked.replace(/<\[[^\]]+\]>/g, ' ').replace(/\+/g, '').replace(/\s+/g, ' ').trim(),
-  );
+  return prepareEdgeRussianSegment(marked);
 }
 
 function prepareEdgeMixedText(script: string, artist: string, title: string): string {
   const marked = prepareYandexTtsText(script, { artist, title, sentencePauses: false });
-  return fixRiffDeclension(
-    mergeLatinTitleOtArtist(marked.replace(/<\[[^\]]+\]>/g, ' ').replace(/\s+/g, ' ').trim()),
+  const merged = mergeLatinTitleOtArtist(
+    marked.replace(/<\[[^\]]+\]>/g, ' ').replace(/\s+/g, ' ').trim(),
   );
+  return merged
+    .split(/(\s+)/)
+    .map((part) => (/[а-яё]/i.test(part) ? prepareEdgeRussianSegment(part) : part))
+    .join('')
+    .replace(/\s+/g, ' ')
+    .trim();
 }
 
 export interface EdgeSynthesisOptions {
@@ -74,7 +79,9 @@ export async function synthesizeSpeechEdge(
   if (speakNames && artist && title) {
     const mixed = prepareEdgeMixedText(source, artist, title);
     const segments = splitMixedLanguageForSilero(mixed, artist, title).map((seg) =>
-      seg.lang === 'ru' ? { ...seg, text: seg.text.replace(/\+/g, '') } : seg,
+      seg.lang === 'ru'
+        ? { ...seg, text: prepareEdgeRussianSegment(seg.text.replace(/\+/g, '')) }
+        : seg,
     );
     for (const seg of segments) {
       if (!seg.text.trim()) continue;
