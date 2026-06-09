@@ -3,6 +3,8 @@
  * Перед синтезом схлопываем geminate, кроме устойчивых русских слов (класс, бассейн…).
  */
 
+import { normalizeGenreTermsForTts } from './tts-genre-pronounce.js';
+
 const CYRILLIC_CONSONANT = 'бвгджзклмнпрстфхцчшщ';
 
 /** Слова/корни, где двойная согласная — норма русского правописания, не трогаем. */
@@ -53,7 +55,9 @@ function collapseGeminateInToken(token: string): string {
 export function normalizeEdgeRussianOrthography(text: string): string {
   if (!text.trim()) return text;
 
-  return text
+  const withGenres = normalizeGenreTermsForTts(text);
+
+  return withGenres
     .split(/(\s+)/)
     .map((part) => {
       if (!part.trim() || !/[а-яё]/i.test(part)) return part;
