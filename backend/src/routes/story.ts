@@ -5,6 +5,7 @@ import { validateStoryFullBody } from '../middleware/validate-story.js';
 import { extractClientSecrets } from '../middleware/client-secrets.js';
 import { enrichTrackMetadata } from '../services/musicbrainz.js';
 import { fetchAggregatedFactContext, emptyAggregatedFactContext, fetchIndieArtistFocusContext, fetchEmergencyFactRescue } from '../services/fact-aggregator.js';
+import { fetchDeepWebSearchSnippets } from '../services/web-search-facts.js';
 import { fetchFastTrackWikiFacts } from '../services/wikipedia-facts.js';
 import { explainReferenceFactSelection, factsTooSimilar, type SelectedReferenceFact } from '../services/fact-picker.js';
 import { formatFactPickLog, logFactCandidatePools } from '../services/fact-interest-log.js';
@@ -612,15 +613,46 @@ router.post('/full', extractClientSecrets, validateStoryFullBody, storyFullRateL
         ]);
         console.log(formatFactPickLog(selectedFact, 'llm'));
       } else if (factCtx.rawSnippets.length > 0) {
-        const snippetSeed =
-          pickSalvageSnippetSeed(factCtx.rawSnippets, metadata.artist, metadata.title) ??
-          pickRelaxedSnippetSeed(factCtx.rawSnippets, metadata.artist, metadata.title);
-        if (snippetSeed) {
-          selectedFact = snippetSeed;
-          ingestFacts(metadata.artist, metadata.title, [
-            { fact: snippetSeed.fact, scope: snippetSeed.scope, source: 'api' },
-          ]);
-          console.log(formatFactPickLog(selectedFact, 'rules') + ' (web-snippet salvage)');
+        let mergedSnippets = factCtx.rawSnippets;
+        if (!factCtx.deepWebSearchRan) {
+          const deepSnippets = await fetchDeepWebSearchSnippets(metadata.artist, metadata.title);
+          if (deepSnippets.length > 0) {
+            mergedSnippets = [...new Set([...factCtx.rawSnippets, ...deepSnippets])];
+            factCtx = { ...factCtx, rawSnippets: mergedSnippets, deepWebSearchRan: true };
+            console.log(
+              `[fact-hunt-llm] deep web retry snippets=${mergedSnippets.length} (+${deepSnippets.length})`,
+            );
+            const huntedDeep = await huntReferenceFactWithLlm({
+              artist: metadata.artist,
+              title: metadata.title,
+              year: metadata.year,
+              genre: metadata.genre,
+              rawSnippets: mergedSnippets,
+              preferredProvider: llmProvider,
+              openRouterModel: openrouterModelFact,
+              openRouterModels: factModels,
+            });
+            if (huntedDeep) {
+              selectedFact = huntedDeep;
+              factHuntLlm = true;
+              ingestFacts(metadata.artist, metadata.title, [
+                { fact: huntedDeep.fact, scope: huntedDeep.scope, source: 'llm' },
+              ]);
+              console.log(formatFactPickLog(selectedFact, 'llm') + ' (deep-web)');
+            }
+          }
+        }
+        if (!selectedFact) {
+          const snippetSeed =
+            pickSalvageSnippetSeed(mergedSnippets, metadata.artist, metadata.title) ??
+            pickRelaxedSnippetSeed(mergedSnippets, metadata.artist, metadata.title);
+          if (snippetSeed) {
+            selectedFact = snippetSeed;
+            ingestFacts(metadata.artist, metadata.title, [
+              { fact: snippetSeed.fact, scope: snippetSeed.scope, source: 'api' },
+            ]);
+            console.log(formatFactPickLog(selectedFact, 'rules') + ' (web-snippet salvage)');
+          }
         }
       }
     } else if (selectedFact) {
