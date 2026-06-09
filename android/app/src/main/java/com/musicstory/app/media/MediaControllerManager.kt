@@ -5,6 +5,8 @@ import android.content.Context
 import android.media.AudioManager
 import android.media.session.MediaController
 import android.media.session.MediaSessionManager
+import android.os.Handler
+import android.os.Looper
 import com.musicstory.app.data.model.TrackInfo
 import com.musicstory.app.service.MediaNotificationListener
 import kotlinx.coroutines.delay
@@ -16,6 +18,7 @@ class MediaControllerManager(
     private val context: Context,
 ) {
     private val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
+    private val mainHandler = Handler(Looper.getMainLooper())
     private val sessionManager: MediaSessionManager =
         context.getSystemService(MediaSessionManager::class.java)
     private var fadedStreamOriginalVolume: Int? = null
@@ -55,17 +58,37 @@ class MediaControllerManager(
     }
 
     fun start() {
+        runOnMain { startOnMainThread() }
+    }
+
+    fun stop() {
+        runOnMain { stopOnMainThread() }
+    }
+
+    fun refreshActiveController() {
+        runOnMain { refreshActiveControllerOnMainThread() }
+    }
+
+    private fun runOnMain(block: () -> Unit) {
+        if (Looper.myLooper() == Looper.getMainLooper()) {
+            block()
+        } else {
+            mainHandler.post(block)
+        }
+    }
+
+    private fun startOnMainThread() {
         if (!hasNotificationAccess()) return
         try {
             val component = ComponentName(context, MediaNotificationListener::class.java)
             sessionManager.addOnActiveSessionsChangedListener(sessionListener, component)
-            refreshActiveController()
+            refreshActiveControllerOnMainThread()
         } catch (_: SecurityException) {
             // Notification listener not granted
         }
     }
 
-    fun stop() {
+    private fun stopOnMainThread() {
         try {
             sessionManager.removeOnActiveSessionsChangedListener(sessionListener)
         } catch (_: Exception) {
@@ -74,7 +97,7 @@ class MediaControllerManager(
         unbindController()
     }
 
-    fun refreshActiveController() {
+    private fun refreshActiveControllerOnMainThread() {
         if (!hasNotificationAccess()) return
         try {
             val component = ComponentName(context, MediaNotificationListener::class.java)
