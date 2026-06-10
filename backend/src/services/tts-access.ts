@@ -3,9 +3,8 @@ import {
   hasUserTtsCredentials,
   type UserTtsCredentials,
 } from './user-tts-credentials.js';
-import { canUseSileroTts } from './silero-tts.js';
 
-export type StoryTtsProviderId = 'auto' | 'yandex' | 'sber' | 'azure' | 'elevenlabs' | 'silero' | 'edge';
+export type StoryTtsProviderId = 'auto' | 'yandex' | 'sber' | 'azure' | 'elevenlabs' | 'edge';
 
 /** Server Yandex SpeechKit — только trial/premium или свой ключ пользователя. */
 export function canUseServerSpeechKit(
@@ -26,16 +25,19 @@ export function shouldSkipDailyStoryQuota(options: {
 /** Принудительный TTS-провайдер с учётом тарифа (не доверяем клиенту на free). */
 export function resolveStoryTtsProvider(
   installId: string,
-  requested: StoryTtsProviderId | undefined,
+  requested: StoryTtsProviderId | string | undefined,
   userTtsCredentials: UserTtsCredentials | null | undefined,
 ): StoryTtsProviderId {
+  const normalized =
+    requested === 'silero' ? 'edge' : (requested as StoryTtsProviderId | undefined);
+
   if (hasUserTtsCredentials(userTtsCredentials)) {
     if (userTtsCredentials?.provider === 'yandex') return 'yandex';
     if (userTtsCredentials?.provider === 'sber') return 'sber';
   }
 
   if (canUseServerSpeechKit(installId, userTtsCredentials)) {
-    return requested ?? 'auto';
+    return normalized ?? 'auto';
   }
 
   return 'edge';
@@ -62,9 +64,6 @@ export class FreeTierEdgeTtsError extends Error {
     this.name = 'FreeTierEdgeTtsError';
   }
 }
-
-/** @deprecated use FreeTierEdgeTtsError */
-export const SileroRequiredForFreeTierError = FreeTierEdgeTtsError;
 
 export function assertFreeTierTtsAvailable(
   installId: string,

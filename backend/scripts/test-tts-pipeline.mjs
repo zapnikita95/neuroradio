@@ -3,7 +3,7 @@
  * Run: npm run build && node scripts/test-tts-pipeline.mjs
  */
 import assert from 'node:assert/strict';
-import { prepareYandexTtsText, prepareSileroTtsText, prepareSileroTtsTextTrace } from '../dist/services/tts-markup.js';
+import { prepareYandexTtsText } from '../dist/services/tts-markup.js';
 import { resolveVoiceDelivery } from '../dist/services/tts-voice-profiles.js';
 import {
   PremiumTtsAccessError,
@@ -20,8 +20,7 @@ import {
   hasForeignSegmentsForEdge,
   splitMixedLanguageForEdge,
 } from '../dist/services/tts-mixed-segments.js';
-import { wrapSileroRussianSsml } from '../dist/services/tts-silero-ssml.js';
-import { resolveEdgeTtsDeliveryForSilero } from '../dist/services/edge-tts-en.js';
+import { resolveEdgeTtsDeliveryForPreset } from '../dist/services/edge-tts-en.js';
 import { normalizeYearsForRussianTts } from '../dist/services/tts-russian-years.js';
 import { normalizeEdgeRussianOrthography } from '../dist/services/tts-edge-normalize.js';
 
@@ -361,34 +360,6 @@ test('salute ssml uses sber voice and breaks', () => {
   assert.match(ssml, /xml:lang="en-US"/);
 });
 
-test('prepareSileroTtsText phonetic Cyrillic for Silero (no Latin left)', () => {
-  const script =
-    'Crazy Town выпустили Butterfly. Damiano David победил с песней «Zitti e buoni». ' +
-    'Звукорежиссёр поймал свист в колонках. В 2021 году коллектив победил снова.';
-  const trace = prepareSileroTtsTextTrace(script, {
-    artist: 'Crazy Town',
-    title: 'Butterfly',
-  });
-  const out = trace.prepared;
-  assert.doesNotMatch(out, /[A-Za-z]{2,}/);
-  assert.match(out, /крейзи|таун/i);
-  assert.match(out, /баттер|флай/i);
-  assert.match(out, /двадцать первом году/i);
-  assert.match(out, /св\+ист|свист/i);
-  assert.match(out, /кол\+он/i);
-  assert.doesNotMatch(out, /<\[/);
-  assert.ok(trace.latinReplacements.length > 0);
-});
-
-test('prepareSileroTtsText phonetic apostrophe titles', () => {
-  const out = prepareSileroTtsText('трек Wake Me When It\u2019s Over звучит мощно.', {
-    artist: 'The Cranberries',
-    title: "Wake Me When It's Over",
-  });
-  assert.doesNotMatch(out, /[A-Za-z]{2,}/);
-  assert.match(out, /в\+?э|ов\+?е/i);
-});
-
 test('splitMixedLanguageForEdge splits Latin for mixed Edge voices', () => {
   const segs = splitMixedLanguageForEdge(
     'The Hit Co. — это группа, и их трэк My Favorite Game — отличный пример.',
@@ -401,19 +372,8 @@ test('splitMixedLanguageForEdge splits Latin for mixed Edge voices', () => {
   assert.ok(hasForeignSegmentsForEdge('The Hit Co. — это группа.', 'The Hit Co.', 'My Favorite Game'));
 });
 
-test('wrapSileroRussianSsml adds sentence breaks and prosody', () => {
-  const ssml = wrapSileroRussianSsml('Первая фраза. Вторая фраза.', {
-    pauseProfile: 'natural',
-    styleId: 'radio_host',
-  });
-  assert.match(ssml, /break time="420ms"/);
-  assert.match(ssml, /prosody rate="medium" pitch="x-high"/);
-  assert.match(ssml, /<s>/);
-  assert.doesNotMatch(ssml, /The Hit/i);
-});
-
 test('Edge TTS rate uses integer percent not +6.00%', () => {
-  const d = resolveEdgeTtsDeliveryForSilero('eugene', 1.0);
+  const d = resolveEdgeTtsDeliveryForPreset('dmitry_lively', 1.0);
   assert.match(d.rate, /^\+6%$/);
   assert.doesNotMatch(d.rate, /\.00/);
 });

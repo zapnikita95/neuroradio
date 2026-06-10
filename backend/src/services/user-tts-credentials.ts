@@ -1,4 +1,3 @@
-import { canUseSileroTts } from './silero-tts.js';
 import { canUseAzureSpeechProduction } from './azure-tts.js';
 import { hasYandexCredentials } from './yandex-tts.js';
 

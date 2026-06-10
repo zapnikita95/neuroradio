@@ -163,71 +163,24 @@ APK → JWT → POST /v1/story/full only
 ```
 Телефон (РФ) → Railway (EU/US) → Groq API ✅
                               → Yandex TTS ✅ (premium)
-                              → Silero TTS ✅ (free tier)
+                              → Edge TTS ✅ (free tier)
 ```
 
-## Silero TTS (бесплатный тариф)
+## Edge TTS (бесплатный тариф)
 
-На free tier BFF озвучивает через **Silero v5_ru** (если настроен), иначе — Yandex.
+На free tier BFF озвучивает через **Microsoft Edge Neural TTS** (без отдельного сервиса и без ключей). На trial/premium — **Yandex SpeechKit** (если настроены `YANDEX_API_KEY` + `YANDEX_FOLDER_ID`).
 
-### 1. Два сервиса в одном проекте (важно)
-
-| Сервис | Dockerfile | Start | Домен (пример) |
-|--------|------------|-------|----------------|
-| **neuroradio** (BFF) | корневой `Dockerfile` | `node dist/index.js` | `neuroradio-production.up.railway.app` |
-| **silero** (TTS) | **`Dockerfile.silero`** | из образа | `neuroradio-silero.up.railway.app` |
-
-**Не путай URL:** `SILERO_TTS_URL` — это **только** Silero-сервис. Если указать домен BFF (`neuroradio-production…`), `/voices` вернёт 404 и озвучка не заработает.
-
-**Silero-сервис:**
-1. В том же Railway-проекте → **+ New** → **GitHub Repo** → тот же репозиторий
-2. Settings → **Config-as-code** → File path: **`silero-railway.toml`**  
-   (корневой `railway.toml` задаёт BFF Dockerfile — поле Dockerfile в UI **не кликается**, это нормально)
-3. У сервиса **silero** убери лишние Variables (GROQ, YANDEX, LLM) — они только на BFF
-4. **Generate Domain** на silero → скопируй URL
-5. **Networking → Public → Port: `8080`** (Railway ставит `$PORT=8080`; если указать 9898 — снаружи будет 502)
-6. Проверка: `curl https://ТВОЙ-SILERO.up.railway.app/voices` → `aidar`, `baya`, …
-
-**Связать BFF и Silero (Variables на music-story):**
-```
-SILERO_TTS_ENABLED=true
-TTS_PREFER_SILERO=true
-SILERO_TTS_API=legacy
-SILERO_TTS_VOICE=baya
-SILERO_TTS_URL=https://${{silero.RAILWAY_PUBLIC_DOMAIN}}
-```
-Reference `${{silero.RAILWAY_PUBLIC_DOMAIN}}` — через **New Variable → Add Reference** → сервис silero.
-
-**Не путай URL:** если `SILERO_TTS_URL` = домен BFF (`neuroradio-production-3966…`), `/health` покажет `sileroTts:false`.
-
-### 2. Variables на BFF (neuroradio)
-
-| Variable | Значение |
-|----------|----------|
-| `SILERO_TTS_ENABLED` | `true` |
-| `TTS_PREFER_SILERO` | `true` |
-| `SILERO_TTS_API` | `legacy` |
-| `SILERO_TTS_VOICE` | `baya` — **только fallback**, если приложение не передало голос; в APK выбор: baya / aidar / kseniya / eugene |
-| `SILERO_TTS_URL` | `https://ТВОЙ-SILERO.up.railway.app` (**не** домен BFF!) |
-
-Локально (Docker): `SILERO_TTS_URL=http://127.0.0.1:8001` — см. `start-silero-tts.bat`.
-
-### 3. Проверка
-
-```powershell
-cd backend
-.\scripts\test-silero-tts.ps1
-```
+Проверка:
 
 ```bash
 curl -s https://ТВОЙ-BFF.up.railway.app/health
-# sileroTts: true
+# edgeTts: true
 
 curl -s https://ТВОЙ-BFF.up.railway.app/v1/public/tts-config
-# silero.healthy: true, presets: [...]
+# edge.enabled: true, presets: [...]
 ```
 
-В приложении (бесплатный тариф): **Настройки → Озвучка → Silero на сервере** или **Android TTS**, затем выбор амплуа (baya / aidar / kseniya / eugene).
+В приложении (бесплатный тариф): **Настройки → Озвучка → Edge на сервере**, выбор пресета (Дмитрий / Светлана / Дария).
 
 ## Оплата и подписка (ЮKassa)
 
@@ -245,7 +198,7 @@ curl -s https://ТВОЙ-BFF.up.railway.app/v1/public/tts-config
 | `RESEND_FROM` | `Эфир AI <hello@efir-ai.ru>` |
 | `RECEIPT_ADMIN_EMAIL` | `zap.nikita95@gmail.com` — запрос чека после оплаты |
 | `BILLING_ADMIN_SECRET` | Секрет для `POST /v1/billing/admin/receipt` |
-| `PUBLIC_BFF_URL` | `https://www.efir-ai.ru` (BFF/music-story, **не** silero!) |
+| `PUBLIC_BFF_URL` | `https://www.efir-ai.ru` (BFF/music-story) |
 | `DATABASE_URL` | `${{Postgres.DATABASE_URL}}` — **обязательно**, иначе premium сбросится при редеплое |
 
 **Webhook в ЮKassa:** `https://ТВОЙ-BFF.up.railway.app/v1/public/yookassa/webhook`  

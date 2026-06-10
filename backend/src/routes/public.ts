@@ -13,12 +13,7 @@ import {
   sendPaymentLinkEmail,
   sendSubscribeEmail,
 } from '../services/email-sender.js';
-import {
-  canUseSileroTts,
-  getSileroTtsBaseUrl,
-  probeSileroTtsHealth,
-} from '../services/silero-tts.js';
-import { SILERO_VOICE_PRESETS } from '../services/silero-voices.js';
+import { EDGE_VOICE_PRESETS } from '../services/edge-voices.js';
 import { hasYandexCredentials } from '../services/yandex-tts.js';
 import { getPublicDownloadLinks, getSiteApkUrl } from '../services/github-downloads.js';
 import { getPublicAuthConfig } from '../services/auth-config.js';
@@ -54,29 +49,19 @@ router.get('/auth-config', (_req: Request, res: Response) => {
   res.json(getPublicAuthConfig());
 });
 
-/** TTS options for free tier (Silero vs Android device TTS). */
+/** TTS options for free tier (Edge TTS vs paid SpeechKit). */
 router.get('/tts-config', async (_req: Request, res: Response) => {
-  const sileroConfigured = canUseSileroTts();
-  const sileroUrl = getSileroTtsBaseUrl();
-  let sileroHealthy = false;
-  if (sileroConfigured && sileroUrl) {
-    sileroHealthy = await probeSileroTtsHealth(sileroUrl);
-  }
   res.json({
     freeTier: {
-      serverEngine: sileroConfigured ? 'silero' : null,
-      deviceEngine: 'android',
+      serverEngine: 'edge',
       speechKitRequiresPaidTier: true,
     },
-    silero: {
-      enabled: sileroConfigured,
-      healthy: sileroHealthy,
-      urlConfigured: Boolean(sileroUrl),
-      presets: SILERO_VOICE_PRESETS.map((p) => ({
+    edge: {
+      enabled: true,
+      presets: Object.values(EDGE_VOICE_PRESETS).map((p) => ({
         id: p.id,
-        voice: p.voice,
         labelRu: p.labelRu,
-        moodRu: p.moodRu,
+        descriptionRu: p.descriptionRu,
       })),
     },
     yandex: { configured: hasYandexCredentials() },

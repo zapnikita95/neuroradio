@@ -1,44 +1,6 @@
 import { EdgeTTS } from 'edge-tts-universal';
-import type { SileroVoiceId } from './silero-voices.js';
 import type { ForeignLang } from './tts-foreign-lang.js';
-import { resolveEdgeVoicePreset } from './edge-voices.js';
-
-/** Пара Edge TTS под каждый Silero — тот же пол, темп и «характер». */
-const EN_PROFILE_BY_SILERO: Record<
-  SileroVoiceId,
-  { voice: string; rateOffset: number; pitch: string; note: string }
-> = {
-  aidar: {
-    voice: 'en-US-EricNeural',
-    rateOffset: 0,
-    pitch: '+0Hz',
-    note: 'спокойный мужской',
-  },
-  eugene: {
-    voice: 'en-US-ChristopherNeural',
-    rateOffset: 6,
-    pitch: '+1Hz',
-    note: 'бодрый мужской (радио)',
-  },
-  baya: {
-    voice: 'en-US-JennyNeural',
-    rateOffset: 0,
-    pitch: '+0Hz',
-    note: 'спокойный женский',
-  },
-  kseniya: {
-    voice: 'en-US-AriaNeural',
-    rateOffset: 5,
-    pitch: '+2Hz',
-    note: 'живой женский',
-  },
-  xenia: {
-    voice: 'en-US-AriaNeural',
-    rateOffset: 5,
-    pitch: '+2Hz',
-    note: 'живой женский',
-  },
-};
+import { resolveEdgeVoicePreset, type EdgeVoicePresetId } from './edge-voices.js';
 
 function formatRatePercent(speed: number, offset = 0): string {
   const pct = Math.round((speed - 1) * 100) + offset;
@@ -46,42 +8,37 @@ function formatRatePercent(speed: number, offset = 0): string {
   return `${sign}${pct}%`;
 }
 
-export function resolveEdgeTtsVoiceForSilero(voice: SileroVoiceId, lang: ForeignLang = 'en'): string {
-  const presetId = ({ aidar: 'dmitry_calm', eugene: 'dmitry_lively', baya: 'svetlana_calm', kseniya: 'svetlana_lively', xenia: 'svetlana_lively' } as const)[voice] ?? 'dmitry_calm';
+export function resolveEdgeTtsVoiceForPreset(presetId: EdgeVoicePresetId, lang: ForeignLang = 'en'): string {
   const preset = resolveEdgeVoicePreset(presetId);
   if (lang === 'de') return preset.deVoice;
   if (lang === 'fr') return preset.frVoice;
   return preset.enVoice;
 }
 
-export function resolveEdgeTtsDeliveryForSilero(
-  sileroVoice: SileroVoiceId,
+export function resolveEdgeTtsDeliveryForPreset(
+  presetId: EdgeVoicePresetId,
   speed = 1.0,
   lang: ForeignLang = 'en',
 ): { voice: string; rate: string; pitch: string } {
-  const profile = EN_PROFILE_BY_SILERO[sileroVoice] ?? EN_PROFILE_BY_SILERO.aidar;
-  const voice = resolveEdgeTtsVoiceForSilero(sileroVoice, lang);
+  const preset = resolveEdgeVoicePreset(presetId);
   return {
-    voice,
-    rate: formatRatePercent(speed, profile.rateOffset),
-    pitch: profile.pitch,
+    voice: resolveEdgeTtsVoiceForPreset(presetId, lang),
+    rate: formatRatePercent(speed, preset.rateOffsetPct),
+    pitch: preset.pitch,
   };
 }
 
-/**
- * Короткие англ. фрагменты (артист, трек) — Edge TTS с тем же полом/темпом, что Silero.
- * Полное совпадение тембра невозможно (разные движки), но пары подобраны максимально близко.
- */
+/** Короткие иностранные фрагменты — Edge TTS по пресету Edge. */
 export async function synthesizeEnglishEdgeTts(
   text: string,
-  sileroVoice: SileroVoiceId,
+  edgePreset: EdgeVoicePresetId,
   options: { rate?: string; pitch?: string; speed?: number; lang?: ForeignLang } = {},
 ): Promise<Buffer> {
   const trimmed = text.trim();
   if (!trimmed) throw new Error('Edge TTS: empty foreign segment');
 
   const lang = options.lang ?? 'en';
-  const delivery = resolveEdgeTtsDeliveryForSilero(sileroVoice, options.speed ?? 1.0, lang);
+  const delivery = resolveEdgeTtsDeliveryForPreset(edgePreset, options.speed ?? 1.0, lang);
   const tts = new EdgeTTS(trimmed, delivery.voice, {
     rate: options.rate ?? delivery.rate,
     pitch: options.pitch ?? delivery.pitch,

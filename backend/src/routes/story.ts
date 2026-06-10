@@ -54,7 +54,6 @@ import { countWords, detectStoryQualityWarnings, sanitizeScriptForTts } from '..
 import type { StoryScript } from '../services/groq.js';
 import { setLogDetail } from '../middleware/request-logger.js';
 import { hasYandexCredentials } from '../services/yandex-tts.js';
-import { canUseSileroTts } from '../services/silero-tts.js';
 import {
   canSynthesizeServerTts,
   hasUserTtsCredentials,
@@ -67,7 +66,7 @@ import {
   assertFreeTierTtsAvailable,
   resolveStoryTtsProvider,
   shouldSkipDailyStoryQuota,
-  SileroRequiredForFreeTierError,
+  FreeTierEdgeTtsError,
   SpeechKitSubscriptionRequiredError,
 } from '../services/tts-access.js';
 import {
@@ -154,8 +153,6 @@ interface StoryFullBody {
   user_tts_provider?: 'yandex' | 'sber';
   /** Client-side Android TTS — skip Yandex/Salute synthesis to save cost during testing. */
   skip_server_tts?: boolean;
-  silero_voice?: string;
-  silero_voice_preset?: import('../services/silero-voices.js').SileroVoicePresetId;
   edge_voice_preset?: string;
   speak_track_names_in_voiceover?: boolean;
 }
@@ -1488,8 +1485,6 @@ router.post('/full', extractClientSecrets, validateStoryFullBody, storyFullRateL
         storyNarrator,
         artist: metadata.artist,
         title: metadata.title,
-        sileroVoice: (req.body as StoryFullBody).silero_voice,
-        sileroVoicePreset: (req.body as StoryFullBody).silero_voice_preset,
         edgeVoicePreset: (req.body as StoryFullBody).edge_voice_preset,
         speakTrackNamesInVoiceover: (req.body as StoryFullBody).speak_track_names_in_voiceover,
         storyLanguage: storyLanguage ?? 'ru',
@@ -1558,7 +1553,7 @@ router.post('/full', extractClientSecrets, validateStoryFullBody, storyFullRateL
       });
       return;
     }
-    if (err instanceof SpeechKitSubscriptionRequiredError || err instanceof SileroRequiredForFreeTierError) {
+    if (err instanceof SpeechKitSubscriptionRequiredError || err instanceof FreeTierEdgeTtsError) {
       res.status(402).json({
         error: err.message,
         code: err.code,

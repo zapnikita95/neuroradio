@@ -18,8 +18,5 @@ for /f "tokens=2" %%a in ('tasklist /FI "IMAGENAME eq cloudflared.exe" /FO LIST 
   taskkill /PID %%a /F >nul 2>&1
 )
 
-docker rm -f music-story-silero >nul 2>&1
-echo  Silero container removed
-
 echo Done.
 pause

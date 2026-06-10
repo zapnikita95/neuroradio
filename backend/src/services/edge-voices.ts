@@ -75,18 +75,22 @@ export const EDGE_VOICE_PRESETS: Record<EdgeVoicePresetId, EdgeVoicePreset> = {
   },
 };
 
-const SILERO_TO_EDGE: Record<string, EdgeVoicePresetId> = {
+const LEGACY_VOICE_ALIASES: Record<string, EdgeVoicePresetId> = {
   aidar: 'dmitry_calm',
   eugene: 'dmitry_lively',
   baya: 'svetlana_calm',
   kseniya: 'svetlana_lively',
   xenia: 'svetlana_lively',
+  calm_female: 'svetlana_calm',
+  calm_male: 'dmitry_calm',
+  lively_female: 'svetlana_lively',
+  lively_male: 'dmitry_lively',
 };
 
 export function resolveEdgeVoicePresetId(value?: string | null): EdgeVoicePresetId {
   const raw = value?.trim().toLowerCase();
   if (raw && raw in EDGE_VOICE_PRESETS) return raw as EdgeVoicePresetId;
-  if (raw && raw in SILERO_TO_EDGE) return SILERO_TO_EDGE[raw]!;
+  if (raw && raw in LEGACY_VOICE_ALIASES) return LEGACY_VOICE_ALIASES[raw]!;
   return 'svetlana_calm';
 }
 

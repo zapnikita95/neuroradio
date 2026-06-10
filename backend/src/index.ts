@@ -24,7 +24,6 @@ import {
 } from './services/local-ollama.js';
 import { resolveLlmProvider } from './services/llm-provider.js';
 import { hasYandexCredentials } from './services/yandex-tts.js';
-import { canUseSileroTts } from './services/silero-tts.js';
 import { securityHeaders } from './middleware/security-headers.js';
 import { requireSignedAudioAccess } from './middleware/audio-auth.js';
 import { requestLogger } from './middleware/request-logger.js';
@@ -133,9 +132,8 @@ app.get('/health', (_req, res) => {
   const gemini = hasGeminiApiKey();
   const localOllama = hasLocalOllamaConfigured();
   const yandexTts = hasYandexCredentials();
-  const sileroTts = canUseSileroTts();
   console.log(
-    `[health] llm=${llm} openrouter=${openrouter} groq=${groq} gemini=${gemini} localOllama=${localOllama} yandexTts=${yandexTts} sileroTts=${sileroTts}`,
+    `[health] llm=${llm} openrouter=${openrouter} groq=${groq} gemini=${gemini} localOllama=${localOllama} yandexTts=${yandexTts} edgeTts=true`,
   );
   res.json({
     status: 'ok',
@@ -148,7 +146,7 @@ app.get('/health', (_req, res) => {
     gemini,
     localOllama,
     yandexTts,
-    sileroTts,
+    edgeTts: true,
     appAuthRequired: isAppAuthEnabled(),
     postgres: hasPostgres(),
   });

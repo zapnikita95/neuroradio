@@ -8,18 +8,13 @@ import { applyRussianStressSafe, RUSSIAN_STRESS } from './russian-stress.js';
 import { runTtsQualityPass } from './tts-quality-pass.js';
 import {
   applyForeignPronunciation,
-  applyForeignPronunciationWithReplacements,
   preserveMusicProperNames,
 } from './tts-foreign-pronounce.js';
-import { stripYandexPauseMarkup } from './tts-azure-ssml.js';
 import { enhanceMixedLanguageText } from './tts-en-normalize.js';
 import {
-  normalizeLatinApostrophes,
   normalizeYandexSpeechTokens,
-  stripApostrophesInLatinRuns,
 } from './tts-yandex-normalize.js';
 import { normalizeYearsForRussianTts } from './tts-russian-years.js';
-import type { SileroTtsTextTrace } from './tts-silero-transcript.js';
 import type { TtsPauseProfile } from './tts-voice-profiles.js';
 
 /** @deprecated use RUSSIAN_STRESS from russian-stress.ts */
@@ -165,55 +160,6 @@ export function prepareYandexTtsText(
     : enhanceMixedLanguageText(text, artist, title);
 
   return collapseMarkupWhitespace(text);
-}
-
-/**
- * Silero v5_ru: CMU+G2P phonetic transliteration → pure Cyrillic (one voice, no Edge).
- */
-export function prepareSileroTtsTextTrace(
-  script: string,
-  options: TtsMarkupOptions = {},
-): SileroTtsTextTrace {
-  const { artist, title } = markupArtistTitle(options);
-
-  const originalScript = script;
-  const afterProperNames = preserveMusicProperNames(script, artist, title);
-
-  let text = afterProperNames;
-  text = sanitizeScriptForTts(text, artist, title, [], {
-    speakTrackNamesInVoiceover: options.speakTrackNamesInVoiceover,
-    trackArtist: options.artist ?? '',
-    trackTitle: options.title ?? '',
-  });
-  text = runTtsQualityPass(text).text;
-  text = normalizeYearsForRussianTts(text);
-  text = expandQuotesForSpeech(text);
-  text = normalizeLatinApostrophes(text);
-  text = applyRussianStressSafe(text);
-
-  const { text: cyrillic, replacements } = applyForeignPronunciationWithReplacements(
-    text,
-    artist,
-    title,
-  );
-  const prepared = stripYandexPauseMarkup(cyrillic);
-
-  return {
-    originalScript,
-    artist,
-    title,
-    afterProperNames,
-    afterLatinTransliteration: cyrillic,
-    latinReplacements: replacements,
-    prepared,
-  };
-}
-
-export function prepareSileroTtsText(
-  script: string,
-  options: TtsMarkupOptions = {},
-): string {
-  return prepareSileroTtsTextTrace(script, options).prepared;
 }
 
 export { STRESS_OVERRIDES, RUSSIAN_STRESS };

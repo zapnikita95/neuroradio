@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "description": "Stylized artist names → RU Cyrillic (Yandex/Edge/Silero) and EN respelling (ElevenLabs/Azure en).",
+  "description": "Stylized artist names → RU Cyrillic (Yandex/Edge) and EN respelling (ElevenLabs/Azure en).",
   "artists": {
     "xxxtentacion": {
       "ru": "икстент+acion",
