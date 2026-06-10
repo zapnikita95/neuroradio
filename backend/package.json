@@ -23,6 +23,8 @@
     "test:silero-phonetic-live": "npm run build && node scripts/test-silero-phonetic-live.mjs",
     "test:tts:voices": "npm run build && node scripts/test-all-voices-tts.mjs",
     "test:elevenlabs-narrators": "npm run build && node scripts/test-elevenlabs-narrators.mjs",
+    "generate:website-demos-en": "node scripts/generate-website-demos-en.mjs --preview",
+    "generate:website-demos-en:all": "node scripts/generate-website-demos-en.mjs --all",
     "test:fact-sources": "npm run build && node scripts/benchmark-fact-sources.mjs",
     "build:catalog": "node scripts/build-popular-tracks-catalog.mjs",
     "seed:facts": "npm run build && node scripts/bulk-seed-fact-bank.mjs",

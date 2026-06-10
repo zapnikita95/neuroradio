@@ -348,4 +348,63 @@ router.post('/subscribe', async (req: Request, res: Response) => {
   }
 });
 
+/** Offline website demo audio — ElevenLabs via Railway (local RF gets Cloudflare 403). */
+router.post('/website-demo/tts', async (req: Request, res: Response) => {
+  const secret = String(req.headers['x-website-demo-secret'] ?? '');
+  const expected = process.env.WEBSITE_DEMO_SECRET?.trim();
+  if (!expected || secret !== expected) {
+    res.status(403).json({ error: 'forbidden' });
+    return;
+  }
+
+  const text = typeof req.body?.text === 'string' ? req.body.text.trim() : '';
+  const lang = req.body?.lang === 'en' ? 'en' : 'ru';
+  const voiceKey = typeof req.body?.voiceId === 'string' ? req.body.voiceId.trim().toLowerCase() : '';
+
+  if (!text || text.length > 6000) {
+    res.status(400).json({ error: 'invalid text' });
+    return;
+  }
+
+  try {
+    if (lang === 'en') {
+      const { synthesizeSpeechElevenLabs } = await import('../services/elevenlabs-tts.js');
+      const { ELEVENLABS_VOICE_PRESETS } = await import('../services/elevenlabs-voices.js');
+      const preset =
+        voiceKey && voiceKey in ELEVENLABS_VOICE_PRESETS
+          ? ELEVENLABS_VOICE_PRESETS[voiceKey as keyof typeof ELEVENLABS_VOICE_PRESETS]
+          : null;
+      const voiceId = preset?.voiceId ?? voiceKey;
+      const tmp = `web-demo-${Date.now()}.ogg`;
+      const result = await synthesizeSpeechElevenLabs(text, tmp, { voiceId });
+      const { readFile, unlink } = await import('node:fs/promises');
+      const buf = await readFile(result.filePath);
+      await unlink(result.filePath).catch(() => undefined);
+      res.setHeader('Content-Type', 'audio/ogg');
+      res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+      res.send(buf);
+      return;
+    }
+
+    const { synthesizeSpeech } = await import('../services/yandex-tts.js');
+    const tmp = `web-demo-ru-${Date.now()}`;
+    const result = await synthesizeSpeech(text, voiceKey || 'zahar', tmp, {
+      speed: 1.08,
+      artist: 'Michael Jackson',
+      title: 'Thriller',
+      pauseProfile: 'tight',
+      websitePreview: true,
+    });
+    const { readFile, unlink } = await import('node:fs/promises');
+    const buf = await readFile(result.filePath);
+    await unlink(result.filePath).catch(() => undefined);
+    res.setHeader('Content-Type', 'audio/wav');
+    res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+    res.send(buf);
+  } catch (err) {
+    console.error('[public/website-demo/tts]', err instanceof Error ? err.message : err);
+    res.status(502).json({ error: 'tts_failed', detail: err instanceof Error ? err.message : String(err) });
+  }
+});
+
 export default router;
