@@ -130,6 +130,64 @@ final class StoryOrchestrator: ObservableObject {
         uiState.errorMessage = nil
     }
 
+    func replayHistoryStory(_ entry: StoryHistoryEntry) async {
+        guard let response = storyRepository.offlineReplayResponse(for: entry.trackKey) else {
+            uiState.errorMessage = "Нет сохранённой озвучки. Послушайте трек онлайн с расширенным тарифом."
+            uiState.state = .error
+            return
+        }
+        if isStoryRunning {
+            stopStory()
+        }
+        isStoryRunning = true
+        playbackSession += 1
+        let session = playbackSession
+
+        uiState.state = .preparingPlayback
+        uiState.errorMessage = nil
+        var musicPaused = false
+        if nowPlaying.canControlPlayback(for: .manual) {
+            nowPlaying.pauseMusic()
+            musicPaused = true
+        }
+
+        let audioURL = storyRepository.resolvePlaybackURL(
+            trackKey: entry.trackKey,
+            audioURL: response.audioUrl
+        )
+        storyPlayer.playStory(
+            response: response,
+            audioURL: audioURL,
+            speechRate: settings.ttsSpeed,
+            resumeMusic: true,
+            onPlaybackStarted: { [weak self] in
+                Task { @MainActor in
+                    guard session == self?.playbackSession else { return }
+                    self?.uiState.state = .playingStory
+                }
+            },
+            onFinished: { [weak self] in
+                Task { @MainActor in
+                    guard session == self?.playbackSession else { return }
+                    if musicPaused, self?.storyPlayer.shouldResumeMusic() == true {
+                        self?.nowPlaying.resumeMusic()
+                    }
+                    self?.isStoryRunning = false
+                    self?.uiState.state = .listening
+                }
+            },
+            onError: { [weak self] in
+                Task { @MainActor in
+                    guard session == self?.playbackSession else { return }
+                    if musicPaused { self?.nowPlaying.resumeMusic() }
+                    self?.isStoryRunning = false
+                    self?.uiState.errorMessage = "Не удалось воспроизвести историю"
+                    self?.uiState.state = .error
+                }
+            }
+        )
+    }
+
     func clearError() {
         uiState.errorMessage = nil
         if uiState.state == .error {
@@ -182,7 +240,10 @@ final class StoryOrchestrator: ObservableObject {
                 musicPaused = true
             }
 
-            let audioURL = storyRepository.resolveAudioURL(response.audioUrl)
+            let audioURL = storyRepository.resolvePlaybackURL(
+                trackKey: track.displayKey,
+                audioURL: response.audioUrl
+            )
             storyPlayer.playStory(
                 response: response,
                 audioURL: audioURL,

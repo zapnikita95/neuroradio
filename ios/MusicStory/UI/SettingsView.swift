@@ -5,6 +5,7 @@ struct SettingsView: View {
     @EnvironmentObject private var settings: SettingsStore
     @EnvironmentObject private var orchestrator: StoryOrchestrator
     @EnvironmentObject private var nowPlaying: NowPlayingCoordinator
+    @ObservedObject private var storyRepository = StoryRepository.shared
 
     @State private var backendURL: String = ""
     @State private var spotifyClientId: String = ""
@@ -18,6 +19,7 @@ struct SettingsView: View {
                     header
                     backendSection
                     modeSection
+                    offlineCacheSection
                     triggerSection
                     spotifySection
                     manualSection
@@ -81,6 +83,26 @@ struct SettingsView: View {
                     .foregroundStyle(AppTheme.creamText)
             }
             .tint(AppTheme.goldBright)
+        }
+    }
+
+    private var offlineCacheSection: some View {
+        let canUse = TierAccess.canUseOfflineAudioCache(storyRepository.accountTier)
+        return GlassCard {
+            Toggle(isOn: Binding(
+                get: { settings.offlineAudioCacheEnabled && canUse },
+                set: { if canUse { settings.offlineAudioCacheEnabled = $0 } }
+            )) {
+                Text("Сохранять истории на телефоне")
+                    .foregroundStyle(AppTheme.creamText)
+            }
+            .tint(AppTheme.goldBright)
+            .disabled(!canUse)
+            Text(canUse
+                 ? "После генерации озвучка сохраняется на iPhone. Без интернета можно переслушать готовые истории."
+                 : "Доступно по расширенной подписке.")
+                .font(.caption)
+                .foregroundStyle(AppTheme.mutedLavender)
         }
     }
 

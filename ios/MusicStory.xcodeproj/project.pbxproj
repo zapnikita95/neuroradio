@@ -33,6 +33,8 @@
 		B1000018 /* MusicStoryWidgetExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = P1000002 /* MusicStoryWidgetExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		B1000019 /* WidgetKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = F1000019 /* WidgetKit.framework */; };
 		B100001A /* SwiftUI.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = F100001A /* SwiftUI.framework */; };
+		B1000020 /* OfflineAudioStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1000020 /* OfflineAudioStore.swift */; };
+		B1000021 /* TierAccess.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1000021 /* TierAccess.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -89,6 +91,8 @@
 		F100001A /* SwiftUI.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = SwiftUI.framework; path = System/Library/Frameworks/SwiftUI.framework; sourceTree = SDKROOT; };
 		P1000002 /* MusicStoryWidgetExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = MusicStoryWidgetExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		P1000003 /* MusicStory.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = MusicStory.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		F1000020 /* OfflineAudioStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OfflineAudioStore.swift; sourceTree = "<group>"; };
+		F1000021 /* TierAccess.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TierAccess.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -192,6 +196,8 @@
 				F100000A /* BackendClient.swift */,
 				F100000B /* StoryHistoryStore.swift */,
 				F100000C /* StoryRepository.swift */,
+				F1000020 /* OfflineAudioStore.swift */,
+				F1000021 /* TierAccess.swift */,
 			);
 			path = Data;
 			sourceTree = "<group>";
@@ -347,6 +353,8 @@
 				B1000013 /* HomeView.swift in Sources */,
 				B1000014 /* SettingsView.swift in Sources */,
 				B1000015 /* HistoryView.swift in Sources */,
+				B1000020 /* OfflineAudioStore.swift in Sources */,
+				B1000021 /* TierAccess.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

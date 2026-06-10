@@ -30,4 +30,7 @@ object TierAccess {
 
     /** Свой порог «трек прослушан» (секунды) — premium. */
     fun canCustomizeListenThresholdSeconds(tier: String?): Boolean = isPremiumLike(tier)
+
+    /** Сохранение озвучки на телефон и replay без интернета — расширенный тариф. */
+    fun canUseOfflineAudioCache(tier: String?): Boolean = isPremiumLike(tier)
 }

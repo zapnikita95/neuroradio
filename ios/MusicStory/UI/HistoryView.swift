@@ -3,6 +3,7 @@ import SwiftData
 
 struct HistoryView: View {
     @Environment(\.dismiss) private var dismiss
+    @EnvironmentObject private var orchestrator: StoryOrchestrator
     @Query(sort: \StoryHistoryEntry.createdAt, order: .reverse) private var stories: [StoryHistoryEntry]
     @Query(sort: \ScrobbleEntry.scrobbledAt, order: .reverse) private var scrobbles: [ScrobbleEntry]
 
@@ -56,6 +57,13 @@ struct HistoryView: View {
                             .font(.caption)
                             .foregroundStyle(AppTheme.mutedLavender)
                             .lineLimit(4)
+                        if StoryRepository.shared.canReplayOffline(trackKey: entry.trackKey) {
+                            Button("Слушать") {
+                                Task { await orchestrator.replayHistoryStory(entry) }
+                            }
+                            .buttonStyle(.borderedProminent)
+                            .tint(AppTheme.goldBright)
+                        }
                     }
                     .listRowBackground(AppTheme.surfaceGlass)
                 }

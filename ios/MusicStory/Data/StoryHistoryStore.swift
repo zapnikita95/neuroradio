@@ -2,6 +2,38 @@ import Foundation
 import SwiftData
 
 @Model
+final class CachedStoryEntry {
+    @Attribute(.unique) var trackKey: String
+    var artist: String
+    var title: String
+    var script: String
+    var audioUrl: String?
+    var localAudioPath: String?
+    var demo: Bool
+    var fetchedAt: Date
+
+    init(
+        trackKey: String,
+        artist: String,
+        title: String,
+        script: String,
+        audioUrl: String? = nil,
+        localAudioPath: String? = nil,
+        demo: Bool = false,
+        fetchedAt: Date = .now
+    ) {
+        self.trackKey = trackKey
+        self.artist = artist
+        self.title = title
+        self.script = script
+        self.audioUrl = audioUrl
+        self.localAudioPath = localAudioPath
+        self.demo = demo
+        self.fetchedAt = fetchedAt
+    }
+}
+
+@Model
 final class StoryHistoryEntry {
     @Attribute(.unique) var id: UUID
     var artist: String
@@ -70,7 +102,7 @@ final class ScrobbleEntry {
 enum StoryHistoryModel {
     static let container: ModelContainer = {
         do {
-            return try ModelContainer(for: StoryHistoryEntry.self, ScrobbleEntry.self)
+            return try ModelContainer(for: StoryHistoryEntry.self, ScrobbleEntry.self, CachedStoryEntry.self)
         } catch {
             fatalError("SwiftData init failed: \(error)")
         }
@@ -108,6 +140,56 @@ final class StoryHistoryStore {
         )
         context.insert(entry)
         try? context.save()
+    }
+
+    func cachedStory(for trackKey: String) -> CachedStoryEntry? {
+        var descriptor = FetchDescriptor<CachedStoryEntry>(
+            predicate: #Predicate { $0.trackKey == trackKey }
+        )
+        descriptor.fetchLimit = 1
+        return try? context.fetch(descriptor).first
+    }
+
+    func upsertCachedStory(
+        trackKey: String,
+        response: StoryResponse,
+        localAudioPath: String?
+    ) {
+        if let existing = cachedStory(for: trackKey) {
+            existing.artist = response.artist
+            existing.title = response.title
+            existing.script = response.script
+            existing.audioUrl = response.audioUrl
+            existing.localAudioPath = localAudioPath ?? existing.localAudioPath
+            existing.demo = response.demo
+            existing.fetchedAt = .now
+        } else {
+            context.insert(
+                CachedStoryEntry(
+                    trackKey: trackKey,
+                    artist: response.artist,
+                    title: response.title,
+                    script: response.script,
+                    audioUrl: response.audioUrl,
+                    localAudioPath: localAudioPath,
+                    demo: response.demo
+                )
+            )
+        }
+        try? context.save()
+    }
+
+    func updateLocalAudioPath(trackKey: String, path: String) {
+        guard let cached = cachedStory(for: trackKey) else { return }
+        cached.localAudioPath = path
+        try? context.save()
+    }
+
+    func cachedStoriesMissingLocalAudio() -> [CachedStoryEntry] {
+        let descriptor = FetchDescriptor<CachedStoryEntry>()
+        return (try? context.fetch(descriptor))?.filter {
+            ($0.localAudioPath ?? "").isEmpty && !($0.audioUrl ?? "").isEmpty
+        } ?? []
     }
 
     func logScrobble(_ track: TrackInfo, storyTriggered: Bool) {

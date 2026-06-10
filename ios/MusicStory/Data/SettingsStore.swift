@@ -26,6 +26,7 @@ final class SettingsStore: ObservableObject {
         static let autoIntercept = "auto_intercept"
         static let spotifyClientId = "spotify_client_id"
         static let spotifyRedirectURI = "spotify_redirect_uri"
+        static let offlineAudioCacheEnabled = "offline_audio_cache_enabled"
     }
 
     private let defaults = UserDefaults.standard
@@ -74,6 +75,10 @@ final class SettingsStore: ObservableObject {
         didSet { defaults.set(spotifyRedirectURI, forKey: Keys.spotifyRedirectURI) }
     }
 
+    @Published var offlineAudioCacheEnabled: Bool {
+        didSet { defaults.set(offlineAudioCacheEnabled, forKey: Keys.offlineAudioCacheEnabled) }
+    }
+
     private init() {
         backendURL = defaults.string(forKey: Keys.backendURL) ?? SettingsDefaults.backendURL
         manualMode = defaults.bool(forKey: Keys.manualMode)
@@ -86,6 +91,7 @@ final class SettingsStore: ObservableObject {
         autoIntercept = defaults.object(forKey: Keys.autoIntercept) as? Bool ?? true
         spotifyClientId = defaults.string(forKey: Keys.spotifyClientId) ?? ""
         spotifyRedirectURI = defaults.string(forKey: Keys.spotifyRedirectURI) ?? "efirai://spotify-callback"
+        offlineAudioCacheEnabled = defaults.object(forKey: Keys.offlineAudioCacheEnabled) as? Bool ?? true
     }
 
     var installId: String {

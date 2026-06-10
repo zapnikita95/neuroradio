@@ -8,13 +8,19 @@ final class StoryRepository: ObservableObject {
     private let backend = BackendClient.shared
     private let history = StoryHistoryStore.shared
     private let settings = SettingsStore.shared
+    private let offlineStore = OfflineAudioStore.shared
 
     @Published private(set) var dailyQuota: StoryQuotaInfo?
+    @Published private(set) var accountTier: String?
+
+    static let offlineNoCacheMessage =
+        "Нет интернета. Эта история ещё не сохранена на телефоне — один раз послушайте онлайн с расширенным тарифом."
 
     func refreshQuota() async {
         do {
             let response = try await backend.fetchQuota()
             dailyQuota = response.quota
+            accountTier = response.tier
         } catch {
             // quota is optional UI hint
         }
@@ -23,6 +29,13 @@ final class StoryRepository: ObservableObject {
     func fetchStory(track: TrackInfo, forceRefresh: Bool = true) async -> Result<StoryResponse, Error> {
         guard track.isValid() else {
             return .failure(BackendError.serverError(400, "Некорректные метаданные трека"))
+        }
+
+        if !NetworkMonitor.isConnected {
+            if let replay = offlineReplayResponse(for: track.displayKey) {
+                return .success(replay)
+            }
+            return .failure(BackendError.serverError(0, Self.offlineNoCacheMessage))
         }
 
         let previousScripts = history.recentScripts(for: track.displayKey)
@@ -39,6 +52,12 @@ final class StoryRepository: ObservableObject {
             let response = try await backend.fetchFullStory(request: request)
             history.saveStory(response, track: track)
             dailyQuota = response.quota
+            let localPath = await maybeDownloadOfflineAudio(trackKey: track.displayKey, audioUrl: response.audioUrl)
+            history.upsertCachedStory(
+                trackKey: track.displayKey,
+                response: response,
+                localAudioPath: localPath
+            )
             return .success(response)
         } catch {
             return .failure(error)
@@ -47,5 +66,67 @@ final class StoryRepository: ObservableObject {
 
     func resolveAudioURL(_ audioURL: String?) -> URL? {
         backend.resolveAudioURL(audioURL)
+    }
+
+    func resolvePlaybackURL(trackKey: String, audioURL: String?) -> URL? {
+        if canUseOfflineReplay(), let cached = history.cachedStory(for: trackKey),
+           offlineStore.hasLocalFile(at: cached.localAudioPath) {
+            return offlineStore.localFileURL(path: cached.localAudioPath!)
+        }
+        return resolveAudioURL(audioURL)
+    }
+
+    func canReplayOffline(trackKey: String) -> Bool {
+        guard canUseOfflineReplay(),
+              let cached = history.cachedStory(for: trackKey) else { return false }
+        return offlineStore.hasLocalFile(at: cached.localAudioPath)
+    }
+
+    func offlineReplayResponse(for trackKey: String) -> StoryResponse? {
+        guard canUseOfflineReplay(),
+              let cached = history.cachedStory(for: trackKey),
+              offlineStore.hasLocalFile(at: cached.localAudioPath),
+              !cached.demo else { return nil }
+        return StoryResponse(
+            artist: cached.artist,
+            title: cached.title,
+            year: nil,
+            genre: nil,
+            mbid: nil,
+            script: cached.script,
+            wordCount: cached.script.split(separator: " ").count,
+            voiceId: nil,
+            demo: cached.demo,
+            audioUrl: cached.audioUrl,
+            audioFile: nil,
+            ttsHint: nil,
+            quota: dailyQuota
+        )
+    }
+
+    func prefetchMissingOfflineAudio() async {
+        guard canUseOfflineReplay(), NetworkMonitor.isWifi else { return }
+        for cached in history.cachedStoriesMissingLocalAudio() {
+            guard canUseOfflineReplay(),
+                  let remote = resolveAudioURL(cached.audioUrl) else { continue }
+            if let path = await offlineStore.download(from: remote, trackKey: cached.trackKey) {
+                history.updateLocalAudioPath(trackKey: cached.trackKey, path: path)
+            }
+        }
+        offlineStore.enforceStorageLimit()
+    }
+
+    private func canUseOfflineReplay() -> Bool {
+        settings.offlineAudioCacheEnabled && TierAccess.canUseOfflineAudioCache(accountTier)
+    }
+
+    private func maybeDownloadOfflineAudio(trackKey: String, audioUrl: String?) async -> String? {
+        guard canUseOfflineReplay(),
+              let remote = resolveAudioURL(audioUrl) else { return nil }
+        let path = await offlineStore.download(from: remote, trackKey: trackKey)
+        if path != nil {
+            offlineStore.enforceStorageLimit()
+        }
+        return path
     }
 }

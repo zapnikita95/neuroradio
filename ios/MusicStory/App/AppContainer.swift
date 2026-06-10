@@ -25,6 +25,8 @@ final class AppContainer: ObservableObject {
         Task {
             await BackendClient.shared.warmUp()
             await StoryRepository.shared.refreshQuota()
+            try? await Task.sleep(nanoseconds: 8_000_000_000)
+            await StoryRepository.shared.prefetchMissingOfflineAudio()
         }
     }
 

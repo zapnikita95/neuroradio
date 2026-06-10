@@ -6,6 +6,7 @@ import android.app.NotificationManager
 import android.os.Build
 import com.musicstory.app.data.local.AppDatabase
 import com.musicstory.app.data.local.SettingsDataStore
+import com.musicstory.app.data.local.StoryOfflineAudioStore
 import com.musicstory.app.data.remote.AccountAuthManager
 import com.musicstory.app.data.remote.AccountSyncManager
 import com.musicstory.app.data.remote.ApiClient
@@ -98,6 +99,7 @@ class MusicStoryApp : Application() {
         )
         val metadataEnricher = MetadataEnricher()
         val metadataCache = MetadataCache(metadataEnricher)
+        val offlineAudioStore = StoryOfflineAudioStore(this)
         storyRepository = StoryRepository(
             storyDao = database.storyDao(),
             storyHistoryDao = database.storyHistoryDao(),
@@ -105,6 +107,7 @@ class MusicStoryApp : Application() {
             apiClient = apiClient,
             accountSyncManager = accountSyncManager,
             metadataCache = metadataCache,
+            offlineAudioStore = offlineAudioStore,
         )
         mediaControllerManager = MediaControllerManager(this)
         storyPlayer = StoryPlayer(this)
@@ -130,6 +133,10 @@ class MusicStoryApp : Application() {
         prefetchAccountHistory()
         appScope.launch {
             storyRepository.dedupeStoryHistory()
+        }
+        appScope.launch {
+            delay(8_000)
+            storyRepository.prefetchMissingOfflineAudio()
         }
     }
 

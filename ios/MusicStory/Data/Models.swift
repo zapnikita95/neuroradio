@@ -48,6 +48,53 @@ struct StoryResponse: Decodable, Sendable {
         case ttsHint
         case quota
     }
+
+    init(
+        artist: String,
+        title: String,
+        year: Int?,
+        genre: String?,
+        mbid: String?,
+        script: String,
+        wordCount: Int,
+        voiceId: String?,
+        demo: Bool,
+        audioUrl: String?,
+        audioFile: String?,
+        ttsHint: String?,
+        quota: StoryQuotaInfo?
+    ) {
+        self.artist = artist
+        self.title = title
+        self.year = year
+        self.genre = genre
+        self.mbid = mbid
+        self.script = script
+        self.wordCount = wordCount
+        self.voiceId = voiceId
+        self.demo = demo
+        self.audioUrl = audioUrl
+        self.audioFile = audioFile
+        self.ttsHint = ttsHint
+        self.quota = quota
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        artist = try container.decode(String.self, forKey: .artist)
+        title = try container.decode(String.self, forKey: .title)
+        year = try container.decodeIfPresent(Int.self, forKey: .year)
+        genre = try container.decodeIfPresent(String.self, forKey: .genre)
+        mbid = try container.decodeIfPresent(String.self, forKey: .mbid)
+        script = try container.decode(String.self, forKey: .script)
+        wordCount = try container.decodeIfPresent(Int.self, forKey: .wordCount) ?? script.split(separator: " ").count
+        voiceId = try container.decodeIfPresent(String.self, forKey: .voiceId)
+        demo = try container.decodeIfPresent(Bool.self, forKey: .demo) ?? false
+        audioUrl = try container.decodeIfPresent(String.self, forKey: .audioUrl)
+        audioFile = try container.decodeIfPresent(String.self, forKey: .audioFile)
+        ttsHint = try container.decodeIfPresent(String.self, forKey: .ttsHint)
+        quota = try container.decodeIfPresent(StoryQuotaInfo.self, forKey: .quota)
+    }
 }
 
 struct StoryQuotaInfo: Decodable, Sendable {

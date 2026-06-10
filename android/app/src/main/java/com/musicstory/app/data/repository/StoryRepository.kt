@@ -6,6 +6,7 @@ import com.musicstory.app.data.local.SettingsDataStore
 import com.musicstory.app.data.local.StoryDao
 import com.musicstory.app.data.local.StoryHistoryDao
 import com.musicstory.app.data.local.StoryHistoryEntry
+import com.musicstory.app.data.local.StoryOfflineAudioStore
 import com.musicstory.app.data.model.StoryRequest
 import com.musicstory.app.data.model.StoryResponse
 import com.musicstory.app.data.model.TrackInfo
@@ -63,6 +64,7 @@ class StoryRepository(
     private val accountSyncManager: AccountSyncManager? = null,
     private val metadataCache: MetadataCache,
     private val connectionChecker: ConnectionChecker = ConnectionChecker(),
+    private val offlineAudioStore: StoryOfflineAudioStore,
 ) {
     private val gson = Gson()
     private val storyFetchMutex = Mutex()
@@ -316,6 +318,11 @@ class StoryRepository(
             .distinct()
             .take(MAX_PREVIOUS_SCRIPTS)
             .toList()
+
+        if (!offlineAudioStore.isNetworkAvailable()) {
+            tryOfflineReplay(trackKey)?.let { return it }
+            return Result.failure(IOException(OFFLINE_NO_CACHE_MESSAGE))
+        }
 
         if (!forceRefresh && previousScripts.isEmpty()) {
             val cached = storyDao.getByTrackKey(trackKey)
@@ -906,12 +913,78 @@ class StoryRepository(
         return resolved
     }
 
+    /** Local OGG if cached, else resolved server URL. */
+    suspend fun resolvePlaybackUrl(trackKey: String, audioUrl: String?): String? {
+        if (canUseOfflineReplay()) {
+            val cached = storyDao.getByTrackKey(trackKey)
+            val localPath = cached?.localAudioPath
+            if (offlineAudioStore.hasLocalFile(localPath)) {
+                return offlineAudioStore.localFileUri(localPath!!)
+            }
+        }
+        return resolveAudioUrl(audioUrl)
+    }
+
+    suspend fun canReplayOffline(trackKey: String): Boolean {
+        if (!canUseOfflineReplay()) return false
+        val cached = storyDao.getByTrackKey(trackKey) ?: return false
+        return offlineAudioStore.hasLocalFile(cached.localAudioPath)
+    }
+
+    suspend fun getOfflineReplayResponse(trackKey: String): StoryResponse? {
+        val cached = storyDao.getByTrackKey(trackKey) ?: return null
+        if (!isReplayableCache(cached)) return null
+        return cached.toResponse()
+    }
+
+    suspend fun prefetchMissingOfflineAudio() {
+        if (!canUseOfflineReplay() || !offlineAudioStore.isWifi()) return
+        val missing = storyDao.findWithoutLocalAudio()
+        for (cached in missing) {
+            if (!canUseOfflineReplay()) return
+            val url = resolveAudioUrl(cached.audioUrl) ?: continue
+            val path = offlineAudioStore.downloadToTrack(url, cached.trackKey) ?: continue
+            storyDao.updateLocalAudioPath(cached.trackKey, path)
+        }
+        offlineAudioStore.enforceStorageLimit()
+    }
+
+    private suspend fun canUseOfflineReplay(): Boolean {
+        if (!settingsDataStore.offlineAudioCacheEnabled.first()) return false
+        val tier = _dailyQuota.value?.tier
+        return TierAccess.canUseOfflineAudioCache(tier)
+    }
+
+    private suspend fun tryOfflineReplay(trackKey: String): Result<StoryResponse>? {
+        if (!canUseOfflineReplay()) return null
+        val cached = storyDao.getByTrackKey(trackKey) ?: return null
+        if (!isReplayableCache(cached)) return null
+        StoryLog.i("Story from offline cache: $trackKey")
+        return Result.success(cached.toResponse())
+    }
+
+    private fun isReplayableCache(cached: CachedStory): Boolean {
+        if (cached.demo) return false
+        if (!offlineAudioStore.hasLocalFile(cached.localAudioPath)) return false
+        if (StoryScriptQuality.isTemplateLike(cached.script, cached.artist, cached.title)) return false
+        return true
+    }
+
+    private suspend fun maybeDownloadOfflineAudio(trackKey: String, audioUrl: String?): String? {
+        if (!canUseOfflineReplay()) return null
+        val resolved = resolveAudioUrl(audioUrl) ?: return null
+        val path = offlineAudioStore.downloadToTrack(resolved, trackKey) ?: return null
+        offlineAudioStore.enforceStorageLimit()
+        return path
+    }
+
     private suspend fun persistStory(
         trackKey: String,
         track: TrackInfo,
         response: StoryResponse,
         angle: String,
     ) {
+        val localPath = maybeDownloadOfflineAudio(trackKey, response.audioUrl)
         storyDao.insert(
             CachedStory(
                 trackKey = trackKey,
@@ -921,6 +994,7 @@ class StoryRepository(
                 genre = response.genre,
                 script = response.script,
                 audioUrl = response.audioUrl,
+                localAudioPath = localPath,
                 demo = response.demo,
             ),
         )
@@ -1020,6 +1094,8 @@ class StoryRepository(
         private const val METADATA_TIMEOUT_MS = 15_000L
         /** Must match backend SECURITY.maxPreviousScripts. */
         private const val MAX_PREVIOUS_SCRIPTS = 8
+        const val OFFLINE_NO_CACHE_MESSAGE =
+            "Нет интернета. Эта история ещё не сохранена на телефоне — один раз послушайте онлайн с расширенным тарифом."
     }
 }
 

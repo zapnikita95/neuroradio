@@ -263,6 +263,10 @@ class SettingsDataStore(private val context: Context) {
         prefs[KEY_SPEAK_TRACK_NAMES_IN_VOICEOVER] ?: false
     }
 
+    val offlineAudioCacheEnabled: Flow<Boolean> = context.settingsDataStore.data.map { prefs ->
+        prefs[KEY_OFFLINE_AUDIO_CACHE_ENABLED] ?: true
+    }
+
     val serverTtsProvider: Flow<ServerTtsProvider> = context.settingsDataStore.data.map { prefs ->
         ServerTtsProvider.fromId(prefs[KEY_SERVER_TTS_PROVIDER])
     }
@@ -556,6 +560,11 @@ class SettingsDataStore(private val context: Context) {
         notifyCloudSync()
     }
 
+    suspend fun setOfflineAudioCacheEnabled(enabled: Boolean) {
+        context.settingsDataStore.edit { it[KEY_OFFLINE_AUDIO_CACHE_ENABLED] = enabled }
+        notifyCloudSync()
+    }
+
     suspend fun setServerTtsProvider(provider: ServerTtsProvider) {
         context.settingsDataStore.edit { it[KEY_SERVER_TTS_PROVIDER] = provider.id }
         notifyCloudSync()
@@ -760,6 +769,7 @@ class SettingsDataStore(private val context: Context) {
         private val KEY_SILERO_VOICE_PRESET = stringPreferencesKey("silero_voice_preset")
         private val KEY_EDGE_VOICE_PRESET = stringPreferencesKey("edge_voice_preset")
         private val KEY_SPEAK_TRACK_NAMES_IN_VOICEOVER = booleanPreferencesKey("speak_track_names_in_voiceover")
+        private val KEY_OFFLINE_AUDIO_CACHE_ENABLED = booleanPreferencesKey("offline_audio_cache_enabled")
         private val KEY_SERVER_TTS_PROVIDER = stringPreferencesKey("server_tts_provider")
         private val KEY_USER_TTS_BILLING = stringPreferencesKey("user_tts_billing")
         private val KEY_YANDEX_API_KEY = stringPreferencesKey("yandex_api_key")

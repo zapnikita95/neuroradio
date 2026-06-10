@@ -36,6 +36,7 @@ import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.remember
@@ -262,6 +263,7 @@ private fun StoryHistoryItem(
                 }
                 if (expanded) {
                     Spacer(modifier = Modifier.height(12.dp))
+                    HistoryListenButton(entry = entry, app = app)
                     HistoryStoryFeedbackBlock(entry = entry, app = app)
                 }
             }
@@ -279,6 +281,28 @@ private fun StoryHistoryItem(
             )
         }
     }
+}
+
+@Composable
+private fun HistoryListenButton(
+    entry: StoryHistoryEntry,
+    app: MusicStoryApp,
+) {
+    val context = LocalContext.current
+    var canListen by remember(entry.trackKey) { mutableStateOf(false) }
+
+    LaunchedEffect(entry.trackKey) {
+        canListen = app.storyRepository.canReplayOffline(entry.trackKey)
+    }
+
+    if (!canListen) return
+
+    SecondaryStoryButton(
+        text = context.getString(R.string.history_listen),
+        onClick = {
+            app.storyOrchestrator.replayHistoryStory(entry)
+        },
+    )
 }
 
 @Composable
