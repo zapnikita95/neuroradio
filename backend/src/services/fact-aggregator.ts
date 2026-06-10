@@ -29,6 +29,7 @@ import {
 export { buildDdgInstantQueries } from './web-search-facts.js';
 import { acceptSearchGroundedSnippet, acceptIndieEmergingSnippet, hasActionableSnippets, isLyricsPageSeed, isWrongEntityDisambiguation, isArtistIdentityBioSnippet } from './web-snippet-accept.js';
 import { lookupCuratedFact } from './curated-facts.js';
+import { fetchLastfmFacts } from './fact-sources/lastfm-facts.js';
 const USER_AGENT = 'MusicStoryBFF/1.0 (contact@example.com)';
 const RAW_SNIPPET_MIN_LEN = 30;
 const RAW_SNIPPET_MAX = 18;
@@ -69,7 +70,7 @@ function resolveFactCountryCode(artist: string, title: string, countryCode?: str
   return undefined;
 }
 
-export type SnippetSource = 'wiki' | 'ddg' | 'web' | 'wikidata' | 'mb';
+export type SnippetSource = 'wiki' | 'ddg' | 'web' | 'wikidata' | 'mb' | 'lastfm';
 
 export interface AggregatedFactContext {
   bundle: ReferenceFactBundle;
@@ -436,6 +437,7 @@ function buildRawSnippets(
   wdRaw: string[],
   mbTrackRaw: string[],
   mbArtistRaw: string[],
+  lastfmRaw: string[],
   artist: string,
   title: string,
 ): { rawSnippets: string[]; snippetSources: SnippetSource[] } {
@@ -454,6 +456,7 @@ function buildRawSnippets(
   for (const text of webRaw) addCandidate(text, 'web');
   for (const text of wdRaw) addCandidate(text, 'wikidata');
   for (const text of [...mbTrackRaw, ...mbArtistRaw]) addCandidate(text, 'mb');
+  for (const text of lastfmRaw) addCandidate(text, 'lastfm');
 
   const seen = new Set<string>();
   const ranked = candidates
@@ -595,7 +598,7 @@ export async function fetchAggregatedFactContext(
 ): Promise<AggregatedFactContext> {
   const t0 = Date.now();
   const cc = resolveFactCountryCode(artist, title, countryCode);
-  const [wiki, wikiLead, ddgUnfiltered, webUnfiltered, webTitleFirst, wdUnfiltered, mbTrackRaw, mbArtistRaw, wikiFastTrack] =
+  const [wiki, wikiLead, ddgUnfiltered, webUnfiltered, webTitleFirst, wdUnfiltered, mbTrackRaw, mbArtistRaw, wikiFastTrack, lastfmHarvest] =
     await Promise.all([
       fetchWithCap(
         'wiki',
@@ -621,7 +624,15 @@ export async function fetchAggregatedFactContext(
         8_000,
       ),
       fetchWithCap('wiki-fast-track', () => fetchFastTrackWikiFacts(artist, title), [], 15_000),
+      fetchWithCap('lastfm', () => fetchLastfmFacts({ artist, title }), [], 8_000),
     ]);
+  const lastfmTrack = lastfmHarvest.filter((f) => f.scope === 'track').map((f) => f.fact);
+  const lastfmArtist = lastfmHarvest.filter((f) => f.scope === 'artist').map((f) => f.fact);
+  if (lastfmHarvest.length > 0) {
+    console.log(
+      `[facts] lastfm ok artist="${artist}" title="${title}" track=${lastfmTrack.length} artist=${lastfmArtist.length}`,
+    );
+  }
   const wikiLeadBundle = wikiLead ? wikiLeadToFacts(wikiLead, artist, title) : EMPTY_WIKI;
   if (wikiLeadBundle.trackFacts.length + wikiLeadBundle.artistFacts.length > 0) {
     console.log(
@@ -650,7 +661,7 @@ export async function fetchAggregatedFactContext(
     `[facts] parallel fetch ${artist} — ${title}: ${Date.now() - t0}ms ` +
       `wiki=${wiki.trackFacts.length + wiki.artistFacts.length} ` +
       `wikiLead=${wikiLeadBundle.trackFacts.length + wikiLeadBundle.artistFacts.length} ` +
-      `ddg=${ddgUnfiltered.length} web=${webAllUnfiltered.length}`,
+      `ddg=${ddgUnfiltered.length} web=${webAllUnfiltered.length} lastfm=${lastfmHarvest.length}`,
   );
 
   const ddg = filterAndRankFacts([...ddgUnfiltered, ...webAllUnfiltered], 10);
@@ -677,6 +688,7 @@ export async function fetchAggregatedFactContext(
     externalSplit.track,
     wdSplit.track,
     mbTrack,
+    filterAndRankFacts(lastfmTrack, 4),
   );
   const artistCandidates = mergeFactsWithWikiLead(
     wikiLeadBundle.artistFacts,
@@ -685,6 +697,7 @@ export async function fetchAggregatedFactContext(
     webRanked,
     wdSplit.artist,
     mbArtist,
+    filterAndRankFacts(lastfmArtist, 4),
   );
 
   const finalized = finalizeFactBundle(trackCandidates, artistCandidates, artist, title);
@@ -734,6 +747,7 @@ export async function fetchAggregatedFactContext(
     wdUnfiltered,
     mbTrackRaw,
     mbArtistRaw,
+    lastfmHarvest.map((f) => f.fact),
     artist,
     title,
   );

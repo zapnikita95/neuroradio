@@ -1,5 +1,6 @@
 import './bootstrap-logs.js';
 import './load-env.js';
+import { ensureHidemyProxy } from './hidemy-proxy.js';
 import express from 'express';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -188,6 +189,7 @@ app.use((_req, res) => {
 });
 
 async function boot(): Promise<void> {
+  await ensureHidemyProxy();
   await initPostgres();
   if (hasPostgres()) {
     await hydrateAccountStoreFromPostgres();

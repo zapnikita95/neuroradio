@@ -1,11 +1,11 @@
 /**
  * Build popular-tracks-catalog.json (target ~10 000 tracks, RU + global).
- * Last.fm blocked in RU — uses Deezer + iTunes + local cover-classics.
+ * Sources: Last.fm (charts/geo/tops) + Deezer + iTunes + cover-classics.
  * Run: npm run build:catalog
  */
 import './setup-hidemy-proxy.mjs';
 import '../dist/load-env.js';
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -19,7 +19,11 @@ const args = process.argv.slice(2);
 const TARGET = parseInt(args.find((a) => a.startsWith('--target='))?.split('=')[1] ?? '10000', 10);
 const TRACKS_PER_ARTIST = 10;
 const DEEZER_RPS = 10;
+const LASTFM_RPS = 4;
 const PLAYLIST_TRACK_LIMIT = 200;
+const LASTFM_KEY = process.env.LASTFM_API_KEY?.trim() ?? '';
+const LASTFM_GEOS = ['Russia', 'United States', 'United Kingdom', 'Germany', 'Ukraine', 'France'];
+const mergeExisting = !args.includes('--fresh');
 
 const RU_SEED_TRACKS = [
   ['Кино', 'Группа крови'], ['Кино', 'Звезда по имени Солнце'], ['Кино', 'Пачка сигарет'],
@@ -117,6 +121,56 @@ async function poolMap(items, concurrency, fn) {
   await Promise.all(Array.from({ length: concurrency }, () => worker()));
 }
 
+async function probeLastFm() {
+  if (!LASTFM_KEY) return false;
+  const data = await fetchJson(
+    `https://ws.audioscrobbler.com/2.0/?method=chart.gettoptracks&limit=1&api_key=${LASTFM_KEY}&format=json`,
+  );
+  return !data?.error && Boolean(data?.tracks?.track?.length);
+}
+
+async function fetchLastFmMethod(params) {
+  if (!LASTFM_KEY) return null;
+  const q = new URLSearchParams({ ...params, api_key: LASTFM_KEY, format: 'json' });
+  return fetchJson(`https://ws.audioscrobbler.com/2.0/?${q}`);
+}
+
+async function fetchLastfmChartTop(limit = 1000) {
+  const data = await fetchLastFmMethod({ method: 'chart.gettoptracks', limit: String(limit) });
+  return (data?.tracks?.track ?? []).map((t) => ({
+    artist: t.artist?.name ?? t.artist?.['#text'] ?? '',
+    title: t.name ?? '',
+    source: 'lastfm-global-chart',
+  }));
+}
+
+async function fetchLastfmGeoTop(country, limit = 1000) {
+  const data = await fetchLastFmMethod({
+    method: 'geo.gettoptracks',
+    country,
+    limit: String(limit),
+  });
+  return (data?.tracks?.track ?? []).map((t) => ({
+    artist: t.artist?.name ?? t.artist?.['#text'] ?? '',
+    title: t.name ?? '',
+    source: `lastfm-geo-${country.toLowerCase().replace(/\s+/g, '-')}`,
+  }));
+}
+
+async function fetchLastfmArtistTop(artist, limit = TRACKS_PER_ARTIST) {
+  const data = await fetchLastFmMethod({
+    method: 'artist.gettoptracks',
+    artist,
+    limit: String(limit),
+    autocorrect: '1',
+  });
+  return (data?.toptracks?.track ?? []).map((t) => ({
+    artist: t.artist?.name ?? artist,
+    title: t.name ?? '',
+    source: 'lastfm-artist-top',
+  }));
+}
+
 async function fetchDeezerChart(chartId) {
   const data = await fetchJson(`https://api.deezer.com/chart/${chartId}/tracks?limit=300`);
   return (data?.data ?? []).map((t) => ({
@@ -201,6 +255,16 @@ function isUsefulArtist(name) {
 
 async function main() {
   const catalog = new Map();
+  const lastfmOk = await probeLastFm();
+  console.log(lastfmOk ? 'lastfm: OK' : 'lastfm: unavailable (no key or proxy)');
+
+  if (mergeExisting && existsSync(OUT)) {
+    const existing = JSON.parse(readFileSync(OUT, 'utf8'));
+    for (const t of existing.tracks ?? []) {
+      addTrack(catalog, t.artist, t.title, t.source ?? 'existing');
+    }
+    console.log(`loaded existing: ${catalog.size}`);
+  }
 
   for (const [artist, title] of RU_SEED_TRACKS) addTrack(catalog, artist, title, 'seed-ru');
   for (const [artist, title] of GLOBAL_SEED_TRACKS) addTrack(catalog, artist, title, 'seed-global');
@@ -216,6 +280,29 @@ async function main() {
     console.log(`+ cover-classics: ${catalog.size}`);
   } catch (e) {
     console.warn('cover-classics:', e.message);
+  }
+
+  if (lastfmOk) {
+    try {
+      for (const t of await fetchLastfmChartTop(1000)) {
+        if (catalog.size >= TARGET) break;
+        addTrack(catalog, t.artist, t.title, t.source);
+      }
+      console.log(`+ lastfm global chart: ${catalog.size}`);
+      await sleep(300);
+
+      for (const geo of LASTFM_GEOS) {
+        if (catalog.size >= TARGET) break;
+        for (const t of await fetchLastfmGeoTop(geo, 1000)) {
+          if (catalog.size >= TARGET) break;
+          addTrack(catalog, t.artist, t.title, t.source);
+        }
+        console.log(`+ lastfm geo ${geo}: ${catalog.size}`);
+        await sleep(300);
+      }
+    } catch (e) {
+      console.warn('lastfm charts:', e.message);
+    }
   }
 
   for (const chartId of DEEZER_CHARTS) {
@@ -279,12 +366,19 @@ async function main() {
   if (catalog.size < TARGET) {
     let done = 0;
     let added = 0;
-    const interval = 1000 / DEEZER_RPS;
-    await poolMap(artists, DEEZER_RPS, async (artist) => {
+    const interval = 1000 / (lastfmOk ? LASTFM_RPS : DEEZER_RPS);
+    const pool = lastfmOk ? LASTFM_RPS : DEEZER_RPS;
+    await poolMap(artists, pool, async (artist) => {
       if (catalog.size >= TARGET) return;
       const before = catalog.size;
       try {
-        let tracks = await fetchDeezerArtistTop(artist, TRACKS_PER_ARTIST);
+        let tracks = [];
+        if (lastfmOk) {
+          tracks = await fetchLastfmArtistTop(artist, TRACKS_PER_ARTIST);
+        }
+        if (tracks.length < 2) {
+          tracks = await fetchDeezerArtistTop(artist, TRACKS_PER_ARTIST);
+        }
         if (tracks.length < 2) {
           tracks = await fetchItunesArtistTop(artist, TRACKS_PER_ARTIST);
         }
