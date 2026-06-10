@@ -79,6 +79,7 @@ class StoryOrchestrator(
     private val mediaControllerManager: MediaControllerManager,
     private val storyPlayer: StoryPlayer,
     private val triggerEngine: TriggerEngine,
+    private val factHintNotifier: FactHintNotifier = FactHintNotifier(context),
 ) {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private val storyMutex = Mutex()
@@ -400,8 +401,30 @@ class StoryOrchestrator(
             !generationInFlight
         ) {
             _state.value = OrchestratorState.LISTENING
+            maybeNotifyFactHint(track, settings)
         }
         publishUiState()
+    }
+
+    private fun maybeNotifyFactHint(track: TrackInfo, settings: TriggerSettings) {
+        if (settings.autoIntercept) return
+        scope.launch {
+            val enabled = settingsDataStore.factNotificationsEnabled.first()
+            if (!enabled) return@launch
+            if (settingsDataStore.appPowerMode.first() != AppPowerMode.ON) return@launch
+            if (isStorySessionActive()) return@launch
+            if (!storyRepository.hasOwnApiKeyConfigured()) return@launch
+            val hasHot = withContext(Dispatchers.IO) {
+                storyRepository.hasHotFactForTrack(track.artist, track.title)
+            }
+            factHintNotifier.maybeShow(
+                track = track,
+                hasHotFact = hasHot,
+                enabled = enabled,
+                manualMode = !settings.autoIntercept,
+                storySessionActive = isStorySessionActive(),
+            )
+        }
     }
 
     fun requestManualStory(fromNotification: Boolean = false) {

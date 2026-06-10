@@ -4,6 +4,7 @@ import express from 'express';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import storyRouter from './routes/story.js';
+import factsHintRouter from './routes/facts-hint.js';
 import llmProbeRouter from './routes/llm-probe.js';
 import authRouter from './routes/auth.js';
 import syncRouter from './routes/sync.js';
@@ -28,7 +29,7 @@ import { securityHeaders } from './middleware/security-headers.js';
 import { requireSignedAudioAccess } from './middleware/audio-auth.js';
 import { requestLogger } from './middleware/request-logger.js';
 import { SECURITY } from './config/security.js';
-import { purgeInvalidBankFacts } from './services/fact-bank.js';
+import { mergeSeedBankOnBoot, purgeInvalidBankFacts } from './services/fact-bank.js';
 import { ingestCuratedFactsOnBoot } from './services/curated-facts.js';
 import { initPostgres, hasPostgres, closePostgres } from './services/db.js';
 import { hydrateAccountStoreFromPostgres, migrateAccountStoryDataToPostgres } from './services/account-store.js';
@@ -159,6 +160,7 @@ app.use('/v1/billing', billingRouter);
 app.use('/v1/account', accountAuthRouter);
 app.use('/v1/llm', llmProbeRouter);
 app.use('/v1/story', storyRouter);
+app.use('/v1/facts', factsHintRouter);
 app.use('/v1/public', publicRouter);
 
 /** Telegram Login Widget — before static site so /telegram-login is never swallowed. */
@@ -200,6 +202,7 @@ async function boot(): Promise<void> {
     const purged = purgeInvalidBankFacts();
     if (purged > 0) console.log(`[boot] fact-bank cleanup removed ${purged} invalid entries`);
     ingestCuratedFactsOnBoot();
+    mergeSeedBankOnBoot();
   } catch (err) {
     console.warn('[boot] fact-bank purge failed:', err instanceof Error ? err.message : err);
   }

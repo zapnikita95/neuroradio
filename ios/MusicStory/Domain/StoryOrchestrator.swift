@@ -88,7 +88,17 @@ final class StoryOrchestrator: ObservableObject {
             await playStory(for: track, manual: false)
         } else if !isStoryRunning {
             uiState.state = .listening
-            await notifications.notifyTrackChanged(track: track, autoMode: uiState.mode == .auto)
+            if settings.manualMode && settings.factNotificationsEnabled {
+                let hasHot = await storyRepository.hasHotFactForTrack(
+                    artist: track.artist,
+                    title: track.title
+                )
+                if hasHot {
+                    await notifications.notifyFactHint(track: track)
+                }
+            } else {
+                await notifications.notifyTrackChanged(track: track, autoMode: uiState.mode == .auto)
+            }
         }
     }
 

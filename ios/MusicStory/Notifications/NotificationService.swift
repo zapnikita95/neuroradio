@@ -6,6 +6,7 @@ final class NotificationService: NSObject, ObservableObject {
     static let shared = NotificationService()
 
     static let categoryTrackChanged = "TRACK_CHANGED"
+    static let categoryFactHint = "FACT_HINT"
     static let actionTellStory = "TELL_STORY"
 
     var onTellStoryAction: ((String, String) -> Void)?
@@ -22,13 +23,19 @@ final class NotificationService: NSObject, ObservableObject {
             title: "Рассказать историю",
             options: [.foreground]
         )
-        let category = UNNotificationCategory(
+        let factHint = UNNotificationCategory(
+            identifier: Self.categoryFactHint,
+            actions: [tellStory],
+            intentIdentifiers: [],
+            options: []
+        )
+        let trackChanged = UNNotificationCategory(
             identifier: Self.categoryTrackChanged,
             actions: [tellStory],
             intentIdentifiers: [],
             options: []
         )
-        UNUserNotificationCenter.current().setNotificationCategories([category])
+        UNUserNotificationCenter.current().setNotificationCategories([factHint, trackChanged])
     }
 
     func requestAuthorization() async -> Bool {
@@ -37,6 +44,31 @@ final class NotificationService: NSObject, ObservableObject {
         } catch {
             return false
         }
+    }
+
+    func notifyFactHint(track: TrackInfo) async {
+        guard await authorizationGranted() else { return }
+        guard FactHintRateLimiter.shared.shouldNotify(trackKey: track.displayKey) else { return }
+
+        let content = UNMutableNotificationContent()
+        content.title = track.title
+        content.subtitle = track.artist
+        content.body = "По этому треку есть интересный факт. Хотите послушать?"
+        content.sound = .default
+        content.categoryIdentifier = Self.categoryFactHint
+        content.userInfo = [
+            "artist": track.artist,
+            "title": track.title,
+        ]
+
+        let request = UNNotificationRequest(
+            identifier: "fact-hint-\(track.displayKey)-\(Int(Date().timeIntervalSince1970))",
+            content: content,
+            trigger: nil
+        )
+
+        try? await UNUserNotificationCenter.current().add(request)
+        FactHintRateLimiter.shared.record(trackKey: track.displayKey)
     }
 
     func notifyTrackChanged(track: TrackInfo, autoMode: Bool) async {

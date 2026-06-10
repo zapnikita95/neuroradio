@@ -35,6 +35,7 @@
 		B100001A /* SwiftUI.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = F100001A /* SwiftUI.framework */; };
 		B1000020 /* OfflineAudioStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1000020 /* OfflineAudioStore.swift */; };
 		B1000021 /* TierAccess.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1000021 /* TierAccess.swift */; };
+		B1000022 /* FactHintRateLimiter.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1000022 /* FactHintRateLimiter.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -93,6 +94,7 @@
 		P1000003 /* MusicStory.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = MusicStory.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		F1000020 /* OfflineAudioStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OfflineAudioStore.swift; sourceTree = "<group>"; };
 		F1000021 /* TierAccess.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TierAccess.swift; sourceTree = "<group>"; };
+		F1000022 /* FactHintRateLimiter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FactHintRateLimiter.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -206,6 +208,7 @@
 			isa = PBXGroup;
 			children = (
 				F100000D /* TriggerEngine.swift */,
+				F1000022 /* FactHintRateLimiter.swift */,
 				F100000E /* StoryPlayer.swift */,
 				F100000F /* StoryOrchestrator.swift */,
 			);
@@ -355,6 +358,7 @@
 				B1000015 /* HistoryView.swift in Sources */,
 				B1000020 /* OfflineAudioStore.swift in Sources */,
 				B1000021 /* TierAccess.swift in Sources */,
+				B1000022 /* FactHintRateLimiter.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
