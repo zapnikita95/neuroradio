@@ -42,6 +42,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import android.app.Activity
 import com.musicstory.app.MusicStoryApp
 import com.musicstory.app.R
 import com.musicstory.app.ui.components.BillingLegalFooter
@@ -139,6 +140,7 @@ private fun BillingTab(app: MusicStoryApp) {
     val englishUi = remember {
         resolveAppLanguage(LocaleHelper.readStoredLanguage(context)) == ResolvedAppLanguage.EN
     }
+    val usePlayBilling = englishUi
     val plans = remember(englishUi) { billingPlansForEnglishUi(englishUi) }
     var selectedPlanIndex by remember { mutableIntStateOf(1) }
     val selectedPlan = plans[selectedPlanIndex]
@@ -222,7 +224,7 @@ private fun BillingTab(app: MusicStoryApp) {
             )
         }
 
-        if (cardSaved || autoRenew) {
+        if ((cardSaved || autoRenew) && !usePlayBilling) {
             Text(
                 text = "Карта привязана — подписка продлевается автоматически.",
                 style = MaterialTheme.typography.bodySmall,
@@ -230,12 +232,14 @@ private fun BillingTab(app: MusicStoryApp) {
             )
         }
 
-        SecondaryStoryButton(
-            text = context.getString(R.string.billing_unlink_card),
-            onClick = { showUnlinkConfirm = true },
-            enabled = !unlinkLoading && !loading,
-            modifier = Modifier.fillMaxWidth(),
-        )
+        if (!usePlayBilling) {
+            SecondaryStoryButton(
+                text = context.getString(R.string.billing_unlink_card),
+                onClick = { showUnlinkConfirm = true },
+                enabled = !unlinkLoading && !loading,
+                modifier = Modifier.fillMaxWidth(),
+            )
+        }
 
         unlinkMessage?.let {
             Text(
@@ -312,14 +316,29 @@ private fun BillingTab(app: MusicStoryApp) {
             onDismiss = { if (!loading) showConfirmDialog = false },
             onConfirmPay = {
                 scope.launch {
-                    pay(
-                        app, backendUrl, email, selectedPlan.id,
-                        agreementsAccepted = true,
-                        { loading = it },
-                        { error = it },
-                    ) { url ->
-                        showConfirmDialog = false
-                        paymentUrl = url
+                    if (usePlayBilling) {
+                        payWithGooglePlay(
+                            app = app,
+                            activity = context as? Activity,
+                            backendUrl = backendUrl,
+                            plan = selectedPlan.id,
+                            setLoading = { loading = it },
+                            setError = { error = it },
+                            onSuccess = {
+                                showConfirmDialog = false
+                                scope.launch { refreshBilling() }
+                            },
+                        )
+                    } else {
+                        pay(
+                            app, backendUrl, email, selectedPlan.id,
+                            agreementsAccepted = true,
+                            { loading = it },
+                            { error = it },
+                        ) { url ->
+                            showConfirmDialog = false
+                            paymentUrl = url
+                        }
                     }
                 }
             },
@@ -339,11 +358,19 @@ private fun BillingTab(app: MusicStoryApp) {
             singleLine = true,
         )
 
-        Text(
-            text = "Email нужен для активации подписки и отправки чека после оплаты.",
-            style = MaterialTheme.typography.bodySmall,
-            color = MutedLavender,
-        )
+        if (!usePlayBilling) {
+            Text(
+                text = "Email нужен для активации подписки и отправки чека после оплаты.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MutedLavender,
+            )
+        } else {
+            Text(
+                text = context.getString(R.string.billing_play_hint),
+                style = MaterialTheme.typography.bodySmall,
+                color = MutedLavender,
+            )
+        }
 
         Text(
             text = context.getString(R.string.billing_plans_heading),
@@ -362,7 +389,7 @@ private fun BillingTab(app: MusicStoryApp) {
             text = context.getString(R.string.billing_subscribe_cta),
             onClick = {
                 error = null
-                if (email.isBlank() || !email.contains('@')) {
+                if (!usePlayBilling && (email.isBlank() || !email.contains('@'))) {
                     error = context.getString(R.string.billing_email_required)
                     return@PrimaryStoryButton
                 }
@@ -381,6 +408,49 @@ private fun BillingTab(app: MusicStoryApp) {
 
         Spacer(modifier = Modifier.height(8.dp))
         BillingLegalFooter()
+    }
+}
+
+private suspend fun payWithGooglePlay(
+    app: MusicStoryApp,
+    activity: Activity?,
+    backendUrl: String,
+    plan: String,
+    setLoading: (Boolean) -> Unit,
+    setError: (String?) -> Unit,
+    onSuccess: () -> Unit,
+) {
+    val context = app.applicationContext
+    if (backendUrl.isBlank()) {
+        setError(context.getString(R.string.billing_no_backend))
+        return
+    }
+    if (activity == null) {
+        setError(context.getString(R.string.billing_play_activity_required))
+        return
+    }
+    setLoading(true)
+    setError(null)
+    try {
+        val purchase = app.playBillingManager.launchSubscriptionPurchase(activity, plan)
+        if (purchase == null) {
+            setError(context.getString(R.string.billing_payment_failed))
+            return
+        }
+        val resp = app.apiClient.verifyGooglePlayPurchase(
+            backendUrl,
+            purchase.productId,
+            purchase.purchaseToken,
+        )
+        if (resp.ok == true) {
+            onSuccess()
+        } else {
+            setError(resp.error ?: context.getString(R.string.billing_payment_failed))
+        }
+    } catch (e: Exception) {
+        setError(e.message ?: context.getString(R.string.billing_payment_failed))
+    } finally {
+        setLoading(false)
     }
 }
 

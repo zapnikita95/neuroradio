@@ -79,6 +79,8 @@ import com.musicstory.app.R
 import com.musicstory.app.data.local.SettingsDataStore
 import com.musicstory.app.data.remote.ConnectionCheckResult
 import com.musicstory.app.data.remote.BillingEntitlementResponse
+import com.musicstory.app.data.remote.LanguageSwitchPolicyResponse
+import java.util.Locale
 import com.musicstory.app.domain.GeminiModel
 import com.musicstory.app.domain.GroqModel
 import com.musicstory.app.domain.LlmProvider
@@ -90,6 +92,7 @@ import com.musicstory.app.domain.ElevenLabsVoice
 import com.musicstory.app.domain.OpenRouterModel
 import com.musicstory.app.domain.ResolvedAppLanguage
 import com.musicstory.app.domain.resolveAppLanguage
+import com.musicstory.app.domain.toApiCode
 import com.musicstory.app.domain.StoryLength
 import com.musicstory.app.domain.StoryNarrator
 import com.musicstory.app.domain.EdgeVoicePreset
@@ -123,7 +126,6 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlin.math.abs
-import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -131,6 +133,7 @@ fun SettingsScreen(
     onBack: () -> Unit,
     onOpenAccountLogin: () -> Unit = {},
     onOpenAccount: () -> Unit = onOpenAccountLogin,
+    onOpenAccountBilling: () -> Unit = onOpenAccount,
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
@@ -332,6 +335,9 @@ fun SettingsScreen(
     var devTierFeedback by remember { mutableStateOf<String?>(null) }
     var devTierSwitchEnabled by remember { mutableStateOf(false) }
     var billingEntitlement by remember { mutableStateOf<BillingEntitlementResponse?>(null) }
+    var languageSwitchToEn by remember { mutableStateOf<LanguageSwitchPolicyResponse?>(null) }
+    var showLanguageUpgradeDialog by remember { mutableStateOf(false) }
+    var languageUpgradeHint by remember { mutableStateOf<String?>(null) }
     val trialExpiredUpsellShown by settings.trialExpiredUpsellShown.collectAsState(initial = false)
     val trialBannerDismissed by settings.trialBannerDismissedMilestones.collectAsState(initial = emptySet())
     var showTrialExpiredDialog by remember { mutableStateOf(false) }
@@ -527,8 +533,10 @@ fun SettingsScreen(
         if (url.isBlank()) return@LaunchedEffect
         app.storyRepository.refreshQuota()
         runCatching {
-            val status = app.apiClient.fetchBillingStatus(url)
+            val resolvedLang = resolveAppLanguage(appLanguageUi).toApiCode()
+            val status = app.apiClient.fetchBillingStatus(url, resolvedLang)
             billingEntitlement = status.entitlement
+            languageSwitchToEn = status.languageSwitch?.toEn
             devTierSwitchEnabled = status.devTierSwitchEnabled == true
             if (devTierSwitchEnabled) {
                 devTierLabel = status.devTierOverride ?: status.tier
@@ -783,7 +791,54 @@ fun SettingsScreen(
                         PreferenceRadioRow(
                             label = label,
                             selected = appLanguageUi == lang,
-                            onSelect = { appLanguageUi = lang },
+                            onSelect = {
+                                val targetEn = when (lang) {
+                                    AppLanguage.EN -> true
+                                    AppLanguage.SYSTEM ->
+                                        !Locale.getDefault().language.equals("ru", ignoreCase = true)
+                                    AppLanguage.RU -> false
+                                }
+                                if (targetEn) {
+                                    val policy = languageSwitchToEn
+                                    if (policy != null && !policy.allowed) {
+                                        languageUpgradeHint = policy.hintRu
+                                            ?: context.getString(R.string.settings_language_en_upgrade_hint)
+                                        showLanguageUpgradeDialog = true
+                                        return@PreferenceRadioRow
+                                    }
+                                }
+                                appLanguageUi = lang
+                            },
+                        )
+                    }
+                    if (showLanguageUpgradeDialog) {
+                        AlertDialog(
+                            onDismissRequest = { showLanguageUpgradeDialog = false },
+                            title = { Text(context.getString(R.string.settings_language_en_blocked_title)) },
+                            text = {
+                                Text(
+                                    languageUpgradeHint
+                                        ?: context.getString(R.string.settings_language_en_upgrade_hint),
+                                )
+                            },
+                            confirmButton = {
+                                PrimaryStoryButton(
+                                    text = context.getString(R.string.settings_language_en_upgrade_cta),
+                                    onClick = {
+                                        showLanguageUpgradeDialog = false
+                                        onOpenAccountBilling()
+                                    },
+                                )
+                            },
+                            dismissButton = {
+                                SecondaryStoryButton(
+                                    text = context.getString(R.string.action_cancel),
+                                    onClick = { showLanguageUpgradeDialog = false },
+                                )
+                            },
+                            containerColor = DeepVoid,
+                            titleContentColor = CreamText,
+                            textContentColor = MutedLavender,
                         )
                     }
                 }

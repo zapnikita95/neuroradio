@@ -350,6 +350,11 @@
     <string name="billing_unlink_card_confirm">Да, отвязать</string>
     <string name="billing_unlink_card_done">Карта отвязана. Доступ сохранится до конца оплаченного периода.</string>
     <string name="billing_unlink_card_failed">Не удалось отвязать карту</string>
+    <string name="billing_play_hint">Оплата через Google Play — встроенная покупка в приложении. Управление подпиской — в Google Play → Платежи и подписки.</string>
+    <string name="billing_play_activity_required">Не удалось открыть оплату Google Play</string>
+    <string name="settings_language_en_blocked_title">Нужна международная подписка</string>
+    <string name="settings_language_en_upgrade_hint">У вас активна подписка в рублях. Английский интерфейс использует более дорогие модели — оформите международную подписку через Google Play.</string>
+    <string name="settings_language_en_upgrade_cta">Перейти к оплате</string>
     <string name="action_cancel">Отмена</string>
     <string name="feedback_title">Как история?</string>
     <string name="feedback_like">👍</string>

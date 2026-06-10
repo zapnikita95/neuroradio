@@ -133,3 +133,44 @@ struct HealthResponse: Decodable, Sendable {
     let yandexTts: Bool?
     let appAuthRequired: Bool?
 }
+
+struct LanguageSwitchPolicy: Decodable, Sendable {
+    let allowed: Bool
+    let reason: String?
+    let hintRu: String?
+    let hintEn: String?
+    let note: String?
+}
+
+struct LanguageSwitchBundle: Decodable, Sendable {
+    let toRu: LanguageSwitchPolicy?
+    let toEn: LanguageSwitchPolicy?
+}
+
+struct BillingEntitlement: Decodable, Sendable {
+    let plan: String?
+    let premiumUntil: Int64?
+    let subscriptionMarket: String?
+    let billingProvider: String?
+}
+
+struct BillingStatusResponse: Decodable, Sendable {
+    let tier: String?
+    let premium: Bool?
+    let entitlement: BillingEntitlement?
+    let subscriptionMarket: String?
+    let billingChannel: String?
+    let languageSwitch: LanguageSwitchBundle?
+}
+
+struct AppStoreVerifyRequest: Encodable, Sendable {
+    let receiptData: String
+}
+
+struct IapVerifyResponse: Decodable, Sendable {
+    let ok: Bool?
+    let tier: String?
+    let subscriptionMarket: String?
+    let hint: String?
+    let error: String?
+}

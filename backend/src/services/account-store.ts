@@ -110,6 +110,9 @@ export type WebCabinetStatus = {
 
 export type AccountPlan = 'free' | 'trial' | 'premium';
 
+export type SubscriptionMarket = 'ru' | 'intl';
+export type BillingProvider = 'yookassa' | 'google_play' | 'app_store';
+
 export interface AccountEntitlement {
   plan: AccountPlan;
   premiumUntil: number;
@@ -117,6 +120,9 @@ export interface AccountEntitlement {
   trialStoriesUsed: number;
   premiumProductId: string | null;
   purchaseTokenHash: string | null;
+  /** RU (₽ YooKassa) vs intl ($ App Store / Google Play). */
+  subscriptionMarket?: SubscriptionMarket | null;
+  billingProvider?: BillingProvider | null;
   /** Saved YooKassa card + autopay (no raw payment_method_id exposed). */
   autoRenew?: boolean;
   cardSaved?: boolean;
@@ -146,6 +152,8 @@ export interface AccountRecord {
   trialStoriesUsed?: number;
   premiumProductId?: string | null;
   purchaseTokenHash?: string | null;
+  subscriptionMarket?: SubscriptionMarket | null;
+  billingProvider?: BillingProvider | null;
   email?: string | null;
   telegramId?: number | null;
   telegramUsername?: string | null;
@@ -696,6 +704,8 @@ function entitlementFromAccount(account: AccountRecord | undefined): AccountEnti
     trialStoriesUsed: account?.trialStoriesUsed ?? 0,
     premiumProductId: account?.premiumProductId ?? null,
     purchaseTokenHash: account?.purchaseTokenHash ?? null,
+    subscriptionMarket: account?.subscriptionMarket ?? null,
+    billingProvider: account?.billingProvider ?? null,
     autoRenew,
     cardSaved,
     subscriptionPlan: account?.subscriptionPlan ?? null,
@@ -716,6 +726,8 @@ export function getEntitlementForInstall(installId: string): AccountEntitlement 
       trialStoriesUsed: 0,
       premiumProductId: null,
       purchaseTokenHash: null,
+      subscriptionMarket: null,
+      billingProvider: null,
       autoRenew: false,
       cardSaved: false,
       subscriptionPlan: null,
@@ -733,12 +745,39 @@ const PREMIUM_MS_MONTH = 31 * 24 * 60 * 60 * 1000;
  */
 export function grantPremiumSubscription(
   installId: string,
-  options: { months?: number; productId?: string; purchaseToken?: string } = {},
+  options: {
+    months?: number;
+    productId?: string;
+    purchaseToken?: string;
+    subscriptionMarket?: SubscriptionMarket;
+    billingProvider?: BillingProvider;
+    premiumUntil?: number;
+    subscriptionPlan?: 'month' | 'quarter' | 'year';
+  } = {},
 ): AccountEntitlement {
   const months = Math.max(1, options.months ?? 1);
   const store = loadStore();
   const normalized = installId.trim().toLowerCase();
   let accountId = store.installToAccount[normalized];
+  const applyPremium = (account: AccountRecord) => {
+    const base = Math.max(Date.now(), account.premiumUntil ?? 0);
+    account.plan = 'premium';
+    account.premiumUntil =
+      options.premiumUntil != null && options.premiumUntil > base
+        ? options.premiumUntil
+        : base + months * PREMIUM_MS_MONTH;
+    account.premiumProductId = options.productId ?? PREMIUM_PRODUCT_MONTHLY;
+    if (options.subscriptionPlan) account.subscriptionPlan = options.subscriptionPlan;
+    if (options.subscriptionMarket) account.subscriptionMarket = options.subscriptionMarket;
+    if (options.billingProvider) account.billingProvider = options.billingProvider;
+    if (options.purchaseToken) {
+      account.purchaseTokenHash = crypto
+        .createHash('sha256')
+        .update(options.purchaseToken)
+        .digest('hex');
+    }
+  };
+
   if (!accountId) {
     const created = createAccount(installId);
     accountId = created.accountId;
@@ -747,15 +786,7 @@ export function grantPremiumSubscription(
     if (!account) {
       return getEntitlementForInstall(installId);
     }
-    account.plan = 'premium';
-    account.premiumUntil = Date.now() + months * PREMIUM_MS_MONTH;
-    account.premiumProductId = options.productId ?? PREMIUM_PRODUCT_MONTHLY;
-    if (options.purchaseToken) {
-      account.purchaseTokenHash = crypto
-        .createHash('sha256')
-        .update(options.purchaseToken)
-        .digest('hex');
-    }
+    applyPremium(account);
     saveStore(reloaded);
     return entitlementFromAccount(account);
   }
@@ -763,16 +794,7 @@ export function grantPremiumSubscription(
   const account = store.accountsById[accountId];
   if (!account) return getEntitlementForInstall(installId);
 
-  const base = Math.max(Date.now(), account.premiumUntil ?? 0);
-  account.plan = 'premium';
-  account.premiumUntil = base + months * PREMIUM_MS_MONTH;
-  account.premiumProductId = options.productId ?? PREMIUM_PRODUCT_MONTHLY;
-  if (options.purchaseToken) {
-    account.purchaseTokenHash = crypto
-      .createHash('sha256')
-      .update(options.purchaseToken)
-      .digest('hex');
-  }
+  applyPremium(account);
   saveStore(store);
   return entitlementFromAccount(account);
 }
@@ -784,6 +806,10 @@ export interface GrantPremiumOptions {
   subscriptionPlan?: 'month' | 'quarter' | 'year';
   paymentMethodId?: string | null;
   autoRenew?: boolean;
+  subscriptionMarket?: SubscriptionMarket;
+  billingProvider?: BillingProvider;
+  purchaseToken?: string;
+  premiumUntil?: number;
 }
 
 export function grantPremiumByEmail(
@@ -833,8 +859,20 @@ export function grantPremiumByEmail(
   account.email = email;
   const base = Math.max(Date.now(), account.premiumUntil ?? 0);
   account.plan = 'premium';
-  account.premiumUntil = base + months * PREMIUM_MS_MONTH;
+  account.premiumUntil =
+    options.premiumUntil != null && options.premiumUntil > base
+      ? options.premiumUntil
+      : base + months * PREMIUM_MS_MONTH;
   account.premiumProductId = options.productId ?? PREMIUM_PRODUCT_MONTHLY;
+  account.subscriptionMarket = options.subscriptionMarket ?? 'ru';
+  account.billingProvider = options.billingProvider ?? 'yookassa';
+
+  if (options.purchaseToken) {
+    account.purchaseTokenHash = crypto
+      .createHash('sha256')
+      .update(options.purchaseToken)
+      .digest('hex');
+  }
 
   if (options.subscriptionPlan) {
     account.subscriptionPlan = options.subscriptionPlan;

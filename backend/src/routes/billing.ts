@@ -27,6 +27,22 @@ import {
 import { canUseDevTierSwitch } from '../services/admin-users.js';
 import type { UserTier } from '../services/entitlements.js';
 import { isEmailConfigured, sendReceiptToUserEmail } from '../services/email-sender.js';
+import {
+  inferSubscriptionMarket,
+  resolveBillingChannel,
+  resolveLanguageSwitchPolicy,
+  type AppLanguageCode,
+} from '../services/subscription-market.js';
+import { SUBSCRIPTION_PLANS_USD } from '../services/yookassa.js';
+import {
+  isGooglePlayBillingConfigured,
+  verifyGooglePlaySubscription,
+} from '../services/google-play-billing.js';
+import {
+  hashAppStorePurchaseKey,
+  isAppStoreBillingConfigured,
+  verifyAppStoreReceipt,
+} from '../services/app-store-billing.js';
 
 const router = Router();
 
@@ -50,10 +66,27 @@ router.get('/status', (req: Request, res: Response) => {
   const quota = getDailyStoryQuota(installId);
   const effectiveDaily = getDailyStoryLimit(installId);
 
+  const appLangRaw = typeof req.query.appLanguage === 'string' ? req.query.appLanguage.trim() : 'ru';
+  const appLanguage: AppLanguageCode = appLangRaw === 'en' ? 'en' : 'ru';
+  const subscriptionMarket = inferSubscriptionMarket({
+    subscriptionMarket: entitlement.subscriptionMarket,
+    billingProvider: entitlement.billingProvider,
+    premiumProductId: entitlement.premiumUntil > Date.now() ? entitlement.premiumProductId : null,
+    cardSaved: entitlement.cardSaved,
+  });
+  const billingChannel = resolveBillingChannel(appLanguage);
+  const languageSwitch = {
+    toRu: resolveLanguageSwitchPolicy(installId, 'ru', subscriptionMarket),
+    toEn: resolveLanguageSwitchPolicy(installId, 'en', subscriptionMarket),
+  };
+
   res.json({
     tier,
     premium: hasPremiumEntitlement(installId),
-    entitlement,
+    entitlement: { ...entitlement, subscriptionMarket },
+    subscriptionMarket,
+    billingChannel,
+    languageSwitch,
     quota,
     limits: {
       dailyStories: effectiveDaily,
@@ -75,6 +108,21 @@ router.get('/status', (req: Request, res: Response) => {
         llmModel: 'deepseek/deepseek-chat-v3-0324',
       },
     },
+    productsUsd: Object.fromEntries(
+      Object.entries(SUBSCRIPTION_PLANS_USD).map(([key, meta]) => [
+        key,
+        {
+          productId: meta.productId,
+          amountUsd: meta.amountUsd,
+          labelEn: meta.labelEn,
+          months: meta.months,
+        },
+      ]),
+    ),
+    inAppBilling: {
+      googlePlayConfigured: isGooglePlayBillingConfigured(),
+      appStoreConfigured: isAppStoreBillingConfigured(),
+    },
     hint: tierQuotaHintRu(tier),
     premiumVoiceHint: premiumUpsellHintRu(tier),
     premiumTtsProvider: 'yandex',
@@ -84,6 +132,117 @@ router.get('/status', (req: Request, res: Response) => {
     devTierSwitchEnabled: canUseDevTierSwitch(installId),
     devTierOverride: canUseDevTierSwitch(installId) ? getDevTierOverride(installId) : null,
   });
+});
+
+/** Check if app language can be switched (RU sub → EN blocked until intl upgrade). */
+router.get('/language-switch', (req: Request, res: Response) => {
+  const installId = req.installId ?? 'unknown';
+  const targetRaw = typeof req.query.target === 'string' ? req.query.target.trim() : '';
+  const target: AppLanguageCode = targetRaw === 'en' ? 'en' : 'ru';
+  const entitlement = getEntitlementForInstall(installId);
+  const market = inferSubscriptionMarket({
+    subscriptionMarket: entitlement.subscriptionMarket,
+    billingProvider: entitlement.billingProvider,
+    premiumProductId: entitlement.premiumUntil > Date.now() ? entitlement.premiumProductId : null,
+    cardSaved: entitlement.cardSaved,
+  });
+  const policy = resolveLanguageSwitchPolicy(installId, target, market);
+  res.json({ target, subscriptionMarket: market, policy });
+});
+
+/** Verify Google Play subscription purchase and grant intl premium. */
+router.post('/verify/google-play', async (req: Request, res: Response) => {
+  const installId = req.installId ?? '';
+  if (!installId) {
+    res.status(400).json({ error: 'Missing install id' });
+    return;
+  }
+  const productId = typeof req.body?.productId === 'string' ? req.body.productId.trim() : '';
+  const purchaseToken = typeof req.body?.purchaseToken === 'string' ? req.body.purchaseToken.trim() : '';
+  if (!productId || !purchaseToken) {
+    res.status(400).json({ error: 'productId and purchaseToken required' });
+    return;
+  }
+  if (!isGooglePlayBillingConfigured()) {
+    res.status(503).json({
+      error: 'Google Play billing not configured on server',
+      code: 'GOOGLE_PLAY_NOT_CONFIGURED',
+    });
+    return;
+  }
+  try {
+    const verified = await verifyGooglePlaySubscription({ productId, purchaseToken });
+    const entitlement = grantPremiumSubscription(installId, {
+      months: verified.months,
+      productId: verified.productId,
+      purchaseToken,
+      subscriptionMarket: 'intl',
+      billingProvider: 'google_play',
+      subscriptionPlan: verified.plan,
+      premiumUntil: verified.expiryTimeMs ?? undefined,
+    });
+    resetStoryQuotaForInstall(installId);
+    res.json({
+      ok: true,
+      tier: resolveUserTier(installId),
+      entitlement,
+      subscriptionMarket: 'intl',
+      hint: 'International subscription active. You can switch to Russian UI — limits stay the same.',
+    });
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error('[billing/verify/google-play]', msg);
+    res.status(400).json({ ok: false, error: msg, code: 'GOOGLE_PLAY_VERIFY_FAILED' });
+  }
+});
+
+/** Verify App Store receipt and grant intl premium. */
+router.post('/verify/app-store', async (req: Request, res: Response) => {
+  const installId = req.installId ?? '';
+  if (!installId) {
+    res.status(400).json({ error: 'Missing install id' });
+    return;
+  }
+  const receiptData = typeof req.body?.receiptData === 'string' ? req.body.receiptData.trim() : '';
+  if (!receiptData) {
+    res.status(400).json({ error: 'receiptData required' });
+    return;
+  }
+  if (!isAppStoreBillingConfigured()) {
+    res.status(503).json({
+      error: 'App Store billing not configured on server',
+      code: 'APP_STORE_NOT_CONFIGURED',
+    });
+    return;
+  }
+  try {
+    const verified = await verifyAppStoreReceipt(receiptData);
+    const purchaseKey =
+      verified.originalTransactionId != null
+        ? hashAppStorePurchaseKey(verified.originalTransactionId)
+        : receiptData.slice(0, 64);
+    const entitlement = grantPremiumSubscription(installId, {
+      months: verified.months,
+      productId: verified.productId,
+      purchaseToken: purchaseKey,
+      subscriptionMarket: 'intl',
+      billingProvider: 'app_store',
+      subscriptionPlan: verified.plan,
+      premiumUntil: verified.expiryTimeMs ?? undefined,
+    });
+    resetStoryQuotaForInstall(installId);
+    res.json({
+      ok: true,
+      tier: resolveUserTier(installId),
+      entitlement,
+      subscriptionMarket: 'intl',
+      hint: 'International subscription active. You can switch to Russian UI — limits stay the same.',
+    });
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error('[billing/verify/app-store]', msg);
+    res.status(400).json({ ok: false, error: msg, code: 'APP_STORE_VERIFY_FAILED' });
+  }
 });
 
 /** Отвязать карту и отключить автопродление (данные привязки удаляются у нас). */

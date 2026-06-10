@@ -79,6 +79,9 @@ class MusicStoryApp : Application() {
     lateinit var offlinePackRepository: OfflinePackRepository
         private set
 
+    lateinit var playBillingManager: com.musicstory.app.billing.PlayBillingManager
+        private set
+
     val appScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     override fun onCreate() {
@@ -122,6 +125,7 @@ class MusicStoryApp : Application() {
             storyRepository = storyRepository,
             notifier = OfflinePackNotifier(this),
         )
+        playBillingManager = com.musicstory.app.billing.PlayBillingManager(this)
         mediaControllerManager = MediaControllerManager(this)
         storyPlayer = StoryPlayer(this)
         triggerEngine = TriggerEngine()

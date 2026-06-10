@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Efir AI</string>
+    <string name="home_title">Efir AI</string>
+    <string name="settings_title">Settings</string>
+    <string name="history_title">History</string>
+    <string name="nav_history">History</string>
+    <string name="nav_settings">Settings</string>
+    <string name="nav_account">Account</string>
+
+    <string name="settings_general_section">General</string>
+    <string name="settings_language">App language</string>
+    <string name="settings_language_system">Match device</string>
+    <string name="settings_language_ru">Russian</string>
+    <string name="settings_language_en">English</string>
+    <string name="settings_elevenlabs_voice">ElevenLabs voice</string>
+    <string name="settings_elevenlabs_hint">In English, Extended plan uses ElevenLabs for voiceover.</string>
+
+    <string name="settings_manual_mode">Manual mode</string>
+    <string name="settings_auto_intercept">Automatic</string>
+    <string name="settings_playback_mode_hint">On — stories start on track change. Off — only via «Tell story».</string>
+    <string name="settings_speak_track_names">Track names in voiceover</string>
+    <string name="settings_offline_cache">Save stories on device</string>
+    <string name="action_save">Save</string>
+    <string name="action_back">Back</string>
+    <string name="settings_saved">Saved</string>
+    <string name="settings_saving">Saving…</string>
+
+    <string name="label_now_playing">Now playing</string>
+    <string name="label_no_track">Track unknown</string>
+    <string name="action_manual_story">Tell story</string>
+    <string name="action_preparing_story">Preparing story…</string>
+    <string name="action_stop_story">Stop story</string>
+    <string name="action_cancel_generation">Cancel</string>
+
+    <string name="settings_narrator_section">Narrator (persona)</string>
+    <string name="settings_voice_section">Voice</string>
+    <string name="settings_tts_voice">Voice</string>
+    <string name="settings_story_length">Story length</string>
+    <string name="settings_tts_speed">Speech speed</string>
+    <string name="settings_tts_emotion">Intonation</string>
+    <string name="settings_trigger_mode">When to tell</string>
+    <string name="settings_ai_section">AI</string>
+
+    <string name="state_fetching">Preparing story…</string>
+    <string name="state_playing">Playing story</string>
+    <string name="state_error">Error</string>
+    <string name="history_empty">No stories yet. Tap «Tell story» or wait for auto mode.</string>
+
+    <string name="billing_premium_title">Extended</string>
+    <string name="billing_plan_month">Month</string>
+    <string name="billing_plan_quarter">Quarter</string>
+    <string name="billing_plan_year">Year · best value</string>
+    <string name="billing_subscribe_cta">Subscribe</string>
+    <string name="billing_play_hint">Payment via Google Play in-app purchase. Manage subscription in Google Play → Payments &amp; subscriptions.</string>
+    <string name="billing_play_activity_required">Could not open Google Play billing</string>
+    <string name="settings_language_en_blocked_title">International subscription required</string>
+    <string name="settings_language_en_upgrade_hint">Your subscription is tied to the Russian (RUB) plan. English uses costlier models — subscribe via Google Play or the App Store.</string>
+    <string name="settings_language_en_upgrade_cta">Go to billing</string>
+
+    <string name="trial_expired_subscribe">Subscribe</string>
+    <string name="settings_premium_locked_hint">Available with subscription</string>
+</resources>

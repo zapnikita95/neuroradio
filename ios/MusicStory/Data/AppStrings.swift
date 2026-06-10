@@ -55,4 +55,21 @@ enum AppStrings {
     enum History {
         static let listen = "Слушать"
     }
+
+    enum Billing {
+        static let navTitle = "Оплата"
+        static let title = "Расширенная подписка"
+        static let playHint = "Оплата через App Store — встроенная покупка. Управление — Настройки → Apple ID → Подписки."
+        static let subscribe = "Оформить подписку"
+        static let processing = "…"
+        static let success = "Подписка активирована"
+    }
+
+    enum Language {
+        static let enBlockedTitle = "Нужна международная подписка"
+        static let enUpgradeHint =
+            "У вас активна подписка в рублях. Английский интерфейс использует более дорогие модели — " +
+            "оформите международную подписку через App Store."
+        static let enUpgradeCta = "Перейти к оплате"
+    }
 }

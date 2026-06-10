@@ -38,6 +38,8 @@
 		B1000022 /* FactHintRateLimiter.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1000022 /* FactHintRateLimiter.swift */; };
 		B1000023 /* OfflinePackStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1000023 /* OfflinePackStore.swift */; };
 		B1000024 /* AppStrings.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1000024 /* AppStrings.swift */; };
+		B1000025 /* StoreKitManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1000025 /* StoreKitManager.swift */; };
+		B1000026 /* AccountView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1000026 /* AccountView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -99,6 +101,8 @@
 		F1000022 /* FactHintRateLimiter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FactHintRateLimiter.swift; sourceTree = "<group>"; };
 		F1000023 /* OfflinePackStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OfflinePackStore.swift; sourceTree = "<group>"; };
 		F1000024 /* AppStrings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppStrings.swift; sourceTree = "<group>"; };
+		F1000025 /* StoreKitManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StoreKitManager.swift; sourceTree = "<group>"; };
+		F1000026 /* AccountView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AccountView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -139,6 +143,7 @@
 				G1000008 /* Data */,
 				G1000009 /* Domain */,
 				G100000A /* Notifications */,
+				G100000C /* Billing */,
 				G100000B /* UI */,
 				F1000016 /* Assets.xcassets */,
 				F1000018 /* Info.plist */,
@@ -229,6 +234,14 @@
 			path = Notifications;
 			sourceTree = "<group>";
 		};
+		G100000C /* Billing */ = {
+			isa = PBXGroup;
+			children = (
+				F1000025 /* StoreKitManager.swift */,
+			);
+			path = Billing;
+			sourceTree = "<group>";
+		};
 		G100000B /* UI */ = {
 			isa = PBXGroup;
 			children = (
@@ -237,6 +250,7 @@
 				F1000013 /* HomeView.swift */,
 				F1000014 /* SettingsView.swift */,
 				F1000015 /* HistoryView.swift */,
+				F1000026 /* AccountView.swift */,
 			);
 			path = UI;
 			sourceTree = "<group>";
@@ -367,6 +381,8 @@
 				B1000024 /* AppStrings.swift in Sources */,
 				B1000021 /* TierAccess.swift in Sources */,
 				B1000022 /* FactHintRateLimiter.swift in Sources */,
+				B1000025 /* StoreKitManager.swift in Sources */,
+				B1000026 /* AccountView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

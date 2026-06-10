@@ -140,8 +140,34 @@ class ApiClient(
         }
     }
 
-    suspend fun fetchBillingStatus(baseUrl: String): BillingStatusResponse {
-        return getApi(baseUrl).billingStatus()
+    suspend fun fetchBillingStatus(baseUrl: String, appLanguage: String? = null): BillingStatusResponse {
+        return getApi(baseUrl).billingStatus(appLanguage)
+    }
+
+    suspend fun checkLanguageSwitch(baseUrl: String, target: String): LanguageSwitchResponse {
+        return try {
+            getApi(baseUrl).languageSwitch(target)
+        } catch (first: Exception) {
+            authManager.invalidateToken()
+            getApi(baseUrl).languageSwitch(target)
+        }
+    }
+
+    suspend fun verifyGooglePlayPurchase(
+        baseUrl: String,
+        productId: String,
+        purchaseToken: String,
+    ): IapVerifyResponse {
+        return try {
+            getApi(baseUrl).verifyGooglePlay(
+                GooglePlayVerifyRequest(productId = productId, purchaseToken = purchaseToken),
+            )
+        } catch (first: Exception) {
+            authManager.invalidateToken()
+            getApi(baseUrl).verifyGooglePlay(
+                GooglePlayVerifyRequest(productId = productId, purchaseToken = purchaseToken),
+            )
+        }
     }
 
     suspend fun unlinkCard(baseUrl: String): UnlinkCardResponse {

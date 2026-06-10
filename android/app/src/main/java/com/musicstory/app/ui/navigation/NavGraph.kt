@@ -24,6 +24,7 @@ object Routes {
     const val HOME = "home"
     const val SETTINGS = "settings"
     const val ACCOUNT = "account"
+    const val ACCOUNT_BILLING = "account/billing"
     const val HISTORY = "history"
 }
 
@@ -112,6 +113,15 @@ fun MusicStoryNavGraph(
                 },
             )
         }
+        composable(Routes.ACCOUNT_BILLING) {
+            AccountScreen(
+                onBack = { navController.popBackStack() },
+                onOpenAccountLogin = {
+                    navController.navigate(Routes.ACCOUNT_LOGIN) { launchSingleTop = true }
+                },
+                initialTab = 1,
+            )
+        }
         composable(Routes.SETTINGS) {
             SettingsScreen(
                 onBack = {
@@ -128,6 +138,9 @@ fun MusicStoryNavGraph(
                 },
                 onOpenAccount = {
                     navController.navigate(Routes.ACCOUNT) { launchSingleTop = true }
+                },
+                onOpenAccountBilling = {
+                    navController.navigate(Routes.ACCOUNT_BILLING) { launchSingleTop = true }
                 },
             )
         }

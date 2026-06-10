@@ -59,6 +59,8 @@ export async function applyYooKassaPaymentSucceeded(options: {
     months: planMeta.months,
     productId: planMeta.productId,
     subscriptionPlan: plan,
+    subscriptionMarket: 'ru',
+    billingProvider: 'yookassa',
   };
   if (paymentMethodId) {
     grantOpts.paymentMethodId = paymentMethodId;

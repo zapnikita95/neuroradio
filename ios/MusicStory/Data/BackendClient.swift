@@ -57,6 +57,23 @@ final class BackendClient {
         return try decode(QuotaResponse.self, from: data)
     }
 
+    func fetchBillingStatus(appLanguage: String = "ru") async throws -> BillingStatusResponse {
+        var components = URLComponents(url: try apiURL(path: "v1/billing/status"), resolvingAgainstBaseURL: false)
+        components?.queryItems = [URLQueryItem(name: "appLanguage", value: appLanguage)]
+        guard let url = components?.url else { throw BackendError.invalidURL }
+        let (data, response) = try await authorizedData(for: url, method: "GET", body: nil)
+        try validateHTTP(response)
+        return try decode(BillingStatusResponse.self, from: data)
+    }
+
+    func verifyAppStorePurchase(receiptData: String) async throws -> IapVerifyResponse {
+        let url = try apiURL(path: "v1/billing/verify/app-store")
+        let body = try JSONEncoder().encode(AppStoreVerifyRequest(receiptData: receiptData))
+        let (data, response) = try await authorizedData(for: url, method: "POST", body: body)
+        try validateHTTP(response)
+        return try decode(IapVerifyResponse.self, from: data)
+    }
+
     func fetchFactHint(artist: String, title: String) async throws -> FactHintResponse {
         var components = URLComponents(url: try apiURL(path: "v1/facts/hint"), resolvingAgainstBaseURL: false)
         components?.queryItems = [
