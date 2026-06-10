@@ -212,7 +212,7 @@ export async function synthesizeSpeechSilero(
     );
     const chunks: Buffer[] = [];
     for (const seg of segments) {
-      if (seg.lang === 'en' || seg.lang === 'de') {
+      if (seg.lang === 'en' || seg.lang === 'de' || seg.lang === 'fr') {
         chunks.push(await synthesizeEnglishEdgeTts(seg.text, voice, { speed, lang: seg.lang }));
       } else {
         const ssml = wrapSileroRussianSsml(seg.text, { pauseProfile, styleId });

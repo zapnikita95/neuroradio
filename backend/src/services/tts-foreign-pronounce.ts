@@ -5,7 +5,8 @@ import {
   hasLatinAfterPhonetic,
 } from './en-phonetic-ru.js';
 import { germanPhraseToRussianPhonetic, germanWordToRussianPhonetic, GERMAN_PHRASE_PHONETIC } from './de-phonetic-ru.js';
-import { detectForeignLang, isGermanLatinPhrase, type ForeignLang } from './tts-foreign-lang.js';
+import { frenchPhraseToRussianPhonetic, frenchWordToRussianPhonetic, FRENCH_PHRASE_PHONETIC } from './fr-phonetic-ru.js';
+import { detectForeignLang, isFrenchLatinPhrase, isGermanLatinPhrase, type ForeignLang } from './tts-foreign-lang.js';
 
 const PHRASE_PRONUNCIATION_RU: Record<string, string> = {
   'zitti e buoni': 'Цитти э буони',
@@ -65,6 +66,7 @@ const PHRASE_PRONUNCIATION_RU: Record<string, string> = {
   'nu metal': 'ню метал',
   'nu-metal': 'ню метал',
   ...GERMAN_PHRASE_PHONETIC,
+  ...FRENCH_PHRASE_PHONETIC,
 };
 
 const EN_WORD_RU: Record<string, string> = {
@@ -241,6 +243,9 @@ export function latinPhraseToRussianTts(phrase: string, langHint?: ForeignLang):
   if (lang === 'de') {
     return germanPhraseToRussianPhonetic(trimmed);
   }
+  if (lang === 'fr') {
+    return frenchPhraseToRussianPhonetic(trimmed);
+  }
   const words = trimmed.split(/\s+/);
   const mapped = words.map((word) => {
     if (word === '&') return 'энд';
@@ -252,6 +257,7 @@ export function latinPhraseToRussianTts(phrase: string, langHint?: ForeignLang):
     if (lang === 'it') return transliterateItalianWord(word);
     if (lang === 'es') return transliterateSpanishWord(word);
     if (lang === 'de') return germanWordToRussianPhonetic(word);
+    if (lang === 'fr') return frenchWordToRussianPhonetic(word);
     return transliterateEnglishWord(word);
   });
   return mapped.join(' ');
@@ -315,9 +321,9 @@ function ensureAllLatinTransliterated(text: string): string {
         if (PHRASE_PRONUNCIATION_RU[key]) return PHRASE_PRONUNCIATION_RU[key]!;
         const ru = lookupPhraseTts(match.replace(/\s*&\s*/g, ' and '));
         if (hasLatinAfterPhonetic(ru)) {
-          return isGermanLatinPhrase(match)
-            ? germanPhraseToRussianPhonetic(match)
-            : englishPhraseToRussianPhonetic(match);
+          if (isFrenchLatinPhrase(match)) return frenchPhraseToRussianPhonetic(match);
+          if (isGermanLatinPhrase(match)) return germanPhraseToRussianPhonetic(match);
+          return englishPhraseToRussianPhonetic(match);
         }
         return ru;
       },
@@ -328,9 +334,9 @@ function ensureAllLatinTransliterated(text: string): string {
   return result.replace(/[A-Za-zÀ-ÿ]+/g, (match) => {
     const key = match.toLowerCase();
     if (PHRASE_PRONUNCIATION_RU[key]) return PHRASE_PRONUNCIATION_RU[key]!;
-    return isGermanLatinPhrase(match)
-      ? germanWordToRussianPhonetic(match)
-      : englishWordToRussianPhonetic(match);
+    if (isFrenchLatinPhrase(match)) return frenchWordToRussianPhonetic(match);
+    if (isGermanLatinPhrase(match)) return germanWordToRussianPhonetic(match);
+    return englishWordToRussianPhonetic(match);
   });
 }
 

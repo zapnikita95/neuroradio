@@ -50,6 +50,7 @@ export function resolveEdgeTtsVoiceForSilero(voice: SileroVoiceId, lang: Foreign
   const presetId = ({ aidar: 'dmitry_calm', eugene: 'dmitry_lively', baya: 'svetlana_calm', kseniya: 'svetlana_lively', xenia: 'svetlana_lively' } as const)[voice] ?? 'dmitry_calm';
   const preset = resolveEdgeVoicePreset(presetId);
   if (lang === 'de') return preset.deVoice;
+  if (lang === 'fr') return preset.frVoice;
   return preset.enVoice;
 }
 

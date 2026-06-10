@@ -10,6 +10,7 @@ export interface EdgeVoicePreset {
   ruVoice: string;
   enVoice: string;
   deVoice: string;
+  frVoice: string;
   rateOffsetPct: number;
   pitch: string;
   labelRu: string;
@@ -22,6 +23,7 @@ export const EDGE_VOICE_PRESETS: Record<EdgeVoicePresetId, EdgeVoicePreset> = {
     ruVoice: 'ru-RU-DmitryNeural',
     enVoice: 'en-US-EricNeural',
     deVoice: 'de-DE-ConradNeural',
+    frVoice: 'fr-FR-HenriNeural',
     rateOffsetPct: 0,
     pitch: '+0Hz',
     labelRu: 'Дмитрий — спокойный',
@@ -32,6 +34,7 @@ export const EDGE_VOICE_PRESETS: Record<EdgeVoicePresetId, EdgeVoicePreset> = {
     ruVoice: 'ru-RU-SvetlanaNeural',
     enVoice: 'en-US-JennyNeural',
     deVoice: 'de-DE-KatjaNeural',
+    frVoice: 'fr-FR-DeniseNeural',
     rateOffsetPct: 0,
     pitch: '+0Hz',
     labelRu: 'Светлана — спокойная',
@@ -42,6 +45,7 @@ export const EDGE_VOICE_PRESETS: Record<EdgeVoicePresetId, EdgeVoicePreset> = {
     ruVoice: 'ru-RU-DmitryNeural',
     enVoice: 'en-US-ChristopherNeural',
     deVoice: 'de-DE-ConradNeural',
+    frVoice: 'fr-FR-HenriNeural',
     rateOffsetPct: 6,
     pitch: '+1Hz',
     labelRu: 'Дмитрий — бодрый',
@@ -52,6 +56,7 @@ export const EDGE_VOICE_PRESETS: Record<EdgeVoicePresetId, EdgeVoicePreset> = {
     ruVoice: 'ru-RU-SvetlanaNeural',
     enVoice: 'en-US-AriaNeural',
     deVoice: 'de-DE-KatjaNeural',
+    frVoice: 'fr-FR-DeniseNeural',
     rateOffsetPct: 5,
     pitch: '+2Hz',
     labelRu: 'Светлана — живая',
@@ -62,6 +67,7 @@ export const EDGE_VOICE_PRESETS: Record<EdgeVoicePresetId, EdgeVoicePreset> = {
     ruVoice: 'ru-RU-DariyaNeural',
     enVoice: 'en-US-MichelleNeural',
     deVoice: 'de-DE-KatjaNeural',
+    frVoice: 'fr-FR-DeniseNeural',
     rateOffsetPct: 0,
     pitch: '+0Hz',
     labelRu: 'Дария — мягкая',
