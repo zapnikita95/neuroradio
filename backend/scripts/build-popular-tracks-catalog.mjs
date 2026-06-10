@@ -2,6 +2,7 @@
  * Build popular-tracks-catalog.json (~1500–2500 tracks, RU + global).
  * Run: npm run build && node scripts/build-popular-tracks-catalog.mjs
  */
+import '../dist/load-env.js';
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';

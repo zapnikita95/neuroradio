@@ -27,8 +27,7 @@
     "generate:website-demos-en:all": "node scripts/generate-website-demos-en.mjs --all",
     "test:fact-sources": "npm run build && node scripts/benchmark-fact-sources.mjs",
     "build:catalog": "node scripts/build-popular-tracks-catalog.mjs",
-    "seed:facts": "npm run build && node scripts/bulk-seed-fact-bank.mjs",
-    "seed:bootstrap": "npm run build && node scripts/bootstrap-facts-seed.mjs"
+    "seed:facts": "npm run build && node scripts/bulk-seed-fact-bank.mjs"
   },
   "keywords": [
     "music",

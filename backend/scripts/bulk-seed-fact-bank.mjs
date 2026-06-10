@@ -2,6 +2,7 @@
  * Bulk harvest facts into facts-bank.json / facts-bank-seed.json.
  * Run: npm run build && node scripts/bulk-seed-fact-bank.mjs [--target 8000] [--concurrency 8] [--resume] [--limit 100]
  */
+import '../dist/load-env.js';
 import crypto from 'node:crypto';
 import { mkdirSync, readFileSync, writeFileSync, existsSync } from 'node:fs';
 import { dirname, join } from 'node:path';
