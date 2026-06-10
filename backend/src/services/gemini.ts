@@ -59,6 +59,7 @@ export interface GenerateStoryInput {
   rawSnippets?: string[];
   geminiModel?: string;
   clientGeminiApiKey?: string;
+  storyLanguage?: import('./story-language.js').StoryLanguageId;
 }
 
 function parseStoryJson(raw: string): StoryScript | null {
@@ -254,6 +255,7 @@ function finalizeStory(
     input.artist,
     input.title,
     input.referenceFacts ?? [],
+    { storyLanguage: input.storyLanguage },
   );
   return {
     ...story,
@@ -324,7 +326,8 @@ export async function generateStoryScript(
     input.title,
     input.countryCode,
   );
-  const systemPrompt = buildSystemPrompt(persona, lengthPreset);
+  const storyLanguage = input.storyLanguage ?? 'ru';
+  const systemPrompt = buildSystemPrompt(persona, lengthPreset, storyLanguage);
   const voiceId = input.voiceId ?? voiceForYear(input.year, input.genre);
 
   let lastCandidate: StoryScript | null = null;
@@ -341,6 +344,7 @@ export async function generateStoryScript(
       previousScripts,
       selectedReferenceFact: input.selectedReferenceFact,
       retryReason: retryDirective ?? undefined,
+      storyLanguage,
     });
 
     const result = await callGemini(
@@ -362,7 +366,7 @@ export async function generateStoryScript(
     story.word_count = countWords(story.script);
     logStoryScript(`gemini attempt ${attempt + 1} raw`, story.script, `model=${result.model}`);
 
-    const qOpts = qualityOptionsForAttempt(attempt, MAX_ATTEMPTS, referenceFacts);
+    const qOpts = qualityOptionsForAttempt(attempt, MAX_ATTEMPTS, referenceFacts, storyLanguage);
     qOpts.skipReferenceAnchor = true;
     qOpts.previousScripts = previousScripts;
 
@@ -395,6 +399,7 @@ export async function generateStoryScript(
         input.artist,
         input.title,
         referenceFacts,
+        { storyLanguage },
       );
       const sanitizedQuality = validateGeneratedStory(
         sanitized,

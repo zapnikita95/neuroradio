@@ -16,6 +16,15 @@ final class StoryRepository: ObservableObject {
     static let offlineNoCacheMessage =
         "Нет интернета. Эта история ещё не сохранена на телефоне — один раз послушайте онлайн с расширенным тарифом."
 
+    func hasHotFactForTrack(artist: String, title: String) async -> Bool {
+        do {
+            let hint = try await backend.fetchFactHint(artist: artist, title: title)
+            return hint.hasHotFact
+        } catch {
+            return false
+        }
+    }
+
     func refreshQuota() async {
         do {
             let response = try await backend.fetchQuota()

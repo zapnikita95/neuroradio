@@ -110,6 +110,7 @@ function finalizeStory(
     input.artist,
     input.title,
     input.referenceFacts ?? [],
+    { storyLanguage: input.storyLanguage },
   );
   return {
     ...story,
@@ -160,7 +161,8 @@ export async function generateStoryScript(
     input.title,
     input.countryCode,
   );
-  const systemPrompt = buildSystemPrompt(persona, lengthPreset);
+  const storyLanguage = input.storyLanguage ?? 'ru';
+  const systemPrompt = buildSystemPrompt(persona, lengthPreset, storyLanguage);
   const voiceId = input.voiceId ?? voiceForYear(input.year, input.genre);
 
   const models = [
@@ -187,6 +189,7 @@ export async function generateStoryScript(
           storyLength,
           previousScripts,
           selectedReferenceFact: input.selectedReferenceFact,
+          storyLanguage,
         });
 
         const content = await callOpenRouter(
@@ -208,7 +211,12 @@ export async function generateStoryScript(
 
         story.voiceId = voiceId;
         story.word_count = countWords(story.script);
-        const qOpts = qualityOptionsForOpenRouterAttempt(attempt, MAX_ATTEMPTS, referenceFacts);
+        const qOpts = qualityOptionsForOpenRouterAttempt(
+          attempt,
+          MAX_ATTEMPTS,
+          referenceFacts,
+          storyLanguage,
+        );
         qOpts.previousScripts = previousScripts;
 
         const quality = validateGeneratedStory(
@@ -227,6 +235,7 @@ export async function generateStoryScript(
           input.artist,
           input.title,
           input.referenceFacts ?? [],
+          { storyLanguage },
         );
         const sanitizedQuality = validateGeneratedStory(
           sanitized,
@@ -318,6 +327,7 @@ export async function generateStoryScript(
       input.artist,
       input.title,
       referenceFacts,
+      { storyLanguage },
     );
     if (
       countWords(sanitized) >= 35 &&

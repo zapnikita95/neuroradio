@@ -11,6 +11,8 @@ import {
 } from './tts-access.js';
 import { hasPremiumEntitlement, isElevenLabsEnabled } from './entitlements.js';
 import { hasElevenLabsCredentials, synthesizeSpeechElevenLabs } from './elevenlabs-tts.js';
+import { resolveElevenLabsVoiceId } from './elevenlabs-voices.js';
+import type { StoryLanguageId } from './story-language.js';
 import {
   synthesizeSpeechSalute,
   canUseSaluteSpeechProduction,
@@ -63,6 +65,8 @@ export interface TtsRouteRequest {
   sileroVoicePreset?: SileroVoicePresetId;
   edgeVoicePreset?: EdgeVoicePresetId | string;
   speakTrackNamesInVoiceover?: boolean;
+  storyLanguage?: StoryLanguageId;
+  elevenLabsVoice?: string;
 }
 
 export interface TtsRouteResult extends SynthesisResult {
@@ -90,7 +94,10 @@ function pickPremiumAutoProvider(): EffectiveTtsProvider {
 }
 
 export function resolveEffectiveTtsProvider(
-  request: Pick<TtsRouteRequest, 'voiceTier' | 'ttsProvider' | 'installId' | 'userTtsCredentials'>,
+  request: Pick<
+    TtsRouteRequest,
+    'voiceTier' | 'ttsProvider' | 'installId' | 'userTtsCredentials' | 'storyLanguage'
+  >,
 ): EffectiveTtsProvider {
   const userProvider = resolveUserTtsProvider(request.userTtsCredentials ?? null);
   if (userProvider === 'yandex') return 'yandex';
@@ -149,7 +156,17 @@ export function resolveEffectiveTtsProvider(
 
   if (request.voiceTier === 'premium') {
     requirePremium();
+    if (request.storyLanguage === 'en' && canUseElevenLabs()) {
+      return 'elevenlabs';
+    }
     return pickPremiumAutoProvider();
+  }
+
+  if (request.storyLanguage === 'en') {
+    if (hasPremiumEntitlement(request.installId) && canUseElevenLabs()) {
+      return 'elevenlabs';
+    }
+    return 'edge';
   }
 
   if (!serverSpeechKit) {
@@ -214,9 +231,14 @@ export async function synthesizeStoryAudio(request: TtsRouteRequest): Promise<Tt
       request.title ?? '',
       request.speakTrackNamesInVoiceover === true,
     );
+    const elevenVoiceId = resolveElevenLabsVoiceId(
+      (request.elevenLabsVoice ?? request.voiceId ?? 'auto') as import('./elevenlabs-voices.js').ElevenLabsVoiceSetting,
+      { storyNarrator: request.storyNarrator, genre: undefined },
+    );
     result = await synthesizeSpeechElevenLabs(plainText, request.fileName, {
       artist: request.artist,
       title: request.title,
+      voiceId: elevenVoiceId,
     });
   } else if (provider === 'silero') {
     result = await synthesizeSpeechSilero(script, request.fileName, {

@@ -5,7 +5,9 @@ import {
   StoryLengthPreset,
 } from './story-length.js';
 import { COVER_CONTEXT_RE, factMentionsArtist, factMentionsTitle, hasTrackContextSignal, storyMentionsPerformingArtist, storyNamesForeignArtist } from './fact-relevance.js';
+import { hasRussianLeak } from './story-english-language.js';
 import { hasEnglishLeak } from './story-russian-language.js';
+import type { StoryLanguageId } from './story-language.js';
 import { prepareStoryScriptLanguage } from './story-english-normalize.js';
 import { isTruncatedMarketingSnippet, isSpeakableReferenceFact } from './web-snippet-accept.js';
 import { interestScore } from './reference-fact-quality.js';
@@ -160,6 +162,43 @@ export function findHardScriptViolation(script: string): string | null {
   return null;
 }
 
+const EN_HARD_SCRIPT_REJECT_PATTERNS: RegExp[] = [
+  /\bpitchfork\s+nailed\s+it\b/i,
+  /\bnailed\s+it\s+when\s+they\b/i,
+  /\bthat\s+pitchfork\s+review\s+nailed\b/i,
+  /\bjill\s+mapes\s+nailed\b/i,
+  /\b(?:the\s+)?review\s+nailed\s+it\b/i,
+];
+
+const EN_UNGROUNDED_FICTION_PATTERNS: Array<{ claim: RegExp; factHint: RegExp }> = [
+  { claim: /\b(?:my\s+)?vinyl\s+copy\b/i, factHint: /\bvinyl\b/i },
+  { claim: /\bscouring\s+record\s+stores\b/i, factHint: /\brecord\s+store\b/i },
+  { claim: /\bworn[- ]out\s+tour\s+tee\b/i, factHint: /\btour\s+tee\b/i },
+  { claim: /\btiny\s+apartment\b/i, factHint: /\bapartment\b/i },
+  { claim: /\bmotel\s+room/i, factHint: /\bmotel\b/i },
+  { claim: /\b(?:between|in)\s+tour\s+van/i, factHint: /\btour\s+van\b/i },
+  { claim: /\byou\s+can\s+hear\s+it\s+live\b/i, factHint: /\blive\b/i },
+  { claim: /\bindefinite\s+hiatus\b/i, factHint: /\bhiatus\b/i },
+];
+
+export function findEnglishScriptViolation(
+  script: string,
+  referenceFacts: string[] = [],
+): string | null {
+  for (const pattern of EN_HARD_SCRIPT_REJECT_PATTERNS) {
+    if (pattern.test(script)) {
+      return `english hard reject: ${pattern.source}`;
+    }
+  }
+  const factsText = referenceFacts.join(' ');
+  for (const { claim, factHint } of EN_UNGROUNDED_FICTION_PATTERNS) {
+    if (claim.test(script) && (referenceFacts.length === 0 || !factHint.test(factsText))) {
+      return `english ungrounded fiction: ${claim.source}`;
+    }
+  }
+  return null;
+}
+
 export function findPersonaCliche(script: string): string | null {
   for (const pattern of PERSONA_CLICHE_PATTERNS) {
     if (pattern.test(script)) {
@@ -306,8 +345,17 @@ export function sanitizeScriptForTts(
   artist: string,
   title: string,
   referenceFacts: string[] = [],
-  options?: { speakTrackNamesInVoiceover?: boolean; trackArtist?: string; trackTitle?: string },
+  options?: {
+    speakTrackNamesInVoiceover?: boolean;
+    trackArtist?: string;
+    trackTitle?: string;
+    storyLanguage?: StoryLanguageId;
+  },
 ): string {
+  if (options?.storyLanguage === 'en') {
+    let result = script.trim().replace(/\s{2,}/g, ' ').replace(/\s+([,.!?])/g, '$1').trim();
+    return stripBannedFluff(result);
+  }
   const allowed = allowedDigitSequences(artist, title, referenceFacts);
   const blockArtist = options?.trackArtist ?? artist;
   const blockTitle = options?.trackTitle ?? title;
@@ -644,6 +692,8 @@ export function validateStoryScript(
     /** Production: skip ampoua clichés when facts anchor the story. */
     skipPersonaCliches?: boolean;
     skipEnglishCheck?: boolean;
+    skipRussianCheck?: boolean;
+    storyLanguage?: StoryLanguageId;
     /** Override minimum word count (e.g. flash-lite models). */
     minWordsOverride?: number;
     previousScripts?: string[];
@@ -656,7 +706,10 @@ export function validateStoryScript(
   const skipFirstSentenceAnchor = options.skipFirstSentenceAnchor ?? false;
   const skipBannedPatterns = options.skipBannedPatterns ?? false;
   const skipPersonaCliches = options.skipPersonaCliches ?? false;
-  const skipEnglishCheck = options.skipEnglishCheck ?? false;
+  const skipEnglishCheck =
+    options.skipEnglishCheck ?? options.storyLanguage === 'en';
+  const skipRussianCheck =
+    options.skipRussianCheck ?? options.storyLanguage !== 'en';
   const referenceFacts = options.referenceFacts ?? [];
   const previousScripts = options.previousScripts ?? [];
   const trimmed = script.trim();
@@ -684,6 +737,12 @@ export function validateStoryScript(
     if (hard) {
       return { ok: false, reason: hard };
     }
+    if (options.storyLanguage === 'en') {
+      const enHard = findEnglishScriptViolation(trimmed, referenceFacts);
+      if (enHard) {
+        return { ok: false, reason: enHard };
+      }
+    }
     if (!skipPersonaCliches) {
       const persona = findPersonaCliche(trimmed);
       if (persona) {
@@ -694,6 +753,10 @@ export function validateStoryScript(
 
   if (!skipEnglishCheck && hasEnglishLeak(trimmed, artist, title, { referenceFacts })) {
     return { ok: false, reason: 'english words in Russian narration' };
+  }
+
+  if (!skipRussianCheck && hasRussianLeak(trimmed, artist, title)) {
+    return { ok: false, reason: 'cyrillic in English narration' };
   }
 
   const numberIssue = findForbiddenNumbers(trimmed, artist, title, referenceFacts);

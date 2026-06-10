@@ -109,6 +109,11 @@ struct QuotaResponse: Decodable, Sendable {
     let quota: StoryQuotaInfo
 }
 
+struct FactHintResponse: Decodable, Sendable {
+    let hasHotFact: Bool
+    let hotCount: Int
+}
+
 struct TokenResponse: Decodable, Sendable {
     let accessToken: String
     let tokenType: String?

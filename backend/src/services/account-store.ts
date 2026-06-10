@@ -35,6 +35,7 @@ const MAX_HISTORY = 200;
 export interface SyncSettings {
   manualMode?: boolean;
   autoIntercept?: boolean;
+  factNotificationsEnabled?: boolean;
   triggerMode?: string;
   everyNTracks?: number;
   sameTrackStoryEveryN?: number;
@@ -47,6 +48,7 @@ export interface SyncSettings {
   ttsEmotion?: string;
   ttsPlaybackEngine?: string;
   llmProvider?: string;
+  appLanguage?: string;
   updatedAt?: number;
 }
 

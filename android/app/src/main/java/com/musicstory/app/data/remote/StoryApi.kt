@@ -42,7 +42,18 @@ interface StoryApi {
 
     @POST("v1/story/feedback")
     suspend fun submitStoryFeedback(@Body request: StoryFeedbackRequest): Map<String, Any?>
+
+    @GET("v1/facts/hint")
+    suspend fun fetchFactHint(
+        @Query("artist") artist: String,
+        @Query("title") title: String,
+    ): FactHintResponse
 }
+
+data class FactHintResponse(
+    val hasHotFact: Boolean = false,
+    val hotCount: Int = 0,
+)
 
 data class StoryFeedbackRequest(
     val artist: String,

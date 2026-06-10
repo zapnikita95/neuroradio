@@ -34,6 +34,10 @@ import com.musicstory.app.domain.ServerTtsProvider
 import com.musicstory.app.domain.UserTtsBilling
 import com.musicstory.app.domain.TtsEmotion
 import com.musicstory.app.domain.TtsSpeed
+import com.musicstory.app.domain.ElevenLabsVoice
+import com.musicstory.app.domain.ResolvedAppLanguage
+import com.musicstory.app.domain.resolveAppLanguage
+import com.musicstory.app.domain.toApiCode
 import com.musicstory.app.domain.TtsVoice
 import com.musicstory.app.util.StoryLog
 import com.musicstory.app.util.ApiKeySanitizer
@@ -260,6 +264,14 @@ class StoryRepository(
     }
 
     /** Stories need personal API key or a configured Railway backend (server quota). */
+    suspend fun hasHotFactForTrack(artist: String, title: String): Boolean {
+        val backendUrl = settingsDataStore.backendUrl.first().trim()
+        if (!shouldTryBackend(backendUrl)) return false
+        return runCatching {
+            apiClient.fetchFactHint(backendUrl, artist, title).hasHotFact
+        }.getOrDefault(false)
+    }
+
     suspend fun hasOwnApiKeyConfigured(): Boolean {
         if (hasPersonalApiKeyConfigured()) return true
         return settingsDataStore.backendUrl.first().trim().isNotBlank()
@@ -353,6 +365,9 @@ class StoryRepository(
         val ttsEmotion = settingsDataStore.ttsEmotion.first()
         val edgeVoicePreset = settingsDataStore.edgeVoicePreset.first()
         val speakTrackNamesInVoiceover = settingsDataStore.speakTrackNamesInVoiceover.first()
+        val appLanguage = settingsDataStore.appLanguage.first()
+        val resolvedLang = resolveAppLanguage(appLanguage)
+        val elevenLabsVoice = settingsDataStore.elevenLabsVoice.first()
         val serverTtsProvider = settingsDataStore.serverTtsProvider.first()
         val userTtsBilling = settingsDataStore.userTtsBilling.first()
         val yandexTtsKey = ApiKeySanitizer.clean(settingsDataStore.yandexApiKey.first())
@@ -499,7 +514,9 @@ class StoryRepository(
                 saluteAuthKey = saluteAuthKey,
                 serverTier = tier,
                 serverTtsProvider = serverTtsProvider,
-            )) {
+                resolvedLang = resolvedLang,
+                elevenLabsVoice = elevenLabsVoice,
+        )) {
                 is StoryAttemptResult.Success -> return Result.success(backendResult.response)
                 is StoryAttemptResult.TemplateRejected -> templateRejected = true
                 is StoryAttemptResult.Failed -> {
@@ -574,6 +591,8 @@ class StoryRepository(
         saluteAuthKey: String = "",
         serverTier: String? = null,
         serverTtsProvider: ServerTtsProvider = ServerTtsProvider.EDGE,
+        resolvedLang: ResolvedAppLanguage = ResolvedAppLanguage.RU,
+        elevenLabsVoice: ElevenLabsVoice = ElevenLabsVoice.AUTO,
     ): StoryAttemptResult {
         return try {
             StoryLog.i(
@@ -599,7 +618,12 @@ class StoryRepository(
                         previousScripts = previousScripts,
                         storyLength = storyLength.id,
                         storyNarrator = storyNarrator.id,
-                        ttsVoice = ttsVoice.id,
+                        ttsVoice = if (resolvedLang == ResolvedAppLanguage.EN) {
+                            elevenLabsVoice.id
+                        } else {
+                            ttsVoice.id
+                        },
+                        storyLanguage = resolvedLang.toApiCode(),
                         ttsSpeed = ttsSpeed.yandexSpeed,
                         ttsEmotion = ttsEmotion.id,
                         llmProvider = llmProvider.id,
@@ -616,12 +640,13 @@ class StoryRepository(
                         ttsProvider = when (userTtsBilling) {
                             UserTtsBilling.YANDEX -> "yandex"
                             UserTtsBilling.SBER -> "sber"
-                            UserTtsBilling.SERVER ->
-                                if (TierAccess.isPremiumLike(serverTier) && serverTtsProvider == ServerTtsProvider.YANDEX) {
-                                    "yandex"
-                                } else {
-                                    "edge"
-                                }
+                            UserTtsBilling.SERVER -> when {
+                                resolvedLang == ResolvedAppLanguage.EN &&
+                                    TierAccess.isPremiumLike(serverTier) -> "auto"
+                                TierAccess.isPremiumLike(serverTier) &&
+                                    serverTtsProvider == ServerTtsProvider.YANDEX -> "yandex"
+                                else -> "edge"
+                            }
                         },
                         userTtsProvider = when (userTtsBilling) {
                             UserTtsBilling.SERVER -> null

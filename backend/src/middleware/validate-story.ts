@@ -9,6 +9,7 @@ import { resolveLlmProvider } from '../services/llm-provider.js';
 import { resolveGeminiModel } from '../services/gemini-models.js';
 import { resolveTtsVoiceStyle, type TtsVoiceStyleId } from '../services/tts-voice-profiles.js';
 import type { TtsProviderId, VoiceTier } from '../services/tts-router.js';
+import { resolveStoryLanguage, type StoryLanguageId } from '../services/story-language.js';
 import type { SileroVoicePresetId } from '../services/silero-voices.js';
 
 interface StoryFullBody {
@@ -43,6 +44,7 @@ interface StoryFullBody {
   silero_voice_preset?: unknown;
   edge_voice_preset?: unknown;
   speak_track_names_in_voiceover?: unknown;
+  story_language?: unknown;
 }
 
 const VALID_VOICE_TIERS = new Set<string>(['default', 'premium']);
@@ -183,6 +185,7 @@ export function validateStoryFullBody(req: Request, res: Response, next: NextFun
   const sileroVoice = sileroVoiceRaw?.toLowerCase();
   const edgeVoicePreset = asTrimmedString(body.edge_voice_preset, 32)?.toLowerCase();
   const speakTrackNamesInVoiceover = body.speak_track_names_in_voiceover === true;
+  const storyLanguage: StoryLanguageId = resolveStoryLanguage(body.story_language);
 
   req.body = {
     artist,
@@ -216,6 +219,7 @@ export function validateStoryFullBody(req: Request, res: Response, next: NextFun
     silero_voice_preset: sileroVoicePreset,
     edge_voice_preset: edgeVoicePreset,
     speak_track_names_in_voiceover: speakTrackNamesInVoiceover,
+    story_language: storyLanguage,
   };
   next();
 }

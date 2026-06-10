@@ -57,6 +57,18 @@ final class BackendClient {
         return try decode(QuotaResponse.self, from: data)
     }
 
+    func fetchFactHint(artist: String, title: String) async throws -> FactHintResponse {
+        var components = URLComponents(url: try apiURL(path: "v1/facts/hint"), resolvingAgainstBaseURL: false)
+        components?.queryItems = [
+            URLQueryItem(name: "artist", value: artist),
+            URLQueryItem(name: "title", value: title),
+        ]
+        guard let url = components?.url else { throw BackendError.invalidURL }
+        let (data, response) = try await authorizedData(for: url, method: "GET", body: nil)
+        try validateHTTP(response)
+        return try decode(FactHintResponse.self, from: data)
+    }
+
     func fetchFullStory(request: StoryRequest) async throws -> StoryResponse {
         let url = try apiURL(path: "v1/story/full")
         let body = try JSONEncoder().encode(request)

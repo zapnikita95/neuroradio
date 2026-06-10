@@ -121,6 +121,16 @@ class ApiClient(
         return getApi(baseUrl).fetchQuota()
     }
 
+    suspend fun fetchFactHint(baseUrl: String, artist: String, title: String): FactHintResponse {
+        return try {
+            getApi(baseUrl).fetchFactHint(artist, title)
+        } catch (first: Exception) {
+            StoryLog.w("Fact hint retry after: ${first.message}")
+            authManager.invalidateToken()
+            getApi(baseUrl).fetchFactHint(artist, title)
+        }
+    }
+
     suspend fun setDevTier(baseUrl: String, tier: String?): DevTierResponse {
         return try {
             getApi(baseUrl).setDevTier(DevTierRequest(tier))

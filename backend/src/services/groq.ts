@@ -71,6 +71,7 @@ export interface GenerateStoryInput {
   localOllamaModel?: string;
   /** major = rich sources; indie = metadata-only honest bio OK. */
   artistTier?: 'major' | 'indie';
+  storyLanguage?: import('./story-language.js').StoryLanguageId;
 }
 
 export class GroqApiError extends Error {
@@ -220,6 +221,7 @@ function finalizeStory(
     input.artist,
     input.title,
     input.referenceFacts ?? [],
+    { storyLanguage: input.storyLanguage },
   );
   return {
     ...story,
@@ -249,7 +251,8 @@ export async function generateStoryScript(
     input.title,
     input.countryCode,
   );
-  const systemPrompt = buildSystemPrompt(persona, lengthPreset);
+  const storyLanguage = input.storyLanguage ?? 'ru';
+  const systemPrompt = buildSystemPrompt(persona, lengthPreset, storyLanguage);
   const voiceId = input.voiceId ?? voiceForYear(input.year, input.genre);
 
   let lastCandidate: StoryScript | null = null;
@@ -264,6 +267,7 @@ export async function generateStoryScript(
       storyLength,
       previousScripts,
       selectedReferenceFact: input.selectedReferenceFact,
+      storyLanguage,
     });
 
     const result = await callGroq(
@@ -285,8 +289,8 @@ export async function generateStoryScript(
     story.word_count = countWords(story.script);
     const qOpts =
       referenceFacts.length > 0
-        ? qualityOptionsForOpenRouterAttempt(attempt, MAX_ATTEMPTS, referenceFacts)
-        : qualityOptionsForAttempt(attempt, MAX_ATTEMPTS, referenceFacts);
+        ? qualityOptionsForOpenRouterAttempt(attempt, MAX_ATTEMPTS, referenceFacts, storyLanguage)
+        : qualityOptionsForAttempt(attempt, MAX_ATTEMPTS, referenceFacts, storyLanguage);
     qOpts.previousScripts = previousScripts;
 
     const quality = validateGeneratedStory(
@@ -301,11 +305,12 @@ export async function generateStoryScript(
     }
 
     const sanitized = sanitizeScriptForTts(
-    story.script,
-    input.artist,
-    input.title,
-    input.referenceFacts ?? [],
-  );
+      story.script,
+      input.artist,
+      input.title,
+      input.referenceFacts ?? [],
+      { storyLanguage },
+    );
     const sanitizedQuality = validateGeneratedStory(
       sanitized,
       storyLength,

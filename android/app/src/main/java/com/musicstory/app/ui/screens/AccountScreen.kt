@@ -50,7 +50,10 @@ import com.musicstory.app.ui.components.BillingSubscribeConfirmDialog
 import com.musicstory.app.ui.components.PaymentCheckoutSheet
 import com.musicstory.app.ui.components.PrimaryStoryButton
 import com.musicstory.app.ui.components.SecondaryStoryButton
-import com.musicstory.app.ui.components.defaultBillingPlans
+import com.musicstory.app.domain.ResolvedAppLanguage
+import com.musicstory.app.domain.resolveAppLanguage
+import com.musicstory.app.ui.components.billingPlansForEnglishUi
+import com.musicstory.app.util.LocaleHelper
 import com.musicstory.app.ui.theme.CreamText
 import com.musicstory.app.ui.theme.DeepVoid
 import com.musicstory.app.ui.theme.ErrorCoral
@@ -133,7 +136,10 @@ private fun BillingTab(app: MusicStoryApp) {
     var unlinkMessage by remember { mutableStateOf<String?>(null) }
     var paymentUrl by remember { mutableStateOf<String?>(null) }
     var showConfirmDialog by remember { mutableStateOf(false) }
-    val plans = remember { defaultBillingPlans }
+    val englishUi = remember {
+        resolveAppLanguage(LocaleHelper.readStoredLanguage(context)) == ResolvedAppLanguage.EN
+    }
+    val plans = remember(englishUi) { billingPlansForEnglishUi(englishUi) }
     var selectedPlanIndex by remember { mutableIntStateOf(1) }
     val selectedPlan = plans[selectedPlanIndex]
 

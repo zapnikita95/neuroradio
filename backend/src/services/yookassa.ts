@@ -13,6 +13,16 @@ export const SUBSCRIPTION_PLANS: Record<
   year: { amountRub: 1999, months: 12, labelRu: 'Расширенный · год', productId: 'efir_premium_year' },
 };
 
+/** International USD pricing (Play Billing / Stripe). */
+export const SUBSCRIPTION_PLANS_USD: Record<
+  SubscriptionPlan,
+  { amountUsd: number; months: number; labelEn: string; productId: string }
+> = {
+  month: { amountUsd: 3.99, months: 1, labelEn: 'Extended · month', productId: 'efir_premium_month_usd' },
+  quarter: { amountUsd: 9.99, months: 3, labelEn: 'Extended · quarter', productId: 'efir_premium_quarter_usd' },
+  year: { amountUsd: 39.99, months: 12, labelEn: 'Extended · year', productId: 'efir_premium_year_usd' },
+};
+
 export function isYooKassaConfigured(): boolean {
   return Boolean(process.env.YOOKASSA_SHOP_ID?.trim() && process.env.YOOKASSA_SECRET_KEY?.trim());
 }

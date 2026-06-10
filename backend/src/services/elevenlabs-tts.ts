@@ -42,7 +42,7 @@ export async function synthesizeSpeechElevenLabs(
   const modelId =
     options.modelId?.trim() ||
     process.env.ELEVENLABS_MODEL_ID?.trim() ||
-    'eleven_multilingual_v2';
+    'eleven_flash_v2_5';
 
   await mkdir(AUDIO_DIR, { recursive: true });
 

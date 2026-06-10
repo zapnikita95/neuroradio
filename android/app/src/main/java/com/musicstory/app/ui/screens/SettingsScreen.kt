@@ -82,7 +82,12 @@ import com.musicstory.app.data.remote.BillingEntitlementResponse
 import com.musicstory.app.domain.GeminiModel
 import com.musicstory.app.domain.GroqModel
 import com.musicstory.app.domain.LlmProvider
+import android.app.Activity
+import com.musicstory.app.domain.AppLanguage
+import com.musicstory.app.domain.ElevenLabsVoice
 import com.musicstory.app.domain.OpenRouterModel
+import com.musicstory.app.domain.ResolvedAppLanguage
+import com.musicstory.app.domain.resolveAppLanguage
 import com.musicstory.app.domain.StoryLength
 import com.musicstory.app.domain.StoryNarrator
 import com.musicstory.app.domain.EdgeVoicePreset
@@ -168,6 +173,11 @@ fun SettingsScreen(
     val ttsEmotion by settings.ttsEmotion.collectAsState(initial = TtsEmotion.LIVELY)
     val edgeVoicePreset by settings.edgeVoicePreset.collectAsState(initial = EdgeVoicePreset.SVETLANA_CALM)
     val speakTrackNamesInVoiceover by settings.speakTrackNamesInVoiceover.collectAsState(initial = false)
+    val factNotificationsEnabled by settings.factNotificationsEnabled.collectAsState(
+        initial = SettingsDataStore.DEFAULT_FACT_NOTIFICATIONS_ENABLED,
+    )
+    val appLanguage by settings.appLanguage.collectAsState(initial = AppLanguage.SYSTEM)
+    val elevenLabsVoice by settings.elevenLabsVoice.collectAsState(initial = ElevenLabsVoice.AUTO)
     val offlineAudioCacheEnabled by settings.offlineAudioCacheEnabled.collectAsState(initial = true)
     val serverTtsProvider by settings.serverTtsProvider.collectAsState(initial = ServerTtsProvider.EDGE)
     val userTtsBilling by settings.userTtsBilling.collectAsState(initial = UserTtsBilling.SERVER)
@@ -280,6 +290,9 @@ fun SettingsScreen(
 
     var autoPlaybackOnUi by remember(manualMode) { mutableStateOf(!manualMode) }
     var speakTrackNamesUi by remember(speakTrackNamesInVoiceover) { mutableStateOf(speakTrackNamesInVoiceover) }
+    var factNotificationsUi by remember(factNotificationsEnabled) { mutableStateOf(factNotificationsEnabled) }
+    var appLanguageUi by remember(appLanguage) { mutableStateOf(appLanguage) }
+    var elevenLabsVoiceUi by remember(elevenLabsVoice) { mutableStateOf(elevenLabsVoice) }
     var offlineCacheUi by remember(offlineAudioCacheEnabled) { mutableStateOf(offlineAudioCacheEnabled) }
     var triggerModeUi by remember(triggerMode) { mutableStateOf(triggerMode) }
     var specificArtistsUi: Set<String> by remember(specificArtists) { mutableStateOf(specificArtists) }
@@ -394,6 +407,10 @@ fun SettingsScreen(
         manualMode,
         speakTrackNamesUi,
         speakTrackNamesInVoiceover,
+        appLanguageUi,
+        appLanguage,
+        elevenLabsVoiceUi,
+        elevenLabsVoice,
         triggerModeUi,
         triggerMode,
         specificArtistsUi,
@@ -458,6 +475,9 @@ fun SettingsScreen(
     ) {
         autoPlaybackOnUi != !manualMode ||
             speakTrackNamesUi != speakTrackNamesInVoiceover ||
+            factNotificationsUi != factNotificationsEnabled ||
+            appLanguageUi != appLanguage ||
+            elevenLabsVoiceUi != elevenLabsVoice ||
             offlineCacheUi != offlineAudioCacheEnabled ||
             triggerModeUi != triggerMode ||
             specificArtistsUi != specificArtists ||
@@ -525,17 +545,25 @@ fun SettingsScreen(
         effectiveServerTtsProvider == ServerTtsProvider.EDGE
     val showServerTtsProviderChoice = userTtsBillingUi == UserTtsBilling.SERVER && isPaidServerTier
     val showEdgeVoices = serverUsesEdge
-    val showYandexVoices = (userTtsBillingUi == UserTtsBilling.YANDEX) ||
-        (userTtsBillingUi == UserTtsBilling.SERVER && isPaidServerTier &&
-            effectiveServerTtsProvider == ServerTtsProvider.YANDEX)
+    val resolvedDraftLang = resolveAppLanguage(appLanguageUi)
+    val showElevenLabsVoices = resolvedDraftLang == ResolvedAppLanguage.EN
+    val showYandexVoices = !showElevenLabsVoices && (
+        (userTtsBillingUi == UserTtsBilling.YANDEX) ||
+            (userTtsBillingUi == UserTtsBilling.SERVER && isPaidServerTier &&
+                effectiveServerTtsProvider == ServerTtsProvider.YANDEX)
+        )
     val userTtsBillingOptions = remember {
         UserTtsBilling.entries.filter { it != UserTtsBilling.SBER }
     }
 
-    suspend fun applySettingsDraft() {
+    suspend fun applySettingsDraft(): Boolean {
         val autoOn = if (canManualMode) autoPlaybackOnUi else true
         settings.setAutoPlaybackMode(autoOn)
         settings.setSpeakTrackNamesInVoiceover(speakTrackNamesUi)
+        settings.setFactNotificationsEnabled(factNotificationsUi)
+        val languageChanged = appLanguageUi != appLanguage
+        settings.setAppLanguage(appLanguageUi)
+        settings.setElevenLabsVoice(elevenLabsVoiceUi)
         if (canUseOfflineCache) {
             settings.setOfflineAudioCacheEnabled(offlineCacheUi)
         }
@@ -623,6 +651,7 @@ fun SettingsScreen(
         settings.setGroqCustomModelId(groqCustomInput.trim())
         settings.setOpenRouterCustomModelId(openRouterCustomInput.trim())
         app.triggerEngine.resetCounter()
+        return languageChanged
     }
 
     LaunchedEffect(userTtsBillingUi) {
@@ -713,6 +742,16 @@ fun SettingsScreen(
                         )
                     }
                     SettingSwitchRow(
+                        title = context.getString(R.string.settings_fact_notifications),
+                        checked = factNotificationsUi,
+                        onCheckedChange = { factNotificationsUi = it },
+                    )
+                    Text(
+                        text = context.getString(R.string.settings_fact_notifications_hint),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MutedLavender,
+                    )
+                    SettingSwitchRow(
                         title = context.getString(R.string.settings_speak_track_names),
                         checked = speakTrackNamesUi,
                         onCheckedChange = { speakTrackNamesUi = it },
@@ -737,6 +776,23 @@ fun SettingsScreen(
                         style = MaterialTheme.typography.bodySmall,
                         color = MutedLavender,
                     )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = context.getString(R.string.settings_language),
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MutedLavender,
+                    )
+                    listOf(
+                        AppLanguage.SYSTEM to context.getString(R.string.settings_language_system),
+                        AppLanguage.RU to context.getString(R.string.settings_language_ru),
+                        AppLanguage.EN to context.getString(R.string.settings_language_en),
+                    ).forEach { (lang, label) ->
+                        PreferenceRadioRow(
+                            label = label,
+                            selected = appLanguageUi == lang,
+                            onSelect = { appLanguageUi = lang },
+                        )
+                    }
                 }
 
                 CollapsibleSettingsSection(
@@ -1011,6 +1067,27 @@ fun SettingsScreen(
                                 description = preset.descriptionRu,
                                 selected = edgeVoicePresetUi == preset,
                                 onSelect = { edgeVoicePresetUi = preset },
+                            )
+                        }
+                        Spacer(modifier = Modifier.height(8.dp))
+                    }
+                    if (showElevenLabsVoices) {
+                        Text(
+                            text = context.getString(R.string.settings_elevenlabs_voice),
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MutedLavender,
+                        )
+                        Text(
+                            text = context.getString(R.string.settings_elevenlabs_hint),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MutedLavender,
+                        )
+                        ElevenLabsVoice.entries.forEach { voice ->
+                            NarratorRadioRow(
+                                label = voice.label(resolvedDraftLang),
+                                description = voice.description(resolvedDraftLang),
+                                selected = elevenLabsVoiceUi == voice,
+                                onSelect = { elevenLabsVoiceUi = voice },
                             )
                         }
                         Spacer(modifier = Modifier.height(8.dp))
@@ -1872,10 +1949,13 @@ fun SettingsScreen(
                             isSaving = true
                             saveFeedback = null
                             try {
-                                applySettingsDraft()
+                                val languageChanged = applySettingsDraft()
                                 yandexKeyInput = ApiKeySanitizer.clean(yandexKeyInput)
                                 StoryLog.i("SETTINGS saved")
                                 saveFeedback = context.getString(R.string.settings_saved)
+                                if (languageChanged) {
+                                    (context as? Activity)?.recreate()
+                                }
                                 delay(2500)
                                 if (saveFeedback == context.getString(R.string.settings_saved)) {
                                     saveFeedback = null

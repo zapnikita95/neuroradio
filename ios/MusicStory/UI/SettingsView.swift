@@ -17,6 +17,7 @@ struct SettingsView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 20) {
                     header
+                    generalSection
                     backendSection
                     modeSection
                     offlineCacheSection
@@ -52,6 +53,24 @@ struct SettingsView: View {
         Text("Подключение и триггеры")
             .font(.title2.bold())
             .foregroundStyle(AppTheme.creamText)
+    }
+
+    private var generalSection: some View {
+        GlassCard {
+            VStack(alignment: .leading, spacing: 12) {
+                Text("Общее")
+                    .font(.headline)
+                    .foregroundStyle(AppTheme.creamText)
+                Toggle(isOn: $settings.factNotificationsEnabled) {
+                    Text("Уведомления о фактах")
+                        .foregroundStyle(AppTheme.creamText)
+                }
+                .tint(AppTheme.goldBright)
+                Text("В ручном режиме — подсказка, если по треку есть интересный факт.")
+                    .font(.footnote)
+                    .foregroundStyle(AppTheme.mutedLavender)
+            }
+        }
     }
 
     private var backendSection: some View {
