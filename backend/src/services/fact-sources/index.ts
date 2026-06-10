@@ -4,12 +4,12 @@ import type { HarvestContext, HarvestedFact, HarvestSource } from './types.js';
 import { fetchGeniusFacts } from './genius-facts.js';
 import { fetchSongfactsFacts } from './songfacts-facts.js';
 import { fetchLastfmFacts } from './lastfm-facts.js';
-import { fetchDiscogsFacts } from './discogs-facts.js';
 import { fetchWhoSampledFacts } from './whosampled-facts.js';
 import { fetchSecondHandSongsFacts } from './secondhandsongs-facts.js';
 import { fetchSetlistfmFacts } from './setlistfm-facts.js';
 import { fetchRapRuFacts } from './rap-ru-facts.js';
 import { fetchTheFlowFacts } from './the-flow-facts.js';
+import { fetchDiscogsFacts } from './discogs-facts.js';
 import { fetchMusixmatchFacts } from './musixmatch-facts.js';
 
 const SOURCE_TIMEOUT_MS = 12_000;
@@ -31,13 +31,15 @@ const DEDICATED_SOURCES: Array<{ source: HarvestSource; fetch: SourceFetcher }> 
   { source: 'genius', fetch: fetchGeniusFacts },
   { source: 'songfacts', fetch: fetchSongfactsFacts },
   { source: 'lastfm', fetch: fetchLastfmFacts },
-  { source: 'discogs', fetch: fetchDiscogsFacts },
+  // Discogs disabled — registration blocked from RU; enable when DISCOGS_TOKEN available.
+  // { source: 'discogs', fetch: fetchDiscogsFacts },
   { source: 'whosampled', fetch: fetchWhoSampledFacts },
   { source: 'secondhandsongs', fetch: fetchSecondHandSongsFacts },
   { source: 'setlistfm', fetch: fetchSetlistfmFacts },
   { source: 'rap-ru', fetch: fetchRapRuFacts },
   { source: 'the-flow', fetch: fetchTheFlowFacts },
-  { source: 'musixmatch', fetch: fetchMusixmatchFacts },
+  // Musixmatch disabled — paid API (~$50/mo).
+  // { source: 'musixmatch', fetch: fetchMusixmatchFacts },
 ];
 
 function dedupeFacts(facts: HarvestedFact[]): HarvestedFact[] {
