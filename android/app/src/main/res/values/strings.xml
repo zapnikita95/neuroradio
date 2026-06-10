@@ -137,7 +137,7 @@
     <string name="settings_general_section">Общее</string>
     <string name="settings_playback_mode_hint">Включено — истории запускаются сами при смене трека. Выключено — только вручную кнопкой «Рассказать».</string>
     <string name="settings_speak_track_names">Названия треков в озвучке</string>
-    <string name="settings_speak_track_names_hint">Включено — в голосе звучат название и исполнитель на английском (Title by Artist). Выключено — «эта песня», «текущий трек» и т.п.</string>
+    <string name="settings_speak_track_names_hint">Включено — в голосе звучат название и исполнитель на английском. Выключено — латинские названия заменяются на «эта песня», «в треке» и т.п.; русские названия остаются.</string>
     <string name="settings_narrator_section">Рассказчик (амлуа)</string>
     <string name="settings_voice_section">Озвучка</string>
     <string name="settings_music_interrupt_section">Прерывание музыки</string>

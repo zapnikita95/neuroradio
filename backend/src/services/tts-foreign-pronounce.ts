@@ -4,6 +4,9 @@ import {
   englishWordToRussianPhonetic,
   hasLatinAfterPhonetic,
 } from './en-phonetic-ru.js';
+import { germanPhraseToRussianPhonetic, germanWordToRussianPhonetic } from './de-phonetic-ru.js';
+import { isGermanLatinPhrase, normalizePhraseKey } from './de-lang-detect.js';
+import { GERMAN_PHRASE_PHONETIC } from './german-music-pronunciation.js';
 
 const PHRASE_PRONUNCIATION_RU: Record<string, string> = {
   'zitti e buoni': 'Цитти э буони',
@@ -62,6 +65,7 @@ const PHRASE_PRONUNCIATION_RU: Record<string, string> = {
   butterfly: 'Баттерфлай',
   'nu metal': 'ню метал',
   'nu-metal': 'ню метал',
+  ...GERMAN_PHRASE_PHONETIC,
 };
 
 const EN_WORD_RU: Record<string, string> = {
@@ -163,10 +167,11 @@ export function hasLatinLetters(text: string): boolean {
   return /[A-Za-zÀ-ÿ]/.test(text);
 }
 
-type ForeignLang = 'en' | 'it' | 'es';
+type ForeignLang = 'en' | 'de' | 'it' | 'es';
 
 function detectForeignLang(phrase: string): ForeignLang {
-  if (/ñ|¿|¡|[áéíóúü]/i.test(phrase)) return 'es';
+  if (isGermanLatinPhrase(phrase)) return 'de';
+  if (/ñ|¿|¡|[áéíóú]/i.test(phrase) && !/[äöüß]/i.test(phrase)) return 'es';
   if (
     /\b(zitti|buoni|mambo|italiano|ciao|amore|gnocchi|bambino)\b/i.test(phrase) ||
     /tti|gn|gli|cci/i.test(phrase)
@@ -224,6 +229,10 @@ function transliterateEnglishWord(word: string): string {
   return englishWordToRussianPhonetic(word);
 }
 
+function transliterateGermanWord(word: string): string {
+  return germanWordToRussianPhonetic(word);
+}
+
 export function latinPhraseToRussianTts(phrase: string, langHint?: ForeignLang): string {
   const trimmed = phrase.trim();
   if (!trimmed || !hasLatinLetters(trimmed)) return trimmed;
@@ -245,6 +254,7 @@ export function latinPhraseToRussianTts(phrase: string, langHint?: ForeignLang):
     if (EN_WORD_RU[wl]) return capitalizeLike(core, EN_WORD_RU[wl]!) + punct;
     if (lang === 'it') return transliterateItalianWord(word);
     if (lang === 'es') return transliterateSpanishWord(word);
+    if (lang === 'de') return germanWordToRussianPhonetic(word);
     return transliterateEnglishWord(word);
   });
   return mapped.join(' ');
@@ -304,10 +314,14 @@ function ensureAllLatinTransliterated(text: string): string {
       /[A-Za-zÀ-ÿ][A-Za-zÀ-ÿ0-9''.\-&]*/g,
       (match) => {
         if (!/[A-Za-zÀ-ÿ]/.test(match)) return match;
-        const key = match.toLowerCase().replace(/\s*&\s*/g, ' and ');
+        const key = normalizePhraseKey(match);
         if (PHRASE_PRONUNCIATION_RU[key]) return PHRASE_PRONUNCIATION_RU[key]!;
         const ru = lookupPhraseTts(match.replace(/\s*&\s*/g, ' and '));
-        if (hasLatinAfterPhonetic(ru)) return englishPhraseToRussianPhonetic(match);
+        if (hasLatinAfterPhonetic(ru)) {
+          return isGermanLatinPhrase(match)
+            ? germanPhraseToRussianPhonetic(match)
+            : englishPhraseToRussianPhonetic(match);
+        }
         return ru;
       },
     );
@@ -317,7 +331,9 @@ function ensureAllLatinTransliterated(text: string): string {
   return result.replace(/[A-Za-zÀ-ÿ]+/g, (match) => {
     const key = match.toLowerCase();
     if (PHRASE_PRONUNCIATION_RU[key]) return PHRASE_PRONUNCIATION_RU[key]!;
-    return englishWordToRussianPhonetic(match);
+    return isGermanLatinPhrase(match)
+      ? germanWordToRussianPhonetic(match)
+      : englishWordToRussianPhonetic(match);
   });
 }
 
@@ -491,6 +507,10 @@ export function applyForeignPronunciation(
 export function preserveMusicProperNames(script: string, artist: string, title: string): string {
   let result = fixWikiTranslationArtifacts(script, artist, title);
   const artistLower = artist.toLowerCase();
+
+  if (/rammstein/i.test(artistLower)) {
+    result = result.replace(/\bRamm\b/gi, 'Rammstein');
+  }
 
   if (/maneskin|måneskin/i.test(artistLower)) {
     result = result.replace(/\bMå\b/g, 'Måneskin').replace(/\bMa\b(?=\s|,|\.)/g, 'Måneskin');
