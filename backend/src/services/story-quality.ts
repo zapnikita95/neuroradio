@@ -791,6 +791,26 @@ const UNGROUNDED_CLAIM_CHECKS: Array<{ claim: RegExp; factHint: RegExp }> = [
     claim: /хит-?пара[дт]\w*\s+христиан\w*\s+музык|христиан\w*\s+хит-?пара[дт]|христиан\w*\s+чарт/i,
     factHint: /christian|gospel|ccb|christian chart|религиозн|госпел/i,
   },
+  {
+    claim: /он\s+же\s+[А-ЯA-ZЁ][\p{L}\p{N}'-]*/u,
+    factHint: /он\s+же|aka|also known|псевдоним|stage name|известен как|known as/i,
+  },
+  {
+    claim: /(?:практически\s+)?(?:случайно|неожиданно)\s*—?\s*как\s+импровизац/i,
+    factHint: /improvis|импровиз|случайн|accident|off the cuff/i,
+  },
+  {
+    claim: /звучал\w*\s+на\s+митинг/i,
+    factHint: /митинг|rally|protest|demonstration/i,
+  },
+  {
+    claim: /стал\s+гимном\s+для/i,
+    factHint: /anthem|гимн|hymn|protest song/i,
+  },
+  {
+    claim: /(?:^|[\s,.!?«»])я\s+обожаю\b/i,
+    factHint: /я\s+обожаю|i love|obsessed with/i,
+  },
 ];
 
 export function findUngroundedClaims(script: string, referenceFacts: string[] = []): string | null {

@@ -667,7 +667,7 @@ router.post('/full', extractClientSecrets, validateStoryFullBody, storyFullRateL
       );
     }
 
-    if (selectedFact && !factFromBank && isWeakSelectedFact(selectedFact)) {
+    if (selectedFact && !factFromBank && isWeakSelectedFact(selectedFact, metadata.artist)) {
       console.warn(
         `[facts] reject weak seed score=${selectedFact.interestScore} fact="${selectedFact.fact.slice(0, 100)}"`,
       );
@@ -1120,11 +1120,11 @@ router.post('/full', extractClientSecrets, validateStoryFullBody, storyFullRateL
     throwIfStoryAborted(clientAbort, 'seed-ready');
 
     const { story, llmUsed } = await (async () => {
-      const hasGroundedSeed = Boolean(selectedFact?.fact && selectedFact.interestScore >= 6 && !isWeakSelectedFact(selectedFact));
+      const hasGroundedSeed = Boolean(selectedFact?.fact && selectedFact.interestScore >= 6 && !isWeakSelectedFact(selectedFact, metadata.artist));
       let effectiveStoryInput = storyInput;
 
       if (!hasGroundedSeed && !factFromBank) {
-        if (selectedFact && isWeakSelectedFact(selectedFact)) {
+        if (selectedFact && isWeakSelectedFact(selectedFact, metadata.artist)) {
           console.warn(
             `[story-pipeline] weak seed rejected score=${selectedFact.interestScore} fact="${selectedFact.fact.slice(0, 100)}"`,
           );

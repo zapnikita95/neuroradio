@@ -25,7 +25,7 @@ import {
 } from './web-search-facts.js';
 
 export { buildDdgInstantQueries } from './web-search-facts.js';
-import { acceptSearchGroundedSnippet, acceptIndieEmergingSnippet, hasActionableSnippets } from './web-snippet-accept.js';
+import { acceptSearchGroundedSnippet, acceptIndieEmergingSnippet, hasActionableSnippets, isLyricsPageSeed, isWrongEntityDisambiguation } from './web-snippet-accept.js';
 import { lookupCuratedFact } from './curated-facts.js';
 const USER_AGENT = 'MusicStoryBFF/1.0 (contact@example.com)';
 const RAW_SNIPPET_MIN_LEN = 30;
@@ -380,6 +380,8 @@ function buildRawSnippets(
   wdRaw: string[],
   mbTrackRaw: string[],
   mbArtistRaw: string[],
+  artist: string,
+  title: string,
 ): { rawSnippets: string[]; snippetSources: SnippetSource[] } {
   const candidates: Array<{ text: string; source: SnippetSource; score: number }> = [];
 
@@ -387,6 +389,7 @@ function buildRawSnippets(
     const trimmed = text.trim();
     if (trimmed.length < RAW_SNIPPET_MIN_LEN) return;
     if (WEAK_TRIVIA_PATTERNS.some((p) => p.test(trimmed))) return;
+    if (isLyricsPageSeed(trimmed) || isWrongEntityDisambiguation(trimmed, artist)) return;
     candidates.push({ text: trimmed.slice(0, 480), source, score: interestScore(trimmed) });
   };
 
@@ -656,6 +659,8 @@ export async function fetchAggregatedFactContext(
     wdUnfiltered,
     mbTrackRaw,
     mbArtistRaw,
+    artist,
+    title,
   );
 
   if (rawSnippets.length > 0) {

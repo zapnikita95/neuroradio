@@ -14,6 +14,7 @@ import {
 } from './story-quality.js';
 import { storyNamesForeignArtist, COVER_CONTEXT_RE, factMentionsArtist, storyMentionsPerformingArtist } from './fact-relevance.js';
 import { isMetadataOnlyFallbackFact } from './metadata-facts.js';
+import { isWeakSnippetSeed } from './search-snippet-salvage.js';
 import { logRejectedScript } from './story-reject-log.js';
 
 /** Below this — empty/garbage, not a story. Normal length is enforced by TTS speed + preset in prompt only. */
@@ -152,6 +153,10 @@ export function finalizeAfterQualityLoop<T extends { script: string }>(
     logRejectedScript('last script rejected', sanitized, 'metadata-only placeholder facts');
     return null;
   }
+  if (referenceFacts.every((f) => isWeakSnippetSeed(f))) {
+    logRejectedScript('last script rejected', sanitized, 'lyrics/junk seed — not grounded');
+    return null;
+  }
   if (
     storyNamesForeignArtist(
       sanitized,
@@ -176,6 +181,7 @@ export function finalizeAfterQualityLoop<T extends { script: string }>(
   if (!grounded) {
     if (
       !referenceFactsAreAnchorable(referenceFacts, input.artist, input.title) &&
+      !referenceFacts.every((f) => isWeakSnippetSeed(f)) &&
       factMentionsArtist(sanitized, input.artist) &&
       !findLlmGarbage(sanitized)
     ) {

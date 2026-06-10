@@ -73,9 +73,45 @@ export function isTruncatedMarketingSnippet(snippet: string): boolean {
   return false;
 }
 
+/** Страницы текстов / SEO — не семя для истории (даже если есть год и альбом). */
+export function isLyricsPageSeed(snippet: string): boolean {
+  const trimmed = decodeHtmlEntities(snippet).trim();
+  if (
+    /\b(?:текст\s+(?:пісн|песн|песни)|lyrics|songtext|letras|слова\s+песни|текст\s+песни)\b/i.test(
+      trimmed,
+    )
+  ) {
+    return true;
+  }
+  if (/Текст\s+пісні|Текст\s+песни|song\s+lyrics|genius\.com/i.test(trimmed)) return true;
+  if (/[\u{1F300}-\u{1FAFF}]/u.test(trimmed)) return true;
+  if (/\b(?:дешевле|mini\s+tractor|міні\s+трактор|купи|скидк|реклам|click here)\b/i.test(trimmed)) {
+    return true;
+  }
+  return false;
+}
+
+/** Wikidata/DDG перепутал артиста с одноимённым предметом (Boombox = магнитола). */
+export function isWrongEntityDisambiguation(snippet: string, artist: string): boolean {
+  const trimmed = decodeHtmlEntities(snippet).trim();
+  const artistKey = artist.trim().toLowerCase();
+  if (!artistKey) return false;
+  if (
+    (artistKey === 'бумбокс' || artistKey === 'boombox') &&
+    /\b(?:portable|stereo|cassette\s+recorder|ghetto\s+blaster|audio\s+equipment|electronic\s+device)\b/i.test(
+      trimmed,
+    ) &&
+    !/\b(?:ukrainian|band|group|musical|artist|song|album|rapper|rock)\b/i.test(trimmed)
+  ) {
+    return true;
+  }
+  return false;
+}
+
 /** SEO, Reddit, platform UI — not a speakable story seed. */
 export function isUnspeakableWebSeed(snippet: string): boolean {
   const trimmed = decodeHtmlEntities(snippet).trim();
+  if (isLyricsPageSeed(trimmed)) return true;
   if (isTruncatedMarketingSnippet(trimmed)) return true;
   if (LOW_QUALITY_WEB_PREFIX.test(trimmed)) return true;
   if (
@@ -124,6 +160,7 @@ export function isSpeakableReferenceFact(
 ): boolean {
   const trimmed = decodeHtmlEntities(fact).trim();
   if (trimmed.length < 35) return false;
+  if (isWrongEntityDisambiguation(trimmed, artist)) return false;
   if (isUnspeakableWebSeed(trimmed)) return false;
   if (isWebListicleJunk(trimmed)) return false;
   if (artist && isPlaylistJunkSnippet(trimmed, artist, title)) return false;

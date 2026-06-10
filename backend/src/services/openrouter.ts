@@ -26,6 +26,7 @@ import {
   validateGeneratedStory,
   finalizeAfterQualityLoop,
 } from './story-generate-loop.js';
+import { isWeakSnippetSeed } from './search-snippet-salvage.js';
 import type { GenerateStoryInput, StoryScript } from './groq.js';
 import { logRejectedScript } from './story-reject-log.js';
 
@@ -274,6 +275,7 @@ export async function generateStoryScript(
         if (
           rejectReason === 'story ignores reference facts' &&
           !referenceFactsAreAnchorable(referenceFacts, input.artist, input.title) &&
+          !referenceFacts.every((f) => isWeakSnippetSeed(f)) &&
           factMentionsArtist(sanitized, input.artist) &&
           !findLlmGarbage(sanitized)
         ) {
