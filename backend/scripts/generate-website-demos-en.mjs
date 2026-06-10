@@ -94,6 +94,15 @@ const PERSONAS = [
     full: 'I remember those years. ' + CONTEMPORARY_FULL,
   },
   {
+    id: 'fan',
+    voice: 'matilda',
+    speed: 0.98,
+    studioVoices: ['matilda', 'bella'],
+    short: 'I love this moment! ' + FACT_REGISTRY + ' I know every second of this video by heart!',
+    minute: 'I love this moment! ' + THRILLER_STORY_MINUTE + ' I know every second of this video by heart!',
+    full: 'I love this moment! ' + THRILLER_STORY_FULL + ' I know every second of this video by heart!',
+  },
+  {
     id: 'backstage',
     voice: 'emily',
     speed: 0.9,
@@ -200,9 +209,19 @@ async function writeOgg(relPath, buf) {
   console.log('wrote', out, buf.length, 'bytes');
 }
 
+function personaFilter() {
+  const i = process.argv.indexOf('--only');
+  if (i < 0 || !process.argv[i + 1]) return PERSONAS;
+  const id = process.argv[i + 1];
+  const list = PERSONAS.filter((p) => p.id === id);
+  if (!list.length) throw new Error(`unknown persona: ${id}`);
+  return list;
+}
+
 async function main() {
-  const arg = process.argv[2] ?? '--preview';
-  if (arg === '--preview') {
+  const args = new Set(process.argv.slice(2));
+  const list = personaFilter();
+  if (!args.has('--personas') && !args.has('--studio') && !args.has('--studio-long') && !args.has('--all')) {
     await writePreview();
     return;
   }
@@ -212,16 +231,17 @@ async function main() {
   fs.mkdirSync(OUT_DIR, { recursive: true });
   await writePreview();
 
-  if (arg === '--personas' || arg === '--all') {
-    for (const p of PERSONAS) {
+  const all = args.has('--all');
+  if (all || args.has('--personas')) {
+    for (const p of list) {
       const { buf, ext } = await synth(p.short, p.voice, p.speed);
       await writeOgg(`persona-${p.id}${ext}`, buf);
       await new Promise((r) => setTimeout(r, 300));
     }
   }
 
-  if (arg === '--studio' || arg === '--all') {
-    for (const p of PERSONAS) {
+  if (all || args.has('--studio')) {
+    for (const p of list) {
       for (const voice of p.studioVoices) {
         const spd = voice === p.voice ? p.speed : 1.08;
         const { buf, ext } = await synth(p.short, voice, spd);
@@ -231,8 +251,8 @@ async function main() {
     }
   }
 
-  if (arg === '--studio-long' || arg === '--all') {
-    for (const p of PERSONAS) {
+  if (all || args.has('--studio-long')) {
+    for (const p of list) {
       const b2 = await synth(p.minute, p.voice, p.speed);
       await writeOgg(studioLongFile(p.id, '-len2', b2.ext), b2.buf);
       await new Promise((r) => setTimeout(r, 400));

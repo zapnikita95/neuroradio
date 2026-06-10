@@ -11,7 +11,7 @@
             desc:
               'Эфир ничего не достаёт из заготовок: факт ищется, ранжируется и превращается в историю в тот самый момент, когда играет трек. Поэтому каждый выпуск получается своим — даже для одной и той же песни.',
           },
-          { title: 'Амплуа на выбор', desc: 'Пять характеров ведущих — от заводного эфира до ночного подкаста.' },
+          { title: 'Амплуа на выбор', desc: 'Шесть характеров ведущих — от заводного эфира до ночного подкаста.' },
           { title: 'Только проверенные факты', desc: 'Источники ранжируются по «интересности», выдумки отсекаются фильтрами качества.' },
           { title: 'Бесшовно с музыкой', desc: 'Плавно ставим трек на паузу, рассказываем историю и возвращаем воспроизведение.' },
           { title: 'Тонкая настройка', desc: 'Голос, темп, длина истории и частота — всё под вас, ползунками.' },
@@ -58,7 +58,7 @@
         basicLead: 'Чтобы вы спокойно попробовали Эфир AI и поняли, нравится ли вам формат. Ничего платить не нужно.',
         basicFeatures: [
           'До 10 историй в день',
-          'Все 5 амплуа ведущих',
+          'Все 6 амплуа ведущих',
           'Поиск фактов в 10+ источниках',
           'Озвучка голосами Yandex SpeechKit',
           'Ручной и автоматический запуск',
@@ -120,7 +120,7 @@
         { q: 'Эфир AI слушает мой микрофон?', a: 'Нет. Используются только метаданные текущего трека — артист и название. Запись звука не ведётся.' },
         {
           q: 'Можно ли пользоваться бесплатно?',
-          a: 'Да. Базовый тариф бесплатный: до 10 историй в день, все 5 амплуа, поиск фактов в 10+ источниках. Текст генерирует модель Gemma, озвучка — Yandex SpeechKit. Расширенный тариф добавляет DeepSeek V3, премиум-голоса, до 25 историй в день и офлайн-эфир.',
+          a: 'Да. Базовый тариф бесплатный: до 10 историй в день, все 6 амплуа, поиск фактов в 10+ источниках. Текст генерирует модель Gemma, озвучка — Yandex SpeechKit. Расширенный тариф добавляет DeepSeek V3, премиум-голоса, до 25 историй в день и офлайн-эфир.',
         },
         {
           q: 'Работает ли офлайн?',
@@ -189,7 +189,7 @@
             desc:
               'Nothing is pulled from a script library: the fact is found, ranked, and turned into a story while the track plays. Every broadcast feels fresh — even for the same song.',
           },
-          { title: 'Pick your host', desc: 'Five personas — from high-energy daytime radio to a late-night whisper.' },
+          { title: 'Pick your host', desc: 'Six personas — from high-energy daytime radio to a late-night whisper.' },
           { title: 'Verified facts only', desc: 'Sources are ranked for interest; fabrications are filtered out.' },
           { title: 'Seamless with music', desc: 'We pause the track smoothly, tell the story, then hand playback back.' },
           { title: 'Fine-tuned control', desc: 'Voice, tempo, story length, and frequency — all yours, with sliders.' },
@@ -236,7 +236,7 @@
         basicLead: 'Try Efir AI at your own pace and see if the format fits. No payment required.',
         basicFeatures: [
           'Up to 10 stories per day',
-          'All 5 host personas',
+          'All 6 host personas',
           'Fact search across 10+ sources',
           'Yandex SpeechKit voices (RU)',
           'Manual and automatic triggers',
@@ -298,7 +298,7 @@
         { q: 'Does Efir AI listen to my microphone?', a: 'No. Only track metadata — artist and title. No audio recording.' },
         {
           q: 'Is there a free tier?',
-          a: 'Yes. Basic is free: up to 10 stories per day, all 5 personas, 10+ fact sources. Extended adds DeepSeek V3, premium voices, 25 stories per day, and offline packs.',
+          a: 'Yes. Basic is free: up to 10 stories per day, all 6 personas, 10+ fact sources. Extended adds DeepSeek V3, premium voices, 25 stories per day, and offline packs.',
         },
         {
           q: 'Does offline work?',

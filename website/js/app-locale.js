@@ -20,6 +20,7 @@
     night_dj: ['ermil'],
     expert: ['ermil', 'zahar', 'filipp'],
     contemporary: ['alena', 'omazh', 'marina'],
+    fan: ['jane', 'dasha', 'lera'],
     backstage: ['omazh', 'jane', 'marina'],
   };
 
@@ -28,6 +29,7 @@
     night_dj: ['antoni', 'adam'],
     expert: ['josh', 'adam', 'charlie'],
     contemporary: ['bella', 'emily', 'matilda'],
+    fan: ['matilda', 'bella'],
     backstage: ['emily', 'matilda'],
   };
 
@@ -98,6 +100,15 @@
       audio: 'assets/demos/persona-contemporary.wav',
     },
     {
+      id: 'fan', tag: 'Фанат-коллекционер', name: 'Фанат-коллекционер',
+      desc: 'Восторженный фанат от первого лица: обожает артиста и знает детали, которые греют сердце коллекционера.',
+      traits: ['восторг', 'детали', 'любовь к делу'],
+      quote: '«Обожаю этот момент!»',
+      voice: 'jane', rate: 1,
+      script: 'Обожаю этот момент! ' + THRILLER_CORE_RU + ' И да — я знаю каждую секунду этого клипа наизусть!',
+      audio: 'assets/demos/persona-fan.wav',
+    },
+    {
       id: 'backstage', tag: 'С закулисья', name: 'Инсайдер с закулисья',
       desc: 'Инсайдерский тон — только если в факте есть курьёз. Истории, о которых обычно говорят вполголоса.',
       traits: ['инсайд', 'курьёз', 'вполголоса'],
@@ -145,6 +156,15 @@
       voice: 'bella', rate: 1,
       script: 'I remember those years. Michael Jackson put half a million into the Thriller video — after the premiere album sales jumped sevenfold. We watched the fourteen-minute clip on MTV in full, then bought VHS tapes to replay it at home.',
       audio: 'assets/demos/en/persona-contemporary.ogg',
+    },
+    {
+      id: 'fan', tag: 'Superfan', name: 'Superfan',
+      desc: 'Enthusiastic collector from the first person — loves the artist and the tiny details, adult voice, no kiddie tone.',
+      traits: ['hype', 'details', 'devotion'],
+      quote: '"I love this moment!"',
+      voice: 'matilda', rate: 1,
+      script: 'I love this moment! ' + THRILLER_CORE_EN + ' And yes — I know every second of this video by heart!',
+      audio: 'assets/demos/en/persona-fan.ogg',
     },
     {
       id: 'backstage', tag: 'Backstage insider', name: 'Backstage insider',

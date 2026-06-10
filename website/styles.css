@@ -124,7 +124,7 @@ main { max-width: 100%; overflow-x: clip; }
 }
 .nav-login, .nav-cabinet { white-space: nowrap; }
 .nav-cta { margin-left: 0; }
-.hero-visual { will-change: transform; margin-top: -8px; }
+.hero-visual { will-change: transform; margin-top: 0; padding-top: 12px; }
 @media (min-width: 981px) {
   #heroNowPlaying { will-change: transform; }
 }
@@ -158,7 +158,7 @@ main { max-width: 100%; overflow-x: clip; }
 
 /* ---------- hero ---------- */
 .hero { position: relative; min-height: min(920px, 100svh); display: flex; flex-direction: column; justify-content: flex-start;
-  padding: 108px clamp(16px, 4vw, 32px) 72px; max-width: min(var(--maxw), 100%); margin: 0 auto; width: 100%; }
+  padding: calc(76px + clamp(36px, 5vw, 64px)) clamp(16px, 4vw, 32px) 72px; max-width: min(var(--maxw), 100%); margin: 0 auto; width: 100%; }
 .hero-parallax { position: absolute; inset: 0; pointer-events: none; z-index: 0; }
 .float-chip, .float-note, .float-ring { position: absolute; left: var(--x); top: var(--y); will-change: transform; }
 .float-chip { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600; color: var(--text);

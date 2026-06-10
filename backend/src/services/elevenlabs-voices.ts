@@ -135,6 +135,9 @@ export function resolveElevenLabsVoiceId(
   }
   const narrator = options.storyNarrator ?? 'auto';
   const genre = (options.genre ?? '').toLowerCase();
+  if (narrator === 'fan') {
+    return ELEVENLABS_VOICE_PRESETS.matilda.voiceId;
+  }
   if (narrator === 'contemporary') {
     return ELEVENLABS_VOICE_PRESETS.bella.voiceId;
   }

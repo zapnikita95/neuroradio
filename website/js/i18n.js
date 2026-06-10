@@ -20,7 +20,7 @@
         listen: 'Послушать ведущих',
         stat1: 'источников фактов',
         stat2: 'амплуа ведущих',
-        stat2n: '5',
+        stat2n: '6',
         stat3: 'до истории в эфире',
       },
       studio: {
@@ -103,7 +103,7 @@
         listen: 'Hear the hosts',
         stat1: 'fact sources',
         stat2: 'host personas',
-        stat2n: '5',
+        stat2n: '6',
         stat3: 'to story on air',
       },
       studio: {
