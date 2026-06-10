@@ -15,6 +15,9 @@ final class StoryRepository: ObservableObject {
         do {
             let response = try await backend.fetchQuota()
             dailyQuota = response.quota
+            if let tier = response.tier, !tier.isEmpty {
+                settings.serverTier = tier
+            }
         } catch {
             // quota is optional UI hint
         }
@@ -26,19 +29,30 @@ final class StoryRepository: ObservableObject {
         }
 
         let previousScripts = history.recentScripts(for: track.displayKey)
+        let paidTier = settings.hasPremiumTtsAccess
+        let ttsProvider = settings.effectiveServerTtsProvider
         let request = StoryRequest(
             artist: track.artist,
             title: track.title,
             previousScripts: previousScripts,
-            storyLength: "30s",
-            ttsSpeed: settings.ttsSpeed,
-            ttsEmotion: "lively"
+            storyLength: settings.storyLength.rawValue,
+            ttsSpeed: settings.ttsSpeedPreset.yandexSpeed,
+            ttsEmotion: settings.ttsEmotion.rawValue,
+            storyNarrator: settings.storyNarrator.rawValue,
+            ttsVoice: settings.ttsVoice.rawValue,
+            edgeVoicePreset: ttsProvider == .edge ? settings.edgeVoicePreset.rawValue : nil,
+            ttsProvider: ttsProvider == .yandex ? "yandex" : "edge",
+            voiceTier: paidTier ? "premium" : "default",
+            speakTrackNamesInVoiceover: settings.speakTrackNamesInVoiceover
         )
 
         do {
             let response = try await backend.fetchFullStory(request: request)
             history.saveStory(response, track: track)
             dailyQuota = response.quota
+            if let tier = response.tier, !tier.isEmpty {
+                settings.serverTier = tier
+            }
             return .success(response)
         } catch {
             return .failure(error)
@@ -47,5 +61,29 @@ final class StoryRepository: ObservableObject {
 
     func resolveAudioURL(_ audioURL: String?) -> URL? {
         backend.resolveAudioURL(audioURL)
+    }
+
+    func submitPendingStoryFeedback(
+        feedback: PendingStoryFeedback,
+        vote: String,
+        reasons: [String]
+    ) async -> Bool {
+        guard !reasons.isEmpty else { return false }
+        let request = StoryFeedbackRequest(
+            artist: feedback.artist,
+            title: feedback.title,
+            vote: vote,
+            reason: reasons[0],
+            reasons: reasons,
+            script: feedback.script,
+            historyId: nil
+        )
+        do {
+            try await backend.submitStoryFeedback(request)
+            history.updateVote(trackKey: feedback.trackKey, script: feedback.script, vote: vote)
+            return true
+        } catch {
+            return false
+        }
     }
 }

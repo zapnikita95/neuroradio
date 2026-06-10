@@ -72,8 +72,14 @@ curl -s https://ВАШ-RAILWAY-URL/health
 После создания:
 
 1. Скопируйте **Client ID**
-2. В приложении: **Настройки → Spotify Client ID** (или в коде `SettingsStore`)
-3. Redirect URI в приложении по умолчанию: `efirai://spotify-callback` (должен совпадать с Dashboard)
+2. Перед сборкой TestFlight:
+   ```bash
+   cp ios/Config/Secrets.xcconfig.example ios/Config/Secrets.xcconfig
+   # вставьте Client ID в SPOTIFY_CLIENT_ID
+   ```
+   Или добавьте в корневой `.env`: `SPOTIFY_CLIENT_ID=...` — `testflight.sh` подхватит сам.
+3. Redirect URI в приложении: `efirai://spotify-callback` (должен совпадать с Dashboard)
+4. При первом подключении **включите трек в Spotify** — SDK требует активное воспроизведение
 
 ### Spotify iOS SDK (опционально, для метаданных Spotify)
 

@@ -5,8 +5,8 @@ import UserNotifications
 final class NotificationService: NSObject, ObservableObject {
     static let shared = NotificationService()
 
-    static let categoryTrackChanged = "TRACK_CHANGED"
-    static let actionTellStory = "TELL_STORY"
+    nonisolated static let categoryTrackChanged = "TRACK_CHANGED"
+    nonisolated static let actionTellStory = "TELL_STORY"
 
     var onTellStoryAction: ((String, String) -> Void)?
 

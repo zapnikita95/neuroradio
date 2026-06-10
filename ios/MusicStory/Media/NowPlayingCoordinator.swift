@@ -13,13 +13,18 @@ final class NowPlayingCoordinator: ObservableObject {
 
     private var cancellables = Set<AnyCancellable>()
     private var lastPublishedKey: String?
+    private let volumeFader = SystemVolumeFader()
     var onTrackChanged: ((TrackInfo) -> Void)?
 
-    func start(settings: SettingsStore) {
+    func prepareSpotify(settings: SettingsStore) {
         spotify.configure(
-            clientId: settings.spotifyClientId,
-            redirectURI: settings.spotifyRedirectURI
+            clientId: settings.effectiveSpotifyClientId,
+            redirectURI: settings.effectiveSpotifyRedirectURI
         )
+    }
+
+    func start(settings: SettingsStore) {
+        prepareSpotify(settings: settings)
         spotify.start()
         appleMusic.start()
 
@@ -41,6 +46,21 @@ final class NowPlayingCoordinator: ObservableObject {
         default:
             break
         }
+    }
+
+    func fadeOutAndPause(seconds: Float) async {
+        guard canControlPlayback(for: activeSource) else { return }
+        await volumeFader.fadeOut(duration: TimeInterval(seconds))
+        pauseMusic()
+    }
+
+    func resumeMusicWithFade(seconds: Float) async {
+        resumeMusic()
+        await volumeFader.fadeIn(duration: TimeInterval(seconds))
+    }
+
+    func restoreVolumeIfNeeded() async {
+        await volumeFader.restoreIfNeeded()
     }
 
     func resumeMusic() {

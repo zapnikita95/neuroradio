@@ -4,6 +4,26 @@ import java.net.URI
 
 object BackendUrlRules {
 
+    private const val PRODUCTION_BACKEND = "https://music-story-production.up.railway.app"
+
+    /** www.efir-ai.ru — сайт; API в приложении идёт на Railway (LE E7, не YR1 на кастомном домене). */
+    fun normalizeBackendUrl(raw: String): String {
+        var value = raw.trim().ifBlank { PRODUCTION_BACKEND }
+        if (!value.startsWith("http", ignoreCase = true)) {
+            value = "https://$value"
+        }
+        value = value.replace("http://", "https://")
+        value = value.replace(
+            "neuroradio-production.up.railway.app",
+            "music-story-production.up.railway.app",
+        )
+        val host = runCatching { URI(value).host?.lowercase().orEmpty() }.getOrDefault("")
+        if (host == "efir-ai.ru" || host == "www.efir-ai.ru") {
+            return PRODUCTION_BACKEND
+        }
+        return value.trimEnd('/')
+    }
+
     private val CLOUD_HOST_MARKERS = listOf(
         "railway.app",
         "music-story-production",

@@ -1,10 +1,8 @@
 import SwiftUI
-import SwiftData
 
 struct HistoryView: View {
     @Environment(\.dismiss) private var dismiss
-    @Query(sort: \StoryHistoryEntry.createdAt, order: .reverse) private var stories: [StoryHistoryEntry]
-    @Query(sort: \ScrobbleEntry.scrobbledAt, order: .reverse) private var scrobbles: [ScrobbleEntry]
+    @ObservedObject private var history = StoryHistoryStore.shared
 
     @State private var tab = 0
 
@@ -42,16 +40,27 @@ struct HistoryView: View {
 
     private var storyList: some View {
         List {
-            if stories.isEmpty {
+            if history.stories.isEmpty {
                 Text("Пока нет сохранённых историй")
                     .foregroundStyle(AppTheme.mutedLavender)
                     .listRowBackground(Color.clear)
             } else {
-                ForEach(stories) { entry in
+                ForEach(history.stories) { entry in
                     VStack(alignment: .leading, spacing: 6) {
-                        Text("\(entry.artist) — \(entry.title)")
-                            .font(.headline)
-                            .foregroundStyle(AppTheme.creamText)
+                        HStack {
+                            Text("\(entry.artist) — \(entry.title)")
+                                .font(.headline)
+                                .foregroundStyle(AppTheme.creamText)
+                            Spacer()
+                            if let vote = entry.vote {
+                                Text(vote == "like" ? "👍" : "👎")
+                            }
+                        }
+                        if let vote = entry.vote {
+                            Text(vote == "like" ? "Ты поставил 👍" : "Ты поставил 👎")
+                                .font(.caption2)
+                                .foregroundStyle(AppTheme.liveGreen)
+                        }
                         Text(entry.script)
                             .font(.caption)
                             .foregroundStyle(AppTheme.mutedLavender)
@@ -66,12 +75,12 @@ struct HistoryView: View {
 
     private var scrobbleList: some View {
         List {
-            if scrobbles.isEmpty {
+            if history.scrobbles.isEmpty {
                 Text("Пока нет записей")
                     .foregroundStyle(AppTheme.mutedLavender)
                     .listRowBackground(Color.clear)
             } else {
-                ForEach(scrobbles) { entry in
+                ForEach(history.scrobbles) { entry in
                     HStack {
                         VStack(alignment: .leading) {
                             Text(entry.title)

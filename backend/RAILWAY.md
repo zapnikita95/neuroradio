@@ -130,6 +130,33 @@ curl https://ТВОЙ-DOMAIN.up.railway.app/health
 | Root Directory `backend` + Nixpacks | Переключи на Dockerfile (уже в `backend/railway.toml`) или Root Directory = пусто |
 | Нет `dist/` после сборки | В Build Logs должно быть `npm run build` без ошибок |
 
+## DNS: не держите A-запись www вместе с CNAME Railway
+
+На Reg.ru у `www.efir-ai.ru` **одновременно** CNAME на Railway и A на парковку (`69.46.46.x`) — на части DNS (и iPhone) уходит на Reg.ru, TLS ломается; на другом телефоне всё ок.
+
+**Исправление:** в DNS Reg.ru удалить **A** для `www`, оставить только **CNAME** → `….up.railway.app` + TXT `_railway-verify`.
+
+Проверка с Mac: `dig +short www.efir-ai.ru A` — должно быть пусто; `dig +short www.efir-ai.ru CNAME` — Railway.
+
+## SSL: www.efir-ai.ru и старые iPhone
+
+С **июня 2026** Let's Encrypt на кастомных доменах Railway выдаёт цепочку **YR1**. Часть iOS её не доверяет → в приложении «не удалось установить защищённое соединение».
+
+| Хост | Сертификат | Для API в приложении |
+|------|------------|----------------------|
+| `www.efir-ai.ru` | LE **YR1** (кастомный домен) | ❌ на части iPhone |
+| `music-story-production.up.railway.app` | LE **E7** (`*.up.railway.app`) | ✅ тот же BFF |
+
+**В приложении (iOS/Android):** API по умолчанию ходит на `music-story-production.up.railway.app`. `www` — для сайта и доков.
+
+**Чтобы www тоже открывался в Safari на старых iPhone:** Cloudflare перед Railway (оранжевое облако, SSL mode **Full**). Тогда клиент видит сертификат Cloudflare, а не YR1 с Railway. См. [Troubleshooting SSL](https://docs.railway.com/networking/troubleshooting/ssl).
+
+Проверка:
+```bash
+curl -s https://music-story-production.up.railway.app/health
+# build и groq:true — тот же прод, что и www
+```
+
 ## 4. Приложение на телефоне
 
 **Ничего настраивать не нужно:**

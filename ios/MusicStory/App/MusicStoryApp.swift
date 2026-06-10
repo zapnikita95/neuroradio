@@ -11,6 +11,7 @@ struct MusicStoryApp: App {
                 .environmentObject(container.settings)
                 .environmentObject(container.orchestrator)
                 .environmentObject(container.nowPlaying)
+                .environmentObject(StoryHistoryStore.shared)
                 .onOpenURL { url in
                     container.handleOpenURL(url)
                 }
@@ -18,26 +19,28 @@ struct MusicStoryApp: App {
                     container.bootstrap()
                 }
         }
-        .modelContainer(StoryHistoryStore.modelContainer)
     }
 }
 
 struct RootView: View {
+    @Environment(\.scenePhase) private var scenePhase
     @EnvironmentObject private var settings: SettingsStore
+    @EnvironmentObject private var nowPlaying: NowPlayingCoordinator
 
-    var body: some View {
-        if settings.onboardingComplete {
-            MainTabView()
-        } else {
-            OnboardingView()
-        }
-    }
-}
-
-struct MainTabView: View {
     var body: some View {
         NavigationStack {
-            HomeView()
+            if settings.onboardingComplete {
+                HomeView()
+            } else {
+                OnboardingView()
+            }
+        }
+        .onChange(of: scenePhase) { phase in
+            if phase == .active {
+                nowPlaying.prepareSpotify(settings: settings)
+                nowPlaying.spotify.attemptSilentReconnect()
+            }
         }
     }
 }
+

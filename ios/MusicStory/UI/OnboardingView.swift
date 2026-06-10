@@ -5,64 +5,95 @@ struct OnboardingView: View {
     @EnvironmentObject private var nowPlaying: NowPlayingCoordinator
 
     @State private var step = 0
-    @State private var notificationsGranted = false
 
     var body: some View {
         MusicStoryBackground {
-            VStack(spacing: 24) {
-                Text("Music Story")
-                    .font(.largeTitle.bold())
-                    .foregroundStyle(AppTheme.goldBright)
+            ScrollView {
+                VStack(spacing: 24) {
+                    BrandTitle(fontSize: 28)
+                        .padding(.top, 24)
 
-                Text("На iPhone приложение работает иначе, чем на Android: без доступа к чужим уведомлениям, но с Spotify, Apple Music и ShazamKit.")
-                    .multilineTextAlignment(.center)
-                    .foregroundStyle(AppTheme.creamText)
-                    .padding(.horizontal)
+                    Text("Нейро-ведущий для Spotify и Apple Music")
+                        .font(.title3.weight(.semibold))
+                        .foregroundStyle(AppTheme.creamText)
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal)
 
-                GlassCard {
-                    VStack(alignment: .leading, spacing: 12) {
-                        onboardingRow(
-                            done: step > 0,
-                            title: "Уведомления",
-                            subtitle: "Кнопка «Рассказать историю» на push о новом треке"
-                        )
-                        onboardingRow(
-                            done: step > 1,
-                            title: "Spotify (опционально)",
-                            subtitle: "Client ID в настройках + SpotifyiOS SDK для авто-режима"
-                        )
-                        onboardingRow(
-                            done: step > 2,
-                            title: "ShazamKit",
-                            subtitle: "Распознавание Яндекс Музыки и других плееров по кнопке"
-                        )
-                    }
-                }
-                .padding(.horizontal)
+                    Text("На iPhone — Spotify, Apple Music и ShazamKit. Истории голосом, пока играет ваш трек.")
+                        .multilineTextAlignment(.center)
+                        .foregroundStyle(AppTheme.mutedLavender)
+                        .padding(.horizontal)
 
-                if step == 0 {
-                    PrimaryStoryButton(title: "Разрешить уведомления") {
-                        Task {
-                            notificationsGranted = await NotificationService.shared.requestAuthorization()
-                            step = 1
+                    VinylDisc(spinning: true)
+                        .padding(.vertical, 8)
+
+                    GlassCard(accentBorder: true) {
+                        VStack(alignment: .leading, spacing: 12) {
+                            onboardingRow(done: step > 0, title: "Уведомления", subtitle: "Кнопка «Рассказать историю» на push")
+                            onboardingRow(done: step > 1, title: "Spotify", subtitle: "Опционально — для авто-режима")
+                            onboardingRow(done: step > 2, title: "Аккаунт", subtitle: "Telegram или email — история в облаке")
                         }
                     }
-                } else if step == 1 {
-                    PrimaryStoryButton(title: "Подключить Spotify") {
-                        nowPlaying.spotify.connect()
-                        step = 2
-                    }
-                    Button("Пропустить") { step = 2 }
-                        .foregroundStyle(AppTheme.mutedLavender)
-                } else {
-                    PrimaryStoryButton(title: "Начать") {
-                        settings.onboardingComplete = true
-                    }
+                    .padding(.horizontal)
+
+                    stepContent
+                        .padding(.horizontal)
+
+                    Spacer(minLength: 24)
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var stepContent: some View {
+        switch step {
+        case 0:
+            PrimaryStoryButton(title: "Разрешить уведомления") {
+                Task {
+                    _ = await NotificationService.shared.requestAuthorization()
+                    step = 1
+                }
+            }
+        case 1:
+            VStack(spacing: 12) {
+                Text("В Spotify включите трек, затем подтвердите доступ — приложение вернётся само.")
+                    .font(.caption)
+                    .foregroundStyle(AppTheme.mutedLavender)
+                    .multilineTextAlignment(.center)
+
+                if let error = nowPlaying.spotify.connectionError {
+                    Text(error)
+                        .font(.caption)
+                        .foregroundStyle(AppTheme.errorCoral)
+                        .multilineTextAlignment(.center)
                 }
 
-                Spacer()
+                PrimaryStoryButton(title: nowPlaying.spotify.isConnected ? "Spotify подключён" : "Подключить Spotify") {
+                    if nowPlaying.spotify.isConnected {
+                        step = 2
+                    } else {
+                        nowPlaying.spotify.connect()
+                    }
+                }
+                .disabled(nowPlaying.spotify.isAuthorizing)
+
+                if nowPlaying.spotify.isAuthorizing {
+                    ProgressView().tint(AppTheme.accentViolet)
+                }
+
+                Button("Пропустить") { step = 2 }
+                    .foregroundStyle(AppTheme.mutedLavender)
             }
-            .padding(.top, 40)
+            .onChange(of: nowPlaying.spotify.isConnected) { connected in
+                if connected { step = 2 }
+            }
+        default:
+            AccountAuthPanel(
+                onSuccess: { settings.onboardingComplete = true },
+                onSkip: { settings.onboardingComplete = true },
+                skipTitle: "Начать без входа"
+            )
         }
     }
 

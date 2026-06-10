@@ -29,8 +29,9 @@ import com.musicstory.app.domain.UserTtsBilling
 import com.musicstory.app.domain.TtsSpeed
 import com.musicstory.app.domain.TtsVoice
 import com.musicstory.app.domain.TriggerMode
-import com.musicstory.app.util.StoryLog
 import com.musicstory.app.util.ApiKeySanitizer
+import com.musicstory.app.util.BackendUrlRules
+import com.musicstory.app.util.StoryLog
 import com.musicstory.app.security.SecureApiKeyStore
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
@@ -93,7 +94,9 @@ class SettingsDataStore(private val context: Context) {
     }
 
     val backendUrl: Flow<String> = context.settingsDataStore.data.map { prefs ->
-        prefs[KEY_BACKEND_URL].orEmpty().trim().ifBlank { DEFAULT_BACKEND_URL }
+        BackendUrlRules.normalizeBackendUrl(
+            prefs[KEY_BACKEND_URL].orEmpty().ifBlank { DEFAULT_BACKEND_URL },
+        )
     }
 
     val triggerMode: Flow<TriggerMode> = context.settingsDataStore.data.map { prefs ->
@@ -366,7 +369,9 @@ class SettingsDataStore(private val context: Context) {
     }
 
     suspend fun setBackendUrl(url: String) {
-        context.settingsDataStore.edit { it[KEY_BACKEND_URL] = url.trimEnd('/') }
+        context.settingsDataStore.edit {
+            it[KEY_BACKEND_URL] = BackendUrlRules.normalizeBackendUrl(url)
+        }
     }
 
     suspend fun readAuthState(): AuthState {
@@ -707,7 +712,7 @@ class SettingsDataStore(private val context: Context) {
     }
 
     companion object {
-        const val DEFAULT_BACKEND_URL = "https://www.efir-ai.ru"
+        const val DEFAULT_BACKEND_URL = "https://music-story-production.up.railway.app"
         const val DEFAULT_EVERY_N_TRACKS = 3
         const val DEFAULT_SAME_TRACK_STORY_EVERY_N = 3
         const val DEFAULT_AUTO_INTERCEPT = true

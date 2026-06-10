@@ -9,7 +9,9 @@ final class AppContainer: ObservableObject {
     let storyPlayer = StoryPlayer()
     lazy var orchestrator = StoryOrchestrator(nowPlaying: nowPlaying, storyPlayer: storyPlayer)
 
-    private init() {}
+    private init() {
+        nowPlaying.prepareSpotify(settings: settings)
+    }
 
     func bootstrap() {
         NotificationService.shared.configure()
@@ -33,6 +35,9 @@ final class AppContainer: ObservableObject {
             Task { await orchestrator.requestManualStory() }
             return
         }
-        nowPlaying.spotify.handleOpenURL(url)
+        if url.scheme?.lowercased() == "efirai",
+           url.host?.lowercased() == "spotify-callback" || url.path.lowercased().contains("spotify-callback") {
+            nowPlaying.spotify.handleOpenURL(url)
+        }
     }
 }

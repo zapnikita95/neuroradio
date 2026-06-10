@@ -220,6 +220,7 @@ async function boot(): Promise<void> {
     console.log(`  GET  /v1/account/* — email/Telegram auth + 7-day trial`);
     console.log(`  GET  /v1/sync/* — linked account settings & history`);
     console.log(`  GET  /v1/billing/status — tier, limits, trial/premium`);
+    console.log(`  POST /v1/billing/apple/verify — App Store purchase (iOS)`);
     console.log(`  POST /v1/llm/probe — test LLM key via BFF (no key logging)`);
     console.log(`  POST /v1/story/full — story + optional Yandex TTS`);
     console.log(`  POST /v1/story/feedback — like/dislike + reason tags`);

@@ -8,7 +8,7 @@ struct TellStoryWidget: Widget {
         StaticConfiguration(kind: kind, provider: TellStoryProvider()) { _ in
             TellStoryWidgetView()
         }
-        .configurationDisplayName("Music Story")
+        .configurationDisplayName("Эфир AI")
         .description("Быстро запросить историю о текущем треке")
         .supportedFamilies([.systemSmall, .accessoryCircular])
     }

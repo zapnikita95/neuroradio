@@ -95,6 +95,9 @@ export function getAuthJwtSecret(): string | null {
 
 const DEFAULT_PACKAGE_NAMES = ['com.efirai.myapp', 'com.musicstory.app'];
 
+/** TestFlight / App Store — без Railway ALLOWED_IOS_TEAM_ID. */
+const DEFAULT_IOS_TEAM_IDS = ['Y52BT2N4L8'];
+
 export function getAllowedPackageNames(): Set<string> {
   const allowed = new Set<string>();
   const raw = process.env.ALLOWED_PACKAGE_NAME?.trim();
@@ -162,8 +165,9 @@ export function getAllowedCertFingerprints(): Set<string> {
     }
   }
 
+  const teamIds = new Set([...getAllowedIosTeamIds(), ...DEFAULT_IOS_TEAM_IDS]);
   for (const bundleId of getAllowedPackageNames()) {
-    for (const teamId of getAllowedIosTeamIds()) {
+    for (const teamId of teamIds) {
       allowed.add(normalizeCertSha256(iosAttestationHash(bundleId, teamId)));
     }
   }

@@ -33,6 +33,14 @@ final class TriggerEngine {
     private var tracksSinceLastStory = 0
     private var sameTrackPlayCounts: [String: Int] = [:]
 
+    func onStoryPlaybackStarted() {
+        tracksSinceLastStory = 0
+    }
+
+    func rollbackFailedStoryTrigger(everyNTracks: Int) {
+        tracksSinceLastStory = max(everyNTracks - 1, 0)
+    }
+
     func resetCounter() {
         tracksSinceLastStory = 0
         sameTrackPlayCounts.removeAll()
@@ -44,35 +52,39 @@ final class TriggerEngine {
         trackArtist: String,
         trackGenre: String?
     ) -> Bool {
-        registerSameTrackPlay(trackKey)
+        registerSameTrackPlay(trackKey: trackKey)
 
         guard settings.autoIntercept, settings.mode != .never else {
             return false
         }
 
-        let globalOk: Bool = switch settings.mode {
+        let globalOk: Bool
+        switch settings.mode {
         case .always:
-            true
+            globalOk = true
         case .never:
-            false
+            globalOk = false
         case .everyNTracks:
             tracksSinceLastStory += 1
             if tracksSinceLastStory >= settings.everyNTracks {
                 tracksSinceLastStory = 0
-                true
+                globalOk = true
             } else {
-                false
+                globalOk = false
             }
         case .specificArtists:
-            settings.specificArtists.contains { selected in
+            globalOk = settings.specificArtists.contains { selected in
                 trackArtist.caseInsensitiveCompare(selected) == .orderedSame ||
                     trackArtist.localizedCaseInsensitiveContains(selected)
             }
         case .specificGenres:
-            guard let genre = trackGenre else { return false }
-            return settings.specificGenres.contains { selected in
-                genre.caseInsensitiveCompare(selected) == .orderedSame ||
-                    genre.localizedCaseInsensitiveContains(selected)
+            if let genre = trackGenre {
+                globalOk = settings.specificGenres.contains { selected in
+                    genre.caseInsensitiveCompare(selected) == .orderedSame ||
+                        genre.localizedCaseInsensitiveContains(selected)
+                }
+            } else {
+                globalOk = false
             }
         }
 

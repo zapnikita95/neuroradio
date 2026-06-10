@@ -7,6 +7,12 @@ struct StoryRequest: Encodable, Sendable {
     let storyLength: String
     let ttsSpeed: Float
     let ttsEmotion: String
+    let storyNarrator: String
+    let ttsVoice: String
+    let edgeVoicePreset: String?
+    let ttsProvider: String
+    let voiceTier: String
+    let speakTrackNamesInVoiceover: Bool
 
     enum CodingKeys: String, CodingKey {
         case artist
@@ -15,6 +21,12 @@ struct StoryRequest: Encodable, Sendable {
         case storyLength = "story_length"
         case ttsSpeed = "tts_speed"
         case ttsEmotion = "tts_emotion"
+        case storyNarrator = "story_narrator"
+        case ttsVoice = "tts_voice"
+        case edgeVoicePreset = "edge_voice_preset"
+        case ttsProvider = "tts_provider"
+        case voiceTier = "voice_tier"
+        case speakTrackNamesInVoiceover = "speak_track_names_in_voiceover"
     }
 }
 
@@ -31,6 +43,8 @@ struct StoryResponse: Decodable, Sendable {
     let audioUrl: String?
     let audioFile: String?
     let ttsHint: String?
+    let ttsProvider: String?
+    let tier: String?
     let quota: StoryQuotaInfo?
 
     enum CodingKeys: String, CodingKey {
@@ -46,6 +60,8 @@ struct StoryResponse: Decodable, Sendable {
         case audioUrl
         case audioFile
         case ttsHint
+        case ttsProvider = "tts_provider"
+        case tier
         case quota
     }
 }
@@ -80,4 +96,35 @@ struct HealthResponse: Decodable, Sendable {
     let groq: Bool?
     let yandexTts: Bool?
     let appAuthRequired: Bool?
+}
+
+struct StoryFeedbackRequest: Encodable, Sendable {
+    let artist: String
+    let title: String
+    let vote: String
+    let reason: String
+    let reasons: [String]
+    let script: String?
+    let historyId: String?
+}
+
+struct BillingEntitlement: Decodable, Sendable {
+    let plan: String?
+    let premiumUntil: Int64?
+    let autoRenew: Bool?
+
+    enum CodingKeys: String, CodingKey {
+        case plan
+        case premiumUntil
+        case autoRenew
+    }
+}
+
+struct BillingStatusResponse: Decodable, Sendable {
+    let ok: Bool?
+    let tier: String?
+    let premium: Bool?
+    let entitlement: BillingEntitlement?
+
+    var premiumUntilMs: Int64? { entitlement?.premiumUntil }
 }

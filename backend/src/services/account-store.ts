@@ -731,7 +731,13 @@ const PREMIUM_MS_MONTH = 31 * 24 * 60 * 60 * 1000;
  */
 export function grantPremiumSubscription(
   installId: string,
-  options: { months?: number; productId?: string; purchaseToken?: string } = {},
+  options: {
+    months?: number;
+    productId?: string;
+    purchaseToken?: string;
+    premiumUntilMs?: number;
+    autoRenew?: boolean;
+  } = {},
 ): AccountEntitlement {
   const months = Math.max(1, options.months ?? 1);
   const store = loadStore();
@@ -746,14 +752,9 @@ export function grantPremiumSubscription(
       return getEntitlementForInstall(installId);
     }
     account.plan = 'premium';
-    account.premiumUntil = Date.now() + months * PREMIUM_MS_MONTH;
+    account.premiumUntil = resolvePremiumUntilMs(account.premiumUntil, options, months);
     account.premiumProductId = options.productId ?? PREMIUM_PRODUCT_MONTHLY;
-    if (options.purchaseToken) {
-      account.purchaseTokenHash = crypto
-        .createHash('sha256')
-        .update(options.purchaseToken)
-        .digest('hex');
-    }
+    applyApplePurchaseMeta(account, options);
     saveStore(reloaded);
     return entitlementFromAccount(account);
   }
@@ -761,18 +762,41 @@ export function grantPremiumSubscription(
   const account = store.accountsById[accountId];
   if (!account) return getEntitlementForInstall(installId);
 
-  const base = Math.max(Date.now(), account.premiumUntil ?? 0);
   account.plan = 'premium';
-  account.premiumUntil = base + months * PREMIUM_MS_MONTH;
+  account.premiumUntil = resolvePremiumUntilMs(account.premiumUntil, options, months);
   account.premiumProductId = options.productId ?? PREMIUM_PRODUCT_MONTHLY;
+  applyApplePurchaseMeta(account, options);
+  saveStore(store);
+  return entitlementFromAccount(account);
+}
+
+function resolvePremiumUntilMs(
+  currentUntil: number | undefined,
+  options: { premiumUntilMs?: number; months?: number },
+  months: number,
+): number {
+  if (options.premiumUntilMs && options.premiumUntilMs > Date.now()) {
+    return Math.max(currentUntil ?? 0, options.premiumUntilMs);
+  }
+  const base = Math.max(Date.now(), currentUntil ?? 0);
+  return base + months * PREMIUM_MS_MONTH;
+}
+
+function applyApplePurchaseMeta(
+  account: AccountRecord,
+  options: { purchaseToken?: string; autoRenew?: boolean },
+): void {
   if (options.purchaseToken) {
     account.purchaseTokenHash = crypto
       .createHash('sha256')
       .update(options.purchaseToken)
       .digest('hex');
   }
-  saveStore(store);
-  return entitlementFromAccount(account);
+  if (options.autoRenew === true) {
+    account.autoRenew = true;
+    account.yookassaPaymentMethodId = null;
+    account.nextPaymentAt = account.premiumUntil ?? null;
+  }
 }
 
 /** Activate or extend premium by email (website / YooKassa). Creates account if needed. */

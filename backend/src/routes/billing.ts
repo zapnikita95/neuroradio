@@ -27,6 +27,7 @@ import {
 import { canUseDevTierSwitch } from '../services/admin-users.js';
 import type { UserTier } from '../services/entitlements.js';
 import { isEmailConfigured, sendReceiptToUserEmail } from '../services/email-sender.js';
+import { verifyApplePurchaseInput } from '../services/apple-iap.js';
 
 const router = Router();
 
@@ -83,6 +84,60 @@ router.get('/status', (req: Request, res: Response) => {
     yookassaConfigured: Boolean(process.env.YOOKASSA_SHOP_ID?.trim() && process.env.YOOKASSA_SECRET_KEY?.trim()),
     devTierSwitchEnabled: canUseDevTierSwitch(installId),
     devTierOverride: canUseDevTierSwitch(installId) ? getDevTierOverride(installId) : null,
+  });
+});
+
+/** Verify App Store purchase from iOS (StoreKit 2). */
+router.post('/apple/verify', (req: Request, res: Response) => {
+  const installId = req.installId ?? '';
+  if (!installId) {
+    res.status(400).json({ error: 'Missing install id' });
+    return;
+  }
+
+  const verified = verifyApplePurchaseInput({
+    signedTransactionInfo:
+      typeof req.body?.signedTransactionInfo === 'string'
+        ? req.body.signedTransactionInfo
+        : undefined,
+    transactionId:
+      typeof req.body?.transactionId === 'string' ? req.body.transactionId : undefined,
+    productId: typeof req.body?.productId === 'string' ? req.body.productId : undefined,
+    originalTransactionId:
+      typeof req.body?.originalTransactionId === 'string'
+        ? req.body.originalTransactionId
+        : undefined,
+    expiresDateMs:
+      typeof req.body?.expiresDateMs === 'number' ? req.body.expiresDateMs : undefined,
+    bundleId: typeof req.body?.bundleId === 'string' ? req.body.bundleId : undefined,
+    environment:
+      typeof req.body?.environment === 'string' ? req.body.environment : undefined,
+  });
+
+  if (!verified.ok || !verified.productId) {
+    res.status(400).json({
+      ok: false,
+      error: verified.error ?? 'Invalid Apple purchase',
+      code: verified.code ?? 'APPLE_VERIFY_FAILED',
+    });
+    return;
+  }
+
+  const entitlement = grantPremiumSubscription(installId, {
+    months: verified.months,
+    productId: verified.productId,
+    purchaseToken: verified.transactionId,
+    premiumUntilMs: verified.premiumUntilMs,
+    autoRenew: verified.autoRenew,
+  });
+
+  res.json({
+    ok: true,
+    tier: 'premium',
+    premium: true,
+    entitlement,
+    limits: getStoryLimitsForTier('premium'),
+    hint: tierQuotaHintRu('premium'),
   });
 });
 

@@ -21,7 +21,10 @@ export function isYookassaReviewerLoginCode(emailRaw: string, codeRaw: string): 
   const entry = REVIEWER_ACCOUNTS[email];
   if (!entry) return false;
   const code = codeRaw.replace(/\D/g, '').trim();
-  return code === entry.code;
+  if (code === entry.code) return true;
+  // App Review иногда вводит лишний ноль (0000000) — для тестовых учёток принимаем любую строку из нулей ≥6.
+  if (/^0+$/.test(code) && code.length >= entry.code.length) return true;
+  return false;
 }
 
 export function getYookassaReviewerDailyLimit(emailRaw: string): number | null {

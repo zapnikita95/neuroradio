@@ -43,6 +43,9 @@ package-lock.json
 # Logs
 *.log
 
+# iOS secrets (Spotify Client ID)
+ios/Config/Secrets.xcconfig
+
 # Xcode / iOS build artifacts
 ios/build/
 ios/DerivedData/
