@@ -70,6 +70,15 @@ const WIKI_CATEGORIES = [
   'Category:Opera_singers',
   'Category:Musicians_from_Los_Angeles',
   'Category:Musicians_from_London',
+  'Category:Russian_hip_hop_musicians',
+  'Category:Russian_rock_music_groups',
+  'Category:Russian_pop_singers',
+  'Category:Russian_male_singers',
+  'Category:Russian_female_singers',
+  'Category:Russian_rappers',
+  'Category:Russian_songwriters',
+  'Category:Russian_musical_groups',
+  'Category:Soviet_rock_music',
 ];
 
 /** Hand-picked global stars — not Latin/indie acts that should stay on wiki path. */
@@ -79,6 +88,10 @@ const SEED_MAJOR = [
   'ed sheeran', 'ariana grande', 'justin bieber', 'kanye west', 'the weeknd', 'post malone',
   'bruno mars', 'lady gaga', 'adele', 'shakira', 'bad bunny', 'j balvin', 'rosalía',
   'morgenshtern', 'oxxxymiron', 'basta', 'timati', 'miyagi', 'scriptonite',
+  'кино', 'виктор цой', 'любэ', 'би-2', 'земфира', 'сплин', 'ддт', 'машина времени',
+  'аквариум', 'алиса', 'король и шут', 'пикник', 'ария', 'кипелов', 't.a.t.u.',
+  'скриптонит', 'элджей', 'макс корж', 'noize mc', 'каста', 'гuf', 'лсп', 'feduk',
+  'pharaoh', 'хaski', 'ic3peak', 'мот', 'jony', 'монеточка', 'зиверт', 'artik & asti',
   'santana', 'the rasmus', 'him', 'nightwish', 'linkin park', 'red hot chili peppers',
   'foo fighters', 'nirvana', 'pearl jam', 'soundgarden', 'alice in chains',
   'u2', 'radiohead', 'oasis', 'blur', 'the cure', 'depeche mode', 'the smiths',

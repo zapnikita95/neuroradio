@@ -32,6 +32,7 @@ export interface SaluteSynthesisOptions {
   styleId?: string;
   storyNarrator?: StoryNarratorId;
   voice?: SaluteVoiceId;
+  speakTrackNamesInVoiceover?: boolean;
   /** Client billing — Authorization Key from Studio (not stored on server). */
   clientAuthKey?: string;
 }
@@ -58,7 +59,12 @@ export async function synthesizeSpeechSalute(
     options.voice ??
     resolveSaluteVoice(options.styleId ?? 'auto', options.storyNarrator ?? 'auto');
 
-  const plainText = prepareSaluteSpeechText(script, artist, title);
+  const plainText = prepareSaluteSpeechText(
+    script,
+    artist,
+    title,
+    options.speakTrackNamesInVoiceover === true,
+  );
   const ssml = buildSaluteSsml(plainText, {
     voice,
     rate: yandexSpeedToSaluteRate(speed),

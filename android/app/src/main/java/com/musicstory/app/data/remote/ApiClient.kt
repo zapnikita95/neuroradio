@@ -121,6 +121,16 @@ class ApiClient(
         return getApi(baseUrl).fetchQuota()
     }
 
+    suspend fun fetchFactHint(baseUrl: String, artist: String, title: String): FactHintResponse {
+        return try {
+            getApi(baseUrl).fetchFactHint(artist, title)
+        } catch (first: Exception) {
+            StoryLog.w("Fact hint retry after: ${first.message}")
+            authManager.invalidateToken()
+            getApi(baseUrl).fetchFactHint(artist, title)
+        }
+    }
+
     suspend fun setDevTier(baseUrl: String, tier: String?): DevTierResponse {
         return try {
             getApi(baseUrl).setDevTier(DevTierRequest(tier))
@@ -130,8 +140,34 @@ class ApiClient(
         }
     }
 
-    suspend fun fetchBillingStatus(baseUrl: String): BillingStatusResponse {
-        return getApi(baseUrl).billingStatus()
+    suspend fun fetchBillingStatus(baseUrl: String, appLanguage: String? = null): BillingStatusResponse {
+        return getApi(baseUrl).billingStatus(appLanguage)
+    }
+
+    suspend fun checkLanguageSwitch(baseUrl: String, target: String): LanguageSwitchResponse {
+        return try {
+            getApi(baseUrl).languageSwitch(target)
+        } catch (first: Exception) {
+            authManager.invalidateToken()
+            getApi(baseUrl).languageSwitch(target)
+        }
+    }
+
+    suspend fun verifyGooglePlayPurchase(
+        baseUrl: String,
+        productId: String,
+        purchaseToken: String,
+    ): IapVerifyResponse {
+        return try {
+            getApi(baseUrl).verifyGooglePlay(
+                GooglePlayVerifyRequest(productId = productId, purchaseToken = purchaseToken),
+            )
+        } catch (first: Exception) {
+            authManager.invalidateToken()
+            getApi(baseUrl).verifyGooglePlay(
+                GooglePlayVerifyRequest(productId = productId, purchaseToken = purchaseToken),
+            )
+        }
     }
 
     suspend fun unlinkCard(baseUrl: String): UnlinkCardResponse {

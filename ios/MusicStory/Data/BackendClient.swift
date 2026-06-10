@@ -276,6 +276,27 @@ final class BackendClient {
         try validateHTTP(response)
     }
 
+    func verifyAppStorePurchase(receiptData: String) async throws -> IapVerifyResponse {
+        let body = try JSONEncoder().encode(AppStoreVerifyRequest(receiptData: receiptData))
+        let (data, response) = try await dataFromAPI(
+            path: "v1/billing/verify/app-store",
+            method: "POST",
+            body: body,
+            authorized: true
+        )
+        try validateHTTP(response)
+        return try decode(IapVerifyResponse.self, from: data)
+    }
+
+    func fetchFactHint(artist: String, title: String) async throws -> FactHintResponse {
+        let encodedArtist = artist.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? artist
+        let encodedTitle = title.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? title
+        let path = "v1/facts/hint?artist=\(encodedArtist)&title=\(encodedTitle)"
+        let (data, response) = try await dataFromAPI(path: path, method: "GET", body: nil, authorized: true)
+        try validateHTTP(response)
+        return try decode(FactHintResponse.self, from: data)
+    }
+
     func fetchBillingStatus() async throws -> BillingStatusResponse {
         let (data, response) = try await dataFromAPI(path: "v1/billing/status", method: "GET", body: nil, authorized: true)
         try validateHTTP(response)

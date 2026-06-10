@@ -76,10 +76,11 @@ final class StoryOrchestrator: ObservableObject {
 
     func onTrackChanged(_ track: TrackInfo) async {
         guard track.isValid() else { return }
+        uiState.currentTrack = track
         if uiState.pendingFeedback?.trackKey != track.displayKey {
             uiState.pendingFeedback = nil
         }
-        uiState.currentTrack = track
+        OfflinePackStore.shared.onTrackHeard(track)
 
         guard !historyStore.wasRecentlyScrobbled(track.displayKey) else { return }
 
@@ -99,7 +100,17 @@ final class StoryOrchestrator: ObservableObject {
             await playStory(for: track, manual: false)
         } else if !isStoryRunning {
             uiState.state = .listening
-            await notifications.notifyTrackChanged(track: track, autoMode: uiState.mode == .auto)
+            if settings.manualMode && settings.factNotificationsEnabled {
+                let hasHot = await storyRepository.hasHotFactForTrack(
+                    artist: track.artist,
+                    title: track.title
+                )
+                if hasHot {
+                    await notifications.notifyFactHint(track: track)
+                }
+            } else {
+                await notifications.notifyTrackChanged(track: track, autoMode: uiState.mode == .auto)
+            }
         }
     }
 
@@ -115,7 +126,7 @@ final class StoryOrchestrator: ObservableObject {
             let track = try await nowPlaying.recognizeWithShazam()
             await playStory(for: track, manual: true)
         } catch {
-            uiState.errorMessage = UserFacingError.message(for: error)
+            uiState.errorMessage = error.localizedDescription
             uiState.state = .error
         }
     }
@@ -137,11 +148,67 @@ final class StoryOrchestrator: ObservableObject {
         isStoryRunning = false
         uiState.pendingFeedback = nil
         storyPlayer.stop()
-        Task {
-            await nowPlaying.resumeMusicWithFade(seconds: settings.musicFadeSeconds)
-        }
+        nowPlaying.resumeMusic()
         uiState.state = .listening
         uiState.errorMessage = nil
+    }
+
+    func replayHistoryStory(_ entry: StoryHistoryEntry) async {
+        guard let response = storyRepository.offlineReplayResponse(for: entry.trackKey) else {
+            uiState.errorMessage = "Нет сохранённой озвучки. Послушайте трек онлайн с расширенным тарифом."
+            uiState.state = .error
+            return
+        }
+        if isStoryRunning {
+            stopStory()
+        }
+        isStoryRunning = true
+        playbackSession += 1
+        let session = playbackSession
+
+        uiState.state = .preparingPlayback
+        uiState.errorMessage = nil
+        var musicPaused = false
+        if nowPlaying.canControlPlayback(for: .manual) {
+            nowPlaying.pauseMusic()
+            musicPaused = true
+        }
+
+        let audioURL = storyRepository.resolvePlaybackURL(
+            trackKey: entry.trackKey,
+            audioURL: response.audioUrl
+        )
+        storyPlayer.playStory(
+            response: response,
+            audioURL: audioURL,
+            speechRate: settings.ttsSpeedPreset.speechRate,
+            resumeMusic: true,
+            onPlaybackStarted: { [weak self] in
+                Task { @MainActor in
+                    guard session == self?.playbackSession else { return }
+                    self?.uiState.state = .playingStory
+                }
+            },
+            onFinished: { [weak self] in
+                Task { @MainActor in
+                    guard session == self?.playbackSession else { return }
+                    if musicPaused, self?.storyPlayer.shouldResumeMusic() == true {
+                        self?.nowPlaying.resumeMusic()
+                    }
+                    self?.isStoryRunning = false
+                    self?.uiState.state = .listening
+                }
+            },
+            onError: { [weak self] in
+                Task { @MainActor in
+                    guard session == self?.playbackSession else { return }
+                    if musicPaused { self?.nowPlaying.resumeMusic() }
+                    self?.isStoryRunning = false
+                    self?.uiState.errorMessage = "Не удалось воспроизвести историю"
+                    self?.uiState.state = .error
+                }
+            }
+        )
     }
 
     func clearError() {
@@ -152,12 +219,7 @@ final class StoryOrchestrator: ObservableObject {
     }
 
     func showError(_ message: String) {
-        uiState.errorMessage = UserFacingError.message(for: message)
-        uiState.state = .error
-    }
-
-    func showError(_ error: Error) {
-        uiState.errorMessage = UserFacingError.message(for: error)
+        uiState.errorMessage = message
         uiState.state = .error
     }
 
@@ -208,17 +270,14 @@ final class StoryOrchestrator: ObservableObject {
             uiState.state = .preparingPlayback
             var musicPaused = false
             if nowPlaying.canControlPlayback(for: track.source) {
-                await nowPlaying.fadeOutAndPause(seconds: settings.musicFadeSeconds)
+                nowPlaying.pauseMusic()
                 musicPaused = true
-                if !manual {
-                    triggerEngine.onStoryPlaybackStarted()
-                    uiState.tracksUntilNext = triggerEngine.tracksUntilNext(settings: settings.triggerSettings)
-                }
             }
 
-            await nowPlaying.restoreVolumeIfNeeded()
-
-            let audioURL = storyRepository.resolveAudioURL(response.audioUrl)
+            let audioURL = storyRepository.resolvePlaybackURL(
+                trackKey: track.displayKey,
+                audioURL: response.audioUrl
+            )
             storyPlayer.playStory(
                 response: response,
                 audioURL: audioURL,
@@ -233,8 +292,8 @@ final class StoryOrchestrator: ObservableObject {
                 onFinished: { [weak self] in
                     Task { @MainActor in
                         guard let self, session == self.playbackSession else { return }
-                        if musicPaused, self.storyPlayer.shouldResumeMusic() {
-                            await self.nowPlaying.resumeMusicWithFade(seconds: self.settings.musicFadeSeconds)
+                        if musicPaused, self.storyPlayer.shouldResumeMusic() == true {
+                            self.nowPlaying.resumeMusic()
                         }
                         self.isStoryRunning = false
                         let trackKey = track.displayKey
@@ -257,15 +316,7 @@ final class StoryOrchestrator: ObservableObject {
                     Task { @MainActor in
                         guard session == self?.playbackSession else { return }
                         if musicPaused {
-                            if !manual {
-                                self?.triggerEngine.rollbackFailedStoryTrigger(
-                                    everyNTracks: self?.settings.everyNTracks ?? SettingsDefaults.everyNTracks
-                                )
-                                self?.uiState.tracksUntilNext = self?.triggerEngine.tracksUntilNext(
-                                    settings: self?.settings.triggerSettings ?? TriggerSettings()
-                                )
-                            }
-                            await self?.nowPlaying.resumeMusicWithFade(seconds: self?.settings.musicFadeSeconds ?? 2)
+                            self?.nowPlaying.resumeMusic()
                         }
                         self?.isStoryRunning = false
                         self?.uiState.errorMessage = "Не удалось воспроизвести историю"
@@ -278,11 +329,7 @@ final class StoryOrchestrator: ObservableObject {
 
         case .failure(let error):
             isStoryRunning = false
-            if !manual {
-                triggerEngine.rollbackFailedStoryTrigger(everyNTracks: settings.everyNTracks)
-                uiState.tracksUntilNext = triggerEngine.tracksUntilNext(settings: settings.triggerSettings)
-            }
-            uiState.errorMessage = UserFacingError.message(for: error)
+            uiState.errorMessage = error.localizedDescription
             uiState.state = .error
         }
     }
@@ -295,9 +342,7 @@ final class StoryOrchestrator: ObservableObject {
             if uiState.state == .playingStory, storyPlayer.state == .playing { return }
 
             storyPlayer.stop()
-            if musicPaused {
-                await nowPlaying.resumeMusicWithFade(seconds: settings.musicFadeSeconds)
-            }
+            if musicPaused { nowPlaying.resumeMusic() }
             isStoryRunning = false
             uiState.errorMessage = "Озвучка не запустилась — попробуй ещё раз"
             uiState.state = .error

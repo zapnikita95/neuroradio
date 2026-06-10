@@ -12,6 +12,7 @@ data class CachedStory(
     val genre: String? = null,
     val script: String,
     val audioUrl: String? = null,
+    val localAudioPath: String? = null,
     val demo: Boolean = false,
     val fetchedAt: Long = System.currentTimeMillis(),
 )

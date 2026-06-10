@@ -13,6 +13,15 @@ interface StoryDao {
     @Query("SELECT * FROM cached_stories WHERE trackKey = :trackKey LIMIT 1")
     suspend fun getByTrackKey(trackKey: String): CachedStory?
 
+    @Query(
+        "SELECT * FROM cached_stories WHERE (localAudioPath IS NULL OR localAudioPath = '') " +
+            "AND audioUrl IS NOT NULL AND audioUrl != ''",
+    )
+    suspend fun findWithoutLocalAudio(): List<CachedStory>
+
+    @Query("UPDATE cached_stories SET localAudioPath = :path WHERE trackKey = :trackKey")
+    suspend fun updateLocalAudioPath(trackKey: String, path: String)
+
     @Query("DELETE FROM cached_stories WHERE fetchedAt < :before")
     suspend fun deleteOlderThan(before: Long)
 

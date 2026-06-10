@@ -1,4 +1,4 @@
-import fetch from 'node-fetch';
+import fetch from '../proxy-fetch.js';
 import { fuzzyTokenMatch } from './title-transliterate.js';
 import type { SelectedReferenceFact } from './fact-picker.js';
 import { factNamesForeignEntity, factMentionsArtist, factMentionsTitle, hasTrackContextSignal, hasRussianTrackContextSignal } from './fact-relevance.js';
@@ -6,6 +6,7 @@ import { interestScore, isBoringFact, MIN_PICK_INTEREST_SCORE, isWeakChartSeed }
 import { interestRating10 } from './fact-interest-log.js';
 import { MIN_GOOD_SCOPE_INTEREST } from './fact-picker.js';
 import { WEAK_TRIVIA_PATTERNS, FACT_HUNT_LLM_PROMPT_BLOCK } from './story-fact-hunt.js';
+import { isLyricsPageSeed, hasNarrativeSeedSignal } from './web-snippet-accept.js';
 import { resolveGroqModelOrder } from './groq-models.js';
 import { resolveGeminiModel, DEFAULT_GEMINI_MODEL } from './gemini-models.js';
 import { GroqApiError } from './groq.js';
@@ -79,6 +80,8 @@ export function shouldRunLlmFactHunt(
   if (rawSnippetCount < 2) return false;
   if (!selected) return true;
   if (bundleFactCount === 0) return true;
+  if (selected && isLyricsPageSeed(selected.fact)) return true;
+  if (selected && !hasNarrativeSeedSignal(selected.fact)) return true;
   if (selected.interestScore >= FAST_SEED_INTEREST_SCORE) {
     return false;
   }
@@ -105,6 +108,8 @@ export function explainFactHuntDecision(
 ): string {
   if (rawSnippetCount < 2) return 'snippets<2';
   if (!selected) return bundleFactCount === 0 ? 'no-facts' : 'no-selection-snippet-hunt';
+  if (isLyricsPageSeed(selected.fact)) return 'lyrics-page-seed';
+  if (!hasNarrativeSeedSignal(selected.fact)) return 'no-narrative-seed';
   if (selected.interestScore >= FAST_SEED_INTEREST_SCORE) {
     return `fast-seed score=${selected.interestScore}`;
   }

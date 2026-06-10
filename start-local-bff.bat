@@ -15,20 +15,13 @@ if not exist "%LOGDIR%" mkdir "%LOGDIR%"
 if not defined LOCAL_OLLAMA_BASE_URL set LOCAL_OLLAMA_BASE_URL=http://127.0.0.1:11435
 if not defined LOCAL_OLLAMA_MODEL set LOCAL_OLLAMA_MODEL=qwen3.6:35b-a3b-q4_K_M
 
-rem Local Silero TTS (PC only — not Railway)
-if not defined SILERO_TTS_URL set SILERO_TTS_URL=http://127.0.0.1:8001
-if not defined SILERO_TTS_VOICE set SILERO_TTS_VOICE=baya
-set SILERO_TTS_ENABLED=true
-set TTS_PREFER_SILERO=true
-set SILERO_TTS_API=legacy
-
 echo.
 echo Music Story - local BFF
 echo =======================
 echo LLM_PROVIDER=%LLM_PROVIDER%
 echo OLLAMA_URL=%LOCAL_OLLAMA_BASE_URL%
 echo OLLAMA_MODEL=%LOCAL_OLLAMA_MODEL%
-echo SILERO_TTS_URL=%SILERO_TTS_URL%  (run start-silero-tts.bat first)
+echo TTS free tier: Edge on BFF
 echo PORT=%PORT%
 echo LOG=%LOG%
 echo.
@@ -53,18 +46,6 @@ if errorlevel 1 (
   goto fail
 )
 echo Ollama OK
-
-curl.exe -s --max-time 5 "%SILERO_TTS_URL%/voices" >nul 2>&1
-if errorlevel 1 (
-  curl.exe -s --max-time 5 "%SILERO_TTS_URL%/tts/model" >nul 2>&1
-  if errorlevel 1 (
-    echo WARN: Silero not at %SILERO_TTS_URL% — run start-silero-tts.bat first
-  ) else (
-    echo Silero TTS OK ^(openai API^)
-  )
-) else (
-  echo Silero TTS OK ^(legacy API^) — stories use local Russian voice
-)
 
 cd /d "%~dp0backend"
 if not exist node_modules (

@@ -5,8 +5,7 @@ import { concatAudioBuffersToWav } from './audio-concat.js';
 import { resolveEdgeVoicePreset, type EdgeVoicePresetId } from './edge-voices.js';
 import { prepareYandexTtsText } from './tts-markup.js';
 import { mergeLatinTitleOtArtist } from './tts-yandex-ssml.js';
-import { splitMixedLanguageForSilero } from './tts-silero-segments.js';
-import { genericizeScriptForVoiceover } from './tts-generic-script.js';
+import { splitMixedLanguageForEdge } from './tts-mixed-segments.js';
 import { prepareEdgeRussianSegment } from './tts-edge-normalize.js';
 import { AUDIO_DIR, type SynthesisResult } from './yandex-tts.js';
 
@@ -30,8 +29,11 @@ async function synthEdgeSegment(
   return buf;
 }
 
-function prepareEdgeRuText(script: string): string {
-  const marked = prepareYandexTtsText(script, { sentencePauses: false });
+function prepareEdgeRuText(script: string, speakTrackNamesInVoiceover = false): string {
+  const marked = prepareYandexTtsText(script, {
+    sentencePauses: false,
+    speakTrackNamesInVoiceover,
+  });
   return prepareEdgeRussianSegment(marked);
 }
 
@@ -70,15 +72,12 @@ export async function synthesizeSpeechEdge(
   const speakNames = options.speakTrackNamesInVoiceover === true;
 
   let source = script.trim();
-  if (!speakNames) {
-    source = genericizeScriptForVoiceover(source, artist, title);
-  }
 
   const bufs: Buffer[] = [];
 
   if (speakNames && artist && title) {
     const mixed = prepareEdgeMixedText(source, artist, title);
-    const segments = splitMixedLanguageForSilero(mixed, artist, title).map((seg) =>
+    const segments = splitMixedLanguageForEdge(mixed, artist, title).map((seg) =>
       seg.lang === 'ru'
         ? { ...seg, text: prepareEdgeRussianSegment(seg.text.replace(/\+/g, '')) }
         : seg,
@@ -88,14 +87,20 @@ export async function synthesizeSpeechEdge(
       bufs.push(
         await synthEdgeSegment(
           seg.text,
-          seg.lang === 'en' ? preset.enVoice : preset.ruVoice,
+          seg.lang === 'de'
+            ? preset.deVoice
+            : seg.lang === 'fr'
+              ? preset.frVoice
+              : seg.lang === 'en'
+                ? preset.enVoice
+                : preset.ruVoice,
           rate,
           pitch,
         ),
       );
     }
   } else {
-    const ruText = prepareEdgeRuText(source);
+    const ruText = prepareEdgeRuText(source, speakNames);
     bufs.push(await synthEdgeSegment(ruText, preset.ruVoice, rate, pitch));
   }
 
@@ -110,6 +115,6 @@ export async function synthesizeSpeechEdge(
     fileName,
     filePath,
     audioUrl: `/audio/${fileName}`,
-    ttsTranscript: speakNames ? prepareEdgeMixedText(source, artist, title) : prepareEdgeRuText(source),
+    ttsTranscript: speakNames ? prepareEdgeMixedText(source, artist, title) : prepareEdgeRuText(source, false),
   };
 }

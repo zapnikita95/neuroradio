@@ -34,7 +34,7 @@ enum class EdgeVoicePreset(
     ;
 
     companion object {
-        private val SILERO_FALLBACK = mapOf(
+        private val LEGACY_VOICE_ALIASES = mapOf(
             "aidar" to DMITRY_CALM,
             "eugene" to DMITRY_LIVELY,
             "baya" to SVETLANA_CALM,
@@ -50,7 +50,7 @@ enum class EdgeVoicePreset(
         fun fromId(id: String?): EdgeVoicePreset {
             val raw = id?.trim().orEmpty()
             entries.firstOrNull { it.id == raw }?.let { return it }
-            SILERO_FALLBACK[raw]?.let { return it }
+            LEGACY_VOICE_ALIASES[raw]?.let { return it }
             return SVETLANA_CALM
         }
     }

@@ -16,7 +16,7 @@ import {
   sileroPhoneticToEdge,
   englishPhrasePhoneticTranscript,
 } from '../dist/services/en-phonetic-ru.js';
-import { splitMixedLanguageForSilero } from '../dist/services/tts-silero-segments.js';
+import { splitMixedLanguageForEdge } from '../dist/services/tts-mixed-segments.js';
 import { mergeLatinTitleOtArtist } from '../dist/services/tts-yandex-ssml.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -125,7 +125,7 @@ function prepareEnMixedText(script, artist, title) {
 
 async function synthEnMixed(script, artist, title) {
   const ruText = prepareEnMixedText(script, artist, title);
-  const segments = splitMixedLanguageForSilero(ruText, artist, title).map((s) =>
+  const segments = splitMixedLanguageForEdge(ruText, artist, title).map((s) =>
     s.lang === 'ru' ? { ...s, text: s.text.replace(/\+/g, '') } : s,
   );
   const bufs = [];

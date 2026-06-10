@@ -29,28 +29,45 @@
 		B1000014 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1000014 /* SettingsView.swift */; };
 		B1000015 /* HistoryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1000015 /* HistoryView.swift */; };
 		B1000016 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = F1000016 /* Assets.xcassets */; };
-		B100001B /* SpotifyiOS.xcframework in Frameworks */ = {isa = PBXBuildFile; fileRef = F100001C /* SpotifyiOS.xcframework */; };
-		B100001C /* SpotifyiOS.xcframework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = F100001C /* SpotifyiOS.xcframework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
-		B100001D /* SystemVolumeFader.swift in Sources */ = {isa = PBXBuildFile; fileRef = F100001D /* SystemVolumeFader.swift */; };
-		B100001E /* AppEnums.swift in Sources */ = {isa = PBXBuildFile; fileRef = F100001E /* AppEnums.swift */; };
-		B100001F /* AccountAuthManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = F100001F /* AccountAuthManager.swift */; };
-		B1000020 /* AccountLoginView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1000020 /* AccountLoginView.swift */; };
-		B1000023 /* TelegramLoginWebView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1000023 /* TelegramLoginWebView.swift */; };
-		B1000024 /* StoryFeedbackSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1000024 /* StoryFeedbackSheet.swift */; };
-		B1000025 /* StoreKitBillingManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1000025 /* StoreKitBillingManager.swift */; };
-		B1000026 /* SubscriptionBillingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1000026 /* SubscriptionBillingView.swift */; };
+		B1000017 /* TellStoryWidget.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1000017 /* TellStoryWidget.swift */; };
+		B1000018 /* MusicStoryWidgetExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = P1000002 /* MusicStoryWidgetExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		B1000019 /* WidgetKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = F1000019 /* WidgetKit.framework */; };
+		B100001A /* SwiftUI.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = F100001A /* SwiftUI.framework */; };
+		B1000020 /* OfflineAudioStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1000020 /* OfflineAudioStore.swift */; };
+		B1000021 /* TierAccess.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1000021 /* TierAccess.swift */; };
+		B1000022 /* FactHintRateLimiter.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1000022 /* FactHintRateLimiter.swift */; };
+		B1000023 /* OfflinePackStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1000023 /* OfflinePackStore.swift */; };
+		B1000024 /* AppStrings.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1000024 /* AppStrings.swift */; };
+		B1000025 /* StoreKitManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1000025 /* StoreKitManager.swift */; };
+		B1000026 /* AccountView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1000026 /* AccountView.swift */; };
+		B1000030 /* AppEnums.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1000030 /* AppEnums.swift */; };
+		B1000031 /* SystemVolumeFader.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1000031 /* SystemVolumeFader.swift */; };
+		B1000032 /* AccountAuthManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1000032 /* AccountAuthManager.swift */; };
+		B1000033 /* AccountLoginView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1000033 /* AccountLoginView.swift */; };
+		B1000034 /* TelegramLoginWebView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1000034 /* TelegramLoginWebView.swift */; };
+		B1000035 /* StoryFeedbackSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1000035 /* StoryFeedbackSheet.swift */; };
 /* End PBXBuildFile section */
 
+/* Begin PBXContainerItemProxy section */
+		C1000001 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = P1000001 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = T1000002;
+			remoteInfo = MusicStoryWidgetExtension;
+		};
+/* End PBXContainerItemProxy section */
+
 /* Begin PBXCopyFilesBuildPhase section */
-		E1000002 /* Embed Frameworks */ = {
+		E1000001 /* Embed Foundation Extensions */ = {
 			isa = PBXCopyFilesBuildPhase;
 			buildActionMask = 2147483647;
 			dstPath = "";
-			dstSubfolderSpec = 10;
+			dstSubfolderSpec = 13;
 			files = (
-				B100001C /* SpotifyiOS.xcframework in Embed Frameworks */,
+				B1000018 /* MusicStoryWidgetExtension.appex in Embed Foundation Extensions */,
 			);
-			name = "Embed Frameworks";
+			name = "Embed Foundation Extensions";
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXCopyFilesBuildPhase section */
@@ -78,19 +95,26 @@
 		F1000014 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 		F1000015 /* HistoryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HistoryView.swift; sourceTree = "<group>"; };
 		F1000016 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		F1000017 /* TellStoryWidget.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TellStoryWidget.swift; sourceTree = "<group>"; };
 		F1000018 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
-		F100001C /* SpotifyiOS.xcframework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.xcframework; name = SpotifyiOS.xcframework; path = Frameworks/SpotifyiOS.xcframework; sourceTree = "<group>"; };
-		F100001D /* SystemVolumeFader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SystemVolumeFader.swift; sourceTree = "<group>"; };
-		F100001E /* AppEnums.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppEnums.swift; sourceTree = "<group>"; };
-		F100001F /* AccountAuthManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AccountAuthManager.swift; sourceTree = "<group>"; };
-		F1000020 /* AccountLoginView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AccountLoginView.swift; sourceTree = "<group>"; };
-		F1000021 /* Base.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Base.xcconfig; sourceTree = "<group>"; };
-		F1000023 /* TelegramLoginWebView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TelegramLoginWebView.swift; sourceTree = "<group>"; };
-		F1000024 /* StoryFeedbackSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StoryFeedbackSheet.swift; sourceTree = "<group>"; };
-		F1000025 /* StoreKitBillingManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StoreKitBillingManager.swift; sourceTree = "<group>"; };
-		F1000026 /* SubscriptionBillingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SubscriptionBillingView.swift; sourceTree = "<group>"; };
-		F1000022 /* Secrets.xcconfig.example */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Secrets.xcconfig.example; sourceTree = "<group>"; };
+		F100001B /* WidgetInfo.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		F1000019 /* WidgetKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = WidgetKit.framework; path = System/Library/Frameworks/WidgetKit.framework; sourceTree = SDKROOT; };
+		F100001A /* SwiftUI.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = SwiftUI.framework; path = System/Library/Frameworks/SwiftUI.framework; sourceTree = SDKROOT; };
+		P1000002 /* MusicStoryWidgetExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = MusicStoryWidgetExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		P1000003 /* MusicStory.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = MusicStory.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		F1000020 /* OfflineAudioStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OfflineAudioStore.swift; sourceTree = "<group>"; };
+		F1000021 /* TierAccess.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TierAccess.swift; sourceTree = "<group>"; };
+		F1000022 /* FactHintRateLimiter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FactHintRateLimiter.swift; sourceTree = "<group>"; };
+		F1000023 /* OfflinePackStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OfflinePackStore.swift; sourceTree = "<group>"; };
+		F1000024 /* AppStrings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppStrings.swift; sourceTree = "<group>"; };
+		F1000025 /* StoreKitManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StoreKitManager.swift; sourceTree = "<group>"; };
+		F1000026 /* AccountView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AccountView.swift; sourceTree = "<group>"; };
+		F1000030 /* AppEnums.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppEnums.swift; sourceTree = "<group>"; };
+		F1000031 /* SystemVolumeFader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SystemVolumeFader.swift; sourceTree = "<group>"; };
+		F1000032 /* AccountAuthManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AccountAuthManager.swift; sourceTree = "<group>"; };
+		F1000033 /* AccountLoginView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AccountLoginView.swift; sourceTree = "<group>"; };
+		F1000034 /* TelegramLoginWebView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TelegramLoginWebView.swift; sourceTree = "<group>"; };
+		F1000035 /* StoryFeedbackSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StoryFeedbackSheet.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -98,7 +122,15 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				B100001B /* SpotifyiOS.xcframework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		X1000002 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				B1000019 /* WidgetKit.framework in Frameworks */,
+				B100001A /* SwiftUI.framework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -108,20 +140,11 @@
 		G1000001 = {
 			isa = PBXGroup;
 			children = (
-				G1000011 /* Config */,
 				G1000002 /* MusicStory */,
+				G1000003 /* MusicStoryWidget */,
 				G1000004 /* Frameworks */,
 				G1000005 /* Products */,
 			);
-			sourceTree = "<group>";
-		};
-		G1000011 /* Config */ = {
-			isa = PBXGroup;
-			children = (
-				F1000021 /* Base.xcconfig */,
-				F1000022 /* Secrets.xcconfig.example */,
-			);
-			path = Config;
 			sourceTree = "<group>";
 		};
 		G1000002 /* MusicStory */ = {
@@ -132,6 +155,7 @@
 				G1000008 /* Data */,
 				G1000009 /* Domain */,
 				G100000A /* Notifications */,
+				G100000C /* Billing */,
 				G100000B /* UI */,
 				F1000016 /* Assets.xcassets */,
 				F1000018 /* Info.plist */,
@@ -139,10 +163,20 @@
 			path = MusicStory;
 			sourceTree = "<group>";
 		};
+		G1000003 /* MusicStoryWidget */ = {
+			isa = PBXGroup;
+			children = (
+				F1000017 /* TellStoryWidget.swift */,
+				F100001B /* WidgetInfo.plist */,
+			);
+			path = MusicStoryWidget;
+			sourceTree = "<group>";
+		};
 		G1000004 /* Frameworks */ = {
 			isa = PBXGroup;
 			children = (
-				F100001C /* SpotifyiOS.xcframework */,
+				F1000019 /* WidgetKit.framework */,
+				F100001A /* SwiftUI.framework */,
 			);
 			name = Frameworks;
 			sourceTree = "<group>";
@@ -151,6 +185,7 @@
 			isa = PBXGroup;
 			children = (
 				P1000003 /* MusicStory.app */,
+				P1000002 /* MusicStoryWidgetExtension.appex */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -172,7 +207,7 @@
 				F1000005 /* SpotifyAppRemoteManager.swift */,
 				F1000006 /* ShazamTrackRecognizer.swift */,
 				F1000007 /* NowPlayingCoordinator.swift */,
-				F100001D /* SystemVolumeFader.swift */,
+				F1000031 /* SystemVolumeFader.swift */,
 			);
 			path = Media;
 			sourceTree = "<group>";
@@ -183,10 +218,13 @@
 				F1000008 /* Models.swift */,
 				F1000009 /* SettingsStore.swift */,
 				F100000A /* BackendClient.swift */,
-				F1000025 /* StoreKitBillingManager.swift */,
+				F1000032 /* AccountAuthManager.swift */,
 				F100000B /* StoryHistoryStore.swift */,
 				F100000C /* StoryRepository.swift */,
-				F100001F /* AccountAuthManager.swift */,
+				F1000020 /* OfflineAudioStore.swift */,
+				F1000023 /* OfflinePackStore.swift */,
+				F1000024 /* AppStrings.swift */,
+				F1000021 /* TierAccess.swift */,
 			);
 			path = Data;
 			sourceTree = "<group>";
@@ -194,8 +232,9 @@
 		G1000009 /* Domain */ = {
 			isa = PBXGroup;
 			children = (
-				F100001E /* AppEnums.swift */,
 				F100000D /* TriggerEngine.swift */,
+				F1000030 /* AppEnums.swift */,
+				F1000022 /* FactHintRateLimiter.swift */,
 				F100000E /* StoryPlayer.swift */,
 				F100000F /* StoryOrchestrator.swift */,
 			);
@@ -210,6 +249,14 @@
 			path = Notifications;
 			sourceTree = "<group>";
 		};
+		G100000C /* Billing */ = {
+			isa = PBXGroup;
+			children = (
+				F1000025 /* StoreKitManager.swift */,
+			);
+			path = Billing;
+			sourceTree = "<group>";
+		};
 		G100000B /* UI */ = {
 			isa = PBXGroup;
 			children = (
@@ -218,10 +265,10 @@
 				F1000013 /* HomeView.swift */,
 				F1000014 /* SettingsView.swift */,
 				F1000015 /* HistoryView.swift */,
-				F1000020 /* AccountLoginView.swift */,
-				F1000023 /* TelegramLoginWebView.swift */,
-				F1000024 /* StoryFeedbackSheet.swift */,
-				F1000026 /* SubscriptionBillingView.swift */,
+				F1000026 /* AccountView.swift */,
+				F1000033 /* AccountLoginView.swift */,
+				F1000034 /* TelegramLoginWebView.swift */,
+				F1000035 /* StoryFeedbackSheet.swift */,
 			);
 			path = UI;
 			sourceTree = "<group>";
@@ -236,16 +283,34 @@
 				S1000001 /* Sources */,
 				X1000001 /* Frameworks */,
 				R1000001 /* Resources */,
-				E1000002 /* Embed Frameworks */,
+				E1000001 /* Embed Foundation Extensions */,
 			);
 			buildRules = (
 			);
 			dependencies = (
+				D1000001 /* PBXTargetDependency */,
 			);
 			name = MusicStory;
 			productName = MusicStory;
 			productReference = P1000003 /* MusicStory.app */;
 			productType = "com.apple.product-type.application";
+		};
+		T1000002 /* MusicStoryWidgetExtension */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = L1000004 /* Build configuration list for PBXNativeTarget "MusicStoryWidgetExtension" */;
+			buildPhases = (
+				S1000002 /* Sources */,
+				X1000002 /* Frameworks */,
+				R1000002 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = MusicStoryWidgetExtension;
+			productName = MusicStoryWidgetExtension;
+			productReference = P1000002 /* MusicStoryWidgetExtension.appex */;
+			productType = "com.apple.product-type.app-extension";
 		};
 /* End PBXNativeTarget section */
 
@@ -258,6 +323,9 @@
 				LastUpgradeCheck = 1500;
 				TargetAttributes = {
 					T1000001 = {
+						CreatedOnToolsVersion = 15.0;
+					};
+					T1000002 = {
 						CreatedOnToolsVersion = 15.0;
 					};
 				};
@@ -277,6 +345,7 @@
 			projectRoot = "";
 			targets = (
 				T1000001 /* MusicStory */,
+				T1000002 /* MusicStoryWidgetExtension */,
 			);
 		};
 /* End PBXProject section */
@@ -287,6 +356,13 @@
 			buildActionMask = 2147483647;
 			files = (
 				B1000016 /* Assets.xcassets in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		R1000002 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -304,7 +380,6 @@
 				B1000005 /* SpotifyAppRemoteManager.swift in Sources */,
 				B1000006 /* ShazamTrackRecognizer.swift in Sources */,
 				B1000007 /* NowPlayingCoordinator.swift in Sources */,
-				B100001D /* SystemVolumeFader.swift in Sources */,
 				B1000008 /* Models.swift in Sources */,
 				B1000009 /* SettingsStore.swift in Sources */,
 				B100000A /* BackendClient.swift in Sources */,
@@ -319,22 +394,43 @@
 				B1000013 /* HomeView.swift in Sources */,
 				B1000014 /* SettingsView.swift in Sources */,
 				B1000015 /* HistoryView.swift in Sources */,
-				B100001E /* AppEnums.swift in Sources */,
-				B100001F /* AccountAuthManager.swift in Sources */,
-				B1000020 /* AccountLoginView.swift in Sources */,
-				B1000023 /* TelegramLoginWebView.swift in Sources */,
-				B1000024 /* StoryFeedbackSheet.swift in Sources */,
-				B1000025 /* StoreKitBillingManager.swift in Sources */,
-				B1000026 /* SubscriptionBillingView.swift in Sources */,
+				B1000020 /* OfflineAudioStore.swift in Sources */,
+				B1000023 /* OfflinePackStore.swift in Sources */,
+				B1000024 /* AppStrings.swift in Sources */,
+				B1000021 /* TierAccess.swift in Sources */,
+				B1000022 /* FactHintRateLimiter.swift in Sources */,
+				B1000025 /* StoreKitManager.swift in Sources */,
+				B1000026 /* AccountView.swift in Sources */,
+				B1000030 /* AppEnums.swift in Sources */,
+				B1000031 /* SystemVolumeFader.swift in Sources */,
+				B1000032 /* AccountAuthManager.swift in Sources */,
+				B1000033 /* AccountLoginView.swift in Sources */,
+				B1000034 /* TelegramLoginWebView.swift in Sources */,
+				B1000035 /* StoryFeedbackSheet.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		S1000002 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				B1000017 /* TellStoryWidget.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXSourcesBuildPhase section */
 
+/* Begin PBXTargetDependency section */
+		D1000001 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = T1000002 /* MusicStoryWidgetExtension */;
+			targetProxy = C1000001 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
 /* Begin XCBuildConfiguration section */
 		C2000001 /* Debug */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReference = F1000021 /* Base.xcconfig */;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
 				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
@@ -350,7 +446,7 @@
 					"DEBUG=1",
 					"$(inherited)",
 				);
-				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				ONLY_ACTIVE_ARCH = YES;
 				SDKROOT = iphoneos;
@@ -362,7 +458,6 @@
 		};
 		C2000002 /* Release */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReference = F1000021 /* Base.xcconfig */;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
 				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
@@ -373,7 +468,7 @@
 				ENABLE_NS_ASSERTIONS = NO;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				GCC_OPTIMIZATION_LEVEL = s;
-				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				SDKROOT = iphoneos;
 				SWIFT_COMPILATION_MODE = wholemodule;
@@ -387,25 +482,23 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 90;
-				DEVELOPMENT_TEAM = Y52BT2N4L8;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = "";
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = MusicStory/Info.plist;
-				INFOPLIST_KEY_CFBundleDisplayName = "\U042d\U0444\U0438\U0440 AI";
+				INFOPLIST_KEY_CFBundleDisplayName = "Music Story";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
-				INFOPLIST_KEY_UIRequiresFullScreen = YES;
-				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
-				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = UIInterfaceOrientationPortrait;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations = UIInterfaceOrientationPortrait;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 1.5.44;
+				MARKETING_VERSION = 1.0.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.efirai.myapp;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
-				TARGETED_DEVICE_FAMILY = 1;
+				TARGETED_DEVICE_FAMILY = "1,2";
 			};
 			name = Debug;
 		};
@@ -414,25 +507,73 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 90;
-				DEVELOPMENT_TEAM = Y52BT2N4L8;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = "";
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = MusicStory/Info.plist;
-				INFOPLIST_KEY_CFBundleDisplayName = "\U042d\U0444\U0438\U0440 AI";
+				INFOPLIST_KEY_CFBundleDisplayName = "Music Story";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
-				INFOPLIST_KEY_UIRequiresFullScreen = YES;
-				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
-				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = UIInterfaceOrientationPortrait;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations = UIInterfaceOrientationPortrait;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 1.5.44;
+				MARKETING_VERSION = 1.0.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.efirai.myapp;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
-				TARGETED_DEVICE_FAMILY = 1;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+		C2000005 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = "";
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = MusicStoryWidget/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = "Music Story Widget";
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.efirai.myapp.widget;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.9;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		C2000006 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = "";
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = MusicStoryWidget/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = "Music Story Widget";
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.efirai.myapp.widget;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.9;
+				TARGETED_DEVICE_FAMILY = "1,2";
 			};
 			name = Release;
 		};
@@ -453,6 +594,15 @@
 			buildConfigurations = (
 				C2000003 /* Debug */,
 				C2000004 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		L1000004 /* Build configuration list for PBXNativeTarget "MusicStoryWidgetExtension" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				C2000005 /* Debug */,
+				C2000006 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;

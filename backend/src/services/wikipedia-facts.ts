@@ -1,4 +1,4 @@
-import fetch from 'node-fetch';
+import fetch from '../proxy-fetch.js';
 import type { ReferenceFactBundle } from './fact-picker.js';
 import { collaboratorNames, primaryArtistName } from './artist-primary.js';
 import { factNamesForeignEntity } from './fact-relevance.js';

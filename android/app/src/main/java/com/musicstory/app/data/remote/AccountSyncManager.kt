@@ -75,6 +75,7 @@ class AccountSyncManager(
             val body = JSONObject()
             payload.manualMode?.let { body.put("manualMode", it) }
             payload.autoIntercept?.let { body.put("autoIntercept", it) }
+            payload.factNotificationsEnabled?.let { body.put("factNotificationsEnabled", it) }
             payload.triggerMode?.let { body.put("triggerMode", it) }
             payload.everyNTracks?.let { body.put("everyNTracks", it) }
             payload.sameTrackStoryEveryN?.let { body.put("sameTrackStoryEveryN", it) }
@@ -112,6 +113,11 @@ class AccountSyncManager(
                 SyncSettingsPayload(
                     manualMode = if (s.has("manualMode")) s.getBoolean("manualMode") else null,
                     autoIntercept = if (s.has("autoIntercept")) s.getBoolean("autoIntercept") else null,
+                    factNotificationsEnabled = if (s.has("factNotificationsEnabled")) {
+                        s.getBoolean("factNotificationsEnabled")
+                    } else {
+                        null
+                    },
                     triggerMode = s.optString("triggerMode").ifBlank { null },
                     everyNTracks = if (s.has("everyNTracks")) s.getInt("everyNTracks") else null,
                     sameTrackStoryEveryN = if (s.has("sameTrackStoryEveryN")) s.getInt("sameTrackStoryEveryN") else null,
@@ -317,6 +323,7 @@ class AccountSyncManager(
     data class SyncSettingsPayload(
         val manualMode: Boolean? = null,
         val autoIntercept: Boolean? = null,
+        val factNotificationsEnabled: Boolean? = null,
         val triggerMode: String? = null,
         val everyNTracks: Int? = null,
         val sameTrackStoryEveryN: Int? = null,
@@ -329,6 +336,7 @@ class AccountSyncManager(
         val ttsEmotion: String? = null,
         val ttsPlaybackEngine: String? = null,
         val llmProvider: String? = null,
+        val appLanguage: String? = null,
         val updatedAt: Long = System.currentTimeMillis(),
     )
 }

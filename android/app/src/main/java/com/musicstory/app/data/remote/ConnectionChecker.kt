@@ -468,6 +468,13 @@ data class BillingEntitlementResponse(
     val cardSaved: Boolean? = null,
     val subscriptionPlan: String? = null,
     val nextPaymentAt: Long? = null,
+    val subscriptionMarket: String? = null,
+    val billingProvider: String? = null,
+)
+
+data class LanguageSwitchBundle(
+    val toRu: LanguageSwitchPolicyResponse? = null,
+    val toEn: LanguageSwitchPolicyResponse? = null,
 )
 
 data class UnlinkCardResponse(
@@ -482,6 +489,9 @@ data class BillingStatusResponse(
     val tier: String? = null,
     val premium: Boolean? = null,
     val entitlement: BillingEntitlementResponse? = null,
+    val subscriptionMarket: String? = null,
+    val billingChannel: String? = null,
+    val languageSwitch: LanguageSwitchBundle? = null,
     val yookassaConfigured: Boolean? = null,
     val premiumTtsProvider: String? = null,
     val devTierSwitchEnabled: Boolean? = null,

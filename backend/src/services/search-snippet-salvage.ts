@@ -1,25 +1,27 @@
 import type { SelectedReferenceFact } from './fact-picker.js';
-import { factMentionsArtist, factMentionsTitle, hasTrackContextSignal } from './fact-relevance.js';
+import { factMentionsArtist, factMentionsTitle, factNamesForeignEntity, hasTrackContextSignal } from './fact-relevance.js';
 import { interestRating10 } from './fact-interest-log.js';
 import { isMetadataOnlyFallbackFact } from './metadata-facts.js';
 import { interestScore, isWikiBiographyLead } from './reference-fact-quality.js';
-import { acceptSearchGroundedSnippet, acceptIndieEmergingSnippet, isPlaylistJunkSnippet, isSpeakableReferenceFact, isUnspeakableWebSeed } from './web-snippet-accept.js';
+import { acceptSearchGroundedSnippet, acceptIndieEmergingSnippet, isLyricsPageSeed, isPlaylistJunkSnippet, isSpeakableReferenceFact, isUnspeakableWebSeed } from './web-snippet-accept.js';
 
 /** Seed too weak to ground LLM + quality gate — upgrade to wiki/better facts. */
 export function isWeakSnippetSeed(fact: string, score = interestScore(fact)): boolean {
   const trimmed = fact.trim();
+  if (isLyricsPageSeed(trimmed)) return true;
   if (score < 6) return true;
   if (isWikiBiographyLead(trimmed)) return true;
   return isUnspeakableWebSeed(trimmed) || !isSpeakableReferenceFact(trimmed);
 }
 
-export function isWeakSelectedFact(selected: SelectedReferenceFact | null): boolean {
+export function isWeakSelectedFact(selected: SelectedReferenceFact | null, artist = ''): boolean {
   if (!selected) return true;
-  const score = Math.max(selected.interestScore ?? 0, interestScore(selected.fact));
-  if (score < 6) return true;
   const trimmed = selected.fact.trim();
+  if (isLyricsPageSeed(trimmed)) return true;
+  const score = Math.max(selected.interestScore ?? 0, interestScore(trimmed));
+  if (score < 6) return true;
   if (isWikiBiographyLead(trimmed)) return true;
-  return isUnspeakableWebSeed(trimmed);
+  return isUnspeakableWebSeed(trimmed) || !isSpeakableReferenceFact(trimmed, artist);
 }
 
 /** Last-resort seed from HTML search snippets when wiki/MB timed out. */
@@ -33,6 +35,7 @@ export function pickSalvageSnippetSeed(
     .filter((snippet) => snippet.length >= 35 && snippet.length <= 480)
     .filter((snippet) => acceptSearchGroundedSnippet(snippet, artist, title))
     .filter((snippet) => !isPlaylistJunkSnippet(snippet, artist, title))
+    .filter((snippet) => !factNamesForeignEntity(snippet, artist, title))
     .filter((snippet) => !isWeakSnippetSeed(snippet))
     .sort((a, b) => {
       const boost = (s: string) =>

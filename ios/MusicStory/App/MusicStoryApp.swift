@@ -11,7 +11,6 @@ struct MusicStoryApp: App {
                 .environmentObject(container.settings)
                 .environmentObject(container.orchestrator)
                 .environmentObject(container.nowPlaying)
-                .environmentObject(StoryHistoryStore.shared)
                 .onOpenURL { url in
                     container.handleOpenURL(url)
                 }

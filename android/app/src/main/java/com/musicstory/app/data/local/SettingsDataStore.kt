@@ -14,6 +14,7 @@ import androidx.datastore.core.handlers.ReplaceFileCorruptionHandler
 import androidx.datastore.preferences.core.emptyPreferences
 import androidx.datastore.preferences.preferencesDataStore
 import com.musicstory.app.domain.AppPowerMode
+import com.musicstory.app.domain.OfflinePackPhase
 import com.musicstory.app.domain.GeminiModel
 import com.musicstory.app.domain.GroqModel
 import com.musicstory.app.domain.LlmProvider
@@ -27,7 +28,10 @@ import com.musicstory.app.domain.TtsEmotion
 import com.musicstory.app.domain.TtsPlaybackEngine
 import com.musicstory.app.domain.UserTtsBilling
 import com.musicstory.app.domain.TtsSpeed
+import com.musicstory.app.domain.AppLanguage
+import com.musicstory.app.domain.ElevenLabsVoice
 import com.musicstory.app.domain.TtsVoice
+import com.musicstory.app.util.LocaleHelper
 import com.musicstory.app.domain.TriggerMode
 import com.musicstory.app.util.ApiKeySanitizer
 import com.musicstory.app.util.BackendUrlRules
@@ -264,6 +268,30 @@ class SettingsDataStore(private val context: Context) {
 
     val speakTrackNamesInVoiceover: Flow<Boolean> = context.settingsDataStore.data.map { prefs ->
         prefs[KEY_SPEAK_TRACK_NAMES_IN_VOICEOVER] ?: false
+    }
+
+    val factNotificationsEnabled: Flow<Boolean> = context.settingsDataStore.data.map { prefs ->
+        prefs[KEY_FACT_NOTIFICATIONS_ENABLED] ?: DEFAULT_FACT_NOTIFICATIONS_ENABLED
+    }
+
+    val appLanguage: Flow<AppLanguage> = context.settingsDataStore.data.map { prefs ->
+        AppLanguage.fromId(prefs[KEY_APP_LANGUAGE])
+    }
+
+    val elevenLabsVoice: Flow<ElevenLabsVoice> = context.settingsDataStore.data.map { prefs ->
+        ElevenLabsVoice.fromId(prefs[KEY_ELEVENLABS_VOICE])
+    }
+
+    val offlineAudioCacheEnabled: Flow<Boolean> = context.settingsDataStore.data.map { prefs ->
+        prefs[KEY_OFFLINE_AUDIO_CACHE_ENABLED] ?: true
+    }
+
+    val offlinePackPhase: Flow<String> = context.settingsDataStore.data.map { prefs ->
+        prefs[KEY_OFFLINE_PACK_PHASE] ?: OfflinePackPhase.IDLE.id
+    }
+
+    val offlinePackSessionId: Flow<Long> = context.settingsDataStore.data.map { prefs ->
+        prefs[KEY_OFFLINE_PACK_SESSION_ID] ?: 0L
     }
 
     val serverTtsProvider: Flow<ServerTtsProvider> = context.settingsDataStore.data.map { prefs ->
@@ -556,8 +584,39 @@ class SettingsDataStore(private val context: Context) {
         notifyCloudSync()
     }
 
+    suspend fun setFactNotificationsEnabled(enabled: Boolean) {
+        context.settingsDataStore.edit { it[KEY_FACT_NOTIFICATIONS_ENABLED] = enabled }
+        notifyCloudSync()
+    }
+
     suspend fun setSpeakTrackNamesInVoiceover(enabled: Boolean) {
         context.settingsDataStore.edit { it[KEY_SPEAK_TRACK_NAMES_IN_VOICEOVER] = enabled }
+        notifyCloudSync()
+    }
+
+    suspend fun setAppLanguage(language: AppLanguage) {
+        context.settingsDataStore.edit { it[KEY_APP_LANGUAGE] = language.id }
+        LocaleHelper.persistLanguageForBoot(context, language)
+        notifyCloudSync()
+    }
+
+    suspend fun setElevenLabsVoice(voice: ElevenLabsVoice) {
+        context.settingsDataStore.edit { it[KEY_ELEVENLABS_VOICE] = voice.id }
+        notifyCloudSync()
+    }
+
+    suspend fun setOfflineAudioCacheEnabled(enabled: Boolean) {
+        context.settingsDataStore.edit { it[KEY_OFFLINE_AUDIO_CACHE_ENABLED] = enabled }
+        notifyCloudSync()
+    }
+
+    suspend fun setOfflinePackPhase(phase: String) {
+        context.settingsDataStore.edit { it[KEY_OFFLINE_PACK_PHASE] = phase }
+        notifyCloudSync()
+    }
+
+    suspend fun setOfflinePackSessionId(sessionId: Long) {
+        context.settingsDataStore.edit { it[KEY_OFFLINE_PACK_SESSION_ID] = sessionId }
         notifyCloudSync()
     }
 
@@ -635,6 +694,7 @@ class SettingsDataStore(private val context: Context) {
         return com.musicstory.app.data.remote.AccountSyncManager.SyncSettingsPayload(
             manualMode = prefs[KEY_MANUAL_MODE] ?: false,
             autoIntercept = prefs[KEY_AUTO_INTERCEPT] ?: DEFAULT_AUTO_INTERCEPT,
+            factNotificationsEnabled = prefs[KEY_FACT_NOTIFICATIONS_ENABLED] ?: DEFAULT_FACT_NOTIFICATIONS_ENABLED,
             triggerMode = prefs[KEY_TRIGGER_MODE] ?: TriggerMode.EVERY_N_TRACKS.name,
             everyNTracks = prefs[KEY_EVERY_N_TRACKS] ?: DEFAULT_EVERY_N_TRACKS,
             sameTrackStoryEveryN = prefs[KEY_SAME_TRACK_STORY_EVERY_N] ?: DEFAULT_SAME_TRACK_STORY_EVERY_N,
@@ -647,6 +707,7 @@ class SettingsDataStore(private val context: Context) {
             ttsEmotion = prefs[KEY_TTS_EMOTION] ?: TtsEmotion.LIVELY.id,
             ttsPlaybackEngine = prefs[KEY_TTS_PLAYBACK_ENGINE] ?: TtsPlaybackEngine.YANDEX_SERVER.id,
             llmProvider = prefs[KEY_LLM_PROVIDER] ?: LlmProvider.OPENROUTER.id,
+            appLanguage = prefs[KEY_APP_LANGUAGE] ?: AppLanguage.SYSTEM.id,
             updatedAt = System.currentTimeMillis(),
         )
     }
@@ -661,6 +722,7 @@ class SettingsDataStore(private val context: Context) {
         context.settingsDataStore.edit { prefs ->
             remote.manualMode?.let { prefs[KEY_MANUAL_MODE] = it }
             remote.autoIntercept?.let { prefs[KEY_AUTO_INTERCEPT] = it }
+            remote.factNotificationsEnabled?.let { prefs[KEY_FACT_NOTIFICATIONS_ENABLED] = it }
             remote.triggerMode?.let { prefs[KEY_TRIGGER_MODE] = it }
             remote.everyNTracks?.let { prefs[KEY_EVERY_N_TRACKS] = it.coerceAtLeast(1) }
             remote.sameTrackStoryEveryN?.let {
@@ -675,6 +737,10 @@ class SettingsDataStore(private val context: Context) {
             remote.ttsEmotion?.let { prefs[KEY_TTS_EMOTION] = it }
             remote.ttsPlaybackEngine?.let { prefs[KEY_TTS_PLAYBACK_ENGINE] = it }
             remote.llmProvider?.let { prefs[KEY_LLM_PROVIDER] = it }
+            remote.appLanguage?.let {
+                prefs[KEY_APP_LANGUAGE] = it
+                LocaleHelper.persistLanguageForBoot(context, AppLanguage.fromId(it))
+            }
             prefs[KEY_SETTINGS_SYNCED_AT] = remoteAt
         }
         StoryLog.i("SETTINGS cloud pull applied updatedAt=$remoteAt")
@@ -716,6 +782,7 @@ class SettingsDataStore(private val context: Context) {
         const val DEFAULT_EVERY_N_TRACKS = 3
         const val DEFAULT_SAME_TRACK_STORY_EVERY_N = 3
         const val DEFAULT_AUTO_INTERCEPT = true
+        const val DEFAULT_FACT_NOTIFICATIONS_ENABLED = true
         const val DEFAULT_MUSIC_FADE_SECONDS = 1.5f
         const val DEFAULT_COUNT_TRACK_LISTEN_SECONDS = 10
         /** URL Ollama с точки зрения ПК с BFF (не телефона). */
@@ -765,6 +832,12 @@ class SettingsDataStore(private val context: Context) {
         private val KEY_SILERO_VOICE_PRESET = stringPreferencesKey("silero_voice_preset")
         private val KEY_EDGE_VOICE_PRESET = stringPreferencesKey("edge_voice_preset")
         private val KEY_SPEAK_TRACK_NAMES_IN_VOICEOVER = booleanPreferencesKey("speak_track_names_in_voiceover")
+        private val KEY_FACT_NOTIFICATIONS_ENABLED = booleanPreferencesKey("fact_notifications_enabled")
+        private val KEY_APP_LANGUAGE = stringPreferencesKey("app_language")
+        private val KEY_ELEVENLABS_VOICE = stringPreferencesKey("elevenlabs_voice")
+        private val KEY_OFFLINE_AUDIO_CACHE_ENABLED = booleanPreferencesKey("offline_audio_cache_enabled")
+        private val KEY_OFFLINE_PACK_PHASE = stringPreferencesKey("offline_pack_phase")
+        private val KEY_OFFLINE_PACK_SESSION_ID = longPreferencesKey("offline_pack_session_id")
         private val KEY_SERVER_TTS_PROVIDER = stringPreferencesKey("server_tts_provider")
         private val KEY_USER_TTS_BILLING = stringPreferencesKey("user_tts_billing")
         private val KEY_YANDEX_API_KEY = stringPreferencesKey("yandex_api_key")

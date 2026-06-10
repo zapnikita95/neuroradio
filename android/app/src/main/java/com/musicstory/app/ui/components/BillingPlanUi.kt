@@ -44,7 +44,10 @@ data class BillingPlanOption(
     val confirmLead: String,
 )
 
-val defaultBillingPlans = listOf(
+val defaultBillingPlans: List<BillingPlanOption>
+    get() = billingPlansRub()
+
+fun billingPlansRub(): List<BillingPlanOption> = listOf(
     BillingPlanOption(
         id = "month",
         title = "Месяц",
@@ -73,6 +76,39 @@ val defaultBillingPlans = listOf(
         confirmLead = "Подписка на 3 месяца с автопродлением.",
     ),
 )
+
+fun billingPlansUsd(): List<BillingPlanOption> = listOf(
+    BillingPlanOption(
+        id = "month",
+        title = "Month",
+        price = "$3.99",
+        oldPrice = null,
+        badge = null,
+        perMonthHint = "$3.99 per month",
+        confirmLead = "1-month Extended plan with higher limits and DeepSeek V3.",
+    ),
+    BillingPlanOption(
+        id = "year",
+        title = "Year",
+        price = "$39.99",
+        oldPrice = "$47.88",
+        badge = "Best value",
+        perMonthHint = "≈ $3.33 per month",
+        confirmLead = "12-month Extended plan — best value.",
+    ),
+    BillingPlanOption(
+        id = "quarter",
+        title = "Quarter",
+        price = "$9.99",
+        oldPrice = "$11.97",
+        badge = null,
+        perMonthHint = "≈ $3.33 per month",
+        confirmLead = "3-month Extended plan with auto-renewal.",
+    ),
+)
+
+fun billingPlansForEnglishUi(englishUi: Boolean): List<BillingPlanOption> =
+    if (englishUi) billingPlansUsd() else billingPlansRub()
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable

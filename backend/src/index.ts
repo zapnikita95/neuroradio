@@ -1,9 +1,10 @@
 import './bootstrap-logs.js';
-import './load-env.js';
+import './bootstrap-proxy.js';
 import express from 'express';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import storyRouter from './routes/story.js';
+import factsHintRouter from './routes/facts-hint.js';
 import llmProbeRouter from './routes/llm-probe.js';
 import authRouter from './routes/auth.js';
 import syncRouter from './routes/sync.js';
@@ -23,12 +24,13 @@ import {
 } from './services/local-ollama.js';
 import { resolveLlmProvider } from './services/llm-provider.js';
 import { hasYandexCredentials } from './services/yandex-tts.js';
-import { canUseSileroTts } from './services/silero-tts.js';
+import { canUseElevenLabsProduction, hasElevenLabsCredentials } from './services/elevenlabs-tts.js';
+import { isElevenLabsEnabled } from './services/entitlements.js';
 import { securityHeaders } from './middleware/security-headers.js';
 import { requireSignedAudioAccess } from './middleware/audio-auth.js';
 import { requestLogger } from './middleware/request-logger.js';
 import { SECURITY } from './config/security.js';
-import { purgeInvalidBankFacts } from './services/fact-bank.js';
+import { mergeSeedBankOnBoot, purgeInvalidBankFacts } from './services/fact-bank.js';
 import { ingestCuratedFactsOnBoot } from './services/curated-facts.js';
 import { initPostgres, hasPostgres, closePostgres } from './services/db.js';
 import { hydrateAccountStoreFromPostgres, migrateAccountStoryDataToPostgres } from './services/account-store.js';
@@ -132,9 +134,11 @@ app.get('/health', (_req, res) => {
   const gemini = hasGeminiApiKey();
   const localOllama = hasLocalOllamaConfigured();
   const yandexTts = hasYandexCredentials();
-  const sileroTts = canUseSileroTts();
+  const elevenLabs = canUseElevenLabsProduction();
+  const proxy = Boolean(process.env.HTTPS_PROXY?.trim() || process.env.HTTP_PROXY?.trim());
+  const lastfm = Boolean(process.env.LASTFM_API_KEY?.trim());
   console.log(
-    `[health] llm=${llm} openrouter=${openrouter} groq=${groq} gemini=${gemini} localOllama=${localOllama} yandexTts=${yandexTts} sileroTts=${sileroTts}`,
+    `[health] llm=${llm} openrouter=${openrouter} groq=${groq} gemini=${gemini} localOllama=${localOllama} yandexTts=${yandexTts} elevenLabs=${elevenLabs} proxy=${proxy} lastfm=${lastfm} edgeTts=true`,
   );
   res.json({
     status: 'ok',
@@ -147,7 +151,11 @@ app.get('/health', (_req, res) => {
     gemini,
     localOllama,
     yandexTts,
-    sileroTts,
+    elevenLabs,
+    elevenLabsConfigured: hasElevenLabsCredentials() && isElevenLabsEnabled(),
+    proxy,
+    lastfm,
+    edgeTts: true,
     appAuthRequired: isAppAuthEnabled(),
     postgres: hasPostgres(),
   });
@@ -159,17 +167,10 @@ app.use('/v1/billing', billingRouter);
 app.use('/v1/account', accountAuthRouter);
 app.use('/v1/llm', llmProbeRouter);
 app.use('/v1/story', storyRouter);
+app.use('/v1/facts', factsHintRouter);
 app.use('/v1/public', publicRouter);
 
-const websiteDir = resolveWebsiteDir(__dirname);
-if (websiteDir) {
-  console.log(`[boot] serving website from ${websiteDir}`);
-  app.use(serveWebsite(websiteDir));
-} else {
-  console.warn('[boot] website/ not found — static site disabled');
-}
-
-/** Telegram Login Widget — domain must match @BotFather /setdomain (see resolveTelegramWidgetBaseUrl). */
+/** Telegram Login Widget — before static site so /telegram-login is never swallowed. */
 function sendTelegramWidgetPage(req: express.Request, res: express.Response): void {
   const bot = telegramBotUsername();
   if (!bot) {
@@ -177,16 +178,39 @@ function sendTelegramWidgetPage(req: express.Request, res: express.Response): vo
     return;
   }
   const appEmbed = req.query.app === '1' || req.query.embed === 'android';
+  res.setHeader('Cache-Control', 'no-store');
   res.type('html').send(buildTelegramWidgetPageHtml(bot, appEmbed));
 }
-if (!websiteDir) {
+app.get('/telegram-login', (req, res) => sendTelegramWidgetPage(req, res));
+
+const websiteDir = resolveWebsiteDir(__dirname);
+if (websiteDir) {
+  console.log(`[boot] serving website from ${websiteDir}`);
+  app.use(serveWebsite(websiteDir));
+} else {
+  console.warn('[boot] website/ not found — static site disabled');
   app.get('/', (_req, res) => sendTelegramWidgetPage(_req, res));
 }
-app.get('/telegram-login', (req, res) => sendTelegramWidgetPage(req, res));
 
 app.use((_req, res) => {
   res.status(404).json({ error: 'Not found' });
 });
+
+async function probeElevenLabsAtBoot(): Promise<void> {
+  if (!canUseElevenLabsProduction()) return;
+  try {
+    const fetch = (await import('./proxy-fetch.js')).default;
+    const res = await fetch('https://api.elevenlabs.io/v1/user', {
+      headers: { 'xi-api-key': process.env.ELEVENLABS_API_KEY!.trim() },
+      signal: AbortSignal.timeout(12_000),
+    });
+    console.log(`[boot] ElevenLabs API: ${res.ok ? 'OK' : `HTTP ${res.status}`}`);
+  } catch (err) {
+    console.warn(
+      `[boot] ElevenLabs API probe failed: ${err instanceof Error ? err.message : err}`,
+    );
+  }
+}
 
 async function boot(): Promise<void> {
   await initPostgres();
@@ -201,11 +225,13 @@ async function boot(): Promise<void> {
     const purged = purgeInvalidBankFacts();
     if (purged > 0) console.log(`[boot] fact-bank cleanup removed ${purged} invalid entries`);
     ingestCuratedFactsOnBoot();
+    mergeSeedBankOnBoot();
   } catch (err) {
     console.warn('[boot] fact-bank purge failed:', err instanceof Error ? err.message : err);
   }
 
   startSubscriptionRenewalScheduler();
+  await probeElevenLabsAtBoot();
 
   const tgWidget = resolveTelegramWidgetBaseUrl();
   if (isTelegramConfigured() && tgWidget) {
@@ -215,7 +241,9 @@ async function boot(): Promise<void> {
   const server = app.listen(PORT, '0.0.0.0', () => {
     console.log(`Music Story BFF listening on http://0.0.0.0:${PORT}`);
     console.log(`[boot] log file: ${process.env.LOCAL_LOG_FILE ?? '(console only)'}`);
-    console.log(`[boot] build=${BUILD_ID} llm=${resolveLlmProvider()} openrouter=${hasOpenRouterApiKey()} groq=${hasGroqApiKey()} gemini=${hasGeminiApiKey()} yandexTts=${hasYandexCredentials()} auth=${isAppAuthEnabled()} postgres=${hasPostgres()}`);
+    console.log(
+      `[boot] build=${BUILD_ID} llm=${resolveLlmProvider()} openrouter=${hasOpenRouterApiKey()} groq=${hasGroqApiKey()} gemini=${hasGeminiApiKey()} yandexTts=${hasYandexCredentials()} elevenLabs=${canUseElevenLabsProduction()} proxy=${Boolean(process.env.HTTPS_PROXY)} auth=${isAppAuthEnabled()} postgres=${hasPostgres()}`,
+    );
     console.log(`  POST /v1/auth/token — app JWT`);
     console.log(`  GET  /v1/account/* — email/Telegram auth + 7-day trial`);
     console.log(`  GET  /v1/sync/* — linked account settings & history`);

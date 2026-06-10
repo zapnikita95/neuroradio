@@ -37,6 +37,7 @@ data class StoryRequest(
     @SerializedName("silero_voice") val sileroVoice: String? = null,
     @SerializedName("edge_voice_preset") val edgeVoicePreset: String? = null,
     @SerializedName("speak_track_names_in_voiceover") val speakTrackNamesInVoiceover: Boolean = false,
+    @SerializedName("story_language") val storyLanguage: String = "ru",
 )
 
 data class StoryResponse(

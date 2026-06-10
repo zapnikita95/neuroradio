@@ -1,5 +1,7 @@
 import { FACT_HUNT_PROMPT_BLOCK } from './story-fact-hunt.js';
+import { buildEnglishStoryUserPrompt, buildEnglishSystemPrompt } from './prompts-en.js';
 import { RUSSIAN_LANGUAGE_PROMPT_BLOCK } from './story-russian-language.js';
+import { type StoryLanguageId, DEFAULT_STORY_LANGUAGE } from './story-language.js';
 import {
   buildLengthStructurePlan,
   DEFAULT_STORY_LENGTH,
@@ -182,7 +184,14 @@ export function personaForTrack(
   );
 }
 
-export function buildSystemPrompt(persona: StoryPersona, length: StoryLengthPreset): string {
+export function buildSystemPrompt(
+  persona: StoryPersona,
+  length: StoryLengthPreset,
+  storyLanguage: StoryLanguageId = DEFAULT_STORY_LANGUAGE,
+): string {
+  if (storyLanguage === 'en') {
+    return buildEnglishSystemPrompt(persona, length);
+  }
   const durationHint = length.targetSeconds
     ? `~${length.targetSeconds} секунд речи`
     : 'развёрнутый рассказ без жёсткого лимита';
@@ -269,7 +278,11 @@ export function buildStoryUserPrompt(params: {
   selectedReferenceFact?: { fact: string; scope: 'artist' | 'track' | 'album'; scopeLabelRu: string };
   rawSnippets?: string[];
   artistTier?: 'major' | 'indie';
+  storyLanguage?: StoryLanguageId;
 }): string {
+  if (params.storyLanguage === 'en') {
+    return buildEnglishStoryUserPrompt(params);
+  }
   const narratorId = resolveStoryNarrator(params.storyNarrator);
   const locale = resolveTrackLocale({
     artist: params.artist,

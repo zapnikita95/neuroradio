@@ -6,6 +6,7 @@ import android.app.NotificationManager
 import android.os.Build
 import com.musicstory.app.data.local.AppDatabase
 import com.musicstory.app.data.local.SettingsDataStore
+import com.musicstory.app.data.local.StoryOfflineAudioStore
 import com.musicstory.app.data.remote.AccountAuthManager
 import com.musicstory.app.data.remote.AccountSyncManager
 import com.musicstory.app.data.remote.ApiClient
@@ -15,6 +16,8 @@ import com.musicstory.app.data.remote.MetadataEnricher
 import com.musicstory.app.data.repository.ScrobbleRepository
 import com.musicstory.app.data.repository.StoryRepository
 import com.musicstory.app.domain.MonitorLifecycle
+import com.musicstory.app.domain.OfflinePackNotifier
+import com.musicstory.app.domain.OfflinePackRepository
 import com.musicstory.app.domain.StoryOrchestrator
 import com.musicstory.app.domain.StoryPlayer
 import com.musicstory.app.domain.TriggerEngine
@@ -73,6 +76,12 @@ class MusicStoryApp : Application() {
     lateinit var storyOrchestrator: StoryOrchestrator
         private set
 
+    lateinit var offlinePackRepository: OfflinePackRepository
+        private set
+
+    lateinit var playBillingManager: com.musicstory.app.billing.PlayBillingManager
+        private set
+
     val appScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     override fun onCreate() {
@@ -98,6 +107,7 @@ class MusicStoryApp : Application() {
         )
         val metadataEnricher = MetadataEnricher()
         val metadataCache = MetadataCache(metadataEnricher)
+        val offlineAudioStore = StoryOfflineAudioStore(this)
         storyRepository = StoryRepository(
             storyDao = database.storyDao(),
             storyHistoryDao = database.storyHistoryDao(),
@@ -105,7 +115,17 @@ class MusicStoryApp : Application() {
             apiClient = apiClient,
             accountSyncManager = accountSyncManager,
             metadataCache = metadataCache,
+            offlineAudioStore = offlineAudioStore,
+            offlinePackDao = database.offlinePackDao(),
         )
+        offlinePackRepository = OfflinePackRepository(
+            context = this,
+            offlinePackDao = database.offlinePackDao(),
+            settingsDataStore = settingsDataStore,
+            storyRepository = storyRepository,
+            notifier = OfflinePackNotifier(this),
+        )
+        playBillingManager = com.musicstory.app.billing.PlayBillingManager(this)
         mediaControllerManager = MediaControllerManager(this)
         storyPlayer = StoryPlayer(this)
         triggerEngine = TriggerEngine()
@@ -130,6 +150,13 @@ class MusicStoryApp : Application() {
         prefetchAccountHistory()
         appScope.launch {
             storyRepository.dedupeStoryHistory()
+        }
+        appScope.launch {
+            offlinePackRepository.refreshState()
+        }
+        appScope.launch {
+            delay(8_000)
+            storyRepository.prefetchMissingOfflineAudio()
         }
     }
 

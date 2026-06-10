@@ -3,6 +3,7 @@ import {
   factMentionsArtistLoose,
   factMentionsOtherTrackTitle,
   factMentionsTitle,
+  factNamesForeignEntity,
   hasTrackContextSignal,
   isWebListicleJunk,
 } from './fact-relevance.js';
@@ -73,9 +74,45 @@ export function isTruncatedMarketingSnippet(snippet: string): boolean {
   return false;
 }
 
+/** Страницы текстов / SEO — не семя для истории (даже если есть год и альбом). */
+export function isLyricsPageSeed(snippet: string): boolean {
+  const trimmed = decodeHtmlEntities(snippet).trim();
+  if (
+    /\b(?:текст\s+(?:пісн|песн|песни)|lyrics|songtext|letras|слова\s+песни|текст\s+песни)\b/i.test(
+      trimmed,
+    )
+  ) {
+    return true;
+  }
+  if (/Текст\s+пісні|Текст\s+песни|song\s+lyrics|genius\.com/i.test(trimmed)) return true;
+  if (/[\u{1F300}-\u{1FAFF}]/u.test(trimmed)) return true;
+  if (/\b(?:дешевле|mini\s+tractor|міні\s+трактор|купи|скидк|реклам|click here)\b/i.test(trimmed)) {
+    return true;
+  }
+  return false;
+}
+
+/** Wikidata/DDG перепутал артиста с одноимённым предметом (Boombox = магнитола). */
+export function isWrongEntityDisambiguation(snippet: string, artist: string): boolean {
+  const trimmed = decodeHtmlEntities(snippet).trim();
+  const artistKey = artist.trim().toLowerCase();
+  if (!artistKey) return false;
+  if (
+    (artistKey === 'бумбокс' || artistKey === 'boombox') &&
+    /\b(?:portable|stereo|cassette\s+recorder|ghetto\s+blaster|audio\s+equipment|electronic\s+device)\b/i.test(
+      trimmed,
+    ) &&
+    !/\b(?:ukrainian|band|group|musical|artist|song|album|rapper|rock)\b/i.test(trimmed)
+  ) {
+    return true;
+  }
+  return false;
+}
+
 /** SEO, Reddit, platform UI — not a speakable story seed. */
 export function isUnspeakableWebSeed(snippet: string): boolean {
   const trimmed = decodeHtmlEntities(snippet).trim();
+  if (isLyricsPageSeed(trimmed)) return true;
   if (isTruncatedMarketingSnippet(trimmed)) return true;
   if (LOW_QUALITY_WEB_PREFIX.test(trimmed)) return true;
   if (
@@ -124,6 +161,7 @@ export function isSpeakableReferenceFact(
 ): boolean {
   const trimmed = decodeHtmlEntities(fact).trim();
   if (trimmed.length < 35) return false;
+  if (isWrongEntityDisambiguation(trimmed, artist)) return false;
   if (isUnspeakableWebSeed(trimmed)) return false;
   if (isWebListicleJunk(trimmed)) return false;
   if (artist && isPlaylistJunkSnippet(trimmed, artist, title)) return false;
@@ -142,9 +180,24 @@ export function isLowQualityWebSnippet(snippet: string): boolean {
   return false;
 }
 
+/** Press/label bio line — «сольный проект X, известный как…» (GALAGA / indie rap). */
+export function isArtistIdentityBioSnippet(snippet: string): boolean {
+  const trimmed = decodeHtmlEntities(snippet).trim();
+  if (trimmed.length < 35 || trimmed.length > 480) return false;
+  if (isLyricsPageSeed(trimmed)) return false;
+  return (
+    /(?:сольный проект|известн(?:ый|ого|ая|ой|ым)\s+как|вокалист(?:а|ом)?|создател\w*\s+групп|участник\s+групп|русск\w*\s+рэп|russian rap|musician biography|rapper biography|stage name|псевдоним)/i.test(
+      trimmed,
+    ) ||
+    (/(?:артист|исполнитель|музыкант|rapper|musician)/i.test(trimmed) &&
+      /(?:родился|род\.|born|project of|member of|ex-)/i.test(trimmed))
+  );
+}
+
 /** Narrative hook in a search snippet — even without repeating artist/title. */
 export function hasNarrativeSeedSignal(text: string): boolean {
   const trimmed = text.trim();
+  if (isArtistIdentityBioSnippet(trimmed)) return true;
   if (hasTrackContextSignal(trimmed)) return true;
   if (isBackstoryFact(trimmed)) return true;
   if (
@@ -172,6 +225,10 @@ export function acceptIndieEmergingSnippet(
   if (isLowQualityWebSnippet(trimmed)) return false;
   if (isWebListicleJunk(trimmed)) return false;
   if (isPlaylistJunkSnippet(trimmed, artist, title)) return false;
+
+  // Artist bio lines often quote a former band — must not be blocked as «other track title».
+  if (isArtistIdentityBioSnippet(trimmed) && factMentionsArtistLoose(trimmed, artist)) return true;
+
   if (factMentionsOtherTrackTitle(trimmed, title)) return false;
 
   // Search was scoped to artist+title — truncated rise/fame clips need not repeat the name.
@@ -222,6 +279,7 @@ export function acceptSearchGroundedSnippet(
   if (isWebListicleJunk(trimmed)) return false;
   if (isPlaylistJunkSnippet(trimmed, artist, title)) return false;
   if (factMentionsOtherTrackTitle(trimmed, title)) return false;
+  if (factNamesForeignEntity(trimmed, artist, title)) return false;
 
   const explicit =
     factMentionsTitle(trimmed, title) ||

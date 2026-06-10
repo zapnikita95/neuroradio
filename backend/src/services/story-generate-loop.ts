@@ -1,4 +1,5 @@
 import type { StoryLengthId } from './story-length.js';
+import type { StoryLanguageId } from './story-language.js';
 import {
   countWords,
   findHardScriptViolation,
@@ -14,6 +15,7 @@ import {
 } from './story-quality.js';
 import { storyNamesForeignArtist, COVER_CONTEXT_RE, factMentionsArtist, storyMentionsPerformingArtist } from './fact-relevance.js';
 import { isMetadataOnlyFallbackFact } from './metadata-facts.js';
+import { isWeakSnippetSeed } from './search-snippet-salvage.js';
 import { logRejectedScript } from './story-reject-log.js';
 
 /** Below this — empty/garbage, not a story. Normal length is enforced by TTS speed + preset in prompt only. */
@@ -28,6 +30,8 @@ export interface StoryQualityAttemptOptions {
   skipBannedPatterns?: boolean;
   skipPersonaCliches?: boolean;
   skipEnglishCheck?: boolean;
+  skipRussianCheck?: boolean;
+  storyLanguage?: StoryLanguageId;
   minWordsOverride?: number;
   previousScripts?: string[];
 }
@@ -35,6 +39,7 @@ export interface StoryQualityAttemptOptions {
 /** Production story checks — no word-count gate; length is a prompt/TTS concern. */
 export function qualityOptionsForProductionAttempt(
   referenceFacts: string[],
+  storyLanguage: StoryLanguageId = 'ru',
 ): StoryQualityAttemptOptions {
   const hasFacts = referenceFacts.length > 0;
   return {
@@ -44,7 +49,9 @@ export function qualityOptionsForProductionAttempt(
     skipFirstSentenceAnchor: true,
     skipBannedPatterns: false,
     skipPersonaCliches: true,
-    skipEnglishCheck: false,
+    skipEnglishCheck: storyLanguage === 'en',
+    skipRussianCheck: storyLanguage !== 'en',
+    storyLanguage,
     referenceFacts: hasFacts ? referenceFacts : [],
   };
 }
@@ -53,8 +60,9 @@ export function qualityOptionsForAttempt(
   _attempt: number,
   _maxAttempts: number,
   referenceFacts: string[],
+  storyLanguage: StoryLanguageId = 'ru',
 ): StoryQualityAttemptOptions {
-  return qualityOptionsForProductionAttempt(referenceFacts);
+  return qualityOptionsForProductionAttempt(referenceFacts, storyLanguage);
 }
 
 /** Local Ollama: never relax fiction/anchor checks — bad story is worse than no story. */
@@ -81,8 +89,9 @@ export function qualityOptionsForOpenRouterAttempt(
   _attempt: number,
   _maxAttempts: number,
   referenceFacts: string[],
+  storyLanguage: StoryLanguageId = 'ru',
 ): StoryQualityAttemptOptions {
-  return qualityOptionsForProductionAttempt(referenceFacts);
+  return qualityOptionsForProductionAttempt(referenceFacts, storyLanguage);
 }
 
 export function validateGeneratedStory(
@@ -152,6 +161,10 @@ export function finalizeAfterQualityLoop<T extends { script: string }>(
     logRejectedScript('last script rejected', sanitized, 'metadata-only placeholder facts');
     return null;
   }
+  if (referenceFacts.every((f) => isWeakSnippetSeed(f))) {
+    logRejectedScript('last script rejected', sanitized, 'lyrics/junk seed — not grounded');
+    return null;
+  }
   if (
     storyNamesForeignArtist(
       sanitized,
@@ -176,6 +189,7 @@ export function finalizeAfterQualityLoop<T extends { script: string }>(
   if (!grounded) {
     if (
       !referenceFactsAreAnchorable(referenceFacts, input.artist, input.title) &&
+      !referenceFacts.every((f) => isWeakSnippetSeed(f)) &&
       factMentionsArtist(sanitized, input.artist) &&
       !findLlmGarbage(sanitized)
     ) {

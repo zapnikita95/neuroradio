@@ -6,14 +6,15 @@ import androidx.room.Room
 import androidx.room.RoomDatabase
 
 @Database(
-    entities = [ScrobbleEntry::class, CachedStory::class, StoryHistoryEntry::class],
-    version = 5,
+    entities = [ScrobbleEntry::class, CachedStory::class, StoryHistoryEntry::class, OfflinePackEntry::class],
+    version = 7,
     exportSchema = false,
 )
 abstract class AppDatabase : RoomDatabase() {
     abstract fun scrobbleDao(): ScrobbleDao
     abstract fun storyDao(): StoryDao
     abstract fun storyHistoryDao(): StoryHistoryDao
+    abstract fun offlinePackDao(): OfflinePackDao
 
     companion object {
         private const val DB_NAME = "music_story.db"

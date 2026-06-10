@@ -42,6 +42,10 @@ final class SettingsStore: ObservableObject {
         static let edgeVoicePreset = "edge_voice_preset"
         static let storyLength = "story_length"
         static let accountProfile = "account_profile_json"
+        static let offlineAudioCacheEnabled = "offline_audio_cache_enabled"
+        static let offlinePackPhase = "offline_pack_phase"
+        static let offlinePackSessionId = "offline_pack_session_id"
+        static let factNotificationsEnabled = "fact_notifications_enabled"
     }
 
     private let defaults = UserDefaults.standard
@@ -135,6 +139,22 @@ final class SettingsStore: ObservableObject {
         didSet { persistAccountProfile() }
     }
 
+    @Published var offlineAudioCacheEnabled: Bool {
+        didSet { defaults.set(offlineAudioCacheEnabled, forKey: Keys.offlineAudioCacheEnabled) }
+    }
+
+    @Published var offlinePackPhase: String {
+        didSet { defaults.set(offlinePackPhase, forKey: Keys.offlinePackPhase) }
+    }
+
+    @Published var offlinePackSessionId: Int64 {
+        didSet { defaults.set(offlinePackSessionId, forKey: Keys.offlinePackSessionId) }
+    }
+
+    @Published var factNotificationsEnabled: Bool {
+        didSet { defaults.set(factNotificationsEnabled, forKey: Keys.factNotificationsEnabled) }
+    }
+
     private init() {
         Self.migrateOnboardingIfNeeded(defaults: defaults)
         let storedBackend = defaults.string(forKey: Keys.backendURL) ?? SettingsDefaults.backendURL
@@ -169,6 +189,10 @@ final class SettingsStore: ObservableObject {
         storyLength = StoryLength.fromId(defaults.string(forKey: Keys.storyLength))
         serverTtsProvider = ServerTtsProvider.fromId(defaults.string(forKey: Keys.serverTtsProvider))
         serverTier = defaults.string(forKey: Keys.serverTier)
+        offlineAudioCacheEnabled = defaults.object(forKey: Keys.offlineAudioCacheEnabled) as? Bool ?? true
+        offlinePackPhase = defaults.string(forKey: Keys.offlinePackPhase) ?? OfflinePackPhase.idle.rawValue
+        offlinePackSessionId = Int64(defaults.object(forKey: Keys.offlinePackSessionId) as? Int ?? 0)
+        factNotificationsEnabled = defaults.object(forKey: Keys.factNotificationsEnabled) as? Bool ?? true
         accountProfile = loadAccountProfile()
     }
 

@@ -4,14 +4,14 @@ import {
   canUseAzureSpeechProduction,
   hasAzureSpeechCredentials,
 } from './azure-tts.js';
-import { preparePlainSpeechText } from './tts-azure-ssml.js';
 import {
   canUseServerSpeechKit,
-  SileroRequiredForFreeTierError,
   SpeechKitSubscriptionRequiredError,
 } from './tts-access.js';
 import { hasPremiumEntitlement, isElevenLabsEnabled } from './entitlements.js';
 import { hasElevenLabsCredentials, synthesizeSpeechElevenLabs } from './elevenlabs-tts.js';
+import { resolveElevenLabsVoiceId } from './elevenlabs-voices.js';
+import type { StoryLanguageId } from './story-language.js';
 import {
   synthesizeSpeechSalute,
   canUseSaluteSpeechProduction,
@@ -19,12 +19,8 @@ import {
 } from './salute-tts.js';
 import { synthesizeSpeechEdge } from './edge-tts-story.js';
 import type { EdgeVoicePresetId } from './edge-voices.js';
+import { resolveEdgeVoicePresetId } from './edge-voices.js';
 import { genericizeScriptForVoiceover } from './tts-generic-script.js';
-import {
-  canUseSileroTts,
-  synthesizeSpeechSilero,
-} from './silero-tts.js';
-import type { SileroVoiceId, SileroVoicePresetId } from './silero-voices.js';
 import type { TtsEmotion } from './tts-options.js';
 import type { TtsPauseProfile, TtsVoiceStyleId } from './tts-voice-profiles.js';
 import {
@@ -40,8 +36,8 @@ import {
   resolveUserTtsProvider,
 } from './user-tts-credentials.js';
 
-export type TtsProviderId = 'auto' | 'yandex' | 'sber' | 'azure' | 'elevenlabs' | 'silero' | 'edge';
-export type EffectiveTtsProvider = 'yandex' | 'sber' | 'azure' | 'elevenlabs' | 'silero' | 'edge';
+export type TtsProviderId = 'auto' | 'yandex' | 'sber' | 'azure' | 'elevenlabs' | 'edge';
+export type EffectiveTtsProvider = 'yandex' | 'sber' | 'azure' | 'elevenlabs' | 'edge';
 export type VoiceTier = 'default' | 'premium';
 
 export interface TtsRouteRequest {
@@ -60,10 +56,10 @@ export interface TtsRouteRequest {
   title?: string;
   logContext?: YandexTtsLogContext;
   userTtsCredentials?: UserTtsCredentials | null;
-  sileroVoice?: string;
-  sileroVoicePreset?: SileroVoicePresetId;
   edgeVoicePreset?: EdgeVoicePresetId | string;
   speakTrackNamesInVoiceover?: boolean;
+  storyLanguage?: StoryLanguageId;
+  elevenLabsVoice?: string;
 }
 
 export interface TtsRouteResult extends SynthesisResult {
@@ -90,9 +86,28 @@ function pickPremiumAutoProvider(): EffectiveTtsProvider {
   return 'yandex';
 }
 
+function normalizeTtsProvider(requested: TtsProviderId | string | undefined): TtsProviderId {
+  if (requested === 'silero') return 'edge';
+  if (
+    requested === 'yandex' ||
+    requested === 'sber' ||
+    requested === 'azure' ||
+    requested === 'elevenlabs' ||
+    requested === 'edge' ||
+    requested === 'auto'
+  ) {
+    return requested;
+  }
+  return 'auto';
+}
+
 export function resolveEffectiveTtsProvider(
-  request: Pick<TtsRouteRequest, 'voiceTier' | 'ttsProvider' | 'installId' | 'userTtsCredentials'>,
+  request: Pick<
+    TtsRouteRequest,
+    'voiceTier' | 'ttsProvider' | 'installId' | 'userTtsCredentials' | 'storyLanguage'
+  >,
 ): EffectiveTtsProvider {
+  const ttsProvider = normalizeTtsProvider(request.ttsProvider);
   const userProvider = resolveUserTtsProvider(request.userTtsCredentials ?? null);
   if (userProvider === 'yandex') return 'yandex';
   if (userProvider === 'sber') return 'sber';
@@ -107,23 +122,18 @@ export function resolveEffectiveTtsProvider(
     }
   };
 
-  if (request.ttsProvider === 'edge') {
+  if (ttsProvider === 'edge') {
     return 'edge';
   }
 
-  if (request.ttsProvider === 'yandex') {
+  if (ttsProvider === 'yandex') {
     if (!serverSpeechKit) {
       throw new SpeechKitSubscriptionRequiredError();
     }
     return 'yandex';
   }
 
-  if (request.ttsProvider === 'silero') {
-    if (canUseSileroTts()) return 'silero';
-    return 'edge';
-  }
-
-  if (request.ttsProvider === 'sber') {
+  if (ttsProvider === 'sber') {
     requirePremium();
     if (canUseSaluteSpeechProduction()) return 'sber';
     if (!serverSpeechKit) throw new SpeechKitSubscriptionRequiredError();
@@ -131,7 +141,7 @@ export function resolveEffectiveTtsProvider(
     return 'yandex';
   }
 
-  if (request.ttsProvider === 'azure') {
+  if (ttsProvider === 'azure') {
     requirePremium();
     if (canUseAzureSpeechProduction()) return 'azure';
     if (canUseSaluteSpeechProduction()) return 'sber';
@@ -139,7 +149,7 @@ export function resolveEffectiveTtsProvider(
     return 'yandex';
   }
 
-  if (request.ttsProvider === 'elevenlabs') {
+  if (ttsProvider === 'elevenlabs') {
     requirePremium();
     if (canUseElevenLabs()) return 'elevenlabs';
     if (canUseSaluteSpeechProduction()) return 'sber';
@@ -150,7 +160,17 @@ export function resolveEffectiveTtsProvider(
 
   if (request.voiceTier === 'premium') {
     requirePremium();
+    if (request.storyLanguage === 'en' && canUseElevenLabs()) {
+      return 'elevenlabs';
+    }
     return pickPremiumAutoProvider();
+  }
+
+  if (request.storyLanguage === 'en') {
+    if (hasPremiumEntitlement(request.installId) && canUseElevenLabs()) {
+      return 'elevenlabs';
+    }
+    return 'edge';
   }
 
   if (!serverSpeechKit) {
@@ -162,7 +182,7 @@ export function resolveEffectiveTtsProvider(
 
 function scriptForProvider(request: TtsRouteRequest, provider: EffectiveTtsProvider): string {
   const speakNames = request.speakTrackNamesInVoiceover === true;
-  if (speakNames || provider === 'silero') return request.script;
+  if (speakNames) return request.script;
   return genericizeScriptForVoiceover(
     request.script,
     request.artist ?? '',
@@ -170,16 +190,23 @@ function scriptForProvider(request: TtsRouteRequest, provider: EffectiveTtsProvi
   );
 }
 
+function ttsMarkupFlags(request: TtsRouteRequest): { speakTrackNamesInVoiceover: boolean } {
+  return { speakTrackNamesInVoiceover: request.speakTrackNamesInVoiceover === true };
+}
+
 export async function synthesizeStoryAudio(request: TtsRouteRequest): Promise<TtsRouteResult> {
   const provider = resolveEffectiveTtsProvider(request);
   const script = scriptForProvider(request, provider);
+  const edgePreset = resolveEdgeVoicePresetId(
+    typeof request.edgeVoicePreset === 'string' ? request.edgeVoicePreset : undefined,
+  );
 
   let result: SynthesisResult;
   if (provider === 'edge') {
     result = await synthesizeSpeechEdge(script, request.fileName, {
       artist: request.artist,
       title: request.title,
-      voicePreset: request.edgeVoicePreset ?? request.sileroVoicePreset,
+      voicePreset: edgePreset,
       speed: request.speed,
       speakTrackNamesInVoiceover: request.speakTrackNamesInVoiceover,
     });
@@ -192,6 +219,7 @@ export async function synthesizeStoryAudio(request: TtsRouteRequest): Promise<Tt
       styleId: request.ttsStyle,
       storyNarrator: request.storyNarrator,
       clientAuthKey: request.userTtsCredentials?.salute?.authKey,
+      ...ttsMarkupFlags(request),
     });
   } else if (provider === 'azure') {
     result = await synthesizeSpeechAzure(script, request.fileName, {
@@ -201,22 +229,19 @@ export async function synthesizeStoryAudio(request: TtsRouteRequest): Promise<Tt
       pauseProfile: request.pauseProfile,
       styleId: request.ttsStyle,
       storyNarrator: request.storyNarrator,
+      ...ttsMarkupFlags(request),
     });
   } else if (provider === 'elevenlabs') {
-    const plainText = preparePlainSpeechText(script, request.artist ?? '', request.title ?? '');
-    result = await synthesizeSpeechElevenLabs(plainText, request.fileName, {
+    const elevenVoiceId = resolveElevenLabsVoiceId(
+      (request.elevenLabsVoice ?? request.voiceId ?? 'auto') as import('./elevenlabs-voices.js').ElevenLabsVoiceSetting,
+      { storyNarrator: request.storyNarrator, genre: undefined },
+    );
+    result = await synthesizeSpeechElevenLabs(script, request.fileName, {
       artist: request.artist,
       title: request.title,
-    });
-  } else if (provider === 'silero') {
-    result = await synthesizeSpeechSilero(script, request.fileName, {
-      artist: request.artist,
-      title: request.title,
-      voicePreset: request.sileroVoicePreset,
-      voice: request.sileroVoice as SileroVoiceId | undefined,
-      pauseProfile: request.pauseProfile,
-      styleId: request.ttsStyle,
-      speed: request.speed,
+      voiceId: elevenVoiceId,
+      speakTrackNamesInVoiceover: request.speakTrackNamesInVoiceover,
+      storyLanguage: request.storyLanguage,
     });
   } else {
     result = await synthesizeYandex(script, request.voiceId, request.fileName, {
@@ -227,6 +252,7 @@ export async function synthesizeStoryAudio(request: TtsRouteRequest): Promise<Tt
       pauseProfile: request.pauseProfile,
       logContext: request.logContext,
       credentials: request.userTtsCredentials?.yandex,
+      ...ttsMarkupFlags(request),
     });
   }
 
@@ -246,5 +272,4 @@ export {
   canUseAzureSpeechProduction,
   hasSaluteSpeechCredentials,
   canUseSaluteSpeechProduction,
-  canUseSileroTts,
 };

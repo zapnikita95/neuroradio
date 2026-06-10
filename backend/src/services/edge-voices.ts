@@ -9,6 +9,8 @@ export interface EdgeVoicePreset {
   id: EdgeVoicePresetId;
   ruVoice: string;
   enVoice: string;
+  deVoice: string;
+  frVoice: string;
   rateOffsetPct: number;
   pitch: string;
   labelRu: string;
@@ -20,6 +22,8 @@ export const EDGE_VOICE_PRESETS: Record<EdgeVoicePresetId, EdgeVoicePreset> = {
     id: 'dmitry_calm',
     ruVoice: 'ru-RU-DmitryNeural',
     enVoice: 'en-US-EricNeural',
+    deVoice: 'de-DE-ConradNeural',
+    frVoice: 'fr-FR-HenriNeural',
     rateOffsetPct: 0,
     pitch: '+0Hz',
     labelRu: 'Дмитрий — спокойный',
@@ -29,6 +33,8 @@ export const EDGE_VOICE_PRESETS: Record<EdgeVoicePresetId, EdgeVoicePreset> = {
     id: 'svetlana_calm',
     ruVoice: 'ru-RU-SvetlanaNeural',
     enVoice: 'en-US-JennyNeural',
+    deVoice: 'de-DE-KatjaNeural',
+    frVoice: 'fr-FR-DeniseNeural',
     rateOffsetPct: 0,
     pitch: '+0Hz',
     labelRu: 'Светлана — спокойная',
@@ -38,6 +44,8 @@ export const EDGE_VOICE_PRESETS: Record<EdgeVoicePresetId, EdgeVoicePreset> = {
     id: 'dmitry_lively',
     ruVoice: 'ru-RU-DmitryNeural',
     enVoice: 'en-US-ChristopherNeural',
+    deVoice: 'de-DE-ConradNeural',
+    frVoice: 'fr-FR-HenriNeural',
     rateOffsetPct: 6,
     pitch: '+1Hz',
     labelRu: 'Дмитрий — бодрый',
@@ -47,6 +55,8 @@ export const EDGE_VOICE_PRESETS: Record<EdgeVoicePresetId, EdgeVoicePreset> = {
     id: 'svetlana_lively',
     ruVoice: 'ru-RU-SvetlanaNeural',
     enVoice: 'en-US-AriaNeural',
+    deVoice: 'de-DE-KatjaNeural',
+    frVoice: 'fr-FR-DeniseNeural',
     rateOffsetPct: 5,
     pitch: '+2Hz',
     labelRu: 'Светлана — живая',
@@ -56,6 +66,8 @@ export const EDGE_VOICE_PRESETS: Record<EdgeVoicePresetId, EdgeVoicePreset> = {
     id: 'daria',
     ruVoice: 'ru-RU-DariyaNeural',
     enVoice: 'en-US-MichelleNeural',
+    deVoice: 'de-DE-KatjaNeural',
+    frVoice: 'fr-FR-DeniseNeural',
     rateOffsetPct: 0,
     pitch: '+0Hz',
     labelRu: 'Дария — мягкая',
@@ -63,18 +75,22 @@ export const EDGE_VOICE_PRESETS: Record<EdgeVoicePresetId, EdgeVoicePreset> = {
   },
 };
 
-const SILERO_TO_EDGE: Record<string, EdgeVoicePresetId> = {
+const LEGACY_VOICE_ALIASES: Record<string, EdgeVoicePresetId> = {
   aidar: 'dmitry_calm',
   eugene: 'dmitry_lively',
   baya: 'svetlana_calm',
   kseniya: 'svetlana_lively',
   xenia: 'svetlana_lively',
+  calm_female: 'svetlana_calm',
+  calm_male: 'dmitry_calm',
+  lively_female: 'svetlana_lively',
+  lively_male: 'dmitry_lively',
 };
 
 export function resolveEdgeVoicePresetId(value?: string | null): EdgeVoicePresetId {
   const raw = value?.trim().toLowerCase();
   if (raw && raw in EDGE_VOICE_PRESETS) return raw as EdgeVoicePresetId;
-  if (raw && raw in SILERO_TO_EDGE) return SILERO_TO_EDGE[raw]!;
+  if (raw && raw in LEGACY_VOICE_ALIASES) return LEGACY_VOICE_ALIASES[raw]!;
   return 'svetlana_calm';
 }
 

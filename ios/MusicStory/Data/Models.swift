@@ -7,12 +7,6 @@ struct StoryRequest: Encodable, Sendable {
     let storyLength: String
     let ttsSpeed: Float
     let ttsEmotion: String
-    let storyNarrator: String
-    let ttsVoice: String
-    let edgeVoicePreset: String?
-    let ttsProvider: String
-    let voiceTier: String
-    let speakTrackNamesInVoiceover: Bool
 
     enum CodingKeys: String, CodingKey {
         case artist
@@ -21,12 +15,6 @@ struct StoryRequest: Encodable, Sendable {
         case storyLength = "story_length"
         case ttsSpeed = "tts_speed"
         case ttsEmotion = "tts_emotion"
-        case storyNarrator = "story_narrator"
-        case ttsVoice = "tts_voice"
-        case edgeVoicePreset = "edge_voice_preset"
-        case ttsProvider = "tts_provider"
-        case voiceTier = "voice_tier"
-        case speakTrackNamesInVoiceover = "speak_track_names_in_voiceover"
     }
 }
 
@@ -43,8 +31,6 @@ struct StoryResponse: Decodable, Sendable {
     let audioUrl: String?
     let audioFile: String?
     let ttsHint: String?
-    let ttsProvider: String?
-    let tier: String?
     let quota: StoryQuotaInfo?
 
     enum CodingKeys: String, CodingKey {
@@ -60,9 +46,54 @@ struct StoryResponse: Decodable, Sendable {
         case audioUrl
         case audioFile
         case ttsHint
-        case ttsProvider = "tts_provider"
-        case tier
         case quota
+    }
+
+    init(
+        artist: String,
+        title: String,
+        year: Int?,
+        genre: String?,
+        mbid: String?,
+        script: String,
+        wordCount: Int,
+        voiceId: String?,
+        demo: Bool,
+        audioUrl: String?,
+        audioFile: String?,
+        ttsHint: String?,
+        quota: StoryQuotaInfo?
+    ) {
+        self.artist = artist
+        self.title = title
+        self.year = year
+        self.genre = genre
+        self.mbid = mbid
+        self.script = script
+        self.wordCount = wordCount
+        self.voiceId = voiceId
+        self.demo = demo
+        self.audioUrl = audioUrl
+        self.audioFile = audioFile
+        self.ttsHint = ttsHint
+        self.quota = quota
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        artist = try container.decode(String.self, forKey: .artist)
+        title = try container.decode(String.self, forKey: .title)
+        year = try container.decodeIfPresent(Int.self, forKey: .year)
+        genre = try container.decodeIfPresent(String.self, forKey: .genre)
+        mbid = try container.decodeIfPresent(String.self, forKey: .mbid)
+        script = try container.decode(String.self, forKey: .script)
+        wordCount = try container.decodeIfPresent(Int.self, forKey: .wordCount) ?? script.split(separator: " ").count
+        voiceId = try container.decodeIfPresent(String.self, forKey: .voiceId)
+        demo = try container.decodeIfPresent(Bool.self, forKey: .demo) ?? false
+        audioUrl = try container.decodeIfPresent(String.self, forKey: .audioUrl)
+        audioFile = try container.decodeIfPresent(String.self, forKey: .audioFile)
+        ttsHint = try container.decodeIfPresent(String.self, forKey: .ttsHint)
+        quota = try container.decodeIfPresent(StoryQuotaInfo.self, forKey: .quota)
     }
 }
 
@@ -76,6 +107,11 @@ struct StoryQuotaInfo: Decodable, Sendable {
 struct QuotaResponse: Decodable, Sendable {
     let tier: String?
     let quota: StoryQuotaInfo
+}
+
+struct FactHintResponse: Decodable, Sendable {
+    let hasHotFact: Bool
+    let hotCount: Int
 }
 
 struct TokenResponse: Decodable, Sendable {
@@ -98,6 +134,47 @@ struct HealthResponse: Decodable, Sendable {
     let appAuthRequired: Bool?
 }
 
+struct LanguageSwitchPolicy: Decodable, Sendable {
+    let allowed: Bool
+    let reason: String?
+    let hintRu: String?
+    let hintEn: String?
+    let note: String?
+}
+
+struct LanguageSwitchBundle: Decodable, Sendable {
+    let toRu: LanguageSwitchPolicy?
+    let toEn: LanguageSwitchPolicy?
+}
+
+struct BillingEntitlement: Decodable, Sendable {
+    let plan: String?
+    let premiumUntil: Int64?
+    let subscriptionMarket: String?
+    let billingProvider: String?
+}
+
+struct BillingStatusResponse: Decodable, Sendable {
+    let tier: String?
+    let premium: Bool?
+    let entitlement: BillingEntitlement?
+    let subscriptionMarket: String?
+    let billingChannel: String?
+    let languageSwitch: LanguageSwitchBundle?
+}
+
+struct AppStoreVerifyRequest: Encodable, Sendable {
+    let receiptData: String
+}
+
+struct IapVerifyResponse: Decodable, Sendable {
+    let ok: Bool?
+    let tier: String?
+    let subscriptionMarket: String?
+    let hint: String?
+    let error: String?
+}
+
 struct StoryFeedbackRequest: Encodable, Sendable {
     let artist: String
     let title: String
@@ -106,25 +183,4 @@ struct StoryFeedbackRequest: Encodable, Sendable {
     let reasons: [String]
     let script: String?
     let historyId: String?
-}
-
-struct BillingEntitlement: Decodable, Sendable {
-    let plan: String?
-    let premiumUntil: Int64?
-    let autoRenew: Bool?
-
-    enum CodingKeys: String, CodingKey {
-        case plan
-        case premiumUntil
-        case autoRenew
-    }
-}
-
-struct BillingStatusResponse: Decodable, Sendable {
-    let ok: Bool?
-    let tier: String?
-    let premium: Bool?
-    let entitlement: BillingEntitlement?
-
-    var premiumUntilMs: Int64? { entitlement?.premiumUntil }
 }

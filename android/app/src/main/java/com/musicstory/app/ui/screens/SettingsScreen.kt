@@ -79,10 +79,20 @@ import com.musicstory.app.R
 import com.musicstory.app.data.local.SettingsDataStore
 import com.musicstory.app.data.remote.ConnectionCheckResult
 import com.musicstory.app.data.remote.BillingEntitlementResponse
+import com.musicstory.app.data.remote.LanguageSwitchPolicyResponse
+import java.util.Locale
 import com.musicstory.app.domain.GeminiModel
 import com.musicstory.app.domain.GroqModel
 import com.musicstory.app.domain.LlmProvider
+import com.musicstory.app.domain.OfflinePackPhase
+import com.musicstory.app.domain.OfflinePackUiState
+import android.app.Activity
+import com.musicstory.app.domain.AppLanguage
+import com.musicstory.app.domain.ElevenLabsVoice
 import com.musicstory.app.domain.OpenRouterModel
+import com.musicstory.app.domain.ResolvedAppLanguage
+import com.musicstory.app.domain.resolveAppLanguage
+import com.musicstory.app.domain.toApiCode
 import com.musicstory.app.domain.StoryLength
 import com.musicstory.app.domain.StoryNarrator
 import com.musicstory.app.domain.EdgeVoicePreset
@@ -116,7 +126,6 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlin.math.abs
-import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -124,6 +133,7 @@ fun SettingsScreen(
     onBack: () -> Unit,
     onOpenAccountLogin: () -> Unit = {},
     onOpenAccount: () -> Unit = onOpenAccountLogin,
+    onOpenAccountBilling: () -> Unit = onOpenAccount,
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
@@ -168,6 +178,11 @@ fun SettingsScreen(
     val ttsEmotion by settings.ttsEmotion.collectAsState(initial = TtsEmotion.LIVELY)
     val edgeVoicePreset by settings.edgeVoicePreset.collectAsState(initial = EdgeVoicePreset.SVETLANA_CALM)
     val speakTrackNamesInVoiceover by settings.speakTrackNamesInVoiceover.collectAsState(initial = false)
+    val factNotificationsEnabled by settings.factNotificationsEnabled.collectAsState(
+        initial = SettingsDataStore.DEFAULT_FACT_NOTIFICATIONS_ENABLED,
+    )
+    val appLanguage by settings.appLanguage.collectAsState(initial = AppLanguage.SYSTEM)
+    val elevenLabsVoice by settings.elevenLabsVoice.collectAsState(initial = ElevenLabsVoice.AUTO)
     val serverTtsProvider by settings.serverTtsProvider.collectAsState(initial = ServerTtsProvider.EDGE)
     val userTtsBilling by settings.userTtsBilling.collectAsState(initial = UserTtsBilling.SERVER)
     val yandexApiKey by settings.yandexApiKey.collectAsState(initial = "")
@@ -178,6 +193,12 @@ fun SettingsScreen(
         initial = SettingsDataStore.DEFAULT_COUNT_TRACK_LISTEN_SECONDS,
     )
     val tourPending by settings.settingsTourPending.collectAsState(initial = false)
+
+    val offlinePackState by app.offlinePackRepository.state.collectAsState()
+
+    LaunchedEffect(Unit) {
+        app.offlinePackRepository.refreshState()
+    }
 
     var tourStep by remember { mutableStateOf<Int?>(null) }
     var tourTargetBounds by remember { mutableStateOf<Rect?>(null) }
@@ -255,21 +276,10 @@ fun SettingsScreen(
     var groqInput by remember(groqApiKey) { mutableStateOf(groqApiKey) }
     var yandexKeyInput by remember(yandexApiKey) { mutableStateOf(yandexApiKey) }
     var yandexFolderInput by remember(yandexFolderId) { mutableStateOf(yandexFolderId) }
-    var userTtsSaveFeedback by remember { mutableStateOf<String?>(null) }
     var geminiInput by remember(geminiApiKey) { mutableStateOf(geminiApiKey) }
     var openRouterInput by remember(openRouterApiKey) { mutableStateOf(openRouterApiKey) }
     var localUrlInput by remember(localOllamaUrl) { mutableStateOf(localOllamaUrl) }
     var localModelInput by remember(localOllamaModel) { mutableStateOf(localOllamaModel) }
-    var localBackendUrlInput by remember(llmProvider) {
-        mutableStateOf(
-            if (llmProvider == LlmProvider.LOCAL) {
-                if (BackendUrlRules.isLanBackend(backendUrl)) backendUrl
-                else SettingsDataStore.SUGGESTED_LOCAL_BACKEND_URL
-            } else {
-                ""
-            },
-        )
-    }
     var groqCustomInput by remember(groqCustomModelId) { mutableStateOf(groqCustomModelId) }
     var openRouterCustomInput by remember(openRouterCustomModelId) { mutableStateOf(openRouterCustomModelId) }
     var nInput by remember(everyN) { mutableStateOf(everyN.toString()) }
@@ -288,6 +298,36 @@ fun SettingsScreen(
         mutableStateOf(countTrackListenSeconds.toString())
     }
 
+    var autoPlaybackOnUi by remember(manualMode) { mutableStateOf(!manualMode) }
+    var speakTrackNamesUi by remember(speakTrackNamesInVoiceover) { mutableStateOf(speakTrackNamesInVoiceover) }
+    var factNotificationsUi by remember(factNotificationsEnabled) { mutableStateOf(factNotificationsEnabled) }
+    var appLanguageUi by remember(appLanguage) { mutableStateOf(appLanguage) }
+    var elevenLabsVoiceUi by remember(elevenLabsVoice) { mutableStateOf(elevenLabsVoice) }
+    var triggerModeUi by remember(triggerMode) { mutableStateOf(triggerMode) }
+    var specificArtistsUi: Set<String> by remember(specificArtists) { mutableStateOf(specificArtists) }
+    var specificGenresUi: Set<String> by remember(specificGenres) { mutableStateOf(specificGenres) }
+    var storyNarratorUi by remember(storyNarrator) { mutableStateOf(storyNarrator) }
+    var serverTtsProviderUi by remember(serverTtsProvider) { mutableStateOf(serverTtsProvider) }
+    var edgeVoicePresetUi by remember(edgeVoicePreset) { mutableStateOf(edgeVoicePreset) }
+    var ttsVoiceUi by remember(ttsVoice) { mutableStateOf(ttsVoice) }
+    var ttsEmotionUi by remember(ttsEmotion) { mutableStateOf(ttsEmotion) }
+    var ttsSpeedUi by remember(ttsSpeed) { mutableStateOf(ttsSpeed) }
+    var storyLengthUi by remember(storyLength) { mutableStateOf(storyLength) }
+    var userTtsBillingUi by remember(userTtsBilling) { mutableStateOf(userTtsBilling) }
+    var llmProviderUi by remember(llmProvider) { mutableStateOf(llmProvider) }
+    var groqModelUi by remember(groqModel) { mutableStateOf(groqModel) }
+    var geminiModelUi by remember(geminiModel) { mutableStateOf(geminiModel) }
+    var openRouterModelUi by remember(openRouterModel) { mutableStateOf(openRouterModel) }
+    var localBackendUrlInput by remember { mutableStateOf("") }
+    LaunchedEffect(llmProvider, backendUrl) {
+        localBackendUrlInput = if (llmProvider == LlmProvider.LOCAL) {
+            if (BackendUrlRules.isLanBackend(backendUrl)) backendUrl
+            else SettingsDataStore.SUGGESTED_LOCAL_BACKEND_URL
+        } else {
+            ""
+        }
+    }
+
     var isChecking by remember { mutableStateOf(false) }
     var checkResult by remember { mutableStateOf<ConnectionCheckResult?>(null) }
     var checkSummary by remember { mutableStateOf<String?>(null) }
@@ -295,26 +335,29 @@ fun SettingsScreen(
     var devTierFeedback by remember { mutableStateOf<String?>(null) }
     var devTierSwitchEnabled by remember { mutableStateOf(false) }
     var billingEntitlement by remember { mutableStateOf<BillingEntitlementResponse?>(null) }
+    var languageSwitchToEn by remember { mutableStateOf<LanguageSwitchPolicyResponse?>(null) }
+    var showLanguageUpgradeDialog by remember { mutableStateOf(false) }
+    var languageUpgradeHint by remember { mutableStateOf<String?>(null) }
     val trialExpiredUpsellShown by settings.trialExpiredUpsellShown.collectAsState(initial = false)
     val trialBannerDismissed by settings.trialBannerDismissedMilestones.collectAsState(initial = emptySet())
     var showTrialExpiredDialog by remember { mutableStateOf(false) }
     var isSaving by remember { mutableStateOf(false) }
     var saveFeedback by remember { mutableStateOf<String?>(null) }
 
-    val activeApiKey = when (llmProvider) {
-        LlmProvider.GROQ -> groqApiKey
-        LlmProvider.GEMINI -> geminiApiKey
-        LlmProvider.OPENROUTER -> openRouterApiKey
+    val activeApiKey = when (llmProviderUi) {
+        LlmProvider.GROQ -> groqInput
+        LlmProvider.GEMINI -> geminiInput
+        LlmProvider.OPENROUTER -> openRouterInput
         LlmProvider.LOCAL -> if (
             BackendUrlRules.isLanBackend(localBackendUrlInput.trim()) &&
-            localOllamaUrl.isNotBlank()
+            localUrlInput.isNotBlank()
         ) {
-            localOllamaUrl
+            localUrlInput
         } else {
             ""
         }
     }
-    val activeApiInput = when (llmProvider) {
+    val activeApiInput = when (llmProviderUi) {
         LlmProvider.GROQ -> groqInput
         LlmProvider.GEMINI -> geminiInput
         LlmProvider.OPENROUTER -> openRouterInput
@@ -372,6 +415,48 @@ fun SettingsScreen(
     val canCustomizeEveryN = TierAccess.canCustomizeEveryNTracks(effectiveTier)
 
     val hasPendingChanges = remember(
+        autoPlaybackOnUi,
+        manualMode,
+        speakTrackNamesUi,
+        speakTrackNamesInVoiceover,
+        appLanguageUi,
+        appLanguage,
+        elevenLabsVoiceUi,
+        elevenLabsVoice,
+        triggerModeUi,
+        triggerMode,
+        specificArtistsUi,
+        specificArtists,
+        specificGenresUi,
+        specificGenres,
+        storyNarratorUi,
+        storyNarrator,
+        serverTtsProviderUi,
+        serverTtsProvider,
+        edgeVoicePresetUi,
+        edgeVoicePreset,
+        ttsVoiceUi,
+        ttsVoice,
+        ttsEmotionUi,
+        ttsEmotion,
+        ttsSpeedUi,
+        ttsSpeed,
+        storyLengthUi,
+        storyLength,
+        userTtsBillingUi,
+        userTtsBilling,
+        yandexKeyInput,
+        yandexApiKey,
+        yandexFolderInput,
+        yandexFolderId,
+        llmProviderUi,
+        llmProvider,
+        groqModelUi,
+        groqModel,
+        geminiModelUi,
+        geminiModel,
+        openRouterModelUi,
+        openRouterModel,
         groqInput,
         groqApiKey,
         geminiInput,
@@ -384,12 +469,14 @@ fun SettingsScreen(
         backendUrl,
         localModelInput,
         localOllamaModel,
-        llmProvider,
+        groqCustomInput,
+        groqCustomModelId,
+        openRouterCustomInput,
+        openRouterCustomModelId,
         nInput,
         everyN,
         sameTrackInput,
         sameTrackEveryN,
-        triggerMode,
         musicFadeInput,
         musicFadeSeconds,
         countListenEnabledUi,
@@ -398,21 +485,45 @@ fun SettingsScreen(
         countTrackListenSeconds,
         canCustomizeEveryN,
     ) {
-        ApiKeySanitizer.clean(groqInput) != ApiKeySanitizer.clean(groqApiKey) ||
+        autoPlaybackOnUi != !manualMode ||
+            speakTrackNamesUi != speakTrackNamesInVoiceover ||
+            factNotificationsUi != factNotificationsEnabled ||
+            appLanguageUi != appLanguage ||
+            elevenLabsVoiceUi != elevenLabsVoice ||
+            triggerModeUi != triggerMode ||
+            specificArtistsUi != specificArtists ||
+            specificGenresUi != specificGenres ||
+            storyNarratorUi != storyNarrator ||
+            serverTtsProviderUi != serverTtsProvider ||
+            edgeVoicePresetUi != edgeVoicePreset ||
+            ttsVoiceUi != ttsVoice ||
+            ttsEmotionUi != ttsEmotion ||
+            ttsSpeedUi != ttsSpeed ||
+            storyLengthUi != storyLength ||
+            userTtsBillingUi != userTtsBilling ||
+            ApiKeySanitizer.clean(yandexKeyInput) != ApiKeySanitizer.clean(yandexApiKey) ||
+            yandexFolderInput.trim() != yandexFolderId.trim() ||
+            llmProviderUi != llmProvider ||
+            groqModelUi != groqModel ||
+            geminiModelUi != geminiModel ||
+            openRouterModelUi != openRouterModel ||
+            ApiKeySanitizer.clean(groqInput) != ApiKeySanitizer.clean(groqApiKey) ||
             ApiKeySanitizer.clean(geminiInput) != ApiKeySanitizer.clean(geminiApiKey) ||
             ApiKeySanitizer.clean(openRouterInput) != ApiKeySanitizer.clean(openRouterApiKey) ||
             localUrlInput.trim().trimEnd('/') != localOllamaUrl.trim().trimEnd('/') ||
-            (llmProvider == LlmProvider.LOCAL &&
+            (llmProviderUi == LlmProvider.LOCAL &&
                 localBackendUrlInput.trim().trimEnd('/') != backendUrl.trim().trimEnd('/')) ||
             localModelInput.trim() != localOllamaModel.trim() ||
+            groqCustomInput.trim() != groqCustomModelId.trim() ||
+            openRouterCustomInput.trim() != openRouterCustomModelId.trim() ||
             sameTrackInput.toIntOrNull() != sameTrackEveryN ||
             musicFadeInput.toFloatOrNull()?.coerceIn(0.5f, 8f) != musicFadeSeconds ||
             countListenEnabledUi != countTrackListenEnabled ||
             listenSecondsInput.toIntOrNull()?.coerceIn(5, 300) != countTrackListenSeconds ||
-            (triggerMode == TriggerMode.EVERY_N_TRACKS && canCustomizeEveryN && nInput.toIntOrNull() != everyN)
+            (triggerModeUi == TriggerMode.EVERY_N_TRACKS && canCustomizeEveryN && nInput.toIntOrNull() != everyN)
     }
 
-    LaunchedEffect(activeApiInput, llmProvider) {
+    LaunchedEffect(activeApiInput, llmProviderUi) {
         checkSummary = null
         checkResult = null
     }
@@ -422,8 +533,10 @@ fun SettingsScreen(
         if (url.isBlank()) return@LaunchedEffect
         app.storyRepository.refreshQuota()
         runCatching {
-            val status = app.apiClient.fetchBillingStatus(url)
+            val resolvedLang = resolveAppLanguage(appLanguageUi).toApiCode()
+            val status = app.apiClient.fetchBillingStatus(url, resolvedLang)
             billingEntitlement = status.entitlement
+            languageSwitchToEn = status.languageSwitch?.toEn
             devTierSwitchEnabled = status.devTierSwitchEnabled == true
             if (devTierSwitchEnabled) {
                 devTierLabel = status.devTierOverride ?: status.tier
@@ -438,31 +551,131 @@ fun SettingsScreen(
     val canCustomizeFade = TierAccess.canCustomizeMusicFadeSeconds(effectiveTier)
     val canCustomizeListen = TierAccess.canCustomizeListenThresholdSeconds(effectiveTier)
     val isPaidServerTier = TierAccess.isPremiumLike(effectiveTier)
+    val canUseOfflineCache = TierAccess.canUseOfflineAudioCache(effectiveTier)
     val isFreeServerTier = TierAccess.isFreeServerTier(effectiveTier)
-    val effectiveServerTtsProvider = if (isFreeServerTier) ServerTtsProvider.EDGE else serverTtsProvider
-    val serverUsesEdge = userTtsBilling == UserTtsBilling.SERVER &&
+    val effectiveServerTtsProvider = if (isFreeServerTier) ServerTtsProvider.EDGE else serverTtsProviderUi
+    val serverUsesEdge = userTtsBillingUi == UserTtsBilling.SERVER &&
         effectiveServerTtsProvider == ServerTtsProvider.EDGE
-    val showServerTtsProviderChoice = userTtsBilling == UserTtsBilling.SERVER && isPaidServerTier
+    val showServerTtsProviderChoice = userTtsBillingUi == UserTtsBilling.SERVER && isPaidServerTier
     val showEdgeVoices = serverUsesEdge
-    val showYandexVoices = (userTtsBilling == UserTtsBilling.YANDEX) ||
-        (userTtsBilling == UserTtsBilling.SERVER && isPaidServerTier &&
-            effectiveServerTtsProvider == ServerTtsProvider.YANDEX)
+    val resolvedDraftLang = resolveAppLanguage(appLanguageUi)
+    val showElevenLabsVoices = resolvedDraftLang == ResolvedAppLanguage.EN
+    val showYandexVoices = !showElevenLabsVoices && (
+        (userTtsBillingUi == UserTtsBilling.YANDEX) ||
+            (userTtsBillingUi == UserTtsBilling.SERVER && isPaidServerTier &&
+                effectiveServerTtsProvider == ServerTtsProvider.YANDEX)
+        )
     val userTtsBillingOptions = remember {
         UserTtsBilling.entries.filter { it != UserTtsBilling.SBER }
     }
 
-    LaunchedEffect(userTtsBilling) {
-        if (userTtsBilling == UserTtsBilling.SBER) {
-            settings.setUserTtsBilling(UserTtsBilling.SERVER)
+    suspend fun applySettingsDraft(): Boolean {
+        val autoOn = if (canManualMode) autoPlaybackOnUi else true
+        settings.setAutoPlaybackMode(autoOn)
+        settings.setSpeakTrackNamesInVoiceover(speakTrackNamesUi)
+        settings.setFactNotificationsEnabled(factNotificationsUi)
+        val languageChanged = appLanguageUi != appLanguage
+        settings.setAppLanguage(appLanguageUi)
+        settings.setElevenLabsVoice(elevenLabsVoiceUi)
+
+        val resolvedTrigger = if (canAdvancedTriggers) triggerModeUi else TriggerMode.EVERY_N_TRACKS
+        settings.setTriggerMode(resolvedTrigger)
+        settings.setSpecificArtists(specificArtistsUi)
+        settings.setSpecificGenres(specificGenresUi)
+
+        nInput.toIntOrNull()?.takeIf { canCustomizeEveryN }?.let { settings.setEveryNTracks(it) }
+        sameTrackInput.toIntOrNull()?.let { settings.setSameTrackStoryEveryN(it) }
+        settings.setCountTrackAfterListenEnabled(countListenEnabledUi)
+        val listenSec = if (countListenEnabledUi) {
+            if (canCustomizeListen) {
+                listenSecondsInput.toIntOrNull()?.coerceIn(5, 300)
+                    ?: SettingsDataStore.DEFAULT_COUNT_TRACK_LISTEN_SECONDS
+            } else {
+                SettingsDataStore.DEFAULT_COUNT_TRACK_LISTEN_SECONDS
+            }
+        } else {
+            listenSecondsInput.toIntOrNull()?.coerceIn(5, 300) ?: countTrackListenSeconds
+        }
+        settings.setCountTrackAfterListenSeconds(listenSec)
+        if (canCustomizeFade) {
+            musicFadeInput.toFloatOrNull()?.let { settings.setMusicFadeSeconds(it) }
+        }
+
+        settings.setStoryNarrator(storyNarratorUi)
+        settings.setServerTtsProvider(serverTtsProviderUi)
+        settings.setEdgeVoicePreset(edgeVoicePresetUi)
+        settings.setTtsVoice(ttsVoiceUi)
+        settings.setTtsEmotion(ttsEmotionUi)
+        settings.setTtsSpeed(ttsSpeedUi)
+        settings.setStoryLength(storyLengthUi)
+
+        val billing = if (userTtsBillingUi == UserTtsBilling.SBER) UserTtsBilling.SERVER else userTtsBillingUi
+        settings.setUserTtsBilling(billing)
+        settings.setYandexApiKey(ApiKeySanitizer.clean(yandexKeyInput))
+        settings.setYandexFolderId(yandexFolderInput.trim())
+
+        settings.setLlmProvider(llmProviderUi)
+        settings.setGroqModel(groqModelUi)
+        settings.setGeminiModel(geminiModelUi)
+        settings.setOpenRouterModel(openRouterModelUi)
+
+        val cleanGroq = ApiKeySanitizer.clean(groqInput)
+        val cleanGemini = ApiKeySanitizer.clean(geminiInput)
+        val cleanOpenRouter = ApiKeySanitizer.clean(openRouterInput)
+        var cleanLocalBackend = localBackendUrlInput.trim().trimEnd('/')
+        val cleanLocalUrl = localUrlInput.trim().trimEnd('/')
+        val cleanLocalModel = localModelInput.trim()
+        val inferredBackendFromLocal = if (llmProviderUi == LlmProvider.LOCAL) {
+            BackendUrlRules.backendFromMistypedOllamaUrl(cleanLocalUrl)
+                ?: BackendUrlRules.backendFromMistypedOllamaUrl(cleanLocalBackend)
+        } else {
+            null
+        }
+        groqInput = cleanGroq
+        geminiInput = cleanGemini
+        openRouterInput = cleanOpenRouter
+        localUrlInput = if (inferredBackendFromLocal != null) {
+            SettingsDataStore.DEFAULT_LOCAL_OLLAMA_URL
+        } else {
+            cleanLocalUrl.ifBlank { SettingsDataStore.DEFAULT_LOCAL_OLLAMA_URL }
+        }
+        localModelInput = cleanLocalModel.ifBlank { SettingsDataStore.DEFAULT_LOCAL_OLLAMA_MODEL }
+        settings.setGroqApiKey(cleanGroq)
+        settings.setGeminiApiKey(cleanGemini)
+        settings.setOpenRouterApiKey(cleanOpenRouter)
+        if (llmProviderUi == LlmProvider.LOCAL) {
+            if (inferredBackendFromLocal != null) {
+                cleanLocalBackend = inferredBackendFromLocal
+                localUrlInput = SettingsDataStore.DEFAULT_LOCAL_OLLAMA_URL
+                settings.setLocalOllamaUrl(localUrlInput)
+            }
+            if (BackendUrlRules.isLanBackend(cleanLocalBackend)) {
+                localBackendUrlInput = cleanLocalBackend
+                settings.setBackendUrl(cleanLocalBackend)
+            }
+        } else if (inferredBackendFromLocal != null) {
+            settings.setBackendUrl(inferredBackendFromLocal)
+        }
+        settings.setLocalOllamaUrl(localUrlInput)
+        settings.setLocalOllamaModel(localModelInput)
+        settings.setGroqCustomModelId(groqCustomInput.trim())
+        settings.setOpenRouterCustomModelId(openRouterCustomInput.trim())
+        app.triggerEngine.resetCounter()
+        return languageChanged
+    }
+
+    LaunchedEffect(userTtsBillingUi) {
+        if (userTtsBillingUi == UserTtsBilling.SBER) {
+            userTtsBillingUi = UserTtsBilling.SERVER
         }
     }
 
-    LaunchedEffect(canManualMode, manualMode) {
-        if (!canManualMode && manualMode) settings.setManualMode(false)
+    LaunchedEffect(canManualMode) {
+        if (!canManualMode && !autoPlaybackOnUi) autoPlaybackOnUi = true
     }
-    LaunchedEffect(canAdvancedTriggers, triggerMode) {
-        if (!canAdvancedTriggers && triggerMode != TriggerMode.EVERY_N_TRACKS) {
-            settings.setTriggerMode(TriggerMode.EVERY_N_TRACKS)
+    LaunchedEffect(canAdvancedTriggers) {
+        if (!canAdvancedTriggers && triggerModeUi != TriggerMode.EVERY_N_TRACKS) {
+            triggerModeUi = TriggerMode.EVERY_N_TRACKS
         }
     }
 
@@ -495,7 +708,7 @@ fun SettingsScreen(
                     .padding(20.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp),
             ) {
-                val autoPlaybackOn = !manualMode
+                val autoPlaybackOn = autoPlaybackOnUi
                 val modeSummary = if (autoPlaybackOn) {
                     context.getString(R.string.settings_auto_intercept)
                 } else {
@@ -520,9 +733,9 @@ fun SettingsScreen(
                         enabled = canManualMode || autoPlaybackOn,
                         onCheckedChange = { autoOn ->
                             if (autoOn) {
-                                scope.launch { settings.setAutoPlaybackMode(true) }
+                                autoPlaybackOnUi = true
                             } else if (canManualMode) {
-                                scope.launch { settings.setAutoPlaybackMode(false) }
+                                autoPlaybackOnUi = false
                             }
                         },
                     )
@@ -539,27 +752,107 @@ fun SettingsScreen(
                         )
                     }
                     SettingSwitchRow(
+                        title = context.getString(R.string.settings_fact_notifications),
+                        checked = factNotificationsUi,
+                        onCheckedChange = { factNotificationsUi = it },
+                    )
+                    Text(
+                        text = context.getString(R.string.settings_fact_notifications_hint),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MutedLavender,
+                    )
+                    SettingSwitchRow(
                         title = context.getString(R.string.settings_speak_track_names),
-                        checked = speakTrackNamesInVoiceover,
-                        onCheckedChange = { scope.launch { settings.setSpeakTrackNamesInVoiceover(it) } },
+                        checked = speakTrackNamesUi,
+                        onCheckedChange = { speakTrackNamesUi = it },
                     )
                     Text(
                         text = context.getString(R.string.settings_speak_track_names_hint),
                         style = MaterialTheme.typography.bodySmall,
                         color = MutedLavender,
                     )
+                    OfflinePackSettingsSection(
+                        canUse = canUseOfflineCache,
+                        state = offlinePackState,
+                        onStart = { scope.launch { app.offlinePackRepository.startCollecting() } },
+                        onCancel = { scope.launch { app.offlinePackRepository.cancelPack() } },
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = context.getString(R.string.settings_language),
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MutedLavender,
+                    )
+                    listOf(
+                        AppLanguage.SYSTEM to context.getString(R.string.settings_language_system),
+                        AppLanguage.RU to context.getString(R.string.settings_language_ru),
+                        AppLanguage.EN to context.getString(R.string.settings_language_en),
+                    ).forEach { (lang, label) ->
+                        PreferenceRadioRow(
+                            label = label,
+                            selected = appLanguageUi == lang,
+                            onSelect = {
+                                val targetEn = when (lang) {
+                                    AppLanguage.EN -> true
+                                    AppLanguage.SYSTEM ->
+                                        !Locale.getDefault().language.equals("ru", ignoreCase = true)
+                                    AppLanguage.RU -> false
+                                }
+                                if (targetEn) {
+                                    val policy = languageSwitchToEn
+                                    if (policy != null && !policy.allowed) {
+                                        languageUpgradeHint = policy.hintRu
+                                            ?: context.getString(R.string.settings_language_en_upgrade_hint)
+                                        showLanguageUpgradeDialog = true
+                                        return@PreferenceRadioRow
+                                    }
+                                }
+                                appLanguageUi = lang
+                            },
+                        )
+                    }
+                    if (showLanguageUpgradeDialog) {
+                        AlertDialog(
+                            onDismissRequest = { showLanguageUpgradeDialog = false },
+                            title = { Text(context.getString(R.string.settings_language_en_blocked_title)) },
+                            text = {
+                                Text(
+                                    languageUpgradeHint
+                                        ?: context.getString(R.string.settings_language_en_upgrade_hint),
+                                )
+                            },
+                            confirmButton = {
+                                PrimaryStoryButton(
+                                    text = context.getString(R.string.settings_language_en_upgrade_cta),
+                                    onClick = {
+                                        showLanguageUpgradeDialog = false
+                                        onOpenAccountBilling()
+                                    },
+                                )
+                            },
+                            dismissButton = {
+                                SecondaryStoryButton(
+                                    text = context.getString(R.string.action_cancel),
+                                    onClick = { showLanguageUpgradeDialog = false },
+                                )
+                            },
+                            containerColor = DeepVoid,
+                            titleContentColor = CreamText,
+                            textContentColor = MutedLavender,
+                        )
+                    }
                 }
 
                 CollapsibleSettingsSection(
                     title = context.getString(R.string.settings_trigger_mode),
                     summary = buildTriggerSummary(
                         context = context,
-                        triggerMode = triggerMode,
-                        specificArtists = specificArtists,
-                        specificGenres = specificGenres,
+                        triggerMode = triggerModeUi,
+                        specificArtists = specificArtistsUi,
+                        specificGenres = specificGenresUi,
                     ),
-                    initiallyExpanded = triggerMode == TriggerMode.SPECIFIC_ARTISTS ||
-                        triggerMode == TriggerMode.SPECIFIC_GENRES,
+                    initiallyExpanded = triggerModeUi == TriggerMode.SPECIFIC_ARTISTS ||
+                        triggerModeUi == TriggerMode.SPECIFIC_GENRES,
                     tourHighlight = tourStep == 1,
                     forceExpanded = tourStep == 1,
                     tourActive = tourStep == 1,
@@ -575,9 +868,9 @@ fun SettingsScreen(
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
                             RadioButton(
-                                selected = triggerMode == mode,
+                                selected = triggerModeUi == mode,
                                 onClick = {
-                                    if (modeEnabled) scope.launch { settings.setTriggerMode(mode) }
+                                    if (modeEnabled) triggerModeUi = mode
                                 },
                                 enabled = modeEnabled,
                                 colors = RadioButtonDefaults.colors(selectedColor = GoldBright),
@@ -597,7 +890,7 @@ fun SettingsScreen(
                             modifier = Modifier.padding(top = 4.dp),
                         )
                     }
-                    if (triggerMode == TriggerMode.EVERY_N_TRACKS) {
+                    if (triggerModeUi == TriggerMode.EVERY_N_TRACKS) {
                         Spacer(modifier = Modifier.height(8.dp))
                         if (canCustomizeEveryN) {
                             OutlinedTextField(
@@ -663,7 +956,7 @@ fun SettingsScreen(
                             )
                         }
                     }
-                    if (triggerMode == TriggerMode.SPECIFIC_ARTISTS) {
+                    if (triggerModeUi == TriggerMode.SPECIFIC_ARTISTS) {
                         Spacer(modifier = Modifier.height(12.dp))
                         Text(
                             text = context.getString(R.string.settings_pick_artists),
@@ -672,17 +965,13 @@ fun SettingsScreen(
                         )
                         ScrobblePickList(
                             items = scrobbledArtists.map { it.artist },
-                            selected = specificArtists,
+                            selected = specificArtistsUi,
                             emptyHint = context.getString(R.string.settings_pick_empty_artists),
                             onToggle = { artist ->
-                                scope.launch {
-                                    val current = settings.specificArtists.first()
-                                    val next = if (current.any { it.equals(artist, ignoreCase = true) }) {
-                                        current.filterNot { it.equals(artist, ignoreCase = true) }.toSet()
-                                    } else {
-                                        current + artist
-                                    }
-                                    settings.setSpecificArtists(next)
+                                specificArtistsUi = if (specificArtistsUi.any { name -> name.equals(artist, ignoreCase = true) }) {
+                                    specificArtistsUi.filterNot { name -> name.equals(artist, ignoreCase = true) }.toSet()
+                                } else {
+                                    specificArtistsUi + artist
                                 }
                             },
                             subtitleFor = { artist ->
@@ -691,7 +980,7 @@ fun SettingsScreen(
                             },
                         )
                     }
-                    if (triggerMode == TriggerMode.SPECIFIC_GENRES) {
+                    if (triggerModeUi == TriggerMode.SPECIFIC_GENRES) {
                         Spacer(modifier = Modifier.height(12.dp))
                         Text(
                             text = context.getString(R.string.settings_pick_genres),
@@ -700,17 +989,13 @@ fun SettingsScreen(
                         )
                         ScrobblePickList(
                             items = scrobbledGenres.map { it.genre },
-                            selected = specificGenres,
+                            selected = specificGenresUi,
                             emptyHint = context.getString(R.string.settings_pick_empty_genres),
                             onToggle = { genre ->
-                                scope.launch {
-                                    val current = settings.specificGenres.first()
-                                    val next = if (current.any { it.equals(genre, ignoreCase = true) }) {
-                                        current.filterNot { it.equals(genre, ignoreCase = true) }.toSet()
-                                    } else {
-                                        current + genre
-                                    }
-                                    settings.setSpecificGenres(next)
+                                specificGenresUi = if (specificGenresUi.any { name -> name.equals(genre, ignoreCase = true) }) {
+                                    specificGenresUi.filterNot { name -> name.equals(genre, ignoreCase = true) }.toSet()
+                                } else {
+                                    specificGenresUi + genre
                                 }
                             },
                             subtitleFor = { genre ->
@@ -751,7 +1036,7 @@ fun SettingsScreen(
 
                 CollapsibleSettingsSection(
                     title = context.getString(R.string.settings_narrator_section),
-                    summary = storyNarrator.labelRu,
+                    summary = storyNarratorUi.labelRu,
                     tourHighlight = tourStep == 3,
                     forceExpanded = tourStep == 3,
                     tourActive = tourStep == 3,
@@ -761,8 +1046,8 @@ fun SettingsScreen(
                         NarratorRadioRow(
                             label = narrator.labelRu,
                             description = narrator.descriptionRu,
-                            selected = storyNarrator == narrator,
-                            onSelect = { scope.launch { settings.setStoryNarrator(narrator) } },
+                            selected = storyNarratorUi == narrator,
+                            onSelect = { storyNarratorUi = narrator },
                         )
                     }
                 }
@@ -771,13 +1056,13 @@ fun SettingsScreen(
                     title = context.getString(R.string.settings_voice_section),
                     summary = when {
                         serverUsesEdge ->
-                            "${edgeVoicePreset.labelRu} · ${ttsSpeed.labelRu} · ${storyLength.labelRu}"
+                            "${edgeVoicePresetUi.labelRu} · ${ttsSpeedUi.labelRu} · ${storyLengthUi.labelRu}"
                         else ->
-                            "${ttsVoice.labelRu} · ${ttsSpeed.labelRu} · ${storyLength.labelRu}"
+                            "${ttsVoiceUi.labelRu} · ${ttsSpeedUi.labelRu} · ${storyLengthUi.labelRu}"
                     }.let { voices ->
                         val engineLabel = when {
                             serverUsesEdge -> ServerTtsProvider.EDGE.labelRu
-                            showYandexVoices && userTtsBilling == UserTtsBilling.SERVER ->
+                            showYandexVoices && userTtsBillingUi == UserTtsBilling.SERVER ->
                                 ServerTtsProvider.YANDEX.labelRu
                             else -> ServerTtsProvider.EDGE.labelRu
                         }
@@ -812,8 +1097,8 @@ fun SettingsScreen(
                             NarratorRadioRow(
                                 label = provider.labelRu,
                                 description = provider.descriptionRu,
-                                selected = serverTtsProvider == provider,
-                                onSelect = { scope.launch { settings.setServerTtsProvider(provider) } },
+                                selected = serverTtsProviderUi == provider,
+                                onSelect = { serverTtsProviderUi = provider },
                             )
                         }
                     }
@@ -828,8 +1113,29 @@ fun SettingsScreen(
                             NarratorRadioRow(
                                 label = preset.labelRu,
                                 description = preset.descriptionRu,
-                                selected = edgeVoicePreset == preset,
-                                onSelect = { scope.launch { settings.setEdgeVoicePreset(preset) } },
+                                selected = edgeVoicePresetUi == preset,
+                                onSelect = { edgeVoicePresetUi = preset },
+                            )
+                        }
+                        Spacer(modifier = Modifier.height(8.dp))
+                    }
+                    if (showElevenLabsVoices) {
+                        Text(
+                            text = context.getString(R.string.settings_elevenlabs_voice),
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MutedLavender,
+                        )
+                        Text(
+                            text = context.getString(R.string.settings_elevenlabs_hint),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MutedLavender,
+                        )
+                        ElevenLabsVoice.entries.forEach { voice ->
+                            NarratorRadioRow(
+                                label = voice.label(resolvedDraftLang),
+                                description = voice.description(resolvedDraftLang),
+                                selected = elevenLabsVoiceUi == voice,
+                                onSelect = { elevenLabsVoiceUi = voice },
                             )
                         }
                         Spacer(modifier = Modifier.height(8.dp))
@@ -844,8 +1150,8 @@ fun SettingsScreen(
                         NarratorRadioRow(
                             label = voice.labelRu,
                             description = voice.descriptionRu,
-                            selected = ttsVoice == voice,
-                            onSelect = { scope.launch { settings.setTtsVoice(voice) } },
+                            selected = ttsVoiceUi == voice,
+                            onSelect = { ttsVoiceUi = voice },
                         )
                     }
                     Spacer(modifier = Modifier.height(8.dp))
@@ -858,8 +1164,8 @@ fun SettingsScreen(
                         NarratorRadioRow(
                             label = emotion.labelRu,
                             description = emotion.descriptionRu,
-                            selected = ttsEmotion == emotion,
-                            onSelect = { scope.launch { settings.setTtsEmotion(emotion) } },
+                            selected = ttsEmotionUi == emotion,
+                            onSelect = { ttsEmotionUi = emotion },
                         )
                     }
                     Spacer(modifier = Modifier.height(8.dp))
@@ -872,8 +1178,8 @@ fun SettingsScreen(
                     TtsSpeed.entries.forEach { speed ->
                         PreferenceRadioRow(
                             label = speed.labelRu,
-                            selected = ttsSpeed == speed,
-                            onSelect = { scope.launch { settings.setTtsSpeed(speed) } },
+                            selected = ttsSpeedUi == speed,
+                            onSelect = { ttsSpeedUi = speed },
                         )
                     }
                     Spacer(modifier = Modifier.height(8.dp))
@@ -885,8 +1191,8 @@ fun SettingsScreen(
                     StoryLength.entries.forEach { length ->
                         PreferenceRadioRow(
                             label = length.labelRu,
-                            selected = storyLength == length,
-                            onSelect = { scope.launch { settings.setStoryLength(length) } },
+                            selected = storyLengthUi == length,
+                            onSelect = { storyLengthUi = length },
                         )
                     }
                     Spacer(modifier = Modifier.height(12.dp))
@@ -905,28 +1211,27 @@ fun SettingsScreen(
                         NarratorRadioRow(
                             label = billing.labelRu,
                             description = billing.descriptionRu,
-                            selected = userTtsBilling == billing,
+                            selected = userTtsBillingUi == billing,
                             onSelect = {
-                                userTtsSaveFeedback = null
-                                scope.launch { settings.setUserTtsBilling(billing) }
+                                userTtsBillingUi = billing
                             },
                         )
                     }
-                    if (userTtsBilling != UserTtsBilling.SERVER) {
+                    if (userTtsBillingUi != UserTtsBilling.SERVER) {
                         Text(
                             text = context.getString(
                                 R.string.settings_user_tts_active,
-                                userTtsBilling.labelRu,
+                                userTtsBillingUi.labelRu,
                             ),
                             style = MaterialTheme.typography.labelMedium,
                             color = GoldBright,
                             modifier = Modifier.padding(top = 8.dp, bottom = 8.dp),
                         )
                     }
-                    if (userTtsBilling == UserTtsBilling.YANDEX) {
+                    if (userTtsBillingUi == UserTtsBilling.YANDEX) {
                         OutlinedTextField(
                             value = yandexKeyInput,
-                            onValueChange = { yandexKeyInput = it; userTtsSaveFeedback = null },
+                            onValueChange = { yandexKeyInput = it },
                             label = { Text(context.getString(R.string.settings_yandex_api_key)) },
                             modifier = Modifier.fillMaxWidth(),
                             singleLine = true,
@@ -937,7 +1242,7 @@ fun SettingsScreen(
                         Spacer(modifier = Modifier.height(8.dp))
                         OutlinedTextField(
                             value = yandexFolderInput,
-                            onValueChange = { yandexFolderInput = it; userTtsSaveFeedback = null },
+                            onValueChange = { yandexFolderInput = it },
                             label = { Text(context.getString(R.string.settings_yandex_folder_id)) },
                             modifier = Modifier.fillMaxWidth(),
                             singleLine = true,
@@ -965,28 +1270,6 @@ fun SettingsScreen(
                                     )
                                 },
                         )
-                    }
-                    if (userTtsBilling != UserTtsBilling.SERVER) {
-                        SecondaryStoryButton(
-                            text = context.getString(R.string.settings_user_tts_save),
-                            onClick = {
-                                scope.launch {
-                                    settings.setYandexApiKey(ApiKeySanitizer.clean(yandexKeyInput))
-                                    settings.setYandexFolderId(yandexFolderInput.trim())
-                                    yandexKeyInput = ApiKeySanitizer.clean(yandexKeyInput)
-                                    userTtsSaveFeedback = context.getString(R.string.settings_user_tts_saved)
-                                }
-                            },
-                            modifier = Modifier.fillMaxWidth(),
-                        )
-                        userTtsSaveFeedback?.let { msg ->
-                            Text(
-                                text = msg,
-                                style = MaterialTheme.typography.bodySmall,
-                                color = GoldBright,
-                                modifier = Modifier.padding(top = 6.dp),
-                            )
-                        }
                     }
                 }
 
@@ -1056,7 +1339,7 @@ fun SettingsScreen(
                 }
                 val advancedAiSummary = context.getString(
                     R.string.settings_ai_advanced_summary,
-                    llmProvider.labelRu,
+                    llmProviderUi.labelRu,
                     if (activeApiKey.isNotBlank()) {
                         context.getString(R.string.settings_groq_status_ok)
                     } else {
@@ -1161,7 +1444,7 @@ fun SettingsScreen(
                         modifier = Modifier.fillMaxWidth(),
                     ) {
                         OutlinedTextField(
-                            value = llmProvider.labelRu,
+                            value = llmProviderUi.labelRu,
                             onValueChange = {},
                             readOnly = true,
                             label = { Text(context.getString(R.string.settings_llm_provider)) },
@@ -1183,18 +1466,15 @@ fun SettingsScreen(
                                     text = { Text(provider.labelRu, color = CreamText) },
                                     onClick = {
                                         providerMenuExpanded = false
-                                        scope.launch {
-                                            StoryLog.i(
-                                                "SETTINGS UI: user tapped LLM provider -> ${provider.labelRu} (${provider.id})",
-                                            )
-                                            settings.setLlmProvider(provider)
-                                            if (provider == LlmProvider.LOCAL) {
-                                                val saved = settings.backendUrl.first()
-                                                localBackendUrlInput = if (BackendUrlRules.isLanBackend(saved)) {
-                                                    saved
-                                                } else {
-                                                    SettingsDataStore.SUGGESTED_LOCAL_BACKEND_URL
-                                                }
+                                        StoryLog.i(
+                                            "SETTINGS UI: user tapped LLM provider -> ${provider.labelRu} (${provider.id})",
+                                        )
+                                        llmProviderUi = provider
+                                        if (provider == LlmProvider.LOCAL) {
+                                            localBackendUrlInput = if (BackendUrlRules.isLanBackend(backendUrl)) {
+                                                backendUrl
+                                            } else {
+                                                SettingsDataStore.SUGGESTED_LOCAL_BACKEND_URL
                                             }
                                         }
                                     },
@@ -1204,11 +1484,11 @@ fun SettingsScreen(
                     }
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(
-                        text = context.getString(R.string.settings_llm_active, llmProvider.labelRu),
+                        text = context.getString(R.string.settings_llm_active, llmProviderUi.labelRu),
                         style = MaterialTheme.typography.labelMedium,
                         color = GoldBright,
                     )
-                    if (llmProvider == LlmProvider.OPENROUTER) {
+                    if (llmProviderUi == LlmProvider.OPENROUTER) {
                         Spacer(modifier = Modifier.height(12.dp))
                         Text(
                             text = context.getString(R.string.settings_openrouter_model_hint),
@@ -1222,7 +1502,7 @@ fun SettingsScreen(
                             modifier = Modifier.fillMaxWidth(),
                         ) {
                             OutlinedTextField(
-                                value = openRouterModel.settingsLabelRu,
+                                value = openRouterModelUi.settingsLabelRu,
                                 onValueChange = {},
                                 readOnly = true,
                                 label = { Text(context.getString(R.string.settings_openrouter_model)) },
@@ -1257,13 +1537,13 @@ fun SettingsScreen(
                                         },
                                         onClick = {
                                             openRouterModelMenuExpanded = false
-                                            scope.launch { settings.setOpenRouterModel(model) }
+                                            openRouterModelUi = model
                                         },
                                     )
                                 }
                             }
                         }
-                        if (openRouterModel == OpenRouterModel.CUSTOM) {
+                        if (openRouterModelUi == OpenRouterModel.CUSTOM) {
                             Spacer(modifier = Modifier.height(8.dp))
                             OutlinedTextField(
                                 value = openRouterCustomInput,
@@ -1277,7 +1557,7 @@ fun SettingsScreen(
                             )
                         }
                     }
-                    if (llmProvider == LlmProvider.GROQ) {
+                    if (llmProviderUi == LlmProvider.GROQ) {
                         Spacer(modifier = Modifier.height(12.dp))
                         Text(
                             text = context.getString(R.string.settings_groq_model_hint),
@@ -1291,7 +1571,7 @@ fun SettingsScreen(
                             modifier = Modifier.fillMaxWidth(),
                         ) {
                             OutlinedTextField(
-                                value = groqModel.settingsLabelRu,
+                                value = groqModelUi.settingsLabelRu,
                                 onValueChange = {},
                                 readOnly = true,
                                 label = { Text(context.getString(R.string.settings_groq_model)) },
@@ -1320,13 +1600,13 @@ fun SettingsScreen(
                                         },
                                         onClick = {
                                             groqModelMenuExpanded = false
-                                            scope.launch { settings.setGroqModel(model) }
+                                            groqModelUi = model
                                         },
                                     )
                                 }
                             }
                         }
-                        if (groqModel == GroqModel.CUSTOM) {
+                        if (groqModelUi == GroqModel.CUSTOM) {
                             Spacer(modifier = Modifier.height(8.dp))
                             OutlinedTextField(
                                 value = groqCustomInput,
@@ -1340,7 +1620,7 @@ fun SettingsScreen(
                             )
                         }
                     }
-                    if (llmProvider == LlmProvider.GEMINI) {
+                    if (llmProviderUi == LlmProvider.GEMINI) {
                         Spacer(modifier = Modifier.height(12.dp))
                         Text(
                             text = context.getString(R.string.settings_gemini_model_hint),
@@ -1354,7 +1634,7 @@ fun SettingsScreen(
                             modifier = Modifier.fillMaxWidth(),
                         ) {
                             OutlinedTextField(
-                                value = geminiModel.settingsLabelRu,
+                                value = geminiModelUi.settingsLabelRu,
                                 onValueChange = {},
                                 readOnly = true,
                                 label = { Text(context.getString(R.string.settings_gemini_model)) },
@@ -1385,7 +1665,7 @@ fun SettingsScreen(
                                         },
                                         onClick = {
                                             geminiModelMenuExpanded = false
-                                            scope.launch { settings.setGeminiModel(model) }
+                                            geminiModelUi = model
                                         },
                                     )
                                 }
@@ -1413,7 +1693,7 @@ fun SettingsScreen(
                                 },
                         )
                     }
-                    if (llmProvider == LlmProvider.LOCAL) {
+                    if (llmProviderUi == LlmProvider.LOCAL) {
                         Spacer(modifier = Modifier.height(12.dp))
                         Text(
                             text = context.getString(R.string.settings_local_backend_url_hint),
@@ -1466,7 +1746,7 @@ fun SettingsScreen(
                     Spacer(modifier = Modifier.height(8.dp))
                     Text(
                         text = if (activeApiKey.isNotBlank()) {
-                            if (llmProvider == LlmProvider.LOCAL) {
+                            if (llmProviderUi == LlmProvider.LOCAL) {
                                 context.getString(R.string.settings_local_status_ok)
                             } else {
                                 context.getString(R.string.settings_groq_status_ok)
@@ -1477,7 +1757,7 @@ fun SettingsScreen(
                         style = MaterialTheme.typography.bodySmall,
                         color = if (activeApiKey.isNotBlank()) LiveGreen else MutedLavender,
                     )
-                    if (activeApiKey.isNotBlank() && llmProvider != LlmProvider.LOCAL) {
+                    if (activeApiKey.isNotBlank() && llmProviderUi != LlmProvider.LOCAL) {
                         Spacer(modifier = Modifier.height(4.dp))
                         Text(
                             text = context.getString(R.string.settings_own_api_key_hint),
@@ -1495,12 +1775,12 @@ fun SettingsScreen(
                             )
                         }
                     }
-                    if (llmProvider != LlmProvider.LOCAL) {
+                    if (llmProviderUi != LlmProvider.LOCAL) {
                     Spacer(modifier = Modifier.height(12.dp))
                     OutlinedTextField(
                         value = activeApiInput,
                         onValueChange = { value ->
-                            when (llmProvider) {
+                            when (llmProviderUi) {
                                 LlmProvider.GROQ -> groqInput = value
                                 LlmProvider.GEMINI -> geminiInput = value
                                 LlmProvider.OPENROUTER -> openRouterInput = value
@@ -1517,7 +1797,7 @@ fun SettingsScreen(
                             if (activeApiInput.isNotEmpty()) {
                                 IconButton(
                                     onClick = {
-                                        when (llmProvider) {
+                                        when (llmProviderUi) {
                                             LlmProvider.GROQ -> groqInput = ""
                                             LlmProvider.GEMINI -> geminiInput = ""
                                             LlmProvider.OPENROUTER -> openRouterInput = ""
@@ -1552,56 +1832,13 @@ fun SettingsScreen(
                                 checkResult = null
                                 checkSummary = null
                                 try {
+                                    applySettingsDraft()
                                     val cleanGroq = ApiKeySanitizer.clean(groqInput)
                                     val cleanGemini = ApiKeySanitizer.clean(geminiInput)
                                     val cleanOpenRouter = ApiKeySanitizer.clean(openRouterInput)
-                                    var cleanLocalBackend = localBackendUrlInput.trim().trimEnd('/')
-                                    val cleanLocalUrl = localUrlInput.trim().trimEnd('/')
-                                    val cleanLocalModel = localModelInput.trim()
-                                    val inferredBackendFromLocal = if (llmProvider == LlmProvider.LOCAL) {
-                                        BackendUrlRules.backendFromMistypedOllamaUrl(cleanLocalUrl)
-                                            ?: BackendUrlRules.backendFromMistypedOllamaUrl(cleanLocalBackend)
-                                    } else {
-                                        null
-                                    }
-                                    groqInput = cleanGroq
-                                    geminiInput = cleanGemini
-                                    openRouterInput = cleanOpenRouter
-                                    localUrlInput =
-                                        if (inferredBackendFromLocal != null) {
-                                            SettingsDataStore.DEFAULT_LOCAL_OLLAMA_URL
-                                        } else {
-                                            cleanLocalUrl.ifBlank { SettingsDataStore.DEFAULT_LOCAL_OLLAMA_URL }
-                                        }
-                                    localModelInput = cleanLocalModel.ifBlank { SettingsDataStore.DEFAULT_LOCAL_OLLAMA_MODEL }
-                                    settings.setGroqApiKey(cleanGroq)
-                                    settings.setGeminiApiKey(cleanGemini)
-                                    settings.setOpenRouterApiKey(cleanOpenRouter)
-                                    if (llmProvider == LlmProvider.LOCAL) {
-                                        if (inferredBackendFromLocal != null) {
-                                            cleanLocalBackend = inferredBackendFromLocal
-                                            localUrlInput = SettingsDataStore.DEFAULT_LOCAL_OLLAMA_URL
-                                            settings.setLocalOllamaUrl(localUrlInput)
-                                            StoryLog.w("SETTINGS auto-fix: moved :3000 URL to backend_url")
-                                        }
-                                        if (!BackendUrlRules.isLanBackend(cleanLocalBackend)) {
-                                            checkSummary =
-                                                "Укажи URL сервера ПК (http://IP:3000 из start-local-bff.bat)"
-                                            StoryLog.i("SETTINGS local skipped: backend not LAN ($cleanLocalBackend)")
-                                            return@launch
-                                        }
-                                        localBackendUrlInput = cleanLocalBackend
-                                        settings.setBackendUrl(cleanLocalBackend)
-                                    } else if (inferredBackendFromLocal != null) {
-                                        settings.setBackendUrl(inferredBackendFromLocal)
-                                        StoryLog.w("SETTINGS auto-fix: moved :3000 URL from Ollama field to backend_url")
-                                    }
-                                    settings.setLocalOllamaUrl(localUrlInput)
-                                    settings.setLocalOllamaModel(localModelInput)
-                                    settings.setGroqCustomModelId(groqCustomInput)
-                                    settings.setOpenRouterCustomModelId(openRouterCustomInput)
+                                    val cleanLocalBackend = localBackendUrlInput.trim().trimEnd('/')
 
-                                    val ready = when (llmProvider) {
+                                    val ready = when (llmProviderUi) {
                                         LlmProvider.GROQ -> cleanGroq.isNotBlank()
                                         LlmProvider.GEMINI -> cleanGemini.isNotBlank()
                                         LlmProvider.OPENROUTER -> cleanOpenRouter.isNotBlank()
@@ -1611,30 +1848,30 @@ fun SettingsScreen(
                                     }
                                     if (!ready) {
                                         checkSummary =
-                                            if (llmProvider == LlmProvider.LOCAL) {
+                                            if (llmProviderUi == LlmProvider.LOCAL) {
                                                 "Укажи URL сервера ПК и Ollama, потом «Сохранить и проверить»"
                                             } else {
                                                 "Сначала вставь API-ключ, потом нажми «Сохранить и проверить»"
                                             }
-                                        StoryLog.i("SETTINGS API test skipped: not configured for ${llmProvider.id}")
+                                        StoryLog.i("SETTINGS API test skipped: not configured for ${llmProviderUi.id}")
                                         return@launch
                                     }
 
-                                    StoryLog.i("SETTINGS API test start provider=${llmProvider.id}")
-                                    val backendUrl = settings.backendUrl.first()
+                                    StoryLog.i("SETTINGS API test start provider=${llmProviderUi.id}")
+                                    val resolvedBackendUrl = settings.backendUrl.first()
                                     app.backendAuthManager.invalidateToken()
                                     app.apiClient.invalidateCache()
                                     val result = app.storyRepository.checkConnections(
-                                        llmProvider = llmProvider,
+                                        llmProvider = llmProviderUi,
                                         groqApiKey = cleanGroq,
                                         geminiApiKey = cleanGemini,
                                         openRouterApiKey = cleanOpenRouter,
-                                        geminiModel = geminiModel,
-                                        groqModel = groqModel,
+                                        geminiModel = geminiModelUi,
+                                        groqModel = groqModelUi,
                                         groqCustomModelId = groqCustomInput,
-                                        openRouterModel = openRouterModel,
+                                        openRouterModel = openRouterModelUi,
                                         openRouterCustomModelId = openRouterCustomInput,
-                                        backendUrl = backendUrl,
+                                        backendUrl = resolvedBackendUrl,
                                         localOllamaUrl = localUrlInput,
                                         localOllamaModel = localModelInput,
                                     )
@@ -1669,16 +1906,16 @@ fun SettingsScreen(
                         )
                     }
                     Spacer(modifier = Modifier.height(8.dp))
-                    if (llmProvider != LlmProvider.LOCAL) {
+                    if (llmProviderUi != LlmProvider.LOCAL) {
                     SecondaryStoryButton(
-                        text = when (llmProvider) {
+                        text = when (llmProviderUi) {
                             LlmProvider.GROQ -> context.getString(R.string.settings_groq_get_key)
                             LlmProvider.GEMINI -> context.getString(R.string.settings_gemini_get_key)
                             LlmProvider.OPENROUTER -> context.getString(R.string.settings_openrouter_get_key)
                             LlmProvider.LOCAL -> ""
                         },
                         onClick = {
-                            val url = when (llmProvider) {
+                            val url = when (llmProviderUi) {
                                 LlmProvider.GROQ -> "https://console.groq.com/keys"
                                 LlmProvider.GEMINI -> "https://aistudio.google.com/apikey"
                                 LlmProvider.OPENROUTER -> "https://openrouter.ai/keys"
@@ -1760,38 +1997,13 @@ fun SettingsScreen(
                             isSaving = true
                             saveFeedback = null
                             try {
-                                nInput.toIntOrNull()?.takeIf { canCustomizeEveryN }?.let { settings.setEveryNTracks(it) }
-                                sameTrackInput.toIntOrNull()?.let { settings.setSameTrackStoryEveryN(it) }
-                                settings.setCountTrackAfterListenEnabled(countListenEnabledUi)
-                                val listenSec = if (countListenEnabledUi) {
-                                    if (canCustomizeListen) {
-                                        listenSecondsInput.toIntOrNull()?.coerceIn(5, 300)
-                                            ?: SettingsDataStore.DEFAULT_COUNT_TRACK_LISTEN_SECONDS
-                                    } else {
-                                        SettingsDataStore.DEFAULT_COUNT_TRACK_LISTEN_SECONDS
-                                    }
-                                } else {
-                                    listenSecondsInput.toIntOrNull()?.coerceIn(5, 300)
-                                        ?: countTrackListenSeconds
-                                }
-                                settings.setCountTrackAfterListenSeconds(listenSec)
-                                if (canCustomizeFade) {
-                                    musicFadeInput.toFloatOrNull()?.let { settings.setMusicFadeSeconds(it) }
-                                }
-                                val cleanGroq = ApiKeySanitizer.clean(groqInput)
-                                val cleanGemini = ApiKeySanitizer.clean(geminiInput)
-                                val cleanOpenRouter = ApiKeySanitizer.clean(openRouterInput)
-                                groqInput = cleanGroq
-                                geminiInput = cleanGemini
-                                openRouterInput = cleanOpenRouter
-                                settings.setGroqApiKey(cleanGroq)
-                                settings.setGeminiApiKey(cleanGemini)
-                                settings.setOpenRouterApiKey(cleanOpenRouter)
-                                settings.setGroqCustomModelId(groqCustomInput)
-                                settings.setOpenRouterCustomModelId(openRouterCustomInput)
-                                app.triggerEngine.resetCounter()
-                                StoryLog.i("SETTINGS saved (no auto API test)")
+                                val languageChanged = applySettingsDraft()
+                                yandexKeyInput = ApiKeySanitizer.clean(yandexKeyInput)
+                                StoryLog.i("SETTINGS saved")
                                 saveFeedback = context.getString(R.string.settings_saved)
+                                if (languageChanged) {
+                                    (context as? Activity)?.recreate()
+                                }
                                 delay(2500)
                                 if (saveFeedback == context.getString(R.string.settings_saved)) {
                                     saveFeedback = null
@@ -2061,4 +2273,101 @@ private fun formatServerQuotaLabel(context: android.content.Context, quota: com.
         )
     }
     return context.getString(R.string.settings_free_quota, quota.remaining, quota.limit)
+}
+
+@Composable
+private fun OfflinePackSettingsSection(
+    canUse: Boolean,
+    state: OfflinePackUiState,
+    onStart: () -> Unit,
+    onCancel: () -> Unit,
+) {
+    val context = LocalContext.current
+    Text(
+        text = context.getString(R.string.settings_offline_pack_title),
+        style = MaterialTheme.typography.labelMedium,
+        color = MutedLavender,
+    )
+    if (!canUse) {
+        Text(
+            text = context.getString(R.string.settings_premium_locked_hint),
+            style = MaterialTheme.typography.bodySmall,
+            color = MutedLavender,
+        )
+        return
+    }
+    when (state.phase) {
+        OfflinePackPhase.IDLE -> {
+            Text(
+                text = context.getString(R.string.settings_offline_pack_intro),
+                style = MaterialTheme.typography.bodySmall,
+                color = MutedLavender,
+            )
+            TextButton(onClick = onStart) {
+                Text(context.getString(R.string.settings_offline_pack_start))
+            }
+        }
+        OfflinePackPhase.COLLECTING -> {
+            Text(
+                text = context.getString(R.string.settings_offline_pack_collecting_hint),
+                style = MaterialTheme.typography.bodySmall,
+                color = MutedLavender,
+            )
+            Text(
+                text = context.getString(
+                    R.string.settings_offline_pack_progress,
+                    state.collectedCount,
+                    state.targetCount,
+                ),
+                style = MaterialTheme.typography.bodyMedium,
+                color = GoldBright,
+            )
+            state.entries.forEach { entry ->
+                Text(
+                    text = "${entry.artist} — ${entry.title}",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MutedLavender,
+                )
+            }
+            TextButton(onClick = onCancel) {
+                Text(context.getString(R.string.settings_offline_pack_cancel))
+            }
+        }
+        OfflinePackPhase.GENERATING -> {
+            Text(
+                text = context.getString(
+                    R.string.settings_offline_pack_generating,
+                    state.readyCount,
+                    state.targetCount,
+                ),
+                style = MaterialTheme.typography.bodyMedium,
+                color = GoldBright,
+            )
+            Text(
+                text = context.getString(R.string.offline_pack_tracks_ready_body, state.targetCount),
+                style = MaterialTheme.typography.bodySmall,
+                color = MutedLavender,
+            )
+        }
+        OfflinePackPhase.READY -> {
+            Text(
+                text = context.getString(R.string.settings_offline_pack_ready, state.readyCount),
+                style = MaterialTheme.typography.bodyMedium,
+                color = LiveGreen,
+            )
+            Text(
+                text = context.getString(R.string.settings_offline_pack_ready_hint),
+                style = MaterialTheme.typography.bodySmall,
+                color = MutedLavender,
+            )
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                TextButton(onClick = onStart) {
+                    Text(context.getString(R.string.settings_offline_pack_refresh))
+                }
+                TextButton(onClick = onCancel) {
+                    Text(context.getString(R.string.settings_offline_pack_cancel))
+                }
+            }
+        }
+    }
 }

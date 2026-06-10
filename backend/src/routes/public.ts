@@ -13,12 +13,7 @@ import {
   sendPaymentLinkEmail,
   sendSubscribeEmail,
 } from '../services/email-sender.js';
-import {
-  canUseSileroTts,
-  getSileroTtsBaseUrl,
-  probeSileroTtsHealth,
-} from '../services/silero-tts.js';
-import { SILERO_VOICE_PRESETS } from '../services/silero-voices.js';
+import { EDGE_VOICE_PRESETS } from '../services/edge-voices.js';
 import { hasYandexCredentials } from '../services/yandex-tts.js';
 import { getPublicDownloadLinks, getSiteApkUrl } from '../services/github-downloads.js';
 import { getPublicAuthConfig } from '../services/auth-config.js';
@@ -54,29 +49,19 @@ router.get('/auth-config', (_req: Request, res: Response) => {
   res.json(getPublicAuthConfig());
 });
 
-/** TTS options for free tier (Silero vs Android device TTS). */
+/** TTS options for free tier (Edge TTS vs paid SpeechKit). */
 router.get('/tts-config', async (_req: Request, res: Response) => {
-  const sileroConfigured = canUseSileroTts();
-  const sileroUrl = getSileroTtsBaseUrl();
-  let sileroHealthy = false;
-  if (sileroConfigured && sileroUrl) {
-    sileroHealthy = await probeSileroTtsHealth(sileroUrl);
-  }
   res.json({
     freeTier: {
-      serverEngine: sileroConfigured ? 'silero' : null,
-      deviceEngine: 'android',
+      serverEngine: 'edge',
       speechKitRequiresPaidTier: true,
     },
-    silero: {
-      enabled: sileroConfigured,
-      healthy: sileroHealthy,
-      urlConfigured: Boolean(sileroUrl),
-      presets: SILERO_VOICE_PRESETS.map((p) => ({
+    edge: {
+      enabled: true,
+      presets: Object.values(EDGE_VOICE_PRESETS).map((p) => ({
         id: p.id,
-        voice: p.voice,
         labelRu: p.labelRu,
-        moodRu: p.moodRu,
+        descriptionRu: p.descriptionRu,
       })),
     },
     yandex: { configured: hasYandexCredentials() },
@@ -345,6 +330,65 @@ router.post('/subscribe', async (req: Request, res: Response) => {
   } catch (err) {
     console.error('[public/subscribe] email send failed:', err instanceof Error ? err.message : err);
     res.status(502).json({ error: 'Не удалось отправить письмо, попробуйте позже' });
+  }
+});
+
+/** Offline website demo audio — ElevenLabs via Railway (local RF gets Cloudflare 403). */
+router.post('/website-demo/tts', async (req: Request, res: Response) => {
+  const secret = String(req.headers['x-website-demo-secret'] ?? '');
+  const expected = process.env.WEBSITE_DEMO_SECRET?.trim();
+  if (!expected || secret !== expected) {
+    res.status(403).json({ error: 'forbidden' });
+    return;
+  }
+
+  const text = typeof req.body?.text === 'string' ? req.body.text.trim() : '';
+  const lang = req.body?.lang === 'en' ? 'en' : 'ru';
+  const voiceKey = typeof req.body?.voiceId === 'string' ? req.body.voiceId.trim().toLowerCase() : '';
+
+  if (!text || text.length > 6000) {
+    res.status(400).json({ error: 'invalid text' });
+    return;
+  }
+
+  try {
+    if (lang === 'en') {
+      const { synthesizeSpeechElevenLabs } = await import('../services/elevenlabs-tts.js');
+      const { ELEVENLABS_VOICE_PRESETS } = await import('../services/elevenlabs-voices.js');
+      const preset =
+        voiceKey && voiceKey in ELEVENLABS_VOICE_PRESETS
+          ? ELEVENLABS_VOICE_PRESETS[voiceKey as keyof typeof ELEVENLABS_VOICE_PRESETS]
+          : null;
+      const voiceId = preset?.voiceId ?? voiceKey;
+      const tmp = `web-demo-${Date.now()}.ogg`;
+      const result = await synthesizeSpeechElevenLabs(text, tmp, { voiceId });
+      const { readFile, unlink } = await import('node:fs/promises');
+      const buf = await readFile(result.filePath);
+      await unlink(result.filePath).catch(() => undefined);
+      res.setHeader('Content-Type', 'audio/ogg');
+      res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+      res.send(buf);
+      return;
+    }
+
+    const { synthesizeSpeech } = await import('../services/yandex-tts.js');
+    const tmp = `web-demo-ru-${Date.now()}`;
+    const result = await synthesizeSpeech(text, voiceKey || 'zahar', tmp, {
+      speed: 1.08,
+      artist: 'Michael Jackson',
+      title: 'Thriller',
+      pauseProfile: 'tight',
+      websitePreview: true,
+    });
+    const { readFile, unlink } = await import('node:fs/promises');
+    const buf = await readFile(result.filePath);
+    await unlink(result.filePath).catch(() => undefined);
+    res.setHeader('Content-Type', 'audio/wav');
+    res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+    res.send(buf);
+  } catch (err) {
+    console.error('[public/website-demo/tts]', err instanceof Error ? err.message : err);
+    res.status(502).json({ error: 'tts_failed', detail: err instanceof Error ? err.message : String(err) });
   }
 });
 

@@ -9,7 +9,8 @@ import { resolveLlmProvider } from '../services/llm-provider.js';
 import { resolveGeminiModel } from '../services/gemini-models.js';
 import { resolveTtsVoiceStyle, type TtsVoiceStyleId } from '../services/tts-voice-profiles.js';
 import type { TtsProviderId, VoiceTier } from '../services/tts-router.js';
-import type { SileroVoicePresetId } from '../services/silero-voices.js';
+import { resolveStoryLanguage, type StoryLanguageId } from '../services/story-language.js';
+import { resolveEdgeVoicePresetId } from '../services/edge-voices.js';
 
 interface StoryFullBody {
   artist?: unknown;
@@ -39,29 +40,24 @@ interface StoryFullBody {
   salute_client_secret?: unknown;
   user_tts_provider?: unknown;
   skip_server_tts?: unknown;
+  /** @deprecated use edge_voice_preset */
   silero_voice?: unknown;
+  /** @deprecated use edge_voice_preset */
   silero_voice_preset?: unknown;
   edge_voice_preset?: unknown;
   speak_track_names_in_voiceover?: unknown;
+  story_language?: unknown;
 }
 
 const VALID_VOICE_TIERS = new Set<string>(['default', 'premium']);
-const VALID_SILERO_VOICE_PRESETS = new Set<string>(['calm_female', 'calm_male', 'lively_female', 'lively_male']);
-
-function resolveSileroVoicePresetId(value: unknown): SileroVoicePresetId | undefined {
-  if (typeof value !== 'string') return undefined;
-  const trimmed = value.trim();
-  if (!VALID_SILERO_VOICE_PRESETS.has(trimmed)) return undefined;
-  return trimmed as SileroVoicePresetId;
-}
 const VALID_TTS_PROVIDERS = new Set<string>([
   'auto',
   'yandex',
   'sber',
   'azure',
   'elevenlabs',
-  'silero',
   'edge',
+  'silero',
 ]);
 
 function resolveVoiceTier(value: unknown): VoiceTier {
@@ -72,8 +68,12 @@ function resolveVoiceTier(value: unknown): VoiceTier {
 }
 
 function resolveTtsProvider(value: unknown): TtsProviderId {
-  if (typeof value === 'string' && VALID_TTS_PROVIDERS.has(value)) {
-    return value as TtsProviderId;
+  if (typeof value === 'string') {
+    const trimmed = value.trim().toLowerCase();
+    if (trimmed === 'silero') return 'edge';
+    if (VALID_TTS_PROVIDERS.has(trimmed)) {
+      return trimmed as TtsProviderId;
+    }
   }
   return 'auto';
 }
@@ -178,11 +178,13 @@ export function validateStoryFullBody(req: Request, res: Response, next: NextFun
       ? body.user_tts_provider
       : undefined;
   const skipServerTts = body.skip_server_tts === true;
-  const sileroVoicePreset = resolveSileroVoicePresetId(body.silero_voice_preset);
-  const sileroVoiceRaw = asTrimmedString(body.silero_voice, 32);
-  const sileroVoice = sileroVoiceRaw?.toLowerCase();
-  const edgeVoicePreset = asTrimmedString(body.edge_voice_preset, 32)?.toLowerCase();
+  const legacyVoicePreset =
+    asTrimmedString(body.edge_voice_preset, 32) ??
+    asTrimmedString(body.silero_voice_preset, 32) ??
+    asTrimmedString(body.silero_voice, 32);
+  const edgeVoicePreset = resolveEdgeVoicePresetId(legacyVoicePreset);
   const speakTrackNamesInVoiceover = body.speak_track_names_in_voiceover === true;
+  const storyLanguage: StoryLanguageId = resolveStoryLanguage(body.story_language);
 
   req.body = {
     artist,
@@ -212,10 +214,9 @@ export function validateStoryFullBody(req: Request, res: Response, next: NextFun
     salute_client_secret: saluteClientSecret,
     user_tts_provider: userTtsProvider,
     skip_server_tts: skipServerTts,
-    silero_voice: sileroVoice,
-    silero_voice_preset: sileroVoicePreset,
     edge_voice_preset: edgeVoicePreset,
     speak_track_names_in_voiceover: speakTrackNamesInVoiceover,
+    story_language: storyLanguage,
   };
   next();
 }

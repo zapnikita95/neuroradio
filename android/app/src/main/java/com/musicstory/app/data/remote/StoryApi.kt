@@ -32,7 +32,13 @@ interface StoryApi {
     suspend fun setDevTier(@Body request: DevTierRequest): DevTierResponse
 
     @GET("v1/billing/status")
-    suspend fun billingStatus(): BillingStatusResponse
+    suspend fun billingStatus(@Query("appLanguage") appLanguage: String? = null): BillingStatusResponse
+
+    @GET("v1/billing/language-switch")
+    suspend fun languageSwitch(@Query("target") target: String): LanguageSwitchResponse
+
+    @POST("v1/billing/verify/google-play")
+    suspend fun verifyGooglePlay(@Body request: GooglePlayVerifyRequest): IapVerifyResponse
 
     @POST("v1/billing/unlink-card")
     suspend fun unlinkCard(): UnlinkCardResponse
@@ -42,7 +48,18 @@ interface StoryApi {
 
     @POST("v1/story/feedback")
     suspend fun submitStoryFeedback(@Body request: StoryFeedbackRequest): Map<String, Any?>
+
+    @GET("v1/facts/hint")
+    suspend fun fetchFactHint(
+        @Query("artist") artist: String,
+        @Query("title") title: String,
+    ): FactHintResponse
 }
+
+data class FactHintResponse(
+    val hasHotFact: Boolean = false,
+    val hotCount: Int = 0,
+)
 
 data class StoryFeedbackRequest(
     val artist: String,
@@ -64,4 +81,33 @@ data class PaymentCreateResponse(
     val confirmationUrl: String? = null,
     val error: String? = null,
     val hint: String? = null,
+)
+
+data class GooglePlayVerifyRequest(
+    val productId: String,
+    val purchaseToken: String,
+)
+
+data class IapVerifyResponse(
+    val ok: Boolean? = null,
+    val tier: String? = null,
+    val subscriptionMarket: String? = null,
+    val hint: String? = null,
+    val error: String? = null,
+    val code: String? = null,
+    val entitlement: BillingEntitlementResponse? = null,
+)
+
+data class LanguageSwitchPolicyResponse(
+    val allowed: Boolean = true,
+    val reason: String? = null,
+    val hintRu: String? = null,
+    val hintEn: String? = null,
+    val note: String? = null,
+)
+
+data class LanguageSwitchResponse(
+    val target: String? = null,
+    val subscriptionMarket: String? = null,
+    val policy: LanguageSwitchPolicyResponse? = null,
 )

@@ -5,6 +5,7 @@ import { validateStoryFullBody } from '../middleware/validate-story.js';
 import { extractClientSecrets } from '../middleware/client-secrets.js';
 import { enrichTrackMetadata } from '../services/musicbrainz.js';
 import { fetchAggregatedFactContext, emptyAggregatedFactContext, fetchIndieArtistFocusContext, fetchEmergencyFactRescue } from '../services/fact-aggregator.js';
+import { fetchDeepWebSearchSnippets, fetchArtistIdentityWebSnippets } from '../services/web-search-facts.js';
 import { fetchFastTrackWikiFacts } from '../services/wikipedia-facts.js';
 import { explainReferenceFactSelection, factsTooSimilar, type SelectedReferenceFact } from '../services/fact-picker.js';
 import { formatFactPickLog, logFactCandidatePools } from '../services/fact-interest-log.js';
@@ -53,7 +54,6 @@ import { countWords, detectStoryQualityWarnings, sanitizeScriptForTts } from '..
 import type { StoryScript } from '../services/groq.js';
 import { setLogDetail } from '../middleware/request-logger.js';
 import { hasYandexCredentials } from '../services/yandex-tts.js';
-import { canUseSileroTts } from '../services/silero-tts.js';
 import {
   canSynthesizeServerTts,
   hasUserTtsCredentials,
@@ -66,7 +66,7 @@ import {
   assertFreeTierTtsAvailable,
   resolveStoryTtsProvider,
   shouldSkipDailyStoryQuota,
-  SileroRequiredForFreeTierError,
+  FreeTierEdgeTtsError,
   SpeechKitSubscriptionRequiredError,
 } from '../services/tts-access.js';
 import {
@@ -153,8 +153,6 @@ interface StoryFullBody {
   user_tts_provider?: 'yandex' | 'sber';
   /** Client-side Android TTS — skip Yandex/Salute synthesis to save cost during testing. */
   skip_server_tts?: boolean;
-  silero_voice?: string;
-  silero_voice_preset?: import('../services/silero-voices.js').SileroVoicePresetId;
   edge_voice_preset?: string;
   speak_track_names_in_voiceover?: boolean;
 }
@@ -301,7 +299,8 @@ router.post('/full', extractClientSecrets, validateStoryFullBody, storyFullRateL
     tts_style: ttsStyle,
     voice_tier: voiceTier,
     tts_provider: ttsProvider,
-  } = req.body as StoryFullBody;
+    story_language: storyLanguage,
+  } = req.body as StoryFullBody & { story_language?: 'ru' | 'en' };
   const geminiModel = (req.body as StoryFullBody).gemini_model;
   const groqModel = (req.body as StoryFullBody).groq_model;
   const openrouterModelRequested = (req.body as StoryFullBody).openrouter_model;
@@ -344,7 +343,7 @@ router.post('/full', extractClientSecrets, validateStoryFullBody, storyFullRateL
   );
   console.log(
     `[story] start install=${installId.slice(0, 8)} requested_llm=${requestedProviderRaw ?? 'missing'} llm=${llmProvider}${modelLog}` +
-      ` narrator=${storyNarrator} artist="${artist}" title="${title}"`,
+      ` lang=${storyLanguage ?? 'ru'} narrator=${storyNarrator} artist="${artist}" title="${title}"`,
   );
 
   const timing = new StoryTiming(installId, artist, title);
@@ -454,6 +453,7 @@ router.post('/full', extractClientSecrets, validateStoryFullBody, storyFullRateL
         metadata.countryCode,
         metadata.mbid,
         metadata.artistMbid,
+        { storyLanguage: storyLanguage ?? 'ru' },
       );
       throwIfStoryAborted(clientAbort, 'facts-fetch');
       timing.mark(
@@ -485,6 +485,7 @@ router.post('/full', extractClientSecrets, validateStoryFullBody, storyFullRateL
             metadata.countryCode,
             metadata.mbid,
             metadata.artistMbid,
+            { storyLanguage: storyLanguage ?? 'ru' },
           );
           factBundle = factCtx.bundle;
           trackFactCount = factBundle.trackFacts.length;
@@ -612,15 +613,74 @@ router.post('/full', extractClientSecrets, validateStoryFullBody, storyFullRateL
         ]);
         console.log(formatFactPickLog(selectedFact, 'llm'));
       } else if (factCtx.rawSnippets.length > 0) {
-        const snippetSeed =
-          pickSalvageSnippetSeed(factCtx.rawSnippets, metadata.artist, metadata.title) ??
-          pickRelaxedSnippetSeed(factCtx.rawSnippets, metadata.artist, metadata.title);
-        if (snippetSeed) {
-          selectedFact = snippetSeed;
-          ingestFacts(metadata.artist, metadata.title, [
-            { fact: snippetSeed.fact, scope: snippetSeed.scope, source: 'api' },
-          ]);
-          console.log(formatFactPickLog(selectedFact, 'rules') + ' (web-snippet salvage)');
+        let mergedSnippets = factCtx.rawSnippets;
+        if (!factCtx.deepWebSearchRan) {
+          const deepSnippets = await fetchDeepWebSearchSnippets(metadata.artist, metadata.title);
+          if (deepSnippets.length > 0) {
+            mergedSnippets = [...new Set([...factCtx.rawSnippets, ...deepSnippets])];
+            factCtx = { ...factCtx, rawSnippets: mergedSnippets, deepWebSearchRan: true };
+            console.log(
+              `[fact-hunt-llm] deep web retry snippets=${mergedSnippets.length} (+${deepSnippets.length})`,
+            );
+            const huntedDeep = await huntReferenceFactWithLlm({
+              artist: metadata.artist,
+              title: metadata.title,
+              year: metadata.year,
+              genre: metadata.genre,
+              rawSnippets: mergedSnippets,
+              preferredProvider: llmProvider,
+              openRouterModel: openrouterModelFact,
+              openRouterModels: factModels,
+            });
+            if (huntedDeep) {
+              selectedFact = huntedDeep;
+              factHuntLlm = true;
+              ingestFacts(metadata.artist, metadata.title, [
+                { fact: huntedDeep.fact, scope: huntedDeep.scope, source: 'llm' },
+              ]);
+              console.log(formatFactPickLog(selectedFact, 'llm') + ' (deep-web)');
+            }
+          }
+        }
+        if (!selectedFact) {
+          const identitySnippets = await fetchArtistIdentityWebSnippets(metadata.artist);
+          if (identitySnippets.length > 0) {
+            mergedSnippets = [...new Set([...mergedSnippets, ...identitySnippets])];
+            factCtx = { ...factCtx, rawSnippets: mergedSnippets };
+            console.log(
+              `[fact-hunt-llm] artist-identity retry snippets=${mergedSnippets.length} (+${identitySnippets.length})`,
+            );
+            const huntedIdentity = await huntReferenceFactWithLlm({
+              artist: metadata.artist,
+              title: metadata.title,
+              year: metadata.year,
+              genre: metadata.genre,
+              rawSnippets: mergedSnippets,
+              preferredProvider: llmProvider,
+              openRouterModel: openrouterModelFact,
+              openRouterModels: factModels,
+            });
+            if (huntedIdentity) {
+              selectedFact = huntedIdentity;
+              factHuntLlm = true;
+              ingestFacts(metadata.artist, metadata.title, [
+                { fact: huntedIdentity.fact, scope: huntedIdentity.scope, source: 'llm' },
+              ]);
+              console.log(formatFactPickLog(selectedFact, 'llm') + ' (artist-identity)');
+            }
+          }
+        }
+        if (!selectedFact) {
+          const snippetSeed =
+            pickSalvageSnippetSeed(mergedSnippets, metadata.artist, metadata.title) ??
+            pickRelaxedSnippetSeed(mergedSnippets, metadata.artist, metadata.title);
+          if (snippetSeed) {
+            selectedFact = snippetSeed;
+            ingestFacts(metadata.artist, metadata.title, [
+              { fact: snippetSeed.fact, scope: snippetSeed.scope, source: 'api' },
+            ]);
+            console.log(formatFactPickLog(selectedFact, 'rules') + ' (web-snippet salvage)');
+          }
         }
       }
     } else if (selectedFact) {
@@ -635,7 +695,7 @@ router.post('/full', extractClientSecrets, validateStoryFullBody, storyFullRateL
       );
     }
 
-    if (selectedFact && !factFromBank && isWeakSelectedFact(selectedFact)) {
+    if (selectedFact && !factFromBank && isWeakSelectedFact(selectedFact, metadata.artist)) {
       console.warn(
         `[facts] reject weak seed score=${selectedFact.interestScore} fact="${selectedFact.fact.slice(0, 100)}"`,
       );
@@ -1052,6 +1112,7 @@ router.post('/full', extractClientSecrets, validateStoryFullBody, storyFullRateL
       clientOpenRouterApiKey: clientLlmKeys.openrouter,
       localOllamaBaseUrl: clientLocal.baseUrl,
       localOllamaModel: clientLocal.model,
+      storyLanguage: storyLanguage ?? 'ru',
     };
 
     if (selectedFact?.fact) {
@@ -1088,11 +1149,11 @@ router.post('/full', extractClientSecrets, validateStoryFullBody, storyFullRateL
     throwIfStoryAborted(clientAbort, 'seed-ready');
 
     const { story, llmUsed } = await (async () => {
-      const hasGroundedSeed = Boolean(selectedFact?.fact && selectedFact.interestScore >= 6 && !isWeakSelectedFact(selectedFact));
+      const hasGroundedSeed = Boolean(selectedFact?.fact && selectedFact.interestScore >= 6 && !isWeakSelectedFact(selectedFact, metadata.artist));
       let effectiveStoryInput = storyInput;
 
       if (!hasGroundedSeed && !factFromBank) {
-        if (selectedFact && isWeakSelectedFact(selectedFact)) {
+        if (selectedFact && isWeakSelectedFact(selectedFact, metadata.artist)) {
           console.warn(
             `[story-pipeline] weak seed rejected score=${selectedFact.interestScore} fact="${selectedFact.fact.slice(0, 100)}"`,
           );
@@ -1424,10 +1485,10 @@ router.post('/full', extractClientSecrets, validateStoryFullBody, storyFullRateL
         storyNarrator,
         artist: metadata.artist,
         title: metadata.title,
-        sileroVoice: (req.body as StoryFullBody).silero_voice,
-        sileroVoicePreset: (req.body as StoryFullBody).silero_voice_preset,
         edgeVoicePreset: (req.body as StoryFullBody).edge_voice_preset,
         speakTrackNamesInVoiceover: (req.body as StoryFullBody).speak_track_names_in_voiceover,
+        storyLanguage: storyLanguage ?? 'ru',
+        elevenLabsVoice: ttsVoice,
         logContext: {
           installId,
           artist: metadata.artist,
@@ -1492,7 +1553,7 @@ router.post('/full', extractClientSecrets, validateStoryFullBody, storyFullRateL
       });
       return;
     }
-    if (err instanceof SpeechKitSubscriptionRequiredError || err instanceof SileroRequiredForFreeTierError) {
+    if (err instanceof SpeechKitSubscriptionRequiredError || err instanceof FreeTierEdgeTtsError) {
       res.status(402).json({
         error: err.message,
         code: err.code,

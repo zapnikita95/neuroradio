@@ -3,9 +3,8 @@ import {
   hasUserTtsCredentials,
   type UserTtsCredentials,
 } from './user-tts-credentials.js';
-import { canUseSileroTts } from './silero-tts.js';
 
-export type StoryTtsProviderId = 'auto' | 'yandex' | 'sber' | 'azure' | 'elevenlabs' | 'silero' | 'edge';
+export type StoryTtsProviderId = 'auto' | 'yandex' | 'sber' | 'azure' | 'elevenlabs' | 'edge';
 
 /** Server Yandex SpeechKit — только trial/premium или свой ключ пользователя. */
 export function canUseServerSpeechKit(
@@ -26,16 +25,19 @@ export function shouldSkipDailyStoryQuota(options: {
 /** Принудительный TTS-провайдер с учётом тарифа (не доверяем клиенту на free). */
 export function resolveStoryTtsProvider(
   installId: string,
-  requested: StoryTtsProviderId | undefined,
+  requested: StoryTtsProviderId | string | undefined,
   userTtsCredentials: UserTtsCredentials | null | undefined,
 ): StoryTtsProviderId {
+  const normalized =
+    requested === 'silero' ? 'edge' : (requested as StoryTtsProviderId | undefined);
+
   if (hasUserTtsCredentials(userTtsCredentials)) {
     if (userTtsCredentials?.provider === 'yandex') return 'yandex';
     if (userTtsCredentials?.provider === 'sber') return 'sber';
   }
 
   if (canUseServerSpeechKit(installId, userTtsCredentials)) {
-    return requested ?? 'auto';
+    return normalized ?? 'auto';
   }
 
   return 'edge';
@@ -52,14 +54,14 @@ export class SpeechKitSubscriptionRequiredError extends Error {
   }
 }
 
-export class SileroRequiredForFreeTierError extends Error {
-  readonly code = 'SILERO_REQUIRED_FOR_FREE';
+export class FreeTierEdgeTtsError extends Error {
+  readonly code = 'EDGE_TTS_FREE_TIER';
 
   constructor(
-    message = 'На бесплатном тарифе озвучка только через Silero. Оформите подписку для SpeechKit или укажите свой ключ Yandex.',
+    message = 'На бесплатном тарифе озвучка через Edge TTS. Оформите подписку для Yandex SpeechKit или укажите свой ключ.',
   ) {
     super(message);
-    this.name = 'SileroRequiredForFreeTierError';
+    this.name = 'FreeTierEdgeTtsError';
   }
 }
 

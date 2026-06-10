@@ -4,6 +4,7 @@
  */
 
 import { collectLatinTokens } from './tts-en-normalize.js';
+import { latinTrackBlocklist } from './tts-generic-script.js';
 
 /** Multi-word brands / outlets — never translate or strip. */
 export const MUSIC_PROPER_NOUN_PHRASES: string[] = [
@@ -301,17 +302,25 @@ export function buildAllowedLatinTokens(
   title: string,
   referenceFacts: string[] = [],
   script = '',
+  options?: { blockTrackLatin?: boolean },
 ): Set<string> {
-  const allowed = collectLatinTokens(artist, title);
+  const blockTrackLatin = options?.blockTrackLatin === true;
+  const blocked = blockTrackLatin ? latinTrackBlocklist(artist, title) : new Set<string>();
+
+  const allowed = blockTrackLatin ? new Set<string>() : collectLatinTokens(artist, title);
   for (const word of MUSIC_PROPER_NOUNS) allowed.add(word);
   for (const token of extractLatinTokensFromFacts(referenceFacts)) allowed.add(token);
   for (const match of script.matchAll(LATIN_CAP_WORD)) {
-    allowed.add(match[0].toLowerCase());
+    const word = match[0].toLowerCase();
+    if (!blocked.has(word)) allowed.add(word);
   }
   for (const phrase of MUSIC_PROPER_NOUN_PHRASES) {
     for (const part of phrase.split(/\s+/)) {
       allowed.add(part.toLowerCase());
     }
+  }
+  if (blockTrackLatin) {
+    for (const word of blocked) allowed.delete(word);
   }
   return allowed;
 }
@@ -351,6 +360,8 @@ export interface StoryLanguageContext {
   artist: string;
   title: string;
   referenceFacts?: string[];
+  /** false / omitted → латиница из artist/title не whitelisted для TTS. */
+  speakTrackNamesInVoiceover?: boolean;
 }
 
 /** Normalize script before quality check / TTS: RU jargon, keep names. */
@@ -367,6 +378,12 @@ export function prepareStoryScriptLanguage(
   text = replaceGenericEnglish(text, namePhrases);
   text = restoreProperNamesCorruptedByGenreTranslation(text, namePhrases);
   text = fixMusicalMistranslations(text);
-  const allowedLatin = buildAllowedLatinTokens(ctx.artist, ctx.title, ctx.referenceFacts ?? [], text);
+  const allowedLatin = buildAllowedLatinTokens(
+    ctx.artist,
+    ctx.title,
+    ctx.referenceFacts ?? [],
+    text,
+    { blockTrackLatin: ctx.speakTrackNamesInVoiceover !== true },
+  );
   return { text, allowedLatin };
 }

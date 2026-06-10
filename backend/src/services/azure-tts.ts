@@ -1,4 +1,4 @@
-import fetch from 'node-fetch';
+import fetch from '../proxy-fetch.js';
 import { writeFile, mkdir } from 'node:fs/promises';
 import path from 'node:path';
 import { AUDIO_DIR, type SynthesisResult } from './yandex-tts.js';
@@ -35,6 +35,7 @@ export interface AzureSynthesisOptions {
   styleId?: string;
   storyNarrator?: StoryNarratorId;
   voice?: AzureRuVoiceId;
+  speakTrackNamesInVoiceover?: boolean;
 }
 
 /**
@@ -60,7 +61,12 @@ export async function synthesizeSpeechAzure(
     options.voice ??
     resolveAzureVoiceForStyle(options.styleId ?? 'auto', options.storyNarrator ?? 'auto');
 
-  const plainText = preparePlainSpeechText(script, artist, title);
+  const plainText = preparePlainSpeechText(
+    script,
+    artist,
+    title,
+    options.speakTrackNamesInVoiceover === true,
+  );
   const ssml = buildAzureSsml(plainText, {
     voice,
     rate: yandexSpeedToAzureRate(speed),

@@ -1,4 +1,4 @@
-import fetch from 'node-fetch';
+import fetch from '../proxy-fetch.js';
 
 /** As seen from BFF host (same PC as start-local-bff.bat). Override via env or app body. */
 export const DEFAULT_LOCAL_OLLAMA_BASE_URL = 'http://127.0.0.1:11435';

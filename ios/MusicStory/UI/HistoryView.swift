@@ -1,8 +1,11 @@
 import SwiftUI
+import SwiftData
 
 struct HistoryView: View {
     @Environment(\.dismiss) private var dismiss
-    @ObservedObject private var history = StoryHistoryStore.shared
+    @EnvironmentObject private var orchestrator: StoryOrchestrator
+    @Query(sort: \StoryHistoryEntry.createdAt, order: .reverse) private var stories: [StoryHistoryEntry]
+    @Query(sort: \ScrobbleEntry.scrobbledAt, order: .reverse) private var scrobbles: [ScrobbleEntry]
 
     @State private var tab = 0
 
@@ -40,12 +43,12 @@ struct HistoryView: View {
 
     private var storyList: some View {
         List {
-            if history.stories.isEmpty {
+            if stories.isEmpty {
                 Text("Пока нет сохранённых историй")
                     .foregroundStyle(AppTheme.mutedLavender)
                     .listRowBackground(Color.clear)
             } else {
-                ForEach(history.stories) { entry in
+                ForEach(stories) { entry in
                     VStack(alignment: .leading, spacing: 6) {
                         HStack {
                             Text("\(entry.artist) — \(entry.title)")
@@ -65,6 +68,13 @@ struct HistoryView: View {
                             .font(.caption)
                             .foregroundStyle(AppTheme.mutedLavender)
                             .lineLimit(4)
+                        if StoryRepository.shared.canReplayOffline(trackKey: entry.trackKey) {
+                            Button(AppStrings.History.listen) {
+                                Task { await orchestrator.replayHistoryStory(entry) }
+                            }
+                            .buttonStyle(.borderedProminent)
+                            .tint(AppTheme.goldBright)
+                        }
                     }
                     .listRowBackground(AppTheme.surfaceGlass)
                 }
@@ -75,12 +85,12 @@ struct HistoryView: View {
 
     private var scrobbleList: some View {
         List {
-            if history.scrobbles.isEmpty {
+            if scrobbles.isEmpty {
                 Text("Пока нет записей")
                     .foregroundStyle(AppTheme.mutedLavender)
                     .listRowBackground(Color.clear)
             } else {
-                ForEach(history.scrobbles) { entry in
+                ForEach(scrobbles) { entry in
                     HStack {
                         VStack(alignment: .leading) {
                             Text(entry.title)

@@ -79,6 +79,7 @@ class StoryOrchestrator(
     private val mediaControllerManager: MediaControllerManager,
     private val storyPlayer: StoryPlayer,
     private val triggerEngine: TriggerEngine,
+    private val factHintNotifier: FactHintNotifier = FactHintNotifier(context),
 ) {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private val storyMutex = Mutex()
@@ -400,8 +401,30 @@ class StoryOrchestrator(
             !generationInFlight
         ) {
             _state.value = OrchestratorState.LISTENING
+            maybeNotifyFactHint(track, settings)
         }
         publishUiState()
+    }
+
+    private fun maybeNotifyFactHint(track: TrackInfo, settings: TriggerSettings) {
+        if (settings.autoIntercept) return
+        scope.launch {
+            val enabled = settingsDataStore.factNotificationsEnabled.first()
+            if (!enabled) return@launch
+            if (settingsDataStore.appPowerMode.first() != AppPowerMode.ON) return@launch
+            if (isStorySessionActive()) return@launch
+            if (!storyRepository.hasOwnApiKeyConfigured()) return@launch
+            val hasHot = withContext(Dispatchers.IO) {
+                storyRepository.hasHotFactForTrack(track.artist, track.title)
+            }
+            factHintNotifier.maybeShow(
+                track = track,
+                hasHotFact = hasHot,
+                enabled = enabled,
+                manualMode = !settings.autoIntercept,
+                storySessionActive = isStorySessionActive(),
+            )
+        }
     }
 
     fun requestManualStory(fromNotification: Boolean = false) {
@@ -738,7 +761,7 @@ class StoryOrchestrator(
                     }
 
                     suspend fun startStoryPlayback(response: com.musicstory.app.data.model.StoryResponse) {
-                        val audioUrl = storyRepository.resolveAudioUrl(response.audioUrl)
+                        val audioUrl = storyRepository.resolvePlaybackUrl(track.displayKey, response.audioUrl)
                         storyPlayer.playStory(
                             response = response,
                             audioUrl = audioUrl,
@@ -999,6 +1022,60 @@ class StoryOrchestrator(
         _pendingFeedback.value = null
         _state.value = OrchestratorState.LISTENING
         publishUiState()
+    }
+
+    /** Replay saved OGG from history — no network fetch. */
+    fun replayHistoryStory(entry: com.musicstory.app.data.local.StoryHistoryEntry) {
+        scope.launch {
+            val response = storyRepository.getOfflineReplayResponse(entry.trackKey)
+            if (response == null) {
+                _hintMessage.value = context.getString(R.string.offline_replay_unavailable)
+                publishUiState()
+                return@launch
+            }
+            if (isStorySessionActive()) {
+                stopStory()
+            }
+            val track = TrackInfo(artist = entry.artist, title = entry.title)
+            playbackSession++
+            val session = playbackSession
+            _state.value = OrchestratorState.PREPARING_PLAYBACK
+            _errorMessage.value = null
+            _hintMessage.value = null
+            publishUiState()
+
+            val fadeSeconds = settingsDataStore.musicFadeSeconds.first()
+            val ttsSpeed = settingsDataStore.ttsSpeed.first().androidRate
+            withContext(Dispatchers.Main.immediate) {
+                mediaControllerManager.fadeOutAndPause(fadeSeconds)
+            }
+
+            val audioUrl = storyRepository.resolvePlaybackUrl(entry.trackKey, response.audioUrl)
+            storyPlayer.playStory(
+                response = response,
+                audioUrl = audioUrl,
+                speechRate = ttsSpeed,
+                resumeMusic = true,
+                onPlaybackStarted = {
+                    if (!isSessionCurrent(session)) return@playStory
+                    _state.value = OrchestratorState.PLAYING_STORY
+                    publishUiState()
+                },
+                onFinished = {
+                    if (!isSessionCurrent(session)) return@playStory
+                    mediaControllerManager.resumeMusic()
+                    _state.value = OrchestratorState.LISTENING
+                    publishUiState()
+                },
+                onError = {
+                    if (!isSessionCurrent(session)) return@playStory
+                    mediaControllerManager.resumeMusic()
+                    _errorMessage.value = context.getString(R.string.server_audio_error_message)
+                    _state.value = OrchestratorState.ERROR
+                    publishUiState()
+                },
+            )
+        }
     }
 
     fun clearError() {

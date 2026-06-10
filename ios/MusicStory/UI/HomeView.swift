@@ -169,7 +169,7 @@ struct HomeView: View {
                     do {
                         _ = try await nowPlaying.recognizeWithShazam()
                     } catch {
-                        orchestrator.showError(error)
+                        orchestrator.showError(error.localizedDescription)
                     }
                 }
             }
