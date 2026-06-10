@@ -1,4 +1,4 @@
-import fetch from 'node-fetch';
+import fetch from '../proxy-fetch.js';
 import { fuzzyTokenMatch } from './title-transliterate.js';
 import type { SelectedReferenceFact } from './fact-picker.js';
 import { factNamesForeignEntity, factMentionsArtist, factMentionsTitle, hasTrackContextSignal, hasRussianTrackContextSignal } from './fact-relevance.js';

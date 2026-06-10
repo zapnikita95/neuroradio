@@ -1,6 +1,7 @@
 /**
  * OpenAI-compatible chat completions (Groq, OpenRouter).
  */
+import fetch from '../proxy-fetch.js';
 
 export class OpenAiChatError extends Error {
   readonly status: number;

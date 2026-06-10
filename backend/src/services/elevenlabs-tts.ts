@@ -12,6 +12,7 @@ import {
   type ElevenLabsSegment,
 } from './elevenlabs-text.js';
 import { applyEnglishArtistPronunciation } from './artist-pronunciation.js';
+import fetch from '../proxy-fetch.js';
 
 const ELEVEN_API = 'https://api.elevenlabs.io/v1/text-to-speech';
 

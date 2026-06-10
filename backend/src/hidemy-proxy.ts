@@ -2,6 +2,9 @@ import net from 'node:net';
 
 /** hidemy.name VPN exposes XRay HTTP proxy on 127.0.0.1:1301 — Node needs HTTP_PROXY. */
 export async function ensureHidemyProxy(): Promise<void> {
+  if (!process.env.NO_PROXY?.trim()) {
+    process.env.NO_PROXY = '127.0.0.1,localhost,::1';
+  }
   if (process.env.HTTPS_PROXY?.trim() || process.env.HTTP_PROXY?.trim()) {
     process.env.NODE_USE_ENV_PROXY = '1';
     return;

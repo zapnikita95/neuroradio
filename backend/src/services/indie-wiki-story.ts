@@ -1,4 +1,4 @@
-import fetch from 'node-fetch';
+import fetch from '../proxy-fetch.js';
 import type { LlmProviderId } from './llm-provider.js';
 import { hasLlmKeyForProvider } from './llm-provider.js';
 import { resolveGroqModelOrder } from './groq-models.js';

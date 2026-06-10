@@ -1,4 +1,4 @@
-import fetch from 'node-fetch';
+import fetch from '../proxy-fetch.js';
 import { hasActionableSnippets } from './web-snippet-accept.js';
 import { cleanTrackTitleForSearch, stripSnippetBoilerplate } from './title-clean.js';
 

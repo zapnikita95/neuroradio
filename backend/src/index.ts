@@ -1,6 +1,5 @@
 import './bootstrap-logs.js';
-import './load-env.js';
-import { ensureHidemyProxy } from './hidemy-proxy.js';
+import './bootstrap-proxy.js';
 import express from 'express';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -25,6 +24,8 @@ import {
 } from './services/local-ollama.js';
 import { resolveLlmProvider } from './services/llm-provider.js';
 import { hasYandexCredentials } from './services/yandex-tts.js';
+import { canUseElevenLabsProduction, hasElevenLabsCredentials } from './services/elevenlabs-tts.js';
+import { isElevenLabsEnabled } from './services/entitlements.js';
 import { securityHeaders } from './middleware/security-headers.js';
 import { requireSignedAudioAccess } from './middleware/audio-auth.js';
 import { requestLogger } from './middleware/request-logger.js';
@@ -133,8 +134,11 @@ app.get('/health', (_req, res) => {
   const gemini = hasGeminiApiKey();
   const localOllama = hasLocalOllamaConfigured();
   const yandexTts = hasYandexCredentials();
+  const elevenLabs = canUseElevenLabsProduction();
+  const proxy = Boolean(process.env.HTTPS_PROXY?.trim() || process.env.HTTP_PROXY?.trim());
+  const lastfm = Boolean(process.env.LASTFM_API_KEY?.trim());
   console.log(
-    `[health] llm=${llm} openrouter=${openrouter} groq=${groq} gemini=${gemini} localOllama=${localOllama} yandexTts=${yandexTts} edgeTts=true`,
+    `[health] llm=${llm} openrouter=${openrouter} groq=${groq} gemini=${gemini} localOllama=${localOllama} yandexTts=${yandexTts} elevenLabs=${elevenLabs} proxy=${proxy} lastfm=${lastfm} edgeTts=true`,
   );
   res.json({
     status: 'ok',
@@ -147,6 +151,10 @@ app.get('/health', (_req, res) => {
     gemini,
     localOllama,
     yandexTts,
+    elevenLabs,
+    elevenLabsConfigured: hasElevenLabsCredentials() && isElevenLabsEnabled(),
+    proxy,
+    lastfm,
     edgeTts: true,
     appAuthRequired: isAppAuthEnabled(),
     postgres: hasPostgres(),
@@ -188,8 +196,23 @@ app.use((_req, res) => {
   res.status(404).json({ error: 'Not found' });
 });
 
+async function probeElevenLabsAtBoot(): Promise<void> {
+  if (!canUseElevenLabsProduction()) return;
+  try {
+    const fetch = (await import('./proxy-fetch.js')).default;
+    const res = await fetch('https://api.elevenlabs.io/v1/user', {
+      headers: { 'xi-api-key': process.env.ELEVENLABS_API_KEY!.trim() },
+      signal: AbortSignal.timeout(12_000),
+    });
+    console.log(`[boot] ElevenLabs API: ${res.ok ? 'OK' : `HTTP ${res.status}`}`);
+  } catch (err) {
+    console.warn(
+      `[boot] ElevenLabs API probe failed: ${err instanceof Error ? err.message : err}`,
+    );
+  }
+}
+
 async function boot(): Promise<void> {
-  await ensureHidemyProxy();
   await initPostgres();
   if (hasPostgres()) {
     await hydrateAccountStoreFromPostgres();
@@ -208,6 +231,7 @@ async function boot(): Promise<void> {
   }
 
   startSubscriptionRenewalScheduler();
+  await probeElevenLabsAtBoot();
 
   const tgWidget = resolveTelegramWidgetBaseUrl();
   if (isTelegramConfigured() && tgWidget) {
@@ -217,7 +241,9 @@ async function boot(): Promise<void> {
   const server = app.listen(PORT, '0.0.0.0', () => {
     console.log(`Music Story BFF listening on http://0.0.0.0:${PORT}`);
     console.log(`[boot] log file: ${process.env.LOCAL_LOG_FILE ?? '(console only)'}`);
-    console.log(`[boot] build=${BUILD_ID} llm=${resolveLlmProvider()} openrouter=${hasOpenRouterApiKey()} groq=${hasGroqApiKey()} gemini=${hasGeminiApiKey()} yandexTts=${hasYandexCredentials()} auth=${isAppAuthEnabled()} postgres=${hasPostgres()}`);
+    console.log(
+      `[boot] build=${BUILD_ID} llm=${resolveLlmProvider()} openrouter=${hasOpenRouterApiKey()} groq=${hasGroqApiKey()} gemini=${hasGeminiApiKey()} yandexTts=${hasYandexCredentials()} elevenLabs=${canUseElevenLabsProduction()} proxy=${Boolean(process.env.HTTPS_PROXY)} auth=${isAppAuthEnabled()} postgres=${hasPostgres()}`,
+    );
     console.log(`  POST /v1/auth/token — app JWT`);
     console.log(`  GET  /v1/account/* — email/Telegram auth + 7-day trial`);
     console.log(`  GET  /v1/sync/* — linked account settings & history`);

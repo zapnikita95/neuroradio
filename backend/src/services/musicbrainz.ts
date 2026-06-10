@@ -1,4 +1,4 @@
-import fetch from 'node-fetch';
+import fetch from '../proxy-fetch.js';
 
 const MUSICBRAINZ_BASE = 'https://musicbrainz.org/ws/2';
 const USER_AGENT = 'MusicStoryBFF/1.0 (contact@example.com)';

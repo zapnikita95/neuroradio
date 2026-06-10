@@ -4,6 +4,9 @@
  */
 import net from 'node:net';
 
+if (!process.env.NO_PROXY?.trim()) {
+  process.env.NO_PROXY = '127.0.0.1,localhost,::1';
+}
 const existing = process.env.HTTPS_PROXY?.trim() || process.env.HTTP_PROXY?.trim();
 if (existing) {
   process.env.NODE_USE_ENV_PROXY = '1';

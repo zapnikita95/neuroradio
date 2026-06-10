@@ -1,4 +1,4 @@
-import fetch from 'node-fetch';
+import fetch from '../proxy-fetch.js';
 import type { ReferenceFactBundle } from './fact-picker.js';
 import {
   assignFactsToScopes,
