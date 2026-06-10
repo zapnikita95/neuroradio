@@ -6,6 +6,7 @@ import {
   foreignLangToXmlLang as deItEsEnToXml,
   isGermanLatinPhrase,
   isKnownGermanPhrase,
+  normalizePhraseKey,
 } from './de-lang-detect.js';
 import { isFrenchLatinPhrase, isKnownFrenchPhrase } from './fr-lang-detect.js';
 
@@ -45,7 +46,35 @@ export function isFrenchArtistName(name: string): boolean {
 }
 
 /** Map to Edge TTS voice family (it/es → en until dedicated voices). */
-export function edgeForeignLang(latin: string): 'en' | 'de' | 'fr' {
+export function edgeForeignLang(latin: string, artist = '', title = ''): 'en' | 'de' | 'fr' {
+  const latinKey = normalizePhraseKey(latin);
+  const artistKey = artist ? normalizePhraseKey(artist) : '';
+  const titleKey = title ? normalizePhraseKey(title) : '';
+
+  const mentionsArtist = Boolean(artistKey && latinKey.includes(artistKey));
+  const mentionsTitle = Boolean(titleKey && latinKey.includes(titleKey));
+
+  if (mentionsArtist || mentionsTitle) {
+    if (
+      (artist && isKnownFrenchPhrase(artist)) ||
+      (title && isKnownFrenchPhrase(title))
+    ) {
+      return 'fr';
+    }
+    if (
+      (artist && isKnownGermanPhrase(artist)) ||
+      (title && isKnownGermanPhrase(title))
+    ) {
+      return 'de';
+    }
+    const artistLooksFr = Boolean(artist && isFrenchLatinPhrase(artist));
+    const titleLooksFr = Boolean(title && isFrenchLatinPhrase(title));
+    const artistLooksDe = Boolean(artist && isGermanLatinPhrase(artist));
+    const titleLooksDe = Boolean(title && isGermanLatinPhrase(title));
+    if ((artistLooksFr || titleLooksFr) && !(artistLooksDe || titleLooksDe)) return 'fr';
+    if ((artistLooksDe || titleLooksDe) && !(artistLooksFr || titleLooksFr)) return 'de';
+  }
+
   const lang = detectForeignLang(latin);
   if (lang === 'de') return 'de';
   if (lang === 'fr') return 'fr';

@@ -29,8 +29,8 @@ function pushSegment(
 /** Split mixed RU + Latin into segments for per-lang Edge voices (ru / en / de / fr). */
 export function splitMixedLanguageForEdge(
   text: string,
-  _artist = '',
-  _title = '',
+  artist = '',
+  title = '',
 ): MixedLangSegment[] {
   const source = text.trim();
   if (!source) return [];
@@ -50,7 +50,7 @@ export function splitMixedLanguageForEdge(
     if (start > cursor) {
       pushSegment(segments, 'ru', source.slice(cursor, start));
     }
-    pushSegment(segments, edgeForeignLang(latin), latin);
+    pushSegment(segments, edgeForeignLang(latin, artist, title), latin);
     cursor = start + latin.length;
   }
 
