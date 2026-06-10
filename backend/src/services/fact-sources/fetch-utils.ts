@@ -1,5 +1,3 @@
-import fetch from 'node-fetch';
-
 export const HARVEST_USER_AGENT =
   'Mozilla/5.0 (compatible; MusicStoryBFF/1.0; +https://efir-ai.ru)';
 

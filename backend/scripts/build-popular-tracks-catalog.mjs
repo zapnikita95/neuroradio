@@ -3,6 +3,7 @@
  * Last.fm blocked in RU — uses Deezer + iTunes + local cover-classics.
  * Run: npm run build:catalog
  */
+import './setup-hidemy-proxy.mjs';
 import '../dist/load-env.js';
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
