@@ -82,6 +82,8 @@ import com.musicstory.app.data.remote.BillingEntitlementResponse
 import com.musicstory.app.domain.GeminiModel
 import com.musicstory.app.domain.GroqModel
 import com.musicstory.app.domain.LlmProvider
+import com.musicstory.app.domain.OfflinePackPhase
+import com.musicstory.app.domain.OfflinePackUiState
 import android.app.Activity
 import com.musicstory.app.domain.AppLanguage
 import com.musicstory.app.domain.ElevenLabsVoice
@@ -178,7 +180,6 @@ fun SettingsScreen(
     )
     val appLanguage by settings.appLanguage.collectAsState(initial = AppLanguage.SYSTEM)
     val elevenLabsVoice by settings.elevenLabsVoice.collectAsState(initial = ElevenLabsVoice.AUTO)
-    val offlineAudioCacheEnabled by settings.offlineAudioCacheEnabled.collectAsState(initial = true)
     val serverTtsProvider by settings.serverTtsProvider.collectAsState(initial = ServerTtsProvider.EDGE)
     val userTtsBilling by settings.userTtsBilling.collectAsState(initial = UserTtsBilling.SERVER)
     val yandexApiKey by settings.yandexApiKey.collectAsState(initial = "")
@@ -189,6 +190,12 @@ fun SettingsScreen(
         initial = SettingsDataStore.DEFAULT_COUNT_TRACK_LISTEN_SECONDS,
     )
     val tourPending by settings.settingsTourPending.collectAsState(initial = false)
+
+    val offlinePackState by app.offlinePackRepository.state.collectAsState()
+
+    LaunchedEffect(Unit) {
+        app.offlinePackRepository.refreshState()
+    }
 
     var tourStep by remember { mutableStateOf<Int?>(null) }
     var tourTargetBounds by remember { mutableStateOf<Rect?>(null) }
@@ -293,7 +300,6 @@ fun SettingsScreen(
     var factNotificationsUi by remember(factNotificationsEnabled) { mutableStateOf(factNotificationsEnabled) }
     var appLanguageUi by remember(appLanguage) { mutableStateOf(appLanguage) }
     var elevenLabsVoiceUi by remember(elevenLabsVoice) { mutableStateOf(elevenLabsVoice) }
-    var offlineCacheUi by remember(offlineAudioCacheEnabled) { mutableStateOf(offlineAudioCacheEnabled) }
     var triggerModeUi by remember(triggerMode) { mutableStateOf(triggerMode) }
     var specificArtistsUi: Set<String> by remember(specificArtists) { mutableStateOf(specificArtists) }
     var specificGenresUi: Set<String> by remember(specificGenres) { mutableStateOf(specificGenres) }
@@ -478,7 +484,6 @@ fun SettingsScreen(
             factNotificationsUi != factNotificationsEnabled ||
             appLanguageUi != appLanguage ||
             elevenLabsVoiceUi != elevenLabsVoice ||
-            offlineCacheUi != offlineAudioCacheEnabled ||
             triggerModeUi != triggerMode ||
             specificArtistsUi != specificArtists ||
             specificGenresUi != specificGenres ||
@@ -564,9 +569,6 @@ fun SettingsScreen(
         val languageChanged = appLanguageUi != appLanguage
         settings.setAppLanguage(appLanguageUi)
         settings.setElevenLabsVoice(elevenLabsVoiceUi)
-        if (canUseOfflineCache) {
-            settings.setOfflineAudioCacheEnabled(offlineCacheUi)
-        }
 
         val resolvedTrigger = if (canAdvancedTriggers) triggerModeUi else TriggerMode.EVERY_N_TRACKS
         settings.setTriggerMode(resolvedTrigger)
@@ -761,20 +763,11 @@ fun SettingsScreen(
                         style = MaterialTheme.typography.bodySmall,
                         color = MutedLavender,
                     )
-                    SettingSwitchRow(
-                        title = context.getString(R.string.settings_offline_cache),
-                        checked = offlineCacheUi && canUseOfflineCache,
-                        enabled = canUseOfflineCache,
-                        onCheckedChange = { if (canUseOfflineCache) offlineCacheUi = it },
-                    )
-                    Text(
-                        text = if (canUseOfflineCache) {
-                            context.getString(R.string.settings_offline_cache_hint)
-                        } else {
-                            context.getString(R.string.settings_premium_locked_hint)
-                        },
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MutedLavender,
+                    OfflinePackSettingsSection(
+                        canUse = canUseOfflineCache,
+                        state = offlinePackState,
+                        onStart = { scope.launch { app.offlinePackRepository.startCollecting() } },
+                        onCancel = { scope.launch { app.offlinePackRepository.cancelPack() } },
                     )
                     Spacer(modifier = Modifier.height(8.dp))
                     Text(
@@ -2225,4 +2218,101 @@ private fun formatServerQuotaLabel(context: android.content.Context, quota: com.
         )
     }
     return context.getString(R.string.settings_free_quota, quota.remaining, quota.limit)
+}
+
+@Composable
+private fun OfflinePackSettingsSection(
+    canUse: Boolean,
+    state: OfflinePackUiState,
+    onStart: () -> Unit,
+    onCancel: () -> Unit,
+) {
+    val context = LocalContext.current
+    Text(
+        text = context.getString(R.string.settings_offline_pack_title),
+        style = MaterialTheme.typography.labelMedium,
+        color = MutedLavender,
+    )
+    if (!canUse) {
+        Text(
+            text = context.getString(R.string.settings_premium_locked_hint),
+            style = MaterialTheme.typography.bodySmall,
+            color = MutedLavender,
+        )
+        return
+    }
+    when (state.phase) {
+        OfflinePackPhase.IDLE -> {
+            Text(
+                text = context.getString(R.string.settings_offline_pack_intro),
+                style = MaterialTheme.typography.bodySmall,
+                color = MutedLavender,
+            )
+            TextButton(onClick = onStart) {
+                Text(context.getString(R.string.settings_offline_pack_start))
+            }
+        }
+        OfflinePackPhase.COLLECTING -> {
+            Text(
+                text = context.getString(R.string.settings_offline_pack_collecting_hint),
+                style = MaterialTheme.typography.bodySmall,
+                color = MutedLavender,
+            )
+            Text(
+                text = context.getString(
+                    R.string.settings_offline_pack_progress,
+                    state.collectedCount,
+                    state.targetCount,
+                ),
+                style = MaterialTheme.typography.bodyMedium,
+                color = GoldBright,
+            )
+            state.entries.forEach { entry ->
+                Text(
+                    text = "${entry.artist} — ${entry.title}",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MutedLavender,
+                )
+            }
+            TextButton(onClick = onCancel) {
+                Text(context.getString(R.string.settings_offline_pack_cancel))
+            }
+        }
+        OfflinePackPhase.GENERATING -> {
+            Text(
+                text = context.getString(
+                    R.string.settings_offline_pack_generating,
+                    state.readyCount,
+                    state.targetCount,
+                ),
+                style = MaterialTheme.typography.bodyMedium,
+                color = GoldBright,
+            )
+            Text(
+                text = context.getString(R.string.offline_pack_tracks_ready_body, state.targetCount),
+                style = MaterialTheme.typography.bodySmall,
+                color = MutedLavender,
+            )
+        }
+        OfflinePackPhase.READY -> {
+            Text(
+                text = context.getString(R.string.settings_offline_pack_ready, state.readyCount),
+                style = MaterialTheme.typography.bodyMedium,
+                color = LiveGreen,
+            )
+            Text(
+                text = context.getString(R.string.settings_offline_pack_ready_hint),
+                style = MaterialTheme.typography.bodySmall,
+                color = MutedLavender,
+            )
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                TextButton(onClick = onStart) {
+                    Text(context.getString(R.string.settings_offline_pack_refresh))
+                }
+                TextButton(onClick = onCancel) {
+                    Text(context.getString(R.string.settings_offline_pack_cancel))
+                }
+            }
+        }
+    }
 }

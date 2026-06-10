@@ -106,6 +106,7 @@ class MediaMonitorService : Service() {
                             dwellTrack = track
                             dwellStartedAtMs = System.currentTimeMillis()
                             scheduleTrackCounted(app, track)
+                            serviceScope.launch { app.offlinePackRepository.onTrackHeard(track) }
                         }
                         lastTrackKey = key
                         if (firstTrack || titleChanged) {

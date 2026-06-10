@@ -102,7 +102,12 @@ final class ScrobbleEntry {
 enum StoryHistoryModel {
     static let container: ModelContainer = {
         do {
-            return try ModelContainer(for: StoryHistoryEntry.self, ScrobbleEntry.self, CachedStoryEntry.self)
+            return try ModelContainer(
+                for: StoryHistoryEntry.self,
+                ScrobbleEntry.self,
+                CachedStoryEntry.self,
+                OfflinePackEntry.self
+            )
         } catch {
             fatalError("SwiftData init failed: \(error)")
         }

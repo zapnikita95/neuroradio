@@ -146,6 +146,7 @@ fun MusicStoryStartupGate(
     hasNotificationAccess: Boolean,
     onNotificationAccessChanged: () -> Unit,
     openListeningPage: Boolean,
+    openSettingsPage: Boolean = false,
     modifier: Modifier = Modifier,
 ) {
     val startDestination = rememberMusicStoryStartDestination(hasNotificationAccess)
@@ -157,6 +158,11 @@ fun MusicStoryStartupGate(
             popUpTo(Routes.HOME) { inclusive = true }
             launchSingleTop = true
         }
+    }
+
+    LaunchedEffect(openSettingsPage, hasNotificationAccess) {
+        if (!openSettingsPage || !hasNotificationAccess) return@LaunchedEffect
+        navController.navigate(Routes.SETTINGS) { launchSingleTop = true }
     }
 
     MusicStoryNavGraph(

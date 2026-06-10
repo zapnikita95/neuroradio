@@ -14,6 +14,7 @@ import androidx.datastore.core.handlers.ReplaceFileCorruptionHandler
 import androidx.datastore.preferences.core.emptyPreferences
 import androidx.datastore.preferences.preferencesDataStore
 import com.musicstory.app.domain.AppPowerMode
+import com.musicstory.app.domain.OfflinePackPhase
 import com.musicstory.app.domain.GeminiModel
 import com.musicstory.app.domain.GroqModel
 import com.musicstory.app.domain.LlmProvider
@@ -280,6 +281,14 @@ class SettingsDataStore(private val context: Context) {
 
     val offlineAudioCacheEnabled: Flow<Boolean> = context.settingsDataStore.data.map { prefs ->
         prefs[KEY_OFFLINE_AUDIO_CACHE_ENABLED] ?: true
+    }
+
+    val offlinePackPhase: Flow<String> = context.settingsDataStore.data.map { prefs ->
+        prefs[KEY_OFFLINE_PACK_PHASE] ?: OfflinePackPhase.IDLE.id
+    }
+
+    val offlinePackSessionId: Flow<Long> = context.settingsDataStore.data.map { prefs ->
+        prefs[KEY_OFFLINE_PACK_SESSION_ID] ?: 0L
     }
 
     val serverTtsProvider: Flow<ServerTtsProvider> = context.settingsDataStore.data.map { prefs ->
@@ -596,6 +605,16 @@ class SettingsDataStore(private val context: Context) {
         notifyCloudSync()
     }
 
+    suspend fun setOfflinePackPhase(phase: String) {
+        context.settingsDataStore.edit { it[KEY_OFFLINE_PACK_PHASE] = phase }
+        notifyCloudSync()
+    }
+
+    suspend fun setOfflinePackSessionId(sessionId: Long) {
+        context.settingsDataStore.edit { it[KEY_OFFLINE_PACK_SESSION_ID] = sessionId }
+        notifyCloudSync()
+    }
+
     suspend fun setServerTtsProvider(provider: ServerTtsProvider) {
         context.settingsDataStore.edit { it[KEY_SERVER_TTS_PROVIDER] = provider.id }
         notifyCloudSync()
@@ -812,6 +831,8 @@ class SettingsDataStore(private val context: Context) {
         private val KEY_APP_LANGUAGE = stringPreferencesKey("app_language")
         private val KEY_ELEVENLABS_VOICE = stringPreferencesKey("elevenlabs_voice")
         private val KEY_OFFLINE_AUDIO_CACHE_ENABLED = booleanPreferencesKey("offline_audio_cache_enabled")
+        private val KEY_OFFLINE_PACK_PHASE = stringPreferencesKey("offline_pack_phase")
+        private val KEY_OFFLINE_PACK_SESSION_ID = longPreferencesKey("offline_pack_session_id")
         private val KEY_SERVER_TTS_PROVIDER = stringPreferencesKey("server_tts_provider")
         private val KEY_USER_TTS_BILLING = stringPreferencesKey("user_tts_billing")
         private val KEY_YANDEX_API_KEY = stringPreferencesKey("yandex_api_key")

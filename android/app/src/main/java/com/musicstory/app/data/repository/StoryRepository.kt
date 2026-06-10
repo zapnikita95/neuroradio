@@ -2,6 +2,8 @@ package com.musicstory.app.data.repository
 
 import android.os.Build
 import com.musicstory.app.data.local.CachedStory
+import com.musicstory.app.data.local.OfflinePackDao
+import com.musicstory.app.data.local.OfflinePackEntry
 import com.musicstory.app.data.local.SettingsDataStore
 import com.musicstory.app.data.local.StoryDao
 import com.musicstory.app.data.local.StoryHistoryDao
@@ -19,6 +21,7 @@ import com.musicstory.app.data.remote.GroqErrorParser
 import com.musicstory.app.data.remote.ServerRateLimitParser
 import com.musicstory.app.data.model.StoryQuotaInfo
 import com.google.gson.Gson
+import com.musicstory.app.domain.OfflinePackPhase
 import com.musicstory.app.domain.GeminiModel
 import com.musicstory.app.domain.GroqModel
 import com.musicstory.app.domain.LlmProvider
@@ -69,6 +72,7 @@ class StoryRepository(
     private val metadataCache: MetadataCache,
     private val connectionChecker: ConnectionChecker = ConnectionChecker(),
     private val offlineAudioStore: StoryOfflineAudioStore,
+    private val offlinePackDao: OfflinePackDao? = null,
 ) {
     private val gson = Gson()
     private val storyFetchMutex = Mutex()
@@ -313,6 +317,18 @@ class StoryRepository(
         storyFetchMutex.withLock {
             fetchStoryLocked(track, forceRefresh)
         }
+
+    /** Background offline-pack generation — always hits backend and saves OGG. */
+    suspend fun fetchStoryForOfflinePack(track: TrackInfo): Result<StoryResponse> =
+        storyFetchMutex.withLock {
+            fetchStoryLocked(track, forceRefresh = true)
+        }
+
+    suspend fun getCachedLocalPath(trackKey: String): String? {
+        val cached = storyDao.getByTrackKey(trackKey) ?: return null
+        val path = cached.localAudioPath ?: return null
+        return path.takeIf { offlineAudioStore.hasLocalFile(it) }
+    }
 
     private suspend fun fetchStoryLocked(track: TrackInfo, forceRefresh: Boolean): Result<StoryResponse> {
         if (!track.isValid()) {
@@ -941,6 +957,7 @@ class StoryRepository(
     /** Local OGG if cached, else resolved server URL. */
     suspend fun resolvePlaybackUrl(trackKey: String, audioUrl: String?): String? {
         if (canUseOfflineReplay()) {
+            packPlaybackPath(trackKey)?.let { return offlineAudioStore.localFileUri(it) }
             val cached = storyDao.getByTrackKey(trackKey)
             val localPath = cached?.localAudioPath
             if (offlineAudioStore.hasLocalFile(localPath)) {
@@ -982,11 +999,40 @@ class StoryRepository(
 
     private suspend fun tryOfflineReplay(trackKey: String): Result<StoryResponse>? {
         if (!canUseOfflineReplay()) return null
+        tryOfflinePackReplay(trackKey)?.let { return it }
         val cached = storyDao.getByTrackKey(trackKey) ?: return null
         if (!isReplayableCache(cached)) return null
         StoryLog.i("Story from offline cache: $trackKey")
         return Result.success(cached.toResponse())
     }
+
+    private suspend fun tryOfflinePackReplay(trackKey: String): Result<StoryResponse>? {
+        val dao = offlinePackDao ?: return null
+        if (settingsDataStore.offlinePackPhase.first() != OfflinePackPhase.READY.id) return null
+        val sessionId = settingsDataStore.offlinePackSessionId.first()
+        if (sessionId <= 0L) return null
+        val entry = dao.findReadyTrack(sessionId, trackKey) ?: return null
+        if (!offlineAudioStore.hasLocalFile(entry.localAudioPath)) return null
+        StoryLog.i("Story from offline pack: $trackKey")
+        return Result.success(entry.toStoryResponse())
+    }
+
+    private suspend fun packPlaybackPath(trackKey: String): String? {
+        val dao = offlinePackDao ?: return null
+        if (settingsDataStore.offlinePackPhase.first() != OfflinePackPhase.READY.id) return null
+        val sessionId = settingsDataStore.offlinePackSessionId.first()
+        if (sessionId <= 0L) return null
+        val entry = dao.findReadyTrack(sessionId, trackKey) ?: return null
+        val path = entry.localAudioPath ?: return null
+        return path.takeIf { offlineAudioStore.hasLocalFile(it) }
+    }
+
+    private fun OfflinePackEntry.toStoryResponse(): StoryResponse = StoryResponse(
+        artist = artist,
+        title = title,
+        script = script.orEmpty(),
+        audioUrl = null,
+    )
 
     private fun isReplayableCache(cached: CachedStory): Boolean {
         if (cached.demo) return false

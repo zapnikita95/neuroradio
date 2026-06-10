@@ -16,6 +16,8 @@ import com.musicstory.app.data.remote.MetadataEnricher
 import com.musicstory.app.data.repository.ScrobbleRepository
 import com.musicstory.app.data.repository.StoryRepository
 import com.musicstory.app.domain.MonitorLifecycle
+import com.musicstory.app.domain.OfflinePackNotifier
+import com.musicstory.app.domain.OfflinePackRepository
 import com.musicstory.app.domain.StoryOrchestrator
 import com.musicstory.app.domain.StoryPlayer
 import com.musicstory.app.domain.TriggerEngine
@@ -74,6 +76,9 @@ class MusicStoryApp : Application() {
     lateinit var storyOrchestrator: StoryOrchestrator
         private set
 
+    lateinit var offlinePackRepository: OfflinePackRepository
+        private set
+
     val appScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     override fun onCreate() {
@@ -108,6 +113,14 @@ class MusicStoryApp : Application() {
             accountSyncManager = accountSyncManager,
             metadataCache = metadataCache,
             offlineAudioStore = offlineAudioStore,
+            offlinePackDao = database.offlinePackDao(),
+        )
+        offlinePackRepository = OfflinePackRepository(
+            context = this,
+            offlinePackDao = database.offlinePackDao(),
+            settingsDataStore = settingsDataStore,
+            storyRepository = storyRepository,
+            notifier = OfflinePackNotifier(this),
         )
         mediaControllerManager = MediaControllerManager(this)
         storyPlayer = StoryPlayer(this)
@@ -133,6 +146,9 @@ class MusicStoryApp : Application() {
         prefetchAccountHistory()
         appScope.launch {
             storyRepository.dedupeStoryHistory()
+        }
+        appScope.launch {
+            offlinePackRepository.refreshState()
         }
         appScope.launch {
             delay(8_000)

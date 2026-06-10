@@ -36,6 +36,7 @@
 		B1000020 /* OfflineAudioStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1000020 /* OfflineAudioStore.swift */; };
 		B1000021 /* TierAccess.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1000021 /* TierAccess.swift */; };
 		B1000022 /* FactHintRateLimiter.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1000022 /* FactHintRateLimiter.swift */; };
+		B1000023 /* OfflinePackStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1000023 /* OfflinePackStore.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -95,6 +96,7 @@
 		F1000020 /* OfflineAudioStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OfflineAudioStore.swift; sourceTree = "<group>"; };
 		F1000021 /* TierAccess.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TierAccess.swift; sourceTree = "<group>"; };
 		F1000022 /* FactHintRateLimiter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FactHintRateLimiter.swift; sourceTree = "<group>"; };
+		F1000023 /* OfflinePackStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OfflinePackStore.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -199,6 +201,7 @@
 				F100000B /* StoryHistoryStore.swift */,
 				F100000C /* StoryRepository.swift */,
 				F1000020 /* OfflineAudioStore.swift */,
+				F1000023 /* OfflinePackStore.swift */,
 				F1000021 /* TierAccess.swift */,
 			);
 			path = Data;
@@ -357,6 +360,7 @@
 				B1000014 /* SettingsView.swift in Sources */,
 				B1000015 /* HistoryView.swift in Sources */,
 				B1000020 /* OfflineAudioStore.swift in Sources */,
+				B1000023 /* OfflinePackStore.swift in Sources */,
 				B1000021 /* TierAccess.swift in Sources */,
 				B1000022 /* FactHintRateLimiter.swift in Sources */,
 			);

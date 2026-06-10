@@ -24,6 +24,7 @@ class MainActivity : ComponentActivity() {
 
     private lateinit var app: MusicStoryApp
     private var openListeningPage by mutableStateOf(false)
+    private var openSettingsPage by mutableStateOf(false)
 
     override fun attachBaseContext(newBase: Context) {
         val language = LocaleHelper.readStoredLanguage(newBase)
@@ -36,6 +37,7 @@ class MainActivity : ComponentActivity() {
 
         app = application as MusicStoryApp
         openListeningPage = intent?.getBooleanExtra(EXTRA_OPEN_LISTENING, false) == true
+        openSettingsPage = intent?.getBooleanExtra(EXTRA_OPEN_SETTINGS, false) == true
 
         setContent {
             MusicStoryTheme {
@@ -61,6 +63,7 @@ class MainActivity : ComponentActivity() {
                         hasNotificationAccess = app.mediaControllerManager.hasNotificationAccess()
                     },
                     openListeningPage = openListeningPage,
+                    openSettingsPage = openSettingsPage,
                     modifier = Modifier.fillMaxSize(),
                 )
             }
@@ -73,6 +76,9 @@ class MainActivity : ComponentActivity() {
         if (intent.getBooleanExtra(EXTRA_OPEN_LISTENING, false)) {
             openListeningPage = true
         }
+        if (intent.getBooleanExtra(EXTRA_OPEN_SETTINGS, false)) {
+            openSettingsPage = true
+        }
     }
 
     override fun onResume() {
@@ -84,5 +90,6 @@ class MainActivity : ComponentActivity() {
 
     companion object {
         const val EXTRA_OPEN_LISTENING = "com.musicstory.app.extra.OPEN_LISTENING"
+        const val EXTRA_OPEN_SETTINGS = "com.musicstory.app.extra.OPEN_SETTINGS"
     }
 }

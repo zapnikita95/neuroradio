@@ -27,6 +27,8 @@ final class SettingsStore: ObservableObject {
         static let spotifyClientId = "spotify_client_id"
         static let spotifyRedirectURI = "spotify_redirect_uri"
         static let offlineAudioCacheEnabled = "offline_audio_cache_enabled"
+        static let offlinePackPhase = "offline_pack_phase"
+        static let offlinePackSessionId = "offline_pack_session_id"
         static let factNotificationsEnabled = "fact_notifications_enabled"
     }
 
@@ -80,6 +82,14 @@ final class SettingsStore: ObservableObject {
         didSet { defaults.set(offlineAudioCacheEnabled, forKey: Keys.offlineAudioCacheEnabled) }
     }
 
+    @Published var offlinePackPhase: String {
+        didSet { defaults.set(offlinePackPhase, forKey: Keys.offlinePackPhase) }
+    }
+
+    @Published var offlinePackSessionId: Int64 {
+        didSet { defaults.set(offlinePackSessionId, forKey: Keys.offlinePackSessionId) }
+    }
+
     @Published var factNotificationsEnabled: Bool {
         didSet { defaults.set(factNotificationsEnabled, forKey: Keys.factNotificationsEnabled) }
     }
@@ -97,6 +107,8 @@ final class SettingsStore: ObservableObject {
         spotifyClientId = defaults.string(forKey: Keys.spotifyClientId) ?? ""
         spotifyRedirectURI = defaults.string(forKey: Keys.spotifyRedirectURI) ?? "efirai://spotify-callback"
         offlineAudioCacheEnabled = defaults.object(forKey: Keys.offlineAudioCacheEnabled) as? Bool ?? true
+        offlinePackPhase = defaults.string(forKey: Keys.offlinePackPhase) ?? OfflinePackPhase.idle.rawValue
+        offlinePackSessionId = Int64(defaults.object(forKey: Keys.offlinePackSessionId) as? Int ?? 0)
         factNotificationsEnabled = defaults.object(forKey: Keys.factNotificationsEnabled) as? Bool ?? true
     }
 

@@ -69,6 +69,7 @@ final class StoryOrchestrator: ObservableObject {
     func onTrackChanged(_ track: TrackInfo) async {
         guard track.isValid() else { return }
         uiState.currentTrack = track
+        OfflinePackStore.shared.onTrackHeard(track)
 
         guard !historyStore.wasRecentlyScrobbled(track.displayKey) else { return }
 

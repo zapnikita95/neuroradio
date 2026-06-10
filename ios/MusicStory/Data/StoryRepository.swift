@@ -41,7 +41,7 @@ final class StoryRepository: ObservableObject {
         }
 
         if !NetworkMonitor.isConnected {
-            if let replay = offlineReplayResponse(for: track.displayKey) {
+            if let replay = offlinePackResponse(for: track.displayKey) ?? offlineReplayResponse(for: track.displayKey) {
                 return .success(replay)
             }
             return .failure(BackendError.serverError(0, Self.offlineNoCacheMessage))
@@ -73,14 +73,31 @@ final class StoryRepository: ObservableObject {
         }
     }
 
+    func fetchStoryForOfflinePack(track: TrackInfo) async -> Result<StoryResponse, Error> {
+        await fetchStory(track: track, forceRefresh: true)
+    }
+
+    func cachedLocalPath(for trackKey: String) -> String? {
+        guard let cached = history.cachedStory(for: trackKey),
+              offlineStore.hasLocalFile(at: cached.localAudioPath) else { return nil }
+        return cached.localAudioPath
+    }
+
     func resolveAudioURL(_ audioURL: String?) -> URL? {
         backend.resolveAudioURL(audioURL)
     }
 
     func resolvePlaybackURL(trackKey: String, audioURL: String?) -> URL? {
-        if canUseOfflineReplay(), let cached = history.cachedStory(for: trackKey),
-           offlineStore.hasLocalFile(at: cached.localAudioPath) {
-            return offlineStore.localFileURL(path: cached.localAudioPath!)
+        if canUseOfflineReplay() {
+            if let pack = OfflinePackStore.shared.readyEntry(for: trackKey),
+               let path = pack.localAudioPath,
+               offlineStore.hasLocalFile(at: path) {
+                return offlineStore.localFileURL(path: path)
+            }
+            if let cached = history.cachedStory(for: trackKey),
+               offlineStore.hasLocalFile(at: cached.localAudioPath) {
+                return offlineStore.localFileURL(path: cached.localAudioPath!)
+            }
         }
         return resolveAudioURL(audioURL)
     }
@@ -96,17 +113,34 @@ final class StoryRepository: ObservableObject {
               let cached = history.cachedStory(for: trackKey),
               offlineStore.hasLocalFile(at: cached.localAudioPath),
               !cached.demo else { return nil }
-        return StoryResponse(
-            artist: cached.artist,
-            title: cached.title,
+        return storyResponse(from: cached.artist, title: cached.title, script: cached.script, demo: cached.demo, audioUrl: cached.audioUrl)
+    }
+
+    func offlinePackResponse(for trackKey: String) -> StoryResponse? {
+        guard canUseOfflineReplay(),
+              let entry = OfflinePackStore.shared.readyEntry(for: trackKey),
+              let script = entry.script else { return nil }
+        return storyResponse(from: entry.artist, title: entry.title, script: script, demo: false, audioUrl: nil)
+    }
+
+    private func storyResponse(
+        from artist: String,
+        title: String,
+        script: String,
+        demo: Bool,
+        audioUrl: String?
+    ) -> StoryResponse {
+        StoryResponse(
+            artist: artist,
+            title: title,
             year: nil,
             genre: nil,
             mbid: nil,
-            script: cached.script,
-            wordCount: cached.script.split(separator: " ").count,
+            script: script,
+            wordCount: script.split(separator: " ").count,
             voiceId: nil,
-            demo: cached.demo,
-            audioUrl: cached.audioUrl,
+            demo: demo,
+            audioUrl: audioUrl,
             audioFile: nil,
             ttsHint: nil,
             quota: dailyQuota
