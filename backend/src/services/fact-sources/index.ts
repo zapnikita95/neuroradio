@@ -63,14 +63,22 @@ function filterRelevant(facts: HarvestedFact[], ctx: HarvestContext): HarvestedF
 
 /** Parallel harvest from dedicated parsers + existing aggregator snippets. */
 export async function harvestAllFacts(ctx: HarvestContext): Promise<HarvestedFact[]> {
+  const collected: HarvestedFact[] = [];
+
+  // Last.fm first (RU needs hidemy proxy) — never let parallel timeout starve it.
+  const lastfmItems = await withTimeout(fetchLastfmFacts(ctx), 15_000);
+  if (lastfmItems?.length) {
+    collected.push(...lastfmItems.map((f) => ({ ...f, source: 'lastfm' as const })));
+  }
+
+  const otherSources = DEDICATED_SOURCES.filter((s) => s.source !== 'lastfm');
   const dedicatedResults = await Promise.allSettled(
-    DEDICATED_SOURCES.map(async ({ source, fetch }) => {
+    otherSources.map(async ({ source, fetch }) => {
       const items = await withTimeout(fetch(ctx), SOURCE_TIMEOUT_MS);
       return (items ?? []).map((f) => ({ ...f, source }));
     }),
   );
 
-  const collected: HarvestedFact[] = [];
   for (const result of dedicatedResults) {
     if (result.status === 'fulfilled') collected.push(...result.value);
   }
