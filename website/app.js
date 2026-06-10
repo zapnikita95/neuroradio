@@ -489,7 +489,10 @@
       };
     }
 
+    var lastLinks = null;
+
     function applyLinks(links) {
+      lastLinks = links;
       var en = window.EfirI18n && window.EfirI18n.getLang() === 'en';
       var tagLabel = links.tag
         ? (en ? 'version ' + links.tag : 'версия ' + links.tag)
@@ -564,6 +567,10 @@
       .catch(function () { return fetchGhList(); })
       .then(applyLinks)
       .catch(function () { applyLinks({ apkUrl: null, extensionUrl: null, tag: null }); });
+
+    window.EfirRefreshDownloadLabels = function () {
+      if (lastLinks) applyLinks(lastLinks);
+    };
   })();
 
 })();

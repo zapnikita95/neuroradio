@@ -46,6 +46,46 @@
         currency: '₽',
       },
       persona: { play: 'Послушать пример: ', amp: 'Амплуа: ' },
+      download: {
+        sub:
+          'Эфир AI работает на Android и в браузере. Подписка единая — войдите под одним email, и настройки синхронизируются между устройствами.',
+        androidTitle: 'Приложение для Android',
+        androidDesc:
+          'Следит за текущим треком в любом плеере (Spotify, Яндекс Музыка, YouTube Music) и озвучивает истории между песнями.',
+        androidMeta: 'APK · Android 8.0+',
+        androidBtn: 'Скачать APK',
+        androidFine: 'После скачивания разрешите установку из этого источника в настройках телефона.',
+        extTitle: 'Расширение для браузера',
+        extDesc:
+          'Для Chrome и Яндекс Браузера. Работает с веб-плеерами Яндекс Музыки, Spotify и YouTube прямо во вкладке.',
+        extMeta: 'Chrome / Яндекс · MV3',
+        extBtn: 'Установить расширение',
+        extFineLink: 'Как установить расширение →',
+      },
+      sections: {
+        serviceKicker: 'О сервисе',
+        serviceTitle: 'Знакомые треки <span class="grad-text">звучат заново</span>',
+        serviceSub:
+          'Когда музыка играет фоном, детали ускользают. Эфир AI возвращает трекам контекст: между песнями звучит короткая живая вставка с настоящим фактом, и даже заигранная композиция открывается с новой стороны.',
+        personasSub:
+          'Один и тот же факт звучит по-разному. Выберите характер — и послушайте, как меняется подача. Листайте карточки вбок.',
+        howSub:
+          'Всю тяжёлую работу берёт на себя сервер, а вам остаётся только слушать. Вот что происходит за те несколько секунд, пока играет песня.',
+        pricingTitle: 'Расширенные возможности',
+        pricingSub: 'для качественного опыта прослушивания',
+        finalCtaTitle: 'Готовы услышать музыку <span class="grad-text">по-новому?</span>',
+        finalCtaSub: 'Соберите свой эфир за минуту — и пусть каждый трек расскажет историю.',
+        finalCtaBtn: 'Подключить Эфир AI',
+        tierBasic: 'Базовый',
+        tierExtended: 'Расширенный',
+        tierFree: 'бесплатно',
+        tierFrom: 'от 167 ₽/мес',
+      },
+      modals: {
+        successApk: 'Скачать APK для Android',
+        successExt: 'Скачать расширение',
+        loginSubmit: 'Войти в кабинет',
+      },
     },
     en: {
       metaTitle: 'Efir AI — AI radio host for your music on Android & browser',
@@ -88,6 +128,46 @@
         currency: '$',
       },
       persona: { play: 'Play sample: ', amp: 'Persona: ' },
+      download: {
+        sub:
+          'Efir AI runs on Android and in the browser. One subscription — sign in with the same email and settings sync across devices.',
+        androidTitle: 'Android app',
+        androidDesc:
+          'Tracks what is playing in any player (Spotify, Yandex Music, YouTube Music) and narrates stories between songs.',
+        androidMeta: 'APK · Android 8.0+',
+        androidBtn: 'Download APK',
+        androidFine: 'After download, allow installs from this source in your phone settings.',
+        extTitle: 'Browser extension',
+        extDesc:
+          'For Chrome and Yandex Browser. Works with Yandex Music, Spotify, and YouTube web players right in the tab.',
+        extMeta: 'Chrome / Yandex · MV3',
+        extBtn: 'Install extension',
+        extFineLink: 'How to install the extension →',
+      },
+      sections: {
+        serviceKicker: 'About',
+        serviceTitle: 'Familiar tracks <span class="grad-text">sound new</span>',
+        serviceSub:
+          'When music is background noise, details slip away. Efir AI brings context back: a short live fact between songs, and even old favorites feel fresh.',
+        personasSub:
+          'One fact — many deliveries. Pick a persona and hear how the tone shifts. Swipe the cards sideways.',
+        howSub:
+          'The server does the heavy lifting — you just listen. Here is what happens in the few seconds while a song plays.',
+        pricingTitle: 'Extended features',
+        pricingSub: 'for a richer listening experience',
+        finalCtaTitle: 'Ready to hear music <span class="grad-text">in a new way?</span>',
+        finalCtaSub: 'Build your station in a minute — let every track tell a story.',
+        finalCtaBtn: 'Get Efir AI',
+        tierBasic: 'Basic',
+        tierExtended: 'Extended',
+        tierFree: 'free',
+        tierFrom: 'from $3.33/mo',
+      },
+      modals: {
+        successApk: 'Download APK for Android',
+        successExt: 'Download extension',
+        loginSubmit: 'Sign in to account',
+      },
     },
   };
 
@@ -197,37 +277,108 @@
     setText('.studio-hint', s.hint);
   }
 
-  function applyPageBlocks(lang) {
-    if (lang !== 'en') return;
-    setText('#service .kicker', 'About');
-    setHtml('#service .section-title', 'Familiar tracks <span class="grad-text">sound new</span>');
-    setText('#personas .kicker', 'Personas');
-    setHtml('#personas .section-title', 'A host for <span class="grad-text">your taste</span>');
-    setText('#personas .section-sub', 'One fact — many deliveries. Pick a persona and hear how the tone shifts. Swipe the cards sideways.');
-    setText('#how .kicker', 'How it works');
-    setHtml('#how .section-title', 'From track to story in <span class="grad-text">seconds</span>');
-    setText('#download .kicker', 'Download');
-    setHtml('#download .section-title', 'Wherever <span class="grad-text">your music</span> plays');
-    setText('#pricing .kicker', 'Pricing');
-    setText('#pricing .section-title', 'Extended features');
-    setText('#pricing .section-sub', 'for a richer listening experience');
-    setText('#models .kicker', 'Tech stack');
-    setText('#models .section-title', 'Under the hood');
+  function applyDownload(T) {
+    var d = T.download;
+    if (!d) return;
+    setText('#download .section-sub', d.sub);
+    var cards = document.querySelectorAll('#download .dl-card');
+    if (cards[0]) {
+      var a0 = cards[0];
+      var h0 = a0.querySelector('h3');
+      var p0 = a0.querySelector('p:not(.dl-fine)');
+      var meta0 = a0.querySelector('.dl-meta li:first-child');
+      var btn0 = q('#dlApk');
+      var fine0 = a0.querySelector('.dl-fine');
+      if (h0) h0.textContent = d.androidTitle;
+      if (p0) p0.textContent = d.androidDesc;
+      if (meta0) meta0.textContent = d.androidMeta;
+      if (btn0) btn0.innerHTML = '<span class="btn-ic site-ic ic-download" aria-hidden="true"></span> ' + d.androidBtn;
+      if (fine0) fine0.textContent = d.androidFine;
+    }
+    if (cards[1]) {
+      var a1 = cards[1];
+      var h1 = a1.querySelector('h3');
+      var p1 = a1.querySelector('p:not(.dl-fine)');
+      var meta1 = a1.querySelector('.dl-meta li:first-child');
+      var btn1 = q('#dlExt');
+      var fine1 = a1.querySelector('.dl-fine a');
+      if (h1) h1.textContent = d.extTitle;
+      if (p1) p1.textContent = d.extDesc;
+      if (meta1) meta1.textContent = d.extMeta;
+      if (btn1) btn1.innerHTML = '<span class="btn-ic site-ic ic-download" aria-hidden="true"></span> ' + d.extBtn;
+      if (fine1) fine1.textContent = d.extFineLink;
+    }
+    var successApk = q('#successApk');
+    var successExt = q('#successExt');
+    if (successApk && T.modals) {
+      successApk.innerHTML = '<span class="btn-ic site-ic ic-download" aria-hidden="true"></span> ' + T.modals.successApk;
+    }
+    if (successExt && T.modals) {
+      successExt.innerHTML = '<span class="btn-ic site-ic ic-puzzle" aria-hidden="true"></span> ' + T.modals.successExt;
+    }
+  }
+
+  function applySections(T, lang) {
+    var s = T.sections;
+    if (!s) return;
+    setText('#service .kicker', s.serviceKicker);
+    setHtml('#service .section-title', s.serviceTitle);
+    setText('#service .section-sub', s.serviceSub);
+    setText('#personas .kicker', lang === 'en' ? 'Personas' : 'Амплуа');
+    setHtml(
+      '#personas .section-title',
+      lang === 'en'
+        ? 'A host for <span class="grad-text">your taste</span>'
+        : 'Рассказчик на <span class="grad-text">ваш вкус</span>',
+    );
+    setText('#personas .section-sub', s.personasSub);
+    setText('#how .kicker', lang === 'en' ? 'How it works' : 'Как это работает');
+    setHtml(
+      '#how .section-title',
+      lang === 'en'
+        ? 'From track to story in <span class="grad-text">seconds</span>'
+        : 'От трека до истории — <span class="grad-text">за секунды</span>',
+    );
+    setText('#how .section-sub', s.howSub);
+    setText('#download .kicker', lang === 'en' ? 'Download' : 'Скачать');
+    setHtml(
+      '#download .section-title',
+      lang === 'en'
+        ? 'Wherever <span class="grad-text">your music</span> plays'
+        : 'Там, где <span class="grad-text">ваша музыка</span>',
+    );
+    setText('#pricing .kicker', lang === 'en' ? 'Pricing' : 'Тарифы');
+    setText('#pricing .section-title', s.pricingTitle);
+    setText('#pricing .section-sub', s.pricingSub);
+    setText('#models .kicker', lang === 'en' ? 'Tech stack' : 'Технологии и модели');
+    setText('#models .section-title', lang === 'en' ? 'Under the hood' : 'Что под капотом');
     setText('#faq .kicker', 'FAQ');
-    setText('#faq .section-title', 'Common questions');
-    setHtml('.final-cta h2', 'Ready to hear music <span class="grad-text">in a new way?</span>');
+    setText('#faq .section-title', lang === 'en' ? 'Common questions' : 'Частые вопросы');
+    setHtml('.final-cta h2', s.finalCtaTitle);
     var ctaP = q('.final-cta p');
-    if (ctaP) ctaP.textContent = 'Build your station in a minute — let every track tell a story.';
+    if (ctaP) ctaP.textContent = s.finalCtaSub;
     var ctaBtn = q('.final-cta .btn');
-    if (ctaBtn) ctaBtn.textContent = 'Get Efir AI';
-    var tierBasic = document.querySelector('.tier-explain header h3');
-    if (tierBasic) tierBasic.textContent = 'Basic';
-    var tierExt = document.querySelector('.tier-explain.accent header h3');
-    if (tierExt) tierExt.textContent = 'Extended';
+    if (ctaBtn) ctaBtn.textContent = s.finalCtaBtn;
+    var tiers = document.querySelectorAll('.tier-explain');
+    if (tiers[0]) {
+      var h = tiers[0].querySelector('header h3');
+      var price = tiers[0].querySelector('.tier-price-min');
+      if (h) h.textContent = s.tierBasic;
+      if (price) price.textContent = s.tierFree;
+    }
+    if (tiers[1]) {
+      var h2 = tiers[1].querySelector('header h3');
+      var price2 = tiers[1].querySelector('.tier-price-min');
+      if (h2) h2.textContent = s.tierExtended;
+      if (price2) price2.textContent = s.tierFrom;
+    }
+    var planNames =
+      lang === 'en' ? ['Month', 'Year', 'Quarter'] : ['Месяц', 'Год', 'Квартал'];
     document.querySelectorAll('.plans .plan-name').forEach(function (el, i) {
-      var names = ['Month', 'Year', 'Quarter'];
-      if (names[i]) el.textContent = names[i];
+      if (planNames[i]) el.textContent = planNames[i];
     });
+    var loginSubmit = q('#loginModalSubmit');
+    if (loginSubmit && T.modals) loginSubmit.textContent = T.modals.loginSubmit;
   }
 
   function applyPricing(lang) {
@@ -281,7 +432,9 @@
     applyHero(T, lang);
     applyStudio(T);
     applyPricing(lang);
-    applyPageBlocks(lang);
+    applySections(T, lang);
+    applyDownload(T);
+    if (global.EfirRefreshDownloadLabels) global.EfirRefreshDownloadLabels();
     document.querySelectorAll('.lang-btn').forEach(function (btn) {
       btn.classList.toggle('on', btn.getAttribute('data-lang') === lang);
     });
