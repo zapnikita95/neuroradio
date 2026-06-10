@@ -4,9 +4,8 @@ import {
   englishWordToRussianPhonetic,
   hasLatinAfterPhonetic,
 } from './en-phonetic-ru.js';
-import { germanPhraseToRussianPhonetic, germanWordToRussianPhonetic } from './de-phonetic-ru.js';
-import { isGermanLatinPhrase, normalizePhraseKey } from './de-lang-detect.js';
-import { GERMAN_PHRASE_PHONETIC } from './german-music-pronunciation.js';
+import { germanPhraseToRussianPhonetic, germanWordToRussianPhonetic, GERMAN_PHRASE_PHONETIC } from './de-phonetic-ru.js';
+import { detectForeignLang, isGermanLatinPhrase, type ForeignLang } from './tts-foreign-lang.js';
 
 const PHRASE_PRONUNCIATION_RU: Record<string, string> = {
   'zitti e buoni': 'Цитти э буони',
@@ -167,18 +166,13 @@ export function hasLatinLetters(text: string): boolean {
   return /[A-Za-zÀ-ÿ]/.test(text);
 }
 
-type ForeignLang = 'en' | 'de' | 'it' | 'es';
-
-function detectForeignLang(phrase: string): ForeignLang {
-  if (isGermanLatinPhrase(phrase)) return 'de';
-  if (/ñ|¿|¡|[áéíóú]/i.test(phrase) && !/[äöüß]/i.test(phrase)) return 'es';
-  if (
-    /\b(zitti|buoni|mambo|italiano|ciao|amore|gnocchi|bambino)\b/i.test(phrase) ||
-    /tti|gn|gli|cci/i.test(phrase)
-  ) {
-    return 'it';
-  }
-  return 'en';
+function normalizePhraseKey(phrase: string): string {
+  return phrase
+    .trim()
+    .toLowerCase()
+    .replace(/\s*&\s*/g, ' and ')
+    .replace(/\s+/g, ' ')
+    .replace(/[!?.…]+$/g, '');
 }
 
 function capitalizeLike(original: string, translated: string): string {
@@ -243,6 +237,9 @@ export function latinPhraseToRussianTts(phrase: string, langHint?: ForeignLang):
   const lang = langHint ?? detectForeignLang(trimmed);
   if (lang === 'en') {
     return englishPhraseToRussianPhonetic(trimmed);
+  }
+  if (lang === 'de') {
+    return germanPhraseToRussianPhonetic(trimmed);
   }
   const words = trimmed.split(/\s+/);
   const mapped = words.map((word) => {

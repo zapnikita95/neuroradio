@@ -6,6 +6,7 @@
 import type { StoryNarratorId } from './story-narrator.js';
 import type { TtsPauseProfile } from './tts-voice-profiles.js';
 import { preparePlainSpeechText } from './tts-azure-ssml.js';
+import { detectLatinLangCode } from './tts-foreign-lang.js';
 
 export type SaluteVoiceId =
   | 'Pon_24000'
@@ -46,16 +47,17 @@ export function resolveSaluteVoice(
   return 'Pon_24000';
 }
 
-function segmentWithEnglishLang(text: string): string {
+function segmentWithForeignLang(text: string): string {
   const re =
-    /([A-Za-z][A-Za-z0-9&'’.-]*(?:\s+[A-Za-z][A-Za-z0-9&'’.-]*)*)/g;
+    /([A-Za-zÀ-ÿäöüßÄÖÜ][A-Za-zÀ-ÿäöüßÄÖÜ0-9&'’.-]*(?:\s+[A-Za-zÀ-ÿäöüßÄÖÜ][A-Za-zÀ-ÿäöüßÄÖÜ0-9&'’.-]*)*)/g;
   let last = 0;
   let out = '';
   let match: RegExpExecArray | null;
 
   while ((match = re.exec(text)) !== null) {
     out += escapeXml(text.slice(last, match.index));
-    out += `<lang xml:lang="en-US">${escapeXml(match[1]!)}</lang>`;
+    const lang = detectLatinLangCode(match[1]!);
+    out += `<lang xml:lang="${lang}">${escapeXml(match[1]!)}</lang>`;
     last = match.index + match[0].length;
   }
   out += escapeXml(text.slice(last));
@@ -84,7 +86,7 @@ export function buildSaluteSsml(
   },
 ): string {
   const profile = options.pauseProfile ?? 'natural';
-  let body = segmentWithEnglishLang(plainText);
+  let body = segmentWithForeignLang(plainText);
   body = injectPauses(body, profile);
   const rate = options.rate ?? 'medium';
 

@@ -1,4 +1,6 @@
-/** Split RU/EN for Silero (ru) + Edge TTS (en) — navatusein transliterates all Latin to Cyrillic. */
+/** Split RU / EN / DE for Silero (ru) + Edge TTS (en/de). */
+
+import { detectForeignLang } from './tts-foreign-lang.js';
 
 const LATIN_APOSTROPHE = "''\u2018\u2019\u02BC\u0060";
 
@@ -7,9 +9,9 @@ const LATIN_RUN_RE = new RegExp(
   'g',
 );
 
-export type MixedLangSegment = { lang: 'ru' | 'en'; text: string };
+export type MixedLangSegment = { lang: 'ru' | 'en' | 'de'; text: string };
 
-function pushSegment(segments: MixedLangSegment[], lang: 'ru' | 'en', chunk: string): void {
+function pushSegment(segments: MixedLangSegment[], lang: 'ru' | 'en' | 'de', chunk: string): void {
   const t = chunk.trim();
   if (!t) return;
   const last = segments[segments.length - 1];
@@ -43,7 +45,7 @@ export function splitMixedLanguageForSilero(
     if (start > cursor) {
       pushSegment(segments, 'ru', source.slice(cursor, start));
     }
-    pushSegment(segments, 'en', latin);
+    pushSegment(segments, detectForeignLang(latin) === 'de' ? 'de' : 'en', latin);
     cursor = start + latin.length;
   }
 
@@ -55,5 +57,5 @@ export function hasEnglishSegmentsForSilero(
   artist = '',
   title = '',
 ): boolean {
-  return splitMixedLanguageForSilero(text, artist, title).some((s) => s.lang === 'en');
+  return splitMixedLanguageForSilero(text, artist, title).some((s) => s.lang === 'en' || s.lang === 'de');
 }

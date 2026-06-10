@@ -9,6 +9,7 @@ import {
   normalizeLatinApostrophes,
   stripLatinApostrophesForTts,
 } from './tts-yandex-normalize.js';
+import { detectLatinLangCode } from './tts-foreign-lang.js';
 
 const BREAK_SMALL = '\uE020';
 const BREAK_MEDIUM = '\uE021';
@@ -37,14 +38,7 @@ export function escapeSsml(text: string): string {
 }
 
 function detectLangCode(latinSpan: string): string {
-  if (/ñ|¿|¡|[áéíóúü]/i.test(latinSpan)) return 'es-ES';
-  if (
-    /\b(zitti|buoni|buono|mambo|italiano|ciao|amore|bambino|gnocchi)\b/i.test(latinSpan) ||
-    /tti\b|gn[a-z]|gli/i.test(latinSpan)
-  ) {
-    return 'it-IT';
-  }
-  return 'en-US';
+  return detectLatinLangCode(latinSpan);
 }
 
 const SHORT_ACCENT_LATIN_CYRILLIC: Record<string, string> = {

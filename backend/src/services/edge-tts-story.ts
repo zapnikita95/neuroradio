@@ -88,7 +88,7 @@ export async function synthesizeSpeechEdge(
       bufs.push(
         await synthEdgeSegment(
           seg.text,
-          seg.lang === 'en' ? preset.enVoice : preset.ruVoice,
+          seg.lang === 'de' ? preset.deVoice : seg.lang === 'en' ? preset.enVoice : preset.ruVoice,
           rate,
           pitch,
         ),

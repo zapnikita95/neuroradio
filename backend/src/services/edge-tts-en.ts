@@ -1,5 +1,7 @@
 import { EdgeTTS } from 'edge-tts-universal';
 import type { SileroVoiceId } from './silero-voices.js';
+import type { ForeignLang } from './tts-foreign-lang.js';
+import { resolveEdgeVoicePreset } from './edge-voices.js';
 
 /** Пара Edge TTS под каждый Silero — тот же пол, темп и «характер». */
 const EN_PROFILE_BY_SILERO: Record<
@@ -44,17 +46,22 @@ function formatRatePercent(speed: number, offset = 0): string {
   return `${sign}${pct}%`;
 }
 
-export function resolveEdgeTtsVoiceForSilero(voice: SileroVoiceId): string {
-  return EN_PROFILE_BY_SILERO[voice]?.voice ?? 'en-US-DavisNeural';
+export function resolveEdgeTtsVoiceForSilero(voice: SileroVoiceId, lang: ForeignLang = 'en'): string {
+  const presetId = ({ aidar: 'dmitry_calm', eugene: 'dmitry_lively', baya: 'svetlana_calm', kseniya: 'svetlana_lively', xenia: 'svetlana_lively' } as const)[voice] ?? 'dmitry_calm';
+  const preset = resolveEdgeVoicePreset(presetId);
+  if (lang === 'de') return preset.deVoice;
+  return preset.enVoice;
 }
 
 export function resolveEdgeTtsDeliveryForSilero(
   sileroVoice: SileroVoiceId,
   speed = 1.0,
+  lang: ForeignLang = 'en',
 ): { voice: string; rate: string; pitch: string } {
   const profile = EN_PROFILE_BY_SILERO[sileroVoice] ?? EN_PROFILE_BY_SILERO.aidar;
+  const voice = resolveEdgeTtsVoiceForSilero(sileroVoice, lang);
   return {
-    voice: profile.voice,
+    voice,
     rate: formatRatePercent(speed, profile.rateOffset),
     pitch: profile.pitch,
   };
@@ -67,12 +74,13 @@ export function resolveEdgeTtsDeliveryForSilero(
 export async function synthesizeEnglishEdgeTts(
   text: string,
   sileroVoice: SileroVoiceId,
-  options: { rate?: string; pitch?: string; speed?: number } = {},
+  options: { rate?: string; pitch?: string; speed?: number; lang?: ForeignLang } = {},
 ): Promise<Buffer> {
   const trimmed = text.trim();
-  if (!trimmed) throw new Error('Edge TTS: empty English segment');
+  if (!trimmed) throw new Error('Edge TTS: empty foreign segment');
 
-  const delivery = resolveEdgeTtsDeliveryForSilero(sileroVoice, options.speed ?? 1.0);
+  const lang = options.lang ?? 'en';
+  const delivery = resolveEdgeTtsDeliveryForSilero(sileroVoice, options.speed ?? 1.0, lang);
   const tts = new EdgeTTS(trimmed, delivery.voice, {
     rate: options.rate ?? delivery.rate,
     pitch: options.pitch ?? delivery.pitch,
