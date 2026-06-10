@@ -5,13 +5,13 @@ import { isElevenLabsEnabled } from './entitlements.js';
 import { concatAudioBuffersToWav } from './audio-concat.js';
 import {
   elevenLabsLanguageCode,
-  prepareElevenLabsMixedSegments,
+  prepareEnglishSpeechText,
   resolveElevenLabsModelForMixed,
-  shouldUseElevenLabsMixedSegments,
+  shouldUseElevenLabsForeignSegments,
+  splitEnglishNarrationForForeignNames,
+  type ElevenLabsSegment,
 } from './elevenlabs-text.js';
-import { preparePlainSpeechText } from './tts-azure-ssml.js';
 import { applyEnglishArtistPronunciation } from './artist-pronunciation.js';
-import type { MixedLangSegment } from './tts-mixed-segments.js';
 
 const ELEVEN_API = 'https://api.elevenlabs.io/v1/text-to-speech';
 
@@ -68,11 +68,11 @@ async function fetchElevenChunk(
   return Buffer.from(await response.arrayBuffer());
 }
 
-async function synthesizeMixedSegments(
+async function synthesizeForeignSegments(
   apiKey: string,
   voiceId: string,
   modelId: string,
-  segments: MixedLangSegment[],
+  segments: ElevenLabsSegment[],
   filePath: string,
 ): Promise<Buffer> {
   const chunks: Buffer[] = [];
@@ -98,7 +98,7 @@ async function synthesizeMixedSegments(
 }
 
 /**
- * Premium TTS: multilingual v2 + language_code per segment (ru/en/de/fr).
+ * English premium TTS (ElevenLabs). DE/FR artist/track names get language_code de/fr; rest is en.
  */
 export async function synthesizeSpeechElevenLabs(
   text: string,
@@ -121,12 +121,12 @@ export async function synthesizeSpeechElevenLabs(
   const title = options.title ?? '';
   const speakNames = options.speakTrackNamesInVoiceover === true;
 
-  const useMixed =
+  const useForeignSegments =
     speakNames &&
-    Boolean(artist && title) &&
-    shouldUseElevenLabsMixedSegments(text, artist, title, speakNames);
+    Boolean(artist || title) &&
+    shouldUseElevenLabsForeignSegments(text, artist, title, speakNames);
 
-  const modelId = resolveElevenLabsModelForMixed(useMixed, options.modelId);
+  const modelId = resolveElevenLabsModelForMixed(useForeignSegments, options.modelId);
 
   await mkdir(AUDIO_DIR, { recursive: true });
   const safeName = fileName.endsWith('.ogg') ? fileName.replace(/\.ogg$/, '.wav') : fileName;
@@ -135,24 +135,22 @@ export async function synthesizeSpeechElevenLabs(
 
   let buffer: Buffer;
 
-  if (useMixed) {
-    const segments = prepareElevenLabsMixedSegments(text, artist, title);
+  if (useForeignSegments) {
+    const segments = splitEnglishNarrationForForeignNames(text, artist, title, speakNames);
     console.log(
-      `[elevenlabs-tts] mixed segments=${segments.length} model=${modelId} ` +
-        segments.map((s) => `${s.lang}:${s.text.slice(0, 20)}`).join(' | '),
+      `[elevenlabs-tts] en+foreign segments=${segments.length} model=${modelId} ` +
+        segments.map((s) => `${s.lang}:${s.text.slice(0, 24)}`).join(' | '),
     );
-    buffer = await synthesizeMixedSegments(apiKey, voiceId, modelId, segments, filePath);
+    buffer = await synthesizeForeignSegments(apiKey, voiceId, modelId, segments, filePath);
   } else {
-    let plainText = preparePlainSpeechText(text, artist, title, speakNames);
+    let plainText = prepareEnglishSpeechText(text, artist, title, speakNames);
     plainText = applyEnglishArtistPronunciation(plainText, artist, title);
-    const langCode =
-      options.storyLanguage === 'en' ? 'en' : 'ru';
-    buffer = await fetchElevenChunk(apiKey, voiceId, modelId, plainText, langCode);
+    buffer = await fetchElevenChunk(apiKey, voiceId, modelId, plainText, 'en');
     await writeFile(filePath, buffer);
   }
 
   console.log(
-    `[elevenlabs-tts] ok voice=${voiceId} model=${modelId} mixed=${useMixed} bytes=${buffer.length}`,
+    `[elevenlabs-tts] ok voice=${voiceId} model=${modelId} foreign=${useForeignSegments} bytes=${buffer.length}`,
   );
 
   return {

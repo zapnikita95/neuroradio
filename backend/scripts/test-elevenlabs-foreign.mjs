@@ -1,11 +1,11 @@
 /**
- * ElevenLabs DE/FR mixed segments (language_code per chunk).
+ * ElevenLabs DE/FR in English narration (language_code per chunk).
  * Run: npm run build && node scripts/test-elevenlabs-foreign.mjs
  */
 import assert from 'node:assert/strict';
 import {
-  prepareElevenLabsMixedSegments,
-  shouldUseElevenLabsMixedSegments,
+  splitEnglishNarrationForForeignNames,
+  shouldUseElevenLabsForeignSegments,
   elevenLabsLanguageCode,
   resolveElevenLabsModelForMixed,
 } from '../dist/services/elevenlabs-text.js';
@@ -19,45 +19,70 @@ function test(name, fn) {
 
 console.log('[test-elevenlabs-foreign]');
 
-test('French Stromae → mixed segments with fr language_code', () => {
-  const segs = prepareElevenLabsMixedSegments(
-    'Хит Papaoutai от Stromae — французская электроника.',
+test('French Stromae in English script → fr segments, no Russian', () => {
+  const segs = splitEnglishNarrationForForeignNames(
+    'The hit Papaoutai by Stromae reshaped European pop overnight.',
     'Stromae',
     'Papaoutai',
+    true,
   );
+  assert.ok(!segs.some((s) => s.lang === 'ru'), JSON.stringify(segs));
   const fr = segs.filter((s) => s.lang === 'fr');
   assert.ok(fr.length >= 1, JSON.stringify(segs));
-  assert.equal(elevenLabsLanguageCode('fr'), 'fr');
   assert.match(fr.map((s) => s.text).join(' '), /Papaoutai|Stromae/i);
+  assert.ok(segs.some((s) => s.lang === 'en'), JSON.stringify(segs));
 });
 
-test('German Rammstein → mixed segments with de language_code', () => {
-  const segs = prepareElevenLabsMixedSegments(
-    'Трек Du hast от Rammstein.',
+test('German Rammstein in English script → de segments', () => {
+  const segs = splitEnglishNarrationForForeignNames(
+    'Rammstein dropped Du hast and the industrial scene shook.',
     'Rammstein',
     'Du hast',
+    true,
   );
   const de = segs.filter((s) => s.lang === 'de');
   assert.ok(de.length >= 1, JSON.stringify(segs));
   assert.equal(elevenLabsLanguageCode('de'), 'de');
+  assert.doesNotMatch(segs.map((s) => s.text).join(' '), /[а-яё]/i);
 });
 
-test('shouldUseElevenLabsMixedSegments true for DE/FR artists', () => {
+test('shouldUseElevenLabsForeignSegments true for DE/FR artists in English mode', () => {
   assert.equal(
-    shouldUseElevenLabsMixedSegments('Хит.', 'Stromae', 'Papaoutai', true),
+    shouldUseElevenLabsForeignSegments(
+      'A wild story about the track.',
+      'Stromae',
+      'Papaoutai',
+      true,
+    ),
     true,
   );
   assert.equal(
-    shouldUseElevenLabsMixedSegments('Хит.', 'Rammstein', 'Du hast', true),
+    shouldUseElevenLabsForeignSegments(
+      'Industrial metal history.',
+      'Rammstein',
+      'Du hast',
+      true,
+    ),
     true,
   );
   assert.equal(
-    shouldUseElevenLabsMixedSegments('Хит.', 'Stromae', 'Papaoutai', false),
+    shouldUseElevenLabsForeignSegments('Story.', 'Stromae', 'Papaoutai', false),
     false,
   );
 });
 
-test('mixed model defaults to eleven_multilingual_v2', () => {
+test('pure English artist stays single en segment', () => {
+  const segs = splitEnglishNarrationForForeignNames(
+    'Michael Jackson invented the moonwalk on stage.',
+    'Michael Jackson',
+    'Billie Jean',
+    true,
+  );
+  assert.equal(segs.length, 1);
+  assert.equal(segs[0].lang, 'en');
+});
+
+test('foreign model defaults to eleven_multilingual_v2', () => {
   const prev = process.env.ELEVENLABS_MULTILINGUAL_MODEL_ID;
   delete process.env.ELEVENLABS_MULTILINGUAL_MODEL_ID;
   assert.equal(resolveElevenLabsModelForMixed(true), 'eleven_multilingual_v2');

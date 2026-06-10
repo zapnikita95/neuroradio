@@ -1,19 +1,18 @@
 /**
- * Prepare mixed RU + EN/DE/FR text for ElevenLabs (language_code per segment).
+ * English narration for ElevenLabs: base language en, DE/FR spans for foreign artist/track names.
+ * ElevenLabs is used only when storyLanguage === 'en' — no Russian segments.
  */
 import { applyEnglishArtistPronunciation } from './artist-pronunciation.js';
-import { prepareYandexTtsText } from './tts-markup.js';
 import { stripYandexMarkup } from './tts-azure-ssml.js';
-import { mergeLatinTitleOtArtist } from './tts-yandex-ssml.js';
-import { normalizeEdgeRussianOrthography } from './tts-edge-normalize.js';
-import {
-  hasForeignSegmentsForEdge,
-  splitMixedLanguageForEdge,
-  type MixedLangSegment,
-} from './tts-mixed-segments.js';
+import { sanitizeScriptForTts } from './story-quality.js';
+import { runTtsQualityPass } from './tts-quality-pass.js';
+import { germanData } from './de-lang-detect.js';
+import { frenchData } from './fr-lang-detect.js';
 import { edgeForeignLang, isKnownFrenchPhrase, isKnownGermanPhrase } from './tts-foreign-lang.js';
 
-/** Optional Latin respelling hints when ElevenLabs misreads a name even with language_code. */
+export type ElevenLabsSegment = { lang: 'en' | 'de' | 'fr'; text: string };
+
+/** Optional Latin respelling when language_code alone misreads a name. */
 const DE_LATIN_HINT: Record<string, string> = {
   rammstein: 'Ramm-shtine',
   'du hast': 'Doo hahst',
@@ -29,43 +28,152 @@ function normalizeKey(phrase: string): string {
   return phrase.trim().toLowerCase().replace(/\s+/g, ' ').replace(/[?!.,…]+$/g, '');
 }
 
-function prepareRussianSegment(text: string): string {
-  return normalizeEdgeRussianOrthography(stripYandexMarkup(text.replace(/\+/g, '')));
-}
-
-function prepareLatinSegment(text: string, lang: 'en' | 'de' | 'fr'): string {
+function prepareForeignSegment(text: string, lang: 'de' | 'fr'): string {
   const trimmed = text.trim();
   if (!trimmed) return trimmed;
-  if (lang === 'en') return applyEnglishArtistPronunciation(trimmed);
   const key = normalizeKey(trimmed);
   if (lang === 'de') return DE_LATIN_HINT[key] ?? trimmed;
   return FR_LATIN_HINT[key] ?? trimmed;
 }
 
-export function prepareElevenLabsMixedSegments(
+export function prepareEnglishSpeechText(
   script: string,
   artist: string,
   title: string,
-): MixedLangSegment[] {
-  const marked = prepareYandexTtsText(script, {
-    artist,
-    title,
-    sentencePauses: false,
-    speakTrackNamesInVoiceover: true,
-  });
-  const merged = mergeLatinTitleOtArtist(
-    marked.replace(/<\[[^\]]+\]>/g, ' ').replace(/\s+/g, ' ').trim(),
-  );
-
-  return splitMixedLanguageForEdge(merged, artist, title).map((seg) => {
-    if (seg.lang === 'ru') {
-      return { ...seg, text: prepareRussianSegment(seg.text) };
-    }
-    return { ...seg, text: prepareLatinSegment(seg.text, seg.lang) };
-  });
+  speakTrackNamesInVoiceover: boolean,
+): string {
+  const markupArtist = speakTrackNamesInVoiceover ? artist : '';
+  const markupTitle = speakTrackNamesInVoiceover ? title : '';
+  let text = sanitizeScriptForTts(script, markupArtist, markupTitle, [], { storyLanguage: 'en' });
+  text = runTtsQualityPass(text).text;
+  return stripYandexMarkup(text);
 }
 
-export function shouldUseElevenLabsMixedSegments(
+function prepareEnglishSegment(text: string, artist: string, title: string): string {
+  const trimmed = text.trim();
+  if (!trimmed) return trimmed;
+  return applyEnglishArtistPronunciation(trimmed, artist, title);
+}
+
+type ForeignPhrase = { phrase: string; lang: 'de' | 'fr' };
+
+function textContainsPhrase(text: string, phrase: string): boolean {
+  return text.toLowerCase().includes(phrase.toLowerCase());
+}
+
+function buildForeignPhrasesInText(text: string, artist: string, title: string): ForeignPhrase[] {
+  const items: ForeignPhrase[] = [];
+  const add = (phrase: string, lang: 'de' | 'fr') => {
+    const p = phrase.trim();
+    if (p.length < 2 || !textContainsPhrase(text, p)) return;
+    items.push({ phrase: p, lang });
+  };
+
+  const artistLang = edgeForeignLang(artist, artist, title);
+  const titleLang = edgeForeignLang(title, artist, title);
+
+  if (artistLang === 'de' || artistLang === 'fr') add(artist, artistLang);
+  if (titleLang === 'de' || titleLang === 'fr') add(title, titleLang);
+  if (artist && title) {
+    const combinedLang =
+      artistLang === 'de' || artistLang === 'fr'
+        ? artistLang
+        : titleLang === 'de' || titleLang === 'fr'
+          ? titleLang
+          : null;
+    if (combinedLang) add(`${title} by ${artist}`, combinedLang);
+  }
+
+  for (const key of Object.keys(germanData.phrases)) {
+    if (key.length >= 3) add(key, 'de');
+  }
+  for (const key of germanData.artistKeys) {
+    add(key, 'de');
+  }
+  for (const key of Object.keys(frenchData.phrases)) {
+    if (key.length >= 3) add(key, 'fr');
+  }
+  for (const key of frenchData.artistKeys) {
+    add(key, 'fr');
+  }
+
+  const seen = new Set<string>();
+  return items
+    .sort((a, b) => b.phrase.length - a.phrase.length)
+    .filter(({ phrase }) => {
+      const k = phrase.toLowerCase();
+      if (seen.has(k)) return false;
+      seen.add(k);
+      return true;
+    });
+}
+
+function findNextForeignIndex(text: string, from: number, phrases: ForeignPhrase[]): number | null {
+  let best: number | null = null;
+  const tail = text.slice(from).toLowerCase();
+  for (const { phrase } of phrases) {
+    const idx = tail.indexOf(phrase.toLowerCase());
+    if (idx === -1) continue;
+    const abs = from + idx;
+    if (best === null || abs < best) best = abs;
+  }
+  return best;
+}
+
+function pushSegment(segments: ElevenLabsSegment[], lang: ElevenLabsSegment['lang'], chunk: string): void {
+  const t = chunk.trim();
+  if (!t) return;
+  const last = segments[segments.length - 1];
+  if (last?.lang === lang) {
+    last.text = `${last.text} ${t}`.replace(/\s+/g, ' ').trim();
+  } else {
+    segments.push({ lang, text: t });
+  }
+}
+
+/** Split English script into en + de/fr chunks for language_code per ElevenLabs request. */
+export function splitEnglishNarrationForForeignNames(
+  script: string,
+  artist: string,
+  title: string,
+  speakTrackNamesInVoiceover = true,
+): ElevenLabsSegment[] {
+  const plain = prepareEnglishSpeechText(script, artist, title, speakTrackNamesInVoiceover);
+  const phrases = buildForeignPhrasesInText(plain, artist, title);
+
+  if (phrases.length === 0) {
+    return [{ lang: 'en', text: prepareEnglishSegment(plain, artist, title) }];
+  }
+
+  const segments: ElevenLabsSegment[] = [];
+  let cursor = 0;
+
+  while (cursor < plain.length) {
+    let matched: ForeignPhrase | null = null;
+    for (const item of phrases) {
+      const slice = plain.slice(cursor, cursor + item.phrase.length);
+      if (slice.toLowerCase() === item.phrase.toLowerCase()) {
+        matched = item;
+        break;
+      }
+    }
+
+    if (matched) {
+      pushSegment(segments, matched.lang, prepareForeignSegment(plain.slice(cursor, cursor + matched.phrase.length), matched.lang));
+      cursor += matched.phrase.length;
+      continue;
+    }
+
+    const nextForeign = findNextForeignIndex(plain, cursor + 1, phrases);
+    const end = nextForeign ?? plain.length;
+    pushSegment(segments, 'en', prepareEnglishSegment(plain.slice(cursor, end), artist, title));
+    cursor = end;
+  }
+
+  return segments.filter((s) => s.text.length > 0);
+}
+
+export function shouldUseElevenLabsForeignSegments(
   script: string,
   artist: string,
   title: string,
@@ -84,34 +192,17 @@ export function shouldUseElevenLabsMixedSegments(
   ) {
     return true;
   }
-  const marked = prepareYandexTtsText(script, {
-    artist,
-    title,
-    sentencePauses: false,
-    speakTrackNamesInVoiceover: true,
-  });
-  const merged = mergeLatinTitleOtArtist(
-    marked.replace(/<\[[^\]]+\]>/g, ' ').replace(/\s+/g, ' ').trim(),
-  );
-  return hasForeignSegmentsForEdge(merged, artist, title);
+  const plain = prepareEnglishSpeechText(script, artist, title, true);
+  return buildForeignPhrasesInText(plain, artist, title).length > 0;
 }
 
-export function elevenLabsLanguageCode(lang: MixedLangSegment['lang']): string {
-  switch (lang) {
-    case 'de':
-      return 'de';
-    case 'fr':
-      return 'fr';
-    case 'en':
-      return 'en';
-    default:
-      return 'ru';
-  }
+export function elevenLabsLanguageCode(lang: ElevenLabsSegment['lang']): string {
+  return lang;
 }
 
-export function resolveElevenLabsModelForMixed(useMixed: boolean, explicit?: string): string {
+export function resolveElevenLabsModelForMixed(useForeignSegments: boolean, explicit?: string): string {
   if (explicit?.trim()) return explicit.trim();
-  if (useMixed) {
+  if (useForeignSegments) {
     return process.env.ELEVENLABS_MULTILINGUAL_MODEL_ID?.trim() || 'eleven_multilingual_v2';
   }
   return process.env.ELEVENLABS_MODEL_ID?.trim() || 'eleven_flash_v2_5';
