@@ -11,7 +11,7 @@ import { interestScore } from '../dist/services/reference-fact-quality.js';
 
 const __dir = dirname(fileURLToPath(import.meta.url));
 const CURATED = join(__dir, '../src/data/curated-facts.json');
-const OUT = join(__dir, '../data/facts-bank-seed.json');
+const OUT = join(__dir, '../src/data/facts-bank-seed.json');
 
 function trackKey(artist, title) {
   return `${artist.trim().toLowerCase()}|${title.trim().toLowerCase()}`;

@@ -1,0 +1,207 @@
+{
+  "byTrack": {
+    "michael jackson|hollywood tonight": [
+      {
+        "id": "94b2d8e3-bd06-40e3-8b53-ba8803ce4052",
+        "artist": "Michael Jackson",
+        "title": "Hollywood Tonight",
+        "scope": "track",
+        "fact": "«Hollywood Tonight» — трек Michael Jackson о мечте Голливуда и её тёмной стороне: артист, прошедший путь от Gary до мировой иконы, поёт об изнанке славы — бесконечные репетиции, давление и одиночество за блеском сцены; не просто поп-песня, а исповедь человека, который видел Голливуд изнутри.",
+        "interestScore": 0,
+        "interestRating": 1,
+        "source": "api",
+        "isHot": true,
+        "harvestSource": "curated",
+        "timesUsed": 0,
+        "addedAt": 1781123945640
+      }
+    ],
+    "the rasmus|in the shadows": [
+      {
+        "id": "a87afa00-356b-457b-b5a7-a989a8507e6b",
+        "artist": "The Rasmus",
+        "title": "In The Shadows",
+        "scope": "track",
+        "fact": "«In the Shadows» — главный хит финской рок-группы The Rasmus (2003): Lauri Ylönen написал песню о давлении славы и страхе потерять себя в «тенях» шоу-бизнеса; сингл взлетел по всей Европе и принёс группе мировую известность после десяти лет в инди-сцене Хельсинки.",
+        "interestScore": 0,
+        "interestRating": 1,
+        "source": "api",
+        "isHot": true,
+        "harvestSource": "curated",
+        "timesUsed": 0,
+        "addedAt": 1781123945640
+      }
+    ],
+    "the rasmus|in the shadows (radio edit)": [
+      {
+        "id": "318c5317-a78e-49e1-9e1b-7b3ee999063e",
+        "artist": "The Rasmus",
+        "title": "In The Shadows (Radio Edit)",
+        "scope": "track",
+        "fact": "«In the Shadows» — главный хит финской рок-группы The Rasmus (2003): Lauri Ylönen написал песню о давлении славы и страхе потерять себя в «тенях» шоу-бизнеса; сингл взлетел по всей Европе и принёс группе мировую известность после десяти лет в инди-сцене Хельсинки.",
+        "interestScore": 0,
+        "interestRating": 1,
+        "source": "api",
+        "isHot": true,
+        "harvestSource": "curated",
+        "timesUsed": 0,
+        "addedAt": 1781123945641
+      }
+    ],
+    "sixpence none the richer|kiss me": [
+      {
+        "id": "0a65a4cc-08df-4d54-81c1-ce495312e194",
+        "artist": "Sixpence None The Richer",
+        "title": "Kiss Me",
+        "scope": "track",
+        "fact": "«Kiss Me» Sixpence None the Richer Matt Slocum набросал черновик в голландском мотеле во время тура и в тот же вечер показал Leigh Nash — они выучили песню за час и впервые сыграли её на Flevo Festival; позже Miramax поставил трек в «She's All That», а саундтрек Dawson's Creek вывел балладу в мировой хит.",
+        "interestScore": 5,
+        "interestRating": 4,
+        "source": "api",
+        "isHot": true,
+        "harvestSource": "curated",
+        "timesUsed": 0,
+        "addedAt": 1781123945641
+      },
+      {
+        "id": "b35f8570-1f45-4380-800f-4661ea4c1ca4",
+        "artist": "Sixpence None the Richer",
+        "title": "Kiss Me",
+        "scope": "track",
+        "fact": "«Kiss Me» Sixpence None the Richer Matt Slocum набросал черновик в голландском мотеле во время тура и в тот же вечер показал Leigh Nash — они выучили песню за час и впервые сыграли её на Flevo Festival; позже Miramax поставил трек в «She's All That», а саундтрек Dawson's Creek вывел балладу в мировой хит.",
+        "interestScore": 5,
+        "interestRating": 4,
+        "source": "api",
+        "isHot": true,
+        "harvestSource": "curated",
+        "timesUsed": 0,
+        "addedAt": 1781123945641
+      }
+    ],
+    "juanes|la camisa negra": [
+      {
+        "id": "3b050964-c1df-4a70-9348-e3692a316821",
+        "artist": "Juanes",
+        "title": "La Camisa Negra",
+        "scope": "track",
+        "fact": "«La Camisa Negra» Juanes написал для альбома Mi Sangre, вдохновившись Octavio Mesa; летом 2005 трек стал хитом Испании, а в Европе его неожиданно подхватили неофашисты — Juanes публично осудил использование песни и подчеркнул, что это история о личной потере, а не политика.",
+        "interestScore": 23,
+        "interestRating": 9,
+        "source": "api",
+        "isHot": true,
+        "harvestSource": "curated",
+        "timesUsed": 0,
+        "addedAt": 1781123945641
+      }
+    ],
+    "sting|every breath you take": [
+      {
+        "id": "ef6bf91d-89a4-4b5a-b8ac-c3e9b68ed147",
+        "artist": "Sting",
+        "title": "Every Breath You Take",
+        "scope": "track",
+        "fact": "«Every Breath You Take» The Police Sting написал после разрыва — на слух это романтическая баллада, но автор называл её песней об одержимости и слежке; сингл стал их единственной американской №1 и одной из самых часто проигрываемых песен в истории радио.",
+        "interestScore": 5,
+        "interestRating": 4,
+        "source": "api",
+        "isHot": true,
+        "harvestSource": "curated",
+        "timesUsed": 0,
+        "addedAt": 1781123945641
+      }
+    ],
+    "sting|every breath you take (remastered 2003)": [
+      {
+        "id": "0a1cd021-9fe7-49cb-92db-12a95fdac3b6",
+        "artist": "Sting",
+        "title": "Every Breath You Take (Remastered 2003)",
+        "scope": "track",
+        "fact": "«Every Breath You Take» The Police Sting написал после разрыва — на слух это романтическая баллада, но автор называл её песней об одержимости и слежке; сингл стал их единственной американской №1 и одной из самых часто проигрываемых песен в истории радио.",
+        "interestScore": 5,
+        "interestRating": 4,
+        "source": "api",
+        "isHot": true,
+        "harvestSource": "curated",
+        "timesUsed": 0,
+        "addedAt": 1781123945641
+      }
+    ],
+    "nirvana|come as you are": [
+      {
+        "id": "933bb753-ae3c-4cbc-8df5-9f00460820d8",
+        "artist": "Nirvana",
+        "title": "Come As You Are",
+        "scope": "track",
+        "fact": "«Come As You Are» Nirvana (1992, Nevermind) — второй сингл после Smells Like Teen Spirit; Kurt Cobain написал riff за один вечер, а клип Kevin Kerslake снял в духе подводных кадров с обложки Nevermind; противоречивый припев «as you were» стал одной из самых узнаваемых grunge-песен 90-х.",
+        "interestScore": 0,
+        "interestRating": 1,
+        "source": "api",
+        "isHot": true,
+        "harvestSource": "curated",
+        "timesUsed": 0,
+        "addedAt": 1781123945641
+      },
+      {
+        "id": "259f7073-d2b9-43d6-88a0-88bcca9779e0",
+        "artist": "Nirvana",
+        "title": "Come as You Are",
+        "scope": "track",
+        "fact": "«Come As You Are» Nirvana (1992, Nevermind) — второй сингл после Smells Like Teen Spirit; Kurt Cobain написал riff за один вечер, а клип Kevin Kerslake снял в духе подводных кадров с обложки Nevermind; противоречивый припев «as you were» стал одной из самых узнаваемых grunge-песен 90-х.",
+        "interestScore": 0,
+        "interestRating": 1,
+        "source": "api",
+        "isHot": true,
+        "harvestSource": "curated",
+        "timesUsed": 0,
+        "addedAt": 1781123945641
+      }
+    ],
+    "green day|boulevard of broken dreams": [
+      {
+        "id": "c866bde2-64f6-44bb-aefa-a5bb206eb676",
+        "artist": "Green Day",
+        "title": "Boulevard of Broken Dreams",
+        "scope": "track",
+        "fact": "«Boulevard of Broken Dreams» Green Day (2004, American Idiot) — Billie Joe Armstrong написал песню о одиночестве на гастролях: герой бродит по «бульвару разбитых надежд» под дождём неоновых огней; сингл принёс группе Grammy за Record of the Year и стал одним из главных рок-хитов 2000-х.",
+        "interestScore": 5,
+        "interestRating": 4,
+        "source": "api",
+        "isHot": true,
+        "harvestSource": "curated",
+        "timesUsed": 0,
+        "addedAt": 1781123945641
+      },
+      {
+        "id": "0adf590a-684a-44d6-bb4e-2526fa5785f7",
+        "artist": "Green Day",
+        "title": "Boulevard Of Broken Dreams",
+        "scope": "track",
+        "fact": "«Boulevard of Broken Dreams» Green Day (2004, American Idiot) — Billie Joe Armstrong написал песню о одиночестве на гастролях: герой бродит по «бульвару разбитых надежд» под дождём неоновых огней; сингл принёс группе Grammy за Record of the Year и стал одним из главных рок-хитов 2000-х.",
+        "interestScore": 5,
+        "interestRating": 4,
+        "source": "api",
+        "isHot": true,
+        "harvestSource": "curated",
+        "timesUsed": 0,
+        "addedAt": 1781123945641
+      }
+    ],
+    "green day|boulevard of broken dreams (radio edit)": [
+      {
+        "id": "695d52cc-ac57-418a-aa7b-540383039026",
+        "artist": "Green Day",
+        "title": "Boulevard of Broken Dreams (Radio Edit)",
+        "scope": "track",
+        "fact": "«Boulevard of Broken Dreams» Green Day (2004, American Idiot) — Billie Joe Armstrong написал песню о одиночестве на гастролях: герой бродит по «бульвару разбитых надежд» под дождём неоновых огней; сингл принёс группе Grammy за Record of the Year и стал одним из главных рок-хитов 2000-х.",
+        "interestScore": 5,
+        "interestRating": 4,
+        "source": "api",
+        "isHot": true,
+        "harvestSource": "curated",
+        "timesUsed": 0,
+        "addedAt": 1781123945641
+      }
+    ]
+  },
+  "byArtist": {}
+}

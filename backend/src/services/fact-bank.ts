@@ -32,7 +32,11 @@ interface FactBankFile {
 
 const DATA_DIR = process.env.ACCOUNT_DATA_DIR?.trim() || path.join(process.cwd(), 'data');
 export const BANK_PATH = path.join(DATA_DIR, 'facts-bank.json');
-const SEED_BANK_PATH = path.join(DATA_DIR, 'facts-bank-seed.json');
+const SEED_BANK_PATHS = [
+  path.join(DATA_DIR, 'facts-bank-seed.json'),
+  path.join(process.cwd(), 'src/data/facts-bank-seed.json'),
+  path.join(process.cwd(), 'dist/data/facts-bank-seed.json'),
+];
 const MAX_POOL_SIZE = 80;
 const MIN_INGEST_SCORE = 3;
 const HOT_MIN_RATING = 6;
@@ -243,10 +247,18 @@ export function countHotFacts(artist: string, title: string): { hotCount: number
 }
 
 /** Merge seed bank from data/facts-bank-seed.json on boot (idempotent). */
+function resolveSeedBankPath(): string | null {
+  for (const candidate of SEED_BANK_PATHS) {
+    if (fs.existsSync(candidate)) return candidate;
+  }
+  return null;
+}
+
 export function mergeSeedBankOnBoot(): number {
   try {
-    if (!fs.existsSync(SEED_BANK_PATH)) return 0;
-    const seed = JSON.parse(fs.readFileSync(SEED_BANK_PATH, 'utf8')) as FactBankFile;
+    const seedPath = resolveSeedBankPath();
+    if (!seedPath) return 0;
+    const seed = JSON.parse(fs.readFileSync(seedPath, 'utf8')) as FactBankFile;
     const bank = loadBank();
     let merged = 0;
     for (const pool of Object.values(seed.byTrack ?? {})) {
@@ -276,7 +288,7 @@ export function mergeSeedBankOnBoot(): number {
       }
     }
     if (merged > 0) {
-      console.log(`[fact-bank] seed bank merged: ${merged} new facts from ${SEED_BANK_PATH}`);
+      console.log(`[fact-bank] seed bank merged: ${merged} new facts from ${seedPath}`);
     }
     return merged;
   } catch (err) {
