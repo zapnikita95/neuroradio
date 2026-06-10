@@ -124,6 +124,12 @@ test('SSML merges Title ot Artist into one English phrase', () => {
   assert.doesNotMatch(ssml, /<lang xml:lang="en-US">Killing in The Name<\/lang>/i);
 });
 
+test('SSML merges Rammstein title ot artist with de-DE lang', () => {
+  const ssml = buildYandexSsml('Du hast от Rammstein — Neue Deutsche Härte.');
+  assert.match(ssml, /<lang xml:lang="de-DE">Du hast by Rammstein<\/lang>/i);
+  assert.doesNotMatch(ssml, /xml:lang="en-US">Rammstein/i);
+});
+
 test('prepareYandexTtsText merges track ot artist from metadata', () => {
   const out = prepareYandexTtsText(
     'Killing in The Name от Rage Against The Machine возглавил чарт.',

@@ -10,8 +10,7 @@ import {
 import { applyForeignPronunciation } from '../dist/services/tts-foreign-pronounce.js';
 import { prepareSileroTtsText } from '../dist/services/tts-markup.js';
 import { buildYandexSsml } from '../dist/services/tts-yandex-ssml.js';
-import { detectForeignLang, detectLatinLangCode } from '../dist/services/tts-foreign-lang.js';
-import { isKnownGermanMusicPhrase } from '../dist/services/german-music-pronunciation.js';
+import { detectForeignLang, detectLatinLangCode, isKnownGermanPhrase } from '../dist/services/tts-foreign-lang.js';
 
 let passed = 0;
 
@@ -64,17 +63,16 @@ test('detectForeignLang: Red Hot Chili Peppers → en', () => {
   assert.equal(detectLatinLangCode('Michael Jackson'), 'en-US');
 });
 
-test('isKnownGermanMusicPhrase covers Rammstein discography sample', () => {
+test('isKnownGermanPhrase covers Rammstein discography sample', () => {
   for (const t of ['Sonne', 'Ich will', 'Mein Herz brennt', 'Keine Lust', 'Feuer frei']) {
-    assert.equal(isKnownGermanMusicPhrase(t), true, t);
+    assert.equal(isKnownGermanPhrase(t), true, t);
   }
 });
 
-test('Yandex SSML uses de-DE for Rammstein', () => {
+test('Yandex SSML uses de-DE for Rammstein (merged title by artist)', () => {
   const ssml = buildYandexSsml('Трек Du hast от Rammstein — хит.');
-  assert.match(ssml, /xml:lang="de-DE">Du hast/i);
-  assert.match(ssml, /xml:lang="de-DE">Rammstein/i);
-  assert.doesNotMatch(ssml, /de-DE">Du hast<\/lang>\s*от\s*<lang xml:lang="de-DE">Rammstein/i);
+  assert.match(ssml, /xml:lang="de-DE">Du hast by Rammstein<\/lang>/i);
+  assert.doesNotMatch(ssml, /xml:lang="en-US">Rammstein/i);
 });
 
 test('applyForeignPronunciation clears Latin for Rammstein story', () => {
