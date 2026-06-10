@@ -14,7 +14,7 @@ import {
   resolveEdgeTtsDeliveryForSilero,
   synthesizeEnglishEdgeTts,
 } from '../dist/services/edge-tts-en.js';
-import { splitMixedLanguageForSilero } from '../dist/services/tts-silero-segments.js';
+import { splitMixedLanguageForEdge } from '../dist/services/tts-mixed-segments.js';
 import { wrapSileroRussianSsml } from '../dist/services/tts-silero-ssml.js';
 import { prepareSileroTtsTextTrace } from '../dist/services/tts-markup.js';
 import { sileroPhoneticToEdge } from '../dist/services/en-phonetic-ru.js';
@@ -163,7 +163,7 @@ async function main() {
   await mkdir(path.join(outRoot, 'edge-phonetic'), { recursive: true });
 
   const latinText = prepareMixedLatinText();
-  const segments = splitMixedLanguageForSilero(latinText, ARTIST, TITLE);
+  const segments = splitMixedLanguageForEdge(latinText, ARTIST, TITLE);
   const phoneticTrace = prepareSileroTtsTextTrace(SCRIPT, { artist: ARTIST, title: TITLE });
   const edgePhoneticText = sileroPhoneticToEdge(phoneticTrace.prepared);
 

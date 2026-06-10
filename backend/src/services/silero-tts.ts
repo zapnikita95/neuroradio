@@ -7,9 +7,9 @@ import { prepareSileroTtsTextTrace } from './tts-markup.js';
 import { formatSileroTranscriptReport } from './tts-silero-transcript.js';
 import { wrapSileroRussianSsml } from './tts-silero-ssml.js';
 import {
-  hasEnglishSegmentsForSilero,
-  splitMixedLanguageForSilero,
-} from './tts-silero-segments.js';
+  hasForeignSegmentsForEdge,
+  splitMixedLanguageForEdge,
+} from './tts-mixed-segments.js';
 import { resolveSileroVoiceFromEnv, resolveSileroVoicePreset, type SileroVoicePresetId } from './silero-voices.js';
 import type { TtsPauseProfile, TtsVoiceStyleId } from './tts-voice-profiles.js';
 import { AUDIO_DIR, type SynthesisResult } from './yandex-tts.js';
@@ -209,11 +209,11 @@ export async function synthesizeSpeechSilero(
   const useMixed =
     options.speakTrackNamesInVoiceover === true &&
     isSileroMixedLangEnabled() &&
-    hasEnglishSegmentsForSilero(plainText, artist, title);
+    hasForeignSegmentsForEdge(plainText, artist, title);
   let buffer: Buffer;
 
   if (useMixed) {
-    const segments = splitMixedLanguageForSilero(plainText, artist, title);
+    const segments = splitMixedLanguageForEdge(plainText, artist, title);
     console.log(
       `[silero-tts] mixed-lang segments=${segments.length} ` +
         segments.map((s) => `${s.lang}:${s.text.slice(0, 24)}`).join(' | '),

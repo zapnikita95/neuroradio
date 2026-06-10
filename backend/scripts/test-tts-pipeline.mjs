@@ -17,9 +17,9 @@ import { buildSaluteSsml } from '../dist/services/salute-ssml.js';
 import { buildYandexSsml } from '../dist/services/tts-yandex-ssml.js';
 import { applyRussianStressSafe } from '../dist/services/russian-stress.js';
 import {
-  hasEnglishSegmentsForSilero,
-  splitMixedLanguageForSilero,
-} from '../dist/services/tts-silero-segments.js';
+  hasForeignSegmentsForEdge,
+  splitMixedLanguageForEdge,
+} from '../dist/services/tts-mixed-segments.js';
 import { wrapSileroRussianSsml } from '../dist/services/tts-silero-ssml.js';
 import { resolveEdgeTtsDeliveryForSilero } from '../dist/services/edge-tts-en.js';
 import { normalizeYearsForRussianTts } from '../dist/services/tts-russian-years.js';
@@ -389,8 +389,8 @@ test('prepareSileroTtsText phonetic apostrophe titles', () => {
   assert.match(out, /в\+?э|ов\+?е/i);
 });
 
-test('splitMixedLanguageForSilero still splits Latin when mixed mode enabled', () => {
-  const segs = splitMixedLanguageForSilero(
+test('splitMixedLanguageForEdge splits Latin for mixed Edge voices', () => {
+  const segs = splitMixedLanguageForEdge(
     'The Hit Co. — это группа, и их трэк My Favorite Game — отличный пример.',
     'The Hit Co.',
     'My Favorite Game',
@@ -398,7 +398,7 @@ test('splitMixedLanguageForSilero still splits Latin when mixed mode enabled', (
   const en = segs.filter((s) => s.lang === 'en').map((s) => s.text);
   assert.ok(en.some((t) => /The Hit Co/i.test(t)));
   assert.ok(en.some((t) => /My Favorite Game/i.test(t)));
-  assert.ok(hasEnglishSegmentsForSilero('The Hit Co. — это группа.', 'The Hit Co.', 'My Favorite Game'));
+  assert.ok(hasForeignSegmentsForEdge('The Hit Co. — это группа.', 'The Hit Co.', 'My Favorite Game'));
 });
 
 test('wrapSileroRussianSsml adds sentence breaks and prosody', () => {

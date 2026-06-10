@@ -5,7 +5,7 @@ import { concatAudioBuffersToWav } from './audio-concat.js';
 import { resolveEdgeVoicePreset, type EdgeVoicePresetId } from './edge-voices.js';
 import { prepareYandexTtsText } from './tts-markup.js';
 import { mergeLatinTitleOtArtist } from './tts-yandex-ssml.js';
-import { splitMixedLanguageForSilero } from './tts-silero-segments.js';
+import { splitMixedLanguageForEdge } from './tts-mixed-segments.js';
 import { prepareEdgeRussianSegment } from './tts-edge-normalize.js';
 import { AUDIO_DIR, type SynthesisResult } from './yandex-tts.js';
 
@@ -77,7 +77,7 @@ export async function synthesizeSpeechEdge(
 
   if (speakNames && artist && title) {
     const mixed = prepareEdgeMixedText(source, artist, title);
-    const segments = splitMixedLanguageForSilero(mixed, artist, title).map((seg) =>
+    const segments = splitMixedLanguageForEdge(mixed, artist, title).map((seg) =>
       seg.lang === 'ru'
         ? { ...seg, text: prepareEdgeRussianSegment(seg.text.replace(/\+/g, '')) }
         : seg,

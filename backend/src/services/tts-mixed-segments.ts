@@ -1,4 +1,4 @@
-/** Split RU / EN / DE / FR for Silero (ru) + Edge TTS foreign voices. */
+/** Split RU / EN / DE / FR for Edge TTS (and Yandex SSML lang tags). */
 
 import { edgeForeignLang } from './tts-foreign-lang.js';
 
@@ -26,7 +26,8 @@ function pushSegment(
   }
 }
 
-export function splitMixedLanguageForSilero(
+/** Split mixed RU + Latin into segments for per-lang Edge voices (ru / en / de / fr). */
+export function splitMixedLanguageForEdge(
   text: string,
   _artist = '',
   _title = '',
@@ -56,10 +57,10 @@ export function splitMixedLanguageForSilero(
   return segments.filter((s) => s.text.length > 0);
 }
 
-export function hasEnglishSegmentsForSilero(
+export function hasForeignSegmentsForEdge(
   text: string,
   artist = '',
   title = '',
 ): boolean {
-  return splitMixedLanguageForSilero(text, artist, title).some((s) => s.lang !== 'ru');
+  return splitMixedLanguageForEdge(text, artist, title).some((s) => s.lang !== 'ru');
 }

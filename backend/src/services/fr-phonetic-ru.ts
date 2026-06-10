@@ -1,5 +1,6 @@
 /**
- * French → Russian Cyrillic phonetic for Silero / Edge RU voices.
+ * French → Russian Cyrillic phonetic (legacy Silero path only).
+ * Edge/Yandex: Latin + fr-FR SSML lang tag — native French pronunciation.
  */
 import { frenchData, normalizePhraseKey } from './fr-lang-detect.js';
 import type { PhoneticFormat } from './en-phonetic-ru.js';

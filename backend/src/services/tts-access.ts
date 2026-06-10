@@ -52,16 +52,19 @@ export class SpeechKitSubscriptionRequiredError extends Error {
   }
 }
 
-export class SileroRequiredForFreeTierError extends Error {
-  readonly code = 'SILERO_REQUIRED_FOR_FREE';
+export class FreeTierEdgeTtsError extends Error {
+  readonly code = 'EDGE_TTS_FREE_TIER';
 
   constructor(
-    message = 'На бесплатном тарифе озвучка только через Silero. Оформите подписку для SpeechKit или укажите свой ключ Yandex.',
+    message = 'На бесплатном тарифе озвучка через Edge TTS. Оформите подписку для Yandex SpeechKit или укажите свой ключ.',
   ) {
     super(message);
-    this.name = 'SileroRequiredForFreeTierError';
+    this.name = 'FreeTierEdgeTtsError';
   }
 }
+
+/** @deprecated use FreeTierEdgeTtsError */
+export const SileroRequiredForFreeTierError = FreeTierEdgeTtsError;
 
 export function assertFreeTierTtsAvailable(
   installId: string,

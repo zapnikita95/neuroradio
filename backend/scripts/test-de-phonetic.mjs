@@ -8,7 +8,7 @@ import { detectForeignLang, detectLatinLangCode } from '../dist/services/tts-for
 import { applyForeignPronunciation } from '../dist/services/tts-foreign-pronounce.js';
 import { buildYandexSsml } from '../dist/services/tts-yandex-ssml.js';
 import { prepareYandexTtsText } from '../dist/services/tts-markup.js';
-import { splitMixedLanguageForSilero } from '../dist/services/tts-silero-segments.js';
+import { splitMixedLanguageForEdge } from '../dist/services/tts-mixed-segments.js';
 
 let passed = 0;
 function test(name, fn) {
@@ -41,6 +41,7 @@ test('Yandex SSML uses de-DE for Rammstein track', () => {
   const marked = prepareYandexTtsText('Хит Du hast группы Rammstein.', {
     artist: 'Rammstein',
     title: 'Du hast',
+    speakTrackNamesInVoiceover: true,
   });
   const ssml = buildYandexSsml(marked);
   assert.match(ssml, /xml:lang="de-DE">Du hast/i);
@@ -57,8 +58,8 @@ test('applyForeignPronunciation transliterates German to pure Cyrillic', () => {
   assert.match(out, /[а-яё]/i);
 });
 
-test('Silero segments split German Latin as de', () => {
-  const segs = splitMixedLanguageForSilero('Трек Du hast от Rammstein.');
+test('Edge segments split German Latin as de', () => {
+  const segs = splitMixedLanguageForEdge('Трек Du hast от Rammstein.');
   const de = segs.filter((s) => s.lang === 'de');
   assert.ok(de.length >= 2, `expected de segments, got ${JSON.stringify(segs)}`);
 });

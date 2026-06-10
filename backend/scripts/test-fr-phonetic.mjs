@@ -8,7 +8,7 @@ import { detectForeignLang, detectLatinLangCode } from '../dist/services/tts-for
 import { applyForeignPronunciation } from '../dist/services/tts-foreign-pronounce.js';
 import { buildYandexSsml } from '../dist/services/tts-yandex-ssml.js';
 import { prepareYandexTtsText } from '../dist/services/tts-markup.js';
-import { splitMixedLanguageForSilero } from '../dist/services/tts-silero-segments.js';
+import { splitMixedLanguageForEdge } from '../dist/services/tts-mixed-segments.js';
 
 let passed = 0;
 function test(name, fn) {
@@ -47,6 +47,7 @@ test('Yandex SSML uses fr-FR for Stromae track', () => {
   const marked = prepareYandexTtsText('Хит Papaoutai от Stromae.', {
     artist: 'Stromae',
     title: 'Papaoutai',
+    speakTrackNamesInVoiceover: true,
   });
   const ssml = buildYandexSsml(marked);
   assert.match(ssml, /xml:lang="fr-FR">Papaoutai by Stromae/i);
@@ -62,8 +63,8 @@ test('applyForeignPronunciation transliterates French to Cyrillic', () => {
   assert.match(out, /[а-яё]/i);
 });
 
-test('Silero segments split French Latin as fr', () => {
-  const segs = splitMixedLanguageForSilero('Трек Papaoutai от Stromae.');
+test('Edge segments split French Latin as fr', () => {
+  const segs = splitMixedLanguageForEdge('Трек Papaoutai от Stromae.');
   const fr = segs.filter((s) => s.lang === 'fr');
   assert.ok(fr.length >= 2, `expected fr segments, got ${JSON.stringify(segs)}`);
 });

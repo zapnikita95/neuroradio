@@ -7,7 +7,6 @@ import {
 import { preparePlainSpeechText } from './tts-azure-ssml.js';
 import {
   canUseServerSpeechKit,
-  SileroRequiredForFreeTierError,
   SpeechKitSubscriptionRequiredError,
 } from './tts-access.js';
 import { hasPremiumEntitlement, isElevenLabsEnabled } from './entitlements.js';

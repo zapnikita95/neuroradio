@@ -1,6 +1,6 @@
 /**
- * German → Russian Cyrillic phonetic for Silero / Edge RU voices.
- * Dictionary: german-pronunciation.json; rules for unknown tokens.
+ * German → Russian Cyrillic phonetic (legacy Silero path only).
+ * Edge/Yandex: Latin + de-DE SSML lang tag — native German pronunciation.
  */
 import { germanData, normalizePhraseKey } from './de-lang-detect.js';
 import type { PhoneticFormat } from './en-phonetic-ru.js';

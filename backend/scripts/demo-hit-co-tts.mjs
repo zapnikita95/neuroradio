@@ -13,7 +13,7 @@ import {
   resolveEdgeTtsDeliveryForSilero,
   synthesizeEnglishEdgeTts,
 } from '../dist/services/edge-tts-en.js';
-import { splitMixedLanguageForSilero } from '../dist/services/tts-silero-segments.js';
+import { splitMixedLanguageForEdge } from '../dist/services/tts-mixed-segments.js';
 import { wrapSileroRussianSsml } from '../dist/services/tts-silero-ssml.js';
 import { prepareYandexTtsText } from '../dist/services/tts-markup.js';
 import { sanitizeScriptForTts } from '../dist/services/story-quality.js';
@@ -98,7 +98,7 @@ async function main() {
   await mkdir(outDir, { recursive: true });
 
   const mixedSource = prepareMixedSourceText();
-  const segments = splitMixedLanguageForSilero(mixedSource, ARTIST, TITLE);
+  const segments = splitMixedLanguageForEdge(mixedSource, ARTIST, TITLE);
 
   const edgeChunks = segments.map((seg) => ({
     text: seg.text,
