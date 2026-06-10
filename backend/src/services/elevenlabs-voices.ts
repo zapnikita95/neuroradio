@@ -135,14 +135,20 @@ export function resolveElevenLabsVoiceId(
   }
   const narrator = options.storyNarrator ?? 'auto';
   const genre = (options.genre ?? '').toLowerCase();
-  if (narrator === 'fan' || narrator === 'contemporary') {
-    return ELEVENLABS_VOICE_PRESETS.elli.voiceId;
+  if (narrator === 'contemporary') {
+    return ELEVENLABS_VOICE_PRESETS.bella.voiceId;
   }
-  if (narrator === 'expert' || narrator === 'backstage') {
+  if (narrator === 'backstage') {
+    return ELEVENLABS_VOICE_PRESETS.emily.voiceId;
+  }
+  if (narrator === 'expert') {
     return ELEVENLABS_VOICE_PRESETS.josh.voiceId;
   }
   if (narrator === 'night_dj') {
-    return ELEVENLABS_VOICE_PRESETS.adam.voiceId;
+    return ELEVENLABS_VOICE_PRESETS.antoni.voiceId;
+  }
+  if (narrator === 'radio_host') {
+    return ELEVENLABS_VOICE_PRESETS.charlie.voiceId;
   }
   if (/punk|rock|metal|grunge/.test(genre)) {
     return ELEVENLABS_VOICE_PRESETS.sam.voiceId;

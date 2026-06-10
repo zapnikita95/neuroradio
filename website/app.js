@@ -100,7 +100,7 @@
         var personas = L().getPersonas();
         var p = personas[+btn.dataset.i];
         var statusEl = $('[data-status="' + btn.dataset.i + '"]');
-        playDemo(p.audio, p.rate, btn, statusEl);
+        playDemo(p.audio, 1, btn, statusEl);
       });
     });
   }

@@ -20,17 +20,15 @@
     night_dj: ['ermil'],
     expert: ['ermil', 'zahar', 'filipp'],
     contemporary: ['alena', 'omazh', 'marina'],
-    fan: ['jane', 'dasha', 'lera'],
-    backstage: ['omazh', 'jane'],
+    backstage: ['omazh', 'jane', 'marina'],
   };
 
   var STUDIO_VOICES_EN = {
-    radio_host: ['rachel', 'adam', 'antoni'],
-    night_dj: ['adam'],
-    expert: ['josh', 'adam', 'antoni'],
+    radio_host: ['charlie', 'adam', 'josh'],
+    night_dj: ['antoni', 'adam'],
+    expert: ['josh', 'adam', 'charlie'],
     contemporary: ['bella', 'emily', 'matilda'],
-    fan: ['elli', 'bella', 'rachel'],
-    backstage: ['antoni', 'sam'],
+    backstage: ['emily', 'matilda'],
   };
 
   var VOICES_RU = [
@@ -100,15 +98,6 @@
       audio: 'assets/demos/persona-contemporary.wav',
     },
     {
-      id: 'fan', tag: 'Фанат-коллекционер', name: 'Фанат-коллекционер',
-      desc: 'Восторженный фанат от первого лица: обожает артиста и знает детали, которые греют сердце коллекционера.',
-      traits: ['восторг', 'детали', 'любовь к делу'],
-      quote: '«Обожаю этот момент!»',
-      voice: 'jane', rate: 1.12,
-      script: 'Обожаю этот момент! ' + THRILLER_CORE_RU + ' И да — я знаю каждую секунду этого клипа наизусть!',
-      audio: 'assets/demos/persona-fan.wav',
-    },
-    {
       id: 'backstage', tag: 'С закулисья', name: 'Инсайдер с закулисья',
       desc: 'Инсайдерский тон — только если в факте есть курьёз. Истории, о которых обычно говорят вполголоса.',
       traits: ['инсайд', 'курьёз', 'вполголоса'],
@@ -124,69 +113,61 @@
       id: 'radio_host', tag: 'High-energy host', name: 'Radio host',
       desc: 'Warm on-air tone — lively but factual. Daytime radio energy between your tracks.',
       traits: ['energetic', 'warm', 'on point'],
-      quote: '"Listen — Thriller blew up MTV!"',
-      voice: 'rachel', rate: 1.08,
-      script: THRILLER_CORE_EN + ' This is the video that hijacked MTV — volume up, let us go!',
-      audio: 'assets/demos/en/persona-radio_host.mp3',
+      quote: '"Listen… Thriller blew up MTV!"',
+      voice: 'charlie', rate: 1,
+      script:
+        'Listen… Thriller is the only music video in the US National Film Registry — preserved as cultural heritage alongside feature films. Michael Jackson made it when videos were still rewriting the rules — not just a track, a fourteen-minute movie. MTV mostly played rock… but Thriller? They aired it in full. Volume up — this is the one that hijacked the airwaves!',
+      audio: 'assets/demos/en/persona-radio_host.ogg',
     },
     {
       id: 'night_dj', tag: 'Late-night show', name: 'Night DJ',
       desc: 'Quiet night shift: clear fact, slow tempo, voice close to your ear. For late playlists and long drives.',
       traits: ['calm', 'intimate', 'slow'],
-      quote: '"Good night! Here is a fact…"',
-      voice: 'adam', rate: 0.92,
-      script: 'Good night! Quick fact: ' + FACT_REGISTRY_EN + ' Stay on our frequency till morning.',
-      audio: 'assets/demos/en/persona-night_dj.mp3',
+      quote: '"Good night… here is a fact…"',
+      voice: 'antoni', rate: 1,
+      script: 'Good night… Quick fact: ' + FACT_REGISTRY_EN + ' Stay on our frequency till morning.',
+      audio: 'assets/demos/en/persona-night_dj.ogg',
     },
     {
       id: 'expert', tag: 'Genre expert', name: 'Genre expert',
       desc: 'Podcast expertise without lecturing. Explains why the track works and what makes the genre tick.',
       traits: ['breakdown', 'context', 'precision'],
       quote: '"Unique fact:"',
-      voice: 'josh', rate: 1.0,
+      voice: 'josh', rate: 1,
       script: 'Unique fact: ' + FACT_REGISTRY_EN + ' A pop-horror benchmark of the eighties.',
-      audio: 'assets/demos/en/persona-expert.mp3',
+      audio: 'assets/demos/en/persona-expert.ogg',
     },
     {
       id: 'contemporary', tag: 'Voice of the era', name: 'Contemporary',
       desc: 'First-person nostalgia — as if you lived when the track dropped. Memory over encyclopedia.',
       traits: ['nostalgia', 'first person', 'warm'],
       quote: '"I remember those years…"',
-      voice: 'bella', rate: 0.98,
+      voice: 'bella', rate: 1,
       script: 'I remember those years. Michael Jackson put half a million into the Thriller video — after the premiere album sales jumped sevenfold. We watched the fourteen-minute clip on MTV in full, then bought VHS tapes to replay it at home.',
-      audio: 'assets/demos/en/persona-contemporary.mp3',
-    },
-    {
-      id: 'fan', tag: 'Superfan', name: 'Superfan',
-      desc: 'Enthusiastic collector energy from the first person — loves the artist and the tiny details.',
-      traits: ['hype', 'details', 'devotion'],
-      quote: '"I love this moment!"',
-      voice: 'elli', rate: 1.12,
-      script: 'I love this moment! ' + THRILLER_CORE_EN + ' And yes — I know every second of this video by heart!',
-      audio: 'assets/demos/en/persona-fan.mp3',
+      audio: 'assets/demos/en/persona-contemporary.ogg',
     },
     {
       id: 'backstage', tag: 'Backstage insider', name: 'Backstage insider',
       desc: 'Insider tone when the fact has a twist. Stories people usually tell in a half-whisper.',
       traits: ['insider', 'gossip', 'hushed'],
       quote: '"Just between us…"',
-      voice: 'antoni', rate: 0.96,
+      voice: 'emily', rate: 1,
       script: BACKSTAGE_SHORT_EN,
-      audio: 'assets/demos/en/persona-backstage.mp3',
+      audio: 'assets/demos/en/persona-backstage.ogg',
     },
   ];
 
   var TEMPOS_RU = [
     { l: 'Очень медленно', r: 0.85 },
     { l: 'Медленно', r: 0.95 },
-    { l: 'Нормально', r: 1.08 },
+    { l: 'Нормально', r: 1.0 },
     { l: 'Быстро', r: 1.22 },
     { l: 'Очень быстро', r: 1.38 },
   ];
   var TEMPOS_EN = [
     { l: 'Very slow', r: 0.85 },
     { l: 'Slow', r: 0.95 },
-    { l: 'Normal', r: 1.08 },
+    { l: 'Normal', r: 1.0 },
     { l: 'Fast', r: 1.22 },
     { l: 'Very fast', r: 1.38 },
   ];
@@ -239,7 +220,7 @@
   }
 
   function demoExt() {
-    return isEn() ? '.mp3' : '.wav';
+    return isEn() ? '.ogg' : '.wav';
   }
 
   function studioSrc(personaId, voiceId, lenN) {

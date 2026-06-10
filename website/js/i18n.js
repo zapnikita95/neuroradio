@@ -20,6 +20,7 @@
         listen: 'Послушать ведущих',
         stat1: 'источников фактов',
         stat2: 'амплуа ведущих',
+        stat2n: '5',
         stat3: 'до истории в эфире',
       },
       studio: {
@@ -102,6 +103,7 @@
         listen: 'Hear the hosts',
         stat1: 'fact sources',
         stat2: 'host personas',
+        stat2n: '5',
         stat3: 'to story on air',
       },
       studio: {
@@ -254,7 +256,7 @@
     if (listen) listen.innerHTML = '<span class="scroll-arrow" aria-hidden="true"></span> ' + h.listen;
     var stats = document.querySelectorAll('.hero-stats.compact div');
     if (stats[0]) stats[0].innerHTML = '<strong>10+</strong><span>' + h.stat1 + '</span>';
-    if (stats[1]) stats[1].innerHTML = '<strong>6</strong><span>' + h.stat2 + '</span>';
+    if (stats[1]) stats[1].innerHTML = '<strong>' + (h.stat2n || '5') + '</strong><span>' + h.stat2 + '</span>';
     if (stats[2]) stats[2].innerHTML = '<strong>~5 ' + (lang === 'en' ? 's' : 'c') + '</strong><span>' + h.stat3 + '</span>';
     var host = q('#heroNowPlaying .np-host');
     if (host && global.EfirLocale) host.textContent = global.EfirLocale.heroHostLabel();
@@ -422,6 +424,146 @@
     });
   }
 
+  function applyPageContent(lang) {
+    var P = global.EfirPageCopy && global.EfirPageCopy[lang];
+    if (!P) return;
+
+    document.querySelectorAll('#service .feature-card').forEach(function (card, i) {
+      var f = P.service.features[i];
+      if (!f) return;
+      var h = card.querySelector('h3');
+      var p = card.querySelector('p');
+      if (h) h.textContent = f.title;
+      if (p) p.textContent = f.desc;
+    });
+
+    document.querySelectorAll('#how .pipe-step').forEach(function (step, i) {
+      var s = P.how.steps[i];
+      if (!s) return;
+      var h = step.querySelector('h3');
+      var p = step.querySelector('p');
+      if (h) h.textContent = s.title;
+      if (p) p.textContent = s.desc;
+    });
+    var howNote = q('.how-note');
+    if (howNote) howNote.innerHTML = '<strong>' + (lang === 'en' ? 'Important:' : 'Важно:') + '</strong> ' + P.how.note.replace(/^Важно:\s*|^Important:\s*/i, '');
+
+    setText('#models .section-sub', P.models.sub);
+    document.querySelectorAll('#models .model-card').forEach(function (card, i) {
+      var m = P.models.cards[i];
+      if (!m) return;
+      var h = card.querySelector('.model-h');
+      var p = card.querySelector('p');
+      if (h) h.innerHTML = h.querySelector('.site-ic') ? h.querySelector('.site-ic').outerHTML + m.title : m.title;
+      if (p) p.textContent = m.desc;
+      var lis = card.querySelectorAll('ul li');
+      m.bullets.forEach(function (b, j) {
+        if (lis[j]) lis[j].textContent = b;
+      });
+    });
+
+    var tiers = document.querySelectorAll('.tier-explain');
+    if (tiers[0]) {
+      var lead0 = tiers[0].querySelector('.tier-lead');
+      if (lead0) lead0.textContent = P.pricing.basicLead;
+      tiers[0].querySelectorAll('.tick-list li').forEach(function (li, j) {
+        if (P.pricing.basicFeatures[j]) li.textContent = P.pricing.basicFeatures[j];
+      });
+    }
+    if (tiers[1]) {
+      var lead1 = tiers[1].querySelector('.tier-lead');
+      var price1 = tiers[1].querySelector('.tier-price-min');
+      if (lead1) lead1.textContent = P.pricing.extendedLead;
+      if (price1 && lang === 'en') price1.textContent = P.pricing.extendedFrom;
+      tiers[1].querySelectorAll('.tick-list li').forEach(function (li, j) {
+        if (P.pricing.extendedFeatures[j]) li.textContent = P.pricing.extendedFeatures[j];
+      });
+    }
+    document.querySelectorAll('.plans .plan').forEach(function (plan, pi) {
+      var feats = P.pricing.planFeatures[pi];
+      if (!feats) return;
+      plan.querySelectorAll('.tick-list li').forEach(function (li, j) {
+        if (feats[j]) li.textContent = feats[j];
+      });
+    });
+    setText('.pricing-fine', P.pricing.fine);
+
+    setText('#docs .kicker', P.docs.kicker);
+    setText('#docs .section-title', P.docs.title);
+    setText('#docs .section-sub', P.docs.sub);
+    document.querySelectorAll('#docs .doc-card').forEach(function (card, i) {
+      var d = P.docs.items[i];
+      if (!d) return;
+      var h = card.querySelector('h3');
+      var p = card.querySelector('p');
+      var go = card.querySelector('.doc-go');
+      if (h) h.textContent = d.title;
+      if (p) p.textContent = d.desc;
+      if (go) go.textContent = d.link;
+    });
+
+    document.querySelectorAll('#faq details').forEach(function (el, i) {
+      var f = P.faq[i];
+      if (!f) return;
+      var sum = el.querySelector('summary');
+      var p = el.querySelector('p');
+      if (sum) sum.textContent = f.q;
+      if (p) p.innerHTML = f.a;
+    });
+
+    var fb = q('.footer-brand p');
+    if (fb) fb.textContent = P.footer.tagline;
+    var fn = document.querySelectorAll('.footer-nav > div');
+    if (fn[0]) {
+      fn[0].querySelector('h4').textContent = P.footer.service;
+      fn[0].querySelectorAll('a').forEach(function (a, j) {
+        if (P.footer.serviceLinks[j]) a.textContent = P.footer.serviceLinks[j];
+      });
+    }
+    if (fn[1]) {
+      fn[1].querySelector('h4').textContent = P.footer.plans;
+      fn[1].querySelectorAll('a').forEach(function (a, j) {
+        if (P.footer.plansLinks[j]) a.textContent = P.footer.plansLinks[j];
+      });
+    }
+    if (fn[2]) {
+      fn[2].querySelector('h4').textContent = P.footer.guides;
+      fn[2].querySelectorAll('a').forEach(function (a, j) {
+        if (P.footer.guidesLinks[j]) a.textContent = P.footer.guidesLinks[j];
+      });
+    }
+    if (fn[3]) {
+      fn[3].querySelector('h4').textContent = P.footer.legal;
+      fn[3].querySelectorAll('a').forEach(function (a, j) {
+        if (P.footer.legalLinks[j]) a.textContent = P.footer.legalLinks[j];
+      });
+    }
+
+    var mc = q('#modalClose');
+    if (mc) mc.setAttribute('aria-label', P.modal.close);
+    var mk = q('.modal-left .kicker');
+    if (mk) mk.textContent = P.modal.kicker;
+    var modalTitle = q('#modalTitle');
+    if (modalTitle) {
+      var planSpan = modalTitle.querySelector('#modalPlanName');
+      var planName = planSpan ? planSpan.textContent : '';
+      modalTitle.innerHTML = P.modal.titlePrefix + '<span id="modalPlanName">' + planName + '</span>';
+    }
+    document.querySelectorAll('.modal-incl li').forEach(function (li, j) {
+      if (P.modal.features[j]) li.textContent = P.modal.features[j];
+    });
+    var emailLabel = q('#subscribeForm .field > span');
+    if (emailLabel) emailLabel.textContent = P.modal.emailLabel;
+    var emailErr = q('#emailErr');
+    if (emailErr) emailErr.textContent = P.modal.emailErr;
+    var modalNote = q('.modal-note');
+    if (modalNote) modalNote.textContent = P.modal.note;
+    var agree = q('#agreeInput + span');
+    if (agree) agree.innerHTML = P.modal.agree;
+    var payBtn = q('#subscribeForm .btn-primary');
+    if (payBtn && !payBtn.disabled) payBtn.textContent = P.modal.pay;
+  }
+
   function apply(lang) {
     var T = STRINGS[lang] || STRINGS.ru;
     document.documentElement.lang = lang === 'en' ? 'en' : 'ru';
@@ -434,6 +576,7 @@
     applyPricing(lang);
     applySections(T, lang);
     applyDownload(T);
+    applyPageContent(lang);
     if (global.EfirRefreshDownloadLabels) global.EfirRefreshDownloadLabels();
     document.querySelectorAll('.lang-btn').forEach(function (btn) {
       btn.classList.toggle('on', btn.getAttribute('data-lang') === lang);
