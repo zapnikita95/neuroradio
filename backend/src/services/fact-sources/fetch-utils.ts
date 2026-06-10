@@ -25,8 +25,10 @@ export function splitSentences(text: string): string[] {
     .filter((s) => s.length >= 35);
 }
 
+import { cleanTrackTitleForSearch } from '../title-clean.js';
+
 export function cleanTrackTitle(title: string): string {
-  return title.replace(/\s*\([^)]*\)\s*/g, ' ').replace(/\s+/g, ' ').trim();
+  return cleanTrackTitleForSearch(title);
 }
 
 export function isCyrillic(text: string): boolean {

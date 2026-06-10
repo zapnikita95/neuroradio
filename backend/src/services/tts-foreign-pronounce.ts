@@ -1,3 +1,7 @@
+import {
+  buildArtistPhrasePhoneticRu,
+  lookupArtistPronunciation,
+} from './artist-pronunciation.js';
 import { fixWikiTranslationArtifacts } from './wiki-translate-quality.js';
 import {
   englishPhraseToRussianPhonetic,
@@ -67,6 +71,7 @@ const PHRASE_PRONUNCIATION_RU: Record<string, string> = {
   'nu-metal': 'ню метал',
   ...GERMAN_PHRASE_PHONETIC,
   ...FRENCH_PHRASE_PHONETIC,
+  ...buildArtistPhrasePhoneticRu(),
 };
 
 const EN_WORD_RU: Record<string, string> = {
@@ -436,12 +441,13 @@ function buildArtistTitleExtra(artist: string, title: string): Record<string, st
   const extra: Record<string, string> = {};
   const a = artist.trim();
   const t = title.trim();
+  const artistEntry = lookupArtistPronunciation(a);
   if (a) {
-    const ru = lookupPhraseTts(a);
-    extra[a.toLowerCase()] = ru;
+    extra[a.toLowerCase()] = artistEntry?.ru ?? lookupPhraseTts(a);
   }
   if (t) {
-    const ru = lookupPhraseTts(t);
+    const titleEntry = lookupArtistPronunciation(t);
+    const ru = titleEntry?.ru ?? lookupPhraseTts(t);
     extra[t.toLowerCase()] = ru;
     extra[t.toLowerCase().replace(/\s*&\s*/g, ' and ')] = ru;
   }

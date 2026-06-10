@@ -4,6 +4,7 @@ import {
   canUseAzureSpeechProduction,
   hasAzureSpeechCredentials,
 } from './azure-tts.js';
+import { applyEnglishArtistPronunciation } from './artist-pronunciation.js';
 import { preparePlainSpeechText } from './tts-azure-ssml.js';
 import {
   canUseServerSpeechKit,
@@ -225,11 +226,15 @@ export async function synthesizeStoryAudio(request: TtsRouteRequest): Promise<Tt
       ...ttsMarkupFlags(request),
     });
   } else if (provider === 'elevenlabs') {
-    const plainText = preparePlainSpeechText(
-      script,
+    const plainText = applyEnglishArtistPronunciation(
+      preparePlainSpeechText(
+        script,
+        request.artist ?? '',
+        request.title ?? '',
+        request.speakTrackNamesInVoiceover === true,
+      ),
       request.artist ?? '',
       request.title ?? '',
-      request.speakTrackNamesInVoiceover === true,
     );
     const elevenVoiceId = resolveElevenLabsVoiceId(
       (request.elevenLabsVoice ?? request.voiceId ?? 'auto') as import('./elevenlabs-voices.js').ElevenLabsVoiceSetting,

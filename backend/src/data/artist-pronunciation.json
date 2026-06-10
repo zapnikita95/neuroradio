@@ -1,0 +1,565 @@
+{
+  "version": 1,
+  "description": "Stylized artist names → RU Cyrillic (Yandex/Edge/Silero) and EN respelling (ElevenLabs/Azure en).",
+  "artists": {
+    "xxxtentacion": {
+      "ru": "икстент+acion",
+      "en": "Ex Ex Ex tentacion",
+      "aliases": ["xxx tentacion", "xxxtentacion", "xxxtenacion"]
+    },
+    "sqwozbab": {
+      "ru": "сквозь баб",
+      "en": "skwoz bab",
+      "aliases": ["s q w o z b a b", "sqwoz bab", "сквозь баб"]
+    },
+    "6ix9ine": {
+      "ru": "сикснайн",
+      "en": "six nine",
+      "aliases": ["tekashi 6ix9ine", "tekashi69"]
+    },
+    "suicideboys": {
+      "ru": "су+исайд бойз",
+      "en": "suicide boys",
+      "aliases": ["$uicideboy$", "suicideboy$"]
+    },
+    "ghostemane": {
+      "ru": "г+остим+ейн",
+      "en": "ghoste mane"
+    },
+    "jpegmafia": {
+      "ru": "дж+ейпег м+афия",
+      "en": "J peg mafia",
+      "aliases": ["jpeg mafia"]
+    },
+    "mf doom": {
+      "ru": "эм-эф д+ум",
+      "en": "M F Doom",
+      "aliases": ["mf doom", "m.f. doom"]
+    },
+    "death grips": {
+      "ru": "д+эс гр+ипс",
+      "en": "death grips"
+    },
+    "grimes": {
+      "ru": "гр+аймз",
+      "en": "grimes"
+    },
+    "fka twigs": {
+      "ru": "эф-к+ей-эй тв+игс",
+      "en": "F K A twigs"
+    },
+    "sia": {
+      "ru": "с+айя",
+      "en": "see ah"
+    },
+    "p!nk": {
+      "ru": "п+инк",
+      "en": "pink",
+      "aliases": ["pink", "p!nk"]
+    },
+    "kesha": {
+      "ru": "к+эша",
+      "en": "keesh ah",
+      "aliases": ["ke$ha"]
+    },
+    "will.i.am": {
+      "ru": "у+ил ай эм",
+      "en": "will I am",
+      "aliases": ["will i am"]
+    },
+    "panic! at the disco": {
+      "ru": "п+аник эт з+а д+иско",
+      "en": "panic at the disco"
+    },
+    "twenty one pilots": {
+      "ru": "тв+энти у+ан п+айлотс",
+      "en": "twenty one pilots",
+      "aliases": ["21 pilots"]
+    },
+    "bring me the horizon": {
+      "ru": "бр+инг ми з+а хора+йзон",
+      "en": "bring me the horizon",
+      "aliases": ["bmth"]
+    },
+    "hoobastank": {
+      "ru": "х+убаст+энк",
+      "en": "hooba stank"
+    },
+    "limp bizkit": {
+      "ru": "л+имп б+изкит",
+      "en": "limp bizkit"
+    },
+    "korn": {
+      "ru": "к+орн",
+      "en": "korn"
+    },
+    "deftones": {
+      "ru": "д+ефтонз",
+      "en": "deftones"
+    },
+    "slipknot": {
+      "ru": "сл+ипнот",
+      "en": "slip knot"
+    },
+    "system of a down": {
+      "ru": "с+истем ов э д+аун",
+      "en": "system of a down",
+      "aliases": ["soad"]
+    },
+    "bon iver": {
+      "ru": "б+он ай-v+ер",
+      "en": "bon eye ver"
+    },
+    "haim": {
+      "ru": "х+айм",
+      "en": "hime"
+    },
+    "chvrches": {
+      "ru": "ч+ёрчес",
+      "en": "churches"
+    },
+    "sbtrkt": {
+      "ru": "с+абтракт",
+      "en": "subtract"
+    },
+    "m83": {
+      "ru": "эм-83",
+      "en": "M eighty three"
+    },
+    "the weeknd": {
+      "ru": "з+а уикенд",
+      "en": "the weekend"
+    },
+    "post malone": {
+      "ru": "п+оуст м+алoun",
+      "en": "post ma lone"
+    },
+    "lil uzi vert": {
+      "ru": "л+ил у+зи в+ёрт",
+      "en": "lil oozie vert"
+    },
+    "juice wrld": {
+      "ru": "дж+ус w+orld",
+      "en": "juice world"
+    },
+    "playboi carti": {
+      "ru": "пл+ейбой к+арти",
+      "en": "playboy carti"
+    },
+    "asap rocky": {
+      "ru": "эй-эс-эй-п+и р+окки",
+      "en": "A sap rocky",
+      "aliases": ["a$ap rocky", "asap rocky"]
+    },
+    "mac miller": {
+      "ru": "м+ак м+иллер",
+      "en": "mac miller"
+    },
+    "travis scott": {
+      "ru": "тр+эвис ск+отт",
+      "en": "travis scott"
+    },
+    "eminem": {
+      "ru": "эмин+ем",
+      "en": "M and M"
+    },
+    "2pac": {
+      "ru": "ту-п+ак",
+      "en": "two pack",
+      "aliases": ["tupac", "tupac shakur", "2 pac"]
+    },
+    "the notorious b.i.g.": {
+      "ru": "нотор+иос би-ай-дж+и",
+      "en": "the notorious big",
+      "aliases": ["notorious b.i.g.", "biggie smalls", "biggie"]
+    },
+    "wu-tang clan": {
+      "ru": "у-т+анг кл+эн",
+      "en": "woo tang clan"
+    },
+    "linkin park": {
+      "ru": "л+инкин п+арк",
+      "en": "linkin park"
+    },
+    "my chemical romance": {
+      "ru": "м+ай кем+икал ром+анс",
+      "en": "my chemical romance",
+      "aliases": ["mcr"]
+    },
+    "fall out boy": {
+      "ru": "ф+ол а+ут бой",
+      "en": "fall out boy"
+    },
+    "arctic monkeys": {
+      "ru": "+аркик м+анкиз",
+      "en": "arctic monkeys"
+    },
+    "the 1975": {
+      "ru": "з+а nineteen seventy five",
+      "en": "the nineteen seventy five"
+    },
+    "tame impala": {
+      "ru": "т+ейм имп+ала",
+      "en": "tame impala"
+    },
+    "sza": {
+      "ru": "с+иза",
+      "en": "sizza"
+    },
+    "rosalia": {
+      "ru": "росал+ия",
+      "en": "roh sah lee ah",
+      "aliases": ["rosalía"]
+    },
+    "bad bunny": {
+      "ru": "б+эд б+анни",
+      "en": "bad bunny"
+    },
+    "j balvin": {
+      "ru": "х+ай б+альвин",
+      "en": "J balvin"
+    },
+    "bts": {
+      "ru": "би-ти-эс",
+      "en": "B T S"
+    },
+    "blackpink": {
+      "ru": "бл+экп+инк",
+      "en": "black pink"
+    },
+    "stray kids": {
+      "ru": "стр+ей к+идс",
+      "en": "stray kids"
+    },
+    "aespa": {
+      "ru": "+эспа",
+      "en": "ay spa"
+    },
+    "exo": {
+      "ru": "+эксо",
+      "en": "E X O"
+    },
+    "nct": {
+      "ru": "эн-си-ти",
+      "en": "N C T",
+      "aliases": ["nct 127", "nct dream"]
+    },
+    "twice": {
+      "ru": "тв+айс",
+      "en": "twice"
+    },
+    "loona": {
+      "ru": "л+уна",
+      "en": "loona"
+    },
+    "gidle": {
+      "ru": "ай+дл",
+      "en": "G idle",
+      "aliases": ["(g)-idle", "g-idle", "(g)i-dle"]
+    },
+    "ateez": {
+      "ru": "эт+из",
+      "en": "A tees"
+    },
+    "enhypen": {
+      "ru": "энх+айpen",
+      "en": "en hyphen"
+    },
+    "miyagi": {
+      "ru": "мия+ги",
+      "en": "miyagi",
+      "aliases": ["miyagi & andy panda", "эндшпиль"]
+    },
+    "pharaoh": {
+      "ru": "ф+араон",
+      "en": "pharaoh",
+      "aliases": ["фaraon", "фaraон"]
+    },
+    "oxxxymiron": {
+      "ru": "оксимир+он",
+      "en": "oxxxymiron",
+      "aliases": ["oxxxy", "оксимирон"]
+    },
+    "basta": {
+      "ru": "б+аста",
+      "en": "basta"
+    },
+    "lsp": {
+      "ru": "эл-эс-п+и",
+      "en": "L S P",
+      "aliases": ["лсп"]
+    },
+    "og buda": {
+      "ru": "о-дж+и б+уда",
+      "en": "O G buda"
+    },
+    "skryptonite": {
+      "ru": "скр+иптон+айт",
+      "en": "kryptonite"
+    },
+    "husky": {
+      "ru": "х+аски",
+      "en": "husky",
+      "aliases": ["хаски"]
+    },
+    "morgenshtern": {
+      "ru": "моргенштерн",
+      "en": "morgen stern",
+      "aliases": ["мorgenshtern"]
+    },
+    "eldzhey": {
+      "ru": "элдж+ей",
+      "en": "el jay",
+      "aliases": ["элджей", "eldzhey"]
+    },
+    "kizaru": {
+      "ru": "кизар+у",
+      "en": "kizaru"
+    },
+    "icegergert": {
+      "ru": "айсgergert",
+      "en": "ice gergert"
+    },
+    "instasamka": {
+      "ru": "инстас+амка",
+      "en": "insta samka"
+    },
+    "friendly thug 52 ngg": {
+      "ru": "фр+ендли thug fifty-two en-gee-gee",
+      "en": "friendly thug fifty two N G G"
+    },
+    "boulevard depo": {
+      "ru": "бульв+ар деп+о",
+      "en": "boulevard depo",
+      "aliases": ["бoulevard depo"]
+    },
+    "feduk": {
+      "ru": "фед+ук",
+      "en": "feduk"
+    },
+    "slava marlow": {
+      "ru": "сл+ава м+арлоу",
+      "en": "slava marlow"
+    },
+    "gone.fludd": {
+      "ru": "г+он фл+ад",
+      "en": "gone fludd"
+    },
+    "lil krystalll": {
+      "ru": "л+ил крист+алл",
+      "en": "lil crystal"
+    },
+    "pyrokinesis": {
+      "ru": "п+ирокин+езис",
+      "en": "pyrokinesis"
+    },
+    "mot": {
+      "ru": "м+от",
+      "en": "mot"
+    },
+    "zivert": {
+      "ru": "з+иверт",
+      "en": "zivert"
+    },
+    "cream soda": {
+      "ru": "кр+им с+ода",
+      "en": "cream soda"
+    },
+    "markul": {
+      "ru": "м+аркул",
+      "en": "markul"
+    },
+    "anacondaz": {
+      "ru": "анак+ондаz",
+      "en": "anaconda z"
+    },
+    "kasta": {
+      "ru": "к+аста",
+      "en": "kasta"
+    },
+    "ev": {
+      "ru": "и-в+и",
+      "en": "E V"
+    },
+    "galaga": {
+      "ru": "гал+ага",
+      "en": "galaga"
+    },
+    "maneskin": {
+      "ru": "ман+ескин",
+      "en": "maneskin",
+      "aliases": ["måneskin"]
+    },
+    "gorillaz": {
+      "ru": "гор+illas",
+      "en": "gorillas"
+    },
+    "daft punk": {
+      "ru": "д+афт п+анк",
+      "en": "daft punk"
+    },
+    "bjork": {
+      "ru": "бй+орк",
+      "en": "byork",
+      "aliases": ["björk"]
+    },
+    "sigur ros": {
+      "ru": "с+игур р+ос",
+      "en": "see gur ross",
+      "aliases": ["sigur rós"]
+    },
+    "halsey": {
+      "ru": "х+олзи",
+      "en": "halsey"
+    },
+    "lil peep": {
+      "ru": "л+ил п+ип",
+      "en": "lil peep"
+    },
+    "kendrick lamar": {
+      "ru": "к+ендрик лам+ар",
+      "en": "kendrick lamar"
+    },
+    "j. cole": {
+      "ru": "дж+ей к+оул",
+      "en": "J cole"
+    },
+    "snoop dogg": {
+      "ru": "сн+уп д+ог",
+      "en": "snoop dogg"
+    },
+    "dr. dre": {
+      "ru": "д+октор др+е",
+      "en": "doctor dre"
+    },
+    "beastie boys": {
+      "ru": "б+исти б+ойz",
+      "en": "beastie boys"
+    },
+    "evanescence": {
+      "ru": "эvan+escence",
+      "en": "evan essence"
+    },
+    "paramore": {
+      "ru": "п+aramore",
+      "en": "paramore"
+    },
+    "onerepublic": {
+      "ru": "у+ан респ+аблик",
+      "en": "one republic"
+    },
+    "alt-j": {
+      "ru": "альт дж+ей",
+      "en": "alt J"
+    },
+    "lil nas x": {
+      "ru": "л+ил н+ас икс",
+      "en": "lil nas ex"
+    },
+    "d4vd": {
+      "ru": "д+эвид",
+      "en": "david"
+    },
+    "070 shake": {
+      "ru": "oh seven oh shake",
+      "en": "oh seven oh shake"
+    },
+    "yung lean": {
+      "ru": "янг л+ин",
+      "en": "young lean"
+    },
+    "bladee": {
+      "ru": "бл+ейди",
+      "en": "blade"
+    },
+    "ecco2k": {
+      "ru": "+экко ту-к+ей",
+      "en": "echo two K"
+    },
+    "destroy lonely": {
+      "ru": "дистр+ой л+онли",
+      "en": "destroy lonely"
+    },
+    "ken carson": {
+      "ru": "к+ен к+арson",
+      "en": "ken carson"
+    },
+    "yeat": {
+      "ru": "й+ит",
+      "en": "yeat"
+    },
+    "gunna": {
+      "ru": "г+анна",
+      "en": "gunna"
+    },
+    "future": {
+      "ru": "ф+ьючер",
+      "en": "future"
+    },
+    "21 savage": {
+      "ru": "twenty one s+avage",
+      "en": "twenty one savage"
+    },
+    "tyler, the creator": {
+      "ru": "т+айлер з+а creator",
+      "en": "tyler the creator"
+    },
+    "childish gambino": {
+      "ru": "ч+айлдish gamb+ino",
+      "en": "childish gambino"
+    },
+    "frank ocean": {
+      "ru": "фр+энк о+ушен",
+      "en": "frank ocean"
+    },
+    "kanye west": {
+      "ru": "к+анье у+эst",
+      "en": "kanye west"
+    },
+    "jay-z": {
+      "ru": "дж+ей-zed",
+      "en": "jay Z"
+    },
+    "rihanna": {
+      "ru": "ри+anna",
+      "en": "ree ah na"
+    },
+    "beyonce": {
+      "ru": "б+ейонсе",
+      "en": "bee yon say",
+      "aliases": ["beyoncé"]
+    },
+    "dua lipa": {
+      "ru": "д+уа л+ипа",
+      "en": "doo ah leep ah"
+    },
+    "billie eilish": {
+      "ru": "б+илли ай+lish",
+      "en": "billie eilish"
+    },
+    "olivia rodrigo": {
+      "ru": "ол+ивия родр+иgo",
+      "en": "olivia rodrigo"
+    },
+    "doja cat": {
+      "ru": "д+ожa к+эт",
+      "en": "doja cat"
+    },
+    "megan thee stallion": {
+      "ru": "м+egan z+и stallion",
+      "en": "megan the stallion"
+    },
+    "nicki minaj": {
+      "ru": "н+ики мин+аж",
+      "en": "nicki minaj"
+    },
+    "cardi b": {
+      "ru": "к+арди би",
+      "en": "cardi B"
+    },
+    "ice spice": {
+      "ru": "+айс spice",
+      "en": "ice spice"
+    }
+  }
+}

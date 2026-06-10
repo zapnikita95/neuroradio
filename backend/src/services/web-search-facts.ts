@@ -1,5 +1,6 @@
 import fetch from 'node-fetch';
 import { hasActionableSnippets } from './web-snippet-accept.js';
+import { cleanTrackTitleForSearch, stripSnippetBoilerplate } from './title-clean.js';
 
 const USER_AGENT = 'Mozilla/5.0 (compatible; MusicStoryBFF/1.0; +https://music-story.app)';
 /** Первый проход — узкие запросы под «дыры» Wikipedia. */
@@ -50,7 +51,7 @@ function quotedArtist(artist: string): string {
 }
 
 function cleanTrackTitle(title: string): string {
-  return title.replace(/\s*\([^)]*\)\s*/g, ' ').trim();
+  return cleanTrackTitleForSearch(title);
 }
 
 /** Latin stage name + Cyrillic title — типичный рэп-кейс (GALAGA и т.п.). */
@@ -219,8 +220,8 @@ export function formatDdgResult(result: DdgHtmlResult): string {
   if (snippetNorm.includes(titleNorm) || titleNorm.includes(snippetNorm.slice(0, 40))) {
     return snippet;
   }
-  const combined = `${title}. ${snippet}`.replace(/\s+/g, ' ').trim();
-  return combined.length <= 480 ? combined : snippet;
+  const combined = stripSnippetBoilerplate(`${title}. ${snippet}`.replace(/\s+/g, ' ').trim());
+  return combined.length <= 480 ? combined : stripSnippetBoilerplate(snippet);
 }
 
 export async function fetchTitleFirstWebSnippets(title: string): Promise<string[]> {
