@@ -179,9 +179,24 @@ export function isLowQualityWebSnippet(snippet: string): boolean {
   return false;
 }
 
+/** Press/label bio line — «сольный проект X, известный как…» (GALAGA / indie rap). */
+export function isArtistIdentityBioSnippet(snippet: string): boolean {
+  const trimmed = decodeHtmlEntities(snippet).trim();
+  if (trimmed.length < 35 || trimmed.length > 480) return false;
+  if (isLyricsPageSeed(trimmed)) return false;
+  return (
+    /(?:сольный проект|известн(?:ый|ого|ая|ой|ым)\s+как|вокалист(?:а|ом)?|создател\w*\s+групп|участник\s+групп|русск\w*\s+рэп|russian rap|musician biography|rapper biography|stage name|псевдоним)/i.test(
+      trimmed,
+    ) ||
+    (/(?:артист|исполнитель|музыкант|rapper|musician)/i.test(trimmed) &&
+      /(?:родился|род\.|born|project of|member of|ex-)/i.test(trimmed))
+  );
+}
+
 /** Narrative hook in a search snippet — even without repeating artist/title. */
 export function hasNarrativeSeedSignal(text: string): boolean {
   const trimmed = text.trim();
+  if (isArtistIdentityBioSnippet(trimmed)) return true;
   if (hasTrackContextSignal(trimmed)) return true;
   if (isBackstoryFact(trimmed)) return true;
   if (
@@ -209,6 +224,10 @@ export function acceptIndieEmergingSnippet(
   if (isLowQualityWebSnippet(trimmed)) return false;
   if (isWebListicleJunk(trimmed)) return false;
   if (isPlaylistJunkSnippet(trimmed, artist, title)) return false;
+
+  // Artist bio lines often quote a former band — must not be blocked as «other track title».
+  if (isArtistIdentityBioSnippet(trimmed) && factMentionsArtistLoose(trimmed, artist)) return true;
+
   if (factMentionsOtherTrackTitle(trimmed, title)) return false;
 
   // Search was scoped to artist+title — truncated rise/fame clips need not repeat the name.

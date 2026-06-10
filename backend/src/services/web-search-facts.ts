@@ -53,6 +53,29 @@ function cleanTrackTitle(title: string): string {
   return title.replace(/\s*\([^)]*\)\s*/g, ' ').trim();
 }
 
+/** Latin stage name + Cyrillic title — типичный рэп-кейс (GALAGA и т.п.). */
+function isLatinArtistCyrillicTrack(artist: string, title: string): boolean {
+  return !isCyrillic(artist.trim()) && isCyrillic(cleanTrackTitle(title));
+}
+
+/** Запросы «{имя} артист» — биография, когда lyrics/концерты не дают фактов. */
+export function buildArtistIdentityQueries(artist: string): string[] {
+  const trimmed = artist.trim();
+  if (!trimmed || trimmed.length < 2) return [];
+  const artistQ = quotedArtist(trimmed);
+  const queries = [
+    `${trimmed} артист`,
+    `"${trimmed}" артист`,
+    `${trimmed} музыкант биография`,
+  ];
+  if (isCyrillic(trimmed)) {
+    queries.push(`${trimmed} рэп исполнитель`, `${trimmed} интервью`);
+  } else {
+    queries.push(`${artistQ} russian rap musician`, `${artistQ} artist biography interview`);
+  }
+  return queries.slice(0, 4);
+}
+
 /** DDG Instant API — язык-зависимые запросы (не «Wounded Knee» для русского рэпа). */
 export function buildDdgInstantQueries(artist: string, title: string): string[] {
   const cleanTitle = cleanTrackTitle(title);
@@ -79,11 +102,14 @@ export function buildWebOnlyQueries(artist: string, title: string): string[] {
   const ruTitle = isCyrillic(title);
   if (isCyrillic(artist) || ruTitle) {
     const lead = artist.trim().toLowerCase() === 'кино' ? 'Виктор Цой Кино' : artist;
+    const fourthQuery = isLatinArtistCyrillicTrack(artist, title)
+      ? `${artist.trim()} артист`
+      : `${lead} артист`;
     return [
       `"${lead}" "${cleanTitle}"`,
       `${lead} ${cleanTitle} текст песни смысл`,
       `${lead} ${cleanTitle} рэп трек`,
-      `${lead} интервью музыкант`,
+      fourthQuery,
     ].slice(0, MAX_HTML_QUERIES);
   }
   if (isAmbiguousArtistName(artist)) {
@@ -214,6 +240,14 @@ export async function fetchIndieArtistWebSnippets(artist: string, title: string)
     buildIndieArtistWebQueries(artist, title),
     'web-indie-artist',
     artist,
+  );
+}
+
+export async function fetchArtistIdentityWebSnippets(artist: string): Promise<string[]> {
+  return collectFromQueries(
+    buildArtistIdentityQueries(artist),
+    'web-artist-id',
+    `${artist} (artist identity)`,
   );
 }
 

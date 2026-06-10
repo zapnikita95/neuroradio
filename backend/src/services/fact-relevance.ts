@@ -713,6 +713,15 @@ export function factMentionsOtherTrackTitle(fact: string, title: string): boolea
     if (/^(?:the|a|an)\s+/i.test(match[1])) continue;
     if (/\b(?:folk|indie|rock|pop|metal|jazz|soul|punk|style|songwriting|alternative)\b/i.test(match[1])) continue;
     if (match[1].trim().split(/\s+/).length > 5) continue;
+    const before = fact.slice(Math.max(0, (match.index ?? 0) - 55), match.index ?? 0);
+    // «Голос Омерики» after «создателя группы» — band name, not another track title.
+    if (
+      /(?:групп\w*|band|коллектив|проект\w*|ensemble|orchestra|members?\s+of|участник\w*\s+|member\s+of)\s*$/i.test(
+        before.trim(),
+      )
+    ) {
+      continue;
+    }
     return true;
   }
   return false;

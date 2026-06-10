@@ -5,7 +5,7 @@ import { validateStoryFullBody } from '../middleware/validate-story.js';
 import { extractClientSecrets } from '../middleware/client-secrets.js';
 import { enrichTrackMetadata } from '../services/musicbrainz.js';
 import { fetchAggregatedFactContext, emptyAggregatedFactContext, fetchIndieArtistFocusContext, fetchEmergencyFactRescue } from '../services/fact-aggregator.js';
-import { fetchDeepWebSearchSnippets } from '../services/web-search-facts.js';
+import { fetchDeepWebSearchSnippets, fetchArtistIdentityWebSnippets } from '../services/web-search-facts.js';
 import { fetchFastTrackWikiFacts } from '../services/wikipedia-facts.js';
 import { explainReferenceFactSelection, factsTooSimilar, type SelectedReferenceFact } from '../services/fact-picker.js';
 import { formatFactPickLog, logFactCandidatePools } from '../services/fact-interest-log.js';
@@ -302,7 +302,8 @@ router.post('/full', extractClientSecrets, validateStoryFullBody, storyFullRateL
     tts_style: ttsStyle,
     voice_tier: voiceTier,
     tts_provider: ttsProvider,
-  } = req.body as StoryFullBody;
+    story_language: storyLanguage,
+  } = req.body as StoryFullBody & { story_language?: 'ru' | 'en' };
   const geminiModel = (req.body as StoryFullBody).gemini_model;
   const groqModel = (req.body as StoryFullBody).groq_model;
   const openrouterModelRequested = (req.body as StoryFullBody).openrouter_model;
@@ -345,7 +346,7 @@ router.post('/full', extractClientSecrets, validateStoryFullBody, storyFullRateL
   );
   console.log(
     `[story] start install=${installId.slice(0, 8)} requested_llm=${requestedProviderRaw ?? 'missing'} llm=${llmProvider}${modelLog}` +
-      ` narrator=${storyNarrator} artist="${artist}" title="${title}"`,
+      ` lang=${storyLanguage ?? 'ru'} narrator=${storyNarrator} artist="${artist}" title="${title}"`,
   );
 
   const timing = new StoryTiming(installId, artist, title);
@@ -455,6 +456,7 @@ router.post('/full', extractClientSecrets, validateStoryFullBody, storyFullRateL
         metadata.countryCode,
         metadata.mbid,
         metadata.artistMbid,
+        { storyLanguage: storyLanguage ?? 'ru' },
       );
       throwIfStoryAborted(clientAbort, 'facts-fetch');
       timing.mark(
@@ -486,6 +488,7 @@ router.post('/full', extractClientSecrets, validateStoryFullBody, storyFullRateL
             metadata.countryCode,
             metadata.mbid,
             metadata.artistMbid,
+            { storyLanguage: storyLanguage ?? 'ru' },
           );
           factBundle = factCtx.bundle;
           trackFactCount = factBundle.trackFacts.length;
@@ -639,6 +642,34 @@ router.post('/full', extractClientSecrets, validateStoryFullBody, storyFullRateL
                 { fact: huntedDeep.fact, scope: huntedDeep.scope, source: 'llm' },
               ]);
               console.log(formatFactPickLog(selectedFact, 'llm') + ' (deep-web)');
+            }
+          }
+        }
+        if (!selectedFact) {
+          const identitySnippets = await fetchArtistIdentityWebSnippets(metadata.artist);
+          if (identitySnippets.length > 0) {
+            mergedSnippets = [...new Set([...mergedSnippets, ...identitySnippets])];
+            factCtx = { ...factCtx, rawSnippets: mergedSnippets };
+            console.log(
+              `[fact-hunt-llm] artist-identity retry snippets=${mergedSnippets.length} (+${identitySnippets.length})`,
+            );
+            const huntedIdentity = await huntReferenceFactWithLlm({
+              artist: metadata.artist,
+              title: metadata.title,
+              year: metadata.year,
+              genre: metadata.genre,
+              rawSnippets: mergedSnippets,
+              preferredProvider: llmProvider,
+              openRouterModel: openrouterModelFact,
+              openRouterModels: factModels,
+            });
+            if (huntedIdentity) {
+              selectedFact = huntedIdentity;
+              factHuntLlm = true;
+              ingestFacts(metadata.artist, metadata.title, [
+                { fact: huntedIdentity.fact, scope: huntedIdentity.scope, source: 'llm' },
+              ]);
+              console.log(formatFactPickLog(selectedFact, 'llm') + ' (artist-identity)');
             }
           }
         }
@@ -1084,6 +1115,7 @@ router.post('/full', extractClientSecrets, validateStoryFullBody, storyFullRateL
       clientOpenRouterApiKey: clientLlmKeys.openrouter,
       localOllamaBaseUrl: clientLocal.baseUrl,
       localOllamaModel: clientLocal.model,
+      storyLanguage: storyLanguage ?? 'ru',
     };
 
     if (selectedFact?.fact) {
@@ -1460,6 +1492,8 @@ router.post('/full', extractClientSecrets, validateStoryFullBody, storyFullRateL
         sileroVoicePreset: (req.body as StoryFullBody).silero_voice_preset,
         edgeVoicePreset: (req.body as StoryFullBody).edge_voice_preset,
         speakTrackNamesInVoiceover: (req.body as StoryFullBody).speak_track_names_in_voiceover,
+        storyLanguage: storyLanguage ?? 'ru',
+        elevenLabsVoice: ttsVoice,
         logContext: {
           installId,
           artist: metadata.artist,

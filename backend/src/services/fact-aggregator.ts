@@ -4,6 +4,7 @@ import {
   assignFactsToScopes,
   factAppliesToRequest,
   factMentionsArtist,
+  factMentionsArtistLoose,
   factMentionsTitle,
   factNamesForeignEntity,
   hasTrackContextSignal,
@@ -18,6 +19,7 @@ import {
   buildDdgInstantQueries,
   fetchBackstoryWebSnippets,
   fetchDeepWebSearchSnippets,
+  fetchArtistIdentityWebSnippets,
   fetchIndieArtistWebSnippets,
   fetchTitleFirstWebSnippets,
   fetchWebSearchFactSnippets,
@@ -25,7 +27,7 @@ import {
 } from './web-search-facts.js';
 
 export { buildDdgInstantQueries } from './web-search-facts.js';
-import { acceptSearchGroundedSnippet, acceptIndieEmergingSnippet, hasActionableSnippets, isLyricsPageSeed, isWrongEntityDisambiguation } from './web-snippet-accept.js';
+import { acceptSearchGroundedSnippet, acceptIndieEmergingSnippet, hasActionableSnippets, isLyricsPageSeed, isWrongEntityDisambiguation, isArtistIdentityBioSnippet } from './web-snippet-accept.js';
 import { lookupCuratedFact } from './curated-facts.js';
 const USER_AGENT = 'MusicStoryBFF/1.0 (contact@example.com)';
 const RAW_SNIPPET_MIN_LEN = 30;
@@ -172,6 +174,60 @@ function artistSurnameInFact(fact: string, artist: string): boolean {
   if (parts.length === 0) return false;
   const factNorm = normalize(fact);
   return parts.some((token) => factNorm.includes(token));
+}
+
+function shouldFetchArtistIdentitySnippets(
+  webSnippets: string[],
+  artistFacts: string[],
+  artist: string,
+): boolean {
+  if (artistFacts.length > 0) return false;
+  if (
+    webSnippets.some(
+      (s) => isArtistIdentityBioSnippet(s) && factMentionsArtistLoose(s, artist),
+    )
+  ) {
+    return false;
+  }
+  const nonLyricsArtist = webSnippets.filter(
+    (s) =>
+      factMentionsArtistLoose(s, artist) &&
+      !isLyricsPageSeed(s) &&
+      !/\b(?:текст\s+песни|lyrics|song lyrics|слушать онлайн|watch on youtube)\b/i.test(s),
+  );
+  return nonLyricsArtist.length < 2;
+}
+
+async function mergeArtistIdentitySnippets(
+  artist: string,
+  title: string,
+  webSnippets: string[],
+  artistFacts: string[],
+  trackFacts: string[],
+): Promise<{ webSnippets: string[]; artistFacts: string[]; trackFacts: string[] }> {
+  if (!shouldFetchArtistIdentitySnippets(webSnippets, artistFacts, artist)) {
+    return { webSnippets, artistFacts, trackFacts };
+  }
+  const identity = await fetchWithCap(
+    'web-artist-id',
+    () => fetchArtistIdentityWebSnippets(artist),
+    [],
+    10_000,
+  );
+  if (identity.length === 0) {
+    return { webSnippets, artistFacts, trackFacts };
+  }
+  const mergedWeb = [...new Set([...webSnippets, ...identity])];
+  const salvaged = salvageWebSearchSnippets(identity, artist, title, true);
+  console.log(
+    `[facts] artist-identity search "${artist}": +${identity.length} snippets ` +
+      `artistFacts=${salvaged.artistFacts.length}`,
+  );
+  return {
+    webSnippets: mergedWeb,
+    artistFacts: mergeFacts(artistFacts, salvaged.artistFacts),
+    trackFacts,
+  };
 }
 
 function salvageArtistBioFacts(
@@ -427,9 +483,11 @@ export async function fetchWikiBundleMerged(
   artist: string,
   title: string,
   countryCode?: string,
+  options: { storyLanguage?: 'ru' | 'en' } = {},
 ): Promise<ReferenceFactBundle> {
   const cc = resolveFactCountryCode(artist, title, countryCode);
-  const primaryLang = cc === 'RU' ? 'RU' : cc ?? 'US';
+  const preferEn = options.storyLanguage === 'en';
+  const primaryLang = preferEn ? 'US' : cc === 'RU' ? 'RU' : cc ?? 'US';
   const [wikiPrimary, wikiAlt] = await Promise.all([
     fetchWithCap(
       'wiki-primary',
@@ -533,12 +591,18 @@ export async function fetchAggregatedFactContext(
   countryCode?: string,
   recordingMbid?: string,
   artistMbid?: string,
+  options: { storyLanguage?: 'ru' | 'en' } = {},
 ): Promise<AggregatedFactContext> {
   const t0 = Date.now();
   const cc = resolveFactCountryCode(artist, title, countryCode);
   const [wiki, wikiLead, ddgUnfiltered, webUnfiltered, webTitleFirst, wdUnfiltered, mbTrackRaw, mbArtistRaw, wikiFastTrack] =
     await Promise.all([
-      fetchWithCap('wiki', () => fetchWikiBundleMerged(artist, title, cc), EMPTY_WIKI, 9_000),
+      fetchWithCap(
+        'wiki',
+        () => fetchWikiBundleMerged(artist, title, cc, options),
+        EMPTY_WIKI,
+        9_000,
+      ),
       fetchWithCap('wiki-lead', () => fetchArtistWikiLeadWithRetry(artist, 3), null, 14_000),
       fetchWithCap('ddg', () => fetchDuckDuckGoUnfiltered(artist, title), [], 12_000),
       fetchWithCap('web', () => fetchWebSearchFactSnippets(artist, title), [], 14_000),
@@ -645,6 +709,17 @@ export async function fetchAggregatedFactContext(
     artistFacts = salvaged.artistFacts;
   }
 
+  const identityMerged = await mergeArtistIdentitySnippets(
+    artist,
+    title,
+    webAllUnfiltered,
+    artistFacts,
+    trackFacts,
+  );
+  webAllUnfiltered = identityMerged.webSnippets;
+  artistFacts = identityMerged.artistFacts;
+  trackFacts = identityMerged.trackFacts;
+
   if (trackFacts.length + artistFacts.length === 0) {
     console.warn(
       `[facts] no validated facts for "${artist}" — "${title}" after relevance filter`,
@@ -696,7 +771,7 @@ export async function fetchEmergencyFactRescue(
   console.log(`[facts] emergency rescue for "${artist}" — "${title}"`);
   const junkOnly =
     existingSnippets.length > 0 && !hasActionableSnippets(existingSnippets, artist, title);
-  const [wikiFast, webBack, titleFirst, webDeep] = await Promise.all([
+  const [wikiFast, webBack, titleFirst, webDeep, artistIdentity] = await Promise.all([
     fetchFastTrackWikiFacts(artist, title),
     junkOnly || existingSnippets.length < 3
       ? fetchBackstoryWebSnippets(artist, title)
@@ -705,9 +780,10 @@ export async function fetchEmergencyFactRescue(
     junkOnly || existingSnippets.length < 4
       ? fetchDeepWebSearchSnippets(artist, title)
       : Promise.resolve([]),
+    fetchArtistIdentityWebSnippets(artist),
   ]);
 
-  const webRescue = [...new Set([...webBack, ...titleFirst, ...webDeep])];
+  const webRescue = [...new Set([...webBack, ...titleFirst, ...webDeep, ...artistIdentity])];
 
   const trackFacts = mergeFacts(wikiFast);
   let artistFacts: string[] = [];

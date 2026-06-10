@@ -1,5 +1,5 @@
 import { highImpactBonus } from './story-fact-hunt.js';
-import { isTruncatedMarketingSnippet, isUnspeakableWebSeed, isLyricsPageSeed } from './web-snippet-accept.js';
+import { isTruncatedMarketingSnippet, isUnspeakableWebSeed, isLyricsPageSeed, isArtistIdentityBioSnippet } from './web-snippet-accept.js';
 
 /** Filters dry encyclopedia lines; ranks human drama, breakthroughs, meaning — not working titles. */
 
@@ -130,6 +130,7 @@ export function interestScore(fact: string): number {
   let score = 0;
   const trimmed = fact.trim();
   if (isLyricsPageSeed(trimmed)) score -= 50;
+  if (isArtistIdentityBioSnippet(trimmed)) score += 16;
   if (isTruncatedMarketingSnippet(trimmed)) score -= 40;
   if (isUnspeakableWebSeed(trimmed)) score -= 50;
   if (isCollectorFact(fact)) score += 8;
