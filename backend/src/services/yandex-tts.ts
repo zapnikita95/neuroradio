@@ -198,6 +198,7 @@ export async function synthesizeSpeech(
     artist?: string;
     title?: string;
     pauseProfile?: TtsPauseProfile;
+    speakTrackNamesInVoiceover?: boolean;
     /** efir-ai.ru offline demos — кириллица + ударения, без SSML lang. */
     websitePreview?: boolean;
     logContext?: YandexTtsLogContext;
@@ -228,6 +229,7 @@ export async function synthesizeSpeech(
   const markedText = prepareYandexTtsText(text, {
     artist: artist ?? logContext?.artist,
     title: title ?? logContext?.title,
+    speakTrackNamesInVoiceover: options.speakTrackNamesInVoiceover,
     sentencePauses: true,
     pauseProfile: options.pauseProfile ?? 'tight',
     websitePreview: websitePreview === true,

@@ -33,7 +33,13 @@ const ru =
 const ruOut = genericizeScriptForVoiceover(ru, 'Король и Шут', 'Лагерная Пыль');
 ok(ruOut.includes('Лагерная Пыль'), 'cyrillic title preserved');
 ok(ruOut.includes('от Король и Шут'), 'cyrillic artist kept in lead');
-console.log('RU →', ruOut);
+const offspring =
+  'Self Esteem от The Offspring — панк-хит девяностых. Offspring тогда гремели на каждом фестивале.';
+const offspringOut = genericizeScriptForVoiceover(offspring, 'The Offspring', 'Self Esteem');
+ok(!/Offspring/i.test(offspringOut), 'Offspring alias stripped without The');
+ok(!/Self Esteem/i.test(offspringOut), 'latin title stripped for Offspring sample');
+ok(/группа|исполнитель|артист|музыкант/i.test(offspringOut), 'artist substitute in Offspring sample');
+console.log('Offspring →', offspringOut);
 
 const stress = applyRussianStressSafe('Трек собран из чужих семплами и барабанов.');
 ok(stress.includes('с+эмплами'), 'семплами stress on first syllable');

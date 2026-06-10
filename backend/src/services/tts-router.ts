@@ -162,12 +162,16 @@ export function resolveEffectiveTtsProvider(
 
 function scriptForProvider(request: TtsRouteRequest, provider: EffectiveTtsProvider): string {
   const speakNames = request.speakTrackNamesInVoiceover === true;
-  if (speakNames || provider === 'silero') return request.script;
+  if (speakNames) return request.script;
   return genericizeScriptForVoiceover(
     request.script,
     request.artist ?? '',
     request.title ?? '',
   );
+}
+
+function ttsMarkupFlags(request: TtsRouteRequest): { speakTrackNamesInVoiceover: boolean } {
+  return { speakTrackNamesInVoiceover: request.speakTrackNamesInVoiceover === true };
 }
 
 export async function synthesizeStoryAudio(request: TtsRouteRequest): Promise<TtsRouteResult> {
@@ -192,6 +196,7 @@ export async function synthesizeStoryAudio(request: TtsRouteRequest): Promise<Tt
       styleId: request.ttsStyle,
       storyNarrator: request.storyNarrator,
       clientAuthKey: request.userTtsCredentials?.salute?.authKey,
+      ...ttsMarkupFlags(request),
     });
   } else if (provider === 'azure') {
     result = await synthesizeSpeechAzure(script, request.fileName, {
@@ -201,9 +206,15 @@ export async function synthesizeStoryAudio(request: TtsRouteRequest): Promise<Tt
       pauseProfile: request.pauseProfile,
       styleId: request.ttsStyle,
       storyNarrator: request.storyNarrator,
+      ...ttsMarkupFlags(request),
     });
   } else if (provider === 'elevenlabs') {
-    const plainText = preparePlainSpeechText(script, request.artist ?? '', request.title ?? '');
+    const plainText = preparePlainSpeechText(
+      script,
+      request.artist ?? '',
+      request.title ?? '',
+      request.speakTrackNamesInVoiceover === true,
+    );
     result = await synthesizeSpeechElevenLabs(plainText, request.fileName, {
       artist: request.artist,
       title: request.title,
@@ -217,6 +228,7 @@ export async function synthesizeStoryAudio(request: TtsRouteRequest): Promise<Tt
       pauseProfile: request.pauseProfile,
       styleId: request.ttsStyle,
       speed: request.speed,
+      ...ttsMarkupFlags(request),
     });
   } else {
     result = await synthesizeYandex(script, request.voiceId, request.fileName, {
@@ -227,6 +239,7 @@ export async function synthesizeStoryAudio(request: TtsRouteRequest): Promise<Tt
       pauseProfile: request.pauseProfile,
       logContext: request.logContext,
       credentials: request.userTtsCredentials?.yandex,
+      ...ttsMarkupFlags(request),
     });
   }
 

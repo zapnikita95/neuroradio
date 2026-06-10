@@ -162,6 +162,7 @@ export interface SileroSynthesisOptions {
   pauseProfile?: TtsPauseProfile;
   styleId?: TtsVoiceStyleId;
   speed?: number;
+  speakTrackNamesInVoiceover?: boolean;
 }
 
 /**
@@ -187,7 +188,11 @@ export async function synthesizeSpeechSilero(
   const styleId = options.styleId;
   const speed = options.speed ?? 1.0;
 
-  const trace = prepareSileroTtsTextTrace(script, { artist, title });
+  const trace = prepareSileroTtsTextTrace(script, {
+    artist,
+    title,
+    speakTrackNamesInVoiceover: options.speakTrackNamesInVoiceover,
+  });
   let plainText = trace.prepared;
   if (plainText.length > SILERO_MAX_INPUT_CHARS) {
     const before = plainText.length;
@@ -201,7 +206,10 @@ export async function synthesizeSpeechSilero(
   }
 
   const synthStarted = Date.now();
-  const useMixed = isSileroMixedLangEnabled() && hasEnglishSegmentsForSilero(plainText, artist, title);
+  const useMixed =
+    options.speakTrackNamesInVoiceover === true &&
+    isSileroMixedLangEnabled() &&
+    hasEnglishSegmentsForSilero(plainText, artist, title);
   let buffer: Buffer;
 
   if (useMixed) {

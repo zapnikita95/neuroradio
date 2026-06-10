@@ -95,8 +95,11 @@ export function preparePlainSpeechText(
   script: string,
   artist: string,
   title: string,
+  speakTrackNamesInVoiceover = true,
 ): string {
-  let text = sanitizeScriptForTts(script, artist, title);
+  const markupArtist = speakTrackNamesInVoiceover ? artist : '';
+  const markupTitle = speakTrackNamesInVoiceover ? title : '';
+  let text = sanitizeScriptForTts(script, markupArtist, markupTitle);
   text = runTtsQualityPass(text).text;
   return stripYandexMarkup(text);
 }

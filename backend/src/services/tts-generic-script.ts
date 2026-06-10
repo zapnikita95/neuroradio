@@ -23,7 +23,61 @@ export function isPrimarilyLatin(text: string): boolean {
 function phraseVariants(phrase: string): string[] {
   const base = phrase.trim();
   const withoutParens = base.replace(/\s*\([^)]*\)\s*/g, ' ').replace(/\s+/g, ' ').trim();
-  return [base, withoutParens].filter((v, i, arr) => v.length >= 2 && arr.indexOf(v) === i);
+  const withoutArticle = base.replace(/^(the|a|an)\s+/i, '').trim();
+  const variants = [base, withoutParens, withoutArticle].filter((v) => v.length >= 2);
+  return variants.filter((v, i, arr) => arr.indexOf(v) === i);
+}
+
+const ARTICLE_PREFIX = /^(the|a|an)\s+/i;
+
+/** Лatin-токены трека/артиста для blocklist в TTS и доп. замены («The Offspring» → «Offspring»). */
+export function latinTrackBlocklist(artist: string, title: string): Set<string> {
+  const blocked = new Set<string>();
+  const addPhrase = (phrase: string) => {
+    if (!isPrimarilyLatin(phrase)) return;
+    for (const variant of phraseVariants(phrase)) {
+      for (const part of variant.split(/[^\p{L}\p{N}]+/u)) {
+        const word = part.trim().toLowerCase();
+        if (word.length >= 2 && /[a-z]/.test(word)) blocked.add(word);
+      }
+      const noArticle = variant.replace(ARTICLE_PREFIX, '').trim();
+      if (noArticle.length >= 2) {
+        for (const part of noArticle.split(/[^\p{L}\p{N}]+/u)) {
+          const word = part.trim().toLowerCase();
+          if (word.length >= 2 && /[a-z]/.test(word)) blocked.add(word);
+        }
+      }
+      const paren = variant.match(/\(([^)]+)\)/);
+      if (paren?.[1]?.trim() && isPrimarilyLatin(paren[1])) {
+        for (const part of paren[1].split(/[^\p{L}\p{N}]+/u)) {
+          const word = part.trim().toLowerCase();
+          if (word.length >= 2 && /[a-z]/.test(word)) blocked.add(word);
+        }
+      }
+    }
+  };
+  addPhrase(artist);
+  addPhrase(title);
+  blocked.delete('the');
+  blocked.delete('a');
+  blocked.delete('an');
+  return blocked;
+}
+
+function latinAliasPhrases(phrase: string): string[] {
+  if (!isPrimarilyLatin(phrase)) return [];
+  const aliases: string[] = [];
+  for (const variant of phraseVariants(phrase)) {
+    const noArticle = variant.replace(ARTICLE_PREFIX, '').trim();
+    if (noArticle && noArticle !== variant && noArticle.length >= 3) {
+      aliases.push(noArticle);
+    }
+    const paren = variant.match(/\(([^)]+)\)/);
+    if (paren?.[1]?.trim() && isPrimarilyLatin(paren[1]) && paren[1].trim().length >= 3) {
+      aliases.push(paren[1].trim());
+    }
+  }
+  return aliases.filter((v, i, arr) => arr.indexOf(v) === i);
 }
 
 const TRACK_SUBSTITUTES = [
@@ -174,9 +228,15 @@ export function genericizeScriptForVoiceover(
   result = stripLatinArtistAfterOt(result, artist);
   if (stripTitle) {
     result = replaceLatinPhrase(result, title, TRACK_SUBSTITUTES, 'track');
+    for (const alias of latinAliasPhrases(title)) {
+      result = replaceLatinPhrase(result, alias, TRACK_SUBSTITUTES, 'track-alias');
+    }
   }
   if (stripArtist) {
     result = replaceLatinPhrase(result, artist, ARTIST_SUBSTITUTES, 'artist');
+    for (const alias of latinAliasPhrases(artist)) {
+      result = replaceLatinPhrase(result, alias, ARTIST_SUBSTITUTES, 'artist-alias');
+    }
   }
 
   result = result

@@ -30,8 +30,17 @@ export interface TtsMarkupOptions {
   title?: string;
   sentencePauses?: boolean;
   pauseProfile?: TtsPauseProfile;
+  /** false / omitted → не подставлять artist/title в sanitize (озвучка без названий). */
+  speakTrackNamesInVoiceover?: boolean;
   /** Статические демо efir-ai.ru: кириллическая транслитерация, без «в кавычках» и без SSML lang. */
   websitePreview?: boolean;
+}
+
+function markupArtistTitle(options: TtsMarkupOptions): { artist: string; title: string } {
+  if (options.speakTrackNamesInVoiceover === true) {
+    return { artist: options.artist ?? '', title: options.title ?? '' };
+  }
+  return { artist: '', title: '' };
 }
 
 function pauseTag(profile: TtsPauseProfile, size: 'small' | 'medium'): string {
@@ -127,12 +136,15 @@ export function prepareYandexTtsText(
   script: string,
   options: TtsMarkupOptions = {},
 ): string {
-  const artist = options.artist ?? '';
-  const title = options.title ?? '';
+  const { artist, title } = markupArtistTitle(options);
   const pauseProfile = options.pauseProfile ?? 'tight';
 
   let text = preserveMusicProperNames(script, artist, title);
-  text = sanitizeScriptForTts(text, artist, title);
+  text = sanitizeScriptForTts(text, artist, title, [], {
+    speakTrackNamesInVoiceover: options.speakTrackNamesInVoiceover,
+    trackArtist: options.artist ?? '',
+    trackTitle: options.title ?? '',
+  });
   const quality = runTtsQualityPass(text);
   text = quality.text;
 
@@ -162,14 +174,17 @@ export function prepareSileroTtsTextTrace(
   script: string,
   options: TtsMarkupOptions = {},
 ): SileroTtsTextTrace {
-  const artist = options.artist ?? '';
-  const title = options.title ?? '';
+  const { artist, title } = markupArtistTitle(options);
 
   const originalScript = script;
   const afterProperNames = preserveMusicProperNames(script, artist, title);
 
   let text = afterProperNames;
-  text = sanitizeScriptForTts(text, artist, title);
+  text = sanitizeScriptForTts(text, artist, title, [], {
+    speakTrackNamesInVoiceover: options.speakTrackNamesInVoiceover,
+    trackArtist: options.artist ?? '',
+    trackTitle: options.title ?? '',
+  });
   text = runTtsQualityPass(text).text;
   text = normalizeYearsForRussianTts(text);
   text = expandQuotesForSpeech(text);

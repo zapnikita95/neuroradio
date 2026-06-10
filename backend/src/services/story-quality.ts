@@ -306,12 +306,16 @@ export function sanitizeScriptForTts(
   artist: string,
   title: string,
   referenceFacts: string[] = [],
+  options?: { speakTrackNamesInVoiceover?: boolean; trackArtist?: string; trackTitle?: string },
 ): string {
   const allowed = allowedDigitSequences(artist, title, referenceFacts);
+  const blockArtist = options?.trackArtist ?? artist;
+  const blockTitle = options?.trackTitle ?? title;
   const { text: localized, allowedLatin } = prepareStoryScriptLanguage(script, {
-    artist,
-    title,
+    artist: blockArtist,
+    title: blockTitle,
     referenceFacts,
+    speakTrackNamesInVoiceover: options?.speakTrackNamesInVoiceover,
   });
   let result = stripTrackTitleGuillemets(localized, title);
 

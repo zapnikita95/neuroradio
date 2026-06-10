@@ -103,6 +103,7 @@ export function prepareSaluteSpeechText(
   script: string,
   artist: string,
   title: string,
+  speakTrackNamesInVoiceover = true,
 ): string {
-  return preparePlainSpeechText(script, artist, title);
+  return preparePlainSpeechText(script, artist, title, speakTrackNamesInVoiceover);
 }
