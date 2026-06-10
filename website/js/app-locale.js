@@ -127,7 +127,7 @@
       quote: '"Listen — Thriller blew up MTV!"',
       voice: 'rachel', rate: 1.08,
       script: THRILLER_CORE_EN + ' This is the video that hijacked MTV — volume up, let us go!',
-      audio: 'assets/demos/en/persona-radio_host.ogg',
+      audio: 'assets/demos/en/persona-radio_host.mp3',
     },
     {
       id: 'night_dj', tag: 'Late-night show', name: 'Night DJ',
@@ -136,7 +136,7 @@
       quote: '"Good night! Here is a fact…"',
       voice: 'adam', rate: 0.92,
       script: 'Good night! Quick fact: ' + FACT_REGISTRY_EN + ' Stay on our frequency till morning.',
-      audio: 'assets/demos/en/persona-night_dj.ogg',
+      audio: 'assets/demos/en/persona-night_dj.mp3',
     },
     {
       id: 'expert', tag: 'Genre expert', name: 'Genre expert',
@@ -145,7 +145,7 @@
       quote: '"Unique fact:"',
       voice: 'josh', rate: 1.0,
       script: 'Unique fact: ' + FACT_REGISTRY_EN + ' A pop-horror benchmark of the eighties.',
-      audio: 'assets/demos/en/persona-expert.ogg',
+      audio: 'assets/demos/en/persona-expert.mp3',
     },
     {
       id: 'contemporary', tag: 'Voice of the era', name: 'Contemporary',
@@ -154,7 +154,7 @@
       quote: '"I remember those years…"',
       voice: 'bella', rate: 0.98,
       script: 'I remember those years. Michael Jackson put half a million into the Thriller video — after the premiere album sales jumped sevenfold. We watched the fourteen-minute clip on MTV in full, then bought VHS tapes to replay it at home.',
-      audio: 'assets/demos/en/persona-contemporary.ogg',
+      audio: 'assets/demos/en/persona-contemporary.mp3',
     },
     {
       id: 'fan', tag: 'Superfan', name: 'Superfan',
@@ -163,7 +163,7 @@
       quote: '"I love this moment!"',
       voice: 'elli', rate: 1.12,
       script: 'I love this moment! ' + THRILLER_CORE_EN + ' And yes — I know every second of this video by heart!',
-      audio: 'assets/demos/en/persona-fan.ogg',
+      audio: 'assets/demos/en/persona-fan.mp3',
     },
     {
       id: 'backstage', tag: 'Backstage insider', name: 'Backstage insider',
@@ -172,7 +172,7 @@
       quote: '"Just between us…"',
       voice: 'antoni', rate: 0.96,
       script: BACKSTAGE_SHORT_EN,
-      audio: 'assets/demos/en/persona-backstage.ogg',
+      audio: 'assets/demos/en/persona-backstage.mp3',
     },
   ];
 
@@ -239,7 +239,7 @@
   }
 
   function demoExt() {
-    return isEn() ? '.ogg' : '.wav';
+    return isEn() ? '.mp3' : '.wav';
   }
 
   function studioSrc(personaId, voiceId, lenN) {

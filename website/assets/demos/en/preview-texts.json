@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-06-10T21:04:53.024Z",
+  "generatedAt": "2026-06-10T21:07:37.708Z",
   "note": "English website demos — ElevenLabs via Railway proxy",
   "personas": [
     {
@@ -13,7 +13,7 @@
       ],
       "speakable": "Thriller is the only music video in the US National Film Registry — preserved as cultural heritage alongside feature films. This is the video that hijacked MTV!",
       "display": "Thriller is the only music video in the US National Film Registry — preserved as cultural heritage alongside feature films. This is the video that hijacked MTV!",
-      "file": "persona-radio_host.ogg"
+      "file": "persona-radio_host.mp3"
     },
     {
       "id": "night_dj",
@@ -24,7 +24,7 @@
       ],
       "speakable": "Good night! Quick fact: Thriller is the only music video in the US National Film Registry — preserved as cultural heritage alongside feature films. Stay on our frequency till morning.",
       "display": "Good night! Quick fact: Thriller is the only music video in the US National Film Registry — preserved as cultural heritage alongside feature films. Stay on our frequency till morning.",
-      "file": "persona-night_dj.ogg"
+      "file": "persona-night_dj.mp3"
     },
     {
       "id": "expert",
@@ -37,7 +37,7 @@
       ],
       "speakable": "Unique fact: Thriller is the only music video in the US National Film Registry — preserved as cultural heritage alongside feature films. A pop-horror benchmark of the eighties.",
       "display": "Unique fact: Thriller is the only music video in the US National Film Registry — preserved as cultural heritage alongside feature films. A pop-horror benchmark of the eighties.",
-      "file": "persona-expert.ogg"
+      "file": "persona-expert.mp3"
     },
     {
       "id": "contemporary",
@@ -50,7 +50,7 @@
       ],
       "speakable": "I remember those years. Michael Jackson put half a million into the Thriller video — after the premiere album sales jumped sevenfold. We watched the fourteen-minute clip on MTV in full, then bought VHS tapes to replay it at home.",
       "display": "I remember those years. Michael Jackson put half a million into the Thriller video — after the premiere album sales jumped sevenfold. We watched the fourteen-minute clip on MTV in full, then bought VHS tapes to replay it at home.",
-      "file": "persona-contemporary.ogg"
+      "file": "persona-contemporary.mp3"
     },
     {
       "id": "fan",
@@ -63,7 +63,7 @@
       ],
       "speakable": "I love this moment! Thriller is the only music video in the US National Film Registry — preserved as cultural heritage alongside feature films. I know every second of this video by heart!",
       "display": "I love this moment! Thriller is the only music video in the US National Film Registry — preserved as cultural heritage alongside feature films. I know every second of this video by heart!",
-      "file": "persona-fan.ogg"
+      "file": "persona-fan.mp3"
     },
     {
       "id": "backstage",
@@ -75,7 +75,7 @@
       ],
       "speakable": "Just between us. Michael Jackson poured half a million dollars of his own money into the Thriller shoot — producers rolled their eyes, then album sales jumped sevenfold after the premiere. Vincent Price laid down the narration in a single day — without that voice the video would be a different beast. People rarely say this out loud.",
       "display": "Just between us. Michael Jackson poured half a million dollars of his own money into the Thriller shoot — producers rolled their eyes, then album sales jumped sevenfold after the premiere. Vincent Price laid down the narration in a single day — without that voice the video would be a different beast. People rarely say this out loud.",
-      "file": "persona-backstage.ogg"
+      "file": "persona-backstage.mp3"
     }
   ],
   "studioLong": [
@@ -85,12 +85,12 @@
       "len2": {
         "speakable": "Michael Jackson made Thriller when music videos were still rewriting the rules. It was not just a track — a fourteen-minute movie. MTV mostly played rock, but Thriller aired in full, interrupting regular programming — unprecedented. Jackson bet on visual stories and put half a million of his own money into the shoot. The budget looked insane until album sales jumped sevenfold after the video dropped. John Landis directed it — two universes colliding. The zombie dance was not in the first draft: choreographer Michael Peters had to convince Landis it would not ruin the horror look. That dance became the clip's signature. This is the video that hijacked MTV!",
         "display": "Michael Jackson made Thriller when music videos were still rewriting the rules. It was not just a track — a fourteen-minute movie. MTV mostly played rock, but Thriller aired in full, interrupting regular programming — unprecedented. Jackson bet on visual stories and put half a million of his own money into the shoot. The budget looked insane until album sales jumped sevenfold after the video dropped. John Landis directed it — two universes colliding. The zombie dance was not in the first draft: choreographer Michael Peters had to convince Landis it would not ruin the horror look. That dance became the clip's signature. This is the video that hijacked MTV!",
-        "file": "studio-radio_host-len2.ogg"
+        "file": "studio-radio_host-len2.mp3"
       },
       "len4": {
         "speakable": "Michael Jackson made Thriller when music videos were still rewriting the rules. It was not just a track — a fourteen-minute movie. MTV mostly played rock, but Thriller aired in full, interrupting regular programming — unprecedented. Jackson bet on visual stories and put half a million of his own money into the shoot. The budget looked insane until album sales jumped sevenfold after the video dropped. John Landis directed it — two universes colliding. The zombie dance was not in the first draft: choreographer Michael Peters had to convince Landis it would not ruin the horror look. That dance became the clip's signature. Thriller is the only music video in the US National Film Registry. Vincent Price recorded the narration, zombie rehearsals ran for weeks. Moonwalk, werewolf transformation, dancing corpses — a new pop-culture religion. VHS players flew off shelves as people rewatched it again and again. The first viral hit before the internet era. This is the video that hijacked MTV!",
         "display": "Michael Jackson made Thriller when music videos were still rewriting the rules. It was not just a track — a fourteen-minute movie. MTV mostly played rock, but Thriller aired in full, interrupting regular programming — unprecedented. Jackson bet on visual stories and put half a million of his own money into the shoot. The budget looked insane until album sales jumped sevenfold after the video dropped. John Landis directed it — two universes colliding. The zombie dance was not in the first draft: choreographer Michael Peters had to convince Landis it would not ruin the horror look. That dance became the clip's signature. Thriller is the only music video in the US National Film Registry. Vincent Price recorded the narration, zombie rehearsals ran for weeks. Moonwalk, werewolf transformation, dancing corpses — a new pop-culture religion. VHS players flew off shelves as people rewatched it again and again. The first viral hit before the internet era. This is the video that hijacked MTV!",
-        "file": "studio-radio_host-len4.ogg"
+        "file": "studio-radio_host-len4.mp3"
       }
     },
     {
@@ -99,12 +99,12 @@
       "len2": {
         "speakable": "Good night! Quick fact: Michael Jackson made Thriller when music videos were still rewriting the rules. It was not just a track — a fourteen-minute movie. MTV mostly played rock, but Thriller aired in full, interrupting regular programming — unprecedented. Jackson bet on visual stories and put half a million of his own money into the shoot. The budget looked insane until album sales jumped sevenfold after the video dropped. John Landis directed it — two universes colliding. The zombie dance was not in the first draft: choreographer Michael Peters had to convince Landis it would not ruin the horror look. That dance became the clip's signature. Stay on our frequency till morning.",
         "display": "Good night! Quick fact: Michael Jackson made Thriller when music videos were still rewriting the rules. It was not just a track — a fourteen-minute movie. MTV mostly played rock, but Thriller aired in full, interrupting regular programming — unprecedented. Jackson bet on visual stories and put half a million of his own money into the shoot. The budget looked insane until album sales jumped sevenfold after the video dropped. John Landis directed it — two universes colliding. The zombie dance was not in the first draft: choreographer Michael Peters had to convince Landis it would not ruin the horror look. That dance became the clip's signature. Stay on our frequency till morning.",
-        "file": "studio-night_dj-len2.ogg"
+        "file": "studio-night_dj-len2.mp3"
       },
       "len4": {
         "speakable": "Good night! Quick fact: Michael Jackson made Thriller when music videos were still rewriting the rules. It was not just a track — a fourteen-minute movie. MTV mostly played rock, but Thriller aired in full, interrupting regular programming — unprecedented. Jackson bet on visual stories and put half a million of his own money into the shoot. The budget looked insane until album sales jumped sevenfold after the video dropped. John Landis directed it — two universes colliding. The zombie dance was not in the first draft: choreographer Michael Peters had to convince Landis it would not ruin the horror look. That dance became the clip's signature. Thriller is the only music video in the US National Film Registry. Vincent Price recorded the narration, zombie rehearsals ran for weeks. Moonwalk, werewolf transformation, dancing corpses — a new pop-culture religion. VHS players flew off shelves as people rewatched it again and again. The first viral hit before the internet era. Stay on our frequency till morning.",
         "display": "Good night! Quick fact: Michael Jackson made Thriller when music videos were still rewriting the rules. It was not just a track — a fourteen-minute movie. MTV mostly played rock, but Thriller aired in full, interrupting regular programming — unprecedented. Jackson bet on visual stories and put half a million of his own money into the shoot. The budget looked insane until album sales jumped sevenfold after the video dropped. John Landis directed it — two universes colliding. The zombie dance was not in the first draft: choreographer Michael Peters had to convince Landis it would not ruin the horror look. That dance became the clip's signature. Thriller is the only music video in the US National Film Registry. Vincent Price recorded the narration, zombie rehearsals ran for weeks. Moonwalk, werewolf transformation, dancing corpses — a new pop-culture religion. VHS players flew off shelves as people rewatched it again and again. The first viral hit before the internet era. Stay on our frequency till morning.",
-        "file": "studio-night_dj-len4.ogg"
+        "file": "studio-night_dj-len4.mp3"
       }
     },
     {
@@ -113,12 +113,12 @@
       "len2": {
         "speakable": "Unique fact: Michael Jackson made Thriller when music videos were still rewriting the rules. It was not just a track — a fourteen-minute movie. MTV mostly played rock, but Thriller aired in full, interrupting regular programming — unprecedented. Jackson bet on visual stories and put half a million of his own money into the shoot. The budget looked insane until album sales jumped sevenfold after the video dropped. John Landis directed it — two universes colliding. The zombie dance was not in the first draft: choreographer Michael Peters had to convince Landis it would not ruin the horror look. That dance became the clip's signature. A pop-horror benchmark of the eighties.",
         "display": "Unique fact: Michael Jackson made Thriller when music videos were still rewriting the rules. It was not just a track — a fourteen-minute movie. MTV mostly played rock, but Thriller aired in full, interrupting regular programming — unprecedented. Jackson bet on visual stories and put half a million of his own money into the shoot. The budget looked insane until album sales jumped sevenfold after the video dropped. John Landis directed it — two universes colliding. The zombie dance was not in the first draft: choreographer Michael Peters had to convince Landis it would not ruin the horror look. That dance became the clip's signature. A pop-horror benchmark of the eighties.",
-        "file": "studio-expert-len2.ogg"
+        "file": "studio-expert-len2.mp3"
       },
       "len4": {
         "speakable": "Unique fact: Michael Jackson made Thriller when music videos were still rewriting the rules. It was not just a track — a fourteen-minute movie. MTV mostly played rock, but Thriller aired in full, interrupting regular programming — unprecedented. Jackson bet on visual stories and put half a million of his own money into the shoot. The budget looked insane until album sales jumped sevenfold after the video dropped. John Landis directed it — two universes colliding. The zombie dance was not in the first draft: choreographer Michael Peters had to convince Landis it would not ruin the horror look. That dance became the clip's signature. Thriller is the only music video in the US National Film Registry. Vincent Price recorded the narration, zombie rehearsals ran for weeks. Moonwalk, werewolf transformation, dancing corpses — a new pop-culture religion. VHS players flew off shelves as people rewatched it again and again. The first viral hit before the internet era. A pop-horror benchmark of the eighties.",
         "display": "Unique fact: Michael Jackson made Thriller when music videos were still rewriting the rules. It was not just a track — a fourteen-minute movie. MTV mostly played rock, but Thriller aired in full, interrupting regular programming — unprecedented. Jackson bet on visual stories and put half a million of his own money into the shoot. The budget looked insane until album sales jumped sevenfold after the video dropped. John Landis directed it — two universes colliding. The zombie dance was not in the first draft: choreographer Michael Peters had to convince Landis it would not ruin the horror look. That dance became the clip's signature. Thriller is the only music video in the US National Film Registry. Vincent Price recorded the narration, zombie rehearsals ran for weeks. Moonwalk, werewolf transformation, dancing corpses — a new pop-culture religion. VHS players flew off shelves as people rewatched it again and again. The first viral hit before the internet era. A pop-horror benchmark of the eighties.",
-        "file": "studio-expert-len4.ogg"
+        "file": "studio-expert-len4.mp3"
       }
     },
     {
@@ -127,12 +127,12 @@
       "len2": {
         "speakable": "I remember those years. Michael Jackson poured five hundred thousand dollars of his own money into the Thriller video. I remember MTV mostly spinning rock, but this fourteen-minute film aired whole, interrupting regular shows. After the premiere album sales jumped sevenfold. John Landis came from feature films; Michael Peters had to convince him to keep the zombie dance. It was not just a video — a television event that rewrote the rules. We bought VHS copies in bulk to replay that masterpiece at home.",
         "display": "I remember those years. Michael Jackson poured five hundred thousand dollars of his own money into the Thriller video. I remember MTV mostly spinning rock, but this fourteen-minute film aired whole, interrupting regular shows. After the premiere album sales jumped sevenfold. John Landis came from feature films; Michael Peters had to convince him to keep the zombie dance. It was not just a video — a television event that rewrote the rules. We bought VHS copies in bulk to replay that masterpiece at home.",
-        "file": "studio-contemporary-len2.ogg"
+        "file": "studio-contemporary-len2.mp3"
       },
       "len4": {
         "speakable": "I remember those years. Michael Jackson poured five hundred thousand dollars of his own money into the Thriller video. I remember MTV mostly spinning rock, but this fourteen-minute film aired whole, interrupting regular shows. After the premiere album sales jumped sevenfold. John Landis came from feature films; Michael Peters had to convince him to keep the zombie dance. It was not just a video — a television event that rewrote the rules. We bought VHS copies in bulk to replay that masterpiece at home. Vincent Price read the narration like a horror movie — goosebumps every time. We practiced the moonwalk by the TV and zombie moves at parties. Years later Thriller entered the National Film Registry — the only music video on the US heritage list.",
         "display": "I remember those years. Michael Jackson poured five hundred thousand dollars of his own money into the Thriller video. I remember MTV mostly spinning rock, but this fourteen-minute film aired whole, interrupting regular shows. After the premiere album sales jumped sevenfold. John Landis came from feature films; Michael Peters had to convince him to keep the zombie dance. It was not just a video — a television event that rewrote the rules. We bought VHS copies in bulk to replay that masterpiece at home. Vincent Price read the narration like a horror movie — goosebumps every time. We practiced the moonwalk by the TV and zombie moves at parties. Years later Thriller entered the National Film Registry — the only music video on the US heritage list.",
-        "file": "studio-contemporary-len4.ogg"
+        "file": "studio-contemporary-len4.mp3"
       }
     },
     {
@@ -141,12 +141,12 @@
       "len2": {
         "speakable": "I love this moment! Michael Jackson made Thriller when music videos were still rewriting the rules. It was not just a track — a fourteen-minute movie. MTV mostly played rock, but Thriller aired in full, interrupting regular programming — unprecedented. Jackson bet on visual stories and put half a million of his own money into the shoot. The budget looked insane until album sales jumped sevenfold after the video dropped. John Landis directed it — two universes colliding. The zombie dance was not in the first draft: choreographer Michael Peters had to convince Landis it would not ruin the horror look. That dance became the clip's signature. I know every second of this video by heart!",
         "display": "I love this moment! Michael Jackson made Thriller when music videos were still rewriting the rules. It was not just a track — a fourteen-minute movie. MTV mostly played rock, but Thriller aired in full, interrupting regular programming — unprecedented. Jackson bet on visual stories and put half a million of his own money into the shoot. The budget looked insane until album sales jumped sevenfold after the video dropped. John Landis directed it — two universes colliding. The zombie dance was not in the first draft: choreographer Michael Peters had to convince Landis it would not ruin the horror look. That dance became the clip's signature. I know every second of this video by heart!",
-        "file": "studio-fan-len2.ogg"
+        "file": "studio-fan-len2.mp3"
       },
       "len4": {
         "speakable": "I love this moment! Michael Jackson made Thriller when music videos were still rewriting the rules. It was not just a track — a fourteen-minute movie. MTV mostly played rock, but Thriller aired in full, interrupting regular programming — unprecedented. Jackson bet on visual stories and put half a million of his own money into the shoot. The budget looked insane until album sales jumped sevenfold after the video dropped. John Landis directed it — two universes colliding. The zombie dance was not in the first draft: choreographer Michael Peters had to convince Landis it would not ruin the horror look. That dance became the clip's signature. Thriller is the only music video in the US National Film Registry. Vincent Price recorded the narration, zombie rehearsals ran for weeks. Moonwalk, werewolf transformation, dancing corpses — a new pop-culture religion. VHS players flew off shelves as people rewatched it again and again. The first viral hit before the internet era. I know every second of this video by heart!",
         "display": "I love this moment! Michael Jackson made Thriller when music videos were still rewriting the rules. It was not just a track — a fourteen-minute movie. MTV mostly played rock, but Thriller aired in full, interrupting regular programming — unprecedented. Jackson bet on visual stories and put half a million of his own money into the shoot. The budget looked insane until album sales jumped sevenfold after the video dropped. John Landis directed it — two universes colliding. The zombie dance was not in the first draft: choreographer Michael Peters had to convince Landis it would not ruin the horror look. That dance became the clip's signature. Thriller is the only music video in the US National Film Registry. Vincent Price recorded the narration, zombie rehearsals ran for weeks. Moonwalk, werewolf transformation, dancing corpses — a new pop-culture religion. VHS players flew off shelves as people rewatched it again and again. The first viral hit before the internet era. I know every second of this video by heart!",
-        "file": "studio-fan-len4.ogg"
+        "file": "studio-fan-len4.mp3"
       }
     },
     {
@@ -155,12 +155,12 @@
       "len2": {
         "speakable": "Just between us. Michael Jackson poured half a million dollars of his own money into the Thriller shoot — producers rolled their eyes, then album sales jumped sevenfold after the premiere. Vincent Price recorded the narration in one day — John Landis brought cinematic scale. Choreographer Michael Peters fought for the zombie dance scene cut from the first draft; it became the clip's calling card. Jackson pushed for details producers called wasteful — those shots later hijacked MTV. People rarely say this out loud.",
         "display": "Just between us. Michael Jackson poured half a million dollars of his own money into the Thriller shoot — producers rolled their eyes, then album sales jumped sevenfold after the premiere. Vincent Price recorded the narration in one day — John Landis brought cinematic scale. Choreographer Michael Peters fought for the zombie dance scene cut from the first draft; it became the clip's calling card. Jackson pushed for details producers called wasteful — those shots later hijacked MTV. People rarely say this out loud.",
-        "file": "studio-backstage-len2.ogg"
+        "file": "studio-backstage-len2.mp3"
       },
       "len4": {
         "speakable": "Just between us. Michael Jackson poured half a million dollars of his own money into the Thriller shoot — producers rolled their eyes, then album sales jumped sevenfold after the premiere. Vincent Price recorded the narration in one day — John Landis brought cinematic scale. Choreographer Michael Peters fought for the zombie dance scene cut from the first draft; it became the clip's calling card. Jackson pushed for details producers called wasteful — those shots later hijacked MTV. People rarely say this out loud. Makeup took four hours per zombie — hallways smelled of latex. Jackson reshot the final step until it locked to the beat. The label hid the numbers until sales jumped sevenfold. Later the clip entered the National Film Registry — the only music video in the US heritage list.",
         "display": "Just between us. Michael Jackson poured half a million dollars of his own money into the Thriller shoot — producers rolled their eyes, then album sales jumped sevenfold after the premiere. Vincent Price recorded the narration in one day — John Landis brought cinematic scale. Choreographer Michael Peters fought for the zombie dance scene cut from the first draft; it became the clip's calling card. Jackson pushed for details producers called wasteful — those shots later hijacked MTV. People rarely say this out loud. Makeup took four hours per zombie — hallways smelled of latex. Jackson reshot the final step until it locked to the beat. The label hid the numbers until sales jumped sevenfold. Later the clip entered the National Film Registry — the only music video in the US heritage list.",
-        "file": "studio-backstage-len4.ogg"
+        "file": "studio-backstage-len4.mp3"
       }
     }
   ]

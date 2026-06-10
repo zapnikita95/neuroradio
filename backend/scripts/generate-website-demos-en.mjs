@@ -112,11 +112,35 @@ const PERSONAS = [
   },
 ];
 
-function studioShortFile(personaId, voiceId) {
-  return `studio-${personaId}-${voiceId}.ogg`;
+function studioShortFile(personaId, voiceId, ext) {
+  return `studio-${personaId}-${voiceId}${ext}`;
 }
-function studioLongFile(personaId, suffix) {
-  return `studio-${personaId}${suffix}.ogg`;
+function studioLongFile(personaId, suffix, ext) {
+  return `studio-${personaId}${suffix}${ext}`;
+}
+
+const EDGE_VOICES = {
+  rachel: 'en-US-JennyNeural',
+  adam: 'en-US-GuyNeural',
+  antoni: 'en-US-ChristopherNeural',
+  bella: 'en-US-AriaNeural',
+  elli: 'en-US-AnaNeural',
+  josh: 'en-US-EricNeural',
+  sam: 'en-US-RogerNeural',
+  emily: 'en-US-MichelleNeural',
+  matilda: 'en-US-AvaNeural',
+  charlie: 'en-US-BrianNeural',
+};
+
+async function synthEdgeLocal(text, voiceId, speed = 1.0) {
+  const { EdgeTTS } = await import('edge-tts-universal');
+  const voice = EDGE_VOICES[voiceId] || EDGE_VOICES.rachel;
+  const pct = Math.round((speed - 1) * 100);
+  const rate = `${pct >= 0 ? '+' : ''}${pct}%`;
+  const tts = new EdgeTTS(text, voice, { rate, pitch: '+0Hz' });
+  const buf = Buffer.from(await (await tts.synthesize()).audio.arrayBuffer());
+  if (buf.length < 64) throw new Error('Edge TTS empty buffer');
+  return { buf, ext: '.mp3' };
 }
 
 async function synthRemote(text, voiceId) {
@@ -136,7 +160,19 @@ async function synthRemote(text, voiceId) {
     const body = await res.text();
     throw new Error(`TTS ${res.status}: ${body.slice(0, 300)}`);
   }
-  return Buffer.from(await res.arrayBuffer());
+  return { buf: Buffer.from(await res.arrayBuffer()), ext: '.ogg' };
+}
+
+async function synth(text, voiceId, speed = 1.0) {
+  if (DEMO_SECRET) {
+    try {
+      return await synthRemote(text, voiceId);
+    } catch (remoteErr) {
+      console.warn('  Railway ElevenLabs:', remoteErr.message);
+      console.warn('  → local Edge TTS fallback');
+    }
+  }
+  return synthEdgeLocal(text, voiceId, speed);
 }
 
 async function writePreview() {
@@ -151,13 +187,13 @@ async function writePreview() {
       studioVoices: p.studioVoices,
       speakable: p.short,
       display: p.short,
-      file: `persona-${p.id}.ogg`,
+      file: `persona-${p.id}.mp3`,
     })),
     studioLong: PERSONAS.map((p) => ({
       persona: p.id,
       voice: p.voice,
-      len2: { speakable: p.minute, display: p.minute, file: studioLongFile(p.id, '-len2') },
-      len4: { speakable: p.full, display: p.full, file: studioLongFile(p.id, '-len4') },
+      len2: { speakable: p.minute, display: p.minute, file: studioLongFile(p.id, '-len2', '.mp3') },
+      len4: { speakable: p.full, display: p.full, file: studioLongFile(p.id, '-len4', '.mp3') },
     })),
   };
   const jsonPath = path.join(OUT_DIR, 'preview-texts.json');
@@ -179,38 +215,38 @@ async function main() {
     return;
   }
   if (!DEMO_SECRET) {
-    console.error('Set WEBSITE_DEMO_SECRET in backend/.env (same value on Railway)');
-    process.exit(1);
+    console.warn('WEBSITE_DEMO_SECRET missing — using Edge TTS locally (set secret on Railway for ElevenLabs)');
   }
   fs.mkdirSync(OUT_DIR, { recursive: true });
   await writePreview();
 
   if (arg === '--personas' || arg === '--all') {
     for (const p of PERSONAS) {
-      const buf = await synthRemote(p.short, p.voice);
-      await writeOgg(`persona-${p.id}.ogg`, buf);
-      await new Promise((r) => setTimeout(r, 400));
+      const { buf, ext } = await synth(p.short, p.voice, p.speed);
+      await writeOgg(`persona-${p.id}${ext}`, buf);
+      await new Promise((r) => setTimeout(r, 300));
     }
   }
 
   if (arg === '--studio' || arg === '--all') {
     for (const p of PERSONAS) {
       for (const voice of p.studioVoices) {
-        const buf = await synthRemote(p.short, voice);
-        await writeOgg(studioShortFile(p.id, voice), buf);
-        await new Promise((r) => setTimeout(r, 400));
+        const spd = voice === p.voice ? p.speed : 1.08;
+        const { buf, ext } = await synth(p.short, voice, spd);
+        await writeOgg(studioShortFile(p.id, voice, ext), buf);
+        await new Promise((r) => setTimeout(r, 300));
       }
     }
   }
 
   if (arg === '--studio-long' || arg === '--all') {
     for (const p of PERSONAS) {
-      const b2 = await synthRemote(p.minute, p.voice);
-      await writeOgg(studioLongFile(p.id, '-len2'), b2);
-      await new Promise((r) => setTimeout(r, 500));
-      const b4 = await synthRemote(p.full, p.voice);
-      await writeOgg(studioLongFile(p.id, '-len4'), b4);
-      await new Promise((r) => setTimeout(r, 500));
+      const b2 = await synth(p.minute, p.voice, p.speed);
+      await writeOgg(studioLongFile(p.id, '-len2', b2.ext), b2.buf);
+      await new Promise((r) => setTimeout(r, 400));
+      const b4 = await synth(p.full, p.voice, p.speed);
+      await writeOgg(studioLongFile(p.id, '-len4', b4.ext), b4.buf);
+      await new Promise((r) => setTimeout(r, 400));
     }
   }
 
