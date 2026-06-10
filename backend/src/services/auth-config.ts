@@ -33,13 +33,14 @@ export function resolveTelegramWidgetBaseUrl(): string | null {
 
   try {
     const u = new URL(raw.startsWith('http') ? raw : `https://${raw}`);
+    u.protocol = 'https:';
     // Keep www only when explicitly requested (TELEGRAM_WIDGET_KEEP_WWW=true).
     if (u.hostname.startsWith('www.') && process.env.TELEGRAM_WIDGET_KEEP_WWW !== 'true') {
       u.hostname = u.hostname.slice(4);
     }
     return u.origin;
   } catch {
-    return raw.replace(/\/$/, '');
+    return raw.replace(/^http:\/\//i, 'https://').replace(/\/$/, '');
   }
 }
 

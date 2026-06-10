@@ -33,6 +33,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
+import com.musicstory.app.util.normalizeHttpsOrigin
 import com.musicstory.app.ui.theme.ErrorCoral
 import com.musicstory.app.ui.theme.GoldBright
 import com.musicstory.app.ui.theme.MutedLavender
@@ -62,7 +63,7 @@ fun TelegramLoginWidgetSheet(
     if (!visible) return
 
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-    val baseOrigin = widgetBaseUrl.trim().trimEnd('/')
+    val baseOrigin = normalizeHttpsOrigin(widgetBaseUrl) ?: widgetBaseUrl.trim().trimEnd('/')
     val pageUrl = remember(baseOrigin, botUsername) {
         "$baseOrigin/telegram-login?embed=android&bot=${botUsername.trim().removePrefix("@")}"
     }

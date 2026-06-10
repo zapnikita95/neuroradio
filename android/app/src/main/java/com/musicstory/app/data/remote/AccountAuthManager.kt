@@ -8,6 +8,7 @@ import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
+import com.musicstory.app.util.normalizeHttpsOrigin
 import org.json.JSONObject
 import java.util.concurrent.TimeUnit
 
@@ -143,7 +144,7 @@ class AccountAuthManager(
             emailEnabled = json.optBoolean("emailEnabled"),
             telegramEnabled = json.optBoolean("telegramEnabled"),
             telegramBotUsername = parseOptionalString(json, "telegramBotUsername"),
-            telegramWidgetBaseUrl = parseOptionalString(json, "telegramWidgetBaseUrl"),
+            telegramWidgetBaseUrl = normalizeHttpsOrigin(parseOptionalString(json, "telegramWidgetBaseUrl")),
         )
 
     suspend fun linkTelegram(baseUrl: String, authJson: JSONObject): AccountLoginResult =
