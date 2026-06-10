@@ -191,6 +191,49 @@ function extractNamedEntities(fact: string): string[] {
     entities.push(name);
   }
 
+  const SKIP_ACRONYM = new Set(
+    [
+      'US',
+      'UK',
+      'EU',
+      'TV',
+      'MV',
+      'HD',
+      'VR',
+      'AI',
+      'DJ',
+      'EP',
+      'LP',
+      'CD',
+      'IT',
+      'OR',
+      'AN',
+      'OF',
+      'TO',
+      'IN',
+      'ON',
+      'AT',
+      'BY',
+      'IS',
+      'NO',
+      'OK',
+      'FIFA',
+      'NBA',
+      'NFL',
+      'BBC',
+      'CNN',
+      'NME',
+    ].map(normalize),
+  );
+  for (const match of fact.matchAll(/\b([A-Z]{2,5})\b/g)) {
+    const name = match[1];
+    if (SKIP_ACRONYM.has(normalize(name))) continue;
+    entities.push(name);
+  }
+  for (const match of fact.matchAll(/\b([A-Z][a-z]*[A-Z][A-Za-z]*(?:\s+[A-Z][a-z]+)*)\b/g)) {
+    entities.push(match[1]);
+  }
+
   return dedupe(entities);
 }
 
@@ -452,6 +495,7 @@ export function factNamesForeignEntity(
 
   for (const entity of extractNamedEntities(fact)) {
     if (isContextEntity(entity)) continue;
+    if (isLikelyPlaceName(entity)) continue;
     if (isCriticAttribution(fact, entity)) continue;
     if (entityMatchesArtist(entity, artist, title)) continue;
     if (isMusicProductionCredit(fact)) continue;
@@ -466,6 +510,8 @@ export function factNamesForeignEntity(
     if (eNorm.includes('-') || eNorm.split(' ').length >= 2) return true;
 
     const aTok = artistTokens(artist);
+    const shortArtist = artistNorm.length <= 3;
+    if (shortArtist && eNorm.length >= 4 && !entityMatchesArtist(entity, artist, title)) return true;
     if (aTok.length >= 2 && !aTok.includes(eNorm) && eNorm.length >= 4) return true;
   }
 
@@ -672,7 +718,16 @@ export function hasRussianTrackContextSignal(fact: string): boolean {
 }
 
 function isMusicProductionCredit(fact: string): boolean {
-  return /\b(?:directed by|music video|produced by|written by|composed by|video was|filmed by)\b/i.test(fact);
+  return /\b(?:directed by|produced by|written by|composed by|video was|filmed by)\b/i.test(fact);
+}
+
+/** City/region in artist bio — not a competing musical act. */
+function isLikelyPlaceName(entity: string): boolean {
+  return (
+    /\b(?:St\.?\s|Street|Suffolk|London|England|Scotland|Manchester|Liverpool|Birmingham|California|breeding ground)\b/i.test(
+      entity,
+    ) || /\b(?:shire|burgh|ford|wich|land)\b/i.test(entity)
+  );
 }
 
 function entityOnlyInParentheses(fact: string, entity: string): boolean {

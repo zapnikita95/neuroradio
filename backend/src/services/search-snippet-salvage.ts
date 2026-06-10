@@ -1,5 +1,5 @@
 import type { SelectedReferenceFact } from './fact-picker.js';
-import { factMentionsArtist, factMentionsTitle, hasTrackContextSignal } from './fact-relevance.js';
+import { factMentionsArtist, factMentionsTitle, factNamesForeignEntity, hasTrackContextSignal } from './fact-relevance.js';
 import { interestRating10 } from './fact-interest-log.js';
 import { isMetadataOnlyFallbackFact } from './metadata-facts.js';
 import { interestScore, isWikiBiographyLead } from './reference-fact-quality.js';
@@ -35,6 +35,7 @@ export function pickSalvageSnippetSeed(
     .filter((snippet) => snippet.length >= 35 && snippet.length <= 480)
     .filter((snippet) => acceptSearchGroundedSnippet(snippet, artist, title))
     .filter((snippet) => !isPlaylistJunkSnippet(snippet, artist, title))
+    .filter((snippet) => !factNamesForeignEntity(snippet, artist, title))
     .filter((snippet) => !isWeakSnippetSeed(snippet))
     .sort((a, b) => {
       const boost = (s: string) =>

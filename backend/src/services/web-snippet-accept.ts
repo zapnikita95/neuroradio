@@ -3,6 +3,7 @@ import {
   factMentionsArtistLoose,
   factMentionsOtherTrackTitle,
   factMentionsTitle,
+  factNamesForeignEntity,
   hasTrackContextSignal,
   isWebListicleJunk,
 } from './fact-relevance.js';
@@ -278,6 +279,7 @@ export function acceptSearchGroundedSnippet(
   if (isWebListicleJunk(trimmed)) return false;
   if (isPlaylistJunkSnippet(trimmed, artist, title)) return false;
   if (factMentionsOtherTrackTitle(trimmed, title)) return false;
+  if (factNamesForeignEntity(trimmed, artist, title)) return false;
 
   const explicit =
     factMentionsTitle(trimmed, title) ||

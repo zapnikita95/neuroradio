@@ -198,6 +198,9 @@ function rewriteLead(script: string, title: string, artist: string): string {
 function cleanupAfterGenericize(text: string): string {
   return text
     .replace(/\b(эта песня|этот трек|эта композиция|в треке|у этой песни)\s+\1\b/giu, '$1')
+    .replace(/\bна\s+трек\s+(?:эта песня|этот трек|эта композиция)\b/giu, 'на этот трек')
+    .replace(/(^|\s)с\s+(?:артист|исполнитель|музыкант|группа)(?=\s|[,.!?—–-]|$)/giu, '$1с ним')
+    .replace(/(^|\s)у\s+(?:артист|исполнитель|музыкант)(?=\s|[,.!?—–-]|$)/giu, '$1у него')
     .replace(/\s+,\s*,/g, ',')
     .replace(/,\s*,/g, ',')
     .replace(/\s{2,}/g, ' ')

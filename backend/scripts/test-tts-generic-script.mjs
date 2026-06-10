@@ -41,6 +41,15 @@ ok(!/Self Esteem/i.test(offspringOut), 'latin title stripped for Offspring sampl
 ok(/группа|исполнитель|артист|музыкант/i.test(offspringOut), 'artist substitute in Offspring sample');
 console.log('Offspring →', offspringOut);
 
+const ev =
+  'EV выпустил клип на трек Cuppa Tea. История повторилась с EV. Его трек — полностью авторская работа.';
+const evOut = genericizeScriptForVoiceover(ev, 'EV', 'Cuppa Tea');
+ok(!/\bEV\b/i.test(evOut), 'EV stripped from voiceover');
+ok(!/Cuppa Tea/i.test(evOut), 'Cuppa Tea stripped');
+ok(/музыкант|исполнитель|артист/i.test(evOut), 'artist substitute at start');
+ok(/с ним/i.test(evOut), 'prepositional fix for с артист');
+console.log('EV →', evOut);
+
 const stress = applyRussianStressSafe('Трек собран из чужих семплами и барабанов.');
 ok(stress.includes('с+эмплами'), 'семплами stress on first syllable');
 console.log('stress →', stress);
