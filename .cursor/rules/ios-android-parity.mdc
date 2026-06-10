@@ -1,0 +1,40 @@
+---
+description: Любая фича в Android — сразу зеркало в iOS (единые строки и поведение). Деплой iOS с Mac, код коммитится из Windows.
+alwaysApply: true
+---
+
+# iOS + Android — всегда вместе
+
+Пользователь собирает iOS **на Mac**, но **весь код** должен быть в репо сразу после правок Android. Не заканчивать задачу только APK.
+
+## Обязательный чеклист при фиче/фиксе UI или логики
+
+1. **Android** — реализация (Kotlin, `strings.xml`, Room и т.д.)
+2. **iOS** — зеркало в `ios/MusicStory/`:
+   | Android | iOS |
+   |---------|-----|
+   | `strings.xml` | `Data/AppStrings.swift` (те же русские тексты) |
+   | `SettingsScreen` | `UI/SettingsView.swift` |
+   | `StoryRepository` | `Data/StoryRepository.swift` |
+   | `StoryOrchestrator` | `Domain/StoryOrchestrator.swift` |
+   | `MediaMonitorService` / track hook | `NowPlayingCoordinator` + `StoryOrchestrator.onTrackChanged` |
+   | Room entity / DAO | SwiftData `@Model` в `StoryHistoryStore` / отдельный store |
+   | `WorkManager` | `Task` / `OfflinePackStore` |
+   | Notifications | `Notifications/NotificationService.swift` |
+3. **`ios/MusicStory.xcodeproj/project.pbxproj`** — новые `.swift` в Sources
+4. **Сайт** — FAQ/тарифы, если меняется UTP
+
+## Строки
+
+- Источник правды для RU-копирайта: `android/.../values/strings.xml`
+- iOS: дублировать в `AppStrings.swift`, **не** хардкодить в View/Notifier
+- Кириллица только: «офлайн», не латинская `n`
+
+## В ответе пользователю
+
+Указывать обе платформы: «Android + iOS в репо»; не писать «потом на iOS».
+
+## Сборка
+
+- Android: `efir-ai.apk` в корне
+- iOS: `cd ios && xcodebuild` или Xcode на Mac — агент на Windows **коммитит код**, не ждёт Mac

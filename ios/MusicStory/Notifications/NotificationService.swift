@@ -99,8 +99,8 @@ final class NotificationService: NSObject, ObservableObject {
     func notifyOfflinePackCollecting(collected: Int, target: Int) async {
         guard await authorizationGranted() else { return }
         let content = UNMutableNotificationContent()
-        content.title = "Сбор треков для офлайн-эфира"
-        content.body = "\(collected) из \(target)"
+        content.title = AppStrings.OfflinePack.notifCollectingTitle
+        content.body = AppStrings.OfflinePack.notifCollectingBody(collected: collected, target: target)
         content.threadIdentifier = "offline-pack"
         let request = UNNotificationRequest(
             identifier: "offline-pack-collecting",
@@ -114,8 +114,8 @@ final class NotificationService: NSObject, ObservableObject {
         guard await authorizationGranted() else { return }
         UNUserNotificationCenter.current().removeDeliveredNotifications(withIdentifiers: ["offline-pack-collecting"])
         let content = UNMutableNotificationContent()
-        content.title = "10 треков собраны"
-        content.body = "Готовим \(count) историй в фоне — пришлём уведомление, когда всё будет готово."
+        content.title = AppStrings.OfflinePack.notifTracksReadyTitle
+        content.body = AppStrings.OfflinePack.notifTracksReadyBody(count: count)
         content.sound = .default
         let request = UNNotificationRequest(
             identifier: "offline-pack-tracks-ready",
@@ -128,8 +128,8 @@ final class NotificationService: NSObject, ObservableObject {
     func notifyOfflinePackGenerating(ready: Int, target: Int) async {
         guard await authorizationGranted() else { return }
         let content = UNMutableNotificationContent()
-        content.title = "Готовим офлайн-эфир"
-        content.body = "\(ready) из \(target) готово"
+        content.title = AppStrings.OfflinePack.notifGeneratingTitle
+        content.body = AppStrings.OfflinePack.notifGeneratingBody(ready: ready, target: target)
         content.threadIdentifier = "offline-pack"
         let request = UNNotificationRequest(
             identifier: "offline-pack-generating",
@@ -143,8 +143,8 @@ final class NotificationService: NSObject, ObservableObject {
         guard await authorizationGranted() else { return }
         UNUserNotificationCenter.current().removeDeliveredNotifications(withIdentifiers: ["offline-pack-generating"])
         let content = UNMutableNotificationContent()
-        content.title = "Офлайн-эфир готов"
-        content.body = "\(count) историй можно слушать без интернета"
+        content.title = AppStrings.OfflinePack.notifDoneTitle
+        content.body = AppStrings.OfflinePack.notifDoneBody(count: count)
         content.sound = .default
         let request = UNNotificationRequest(
             identifier: "offline-pack-ready",
@@ -158,8 +158,8 @@ final class NotificationService: NSObject, ObservableObject {
         guard await authorizationGranted() else { return }
         UNUserNotificationCenter.current().removeDeliveredNotifications(withIdentifiers: ["offline-pack-generating"])
         let content = UNMutableNotificationContent()
-        content.title = "Не удалось подготовить офлайн-эфир"
-        content.body = "Проверьте интернет и попробуйте снова в настройках."
+        content.title = AppStrings.OfflinePack.notifFailedTitle
+        content.body = AppStrings.OfflinePack.notifFailedBody
         content.sound = .default
         let request = UNNotificationRequest(
             identifier: "offline-pack-failed",

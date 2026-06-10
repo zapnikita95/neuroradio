@@ -21,7 +21,7 @@ struct SettingsView: View {
                     generalSection
                     backendSection
                     modeSection
-                    offlineCacheSection
+                    offlinePackSection
                     triggerSection
                     spotifySection
                     manualSection
@@ -107,35 +107,35 @@ struct SettingsView: View {
         }
     }
 
-    private var offlineCacheSection: some View {
+    private var offlinePackSection: some View {
         let canUse = TierAccess.canUseOfflineAudioCache(storyRepository.accountTier)
         let state = offlinePack.uiState
         return GlassCard {
             VStack(alignment: .leading, spacing: 12) {
-                Text("Офлайн-эфир")
+                Text(AppStrings.OfflinePack.title)
                     .font(.headline)
                     .foregroundStyle(AppTheme.creamText)
 
                 if !canUse {
-                    Text("Доступно по расширенной подписке.")
+                    Text(AppStrings.OfflinePack.premiumLocked)
                         .font(.caption)
                         .foregroundStyle(AppTheme.mutedLavender)
                 } else {
                     switch state.phase {
                     case .idle:
-                        Text("Соберите 10 разных треков — приложение подготовит для них истории заранее. Потом можно слушать без интернета.")
+                        Text(AppStrings.OfflinePack.intro)
                             .font(.footnote)
                             .foregroundStyle(AppTheme.mutedLavender)
-                        Button("Подготовить офлайн-эфир") {
+                        Button(AppStrings.OfflinePack.start) {
                             Task { _ = await offlinePack.startCollecting() }
                         }
                         .buttonStyle(.borderedProminent)
                         .tint(AppTheme.goldBright)
                     case .collecting:
-                        Text("Включите shuffle или перематывайте треки в плеере. Каждый новый трек добавляется в пакет.")
+                        Text(AppStrings.OfflinePack.collectingHint)
                             .font(.footnote)
                             .foregroundStyle(AppTheme.mutedLavender)
-                        Text("Собрано \(state.collectedCount) из \(state.targetCount)")
+                        Text(AppStrings.OfflinePack.progress(collected: state.collectedCount, target: state.targetCount))
                             .foregroundStyle(AppTheme.goldBright)
                         ForEach(state.entries.indices, id: \.self) { index in
                             let entry = state.entries[index]
@@ -143,26 +143,26 @@ struct SettingsView: View {
                                 .font(.caption)
                                 .foregroundStyle(AppTheme.mutedLavender)
                         }
-                        Button("Отменить", role: .cancel) {
+                        Button(AppStrings.OfflinePack.cancel, role: .cancel) {
                             offlinePack.cancelPack()
                         }
                     case .generating:
-                        Text("Готовим истории и факты… \(state.readyCount) из \(state.targetCount)")
+                        Text(AppStrings.OfflinePack.generating(ready: state.readyCount, target: state.targetCount))
                             .foregroundStyle(AppTheme.goldBright)
-                        Text("Пришлём уведомление, когда всё будет готово.")
+                        Text(AppStrings.OfflinePack.tracksReadyBody(count: state.targetCount))
                             .font(.footnote)
                             .foregroundStyle(AppTheme.mutedLavender)
                     case .ready:
-                        Text("Готово! \(state.readyCount) историй на телефоне — можно слушать без сети.")
+                        Text(AppStrings.OfflinePack.ready(count: state.readyCount))
                             .foregroundStyle(AppTheme.creamText)
-                        Text("Когда играет трек из пакета, Эфир расскажет сохранённую историю офлайн.")
+                        Text(AppStrings.OfflinePack.readyHint)
                             .font(.footnote)
                             .foregroundStyle(AppTheme.mutedLavender)
                         HStack {
-                            Button("Собрать новый пакет") {
+                            Button(AppStrings.OfflinePack.refresh) {
                                 Task { _ = await offlinePack.startCollecting() }
                             }
-                            Button("Отменить", role: .cancel) {
+                            Button(AppStrings.OfflinePack.cancel, role: .cancel) {
                                 offlinePack.cancelPack()
                             }
                         }

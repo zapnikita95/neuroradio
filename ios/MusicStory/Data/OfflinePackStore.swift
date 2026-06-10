@@ -102,7 +102,7 @@ final class OfflinePackStore: ObservableObject {
             return .failure(NSError(
                 domain: "OfflinePack",
                 code: 1,
-                userInfo: [NSLocalizedDescriptionKey: "Офлайн-эфир доступен на расширенном тарифе"]
+                userInfo: [NSLocalizedDescriptionKey: AppStrings.OfflinePack.tierRequiredError]
             ))
         }
         let oldSession = settings.offlinePackSessionId

@@ -97,6 +97,24 @@ MediaNotificationListener
 
 ---
 
+## iOS — ключевые классы (зеркало Android)
+
+| Класс | Роль |
+|-------|------|
+| `StoryOrchestrator` | Авто/ручной триггер, пауза музыки |
+| `StoryRepository` | SwiftData-кэш, backend |
+| `StoryPlayer` | AVPlayer + server/local OGG |
+| `BackendClient` | HTTP, JWT |
+| `SettingsStore` | URL, триггеры, offline pack phase |
+| `NowPlayingCoordinator` | Spotify / Apple Music, смена трека |
+| `OfflinePackStore` | Офлайн-эфир: сбор 10 треков + генерация |
+| `NotificationService` | Push (факты, offline pack) |
+| `AppStrings` | RU-строки — **синхрон с** `android/.../strings.xml` |
+
+**Правило:** любая фича в `android/` → сразу правки в `ios/MusicStory/` + `project.pbxproj`. См. `.cursor/rules/ios-android-parity.mdc`.
+
+---
+
 ## Что агенту НЕ делать
 
 - Не добавлять Android `TextToSpeech` / «проверь синтез речи в настройках» для основного сценария.
@@ -104,6 +122,7 @@ MediaNotificationListener
 - Не ломать `POST /v1/story/full` как единственный источник `audioUrl` для production.
 - Не коммитить `.env`, ключи API.
 - APK пользователю указывать как **`efir-ai.apk`** в корне репозитория.
+- **Не** заканчивать фичу только Android — iOS-код в том же коммите (деплой iOS пользователь делает с Mac).
 
 ---
 

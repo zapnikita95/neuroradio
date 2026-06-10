@@ -58,7 +58,7 @@ struct HistoryView: View {
                             .foregroundStyle(AppTheme.mutedLavender)
                             .lineLimit(4)
                         if StoryRepository.shared.canReplayOffline(trackKey: entry.trackKey) {
-                            Button("Слушать") {
+                            Button(AppStrings.History.listen) {
                                 Task { await orchestrator.replayHistoryStory(entry) }
                             }
                             .buttonStyle(.borderedProminent)
