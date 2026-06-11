@@ -38,6 +38,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.RadioButtonDefaults
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
@@ -714,6 +715,46 @@ fun SettingsScreen(
         unfocusedTextColor = CreamText,
     )
 
+    val savedLabel = context.getString(R.string.settings_saved)
+    val showSavedFeedback = saveFeedback == savedLabel
+    val showSaveBar = hasPendingChanges || isSaving || showSavedFeedback || saveFeedback != null
+
+    val performSave: () -> Unit = {
+        if (hasPendingChanges && !isSaving) {
+            scope.launch {
+                isSaving = true
+                saveFeedback = null
+                try {
+                    val languageChanged = applySettingsDraft()
+                    yandexKeyInput = ApiKeySanitizer.clean(yandexKeyInput)
+                    StoryLog.i("SETTINGS saved")
+                    saveFeedback = savedLabel
+                    app.appScope.launch {
+                        runCatching { app.syncSettingsWithServer() }
+                    }
+                    if (languageChanged) {
+                        (context as? Activity)?.recreate()
+                    }
+                    delay(1200)
+                    if (saveFeedback == savedLabel) {
+                        saveFeedback = null
+                    }
+                } catch (e: Exception) {
+                    StoryLog.e("SETTINGS save failed: ${e.message}", e)
+                    saveFeedback = e.message ?: context.getString(R.string.settings_groq_test_fail)
+                } finally {
+                    isSaving = false
+                }
+            }
+        }
+    }
+
+    LaunchedEffect(hasPendingChanges) {
+        if (hasPendingChanges) {
+            scrollState.animateScrollBy(120f)
+        }
+    }
+
     MusicStoryBackground(modifier = modifier) {
         Box(modifier = Modifier.fillMaxSize()) {
         Column(modifier = Modifier.fillMaxSize()) {
@@ -729,10 +770,10 @@ fun SettingsScreen(
 
             Column(
                 modifier = Modifier
-                    .fillMaxSize()
+                    .weight(1f)
+                    .fillMaxWidth()
                     .verticalScroll(scrollState, enabled = tourStep == null)
-                    .navigationBarsPadding()
-                    .padding(start = 20.dp, end = 20.dp, top = 20.dp, bottom = 32.dp),
+                    .padding(start = 20.dp, end = 20.dp, top = 20.dp, bottom = 16.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp),
             ) {
                 val autoPlaybackOn = autoPlaybackOnUi
@@ -1872,49 +1913,6 @@ fun SettingsScreen(
                     }
                 }
 
-                val savedLabel = context.getString(R.string.settings_saved)
-                val showSavedFeedback = saveFeedback == savedLabel
-                PrimaryStoryButton(
-                    text = when {
-                        isSaving -> context.getString(R.string.settings_saving)
-                        showSavedFeedback -> savedLabel
-                        saveFeedback != null -> saveFeedback!!
-                        else -> context.getString(R.string.action_save)
-                    },
-                    enabled = hasPendingChanges || isSaving || showSavedFeedback,
-                    loading = isSaving,
-                    onClick = {
-                        if (hasPendingChanges && !isSaving) {
-                            scope.launch {
-                                isSaving = true
-                                saveFeedback = null
-                                try {
-                                    val languageChanged = applySettingsDraft()
-                                    yandexKeyInput = ApiKeySanitizer.clean(yandexKeyInput)
-                                    StoryLog.i("SETTINGS saved")
-                                    saveFeedback = savedLabel
-                                    app.appScope.launch {
-                                        runCatching { app.syncSettingsWithServer() }
-                                    }
-                                    if (languageChanged) {
-                                        (context as? Activity)?.recreate()
-                                    }
-                                    delay(1200)
-                                    if (saveFeedback == savedLabel) {
-                                        saveFeedback = null
-                                    }
-                                } catch (e: Exception) {
-                                    StoryLog.e("SETTINGS save failed: ${e.message}", e)
-                                    saveFeedback = e.message ?: context.getString(R.string.settings_groq_test_fail)
-                                } finally {
-                                    isSaving = false
-                                }
-                            }
-                        }
-                    },
-                )
-            }
-
                 Text(
                     text = context.getString(
                         R.string.settings_app_version,
@@ -1925,9 +1923,18 @@ fun SettingsScreen(
                     color = MutedLavender.copy(alpha = 0.65f),
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(top = 12.dp, bottom = 16.dp),
+                        .padding(top = 12.dp, bottom = 8.dp),
                 )
-        }
+            }
+
+            SettingsUnsavedSaveBar(
+                visible = showSaveBar,
+                hasPendingChanges = hasPendingChanges,
+                isSaving = isSaving,
+                saveFeedback = saveFeedback,
+                savedLabel = savedLabel,
+                onSave = performSave,
+            )
 
             if (tourOverlayReady) {
                 tourStep?.let { step ->
@@ -1954,6 +1961,61 @@ fun SettingsScreen(
                         },
                     )
                 }
+            }
+        }
+        }
+    }
+}
+
+@Composable
+private fun SettingsUnsavedSaveBar(
+    visible: Boolean,
+    hasPendingChanges: Boolean,
+    isSaving: Boolean,
+    saveFeedback: String?,
+    savedLabel: String,
+    onSave: () -> Unit,
+) {
+    val context = LocalContext.current
+    AnimatedVisibility(
+        visible = visible,
+        enter = expandVertically(),
+        exit = shrinkVertically(),
+    ) {
+        Surface(
+            modifier = Modifier
+                .fillMaxWidth()
+                .navigationBarsPadding(),
+            color = DeepVoid.copy(alpha = 0.96f),
+            tonalElevation = 12.dp,
+            shadowElevation = 16.dp,
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 20.dp, vertical = 12.dp),
+            ) {
+                if (hasPendingChanges && !isSaving) {
+                    Text(
+                        text = context.getString(R.string.settings_unsaved_hint),
+                        style = MaterialTheme.typography.labelMedium,
+                        color = GoldBright,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(bottom = 10.dp),
+                    )
+                }
+                PrimaryStoryButton(
+                    text = when {
+                        isSaving -> context.getString(R.string.settings_saving)
+                        saveFeedback == savedLabel -> savedLabel
+                        saveFeedback != null -> saveFeedback
+                        else -> context.getString(R.string.action_save)
+                    },
+                    enabled = hasPendingChanges && !isSaving,
+                    loading = isSaving,
+                    onClick = onSave,
+                )
             }
         }
     }

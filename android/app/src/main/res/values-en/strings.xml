@@ -24,6 +24,7 @@
     <string name="action_save">Save</string>
     <string name="action_back">Back</string>
     <string name="settings_saved">Saved</string>
+    <string name="settings_unsaved_hint">You have unsaved changes — tap Save</string>
     <string name="settings_saving">Saving…</string>
 
     <string name="label_now_playing">Now playing</string>
