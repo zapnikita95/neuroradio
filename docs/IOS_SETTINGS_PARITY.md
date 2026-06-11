@@ -7,7 +7,7 @@
 
 | # | Android string | iOS |
 |---|----------------|-----|
-| 1 | Общее | Уведомления, Shazam |
+| 1 | Общее | Уведомления, Shazam, **названия треков в озвучке** |
 | 2 | Режим | Ручной режим |
 | 3 | Триггер | TriggerMode + stepper N |
 | 4 | `settings_narrator_section` | Рассказчик (амплуа) — 7 персонажей |
@@ -49,6 +49,7 @@
   "tts_emotion": "good",
   "tts_provider": "edge",
   "edge_voice_preset": "svetlana_calm",
+  "speak_track_names_in_voiceover": true,
   "client_platform": "ios"
 }
 ```

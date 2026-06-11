@@ -9,7 +9,7 @@ alwaysApply: true
 
 ## Обязательные секции (сворачиваемые `SettingsSection`)
 
-1. **Общее** — уведомления, Shazam auto
+1. **Общее** — уведомления, Shazam auto, **названия треков в озвучке** (toggle, default ON как Android)
 2. **Режим** — ручной / авто
 3. **Триггер** — режим, N треков
 4. **Рассказчик (амплуа)** — все `StoryNarrator` radio rows
@@ -32,6 +32,6 @@ alwaysApply: true
 
 ## API
 
-`StoryRequest` на iOS должен слать как Android: `story_narrator`, `tts_voice`, `tts_speed`, `tts_emotion`, `tts_provider`, `edge_voice_preset`, `client_platform: ios`.
+`StoryRequest` на iOS должен слать как Android: `story_narrator`, `tts_voice`, `tts_speed`, `tts_emotion`, `tts_provider`, `edge_voice_preset`, `speak_track_names_in_voiceover`, `client_platform: ios`.
 
 Док: `docs/IOS_SETTINGS_PARITY.md`

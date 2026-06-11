@@ -176,6 +176,12 @@ struct SettingsView: View {
                     .foregroundStyle(AppTheme.creamText)
             }
             .tint(AppTheme.goldBright)
+
+            Toggle(isOn: $settings.speakTrackNamesInVoiceover) {
+                Text("Названия треков в озвучке")
+                    .foregroundStyle(AppTheme.creamText)
+            }
+            .tint(AppTheme.goldBright)
         }
     }
 

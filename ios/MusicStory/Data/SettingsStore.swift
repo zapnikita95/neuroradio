@@ -8,6 +8,8 @@ enum SettingsDefaults {
     static let ttsSpeedPreset: TtsSpeed = .normal
     static let musicFadeSeconds: Float = 2.0
     static let storyLength: StoryLength = .sec60
+    /// Как Android `DEFAULT_SPEAK_TRACK_NAMES_IN_VOICEOVER`.
+    static let speakTrackNamesInVoiceover = true
 }
 
 @MainActor
@@ -189,7 +191,8 @@ final class SettingsStore: ObservableObject {
         specificArtists = defaults.stringArray(forKey: Keys.specificArtists) ?? []
         specificGenres = defaults.stringArray(forKey: Keys.specificGenres) ?? []
         autoIntercept = defaults.object(forKey: Keys.autoIntercept) as? Bool ?? true
-        speakTrackNamesInVoiceover = defaults.bool(forKey: Keys.speakTrackNamesInVoiceover)
+        speakTrackNamesInVoiceover = defaults.object(forKey: Keys.speakTrackNamesInVoiceover) as? Bool
+            ?? SettingsDefaults.speakTrackNamesInVoiceover
         spotifyClientId = defaults.string(forKey: Keys.spotifyClientId) ?? ""
         spotifyRedirectURI = defaults.string(forKey: Keys.spotifyRedirectURI) ?? SettingsDefaults.spotifyRedirectURI
         storyNarrator = StoryNarrator.fromId(defaults.string(forKey: Keys.storyNarrator))

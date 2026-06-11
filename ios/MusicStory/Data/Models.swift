@@ -12,6 +12,7 @@ struct StoryRequest: Encodable, Sendable {
     let clientPlatform: String
     let ttsProvider: String?
     let edgeVoicePreset: String?
+    let speakTrackNamesInVoiceover: Bool
 
     enum CodingKeys: String, CodingKey {
         case artist
@@ -25,6 +26,7 @@ struct StoryRequest: Encodable, Sendable {
         case clientPlatform = "client_platform"
         case ttsProvider = "tts_provider"
         case edgeVoicePreset = "edge_voice_preset"
+        case speakTrackNamesInVoiceover = "speak_track_names_in_voiceover"
     }
 }
 
