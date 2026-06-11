@@ -219,6 +219,17 @@ async function boot(): Promise<void> {
     await hydrateDevTierStoreFromPostgres();
     await migrateAccountStoryDataToPostgres();
     console.log('[boot] postgres stores hydrated');
+    try {
+      const { backfillStyleCorpusFromFeedback } = await import('./services/style-feedback-backfill.js');
+      const backfill = await backfillStyleCorpusFromFeedback();
+      if (backfill.reprocessed > 0) {
+        console.log(
+          `[boot] style corpus backfill: +${backfill.goldAfter - backfill.goldBefore} gold, good_persona=${backfill.goodPersona}`,
+        );
+      }
+    } catch (err) {
+      console.warn('[boot] style corpus backfill failed:', err instanceof Error ? err.message : err);
+    }
   }
 
   try {

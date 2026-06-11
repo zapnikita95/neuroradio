@@ -7,8 +7,8 @@ import { resolveStoryNarrator, type StoryNarratorId } from './story-narrator.js'
 import { retrieveStyleExamples } from './style-rag.js';
 
 export const STYLE_RAG_MIN_GOLD = parseInt(process.env.STYLE_RAG_MIN_GOLD ?? '50', 10);
-export const STYLE_PROMOTE_MIN_LIKES = parseInt(process.env.STYLE_PROMOTE_MIN_LIKES ?? '10', 10);
-export const STYLE_PROMOTE_MIN_TRACKS = parseInt(process.env.STYLE_PROMOTE_MIN_TRACKS ?? '5', 10);
+export const STYLE_PROMOTE_MIN_LIKES = parseInt(process.env.STYLE_PROMOTE_MIN_LIKES ?? '1', 10);
+export const STYLE_PROMOTE_MIN_TRACKS = parseInt(process.env.STYLE_PROMOTE_MIN_TRACKS ?? '1', 10);
 export const STYLE_MAX_GOLD_PER_NARRATOR = parseInt(process.env.STYLE_MAX_GOLD_PER_NARRATOR ?? '20', 10);
 export const STYLE_FEWSHOT_MAX = 2;
 

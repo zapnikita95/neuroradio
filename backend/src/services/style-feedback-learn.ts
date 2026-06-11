@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { trackKey } from './fact-bank.js';
 import type { StoryLanguageId } from './story-language.js';
-import type { StoryNarratorId } from './story-narrator.js';
+import { resolveStoryNarrator, type StoryNarratorId } from './story-narrator.js';
 import { anchorsReferenceFact, validateStoryScript } from './story-quality.js';
 import { DEFAULT_STORY_LENGTH } from './story-length.js';
 import {
@@ -22,9 +22,18 @@ import {
   type StyleNarratorId,
 } from './style-corpus.js';
 import type { StoryFeedbackEntry } from './story-feedback.js';
+import { getAccountByInstallId } from './account-store.js';
 
 const DATA_DIR = process.env.ACCOUNT_DATA_DIR?.trim() || path.join(process.cwd(), 'data');
 const PROMOTE_STATE_PATH = path.join(DATA_DIR, 'style-corpus', 'promote-state.json');
+
+export function inferNarratorForInstall(installId: string): StyleNarratorId | undefined {
+  const account = getAccountByInstallId(installId);
+  const raw = account?.settings?.storyNarrator?.trim();
+  if (!raw) return undefined;
+  const id = resolveStoryNarrator(raw);
+  return id === 'auto' ? undefined : id;
+}
 
 interface PromoteBucket {
   scriptHash: string;
@@ -106,20 +115,32 @@ function passesPromoteQuality(
   title: string,
   lang: StoryLanguageId,
 ): boolean {
-  if (!seedFact.trim() || !script.trim()) return false;
-  if (!anchorsReferenceFact(script, [seedFact])) return false;
-  const check = validateStoryScript(script, DEFAULT_STORY_LENGTH, artist, title, {
-    referenceFacts: [seedFact],
+  if (!script.trim()) return false;
+
+  if (seedFact.trim()) {
+    if (!anchorsReferenceFact(script, [seedFact])) return false;
+    const check = validateStoryScript(script, DEFAULT_STORY_LENGTH, artist, title, {
+      referenceFacts: [seedFact],
+      storyLanguage: lang,
+      skipPersonaCliches: true,
+    });
+    return check.ok;
+  }
+
+  // Style-only gold (no seed in feedback) — still block obvious garbage.
+  const styleOnly = validateStoryScript(script, DEFAULT_STORY_LENGTH, artist, title, {
+    referenceFacts: ['style-like placeholder anchor'],
     storyLanguage: lang,
+    skipReferenceAnchor: true,
+    skipFirstSentenceAnchor: true,
     skipPersonaCliches: true,
   });
-  return check.ok;
+  return styleOnly.ok;
 }
 
 function tryPromoteBucket(bucket: PromoteBucket, artist: string, title: string): void {
   if (bucket.likeCount < STYLE_PROMOTE_MIN_LIKES) return;
   if (bucket.trackKeys.size < STYLE_PROMOTE_MIN_TRACKS) return;
-  if (!bucket.seedFact.trim()) return;
 
   const existing = loadGoldCorpus().find(
     (e) => e.status === 'gold' && scriptFingerprint(e.script) === bucket.scriptHash,
@@ -169,7 +190,8 @@ export function processFeedbackForStyleLearning(
   entry: StoryFeedbackEntry,
   ctx: StyleFeedbackContext = {},
 ): void {
-  const narrator = resolveStyleNarrator(ctx.storyNarrator);
+  const narrator =
+    resolveStyleNarrator(ctx.storyNarrator) ?? inferNarratorForInstall(entry.installId);
   const script = entry.script?.trim();
   if (!narrator || !script) return;
 

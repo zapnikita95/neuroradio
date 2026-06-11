@@ -392,4 +392,25 @@ router.post('/website-demo/tts', async (req: Request, res: Response) => {
   }
 });
 
+/** Reprocess good_persona likes → style gold corpus (dev / after deploy). */
+router.post('/style-corpus/backfill', async (req: Request, res: Response) => {
+  const secret = String(req.headers['x-website-demo-secret'] ?? '');
+  const expected = process.env.WEBSITE_DEMO_SECRET?.trim();
+  if (!expected || secret !== expected) {
+    res.status(403).json({ error: 'forbidden' });
+    return;
+  }
+  try {
+    const { backfillStyleCorpusFromFeedback, summarizeGoodPersonaFeedback } = await import(
+      '../services/style-feedback-backfill.js'
+    );
+    const summary = await summarizeGoodPersonaFeedback();
+    const result = await backfillStyleCorpusFromFeedback();
+    res.json({ ok: true, summary, result });
+  } catch (err) {
+    console.error('[public/style-corpus/backfill]', err instanceof Error ? err.message : err);
+    res.status(500).json({ error: 'backfill_failed', detail: err instanceof Error ? err.message : String(err) });
+  }
+});
+
 export default router;
