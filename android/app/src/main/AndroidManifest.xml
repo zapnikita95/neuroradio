@@ -51,6 +51,7 @@
         <activity
             android:name=".data.auth.TelegramOAuthActivity"
             android:exported="false"
+            android:hardwareAccelerated="true"
             android:theme="@style/Theme.MusicStory" />
 
         <service

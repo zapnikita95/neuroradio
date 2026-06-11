@@ -158,13 +158,13 @@ interface StoryFullBody {
   skip_server_tts?: boolean;
   edge_voice_preset?: string;
   speak_track_names_in_voiceover?: boolean;
-  /** ios — AVPlayer не играет OGG; отдаём WAV с Yandex TTS. */
+  /** ios/android — AVPlayer and Huawei ExoPlayer fail on Yandex OGG/Opus; use WAV. */
   client_platform?: 'ios' | 'android' | string;
 }
 
 function storyAudioExtensionForClient(body: StoryFullBody): 'ogg' | 'wav' {
   const platform = typeof body.client_platform === 'string' ? body.client_platform.trim().toLowerCase() : '';
-  if (platform === 'ios') return 'wav';
+  if (platform === 'ios' || platform === 'android') return 'wav';
   return yandexAudioExtension();
 }
 

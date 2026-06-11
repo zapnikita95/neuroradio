@@ -38,6 +38,8 @@ data class StoryRequest(
     @SerializedName("edge_voice_preset") val edgeVoicePreset: String? = null,
     @SerializedName("speak_track_names_in_voiceover") val speakTrackNamesInVoiceover: Boolean = true,
     @SerializedName("story_language") val storyLanguage: String = "ru",
+    /** Backend serves Yandex WAV (not OGG/Opus) — Huawei/Poco MediaCodec opus decoder crashes. */
+    @SerializedName("client_platform") val clientPlatform: String = "android",
 )
 
 data class StoryResponse(

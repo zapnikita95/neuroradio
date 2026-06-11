@@ -98,15 +98,20 @@ class TelegramOAuthCoordinator private constructor() {
 
     /**
      * WebView preserves query params (Custom Tabs on Huawei strip them).
-     * Always open oauth.telegram.org directly — BFF /authorize is optional fallback only.
+     * Open BFF /authorize — server 302 → oauth.telegram.org with full params.
      */
     private fun buildStartUrl(
-        @Suppress("UNUSED_PARAMETER") backendBaseUrl: String,
-        clientId: String,
-        redirectUri: String,
+        backendBaseUrl: String,
+        @Suppress("UNUSED_PARAMETER") clientId: String,
+        @Suppress("UNUSED_PARAMETER") redirectUri: String,
         challenge: String,
-    ): String = buildDirectAuthUri(clientId, redirectUri, challenge).toString()
+    ): String {
+        val base = backendBaseUrl.trimEnd('/')
+        val enc = URLEncoder.encode(challenge, StandardCharsets.UTF_8.name())
+        return "$base/v1/public/oauth/telegram/authorize?code_challenge=$enc&code_challenge_method=S256"
+    }
 
+    @Suppress("unused")
     private fun buildDirectAuthUri(clientId: String, redirectUri: String, challenge: String): Uri {
         val enc = StandardCharsets.UTF_8
         fun enc(v: String) = URLEncoder.encode(v, enc.name())

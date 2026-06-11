@@ -95,7 +95,8 @@ class StoryOfflineAudioStore(context: Context) {
         StoryLog.i("Offline cache wiped")
     }
 
-    fun localFileUri(path: String): String = File(path).toURI().toString()
+    fun localFileUri(path: String): String =
+        android.net.Uri.fromFile(File(path)).toString()
 
     /** Remove other extensions for the same track (e.g. stale .ogg when server now serves .wav). */
     fun evictOtherExtensions(trackKey: String, keepExtension: String) {
