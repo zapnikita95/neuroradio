@@ -575,8 +575,8 @@ fun HomeScreen(
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 16.dp)
-                    .padding(top = 4.dp, bottom = 32.dp),
+                    .padding(horizontal = 24.dp)
+                    .padding(top = 8.dp, bottom = 32.dp),
                 verticalArrangement = Arrangement.spacedBy(14.dp),
             ) {
                 if (uiState.generationPreview.isActive && uiState.generationPreview.words.isNotEmpty()) {

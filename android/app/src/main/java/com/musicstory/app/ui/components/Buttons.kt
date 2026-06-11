@@ -22,13 +22,23 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import com.musicstory.app.ui.theme.Copper
 import com.musicstory.app.ui.theme.DeepVoid
 import com.musicstory.app.ui.theme.GlassBorder
 import com.musicstory.app.ui.theme.GoldBright
-import com.musicstory.app.ui.theme.GoldWarm
+
+private val PrimaryButtonShape = RoundedCornerShape(28.dp)
+
+/** Original gold CTA gradient — not the pink/violet theme aliases. */
+private val PrimaryButtonGradient = Brush.horizontalGradient(
+    colors = listOf(
+        Color(0xFFE8A838),
+        Color(0xFFFFC857),
+        Color(0xFFB87333).copy(alpha = 0.92f),
+    ),
+)
 
 @Composable
 fun PrimaryStoryButton(
@@ -44,12 +54,8 @@ fun PrimaryStoryButton(
             .fillMaxWidth()
             .height(56.dp)
             .alpha(if (loading || enabled) 1f else 0.45f)
-            .clip(RoundedCornerShape(18.dp))
-            .background(
-                Brush.horizontalGradient(
-                    colors = listOf(GoldWarm, GoldBright, Copper.copy(alpha = 0.85f)),
-                ),
-            )
+            .clip(PrimaryButtonShape)
+            .background(PrimaryButtonGradient, PrimaryButtonShape)
             .then(if (interactive) Modifier.clickable(onClick = onClick) else Modifier),
         contentAlignment = Alignment.Center,
     ) {
