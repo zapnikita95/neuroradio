@@ -39,13 +39,20 @@ export function inferNarratorForInstall(installId: string): StyleNarratorId | un
 export function inferNarratorFromScript(script: string): StyleNarratorId | undefined {
   const s = script.trim();
   if (!s) return undefined;
-  if (/(?:я обожаю|я знаю каждую|пересматривал|коллекцион|on vinyl|by heart)/i.test(s)) return 'fan';
-  if (/(?:я помню|мы тогда|в те годы|мы смотрели|i remember those)/i.test(s)) return 'contemporary';
-  if (/(?:между нами|off the record|инсайд|полушёпот|коридоре студии)/i.test(s)) return 'backstage';
-  if (/(?:жанр|поджанр|механик|suite|аранж|french house|modal jazz)/i.test(s)) return 'expert';
-  if (/(?:тихий час|ночной эфир|good night|этой ночью|полумраке)/i.test(s)) return 'night_dj';
-  if (/(?:поехали|на максимум|stay on our|волне)/i.test(s)) return 'radio_host';
-  return undefined;
+  if (/(?:я обожаю|я знаю каждую|пересматривал|коллекцион|on vinyl|by heart|фанат|наизусть)/i.test(s)) return 'fan';
+  if (/(?:я помню|мы тогда|в те годы|мы смотрели|i remember those|мы гоняли|включали на повторе)/i.test(s)) return 'contemporary';
+  if (/(?:между нами|off the record|инсайд|полушёпот|коридоре студии|лейбл настаив|не хотел|отказал)/i.test(s)) return 'backstage';
+  if (/(?:жанр|поджанр|механик|suite|аранж|french house|modal jazz|глэм|арт-поп|басовая линия|продакшн)/i.test(s)) return 'expert';
+  if (/(?:тихий час|ночной эфир|good night|этой ночью|полумраке|ночью)/i.test(s)) return 'night_dj';
+  if (/(?:поехали|на максимум|stay on our|волне|эфир|слушател)/i.test(s)) return 'radio_host';
+  // Broad fallbacks for backfill (old likes without stored narrator)
+  if (/\bя\b/i.test(s)) {
+    if (/(?:обожа|восторг|крутейш|шикарн|обалд)/i.test(s)) return 'fan';
+    return 'contemporary';
+  }
+  if (/(?:спор|скандал|курьёз|ультиматум|запретил)/i.test(s)) return 'backstage';
+  if (/(?:чарт|стрим|миллион|релиз|альбом вышел|билборд)/i.test(s)) return 'radio_host';
+  return 'radio_host';
 }
 
 interface PromoteBucket {
