@@ -9,8 +9,8 @@ export function isTelegramConfigured(): boolean {
 }
 
 /**
- * Origin for Telegram Login Widget — must match @BotFather /setdomain exactly.
- * BotFather usually registers apex (efir-ai.ru), not www — strip www by default.
+ * Origin for Telegram Login Widget — HTTPS only (iOS ATS / Android cleartext).
+ * efir-ai.ru apex redirects to http://www — use www for WebView embed.
  */
 export function resolveTelegramWidgetBaseUrl(): string | null {
   const raw =
@@ -24,24 +24,38 @@ export function resolveTelegramWidgetBaseUrl(): string | null {
     .replace(/^https?:\/\//, '')
     .replace(/\/.*$/, '');
   if (forcedHost) {
-    try {
-      return new URL(`https://${forcedHost}`).origin;
-    } catch {
-      return raw.replace(/\/$/, '');
-    }
+    return normalizeTelegramWidgetOrigin(forcedHost);
   }
 
   try {
     const u = new URL(raw.startsWith('http') ? raw : `https://${raw}`);
-    u.protocol = 'https:';
-    // Keep www only when explicitly requested (TELEGRAM_WIDGET_KEEP_WWW=true).
-    if (u.hostname.startsWith('www.') && process.env.TELEGRAM_WIDGET_KEEP_WWW !== 'true') {
-      u.hostname = u.hostname.slice(4);
-    }
-    return u.origin;
+    return normalizeTelegramWidgetOrigin(u.hostname);
   } catch {
-    return raw.replace(/^http:\/\//i, 'https://').replace(/\/$/, '');
+    const cleaned = raw
+      .replace(/^http:\/\//i, 'https://')
+      .replace(/\/$/, '');
+    try {
+      const u = new URL(cleaned.startsWith('https://') ? cleaned : `https://${cleaned}`);
+      return normalizeTelegramWidgetOrigin(u.hostname);
+    } catch {
+      return cleaned;
+    }
   }
+}
+
+function normalizeTelegramWidgetOrigin(hostOrOrigin: string): string {
+  let host = hostOrOrigin
+    .replace(/^https?:\/\//i, '')
+    .replace(/\/.*$/, '')
+    .toLowerCase();
+  if (!host) return 'https://www.efir-ai.ru';
+
+  // Apex efir-ai.ru → 301 to insecure http://www — load widget from www directly.
+  if (host === 'efir-ai.ru') {
+    host = 'www.efir-ai.ru';
+  }
+
+  return `https://${host}`;
 }
 
 export function getPublicAuthConfig(): {

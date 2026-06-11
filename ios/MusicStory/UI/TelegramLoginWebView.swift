@@ -1,6 +1,55 @@
 import SwiftUI
 import WebKit
 
+enum TelegramWidgetURL {
+    /// HTTPS origin for widget page — apex efir-ai.ru redirects to http://www (ATS block on iOS).
+    static func normalizeBase(_ raw: String) -> String {
+        var trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+            .trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+        if trimmed.isEmpty { return "https://www.efir-ai.ru" }
+
+        if !trimmed.lowercased().hasPrefix("http") {
+            trimmed = "https://\(trimmed)"
+        }
+        trimmed = trimmed.replacingOccurrences(
+            of: "^http://",
+            with: "https://",
+            options: [.regularExpression, .caseInsensitive]
+        )
+
+        guard var components = URLComponents(string: trimmed) else {
+            return "https://www.efir-ai.ru"
+        }
+        components.scheme = "https"
+        if components.host?.lowercased() == "efir-ai.ru" {
+            components.host = "www.efir-ai.ru"
+        }
+        return components.url?.absoluteString
+            .replacingOccurrences(of: "/$", with: "", options: .regularExpression)
+            ?? "https://www.efir-ai.ru"
+    }
+
+    static func pageURL(base: String, bot: String) -> URL? {
+        let trimmedBase = normalizeBase(base)
+        let safeBot = bot.trimmingCharacters(in: .whitespaces).replacingOccurrences(of: "@", with: "")
+        var components = URLComponents(string: "\(trimmedBase)/telegram-login")
+        components?.queryItems = [
+            URLQueryItem(name: "embed", value: "ios"),
+            URLQueryItem(name: "bot", value: safeBot),
+        ]
+        return components?.url
+    }
+
+    static func upgradeToHTTPS(_ url: URL) -> URL {
+        guard url.scheme?.lowercased() == "http",
+              var parts = URLComponents(url: url, resolvingAgainstBaseURL: false) else {
+            return url
+        }
+        parts.scheme = "https"
+        return parts.url ?? url
+    }
+}
+
 struct TelegramLoginWebView: UIViewRepresentable {
     let botUsername: String
     let widgetBaseURL: String
@@ -24,7 +73,7 @@ struct TelegramLoginWebView: UIViewRepresentable {
         webView.scrollView.backgroundColor = .clear
         webView.navigationDelegate = context.coordinator
 
-        if let url = Self.pageURL(base: widgetBaseURL, bot: botUsername) {
+        if let url = TelegramWidgetURL.pageURL(base: widgetBaseURL, bot: botUsername) {
             webView.load(URLRequest(url: url))
         } else {
             onError("Некорректный URL для Telegram")
@@ -33,17 +82,6 @@ struct TelegramLoginWebView: UIViewRepresentable {
     }
 
     func updateUIView(_ uiView: WKWebView, context: Context) {}
-
-    static func pageURL(base: String, bot: String) -> URL? {
-        let trimmedBase = base.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
-        let safeBot = bot.trimmingCharacters(in: .whitespaces).replacingOccurrences(of: "@", with: "")
-        var components = URLComponents(string: "\(trimmedBase)/telegram-login")
-        components?.queryItems = [
-            URLQueryItem(name: "embed", value: "ios"),
-            URLQueryItem(name: "bot", value: safeBot),
-        ]
-        return components?.url
-    }
 
     final class Coordinator: NSObject, WKNavigationDelegate, WKScriptMessageHandler {
         private let onAuth: ([String: Any]) -> Void
@@ -60,7 +98,7 @@ struct TelegramLoginWebView: UIViewRepresentable {
         }
 
         func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) {
-            onError(error.localizedDescription)
+            onError(userFacing(error))
         }
 
         func webView(
@@ -68,11 +106,23 @@ struct TelegramLoginWebView: UIViewRepresentable {
             didFailProvisionalNavigation navigation: WKNavigation!,
             withError error: Error
         ) {
-            onError(error.localizedDescription)
+            onError(userFacing(error))
         }
 
         func webView(_ webView: WKWebView, decidePolicyFor navigationAction: WKNavigationAction, decisionHandler: @escaping (WKNavigationActionPolicy) -> Void) {
-            guard let host = navigationAction.request.url?.host?.lowercased() else {
+            guard let url = navigationAction.request.url else {
+                decisionHandler(.cancel)
+                return
+            }
+
+            if url.scheme?.lowercased() == "http" {
+                let https = TelegramWidgetURL.upgradeToHTTPS(url)
+                webView.load(URLRequest(url: https))
+                decisionHandler(.cancel)
+                return
+            }
+
+            guard let host = url.host?.lowercased() else {
                 decisionHandler(.cancel)
                 return
             }
@@ -91,6 +141,14 @@ struct TelegramLoginWebView: UIViewRepresentable {
                 decisionHandler(.cancel)
             }
         }
+
+        private func userFacing(_ error: Error) -> String {
+            let ns = error as NSError
+            if ns.domain == NSURLErrorDomain, ns.code == NSURLErrorAppTransportSecurityRequiresSecureConnection {
+                return "Нужно HTTPS-соединение. Обновите приложение."
+            }
+            return error.localizedDescription
+        }
     }
 }
 
@@ -104,19 +162,25 @@ struct TelegramLoginSheet: View {
 
     var body: some View {
         NavigationStack {
-            VStack(spacing: 12) {
-                TelegramLoginWebView(
-                    botUsername: botUsername,
-                    widgetBaseURL: widgetBaseURL,
-                    onAuth: onAuth,
-                    onError: { errorMessage = $0 }
-                )
-                if let errorMessage {
-                    Text(errorMessage)
-                        .font(.caption)
-                        .foregroundStyle(AppTheme.errorCoral)
-                        .multilineTextAlignment(.center)
-                        .padding(.horizontal)
+            ZStack {
+                AppTheme.nightPlum.ignoresSafeArea()
+                VStack(spacing: 0) {
+                    TelegramLoginWebView(
+                        botUsername: botUsername,
+                        widgetBaseURL: widgetBaseURL,
+                        onAuth: onAuth,
+                        onError: { errorMessage = $0 }
+                    )
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+
+                    if let errorMessage {
+                        Text(errorMessage)
+                            .font(.caption)
+                            .foregroundStyle(AppTheme.errorCoral)
+                            .multilineTextAlignment(.center)
+                            .padding(.horizontal, 20)
+                            .padding(.bottom, 12)
+                    }
                 }
             }
             .navigationTitle("Telegram")
@@ -128,6 +192,8 @@ struct TelegramLoginSheet: View {
                 }
             }
         }
-        .presentationDetents([.medium, .large])
+        .presentationDetents([.fraction(0.55), .large])
+        .presentationDragIndicator(.visible)
+        .presentationBackground(AppTheme.nightPlum)
     }
 }
