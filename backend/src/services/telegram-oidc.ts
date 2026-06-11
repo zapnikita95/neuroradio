@@ -38,6 +38,24 @@ export function resolveTelegramOAuthRedirectUri(): string {
   }
 }
 
+/** Full Telegram authorize URL — used by /oauth/telegram/authorize redirect (Android WebView / Custom Tabs). */
+export function buildTelegramOAuthAuthorizeTarget(codeChallenge: string, method = 'S256'): string | null {
+  const clientId = telegramBotNumericId();
+  if (!clientId) return null;
+  const challenge = codeChallenge.trim();
+  if (!challenge || challenge.length < 43 || challenge.length > 128) return null;
+  const redirectUri = resolveTelegramOAuthRedirectUri();
+  const params = new URLSearchParams({
+    client_id: clientId,
+    redirect_uri: redirectUri,
+    response_type: 'code',
+    scope: 'openid profile',
+    code_challenge: challenge,
+    code_challenge_method: method.trim() || 'S256',
+  });
+  return `https://oauth.telegram.org/auth?${params.toString()}`;
+}
+
 export function oauthNativeBridgeHtml(queryString: string): string {
   const qs = queryString.startsWith('?') ? queryString.slice(1) : queryString;
   const deeplink = `efirai://oauth/telegram${qs ? `?${qs}` : ''}`;

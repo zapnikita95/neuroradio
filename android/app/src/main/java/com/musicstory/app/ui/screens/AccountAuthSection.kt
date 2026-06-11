@@ -146,7 +146,12 @@ private fun CoroutineScope.launchTelegramAuth(
             val botId = cfg.telegramBotId.orEmpty()
             val redirectUri = TelegramOAuthCoordinator.resolveRedirectUri(cfg.telegramOAuthRedirectUri)
             try {
-                val (code, verifier) = TelegramOAuthCoordinator.instance.signIn(activity, botId, redirectUri)
+                val (code, verifier) = TelegramOAuthCoordinator.instance.signIn(
+                    activity,
+                    botId,
+                    redirectUri,
+                    backendUrl,
+                )
                 val login = withContext(Dispatchers.IO) {
                     app.accountAuthManager.linkTelegramOAuth(
                         backendUrl,

@@ -1,8 +1,8 @@
 package com.musicstory.app.data.auth
 
 import android.app.Activity
+import android.content.Intent
 import android.net.Uri
-import androidx.browser.customtabs.CustomTabsIntent
 import com.musicstory.app.util.StoryLog
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
@@ -17,7 +17,12 @@ class TelegramOAuthCoordinator private constructor() {
     private var pendingCode: CompletableDeferred<String>? = null
     private var activeCodeVerifier: String? = null
 
-    suspend fun signIn(activity: Activity, clientId: String, redirectUri: String): Pair<String, String> {
+    suspend fun signIn(
+        activity: Activity,
+        clientId: String,
+        redirectUri: String,
+        backendBaseUrl: String,
+    ): Pair<String, String> {
         cancelPending()
 
         val botId = clientId.trim()
@@ -28,21 +33,18 @@ class TelegramOAuthCoordinator private constructor() {
 
         val verifier = makeCodeVerifier()
         val challenge = makeCodeChallenge(verifier)
-        val authUri = buildAuthUri(botId, redirect, challenge)
+        val startUrl = buildStartUrl(backendBaseUrl, botId, redirect, challenge)
 
         val deferred = CompletableDeferred<String>()
         pendingCode = deferred
         activeCodeVerifier = verifier
 
-        StoryLog.i("Telegram OAuth start clientId=$botId redirect=$redirect url=$authUri")
+        StoryLog.i("Telegram OAuth start clientId=$botId redirect=$redirect url=${startUrl.take(160)}")
 
         withContext(Dispatchers.Main) {
-            val customTabs = CustomTabsIntent.Builder()
-                .setShowTitle(true)
-                .build()
-            // launchUrl() on some OEM builds drops query params → bare oauth.telegram.org/auth.
-            customTabs.intent.data = authUri
-            activity.startActivity(customTabs.intent)
+            val intent = Intent(activity, TelegramOAuthActivity::class.java)
+                .putExtra(TelegramOAuthActivity.EXTRA_AUTH_URL, startUrl)
+            activity.startActivity(intent)
         }
 
         return try {
@@ -94,7 +96,29 @@ class TelegramOAuthCoordinator private constructor() {
         activeCodeVerifier = null
     }
 
-    private fun buildAuthUri(clientId: String, redirectUri: String, challenge: String): Uri {
+    /**
+     * Prefer BFF /authorize (server 302 → Telegram with full query).
+     * Direct oauth.telegram.org from Custom Tabs breaks on Huawei (drops redirect_uri).
+     */
+    private fun buildStartUrl(
+        backendBaseUrl: String,
+        clientId: String,
+        redirectUri: String,
+        challenge: String,
+    ): String {
+        val base = backendBaseUrl.trim().trimEnd('/')
+        if (base.startsWith("http", ignoreCase = true)) {
+            return Uri.parse("$base/v1/public/oauth/telegram/authorize")
+                .buildUpon()
+                .appendQueryParameter("code_challenge", challenge)
+                .appendQueryParameter("code_challenge_method", "S256")
+                .build()
+                .toString()
+        }
+        return buildDirectAuthUri(clientId, redirectUri, challenge).toString()
+    }
+
+    private fun buildDirectAuthUri(clientId: String, redirectUri: String, challenge: String): Uri {
         val enc = StandardCharsets.UTF_8
         fun enc(v: String) = URLEncoder.encode(v, enc.name())
         val url = buildString {

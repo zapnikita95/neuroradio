@@ -17,7 +17,7 @@ import { EDGE_VOICE_PRESETS } from '../services/edge-voices.js';
 import { hasYandexCredentials } from '../services/yandex-tts.js';
 import { getPublicDownloadLinks, getSiteApkUrl } from '../services/github-downloads.js';
 import { getPublicAuthConfig } from '../services/auth-config.js';
-import { oauthNativeBridgeHtml } from '../services/telegram-oidc.js';
+import { oauthNativeBridgeHtml, buildTelegramOAuthAuthorizeTarget } from '../services/telegram-oidc.js';
 import {
   getWebCabinetStatus,
   startWebCabinetCode,
@@ -56,6 +56,23 @@ router.get('/oauth/telegram/callback-bridge', (req: Request, res: Response) => {
   console.info('[telegram-oauth] callback-bridge qs_len=%s', qs.length);
   res.setHeader('Cache-Control', 'no-store');
   res.type('html').send(oauthNativeBridgeHtml(qs));
+});
+
+/**
+ * Android/Huawei: app opens this URL (short, our domain); server 302 → oauth.telegram.org with all params.
+ * Custom Tabs on some OEMs strip query params on direct oauth.telegram.org links.
+ */
+router.get('/oauth/telegram/authorize', (req: Request, res: Response) => {
+  const codeChallenge = String(req.query.code_challenge ?? '').trim();
+  const method = String(req.query.code_challenge_method ?? 'S256').trim() || 'S256';
+  const target = buildTelegramOAuthAuthorizeTarget(codeChallenge, method);
+  if (!target) {
+    res.status(400).type('text/plain').send('Invalid code_challenge or OAuth not configured');
+    return;
+  }
+  console.info('[telegram-oauth] authorize redirect challenge_len=%s', codeChallenge.length);
+  res.setHeader('Cache-Control', 'no-store');
+  res.redirect(302, target);
 });
 
 /** TTS options for free tier (Edge TTS vs paid SpeechKit). */

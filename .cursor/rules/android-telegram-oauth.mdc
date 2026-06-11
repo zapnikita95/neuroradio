@@ -1,0 +1,43 @@
+---
+description: Telegram OAuth на Android — WebView + BFF /authorize, не Custom Tabs на oauth.telegram.org
+globs: android/**/TelegramOAuth*.kt,backend/**/telegram-oidc.ts,backend/**/public.ts
+alwaysApply: false
+---
+
+# Telegram OAuth (Android)
+
+## Симптом
+
+`oauth.telegram.org` показывает **`redirect_uri required`** — запрос пришёл **без query-параметров**.
+
+## Причина
+
+**Custom Tabs** (Huawei, часть OEM) при открытии `https://oauth.telegram.org/auth?...` **обрезают query string** → Telegram видит голый `/auth`.
+
+## Правильная схема
+
+1. App генерирует PKCE (`code_verifier` / `code_challenge`) локально.
+2. App открывает **WebView** (`TelegramOAuthActivity`), URL:
+   `{BFF}/v1/public/oauth/telegram/authorize?code_challenge=...&code_challenge_method=S256`
+3. BFF отвечает **302** на полный `https://oauth.telegram.org/auth?client_id&redirect_uri&...`
+4. Пользователь логинится → redirect на `https://www.efir-ai.ru/v1/public/oauth/telegram/callback-bridge?code=...`
+5. Bridge HTML → `efirai://oauth/telegram?code=...` → `MainActivity` / WebView intercept → `linkTelegramOAuth`
+
+## Запрещено
+
+- Custom Tabs / `launchUrl` напрямую на `oauth.telegram.org` как единственный путь.
+- Требовать `telegramOAuthRedirectUri` с сервера для старта OAuth (есть `DEFAULT_REDIRECT_URI`).
+- Ломать deep link `efirai://oauth/telegram` в манифесте.
+
+## BotFather
+
+Redirect URL: `https://www.efir-ai.ru/v1/public/oauth/telegram/callback-bridge`
+
+## Проверка
+
+```bash
+curl -sI "https://www.efir-ai.ru/v1/public/oauth/telegram/authorize?code_challenge=REPLACEME43charsPKCEchallenge1234567890abc"
+# Location: https://oauth.telegram.org/auth?client_id=...&redirect_uri=...
+```
+
+На телефоне в logcat: `Telegram OAuth WebView load:` → не должно быть голого `oauth.telegram.org/auth` без `?`.
