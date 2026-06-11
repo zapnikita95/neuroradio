@@ -158,6 +158,14 @@ interface StoryFullBody {
   skip_server_tts?: boolean;
   edge_voice_preset?: string;
   speak_track_names_in_voiceover?: boolean;
+  /** ios — AVPlayer не играет OGG; отдаём WAV с Yandex TTS. */
+  client_platform?: 'ios' | 'android' | string;
+}
+
+function storyAudioExtensionForClient(body: StoryFullBody): 'ogg' | 'wav' {
+  const platform = typeof body.client_platform === 'string' ? body.client_platform.trim().toLowerCase() : '';
+  if (platform === 'ios') return 'wav';
+  return yandexAudioExtension();
 }
 
 router.get('/quota', (req: Request, res: Response) => {
@@ -1500,13 +1508,15 @@ router.post('/full', extractClientSecrets, validateStoryFullBody, storyFullRateL
       console.log(
         `[tts] queue install=${installId.slice(0, 8)} voice=${voiceId} style=${delivery.styleId} speed=${delivery.speed} emotion=${delivery.emotion} tier=${effectiveVoiceTier} userTier=${userTier} provider=${effectiveTtsProvider} userBilling=${hasUserTtsCredentials(userTtsCredentials) ? userTtsCredentials?.provider : 'server'} words=${story.word_count}`,
       );
+      const iosPlayback = storyAudioExtensionForClient(body) === 'wav';
       const audio = await synthesizeStoryAudio({
         installId,
         voiceTier: effectiveVoiceTier,
         ttsProvider: effectiveTtsProvider,
         script: story.script,
         voiceId,
-        fileName: `${id}.${yandexAudioExtension()}`,
+        fileName: `${id}.${storyAudioExtensionForClient(body)}`,
+        preferIosPlayback: iosPlayback,
         speed: delivery.speed,
         emotion: delivery.emotion,
         pauseProfile: delivery.pauseProfile,

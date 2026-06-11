@@ -14,6 +14,7 @@ final class AppContainer: ObservableObject {
     }
 
     func bootstrap() {
+        settings.migratePlaybackCacheIfNeeded()
         NotificationService.shared.configure()
         NotificationService.shared.onTellStoryAction = { [weak self] artist, title in
             Task { @MainActor in

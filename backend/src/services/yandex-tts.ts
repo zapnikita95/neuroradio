@@ -203,6 +203,7 @@ export async function synthesizeSpeech(
     websitePreview?: boolean;
     logContext?: YandexTtsLogContext;
     credentials?: { apiKey: string; folderId: string };
+    audioFormat?: YandexAudioFormat;
   } = {},
 ): Promise<SynthesisResult> {
   const apiKey = options.credentials?.apiKey ?? process.env.YANDEX_API_KEY;
@@ -237,7 +238,7 @@ export async function synthesizeSpeech(
   const ttsTranscript = stripYandexMarkup(markedText);
 
   const primaryVoice = coerceVoiceForSpeechKit(voiceId);
-  const audioFormat = resolveYandexAudioFormat();
+  const audioFormat = options.audioFormat ?? resolveYandexAudioFormat();
   const audioExt = yandexAudioExtension(audioFormat);
   const attempts = buildTtsAttempts(primaryVoice, ttsOptions);
 

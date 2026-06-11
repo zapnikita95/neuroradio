@@ -17,8 +17,15 @@ final class OfflineAudioStore {
         session = URLSession(configuration: config)
     }
 
-    func localFile(for trackKey: String) -> URL {
-        directory.appendingPathComponent("\(hashTrackKey(trackKey)).ogg")
+    func localFile(for trackKey: String, ext: String = "wav") -> URL {
+        directory.appendingPathComponent("\(hashTrackKey(trackKey)).\(ext)")
+    }
+
+    func wipeAll() {
+        guard let files = try? FileManager.default.contentsOfDirectory(at: directory, includingPropertiesForKeys: nil) else { return }
+        for url in files {
+            try? FileManager.default.removeItem(at: url)
+        }
     }
 
     func hasLocalFile(at path: String?) -> Bool {
@@ -34,7 +41,9 @@ final class OfflineAudioStore {
     }
 
     func download(from url: URL, trackKey: String) async -> String? {
-        let target = localFile(for: trackKey)
+        let ext = url.pathExtension.lowercased()
+        let safeExt = (ext == "wav" || ext == "ogg") ? ext : "wav"
+        let target = localFile(for: trackKey, ext: safeExt)
         let temp = target.deletingLastPathComponent().appendingPathComponent("\(target.lastPathComponent).part")
         for attempt in 0..<3 {
             if attempt > 0 {
@@ -66,7 +75,7 @@ final class OfflineAudioStore {
         ) else { return }
         var entries: [(url: URL, size: Int64, date: Date)] = []
         var total: Int64 = 0
-        for url in files where url.pathExtension == "ogg" {
+        for url in files where url.pathExtension == "ogg" || url.pathExtension == "wav" {
             let values = try? url.resourceValues(forKeys: [.fileSizeKey, .contentModificationDateKey])
             let size = Int64(values?.fileSize ?? 0)
             let date = values?.contentModificationDate ?? .distantPast

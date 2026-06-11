@@ -17,13 +17,16 @@ final class StoryPlayer: NSObject, ObservableObject {
 
     private var player: AVPlayer?
     private var playerObserver: NSKeyValueObservation?
+    private var itemStatusObserver: NSKeyValueObservation?
     private var endObserver: NSObjectProtocol?
+    private var failObserver: NSObjectProtocol?
     private let synthesizer = AVSpeechSynthesizer()
     private var resumeMusicOnFinish = true
     private var onFinished: (() -> Void)?
     private var onError: (() -> Void)?
     private var onPlaybackStarted: (() -> Void)?
     private var playbackStartedNotified = false
+    private var fallbackTask: Task<Void, Never>?
 
     override init() {
         super.init()
@@ -50,7 +53,7 @@ final class StoryPlayer: NSObject, ObservableObject {
         try? AVAudioSession.sharedInstance().setCategory(.playback, mode: .spokenAudio, options: [.duckOthers])
         try? AVAudioSession.sharedInstance().setActive(true)
 
-        if let audioURL {
+        if let audioURL, Self.canPlayWithAVPlayer(url: audioURL) {
             playRemoteAudio(url: audioURL, fallbackScript: response.script, speechRate: speechRate)
         } else {
             playWithTTS(response.script, speechRate: speechRate)
@@ -61,6 +64,11 @@ final class StoryPlayer: NSObject, ObservableObject {
 
     func stop() {
         stopInternal(clearCallbacks: true)
+    }
+
+    private static func canPlayWithAVPlayer(url: URL) -> Bool {
+        let ext = url.pathExtension.lowercased()
+        return ext != "ogg" && ext != "opus"
     }
 
     private func playRemoteAudio(url: URL, fallbackScript: String, speechRate: Float) {
@@ -86,6 +94,15 @@ final class StoryPlayer: NSObject, ObservableObject {
             }
         }
 
+        itemStatusObserver = item.observe(\.status, options: [.new]) { [weak self] item, _ in
+            Task { @MainActor in
+                guard let self else { return }
+                if item.status == .failed {
+                    self.fallbackToTTS(fallbackScript, speechRate: speechRate)
+                }
+            }
+        }
+
         endObserver = NotificationCenter.default.addObserver(
             forName: .AVPlayerItemDidPlayToEndTime,
             object: item,
@@ -96,16 +113,32 @@ final class StoryPlayer: NSObject, ObservableObject {
             }
         }
 
-        avPlayer.play()
-
-        Task {
-            try? await Task.sleep(nanoseconds: 15_000_000_000)
-            await MainActor.run {
-                guard self.state == .preparing || (self.state == .playing && !self.playbackStartedNotified) else { return }
-                self.cleanupPlayer()
-                self.playWithTTS(fallbackScript, speechRate: speechRate)
+        failObserver = NotificationCenter.default.addObserver(
+            forName: .AVPlayerItemFailedToPlayToEndTime,
+            object: item,
+            queue: .main
+        ) { [weak self] _ in
+            Task { @MainActor in
+                self?.fallbackToTTS(fallbackScript, speechRate: speechRate)
             }
         }
+
+        avPlayer.play()
+
+        fallbackTask = Task {
+            try? await Task.sleep(nanoseconds: 6_000_000_000)
+            await MainActor.run {
+                guard self.state == .preparing || (self.state == .playing && !self.playbackStartedNotified) else { return }
+                self.fallbackToTTS(fallbackScript, speechRate: speechRate)
+            }
+        }
+    }
+
+    private func fallbackToTTS(_ script: String, speechRate: Float) {
+        fallbackTask?.cancel()
+        fallbackTask = nil
+        cleanupPlayer()
+        playWithTTS(script, speechRate: speechRate)
     }
 
     private func playWithTTS(_ script: String, speechRate: Float) {
@@ -118,6 +151,8 @@ final class StoryPlayer: NSObject, ObservableObject {
     }
 
     private func finishPlayback() {
+        fallbackTask?.cancel()
+        fallbackTask = nil
         cleanupPlayer()
         state = .completed
         onFinished?()
@@ -125,6 +160,8 @@ final class StoryPlayer: NSObject, ObservableObject {
     }
 
     private func failPlayback() {
+        fallbackTask?.cancel()
+        fallbackTask = nil
         cleanupPlayer()
         synthesizer.stopSpeaking(at: .immediate)
         state = .error
@@ -135,11 +172,15 @@ final class StoryPlayer: NSObject, ObservableObject {
     private func notifyPlaybackStarted() {
         guard !playbackStartedNotified else { return }
         playbackStartedNotified = true
+        fallbackTask?.cancel()
+        fallbackTask = nil
         onPlaybackStarted?()
         onPlaybackStarted = nil
     }
 
     private func stopInternal(clearCallbacks: Bool) {
+        fallbackTask?.cancel()
+        fallbackTask = nil
         cleanupPlayer()
         synthesizer.stopSpeaking(at: .immediate)
         state = .idle
@@ -152,8 +193,12 @@ final class StoryPlayer: NSObject, ObservableObject {
         player?.pause()
         playerObserver?.invalidate()
         playerObserver = nil
+        itemStatusObserver?.invalidate()
+        itemStatusObserver = nil
         if let endObserver { NotificationCenter.default.removeObserver(endObserver) }
         endObserver = nil
+        if let failObserver { NotificationCenter.default.removeObserver(failObserver) }
+        failObserver = nil
         player = nil
     }
 

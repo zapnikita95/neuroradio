@@ -47,7 +47,11 @@ final class SettingsStore: ObservableObject {
         static let offlinePackSessionId = "offline_pack_session_id"
         static let factNotificationsEnabled = "fact_notifications_enabled"
         static let shazamAutoDetectEnabled = "shazam_auto_detect_enabled"
+        static let playbackCachePurgeVersion = "playback_cache_purge_version"
     }
+
+    /// Сброс битого OGG-кэша при обновлении (AVPlayer на iOS не играет OGG).
+    private static let playbackCachePurgeTarget = 105
 
     private let defaults = UserDefaults.standard
 
@@ -200,6 +204,14 @@ final class SettingsStore: ObservableObject {
         factNotificationsEnabled = defaults.object(forKey: Keys.factNotificationsEnabled) as? Bool ?? true
         shazamAutoDetectEnabled = defaults.object(forKey: Keys.shazamAutoDetectEnabled) as? Bool ?? true
         accountProfile = loadAccountProfile()
+    }
+
+    func migratePlaybackCacheIfNeeded() {
+        let marker = defaults.integer(forKey: Keys.playbackCachePurgeVersion)
+        guard marker < Self.playbackCachePurgeTarget else { return }
+        OfflineAudioStore.shared.wipeAll()
+        offlineAudioCacheEnabled = false
+        defaults.set(Self.playbackCachePurgeTarget, forKey: Keys.playbackCachePurgeVersion)
     }
 
     /// Сброс онбординга при крупном обновлении потока входа (v3: Shazam / плееры iOS).

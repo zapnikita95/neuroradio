@@ -59,6 +59,8 @@ export interface TtsRouteRequest {
   speakTrackNamesInVoiceover?: boolean;
   storyLanguage?: StoryLanguageId;
   elevenLabsVoice?: string;
+  /** iOS AVPlayer — WAV only; Salute OGG заменяем на Yandex WAV. */
+  preferIosPlayback?: boolean;
 }
 
 export interface TtsRouteResult extends SynthesisResult {
@@ -189,8 +191,13 @@ function ttsMarkupFlags(request: TtsRouteRequest): { speakTrackNamesInVoiceover:
 }
 
 export async function synthesizeStoryAudio(request: TtsRouteRequest): Promise<TtsRouteResult> {
-  const provider = resolveEffectiveTtsProvider(request);
+  let provider = resolveEffectiveTtsProvider(request);
+  if (request.preferIosPlayback && provider === 'sber') {
+    console.warn('[tts-router] ios playback — Salute OGG skipped, using Yandex WAV');
+    provider = 'yandex';
+  }
   const script = scriptForProvider(request, provider);
+  const yandexAudioFormat = request.preferIosPlayback ? ('lpcm-wav' as const) : undefined;
   const edgePreset = resolveEdgeVoicePresetId(
     typeof request.edgeVoicePreset === 'string' ? request.edgeVoicePreset : undefined,
   );
@@ -246,6 +253,7 @@ export async function synthesizeStoryAudio(request: TtsRouteRequest): Promise<Tt
       pauseProfile: request.pauseProfile,
       logContext: request.logContext,
       credentials: request.userTtsCredentials?.yandex,
+      audioFormat: yandexAudioFormat,
       ...ttsMarkupFlags(request),
     });
   }
