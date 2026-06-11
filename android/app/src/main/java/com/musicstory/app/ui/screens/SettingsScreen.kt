@@ -77,6 +77,7 @@ import com.musicstory.app.util.StoryLog
 import com.musicstory.app.util.ApiKeySanitizer
 import com.musicstory.app.util.BackendUrlRules
 import com.musicstory.app.R
+import com.musicstory.app.data.local.CachedAccountProfile
 import com.musicstory.app.data.local.SettingsDataStore
 import com.musicstory.app.data.remote.ConnectionCheckResult
 import com.musicstory.app.data.remote.BillingEntitlementResponse
@@ -338,6 +339,9 @@ fun SettingsScreen(
     var devTierFeedback by remember { mutableStateOf<String?>(null) }
     var devTierSwitchEnabled by remember { mutableStateOf(false) }
     var billingEntitlement by remember { mutableStateOf<BillingEntitlementResponse?>(null) }
+    var billingStatusTier by remember { mutableStateOf<String?>(null) }
+    var billingPremium by remember { mutableStateOf<Boolean?>(null) }
+    var cachedAccountProfile by remember { mutableStateOf<CachedAccountProfile?>(null) }
     var languageSwitchToEn by remember { mutableStateOf<LanguageSwitchPolicyResponse?>(null) }
     var showLanguageUpgradeDialog by remember { mutableStateOf(false) }
     var languageUpgradeHint by remember { mutableStateOf<String?>(null) }
@@ -366,8 +370,20 @@ fun SettingsScreen(
         LlmProvider.OPENROUTER -> openRouterInput
         LlmProvider.LOCAL -> localUrlInput
     }
-    val effectiveTier = devTierLabel ?: dailyQuota?.tier
-    val trialUntil = billingEntitlement?.trialUntil
+    val resolvedTier = TierAccess.resolveEffectiveTier(
+        dailyQuotaTier = dailyQuota?.tier,
+        plan = billingEntitlement?.plan ?: cachedAccountProfile?.plan,
+        trialUntil = billingEntitlement?.trialUntil ?: cachedAccountProfile?.trialUntil,
+        premiumUntil = billingEntitlement?.premiumUntil ?: cachedAccountProfile?.premiumUntil,
+    )
+    val effectiveTier = when {
+        !devTierLabel.isNullOrBlank() -> devTierLabel
+        TierAccess.isPremiumLike(resolvedTier) -> resolvedTier
+        billingPremium == true -> "premium"
+        TierAccess.isPremiumLike(billingStatusTier) -> billingStatusTier
+        else -> resolvedTier ?: dailyQuota?.tier
+    }
+    val trialUntil = billingEntitlement?.trialUntil ?: cachedAccountProfile?.trialUntil
     var trialTick by remember { mutableIntStateOf(0) }
     LaunchedEffect(trialUntil) {
         if (trialUntil == null || trialUntil <= System.currentTimeMillis()) return@LaunchedEffect
@@ -531,20 +547,27 @@ fun SettingsScreen(
         checkResult = null
     }
 
+    LaunchedEffect(Unit) {
+        cachedAccountProfile = app.settingsDataStore.readCachedAccountProfile()
+    }
+
     LaunchedEffect(backendUrl) {
         val url = backendUrl.trim().trimEnd('/')
         if (url.isBlank()) return@LaunchedEffect
+        cachedAccountProfile = app.settingsDataStore.readCachedAccountProfile()
         app.storyRepository.refreshQuota()
         runCatching {
             val resolvedLang = resolveAppLanguage(appLanguageUi).toApiCode()
             val status = app.apiClient.fetchBillingStatus(url, resolvedLang)
             billingEntitlement = status.entitlement
+            billingStatusTier = status.tier
+            billingPremium = status.premium
             languageSwitchToEn = status.languageSwitch?.toEn
-            devTierSwitchEnabled = status.devTierSwitchEnabled == true
+            devTierSwitchEnabled = status.devTierSwitchEnabled == true || BuildConfig.DEBUG
             if (devTierSwitchEnabled) {
                 devTierLabel = status.devTierOverride ?: status.tier
             } else {
-                devTierLabel = status.tier
+                devTierLabel = null
             }
         }
     }

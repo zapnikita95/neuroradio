@@ -1,4 +1,5 @@
 import { getAccountProfile } from './account-store.js';
+import { isDevTierSwitchEnabled } from './dev-tier-store.js';
 
 const DEFAULT_ADMIN_EMAILS = ['zap.nikita95@gmail.com'];
 
@@ -17,7 +18,8 @@ export function isAdminInstall(installId: string): boolean {
   return adminEmailSet().has(email);
 }
 
-/** Dev tier switch in app settings — only for admin accounts. */
+/** Dev tier switch in app settings — admin accounts or ALLOW_DEV_TIER_SWITCH=true on server. */
 export function canUseDevTierSwitch(installId: string): boolean {
+  if (isDevTierSwitchEnabled()) return true;
   return isAdminInstall(installId);
 }
