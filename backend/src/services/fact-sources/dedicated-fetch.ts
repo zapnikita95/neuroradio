@@ -1,3 +1,14 @@
+import type { FactScope, ReferenceFactBundle } from '../fact-picker.js';
+import {
+  factAppliesToRequest,
+  factMentionsArtist,
+  factMentionsOtherTrackTitle,
+  factMentionsTitle,
+  factNamesForeignEntity,
+  hasTrackContextSignal,
+} from '../fact-relevance.js';
+import { interestScore } from '../reference-fact-quality.js';
+import { isTruncatedMarketingSnippet } from '../web-snippet-accept.js';
 import type { HarvestContext, HarvestedFact, HarvestSource } from './types.js';
 import { fetchGeniusFacts } from './genius-facts.js';
 import { fetchSongfactsFacts } from './songfacts-facts.js';
@@ -62,6 +73,59 @@ export async function fetchDedicatedSourceFacts(ctx: HarvestContext): Promise<Ha
   }
 
   return dedupeFacts(collected);
+}
+
+function normalizeKey(fact: string): string {
+  return fact.toLowerCase().replace(/\s+/g, ' ').trim().slice(0, 200);
+}
+
+/** Parser-trusted relevance — не режем Genius/Last.fm через isBoringFact. */
+function dedicatedFactRelevant(
+  fact: string,
+  scope: FactScope,
+  artist: string,
+  title: string,
+): boolean {
+  const trimmed = fact.trim();
+  if (trimmed.length < 35 || isTruncatedMarketingSnippet(trimmed)) return false;
+  if (/multiple artists tracked as/i.test(trimmed)) return false;
+  if (factNamesForeignEntity(trimmed, artist, title, artist, 'indie')) return false;
+
+  const trackScope: 'track' | 'artist' = scope === 'artist' ? 'artist' : 'track';
+  if (factAppliesToRequest(trimmed, artist, title, trackScope, 'indie')) return true;
+  if (trackScope === 'track') {
+    if (factMentionsTitle(trimmed, title)) return true;
+    if (hasTrackContextSignal(trimmed) && !factMentionsOtherTrackTitle(trimmed, title)) return true;
+  }
+  if (trackScope === 'artist' && factMentionsArtist(trimmed, artist)) return true;
+  return false;
+}
+
+/** Dedicated parsers → bundle без strict/boring-фильтра wiki/web. */
+export function dedicatedHarvestToBundle(
+  harvest: HarvestedFact[],
+  artist: string,
+  title: string,
+): ReferenceFactBundle {
+  const trackFacts: string[] = [];
+  const artistFacts: string[] = [];
+  const seen = new Set<string>();
+
+  const sorted = [...harvest].sort((a, b) => interestScore(b.fact) - interestScore(a.fact));
+
+  for (const item of sorted) {
+    const key = normalizeKey(item.fact);
+    if (seen.has(key)) continue;
+    if (!dedicatedFactRelevant(item.fact, item.scope, artist, title)) continue;
+    seen.add(key);
+    if (item.scope === 'artist') {
+      if (artistFacts.length < 5) artistFacts.push(item.fact);
+    } else if (trackFacts.length < 8) {
+      trackFacts.push(item.fact);
+    }
+  }
+
+  return { trackFacts, artistFacts };
 }
 
 export function dedicatedFactsBySource(facts: HarvestedFact[]): Record<string, number> {

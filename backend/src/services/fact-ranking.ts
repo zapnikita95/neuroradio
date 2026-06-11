@@ -1,7 +1,6 @@
 import { factAppliesToRequest, factMentionsOtherTrackTitle, factMentionsTitle, isAlbumScopeFact } from './fact-relevance.js';
 import type { ReferenceFactBundle } from './fact-picker.js';
 import {
-  filterAndRankFacts,
   interestScore,
   isBoringFact,
   isCollectorFact,
@@ -42,20 +41,24 @@ function splitPoolsWithMode(
   const album: string[] = [];
   const artistFacts: string[] = [];
 
-  for (const fact of filterAndRankFacts(bundle.trackFacts, 20)) {
-    if (!factAppliesToRequest(fact, artist, title, 'track', mode)) continue;
-    if (factMentionsOtherTrackTitle(fact, title)) continue;
-    if (isAlbumScopeFact(fact, title)) album.push(fact);
-    else track.push(fact);
+  for (const fact of bundle.trackFacts) {
+    const trimmed = fact.trim();
+    if (trimmed.length < 35) continue;
+    if (!factAppliesToRequest(trimmed, artist, title, 'track', mode)) continue;
+    if (factMentionsOtherTrackTitle(trimmed, title)) continue;
+    if (isAlbumScopeFact(trimmed, title)) album.push(trimmed);
+    else track.push(trimmed);
   }
 
-  for (const fact of filterAndRankFacts(bundle.artistFacts, 20)) {
-    if (!factAppliesToRequest(fact, artist, title, 'artist', mode)) continue;
-    if (factMentionsOtherTrackTitle(fact, title)) continue;
-    if (!factMentionsTitle(fact, title) && /\b(?:did not chart|withheld from release|banned by several radio)\b/i.test(fact)) {
+  for (const fact of bundle.artistFacts) {
+    const trimmed = fact.trim();
+    if (trimmed.length < 35) continue;
+    if (!factAppliesToRequest(trimmed, artist, title, 'artist', mode)) continue;
+    if (factMentionsOtherTrackTitle(trimmed, title)) continue;
+    if (!factMentionsTitle(trimmed, title) && /\b(?:did not chart|withheld from release|banned by several radio)\b/i.test(trimmed)) {
       continue;
     }
-    artistFacts.push(fact);
+    artistFacts.push(trimmed);
   }
 
   return { track, album, artist: artistFacts };

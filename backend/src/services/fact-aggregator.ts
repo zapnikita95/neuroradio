@@ -31,6 +31,7 @@ import { acceptSearchGroundedSnippet, acceptIndieEmergingSnippet, hasActionableS
 import { lookupCuratedFact } from './curated-facts.js';
 import {
   dedicatedFactsBySource,
+  dedicatedHarvestToBundle,
   fetchDedicatedSourceFacts,
 } from './fact-sources/dedicated-fetch.js';
 import type { HarvestSource } from './fact-sources/types.js';
@@ -147,6 +148,22 @@ function salvageWebSearchSnippets(
 
 function mergeFacts(...pools: string[][]): string[] {
   return filterAndRankFacts(pools.flat(), 8);
+}
+
+/** Dedicated parsers — не прогонять через isBoringFact повторно. */
+function mergeDedicatedFacts(base: string[], dedicated: string[], max = 10): string[] {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const fact of [...dedicated, ...base]) {
+    const trimmed = fact.trim();
+    if (trimmed.length < 35) continue;
+    const key = normalize(trimmed);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(trimmed);
+    if (out.length >= max) break;
+  }
+  return out;
 }
 
 /** Wikipedia REST lead — grounding anchor; must not be dropped by lineup «boring» heuristics. */
@@ -712,7 +729,6 @@ export async function fetchAggregatedFactContext(
     externalSplit.track,
     wdSplit.track,
     mbTrack,
-    filterAndRankFacts(dedicatedTrack, 6),
   );
   const artistCandidates = mergeFactsWithWikiLead(
     wikiLeadBundle.artistFacts,
@@ -721,7 +737,6 @@ export async function fetchAggregatedFactContext(
     webRanked,
     wdSplit.artist,
     mbArtist,
-    filterAndRankFacts(dedicatedArtist, 4),
   );
 
   const finalized = finalizeFactBundle(trackCandidates, artistCandidates, artist, title);
@@ -756,6 +771,17 @@ export async function fetchAggregatedFactContext(
   webAllUnfiltered = identityMerged.webSnippets;
   artistFacts = identityMerged.artistFacts;
   trackFacts = identityMerged.trackFacts;
+
+  const dedicatedBundle = dedicatedHarvestToBundle(dedicatedHarvest, artist, title);
+  if (dedicatedBundle.trackFacts.length + dedicatedBundle.artistFacts.length > 0) {
+    trackFacts = mergeDedicatedFacts(trackFacts, dedicatedBundle.trackFacts, 8);
+    artistFacts = mergeDedicatedFacts(artistFacts, dedicatedBundle.artistFacts, 6);
+    console.log(
+      `[facts] dedicated bundle merged "${artist}" — "${title}": ` +
+        `track=${dedicatedBundle.trackFacts.length} artist=${dedicatedBundle.artistFacts.length} ` +
+        `(total track=${trackFacts.length} artist=${artistFacts.length})`,
+    );
+  }
 
   if (trackFacts.length + artistFacts.length === 0) {
     console.warn(
