@@ -69,6 +69,11 @@ data class StoryFeedbackRequest(
     val reasons: List<String>? = null,
     val script: String? = null,
     val historyId: String? = null,
+    val story_narrator: String? = null,
+    val seed_fact: String? = null,
+    val genre: String? = null,
+    val year: Int? = null,
+    val lang: String? = null,
 )
 
 data class PaymentCreateRequest(

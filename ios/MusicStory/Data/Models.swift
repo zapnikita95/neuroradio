@@ -183,4 +183,37 @@ struct StoryFeedbackRequest: Encodable, Sendable {
     let reasons: [String]
     let script: String?
     let historyId: String?
+    let story_narrator: String?
+    let seed_fact: String?
+    let genre: String?
+    let year: Int?
+    let lang: String?
+
+    init(
+        artist: String,
+        title: String,
+        vote: String,
+        reason: String,
+        reasons: [String],
+        script: String?,
+        historyId: String?,
+        story_narrator: String? = nil,
+        seed_fact: String? = nil,
+        genre: String? = nil,
+        year: Int? = nil,
+        lang: String? = nil
+    ) {
+        self.artist = artist
+        self.title = title
+        self.vote = vote
+        self.reason = reason
+        self.reasons = reasons
+        self.script = script
+        self.historyId = historyId
+        self.story_narrator = story_narrator
+        self.seed_fact = seed_fact
+        self.genre = genre
+        self.year = year
+        self.lang = lang
+    }
 }

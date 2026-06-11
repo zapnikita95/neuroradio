@@ -2,6 +2,9 @@ import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { getPool, hasPostgres } from './db.js';
+import { processFeedbackForStyleLearning } from './style-feedback-learn.js';
+import type { StoryLanguageId } from './story-language.js';
+import { resolveStoryNarrator } from './story-narrator.js';
 
 export type FeedbackVote = 'like' | 'dislike';
 
@@ -24,7 +27,26 @@ export interface StoryFeedbackEntry {
   vote: FeedbackVote;
   reason: string;
   script?: string;
+  storyNarrator?: string;
+  seedFact?: string;
+  genre?: string;
+  year?: number;
+  lang?: string;
   at: number;
+}
+
+export interface StoryFeedbackRecordInput {
+  installId: string;
+  artist: string;
+  title: string;
+  vote: FeedbackVote;
+  reason: string;
+  script?: string;
+  storyNarrator?: string;
+  seedFact?: string;
+  genre?: string;
+  year?: number;
+  lang?: string;
 }
 
 const DATA_DIR = process.env.ACCOUNT_DATA_DIR?.trim() || path.join(process.cwd(), 'data');
@@ -35,7 +57,7 @@ export function isValidFeedbackReason(vote: FeedbackVote, reason: string): boole
   return (DISLIKE_REASONS as readonly string[]).includes(reason);
 }
 
-export function recordStoryFeedback(entry: Omit<StoryFeedbackEntry, 'id' | 'at'>): StoryFeedbackEntry {
+export function recordStoryFeedback(entry: StoryFeedbackRecordInput): StoryFeedbackEntry {
   const record: StoryFeedbackEntry = {
     id: crypto.randomUUID(),
     at: Date.now(),
@@ -70,5 +92,18 @@ export function recordStoryFeedback(entry: Omit<StoryFeedbackEntry, 'id' | 'at'>
     `[feedback] ${record.vote} reason=${record.reason} install=${record.installId.slice(0, 8)} ` +
       `"${record.artist}" — "${record.title}"`,
   );
+
+  try {
+    processFeedbackForStyleLearning(record, {
+      storyNarrator: resolveStoryNarrator(record.storyNarrator),
+      seedFact: record.seedFact,
+      genre: record.genre,
+      year: record.year,
+      lang: (record.lang === 'en' ? 'en' : 'ru') as StoryLanguageId,
+    });
+  } catch (err) {
+    console.warn('[style-learn] feedback hook failed:', err instanceof Error ? err.message : err);
+  }
+
   return record;
 }

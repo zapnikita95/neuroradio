@@ -1621,6 +1621,20 @@ router.post('/feedback', (req: Request, res: Response) => {
   const title = typeof req.body?.title === 'string' ? req.body.title.trim() : '';
   const voteRaw = typeof req.body?.vote === 'string' ? req.body.vote.trim().toLowerCase() : '';
   const script = typeof req.body?.script === 'string' ? req.body.script.trim() : undefined;
+  const storyNarratorRaw =
+    typeof req.body?.story_narrator === 'string' ? req.body.story_narrator.trim() : undefined;
+  const seedFact =
+    typeof req.body?.seed_fact === 'string' ? req.body.seed_fact.trim() : undefined;
+  const genre = typeof req.body?.genre === 'string' ? req.body.genre.trim() : undefined;
+  const yearRaw = req.body?.year;
+  const year =
+    typeof yearRaw === 'number' && Number.isFinite(yearRaw)
+      ? yearRaw
+      : typeof yearRaw === 'string' && yearRaw.trim()
+        ? parseInt(yearRaw, 10)
+        : undefined;
+  const langRaw = typeof req.body?.lang === 'string' ? req.body.lang.trim().toLowerCase() : undefined;
+  const lang = langRaw === 'en' || langRaw === 'ru' ? langRaw : undefined;
 
   if (!artist || !title) {
     res.status(400).json({ error: 'artist and title required' });
@@ -1651,7 +1665,19 @@ router.post('/feedback', (req: Request, res: Response) => {
   }
 
   const ids = uniqueReasons.map((reason) =>
-    recordStoryFeedback({ installId, artist, title, vote, reason, script }).id,
+    recordStoryFeedback({
+      installId,
+      artist,
+      title,
+      vote,
+      reason,
+      script,
+      storyNarrator: storyNarratorRaw,
+      seedFact,
+      genre,
+      year: Number.isFinite(year) ? year : undefined,
+      lang,
+    }).id,
   );
   if (historyId) {
     void updateHistoryVoteAsync(installId, historyId, vote).catch((err) =>

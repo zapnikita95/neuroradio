@@ -1,4 +1,5 @@
 import { highImpactBonus } from './story-fact-hunt.js';
+import type { StoryNarratorId } from './story-narrator.js';
 import { isTruncatedMarketingSnippet, isUnspeakableWebSeed, isLyricsPageSeed, isArtistIdentityBioSnippet } from './web-snippet-accept.js';
 
 /** Filters dry encyclopedia lines; ranks human drama, breakthroughs, meaning — not working titles. */
@@ -126,6 +127,61 @@ function normalizeForMatch(text: string): string {
     .trim();
 }
 
+const BACKSTAGE_DRAMA_PATTERNS: RegExp[] = [
+  /\b(?:conflict|scandal|controvers|banned|refused|lawsuit|argued|ultimatum|nearly|disagreed|reject(?:ed|ion)?)\b/i,
+  /(?:скандал|конфликт|запрет|отказ|суд|плагиат|ссор|ультиматум|почти не|отверг)/i,
+];
+
+const EXPERT_MECHANISM_PATTERNS: RegExp[] = [
+  /\b(?:genre|subgenre|produc|arrang|synthes|sample|tempo|harmon|chord|instrument|structure|suite|operatic)\b/i,
+  /(?:жанр|аранж|продакш|синтез|семпл|ритм|гармон|структур|без припева)/i,
+];
+
+const CONTEMPORARY_ERA_PATTERNS: RegExp[] = [
+  /\b(?:iron curtain|eastern bloc|ussr|soviet union|soviet|cold war|mozambique|african musician)\b/i,
+  /(?:ссср|совет|железн|эпох|поколен|прорыв)/i,
+];
+
+/** Score delta when picking seed fact for a fixed narrator (not for `auto`). */
+export function narratorFactBoost(fact: string, narrator: StoryNarratorId = 'auto'): number {
+  if (narrator === 'auto' || narrator === 'radio_host' || narrator === 'night_dj') return 0;
+
+  const trimmed = fact.trim();
+  if (narrator === 'fan') {
+    if (isCollectorFact(trimmed)) return 14;
+    if (/\b(?:chart|streams?|billboard|tiktok|vinyl|edition|co[- ]?writ)\b/i.test(trimmed)) return 8;
+    if (isWeakChartSeed(trimmed)) return 6;
+    return 0;
+  }
+
+  if (narrator === 'expert') {
+    if (EXPERT_MECHANISM_PATTERNS.some((p) => p.test(trimmed))) return 12;
+    if (/\b(?:blues|jazz|hip hop|techno|metal|punk|funk|disco|synth|grunge|drill)\b/i.test(trimmed)) return 8;
+    return 0;
+  }
+
+  if (narrator === 'backstage') {
+    if (BACKSTAGE_DRAMA_PATTERNS.some((p) => p.test(trimmed))) return 16;
+    if (BACKSTORY_FACT_PATTERNS.some((p) => p.test(trimmed)) && BACKSTAGE_DRAMA_PATTERNS.some((p) => p.test(trimmed))) {
+      return 10;
+    }
+    if (isBoringFact(trimmed)) return -18;
+    return -6;
+  }
+
+  if (narrator === 'contemporary') {
+    if (CONTEMPORARY_ERA_PATTERNS.some((p) => p.test(trimmed))) return 10;
+    if (STORY_FACT_PATTERNS.some((p) => p.test(trimmed))) return 5;
+    return 0;
+  }
+
+  return 0;
+}
+
+export function adjustedInterestScore(fact: string, narrator: StoryNarratorId = 'auto'): number {
+  return interestScore(fact) + narratorFactBoost(fact, narrator);
+}
+
 export function interestScore(fact: string): number {
   let score = 0;
   const trimmed = fact.trim();
@@ -174,6 +230,12 @@ export function interestScore(fact: string): number {
   if (/^(?:This image would later be used|Filmed at the New London Theatre)\b/i.test(fact.trim())) score -= 18;
   if (/(?:предложил\w*|borrowed|suggested|названи\w*).{0,80}(?:«|")/i.test(fact)) score += 12;
   if (/(?:origin|originally|meaning|metaphor|hidden|disguised|ironic|paradox|заклинан|смысл|метафор|ирони|парадокс)/i.test(fact)) score += 6;
+  // Genius / narrative parser facts (не chart-trivia).
+  if (/\b(?:widely considered|grunge anthem|ultimate grunge|song'?s success|omnipresence|grew tired of it|removed it from their live)\b/i.test(fact)) {
+    score += 14;
+  }
+  if (/\b(?:deodorant|Hanna was referring|inspired the title|wrote the song in)\b/i.test(fact)) score += 10;
+  if (/(?:написал\w*|сочинил\w*|автором текста).*(?:Цой|цой|«Кино»|Кино)/i.test(fact)) score += 10;
   if (/\b(?:intended to|repudiat\w*|members? of the (?:band|group|four)|their past|dark past)\b/i.test(fact)) score += 8;
   score += highImpactBonus(fact);
   return score;

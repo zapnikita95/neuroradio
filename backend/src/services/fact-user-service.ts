@@ -238,7 +238,7 @@ export async function pickFactForUser(
 
   const previous = await collectPreviousScripts(installId, artist, title);
   const mergedPrevious = [...new Set([...previous, ...recentForTrack])];
-  const picked = pickReferenceFact(bundle, mergedPrevious, storyIndex, artist, title, used);
+  const picked = pickReferenceFact(bundle, mergedPrevious, storyIndex, artist, title, used, _narrator);
   if (picked && factsTooSimilar(picked.fact, recentForTrack)) return null;
   return picked;
 }

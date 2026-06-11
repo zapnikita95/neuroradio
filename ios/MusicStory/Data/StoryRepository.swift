@@ -179,6 +179,8 @@ final class StoryRepository: ObservableObject {
         reasons: [String]
     ) async -> Bool {
         guard !reasons.isEmpty else { return false }
+        let settings = SettingsStore.shared
+        let langCode = Locale.preferredLanguages.first?.lowercased().hasPrefix("en") == true ? "en" : "ru"
         let request = StoryFeedbackRequest(
             artist: feedback.artist,
             title: feedback.title,
@@ -186,7 +188,9 @@ final class StoryRepository: ObservableObject {
             reason: reasons[0],
             reasons: reasons,
             script: feedback.script,
-            historyId: nil
+            historyId: nil,
+            story_narrator: settings.storyNarrator.rawValue,
+            lang: langCode
         )
         do {
             try await backend.submitStoryFeedback(request)

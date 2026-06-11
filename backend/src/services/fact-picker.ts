@@ -2,12 +2,14 @@ import { factFingerprint } from './fact-bank.js';
 import {
   filterAndRankFacts,
   interestScore,
+  adjustedInterestScore,
   isBackstoryFact,
   isBoringFact,
   isCollectorFact,
   isWeakChartSeed,
   MIN_PICK_INTEREST_SCORE,
 } from './reference-fact-quality.js';
+import type { StoryNarratorId } from './story-narrator.js';
 import { interestRating10 } from './fact-interest-log.js';
 import { WEAK_TRIVIA_PATTERNS } from './story-fact-hunt.js';
 import { isMetadataOnlyFallbackFact } from './metadata-facts.js';
@@ -106,8 +108,10 @@ function isRejectedSeed(fact: string, title = ''): boolean {
   return false;
 }
 
-function sortByInterest(facts: string[]): string[] {
-  return [...facts].sort((a, b) => interestScore(b) - interestScore(a));
+function sortByInterest(facts: string[], narrator: StoryNarratorId = 'auto'): string[] {
+  return [...facts].sort(
+    (a, b) => adjustedInterestScore(b, narrator) - adjustedInterestScore(a, narrator),
+  );
 }
 
 function isUsedFact(fact: string, usedFingerprints: Set<string>): boolean {
@@ -120,10 +124,11 @@ function pickBestByInterest(
   usedFingerprints: Set<string>,
   minScore = MIN_PICK_INTEREST_SCORE,
   title = '',
+  narrator: StoryNarratorId = 'auto',
 ): string | null {
-  for (const fact of sortByInterest(facts)) {
+  for (const fact of sortByInterest(facts, narrator)) {
     if (isRejectedSeed(fact, title)) continue;
-    if (interestScore(fact) < minScore) continue;
+    if (adjustedInterestScore(fact, narrator) < minScore) continue;
     if (isUsedFact(fact, usedFingerprints)) continue;
     if (factOverlapsPrevious(fact, previousScripts)) continue;
     return fact;
@@ -131,8 +136,8 @@ function pickBestByInterest(
   return null;
 }
 
-function wrapSelected(fact: string, scope: FactScope): SelectedReferenceFact {
-  const score = interestScore(fact);
+function wrapSelected(fact: string, scope: FactScope, narrator: StoryNarratorId = 'auto'): SelectedReferenceFact {
+  const score = adjustedInterestScore(fact, narrator);
   return {
     fact,
     scope,
@@ -158,6 +163,7 @@ export function pickReferenceFact(
   artist = '',
   title = '',
   usedFingerprints: Set<string> = new Set(),
+  narrator: StoryNarratorId = 'auto',
 ): SelectedReferenceFact | null {
   const pools = splitBundleByScope(bundle, artist, title);
 
@@ -167,9 +173,16 @@ export function pickReferenceFact(
   for (const scope of scopeOrder) {
     const pool = pools[scope];
     if (pool.length === 0) continue;
-    const picked = pickBestByInterest(pool, previousScripts, usedFingerprints, MIN_PICK_INTEREST_SCORE, title);
-    if (picked && interestScore(picked) >= MIN_GOOD_SCOPE_INTEREST) {
-      return wrapSelected(picked, scope);
+    const picked = pickBestByInterest(
+      pool,
+      previousScripts,
+      usedFingerprints,
+      MIN_PICK_INTEREST_SCORE,
+      title,
+      narrator,
+    );
+    if (picked && adjustedInterestScore(picked, narrator) >= MIN_GOOD_SCOPE_INTEREST) {
+      return wrapSelected(picked, scope, narrator);
     }
   }
 
@@ -179,6 +192,7 @@ export function pickReferenceFact(
     usedFingerprints,
     MIN_PICK_INTEREST_SCORE,
     title,
+    narrator,
   );
   if (globalBest) {
     const scope: FactScope = pools.track.includes(globalBest)
@@ -186,16 +200,16 @@ export function pickReferenceFact(
       : pools.album.includes(globalBest)
         ? 'album'
         : 'artist';
-    return wrapSelected(globalBest, scope);
+    return wrapSelected(globalBest, scope, narrator);
   }
 
   const anyPool = [...pools.track, ...pools.album, ...pools.artist];
-  for (const fact of sortByInterest(anyPool)) {
+  for (const fact of sortByInterest(anyPool, narrator)) {
     if (isMetadataOnlyFallbackFact(fact)) continue;
     if (isMisattributedBandTrackFact(fact, title)) continue;
     if (isBoringFact(fact)) continue;
     if (isRejectedSeed(fact, title)) continue;
-    if (interestScore(fact) < 6) continue;
+    if (adjustedInterestScore(fact, narrator) < 6) continue;
     if (isUsedFact(fact, usedFingerprints)) continue;
     if (!factOverlapsPrevious(fact, previousScripts)) {
       const scope: FactScope = pools.track.includes(fact)
@@ -203,7 +217,7 @@ export function pickReferenceFact(
         : pools.album.includes(fact)
           ? 'album'
           : 'artist';
-      return wrapSelected(fact, scope);
+      return wrapSelected(fact, scope, narrator);
     }
   }
 

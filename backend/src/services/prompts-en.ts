@@ -13,6 +13,7 @@ import {
   resolveStoryNarrator,
   StoryNarratorId,
 } from './story-narrator.js';
+import { buildStylePromptBlock } from './style-corpus.js';
 import { eraContextForPrompt, resolveTrackLocale } from './track-locale.js';
 import type { StoryPersona } from './prompts.js';
 
@@ -188,6 +189,17 @@ export function buildEnglishStoryUserPrompt(params: {
     }
   }
   lines.push('Persona = tone and format only. CONTENT comes strictly from the fact seed.');
+  const styleBlock = buildStylePromptBlock({
+    narratorId,
+    lang: 'en',
+    genre: params.genre,
+    year: params.year,
+    seedFact: params.selectedReferenceFact?.fact,
+  });
+  if (styleBlock) {
+    lines.push('');
+    lines.push(styleBlock);
+  }
   lines.push(`STRICT LENGTH: ${length.wordsMin}–${length.wordsMax} words.`);
   lines.push(buildLengthStructurePlanEn(length));
   lines.push('In script — no digits or years except inside artist/title names.');

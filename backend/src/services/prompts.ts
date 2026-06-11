@@ -16,6 +16,7 @@ import {
   resolveStoryNarrator,
   StoryNarratorId,
 } from './story-narrator.js';
+import { buildStylePromptBlock } from './style-corpus.js';
 import { eraContextForPrompt, resolveTrackLocale, type TrackLocale } from './track-locale.js';
 import { resolveArtistGrammarRu } from './artist-grammar.js';
 import { voiceStoryPromptHint } from './voices.js';
@@ -333,6 +334,17 @@ export function buildStoryUserPrompt(params: {
   lines.push(
     'Амплуа = только тон и формат. СОДЕРЖАНИЕ берётся строго из семени факта.',
   );
+  const styleBlock = buildStylePromptBlock({
+    narratorId,
+    lang: params.storyLanguage ?? 'ru',
+    genre: params.genre,
+    year: params.year,
+    seedFact: params.selectedReferenceFact?.fact,
+  });
+  if (styleBlock) {
+    lines.push('');
+    lines.push(styleBlock);
+  }
   lines.push('Запрещено: менять или украшать факт ради стиля амплуа.');
   lines.push(
     'ЗАПРЕЩЕНО выдумывать социальные/политические темы (расизм, дискриминация, «равенство и справедливость») — только если это ЕСТЬ в семени.',

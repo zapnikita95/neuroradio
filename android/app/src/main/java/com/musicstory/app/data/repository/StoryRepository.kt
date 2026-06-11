@@ -196,6 +196,9 @@ class StoryRepository(
             storyHistoryDao.updateServerId(entry.id, serverId)
         }
 
+        val storyNarrator = settingsDataStore.storyNarrator.first()
+        val appLang = settingsDataStore.appLanguage.first()
+
         val ok = apiClient.submitStoryFeedback(
             baseUrl = url,
             artist = entry.artist,
@@ -204,6 +207,8 @@ class StoryRepository(
             reasons = reasons,
             script = entry.script,
             historyId = serverId,
+            storyNarrator = storyNarrator.id,
+            lang = if (appLang == "en") "en" else "ru",
         )
         if (!ok) return false
 
@@ -226,6 +231,8 @@ class StoryRepository(
         }
         val url = settingsDataStore.backendUrl.first().trim()
         if (url.isBlank()) return false
+        val storyNarrator = settingsDataStore.storyNarrator.first()
+        val appLang = settingsDataStore.appLanguage.first()
         val ok = apiClient.submitStoryFeedback(
             baseUrl = url,
             artist = feedback.artist,
@@ -233,6 +240,8 @@ class StoryRepository(
             vote = vote,
             reasons = reasons,
             script = feedback.script,
+            storyNarrator = storyNarrator.id,
+            lang = if (appLang == "en") "en" else "ru",
         )
         if (ok) {
             storyHistoryDao.findLatestByTrackAndScript(feedback.trackKey, feedback.script)

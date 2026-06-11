@@ -82,6 +82,19 @@ MediaNotificationListener
 
 ---
 
+## Style learning (амплуа без fine-tune)
+
+| Слой | Где | Док |
+|------|-----|-----|
+| Fact boost по narrator | `reference-fact-quality.ts`, `fact-picker.ts` | `docs/STYLE_LEARNING.md` |
+| Few-shot / RAG (≥50 gold) | `style-corpus.ts`, `style-rag.ts`, `prompts.ts` | ↑ |
+| Promote из лайков `good_persona` | `style-feedback-learn.ts` | ↑ |
+| Fine-tune LLM (отложен) | — | `docs/LLM_FINETUNE.md` |
+
+Seed: `backend/src/data/style-corpus-seed.jsonl`. Runtime gold: `data/style-corpus/gold.jsonl` на volume.
+
+---
+
 ## Android — ключевые классы
 
 | Класс | Роль |

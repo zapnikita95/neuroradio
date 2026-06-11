@@ -340,6 +340,11 @@ class ApiClient(
         reasons: List<String>,
         script: String?,
         historyId: String? = null,
+        storyNarrator: String? = null,
+        seedFact: String? = null,
+        genre: String? = null,
+        year: Int? = null,
+        lang: String? = null,
     ): Boolean {
         if (reasons.isEmpty()) return false
         val body = StoryFeedbackRequest(
@@ -350,6 +355,11 @@ class ApiClient(
             reasons = reasons,
             script = script,
             historyId = historyId,
+            story_narrator = storyNarrator,
+            seed_fact = seedFact,
+            genre = genre,
+            year = year,
+            lang = lang,
         )
         return try {
             getApi(baseUrl).submitStoryFeedback(body)
