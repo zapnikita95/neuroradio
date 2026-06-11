@@ -9,6 +9,7 @@ Music story/
 ├── android/          # Android-приложение (APK)
 ├── backend/          # Node.js BFF (истории + Yandex TTS)
 └── docs/             # Документация
+    └── IOS_AUDIO_PLAYBACK.md  # ⚠️ iOS: только WAV, не OGG
 ```
 
 ## Требования

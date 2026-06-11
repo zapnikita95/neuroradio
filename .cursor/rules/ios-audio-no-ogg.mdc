@@ -1,0 +1,29 @@
+---
+description: iOS AVPlayer не играет OGG — только WAV с сервера. Не ломать озвучку на iPhone.
+alwaysApply: true
+---
+
+# iOS озвучка: НЕ OGG
+
+**AVPlayer на iOS не воспроизводит OGG/Opus.** Android ExoPlayer — да. Это разные платформы.
+
+## Обязательно
+
+- iOS `POST /v1/story/full` → `client_platform: "ios"`.
+- Бэкенд для iOS → **WAV** (`lpcm-wav`), URL `*.wav`.
+- iOS `StoryPlayer` — не кормить AVPlayer файлами `.ogg`.
+- Офлайн-кэш на iPhone — только `.wav` или выключен; не предпочитать локальный OGG.
+
+## Запрещено
+
+- Единый OGG для всех клиентов «как на Android».
+- `preferLocal` / offline cache с OGG на iOS без проверки формата.
+- Убирать `preferIosPlayback` / `storyAudioExtensionForClient` без замены.
+
+## Перед merge TTS/playback
+
+Прочитать `docs/IOS_AUDIO_PLAYBACK.md`. Проверить: `audioUrl` для ios содержит `.wav`.
+
+## Симптом бага
+
+История есть, звука нет (или робот вместо нейро-голоса) — первым делом формат аудио на iOS.
