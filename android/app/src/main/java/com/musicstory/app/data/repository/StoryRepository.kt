@@ -59,6 +59,7 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withTimeout
 import retrofit2.HttpException
+import java.io.File
 import java.io.IOException
 import java.net.SocketTimeoutException
 import java.util.UUID
@@ -988,14 +989,20 @@ class StoryRepository(
         /** After stream failure — download full file once, then play from disk. */
         forceFullDownload: Boolean = false,
     ): String? {
-        val serverUrl = resolveAudioUrl(audioUrl)
-        if (forceFullDownload && !serverUrl.isNullOrBlank() && serverUrl.startsWith("http", ignoreCase = true)) {
-            offlineAudioStore.downloadEphemeral(serverUrl)?.let { path ->
-                StoryLog.i("Playback retry: playing downloaded file")
+        val serverUrl = resolveAudioUrl(audioUrl) ?: return null
+
+        if (!serverUrl.isNullOrBlank() && serverUrl.startsWith("http", ignoreCase = true)) {
+            offlineAudioStore.downloadEphemeral(serverUrl, forceRefresh = forceFullDownload)?.let { path ->
+                StoryLog.i("Playback: local file ${path.substringAfterLast('/')} (${File(path).length()} bytes)")
                 return offlineAudioStore.localFileUri(path)
             }
-            StoryLog.w("Playback retry: download failed — streaming again")
+            if (forceFullDownload) {
+                StoryLog.e("Playback retry: could not download audio file")
+                return null
+            }
+            StoryLog.w("Playback: download failed — falling back to stream")
         }
+
         if (!preferLocal || serverUrl.isNullOrBlank()) return serverUrl
         if (!canUseOfflineReplay()) return serverUrl
         packPlaybackPath(trackKey)?.let { path ->

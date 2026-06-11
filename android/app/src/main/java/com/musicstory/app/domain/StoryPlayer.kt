@@ -42,7 +42,7 @@ class StoryPlayer(context: Context) {
         .setUserAgent("MusicStory/${com.musicstory.app.BuildConfig.VERSION_NAME} (Android)")
         .setAllowCrossProtocolRedirects(true)
         .setConnectTimeoutMs(30_000)
-        .setReadTimeoutMs(90_000)
+        .setReadTimeoutMs(120_000)
 
     /** HTTP for signed URLs + file/content for premium offline cache. */
     private val dataSourceFactory = DefaultDataSource.Factory(appContext, httpDataSourceFactory)
@@ -168,7 +168,8 @@ class StoryPlayer(context: Context) {
             return
         }
         try {
-            StoryLog.i("Playing server audio: $audioUrl")
+            val isLocalFile = audioUrl.startsWith("file://") || audioUrl.startsWith("content://")
+            StoryLog.i("Playing server audio (${if (isLocalFile) "local" else "stream"}): $audioUrl")
             playWithExoPlayer(audioUrl)
         } catch (e: Exception) {
             StoryLog.e("ExoPlayer init/play failed", e)
