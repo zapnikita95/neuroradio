@@ -1,7 +1,7 @@
 /**
  * Bulk harvest facts into facts-bank.json / facts-bank-seed.json.
  * Checkpoint every 10 tracks (bank + hot-seed + progress).
- * Run: npm run build && node scripts/bulk-seed-fact-bank.mjs [--target=8000] [--concurrency=4] [--resume] [--retry-zero]
+ * Run: node scripts/bulk-seed-fact-bank.mjs [--target=8000] [--concurrency=2] [--resume] [--retry-zero] [--no-proxy]
  */
 import './setup-hidemy-proxy.mjs';
 import '../dist/load-env.js';

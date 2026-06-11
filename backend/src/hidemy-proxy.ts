@@ -1,7 +1,22 @@
 import net from 'node:net';
 
+export function shouldSkipProxy(): boolean {
+  return (
+    process.env.SKIP_PROXY === '1' ||
+    process.env.SKIP_PROXY === 'true' ||
+    process.argv.includes('--no-proxy') ||
+    process.argv.includes('--direct')
+  );
+}
+
 /** hidemy.name VPN exposes XRay HTTP proxy on 127.0.0.1:1301 — Node needs HTTP_PROXY. */
 export async function ensureHidemyProxy(): Promise<void> {
+  if (shouldSkipProxy()) {
+    delete process.env.HTTP_PROXY;
+    delete process.env.HTTPS_PROXY;
+    delete process.env.NODE_USE_ENV_PROXY;
+    return;
+  }
   if (!process.env.NO_PROXY?.trim()) {
     process.env.NO_PROXY = '127.0.0.1,localhost,::1';
   }

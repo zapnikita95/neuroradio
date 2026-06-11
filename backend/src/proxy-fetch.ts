@@ -1,10 +1,17 @@
-import { ensureHidemyProxy } from './hidemy-proxy.js';
+import { ensureHidemyProxy, shouldSkipProxy } from './hidemy-proxy.js';
 
 let proxyInit: Promise<void> | null = null;
 
 function initProxy(): Promise<void> {
+  if (shouldSkipProxy()) {
+    delete process.env.HTTP_PROXY;
+    delete process.env.HTTPS_PROXY;
+    delete process.env.NODE_USE_ENV_PROXY;
+    return Promise.resolve();
+  }
   if (!proxyInit) {
     proxyInit = ensureHidemyProxy().then(() => {
+      if (shouldSkipProxy()) return;
       if (!process.env.NO_PROXY?.trim()) {
         process.env.NO_PROXY = '127.0.0.1,localhost,::1';
       }
