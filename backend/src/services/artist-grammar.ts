@@ -58,8 +58,11 @@ function looksLikeGroupName(artist: string): boolean {
   if (groupNames!.has(n)) return true;
   if (/^the\s/.test(n)) return true;
   if (GROUP_NAME_RE.test(artist)) return true;
+  if (/\bpeople\b/i.test(artist)) return true;
   if (/\s&\s/.test(artist)) return true;
   if (/\band\b/i.test(artist) && artist.split(/\s+/).length >= 3) return true;
+  const words = n.split(/\s+/).filter(Boolean);
+  if (words.length >= 3 && words.includes('the')) return true;
   return false;
 }
 

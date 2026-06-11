@@ -1,5 +1,7 @@
 /** Убираем латинские названия трека/артиста из озвучки — русские замены. Кириллица остаётся. */
 
+import { resolveArtistGrammarRu } from './artist-grammar.js';
+
 function escapeRe(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
@@ -107,21 +109,22 @@ function latinAliasPhrases(phrase: string): string[] {
   return aliases.filter((v, i, arr) => arr.indexOf(v) === i);
 }
 
-const TRACK_SUBSTITUTES = [
-  'эта песня',
-  'этот трек',
-  'эта композиция',
-  'в треке',
-  'у этой песни',
-  'в этой композиции',
-];
+const TRACK_SUBSTITUTES = ['эта песня', 'этот трек', 'у этой песни', 'в треке'];
 
-const ARTIST_SUBSTITUTES = [
-  'исполнитель',
-  'артист',
-  'музыкант',
-  'группа',
-];
+function artistSubstitutesForVoiceover(artist: string): string[] {
+  const grammar = resolveArtistGrammarRu(artist);
+  if (grammar.kind === 'group') {
+    return ['эта группа', 'этот коллектив', 'эта команда'];
+  }
+  if (grammar.gender === 'feminine') {
+    return ['эта исполнительница', 'эта артистка'];
+  }
+  return ['этот исполнитель', 'этот артист'];
+}
+
+function artistLeadSubstitute(artist: string): string {
+  return artistSubstitutesForVoiceover(artist)[0]!;
+}
 
 function pickSubstitute(seed: string, options: string[]): string {
   return options[pickVariant(seed, options.length)]!;
@@ -196,7 +199,7 @@ function rewriteLead(script: string, title: string, artist: string): string {
       const body = rest.replace(/^[—–-]\s*/, '');
       const templates = [
         `У этой песни тот самый ${body}`,
-        `Эта композиция построена на запоминающемся ${body.replace(/^гитарный рифф/i, 'гитарном рифе')}`,
+        `Эта песня построена на запоминающемся ${body.replace(/^гитарный рифф/i, 'гитарном рифе')}`,
         `Этот хит держится на ${body.replace(/^гитарный рифф/i, 'гитарном рифе')}`,
         `Сейчас в эфире песня с ${body.replace(/^гитарный рифф/i, 'гитарным рифом')}`,
         `Сейчас играет песня с тем самым ${body}`,
@@ -206,10 +209,10 @@ function rewriteLead(script: string, title: string, artist: string): string {
 
     const templates = [
       `Эта песня ${rest}`,
-      `Эта композиция ${rest}`,
+      `Этот трек ${rest}`,
       `Этот хит ${rest.replace(/^вышел\b/i, 'появился').replace(/^неожиданно возглавил/i, 'неожиданно возглавил')}`,
-      `Текущий трек ${rest}`,
-      `В эфире сейчас классика, которая ${rest.replace(/^вышел\b/i, 'вышла').replace(/^неожиданно возглавил/i, 'неожиданно возглавила')}`,
+      `Сейчас в эфире ${rest}`,
+      `В эфире классика, которая ${rest.replace(/^вышел\b/i, 'вышла').replace(/^неожиданно возглавил/i, 'неожиданно возглавила')}`,
     ];
     return templates[v]!;
   }
@@ -232,16 +235,44 @@ function rewriteLead(script: string, title: string, artist: string): string {
   return templates[v]!;
 }
 
-function cleanupAfterGenericize(text: string): string {
+function cleanupAfterGenericize(text: string, artist: string): string {
+  const leadArtist = artistLeadSubstitute(artist);
   return text
     .replace(/^\s*\/+\s*/g, '')
     .replace(/В нет потолка/giu, 'В этой песне нет потолка')
     .replace(/(^|[.!?…]\s+)здесь не просто поёт/giu, '$1он не просто поёт')
     .replace(/(^|[.!?…]\s+)здесь не просто пел/giu, '$1он не просто пел')
-    .replace(/\b(эта песня|этот трек|эта композиция|в треке|у этой песни)\s+\1\b/giu, '$1')
-    .replace(/\bна\s+трек\s+(?:эта песня|этот трек|эта композиция)\b/giu, 'на этот трек')
-    .replace(/(^|\s)с\s+(?:артист|исполнитель|музыкант|группа)(?=\s|[,.!?—–-]|$)/giu, '$1с ним')
-    .replace(/(^|\s)у\s+(?:артист|исполнитель|музыкант)(?=\s|[,.!?—–-]|$)/giu, '$1у него')
+    .replace(
+      /^(?:музыкант|исполнитель|артист|группа)\s*([—–-])/iu,
+      `${leadArtist} $1`,
+    )
+    .replace(
+      /([.!?…]\s+)[Вв] этой композиции\s*[—–-]\s*один из треков/giu,
+      '$1Это один из тех треков',
+    )
+    .replace(/^[Вв] этой композиции\s*[—–-]\s*/iu, '')
+    .replace(/([.!?…]\s+)[Вв] этой композиции\s*[—–-]\s*/giu, '$1')
+    .replace(/([Ээ])та композиция\s*[—–-]\s*один из/giu, 'это один из')
+    .replace(/([Ээ])та композиция/giu, '$1та песня')
+    .replace(/([Вв]) этой композиции/giu, '$1 этой песне')
+    .replace(/\b(эта песня|этот трек|у этой песни|в треке)\s+\1\b/giu, '$1')
+    .replace(/\bна\s+трек\s+(?:эта песня|этот трек)\b/giu, 'на этот трек')
+    .replace(
+      /(^|\s)с\s+эт(?:им исполнителем|ой группой|им артистом|им коллективом|ой командой|от исполнителем|ой артисткой)(?=\s|[,.!?—–-]|$)/giu,
+      '$1с ним',
+    )
+    .replace(
+      /(^|\s)с\s+эт(?:от исполнитель|от артист|а группа|от коллектив|а команда)(?=\s|[,.!?—–-]|$)/giu,
+      '$1с ним',
+    )
+    .replace(
+      /(^|\s)с\s+(?:артист|исполнитель|музыкант|группа)(?=\s|[,.!?—–-]|$)/giu,
+      '$1с ним',
+    )
+    .replace(
+      /(^|\s)у\s+(?:артист|исполнитель|музыкант|этого исполнителя|этой группы)(?=\s|[,.!?—–-]|$)/giu,
+      '$1у него',
+    )
     .replace(/(?:исполнитель|артист|музыкант|группа)\s+он(?=\s|[,.!?—–-]|$)/giu, 'он')
     .replace(/\s+,\s*,/g, ',')
     .replace(/,\s*,/g, ',')
@@ -277,16 +308,17 @@ export function genericizeScriptForVoiceover(
       result = replaceLatinPhrase(result, alias, TRACK_SUBSTITUTES, 'track-alias', false);
     }
   }
+  const artistSubs = artistSubstitutesForVoiceover(artist);
   if (stripArtist) {
-    result = replaceLatinPhrase(result, artist, ARTIST_SUBSTITUTES, 'artist', true);
+    result = replaceLatinPhrase(result, artist, artistSubs, 'artist', true);
     for (const alias of latinAliasPhrases(artist)) {
-      result = replaceLatinPhrase(result, alias, ARTIST_SUBSTITUTES, 'artist-alias', false);
+      result = replaceLatinPhrase(result, alias, artistSubs, 'artist-alias', false);
     }
   }
 
   result = result
-    .replace(/\bPeppers\b/gi, 'группа')
+    .replace(/\bPeppers\b/gi, 'эта группа')
     .replace(/\bMTV\b/gi, 'МТВ');
 
-  return cleanupAfterGenericize(result);
+  return cleanupAfterGenericize(result, artist);
 }
