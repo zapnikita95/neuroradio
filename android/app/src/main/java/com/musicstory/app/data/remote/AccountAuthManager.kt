@@ -317,9 +317,7 @@ class AccountAuthManager(
         val telegramWidgetBaseUrl: String?,
     ) {
         val canUseTelegramOAuth: Boolean
-            get() = telegramOAuthEnabled &&
-                !telegramBotId.isNullOrBlank() &&
-                !telegramOAuthRedirectUri.isNullOrBlank()
+            get() = telegramOAuthEnabled && !telegramBotId.isNullOrBlank()
 
         val showsTelegramLogin: Boolean
             get() = canUseTelegramOAuth || !telegramBotUsername.isNullOrBlank()

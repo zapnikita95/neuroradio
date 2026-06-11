@@ -7,6 +7,8 @@ import com.musicstory.app.util.StoryLog
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import java.net.URLEncoder
+import java.nio.charset.StandardCharsets
 import java.security.MessageDigest
 import java.security.SecureRandom
 
@@ -18,28 +20,29 @@ class TelegramOAuthCoordinator private constructor() {
     suspend fun signIn(activity: Activity, clientId: String, redirectUri: String): Pair<String, String> {
         cancelPending()
 
+        val botId = clientId.trim()
+        val redirect = resolveRedirectUri(redirectUri)
+        if (botId.isBlank()) {
+            throw TelegramOAuthException.Failed("Telegram OAuth: bot id не настроен на сервере")
+        }
+
         val verifier = makeCodeVerifier()
         val challenge = makeCodeChallenge(verifier)
-        val authUri = Uri.parse(AUTH_URL).buildUpon()
-            .appendQueryParameter("client_id", clientId)
-            .appendQueryParameter("redirect_uri", redirectUri)
-            .appendQueryParameter("response_type", "code")
-            .appendQueryParameter("scope", "openid profile")
-            .appendQueryParameter("code_challenge", challenge)
-            .appendQueryParameter("code_challenge_method", "S256")
-            .build()
+        val authUri = buildAuthUri(botId, redirect, challenge)
 
         val deferred = CompletableDeferred<String>()
         pendingCode = deferred
         activeCodeVerifier = verifier
 
-        StoryLog.i("Telegram OAuth start clientId=$clientId redirect=$redirectUri")
+        StoryLog.i("Telegram OAuth start clientId=$botId redirect=$redirect url=$authUri")
 
         withContext(Dispatchers.Main) {
-            CustomTabsIntent.Builder()
+            val customTabs = CustomTabsIntent.Builder()
                 .setShowTitle(true)
                 .build()
-                .launchUrl(activity, authUri)
+            // launchUrl() on some OEM builds drops query params → bare oauth.telegram.org/auth.
+            customTabs.intent.data = authUri
+            activity.startActivity(customTabs.intent)
         }
 
         return try {
@@ -91,6 +94,21 @@ class TelegramOAuthCoordinator private constructor() {
         activeCodeVerifier = null
     }
 
+    private fun buildAuthUri(clientId: String, redirectUri: String, challenge: String): Uri {
+        val enc = StandardCharsets.UTF_8
+        fun enc(v: String) = URLEncoder.encode(v, enc.name())
+        val url = buildString {
+            append(AUTH_URL)
+            append("?client_id=").append(enc(clientId))
+            append("&redirect_uri=").append(enc(redirectUri))
+            append("&response_type=code")
+            append("&scope=").append(enc("openid profile"))
+            append("&code_challenge=").append(challenge)
+            append("&code_challenge_method=S256")
+        }
+        return Uri.parse(url)
+    }
+
     private fun makeCodeVerifier(): String {
         val bytes = ByteArray(32)
         SecureRandom().nextBytes(bytes)
@@ -108,6 +126,13 @@ class TelegramOAuthCoordinator private constructor() {
 
     companion object {
         val instance = TelegramOAuthCoordinator()
+
+        /** Must match BotFather OAuth redirect + backend callback-bridge. */
+        const val DEFAULT_REDIRECT_URI =
+            "https://www.efir-ai.ru/v1/public/oauth/telegram/callback-bridge"
+
+        fun resolveRedirectUri(fromConfig: String?): String =
+            fromConfig?.trim()?.takeIf { it.isNotBlank() } ?: DEFAULT_REDIRECT_URI
 
         private const val AUTH_URL = "https://oauth.telegram.org/auth"
         private const val CALLBACK_SCHEME = "efirai"

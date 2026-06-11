@@ -33,8 +33,8 @@ android {
         applicationId = "com.efirai.myapp"
         minSdk = 26
         targetSdk = 35
-        versionCode = 110
-        versionName = "1.5.72"
+        versionCode = 111
+        versionName = "1.5.73"
 
         buildConfigField("String", "VERSION_NAME", "\"$versionName\"")
         buildConfigField("int", "VERSION_CODE", "$versionCode")
