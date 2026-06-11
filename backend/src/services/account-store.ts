@@ -166,6 +166,7 @@ export interface AccountRecord {
   subscriptionMarket?: SubscriptionMarket | null;
   billingProvider?: BillingProvider | null;
   email?: string | null;
+  appleSub?: string | null;
   telegramId?: number | null;
   telegramUsername?: string | null;
   /** YooKassa saved card for autopay (like Movie Planner). */
@@ -187,6 +188,7 @@ interface StoreFile {
   installToAccount: Record<string, string>;
   syncCodeToAccount: Record<string, string>;
   emailToAccount?: Record<string, string>;
+  appleToAccount?: Record<string, string>;
   telegramToAccount?: Record<string, string>;
   pendingEmailCodes?: Record<string, PendingEmailCode>;
   pendingWebCabinetCodes?: Record<string, PendingWebCabinetCode>;
@@ -1375,6 +1377,7 @@ export function getAccountProfile(installId: string): {
   email: string | null;
   telegramId: number | null;
   telegramUsername: string | null;
+  appleSub: string | null;
   plan: AccountPlan | null;
   trialUntil: number | null;
   premiumUntil: number | null;
@@ -1387,6 +1390,7 @@ export function getAccountProfile(installId: string): {
       email: null,
       telegramId: null,
       telegramUsername: null,
+      appleSub: null,
       plan: null,
       trialUntil: null,
       premiumUntil: null,
@@ -1399,6 +1403,7 @@ export function getAccountProfile(installId: string): {
     email: account?.email ?? null,
     telegramId: account?.telegramId ?? null,
     telegramUsername: account?.telegramUsername ?? null,
+    appleSub: account?.appleSub ?? null,
     plan: ent?.plan ?? null,
     trialUntil: ent?.trialUntil ?? null,
     premiumUntil: ent?.premiumUntil ?? null,
@@ -1573,6 +1578,51 @@ export function linkTelegramAccount(
   }
   store.installToAccount[normalized] = accountId;
   store.telegramToAccount[tgKey] = accountId;
+  saveStore(store);
+  return { ok: true, accountId };
+}
+
+export function linkAppleAccount(
+  installId: string,
+  appleSub: string,
+  email?: string | null,
+): { ok: true; accountId: string } | { ok: false; error: string } {
+  const store = loadStore();
+  store.appleToAccount = store.appleToAccount ?? {};
+  const normalized = installId.trim().toLowerCase();
+  const subKey = appleSub.trim();
+  if (!subKey) {
+    return { ok: false, error: 'Invalid Apple account' };
+  }
+
+  let accountId = store.appleToAccount[subKey];
+  const isFirstRegistration = !accountId;
+  if (!accountId) {
+    accountId = store.installToAccount[normalized] ?? createAccount(installId).accountId;
+  }
+  const account = store.accountsById[accountId];
+  if (!account) return { ok: false, error: 'Аккаунт недоступен' };
+
+  account.appleSub = subKey;
+  const normalizedEmail = email?.trim().toLowerCase();
+  if (normalizedEmail && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)) {
+    account.email = normalizedEmail;
+    store.emailToAccount = store.emailToAccount ?? {};
+    store.emailToAccount[normalizedEmail] = accountId;
+    if (isYookassaReviewerEmail(normalizedEmail)) {
+      provisionYookassaReviewerAccount(account);
+    }
+  } else if (isFirstRegistration) {
+    grantWelcomeTrialIfEligible(account);
+  }
+
+  const attach = attachInstallToAccount(store, account, normalized);
+  if (!attach.ok) {
+    return attach;
+  }
+  store.installToAccount[normalized] = accountId;
+  store.appleToAccount[subKey] = accountId;
+  account.ownerInstallId = normalized;
   saveStore(store);
   return { ok: true, accountId };
 }

@@ -47,14 +47,17 @@ export function resolveTelegramWidgetBaseUrl(): string | null {
 export function getPublicAuthConfig(): {
   emailEnabled: boolean;
   telegramEnabled: boolean;
+  appleSignInEnabled: boolean;
   telegramBotUsername: string | null;
   telegramWidgetBaseUrl: string | null;
 } {
   const widgetBase = resolveTelegramWidgetBaseUrl();
   const botUsername = telegramBotUsername();
   return {
-    emailEnabled: isEmailConfigured(),
+    // Email login works without SMTP (reviewer codes + server logs).
+    emailEnabled: true,
     telegramEnabled: isTelegramConfigured(),
+    appleSignInEnabled: true,
     telegramBotUsername: botUsername,
     telegramWidgetBaseUrl: widgetBase,
   };

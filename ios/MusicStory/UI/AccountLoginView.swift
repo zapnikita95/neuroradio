@@ -1,6 +1,7 @@
 import SwiftUI
+import AuthenticationServices
 
-/// Блок входа (Telegram + email) — онбординг и настройки.
+/// Блок входа (Sign in with Apple, Telegram, email) — онбординг и настройки.
 struct AccountAuthPanel: View {
     var onSuccess: () -> Void
     var onSkip: () -> Void
@@ -19,8 +20,25 @@ struct AccountAuthPanel: View {
 
     private enum LoginStep { case email, code }
 
+    private var isReviewerEmail: Bool {
+        let trimmed = email.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        return trimmed == "appletester@test.ru" || trimmed == "googletester@test.ru"
+    }
+
     var body: some View {
         VStack(spacing: 14) {
+            if authConfig?.appleSignInEnabled != false {
+                SignInWithAppleButton(.signIn) { request in
+                    request.requestedScopes = [.email, .fullName]
+                } onCompletion: { result in
+                    Task { await handleAppleSignIn(result) }
+                }
+                .signInWithAppleButtonStyle(.white)
+                .frame(height: 50)
+                .clipShape(RoundedRectangle(cornerRadius: 18))
+                .disabled(loading)
+            }
+
             if let cfg = authConfig, cfg.canUseTelegram {
                 GlassCard(accentBorder: true) {
                     VStack(alignment: .leading, spacing: 14) {
@@ -34,45 +52,53 @@ struct AccountAuthPanel: View {
                 }
             }
 
-            if authConfig?.emailEnabled != false {
-                GlassCard(accentBorder: true) {
-                    VStack(alignment: .leading, spacing: 14) {
-                        Text(step == .email ? "Email" : "Код из письма")
-                            .font(.caption)
-                            .foregroundStyle(AppTheme.mutedLavender)
-                        if step == .email {
-                            TextField("you@example.com", text: $email)
-                                .textInputAutocapitalization(.never)
-                                .keyboardType(.emailAddress)
-                                .autocorrectionDisabled()
-                                .foregroundStyle(AppTheme.creamText)
-                                .textContentType(.emailAddress)
-                            PrimaryStoryButton(title: "Получить код", loading: loading) {
-                                Task { await sendCode() }
-                            }
-                            .disabled(loading || email.trimmingCharacters(in: .whitespaces).isEmpty)
-                            if let message, !message.contains("отправлен") {
-                                Text(message)
-                                    .font(.caption)
-                                    .foregroundStyle(AppTheme.errorCoral)
-                                    .multilineTextAlignment(.center)
-                            }
-                        } else {
-                            TextField("000000", text: $code)
-                                .keyboardType(.numberPad)
-                                .foregroundStyle(AppTheme.creamText)
-                                .onChange(of: code) { newValue in
-                                    let digits = newValue.filter(\.isNumber)
-                                    if digits.count > 6 { code = String(digits.prefix(6)) }
-                                    else if digits != newValue { code = digits }
-                                }
-                            PrimaryStoryButton(title: "Войти", loading: loading) {
-                                Task { await verifyCode() }
-                            }
-                            Button("Изменить email") { step = .email }
+            GlassCard(accentBorder: true) {
+                VStack(alignment: .leading, spacing: 14) {
+                    Text(step == .email ? "Email" : "Код из письма")
+                        .font(.caption)
+                        .foregroundStyle(AppTheme.mutedLavender)
+                    if step == .email {
+                        TextField("you@example.com", text: $email)
+                            .textInputAutocapitalization(.never)
+                            .keyboardType(.emailAddress)
+                            .autocorrectionDisabled()
+                            .foregroundStyle(AppTheme.creamText)
+                            .textContentType(.emailAddress)
+                        if isReviewerEmail {
+                            Text("Тест App Review: нажмите «Получить код», затем введите 000000")
                                 .font(.caption)
                                 .foregroundStyle(AppTheme.mutedLavender)
                         }
+                        PrimaryStoryButton(title: "Получить код", loading: loading) {
+                            Task { await sendCode() }
+                        }
+                        .disabled(loading || email.trimmingCharacters(in: .whitespaces).isEmpty)
+                        if let message, !message.contains("отправлен"), step == .email {
+                            Text(message)
+                                .font(.caption)
+                                .foregroundStyle(AppTheme.errorCoral)
+                                .multilineTextAlignment(.center)
+                        }
+                    } else {
+                        TextField("000000", text: $code)
+                            .keyboardType(.numberPad)
+                            .foregroundStyle(AppTheme.creamText)
+                            .onChange(of: code) { _, newValue in
+                                let digits = newValue.filter(\.isNumber)
+                                if digits.count > 6 { code = String(digits.prefix(6)) }
+                                else if digits != newValue { code = digits }
+                            }
+                        PrimaryStoryButton(title: "Войти", loading: loading) {
+                            Task { await verifyCode() }
+                        }
+                        .disabled(loading || code.count < 6)
+                        Button("Изменить email") {
+                            step = .email
+                            code = ""
+                            message = nil
+                        }
+                        .font(.caption)
+                        .foregroundStyle(AppTheme.mutedLavender)
                     }
                 }
             }
@@ -96,7 +122,7 @@ struct AccountAuthPanel: View {
                 .multilineTextAlignment(.center)
         }
         .task { await bootstrap() }
-        .onChange(of: email) { _ in
+        .onChange(of: email) { _, _ in
             if step == .email { message = nil }
         }
         .sheet(isPresented: $showTelegramSheet) {
@@ -116,11 +142,19 @@ struct AccountAuthPanel: View {
     }
 
     private func bootstrap() async {
-        authConfig = AuthConfig(emailEnabled: true, telegramEnabled: false, telegramBotUsername: nil, telegramWidgetBaseUrl: nil)
+        authConfig = AuthConfig(
+            emailEnabled: true,
+            telegramEnabled: false,
+            appleSignInEnabled: true,
+            telegramBotUsername: nil,
+            telegramWidgetBaseUrl: nil
+        )
         let prep = await BackendClient.shared.prepareForLogin()
         backendReady = prep.ready
         if prep.ready {
             authConfig = await AccountAuthManager.shared.fetchConfig()
+        } else {
+            message = prep.error
         }
     }
 
@@ -148,20 +182,63 @@ struct AccountAuthPanel: View {
         if let err = await AccountAuthManager.shared.startEmailLogin(email: trimmed) {
             message = UserFacingError.message(for: err)
         } else {
-            message = "Код отправлен на \(trimmed)"
+            message = isReviewerEmail
+                ? "Код для проверки: 000000"
+                : "Код отправлен на \(trimmed)"
             step = .code
+            if isReviewerEmail {
+                code = "000000"
+            }
         }
     }
 
     private func verifyCode() async {
+        let trimmedCode = code.trimmingCharacters(in: .whitespaces)
+        guard trimmedCode.count >= 6 else {
+            message = "Введите 6-значный код"
+            return
+        }
         loading = true
         defer { loading = false }
-        let result = await AccountAuthManager.shared.verifyEmailLogin(email: email, code: code)
+        let result = await AccountAuthManager.shared.verifyEmailLogin(email: email, code: trimmedCode)
         if let err = result.error {
             message = err
         } else {
+            message = "Вход выполнен"
             await StoryRepository.shared.refreshQuota()
             onSuccess()
+        }
+    }
+
+    private func handleAppleSignIn(_ result: Result<ASAuthorization, Error>) async {
+        switch result {
+        case .failure(let error):
+            let ns = error as NSError
+            if ns.domain == ASAuthorizationError.errorDomain,
+               ns.code == ASAuthorizationError.canceled.rawValue {
+                return
+            }
+            message = error.localizedDescription
+        case .success(let authorization):
+            guard let credential = authorization.credential as? ASAuthorizationAppleIDCredential,
+                  let tokenData = credential.identityToken,
+                  let token = String(data: tokenData, encoding: .utf8),
+                  !token.isEmpty else {
+                message = "Не удалось получить токен Apple"
+                return
+            }
+            loading = true
+            defer { loading = false }
+            let login = await AccountAuthManager.shared.completeAppleSignIn(
+                identityToken: token,
+                email: credential.email
+            )
+            if let err = login.error {
+                message = err
+            } else {
+                await StoryRepository.shared.refreshQuota()
+                onSuccess()
+            }
         }
     }
 
@@ -213,4 +290,3 @@ struct AccountLoginView: View {
         }
     }
 }
-

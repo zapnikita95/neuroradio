@@ -3,6 +3,7 @@ import Foundation
 struct AccountProfile: Codable, Sendable {
     var accountId: String?
     var email: String?
+    var appleSub: String?
     var telegramId: Int64?
     var telegramUsername: String?
     var plan: String?
@@ -10,7 +11,9 @@ struct AccountProfile: Codable, Sendable {
     var premiumUntil: Int64?
 
     var isLoggedIn: Bool {
-        !(email?.isEmpty ?? true) || (telegramId ?? 0) > 0
+        !(email?.isEmpty ?? true) ||
+            !(appleSub?.isEmpty ?? true) ||
+            (telegramId ?? 0) > 0
     }
 
     var displayName: String {
@@ -23,6 +26,7 @@ struct AccountProfile: Codable, Sendable {
 struct AuthConfig: Sendable {
     let emailEnabled: Bool
     let telegramEnabled: Bool
+    let appleSignInEnabled: Bool
     let telegramBotUsername: String?
     let telegramWidgetBaseUrl: String?
 
@@ -58,6 +62,7 @@ final class AccountAuthManager {
             return AuthConfig(
                 emailEnabled: json["emailEnabled"] as? Bool ?? true,
                 telegramEnabled: json["telegramEnabled"] as? Bool ?? false,
+                appleSignInEnabled: json["appleSignInEnabled"] as? Bool ?? true,
                 telegramBotUsername: json["telegramBotUsername"] as? String,
                 telegramWidgetBaseUrl: json["telegramWidgetBaseUrl"] as? String
             )
@@ -65,9 +70,49 @@ final class AccountAuthManager {
             return AuthConfig(
                 emailEnabled: true,
                 telegramEnabled: false,
+                appleSignInEnabled: true,
                 telegramBotUsername: nil,
                 telegramWidgetBaseUrl: nil
             )
+        }
+    }
+
+    func completeAppleSignIn(identityToken: String, email: String?) async -> AccountLoginResult {
+        var payload: [String: Any] = ["identityToken": identityToken]
+        if let email, !email.isEmpty {
+            payload["email"] = email
+        }
+        let body = try? JSONSerialization.data(withJSONObject: payload)
+        do {
+            let data = try await backend.authorizedJSON(
+                path: "v1/account/apple",
+                method: "POST",
+                body: body
+            )
+            if let err = data["error"] as? String, !err.isEmpty {
+                return AccountLoginResult(error: err)
+            }
+            let profile = parseProfile(data["profile"] as? [String: Any] ?? data)
+            settings.saveAccountProfile(profile)
+            if let plan = profile.plan, !plan.isEmpty {
+                settings.serverTier = plan
+            }
+            return AccountLoginResult(profile: profile)
+        } catch let error as BackendError {
+            return AccountLoginResult(error: error.errorDescription ?? UserFacingError.message(for: error))
+        } catch {
+            return AccountLoginResult(error: UserFacingError.message(for: error))
+        }
+    }
+
+    func signInWithApple() async -> AccountLoginResult {
+        do {
+            let payload = try await AppleSignInCoordinator.shared.signIn()
+            return await completeAppleSignIn(identityToken: payload.identityToken, email: payload.email)
+        } catch let error as AppleSignInError {
+            return AccountLoginResult(error: error.localizedDescription)
+        } catch {
+            return AccountLoginResult(error: UserFacingError.message(for: error))
         }
     }
 
@@ -162,6 +207,7 @@ final class AccountAuthManager {
         AccountProfile(
             accountId: json["accountId"] as? String,
             email: json["email"] as? String,
+            appleSub: json["appleSub"] as? String,
             telegramId: Self.int64(json["telegramId"]),
             telegramUsername: json["telegramUsername"] as? String,
             plan: json["plan"] as? String,

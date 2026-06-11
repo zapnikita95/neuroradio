@@ -4,11 +4,13 @@ import {
   claimDeviceWelcomeTrial,
   getAccountProfileLoaded,
   getSyncStatus,
+  linkAppleAccount,
   linkTelegramAccount,
   pullAccountCloudData,
   startEmailLogin,
   verifyEmailLogin,
 } from '../services/account-store.js';
+import { verifyAppleIdentityToken } from '../services/apple-sign-in.js';
 import { verifyTelegramLogin, type TelegramAuthPayload } from '../services/telegram-auth.js';
 import { getPublicAuthConfig } from '../services/auth-config.js';
 
@@ -65,6 +67,42 @@ router.post('/email/verify', async (req: Request, res: Response) => {
   const deviceFingerprint =
     typeof req.body?.device_fingerprint === 'string' ? req.body.device_fingerprint : undefined;
   const result = await verifyEmailLogin(req.installId!, email, code, deviceFingerprint);
+  if (!result.ok) {
+    res.status(400).json({ error: result.error });
+    return;
+  }
+  const cloud = await pullAccountCloudData(req.installId!);
+  const profile = await getAccountProfileLoaded(req.installId!);
+  res.json({
+    ok: true,
+    accountId: result.accountId,
+    profile,
+    history: cloud?.history ?? [],
+    scrobbles: cloud?.scrobbles ?? [],
+  });
+});
+
+/** Sign in with Apple — identity token verified server-side (Guideline 4.8). */
+router.post('/apple', async (req: Request, res: Response) => {
+  const identityToken =
+    typeof req.body?.identityToken === 'string' ? req.body.identityToken.trim() : '';
+  if (!identityToken) {
+    res.status(400).json({ error: 'Missing Apple identity token' });
+    return;
+  }
+
+  const verified = await verifyAppleIdentityToken(identityToken);
+  if (!verified.ok) {
+    res.status(403).json({ error: verified.error });
+    return;
+  }
+
+  const email =
+    typeof req.body?.email === 'string' && req.body.email.trim()
+      ? req.body.email.trim()
+      : verified.claims.email;
+
+  const result = linkAppleAccount(req.installId!, verified.claims.sub, email);
   if (!result.ok) {
     res.status(400).json({ error: result.error });
     return;

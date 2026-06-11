@@ -50,6 +50,7 @@
 		B1000037 /* TrackDurationResolver.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1000037 /* TrackDurationResolver.swift */; };
 		B1000038 /* ShazamAutoPolicy.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1000038 /* ShazamAutoPolicy.swift */; };
 		B1000039 /* ShazamFloatingButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1000039 /* ShazamFloatingButton.swift */; };
+		B1000041 /* AppleSignInCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1000041 /* AppleSignInCoordinator.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -124,6 +125,7 @@
 		F1000038 /* ShazamAutoPolicy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShazamAutoPolicy.swift; sourceTree = "<group>"; };
 		F1000039 /* ShazamFloatingButton.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShazamFloatingButton.swift; sourceTree = "<group>"; };
 		F1000040 /* MusicStory.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = MusicStory.entitlements; sourceTree = "<group>"; };
+		F1000041 /* AppleSignInCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppleSignInCoordinator.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -232,6 +234,7 @@
 				F1000009 /* SettingsStore.swift */,
 				F100000A /* BackendClient.swift */,
 				F1000032 /* AccountAuthManager.swift */,
+				F1000041 /* AppleSignInCoordinator.swift */,
 				F100000B /* StoryHistoryStore.swift */,
 				F100000C /* StoryRepository.swift */,
 				F1000020 /* OfflineAudioStore.swift */,
@@ -425,6 +428,7 @@
 				B1000033 /* AccountLoginView.swift in Sources */,
 				B1000034 /* TelegramLoginWebView.swift in Sources */,
 				B1000035 /* StoryFeedbackSheet.swift in Sources */,
+				B1000041 /* AppleSignInCoordinator.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -501,7 +505,7 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = MusicStory/MusicStory.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 97;
 				DEVELOPMENT_TEAM = Y52BT2N4L8;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = MusicStory/Info.plist;
@@ -517,7 +521,7 @@
 				PRODUCT_BUNDLE_IDENTIFIER = com.efirai.appname;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
-				TARGETED_DEVICE_FAMILY = "1,2";
+				TARGETED_DEVICE_FAMILY = 1;
 			};
 			name = Debug;
 		};
@@ -527,7 +531,7 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = MusicStory/MusicStory.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 97;
 				DEVELOPMENT_TEAM = Y52BT2N4L8;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = MusicStory/Info.plist;
@@ -543,7 +547,7 @@
 				PRODUCT_BUNDLE_IDENTIFIER = com.efirai.appname;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
-				TARGETED_DEVICE_FAMILY = "1,2";
+				TARGETED_DEVICE_FAMILY = 1;
 			};
 			name = Release;
 		};
@@ -551,7 +555,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 97;
 				DEVELOPMENT_TEAM = Y52BT2N4L8;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = MusicStoryWidget/Info.plist;
@@ -568,7 +572,7 @@
 				SKIP_INSTALL = YES;
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 5.9;
-				TARGETED_DEVICE_FAMILY = "1,2";
+				TARGETED_DEVICE_FAMILY = 1;
 			};
 			name = Debug;
 		};
@@ -576,7 +580,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 97;
 				DEVELOPMENT_TEAM = Y52BT2N4L8;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = MusicStoryWidget/Info.plist;
@@ -593,7 +597,7 @@
 				SKIP_INSTALL = YES;
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 5.9;
-				TARGETED_DEVICE_FAMILY = "1,2";
+				TARGETED_DEVICE_FAMILY = 1;
 			};
 			name = Release;
 		};
