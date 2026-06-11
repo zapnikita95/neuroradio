@@ -985,8 +985,17 @@ class StoryRepository(
         trackKey: String,
         audioUrl: String?,
         preferLocal: Boolean = false,
+        /** After stream failure — download full file once, then play from disk. */
+        forceFullDownload: Boolean = false,
     ): String? {
         val serverUrl = resolveAudioUrl(audioUrl)
+        if (forceFullDownload && !serverUrl.isNullOrBlank() && serverUrl.startsWith("http", ignoreCase = true)) {
+            offlineAudioStore.downloadEphemeral(serverUrl)?.let { path ->
+                StoryLog.i("Playback retry: playing downloaded file")
+                return offlineAudioStore.localFileUri(path)
+            }
+            StoryLog.w("Playback retry: download failed — streaming again")
+        }
         if (!preferLocal || serverUrl.isNullOrBlank()) return serverUrl
         if (!canUseOfflineReplay()) return serverUrl
         packPlaybackPath(trackKey)?.let { path ->

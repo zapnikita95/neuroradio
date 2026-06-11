@@ -124,7 +124,11 @@ class StoryPlayer(context: Context) {
                 }
 
                 override fun onPlayerError(error: androidx.media3.common.PlaybackException) {
-                    StoryLog.e("ExoPlayer error (server audio): ${error.message}", error)
+                    StoryLog.e(
+                        "ExoPlayer error (server audio): code=${error.errorCode} " +
+                            "cause=${error.cause?.javaClass?.simpleName} msg=${error.message}",
+                        error,
+                    )
                     if (retryExoSameUrl("player error")) return
                     failPlayback()
                 }

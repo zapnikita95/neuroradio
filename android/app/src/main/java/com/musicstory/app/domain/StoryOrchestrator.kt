@@ -768,6 +768,7 @@ class StoryOrchestrator(
                             track.displayKey,
                             response.audioUrl,
                             preferLocal = false,
+                            forceFullDownload = playbackRetry,
                         )
                         storyPlayer.playStory(
                             response = response,
@@ -776,7 +777,6 @@ class StoryOrchestrator(
                             resumeMusic = true,
                             onPlaybackStarted = {
                                 if (!isSessionCurrent(session)) return@playStory
-                                mediaControllerManager.restoreSystemMusicVolumeIfNeeded()
                                 lastStoryStartedAtMs = System.currentTimeMillis()
                                 _state.value = OrchestratorState.PLAYING_STORY
                                 publishUiState()

@@ -16,6 +16,8 @@ class StoryOfflineAudioStore(context: Context) {
 
     private val appContext = context.applicationContext
     private val storiesDir = File(appContext.filesDir, "offline_stories").also { it.mkdirs() }
+    /** Short-lived full downloads for ExoPlayer — avoids mid-stream failures on Huawei/BT. */
+    private val playbackTempDir = File(appContext.cacheDir, "playback_temp").also { it.mkdirs() }
 
     private val client = OkHttpClient.Builder()
         .connectTimeout(30, TimeUnit.SECONDS)
@@ -109,6 +111,59 @@ class StoryOfflineAudioStore(context: Context) {
         }
     }
 
+    suspend fun downloadEphemeral(url: String): String? = withContext(Dispatchers.IO) {
+        if (url.isBlank()) return@withContext null
+        val ext = extensionFromUrl(url)
+        val hash = hashUrl(url)
+        val target = File(playbackTempDir, "$hash.$ext")
+        val maxAgeMs = 2L * 60L * 60L * 1000L
+        if (target.isFile && target.length() > 512L && isLikelyValidAudio(target)) {
+            if (System.currentTimeMillis() - target.lastModified() < maxAgeMs) {
+                return@withContext target.absolutePath
+            }
+            target.delete()
+        }
+        val temp = File(playbackTempDir, "$hash.$ext.part")
+        try {
+            repeat(3) { attempt ->
+                if (attempt > 0) Thread.sleep(400L * attempt)
+                client.newCall(
+                    Request.Builder()
+                        .url(url)
+                        .header("User-Agent", "MusicStory/Playback (Android)")
+                        .get()
+                        .build(),
+                ).execute().use { response ->
+                    if (!response.isSuccessful) {
+                        StoryLog.w("Playback audio download HTTP ${response.code} attempt=${attempt + 1}")
+                        return@use
+                    }
+                    val body = response.body ?: return@use
+                    temp.outputStream().use { out ->
+                        body.byteStream().copyTo(out)
+                    }
+                    if (temp.length() < 512L || !isLikelyValidAudio(temp)) {
+                        StoryLog.w("Playback audio invalid — discarding (${temp.length()} bytes)")
+                        temp.delete()
+                        return@use
+                    }
+                    if (target.exists()) target.delete()
+                    if (!temp.renameTo(target)) {
+                        temp.copyTo(target, overwrite = true)
+                        temp.delete()
+                    }
+                    StoryLog.i("Playback audio cached: ${target.name} (${target.length()} bytes)")
+                    return@withContext target.absolutePath
+                }
+            }
+            null
+        } catch (e: Exception) {
+            StoryLog.w("Playback audio download failed: ${e.message}")
+            temp.delete()
+            null
+        }
+    }
+
     suspend fun downloadToTrack(url: String, trackKey: String): String? = withContext(Dispatchers.IO) {
         if (url.isBlank()) return@withContext null
         val ext = extensionFromUrl(url)
@@ -172,6 +227,12 @@ class StoryOfflineAudioStore(context: Context) {
     private fun hashTrackKey(trackKey: String): String {
         val digest = MessageDigest.getInstance("SHA-256")
         val bytes = digest.digest(trackKey.toByteArray(Charsets.UTF_8))
+        return bytes.joinToString("") { "%02x".format(it) }.take(32)
+    }
+
+    private fun hashUrl(url: String): String {
+        val digest = MessageDigest.getInstance("SHA-256")
+        val bytes = digest.digest(url.toByteArray(Charsets.UTF_8))
         return bytes.joinToString("") { "%02x".format(it) }.take(32)
     }
 

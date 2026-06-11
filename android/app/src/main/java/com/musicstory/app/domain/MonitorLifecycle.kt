@@ -93,7 +93,9 @@ class MonitorLifecycle(
         settingsDataStore.setAppPowerMode(mode)
         when (mode) {
             AppPowerMode.OFF -> {
-                storyOrchestrator.stopStory()
+                withContext(Dispatchers.Main.immediate) {
+                    storyOrchestrator.stopStory()
+                }
                 storyOrchestrator.setServiceRunning(false)
                 MediaMonitorService.stop(context)
                 withContext(Dispatchers.Main.immediate) {
