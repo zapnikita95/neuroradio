@@ -97,8 +97,8 @@ class TelegramOAuthCoordinator private constructor() {
     }
 
     /**
-     * Prefer BFF /authorize (server 302 → Telegram with full query).
-     * Direct oauth.telegram.org from Custom Tabs breaks on Huawei (drops redirect_uri).
+     * WebView preserves the full query string (Custom Tabs on Huawei strip params).
+     * BFF /authorize is optional; direct oauth.telegram.org works in WebView on all OEMs.
      */
     private fun buildStartUrl(
         backendBaseUrl: String,
@@ -107,7 +107,7 @@ class TelegramOAuthCoordinator private constructor() {
         challenge: String,
     ): String {
         val base = backendBaseUrl.trim().trimEnd('/')
-        if (base.startsWith("http", ignoreCase = true)) {
+        if (base.contains("efir-ai.ru", ignoreCase = true)) {
             return Uri.parse("$base/v1/public/oauth/telegram/authorize")
                 .buildUpon()
                 .appendQueryParameter("code_challenge", challenge)
