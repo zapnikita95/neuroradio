@@ -126,6 +126,7 @@ export async function initPostgres(): Promise<void> {
   try {
     await client.query(SCHEMA);
     await client.query('ALTER TABLE story_history ADD COLUMN IF NOT EXISTS vote TEXT');
+    await client.query('ALTER TABLE story_history ADD COLUMN IF NOT EXISTS story_narrator TEXT');
     console.log('[postgres] schema ready');
   } finally {
     client.release();

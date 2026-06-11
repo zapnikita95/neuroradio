@@ -60,11 +60,12 @@ export async function pgInsertStoryHistory(
   const res = await getPool().query(
     `INSERT INTO story_history (
       id, install_id, account_id, track_key, artist, title, script, angle,
-      seed_fact, seed_scope, interest_rating, vote, played_at
-    ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
+      seed_fact, seed_scope, interest_rating, vote, played_at, story_narrator
+    ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)
     ON CONFLICT (id) DO UPDATE SET
       vote = COALESCE(EXCLUDED.vote, story_history.vote),
-      account_id = COALESCE(EXCLUDED.account_id, story_history.account_id)`,
+      account_id = COALESCE(EXCLUDED.account_id, story_history.account_id),
+      story_narrator = COALESCE(EXCLUDED.story_narrator, story_history.story_narrator)`,
     [
       historyId,
       installId.trim().toLowerCase(),
@@ -79,6 +80,7 @@ export async function pgInsertStoryHistory(
       entry.interestRating ?? null,
       entry.vote ?? null,
       entry.playedAt,
+      entry.storyNarrator ?? null,
     ],
   );
   return (res.rowCount ?? 0) > 0;
@@ -104,7 +106,7 @@ export async function pgListStoryHistory(
 ): Promise<SyncHistoryEntry[]> {
   const normalized = installId.trim().toLowerCase();
   const params: Array<string | number> = [since];
-  let sql = `SELECT id, track_key, artist, title, script, angle, seed_fact, seed_scope, interest_rating, vote, played_at
+  let sql = `SELECT id, track_key, artist, title, script, angle, seed_fact, seed_scope, interest_rating, vote, played_at, story_narrator
     FROM story_history WHERE played_at > $1`;
 
   if (accountId) {
@@ -128,6 +130,7 @@ export async function pgListStoryHistory(
     playedAt: Number(row.played_at),
     seedFact: (row.seed_fact as string | null) ?? undefined,
     seedScope: (row.seed_scope as string | null) ?? undefined,
+    storyNarrator: (row.story_narrator as string | null) ?? undefined,
     interestRating: row.interest_rating != null ? Number(row.interest_rating) : undefined,
     vote:
       row.vote === 'like' || row.vote === 'dislike'

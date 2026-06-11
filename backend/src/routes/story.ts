@@ -1521,6 +1521,7 @@ router.post('/full', extractClientSecrets, validateStoryFullBody, storyFullRateL
         title: metadata.title,
         script: story.script,
         seed: selectedFact,
+        storyNarrator,
       });
     }
     attachStoryQuotaHeaders(res, installId);

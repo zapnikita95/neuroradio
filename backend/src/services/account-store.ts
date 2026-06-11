@@ -62,6 +62,7 @@ export interface SyncHistoryEntry {
   playedAt: number;
   seedFact?: string;
   seedScope?: string;
+  storyNarrator?: string;
   interestRating?: number;
   vote?: 'like' | 'dislike';
 }

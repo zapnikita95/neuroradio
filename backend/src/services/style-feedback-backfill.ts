@@ -1,5 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import { resolveAccountId } from './account-store.js';
 import { getPool, hasPostgres } from './db.js';
 import { resolveStoryNarrator, type StoryNarratorId } from './story-narrator.js';
 import type { StoryLanguageId } from './story-language.js';
@@ -35,52 +36,64 @@ export interface FeedbackEnrichment {
   lang?: StoryLanguageId;
 }
 
-async function findSeedInPostgresHistory(
+async function findHistoryForFeedback(
   installId: string,
   artist: string,
   title: string,
   script: string,
-): Promise<{ seedFact?: string }> {
+): Promise<{ seedFact?: string; storyNarrator?: StoryNarratorId }> {
   if (!hasPostgres()) return {};
   const normalized = installId.trim().toLowerCase();
+  const accountId = resolveAccountId(installId);
   const res = await getPool().query(
-    `SELECT seed_fact, script FROM story_history
-     WHERE install_id = $1
+    `SELECT seed_fact, script, story_narrator FROM story_history
+     WHERE (install_id = $1 OR ($4::text IS NOT NULL AND account_id = $4))
        AND lower(artist) = lower($2)
        AND lower(title) = lower($3)
      ORDER BY played_at DESC
-     LIMIT 12`,
-    [normalized, artist.trim(), title.trim()],
+     LIMIT 16`,
+    [normalized, artist.trim(), title.trim(), accountId],
   );
   const target = normalizeScript(script);
   for (const row of res.rows) {
     const histScript = typeof row.script === 'string' ? row.script : '';
-    if (normalizeScript(histScript) === target || target.startsWith(normalizeScript(histScript).slice(0, 80))) {
+    const histNorm = normalizeScript(histScript);
+    if (histNorm === target || target.startsWith(histNorm.slice(0, 80)) || histNorm.startsWith(target.slice(0, 80))) {
       const seed = typeof row.seed_fact === 'string' ? row.seed_fact.trim() : '';
-      if (seed) return { seedFact: seed };
+      const narratorRaw = typeof row.story_narrator === 'string' ? row.story_narrator.trim() : '';
+      const resolved = narratorRaw ? resolveStoryNarrator(narratorRaw) : 'auto';
+      return {
+        seedFact: seed || undefined,
+        storyNarrator: resolved === 'auto' ? undefined : resolved,
+      };
     }
   }
   return {};
 }
 
-export async function enrichFeedbackContext(  entry: StoryFeedbackEntry,
+export async function enrichFeedbackContext(
+  entry: StoryFeedbackEntry,
   overrides: Partial<FeedbackEnrichment> = {},
 ): Promise<StyleFeedbackContext> {
-  const narrator =
-    overrides.storyNarrator ??
-    resolveStyleNarrator(entry.storyNarrator) ??
-    inferNarratorForInstall(entry.installId);
-
   let seedFact = overrides.seedFact ?? entry.seedFact?.trim();
-  if (!seedFact && entry.script?.trim()) {
-    const hist = await findSeedInPostgresHistory(
+  let narratorFromHistory: StoryNarratorId | undefined;
+
+  if (entry.script?.trim()) {
+    const hist = await findHistoryForFeedback(
       entry.installId,
       entry.artist,
       entry.title,
       entry.script,
     );
-    seedFact = hist.seedFact;
+    if (!seedFact) seedFact = hist.seedFact;
+    narratorFromHistory = hist.storyNarrator;
   }
+
+  const narrator =
+    overrides.storyNarrator ??
+    resolveStyleNarrator(entry.storyNarrator) ??
+    narratorFromHistory ??
+    inferNarratorForInstall(entry.installId);
 
   const lang = (overrides.lang ?? entry.lang === 'en' ? 'en' : 'ru') as StoryLanguageId;
 

@@ -250,6 +250,7 @@ export async function recordUserStory(
     title: string;
     script: string;
     seed: SelectedReferenceFact;
+    storyNarrator?: StoryNarratorId;
   },
 ): Promise<void> {
   ensureAccount(installId);
@@ -273,6 +274,7 @@ export async function recordUserStory(
     playedAt: Date.now(),
     seedFact: input.seed.fact,
     seedScope: input.seed.scope,
+    storyNarrator: input.storyNarrator && input.storyNarrator !== 'auto' ? input.storyNarrator : undefined,
     interestRating: input.seed.interestRating,
   });
   clearPendingTrackSeed(installId, input.artist, input.title);
