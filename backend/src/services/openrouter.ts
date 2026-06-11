@@ -201,7 +201,10 @@ export async function generateStoryScript(
           selectedReferenceFact: input.selectedReferenceFact,
           storyLanguage,
           speakTrackNamesInVoiceover: input.speakTrackNamesInVoiceover,
-          retryReason: buildStoryRetryDirective(lastRejectReason, lengthPreset.wordsMin),
+          retryReason: buildStoryRetryDirective(lastRejectReason, lengthPreset.wordsMin, {
+            script: lastCandidate?.script,
+            storyNarrator: narratorId,
+          }),
         });
 
         const content = await callOpenRouter(

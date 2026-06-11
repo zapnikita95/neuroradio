@@ -19,6 +19,7 @@ import { isTruncatedMarketingSnippet, isSpeakableReferenceFact } from './web-sni
 import { interestScore } from './reference-fact-quality.js';
 import { fixSoloArtistPronounsRu } from './artist-grammar.js';
 import { isVoiceoverWithoutTrackNames, scriptLeaksVoiceoverNames } from './voiceover-no-names.js';
+import { resolveStoryNarrator, type StoryNarratorId } from './story-narrator.js';
 
 export { DEFAULT_STORY_LENGTH, getStoryLengthPreset };
 export type { StoryLengthId, StoryLengthPreset };
@@ -994,38 +995,21 @@ function findFactPlatformMismatch(script: string, referenceFacts: string[]): str
   return null;
 }
 
-/** Абстрактная «лекция о жанре» без детали из семени. */
+/**
+ * Абстрактная «лекция о жанре» — только для strict/local проверок (!skipPersonaCliches).
+ * Лексика фаната («я обожаю») сюда НЕ входит — она задаётся промптом амплуа, не гейтом.
+ */
 const GENRE_WATER_PATTERNS: RegExp[] = [
   /истори[яю]\s+о\s+том,\s+как/i,
-  /жанров(?:ая|ой)\s+механик/i,
-  /это\s+не\s+просто\s+(?:песн|трек|рок|групп)/i,
-  /настоящ(?:ий|им)\s+прорыв/i,
-  /большой\s+потенциал/i,
-  /уникальн\w*\s+звук/i,
-  /глубок(?:ий|ого)\s+смысл/i,
-  /запоминающ\w*/i,
-  /мастера\s+альтернатив/i,
-  /эталонн\w*\s+(?:ню|панк|поп|рок)/i,
-  /музык\w*,\s+которая\s+не\s+требует/i,
-  /звуковой\s+фон\s+для\s+размышлен/i,
-  /эмоциональн\w*\s+качел/i,
-  /психологическ\w*\s+(?:триллер|драм)/i,
-  /камерную\s+обстановк/i,
-  /лоу-?фай\s+эстетик/i,
-  /минимализм\w*\s+в\s+продакшн/i,
-  /смесь\s+разных\s+стилей/i,
-  /интересную\s+аранжировк/i,
-  /высококачественн\w*\s+музык/i,
-  /удивил\w*\s+всех\s+своей/i,
-  /когда-то\s+удивил/i,
-  /удивил\w*\s+всех/i,
   /истори[яю]\s+о\s+фузии/i,
-  /настоящ(?:ий|им)\s+шедевр/i,
-  /уникальн\w*\s+стил/i,
-  /я\s+обожаю/i,
-  /зал\s+славы/i,
+  /жанров(?:ая|ой)\s+механик/i,
   /механик\w*\s+успеха/i,
   /визитной\s+карточкой\s+жанра/i,
+  /это\s+не\s+просто\s+(?:песн|трек|рок|групп)/i,
+  /музык\w*,\s+которая\s+не\s+требует/i,
+  /звуковой\s+фон\s+для\s+размышлен/i,
+  /лоу-?фай\s+эстетик/i,
+  /минимализм\w*\s+в\s+продакшн/i,
 ];
 
 const CLICHE_FILLER_PATTERNS: RegExp[] = [
@@ -1060,8 +1044,6 @@ export function findGenreWater(script: string): string | null {
 }
 
 export function findClicheFiller(script: string): string | null {
-  const genreWater = findGenreWater(script);
-  if (genreWater) return genreWater;
   for (const pattern of CLICHE_FILLER_PATTERNS) {
     if (pattern.test(script)) {
       return `cliche filler: ${pattern.source}`;
@@ -1070,14 +1052,40 @@ export function findClicheFiller(script: string): string | null {
   return null;
 }
 
+/** Подсказка retry: чужая лексика амплуа (не гейт — только в промпт перегенерации). */
+export function personaLexiconRetryHint(
+  script: string,
+  narrator: StoryNarratorId | undefined,
+): string | undefined {
+  const id = resolveStoryNarrator(narrator);
+  if (id === 'fan' || id === 'contemporary') return undefined;
+  if (/я\s+обожаю/i.test(script)) {
+    return 'Без «я обожаю» — это голос фаната; у твоего амплуа другая лексика.';
+  }
+  if ((id === 'expert' || id === 'radio_host') && /удивил\w*\s+всех/i.test(script)) {
+    return 'Без «удивил всех» — начни с конкретного факта из семени, не с восторженного вступления.';
+  }
+  if (id === 'expert' && /жанров(?:ая|ой)\s+механик/i.test(script)) {
+    return 'Без лекции «жанровая механика» — жанр одним словом, остальное факты из семени.';
+  }
+  return undefined;
+}
+
 /** Подсказка модели при retry после брака quality gate. */
 export function buildStoryRetryDirective(
   reason: string | undefined,
   minWords: number,
+  options: { script?: string; storyNarrator?: StoryNarratorId } = {},
 ): string | undefined {
-  if (!reason?.trim()) return undefined;
-  const lower = reason.toLowerCase();
-  const parts: string[] = [`ПРИЧИНА БРАКА: ${reason}`];
+  const personaHint =
+    options.script?.trim() ?
+      personaLexiconRetryHint(options.script, options.storyNarrator)
+    : undefined;
+  if (!reason?.trim() && !personaHint) return undefined;
+  const lower = (reason ?? '').toLowerCase();
+  const parts: string[] = [];
+  if (reason?.trim()) parts.push(`ПРИЧИНА БРАКА: ${reason}`);
+  if (personaHint) parts.push(personaHint);
   if (lower.includes('no concrete fact') || lower.includes('genre water') || lower.includes('cliche filler')) {
     parts.push(
       'Убери воду про жанр и «уникальность». Каждое предложение — факт из семени: имя, событие, платформа, инструмент, курьёз.',
@@ -1098,7 +1106,7 @@ export function buildStoryRetryDirective(
   if (lower.includes('english')) {
     parts.push('Только русский: переведи обычные английские слова.');
   }
-  return parts.join(' ');
+  return parts.length > 0 ? parts.join(' ') : undefined;
 }
 
 /** Reject generic filler — artist name alone is not enough. */
@@ -1110,8 +1118,10 @@ export function findWateryContent(
   options: { skipPersonaCliches?: boolean } = {},
 ): string | null {
   const skipPersona = options.skipPersonaCliches ?? false;
-  const genreWater = findGenreWater(script);
-  if (genreWater) return genreWater;
+  if (!skipPersona) {
+    const genreWater = findGenreWater(script);
+    if (genreWater) return genreWater;
+  }
 
   const garbage = findLlmGarbage(script);
   if (garbage) return garbage;

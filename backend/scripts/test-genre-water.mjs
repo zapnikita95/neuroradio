@@ -23,8 +23,15 @@ const good =
 const facts = [
   '“Sit Next to Me” was released on July 17, 2017, as the last promotional single of Foster the People third album Supermodel.',
 ];
-const water = findWateryContent(good, 'Foster The People', 'Sit Next to Me', facts);
+const water = findWateryContent(good, 'Foster The People', 'Sit Next to Me', facts, {
+  skipPersonaCliches: true,
+});
 if (water) fail(`grounded script rejected: ${water}`);
-else ok('fact-grounded script passes water check');
+else ok('fact-grounded script passes production water check');
+
+const fanLine = 'Я обожаю этот promotional single. Марк Foster писал в студии.';
+const fanWater = findWateryContent(fanLine, '', '', facts, { skipPersonaCliches: true });
+if (fanWater) fail(`fan lexicon blocked in production: ${fanWater}`);
+else ok('fan lexicon not blocked by production gate');
 
 process.exit(failed > 0 ? 1 : 0);
