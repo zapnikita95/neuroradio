@@ -15,6 +15,7 @@ import { interestRating10 } from '../dist/services/fact-interest-log.js';
 import { isBoringFact } from '../dist/services/reference-fact-quality.js';
 import { BANK_PATH } from '../dist/services/fact-bank.js';
 import { classifyFactTopic, poolHasTopicDuplicate } from '../dist/services/fact-topic.js';
+import { isParserTrustedHarvestSource } from '../dist/services/fact-sources/types.js';
 
 const __dir = dirname(fileURLToPath(import.meta.url));
 const CATALOG = join(__dir, '../src/data/popular-tracks-catalog.json');
@@ -116,19 +117,45 @@ function saveCheckpoint(bank, stats, doneKeys, zeroFactKeys) {
 }
 
 function shouldRejectFact(trimmed, item) {
-  if (JUNK_FACT.test(trimmed)) return true;
+  if (JUNK_FACT.test(trimmed)) return 'junk';
+  if (isParserTrustedHarvestSource(item.source)) return null;
   if (item.scope === 'artist' && item.source === 'wiki' && trimmed.length >= 80) {
-    return interestScore(trimmed) < 2;
+    return interestScore(trimmed) < 2 ? 'wiki_low_score' : null;
   }
-  if (isBoringFact(trimmed)) return true;
-  return false;
+  if (isBoringFact(trimmed)) return 'boring';
+  return null;
+}
+
+function upsertRejectReason(bank, artist, title, item) {
+  const trimmed = item.fact.trim();
+  if (trimmed.length < 35) return 'short';
+  const quality = shouldRejectFact(trimmed, item);
+  if (quality) return quality;
+  const score = interestScore(trimmed);
+  const minScore = isParserTrustedHarvestSource(item.source) ? 0 : 3;
+  if (score < minScore) return `score<${minScore}`;
+  const fp = trimmed.toLowerCase().replace(/\s+/g, ' ').trim().slice(0, 200);
+  const tk = trackKey(artist, title);
+  const ak = artistKey(artist);
+  const pool = item.scope === 'artist' ? (bank.byArtist[ak] ?? []) : (bank.byTrack[tk] ?? []);
+  if (pool.some((f) => f.fact.toLowerCase().replace(/\s+/g, ' ').trim().slice(0, 200) === fp)) {
+    return 'duplicate';
+  }
+  const topicKey = classifyFactTopic(trimmed);
+  if (
+    topicKey !== 'misc' &&
+    pool.some((f) => f.topicKey === topicKey && f.topicKey !== 'misc')
+  ) {
+    return `topic:${topicKey}`;
+  }
+  if (poolHasTopicDuplicate(trimmed, pool.map((f) => f.fact))) return 'topic_overlap';
+  return null;
 }
 
 function upsertFact(bank, artist, title, item) {
   const trimmed = item.fact.trim();
-  if (trimmed.length < 35 || shouldRejectFact(trimmed, item)) return false;
+  if (upsertRejectReason(bank, artist, title, item)) return false;
   const score = interestScore(trimmed);
-  if (score < 3) return false;
   const rating = interestRating10(trimmed);
   const topicKey = classifyFactTopic(trimmed);
   const stored = {
@@ -175,18 +202,22 @@ async function processTrack(bank, track, stats) {
   let saved = 0;
   let savedHot = 0;
   let savedLastfm = 0;
+  const rejectCounts = {};
   for (const f of facts) {
     if (upsertFact(bank, artist, title, f)) {
       saved += 1;
       stats.bySource[f.source] = (stats.bySource[f.source] ?? 0) + 1;
       if (f.source === 'lastfm') savedLastfm += 1;
       if (interestRating10(f.fact) >= 6 && !JUNK_FACT.test(f.fact)) savedHot += 1;
+    } else {
+      const why = upsertRejectReason(bank, artist, title, f) ?? 'unknown';
+      rejectCounts[why] = (rejectCounts[why] ?? 0) + 1;
     }
   }
   stats.total += saved;
   stats.hot += savedHot;
   stats.tracks += 1;
-  return { saved, savedLastfm, harvested: facts.length };
+  return { saved, savedLastfm, harvested: facts.length, rejectCounts };
 }
 
 function orderTracks(tracks, doneKeys, bank, zeroFactKeys) {
@@ -224,13 +255,17 @@ async function runPool(tracks, bank, stats, doneKeys, zeroFactKeys) {
       const track = tracks[i];
       const key = trackKey(track.artist, track.title);
       try {
-        const { saved, savedLastfm, harvested } = await processTrack(bank, track, stats);
+        const { saved, savedLastfm, harvested, rejectCounts } = await processTrack(bank, track, stats);
         doneKeys.add(key);
         if (saved === 0) {
           zeroFactKeys.add(key);
           stats.zeroFacts = (stats.zeroFacts ?? 0) + 1;
+          const rejectHint =
+            harvested > 0 && Object.keys(rejectCounts).length
+              ? ` rejected=${JSON.stringify(rejectCounts)}`
+              : '';
           console.warn(
-            `[${stats.tracks}] ZERO ${track.artist} — ${track.title} (harvested=${harvested}, zeroTotal=${stats.zeroFacts})`,
+            `[${stats.tracks}] ZERO ${track.artist} — ${track.title} (harvested=${harvested}${rejectHint}, zeroTotal=${stats.zeroFacts})`,
           );
         } else {
           zeroFactKeys.delete(key);

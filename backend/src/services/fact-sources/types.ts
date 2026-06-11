@@ -17,6 +17,24 @@ export type HarvestSource =
   | 'ddg'
   | 'web';
 
+/** Genius/Last.fm/Setlist.fm parsers — relevance already checked; skip isBoringFact (live + bulk). */
+export const PARSER_TRUSTED_SOURCES: ReadonlySet<HarvestSource> = new Set([
+  'genius',
+  'lastfm',
+  'songfacts',
+  'whosampled',
+  'secondhandsongs',
+  'setlistfm',
+  'rap-ru',
+  'the-flow',
+  'discogs',
+  'musixmatch',
+]);
+
+export function isParserTrustedHarvestSource(source: HarvestSource): boolean {
+  return PARSER_TRUSTED_SOURCES.has(source);
+}
+
 export interface HarvestedFact {
   fact: string;
   scope: FactScope;

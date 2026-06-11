@@ -3,6 +3,8 @@
  */
 import { classifyFactTopic, factsShareTopicOrOverlap, poolHasTopicDuplicate } from '../dist/services/fact-topic.js';
 import { factFitsStoryLanguage, isEnglishOnlyRussianMetaFact } from '../dist/services/fact-language-fit.js';
+import { isParserTrustedHarvestSource } from '../dist/services/fact-sources/types.js';
+import { interestScore, isBoringFact } from '../dist/services/reference-fact-quality.js';
 
 const cases = [
   {
@@ -72,6 +74,29 @@ if (!factFitsStoryLanguage(kinoMeta, 'en')) {
 const coiFact = '«Группу крови» Виктор Цой написал практически без участия остальных музыкантов из «Кино».';
 if (!factFitsStoryLanguage(coiFact, 'ru')) {
   console.error('FAIL lang: native RU genius fact should fit RU');
+  failed += 1;
+}
+
+const museSingle = {
+  fact: 'The first single from Muse’s 2006 album Black Holes and Revelations.',
+  source: 'genius',
+};
+if (!isParserTrustedHarvestSource(museSingle.source)) {
+  console.error('FAIL bulk-trust: genius must be parser-trusted');
+  failed += 1;
+}
+function bulkWouldAccept(item) {
+  if (!isParserTrustedHarvestSource(item.source)) {
+    return !isBoringFact(item.fact) && interestScore(item.fact) >= 3;
+  }
+  return item.fact.trim().length >= 35;
+}
+if (!bulkWouldAccept(museSingle)) {
+  console.error('FAIL bulk-trust: Muse first-single genius fact should enter bank');
+  failed += 1;
+}
+if (!isBoringFact(museSingle.fact)) {
+  console.error('FAIL bulk-trust: expected isBoringFact=true for first-single (live still keeps via parser trust)');
   failed += 1;
 }
 
