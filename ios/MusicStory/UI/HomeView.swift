@@ -11,6 +11,7 @@ struct HomeView: View {
 
     var body: some View {
         MusicStoryBackground {
+            ZStack(alignment: .topTrailing) {
             ZStack(alignment: .bottom) {
             VStack(spacing: 0) {
                 topBar
@@ -73,6 +74,13 @@ struct HomeView: View {
                 )
                 .transition(.move(edge: .bottom).combined(with: .opacity))
             }
+            }
+
+            ShazamFloatingButton(isListening: nowPlaying.shazam.isListening) {
+                Task { await triggerManualShazam() }
+            }
+            .padding(.top, 58)
+            .padding(.trailing, 18)
             }
         }
         .navigationBarHidden(true)
@@ -160,18 +168,14 @@ struct HomeView: View {
                 Task { await orchestrator.requestManualStory() }
             }
 
-            SecondaryStoryButton(
-                title: nowPlaying.shazam.isListening ? AppStrings.Shazam.listeningHint : AppStrings.Shazam.recognizeButton,
-                enabled: !nowPlaying.shazam.isListening
-            ) {
-                Task {
-                    orchestrator.clearError()
-                    do {
-                        _ = try await nowPlaying.recognizeWithShazam()
-                    } catch {
-                        orchestrator.showError(error.localizedDescription)
-                    }
-                }
+            if nowPlaying.shazam.isListening {
+                Text(
+                    nowPlaying.shazam.usesHeadphonesRoute
+                        ? AppStrings.Shazam.listeningAirPods
+                        : AppStrings.Shazam.listeningHint
+                )
+                .font(.caption)
+                .foregroundStyle(AppTheme.mutedLavender)
             }
 
             if orchestrator.uiState.state == .playingStory || orchestrator.uiState.state == .preparingPlayback {
@@ -200,6 +204,15 @@ struct HomeView: View {
         case .fetchingStory: return "Генерируем историю…"
         case .preparingPlayback, .playingStory: return "История играет…"
         default: return "Рассказать историю"
+        }
+    }
+
+    private func triggerManualShazam() async {
+        orchestrator.clearError()
+        do {
+            _ = try await nowPlaying.recognizeWithShazam()
+        } catch {
+            orchestrator.showError(error.localizedDescription)
         }
     }
 

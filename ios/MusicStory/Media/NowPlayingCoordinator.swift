@@ -99,13 +99,23 @@ final class NowPlayingCoordinator: ObservableObject {
         publish(track: track)
     }
 
-    func recognizeWithShazam() async throws -> TrackInfo {
-        let track = try await shazam.recognizeOnce()
-        let playing = AVAudioSession.sharedInstance().isOtherAudioPlaying
-            || spotify.isPlaying
-            || appleMusic.isPlaying
-        publish(track: track, isPlaying: playing)
-        return track
+    func recognizeWithShazam(autoTriggered: Bool = false) async throws -> TrackInfo {
+        do {
+            let track = try await shazam.recognizeOnce()
+            let playing = AVAudioSession.sharedInstance().isOtherAudioPlaying
+                || spotify.isPlaying
+                || appleMusic.isPlaying
+            publish(track: track, isPlaying: playing)
+            if !autoTriggered {
+                otherAudioWatcher.recordManualSuccess(track)
+            }
+            return track
+        } catch {
+            if !autoTriggered {
+                otherAudioWatcher.recordManualFailure()
+            }
+            throw error
+        }
     }
 
     private func merge(

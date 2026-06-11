@@ -22,12 +22,11 @@ enum ShazamError: LocalizedError {
 final class ShazamTrackRecognizer: ObservableObject {
     @Published private(set) var isListening = false
     @Published private(set) var lastMatch: TrackInfo?
+    @Published private(set) var usesHeadphonesRoute = false
 
     private var activeSession: SHManagedSession?
-    private var recognizeTask: Task<TrackInfo, Error>?
 
     func recognizeOnce(timeout: TimeInterval = 12) async throws -> TrackInfo {
-        recognizeTask?.cancel()
         stopListening()
 
         guard await requestMicrophonePermission() else {
@@ -38,17 +37,21 @@ final class ShazamTrackRecognizer: ObservableObject {
         defer {
             isListening = false
             activeSession = nil
+            usesHeadphonesRoute = false
         }
+
+        try configureAudioSessionForShazam()
+        usesHeadphonesRoute = isHeadphoneRouteActive()
 
         let session = SHManagedSession()
         activeSession = session
         await session.prepare()
 
-        return try await withThrowingTaskGroup(of: TrackInfo.self) { group in
+        var track = try await withThrowingTaskGroup(of: TrackInfo.self) { group in
             group.addTask {
                 switch await session.result() {
                 case .match(let match):
-                    return try Self.track(from: match)
+                    return try await Self.track(from: match)
                 case .noMatch:
                     throw ShazamError.noMatch
                 case .error(_, _):
@@ -64,19 +67,54 @@ final class ShazamTrackRecognizer: ObservableObject {
                 throw ShazamError.noMatch
             }
             group.cancelAll()
-            self.lastMatch = track
             return track
         }
+
+        let durationMs = await TrackDurationResolver.resolveDurationMs(
+            artist: track.artist,
+            title: track.title
+        )
+        if durationMs > 0 {
+            track = TrackInfo(
+                artist: track.artist,
+                title: track.title,
+                album: track.album,
+                source: track.source,
+                durationMs: durationMs
+            )
+        }
+
+        lastMatch = track
+        return track
     }
 
     func stopListening() {
-        recognizeTask?.cancel()
-        recognizeTask = nil
         activeSession = nil
         isListening = false
     }
 
-    private static func track(from match: SHMatch) throws -> TrackInfo {
+    private func configureAudioSessionForShazam() throws {
+        let audioSession = AVAudioSession.sharedInstance()
+        var options: AVAudioSession.CategoryOptions = [.mixWithOthers, .allowBluetooth, .allowBluetoothA2DP]
+        if isHeadphoneRouteActive() {
+            options.insert(.defaultToSpeaker)
+        }
+        try audioSession.setCategory(.playAndRecord, mode: .measurement, options: options)
+        try audioSession.setActive(true, options: .notifyOthersOnDeactivation)
+    }
+
+    private func isHeadphoneRouteActive() -> Bool {
+        AVAudioSession.sharedInstance().currentRoute.outputs.contains { output in
+            switch output.portType {
+            case .headphones, .bluetoothA2DP, .bluetoothLE, .bluetoothHFP:
+                return true
+            default:
+                return false
+            }
+        }
+    }
+
+    private static func track(from match: SHMatch) async throws -> TrackInfo {
         guard let item = match.mediaItems.first else {
             throw ShazamError.noMatch
         }

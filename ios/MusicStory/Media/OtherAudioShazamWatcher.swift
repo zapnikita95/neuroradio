@@ -1,60 +1,60 @@
 import AVFoundation
 import Foundation
 
-/// When Spotify / Apple Music are not the active source, detects other apps playing audio
-/// and runs short Shazam bursts (not continuous mic) — similar spirit to Android auto mode.
+/// Auto-Shazam when other apps play audio. Pauses between attempts for the recognized track length.
 @MainActor
 final class OtherAudioShazamWatcher {
     private var task: Task<Void, Never>?
-    private var lastAttempt = Date.distantPast
+    private var policy = ShazamAutoPolicy()
     private var lastRecognizedKey: String?
 
-    private let pollIntervalNs: UInt64 = 2_000_000_000
-    private let recognizeCooldown: TimeInterval = 50
+    private let pollIntervalNs: UInt64 = 2_500_000_000
 
     func start(nowPlaying: NowPlayingCoordinator, settings: SettingsStore) {
         task?.cancel()
         task = Task { [weak nowPlaying, weak settings] in
-            var wasOtherAudioPlaying = false
             while !Task.isCancelled {
                 try? await Task.sleep(nanoseconds: self.pollIntervalNs)
                 guard let nowPlaying, let settings else { return }
                 guard settings.shazamAutoDetectEnabled else { continue }
-
-                let otherAudio = AVAudioSession.sharedInstance().isOtherAudioPlaying
-                if usesIntegratedPlayer(nowPlaying) {
-                    wasOtherAudioPlaying = otherAudio
-                    continue
-                }
-
-                guard otherAudio else {
-                    wasOtherAudioPlaying = false
-                    continue
-                }
-
-                let risingEdge = !wasOtherAudioPlaying
-                let periodicRescan = Date().timeIntervalSince(self.lastAttempt) >= self.recognizeCooldown
-                wasOtherAudioPlaying = true
-
-                guard risingEdge || periodicRescan else { continue }
                 guard !nowPlaying.shazam.isListening else { continue }
 
-                self.lastAttempt = Date()
+                let otherAudio = AVAudioSession.sharedInstance().isOtherAudioPlaying
+                let integrated = self.usesIntegratedPlayer(nowPlaying)
+
+                guard self.policy.shouldAttempt(
+                    otherAudioPlaying: otherAudio,
+                    integratedPlayerActive: integrated
+                ) else {
+                    continue
+                }
+
                 do {
-                    let track = try await nowPlaying.recognizeWithShazam()
+                    let track = try await nowPlaying.recognizeWithShazam(autoTriggered: true)
+                    self.policy.recordSuccess(track)
                     if track.displayKey != self.lastRecognizedKey {
                         self.lastRecognizedKey = track.displayKey
                     }
                 } catch {
-                    // No match or mic busy — try again on next cooldown / new playback.
+                    self.policy.recordFailure()
                 }
             }
         }
     }
 
+    func recordManualSuccess(_ track: TrackInfo) {
+        policy.recordSuccess(track)
+        lastRecognizedKey = track.displayKey
+    }
+
+    func recordManualFailure() {
+        policy.recordFailure()
+    }
+
     func stop() {
         task?.cancel()
         task = nil
+        policy.mediaDidStop()
     }
 
     private func usesIntegratedPlayer(_ nowPlaying: NowPlayingCoordinator) -> Bool {

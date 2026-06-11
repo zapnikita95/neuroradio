@@ -87,11 +87,12 @@ enum AppStrings {
 
         static let shazamTitle = "Другие плееры (Яндекс, VK и др.)"
         static let shazamSubtitle =
-            "Музыка ловится через Shazam: короткое распознавание, затем история по треку."
+            "Другие плееры ловятся через Shazam: короткое распознавание, пауза на длину трека, затем снова при смене."
 
         static let headphonesTitle = "Наушники"
         static let headphonesSubtitle =
-            "AirPods — распознавание прямо из наушников. Обычные наушники — поднесите телефон к источнику звука, как в Shazam."
+            "AirPods — Shazam слышит музыку в наушниках. Обычные — поднесите телефон к колонке. " +
+            "Если звук не музыка — Shazam не сработает и не будет спамить."
 
         static let notificationsTitle = "Уведомления"
         static let notificationsSubtitle = "Кнопка «Рассказать историю» в push о новом треке."
@@ -110,8 +111,9 @@ enum AppStrings {
 
         static let autoDetectTitle = "Shazam для других плееров"
         static let autoDetectHint =
-            "Когда играет музыка не из Spotify / Apple Music, приложение коротко слушает и узнаёт трек — " +
-            "как авто-режим на Android. Не non-stop: ~10 секунд раз в минуту, пока играет плеер."
+            "Пока играет чужой плеер: короткий Shazam (~10 с), затем пауза на длину трека. " +
+            "Музыка остановилась — Shazam выключается. Два промаха подряд — ждём нового воспроизведения."
+        static let listeningAirPods = "Слушаю в AirPods…"
         static let recognizeButton = "Распознать через Shazam"
         static let listeningHint = "Слушаю… поднесите к колонке"
         static let homeIdleSubtitle =
