@@ -1543,7 +1543,11 @@ router.post('/full', extractClientSecrets, validateStoryFullBody, storyFullRateL
       response.audioFile = audio.fileName;
       response.ttsProvider = audio.provider;
       if (audio.ttsTranscript) {
-        response.tts_transcript = formatUserFacingTranscript(audio.ttsTranscript);
+        const speakNames = (req.body as StoryFullBody).speak_track_names_in_voiceover === true;
+        response.tts_transcript = formatUserFacingTranscript(
+          audio.ttsTranscript,
+          speakNames ? story.script : undefined,
+        );
       }
     } else {
       response.audioUrl = null;

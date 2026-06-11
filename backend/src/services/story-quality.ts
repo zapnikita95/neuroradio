@@ -8,11 +8,10 @@ import { COVER_CONTEXT_RE, factMentionsArtist, factMentionsTitle, hasTrackContex
 import { hasRussianLeak } from './story-english-language.js';
 import { hasEnglishLeak } from './story-russian-language.js';
 import type { StoryLanguageId } from './story-language.js';
-import { prepareStoryScriptLanguage, transliterateLatinExceptPhrases } from './story-english-normalize.js';
+import { prepareStoryScriptLanguage } from './story-english-normalize.js';
 import { applyForeignPronunciation } from './tts-foreign-pronounce.js';
 import {
   genericizeScriptForVoiceover,
-  latinTrackProtectPhrases,
   shouldStripLatinTrackNames,
 } from './tts-generic-script.js';
 import { isTruncatedMarketingSnippet, isSpeakableReferenceFact } from './web-snippet-accept.js';
@@ -398,12 +397,8 @@ export function sanitizeScriptForTts(
     result = genericizeScriptForVoiceover(result, blockArtist, blockTitle);
   }
 
-  if (speakNames && latinTrackProtectPhrases(blockArtist, blockTitle).length > 0) {
-    result = transliterateLatinExceptPhrases(
-      result,
-      latinTrackProtectPhrases(blockArtist, blockTitle),
-    );
-  } else {
+  // Озвучка с названиями: латиница остаётся — Yandex SSML <lang en-US>, не «Зэ 2нд Ло».
+  if (!speakNames) {
     result = applyForeignPronunciation(result, '', '');
   }
 

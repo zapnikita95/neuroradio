@@ -157,12 +157,36 @@ export function normalizeLatinPunctuation(text: string): string {
     .trim();
 }
 
+/** 2nd → second inside Latin runs (TTS only — display script keeps «The 2nd Law»). */
+const EN_ORDINAL_WORDS: Record<number, string> = {
+  1: 'first',
+  2: 'second',
+  3: 'third',
+  4: 'fourth',
+  5: 'fifth',
+  6: 'sixth',
+  7: 'seventh',
+  8: 'eighth',
+  9: 'ninth',
+  10: 'tenth',
+  11: 'eleventh',
+  12: 'twelfth',
+};
+
+export function normalizeEnglishOrdinalsInLatin(text: string): string {
+  return text.replace(
+    /\b(\d{1,2})\s*(st|nd|rd|th)\b/gi,
+    (match, digits: string) => EN_ORDINAL_WORDS[parseInt(digits, 10)] ?? match,
+  );
+}
+
 export function enhanceMixedLanguageText(
   text: string,
   artist: string,
   title: string,
 ): string {
   let result = normalizeLatinPunctuation(text);
+  result = normalizeEnglishOrdinalsInLatin(result);
   result = addLatinArticulationPauses(result);
   void artist;
   void title;
