@@ -51,6 +51,7 @@
 		B1000038 /* ShazamAutoPolicy.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1000038 /* ShazamAutoPolicy.swift */; };
 		B1000039 /* ShazamFloatingButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1000039 /* ShazamFloatingButton.swift */; };
 		B1000041 /* AppleSignInCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1000041 /* AppleSignInCoordinator.swift */; };
+		B1000042 /* TelegramWidgetHtml.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1000042 /* TelegramWidgetHtml.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -126,6 +127,7 @@
 		F1000039 /* ShazamFloatingButton.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShazamFloatingButton.swift; sourceTree = "<group>"; };
 		F1000040 /* MusicStory.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = MusicStory.entitlements; sourceTree = "<group>"; };
 		F1000041 /* AppleSignInCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppleSignInCoordinator.swift; sourceTree = "<group>"; };
+		F1000042 /* TelegramWidgetHtml.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TelegramWidgetHtml.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -284,6 +286,7 @@
 				F1000026 /* AccountView.swift */,
 				F1000033 /* AccountLoginView.swift */,
 				F1000034 /* TelegramLoginWebView.swift */,
+				F1000042 /* TelegramWidgetHtml.swift */,
 				F1000035 /* StoryFeedbackSheet.swift */,
 				F1000039 /* ShazamFloatingButton.swift */,
 			);
@@ -427,6 +430,7 @@
 				B1000032 /* AccountAuthManager.swift in Sources */,
 				B1000033 /* AccountLoginView.swift in Sources */,
 				B1000034 /* TelegramLoginWebView.swift in Sources */,
+				B1000042 /* TelegramWidgetHtml.swift in Sources */,
 				B1000035 /* StoryFeedbackSheet.swift in Sources */,
 				B1000041 /* AppleSignInCoordinator.swift in Sources */,
 			);
@@ -505,7 +509,7 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = MusicStory/MusicStory.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 101;
+				CURRENT_PROJECT_VERSION = 102;
 				DEVELOPMENT_TEAM = Y52BT2N4L8;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = MusicStory/Info.plist;
@@ -517,7 +521,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 1.5.46;
+				MARKETING_VERSION = 1.5.47;
 				PRODUCT_BUNDLE_IDENTIFIER = com.efirai.myapp;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
@@ -531,7 +535,7 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = MusicStory/MusicStory.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 101;
+				CURRENT_PROJECT_VERSION = 102;
 				DEVELOPMENT_TEAM = Y52BT2N4L8;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = MusicStory/Info.plist;
@@ -543,7 +547,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 1.5.46;
+				MARKETING_VERSION = 1.5.47;
 				PRODUCT_BUNDLE_IDENTIFIER = com.efirai.myapp;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
@@ -555,7 +559,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 101;
+				CURRENT_PROJECT_VERSION = 102;
 				DEVELOPMENT_TEAM = Y52BT2N4L8;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = MusicStoryWidget/Info.plist;
@@ -566,7 +570,7 @@
 					"@executable_path/Frameworks",
 					"@executable_path/../../Frameworks",
 				);
-				MARKETING_VERSION = 1.5.46;
+				MARKETING_VERSION = 1.5.47;
 				PRODUCT_BUNDLE_IDENTIFIER = com.efirai.myapp.widget;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SKIP_INSTALL = YES;
@@ -580,7 +584,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 101;
+				CURRENT_PROJECT_VERSION = 102;
 				DEVELOPMENT_TEAM = Y52BT2N4L8;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = MusicStoryWidget/Info.plist;
@@ -591,7 +595,7 @@
 					"@executable_path/Frameworks",
 					"@executable_path/../../Frameworks",
 				);
-				MARKETING_VERSION = 1.5.46;
+				MARKETING_VERSION = 1.5.47;
 				PRODUCT_BUNDLE_IDENTIFIER = com.efirai.myapp.widget;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SKIP_INSTALL = YES;

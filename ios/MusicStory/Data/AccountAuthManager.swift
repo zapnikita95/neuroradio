@@ -59,7 +59,9 @@ final class AccountAuthManager {
     func fetchConfig() async -> AuthConfig? {
         do {
             let json = try await backend.fetchPublicJSON(path: "v1/public/auth-config")
-            let widgetBase = (json["telegramWidgetBaseUrl"] as? String).map { TelegramWidgetURL.normalizeBase($0) }
+            let widgetBase = (json["telegramWidgetBaseUrl"] as? String).map { raw in
+                raw.lowercased().contains("efir-ai.ru") ? TelegramWidgetHtml.widgetOrigin : raw
+            }
             return AuthConfig(
                 emailEnabled: json["emailEnabled"] as? Bool ?? true,
                 telegramEnabled: json["telegramEnabled"] as? Bool ?? false,

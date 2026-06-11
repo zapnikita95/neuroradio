@@ -68,12 +68,9 @@ struct AccountAuthPanel: View {
         }
         .task { await bootstrap() }
         .sheet(isPresented: $showTelegramSheet) {
-            if let cfg = authConfig,
-               let bot = cfg.telegramBotUsername,
-               let base = cfg.telegramWidgetBaseUrl {
+            if let cfg = authConfig, let bot = cfg.telegramBotUsername {
                 TelegramLoginSheet(
                     botUsername: bot,
-                    widgetBaseURL: base,
                     onAuth: { payload in
                         Task { await handleTelegramAuth(payload) }
                     },
