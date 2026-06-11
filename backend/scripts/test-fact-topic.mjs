@@ -2,6 +2,7 @@
  * Smoke test: generic topic keys + cross-source dedup (no track names in keys).
  */
 import { classifyFactTopic, factsShareTopicOrOverlap, poolHasTopicDuplicate } from '../dist/services/fact-topic.js';
+import { factFitsStoryLanguage, isEnglishOnlyRussianMetaFact } from '../dist/services/fact-language-fit.js';
 
 const cases = [
   {
@@ -54,8 +55,28 @@ if (classifyFactTopic(genius) === 'nevermind_recording') {
   failed += 1;
 }
 
+const kinoMeta =
+  'Кино (Kino, Russian for "cinema" or "movie") was a Soviet rock band formed by Виктор Цой';
+if (!isEnglishOnlyRussianMetaFact(kinoMeta)) {
+  console.error('FAIL lang: Kino Russian-for should be EN-only meta');
+  failed += 1;
+}
+if (factFitsStoryLanguage(kinoMeta, 'ru')) {
+  console.error('FAIL lang: Kino meta must not fit RU stories');
+  failed += 1;
+}
+if (!factFitsStoryLanguage(kinoMeta, 'en')) {
+  console.error('FAIL lang: Kino meta should fit EN stories');
+  failed += 1;
+}
+const coiFact = '«Группу крови» Виктор Цой написал практически без участия остальных музыкантов из «Кино».';
+if (!factFitsStoryLanguage(coiFact, 'ru')) {
+  console.error('FAIL lang: native RU genius fact should fit RU');
+  failed += 1;
+}
+
 if (failed > 0) {
   console.error(`\n${failed} test(s) failed`);
   process.exit(1);
 }
-console.log('OK fact-topic: classify + dedup');
+console.log('OK fact-topic: classify + dedup + lang-fit');

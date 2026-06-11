@@ -28,6 +28,7 @@ import {
   topicKeySet,
   type FactTopicKey,
 } from './fact-topic.js';
+import type { StoryLanguageId } from './story-language.js';
 import { getAccountUsedSeedsForArtistAsync } from './account-store.js';
 
 const PENDING_SEED_TTL_MS = 3 * 60_000;
@@ -158,13 +159,14 @@ export interface FactPickContext {
   rejectSimilarTo: string[];
   blockedTopics: Set<FactTopicKey>;
   recentScopes: FactScope[];
+  storyLanguage: StoryLanguageId;
 }
 
 export async function buildFactPickContext(
   installId: string,
   artist: string,
   title: string,
-  options: { album?: string; storyNarrator?: StoryNarratorId } = {},
+  options: { album?: string; storyNarrator?: StoryNarratorId; storyLanguage?: StoryLanguageId } = {},
 ): Promise<FactPickContext> {
   const [used, recentTrack, recentArtist, blockedTopics, recentScopes, narratorTopic] =
     await Promise.all([
@@ -179,7 +181,8 @@ export async function buildFactPickContext(
     ]);
   if (narratorTopic) blockedTopics.add(narratorTopic);
   const rejectSimilarTo = [...new Set([...recentTrack, ...recentArtist])];
-  return { usedFingerprints: used, rejectSimilarTo, blockedTopics, recentScopes };
+  const storyLanguage = options.storyLanguage ?? 'ru';
+  return { usedFingerprints: used, rejectSimilarTo, blockedTopics, recentScopes, storyLanguage };
 }
 
 export async function getRecentSeedFactsForTrack(
@@ -317,7 +320,7 @@ export async function pickBankFactForUser(
   ensureAccount(installId);
   const ctx =
     pickCtx ?? (await buildFactPickContext(installId, artist, title));
-  const { usedFingerprints: used, rejectSimilarTo, blockedTopics } = ctx;
+  const { usedFingerprints: used, rejectSimilarTo, blockedTopics, storyLanguage } = ctx;
   const keys: Array<[string, string]> = [[artist, title]];
   if (cover?.isCover) {
     keys.push([cover.factArtist, cover.factTitle]);
@@ -331,6 +334,7 @@ export async function pickBankFactForUser(
       0,
       rejectSimilarTo,
       blockedTopics,
+      storyLanguage,
     );
     if (fromBank && !factsTooSimilar(fromBank.fact, rejectSimilarTo)) {
       return storedFactToSelected(fromBank);
@@ -368,7 +372,7 @@ export async function pickFactForUser(
   const ctx =
     pickCtx ??
     (await buildFactPickContext(installId, artist, title, { storyNarrator: narrator }));
-  const { usedFingerprints: used, rejectSimilarTo, blockedTopics, recentScopes } = ctx;
+  const { usedFingerprints: used, rejectSimilarTo, blockedTopics, recentScopes, storyLanguage } = ctx;
 
   for (let offset = 0; offset < 8; offset += 1) {
     const fromBank = pickFromBank(
@@ -379,6 +383,7 @@ export async function pickFactForUser(
       offset,
       rejectSimilarTo,
       blockedTopics,
+      storyLanguage,
     );
     if (fromBank && !factsTooSimilar(fromBank.fact, rejectSimilarTo)) {
       return storedFactToSelected(fromBank);
@@ -391,6 +396,7 @@ export async function pickFactForUser(
   const picked = pickReferenceFact(bundle, mergedPrevious, storyIndex, artist, title, used, narrator, {
     blockedTopics,
     recentScopes,
+    storyLanguage,
   });
   if (picked && factsTooSimilar(picked.fact, rejectSimilarTo)) return null;
   return picked;

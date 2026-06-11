@@ -35,6 +35,8 @@ import {
   fetchDedicatedSourceFacts,
 } from './fact-sources/dedicated-fetch.js';
 import type { HarvestSource } from './fact-sources/types.js';
+import { factFitsStoryLanguage, filterBundleForStoryLanguage } from './fact-language-fit.js';
+import { resolveStoryLanguage, type StoryLanguageId } from './story-language.js';
 const USER_AGENT = 'MusicStoryBFF/1.0 (contact@example.com)';
 const RAW_SNIPPET_MIN_LEN = 30;
 const RAW_SNIPPET_MAX = 18;
@@ -802,16 +804,28 @@ export async function fetchAggregatedFactContext(
     title,
   );
 
-  if (rawSnippets.length > 0) {
-    console.log(`[facts] raw snippets (${rawSnippets.length}) for ${artist} — ${title}:`);
-    for (let i = 0; i < Math.min(5, rawSnippets.length); i++) {
-      const src = snippetSources[i] ?? '?';
-      const preview = rawSnippets[i]!.replace(/\s+/g, ' ').slice(0, 90);
-      console.log(`[facts]   ${i + 1}. [${src}] ${preview}${rawSnippets[i]!.length > 90 ? '…' : ''}`);
+  const storyLanguage: StoryLanguageId = resolveStoryLanguage(options.storyLanguage);
+  const langBundle = filterBundleForStoryLanguage(bundle, storyLanguage);
+  const langRawSnippets = rawSnippets.filter((s) => factFitsStoryLanguage(s, storyLanguage));
+  const langSnippetSources = snippetSources.filter((_, i) =>
+    factFitsStoryLanguage(rawSnippets[i] ?? '', storyLanguage),
+  );
+
+  if (langRawSnippets.length > 0) {
+    console.log(`[facts] raw snippets (${langRawSnippets.length}) for ${artist} — ${title}:`);
+    for (let i = 0; i < Math.min(5, langRawSnippets.length); i++) {
+      const src = langSnippetSources[i] ?? '?';
+      const preview = langRawSnippets[i]!.replace(/\s+/g, ' ').slice(0, 90);
+      console.log(`[facts]   ${i + 1}. [${src}] ${preview}${langRawSnippets[i]!.length > 90 ? '…' : ''}`);
     }
   }
 
-  return { bundle, rawSnippets, snippetSources, deepWebSearchRan };
+  return {
+    bundle: langBundle,
+    rawSnippets: langRawSnippets,
+    snippetSources: langSnippetSources,
+    deepWebSearchRan,
+  };
 }
 export async function fetchEmergencyFactRescue(
   artist: string,

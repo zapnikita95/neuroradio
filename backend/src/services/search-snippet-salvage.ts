@@ -4,6 +4,8 @@ import { interestRating10 } from './fact-interest-log.js';
 import { isMetadataOnlyFallbackFact } from './metadata-facts.js';
 import { interestScore, isWikiBiographyLead } from './reference-fact-quality.js';
 import { acceptSearchGroundedSnippet, acceptIndieEmergingSnippet, isLyricsPageSeed, isPlaylistJunkSnippet, isSpeakableReferenceFact, isUnspeakableWebSeed } from './web-snippet-accept.js';
+import { factFitsStoryLanguage } from './fact-language-fit.js';
+import type { StoryLanguageId } from './story-language.js';
 
 /** Seed too weak to ground LLM + quality gate — upgrade to wiki/better facts. */
 export function isWeakSnippetSeed(fact: string, score = interestScore(fact)): boolean {
@@ -29,9 +31,11 @@ export function pickSalvageSnippetSeed(
   rawSnippets: string[],
   artist: string,
   title: string,
+  storyLanguage: StoryLanguageId = 'ru',
 ): SelectedReferenceFact | null {
   const ranked = rawSnippets
     .map((snippet) => snippet.trim())
+    .filter((snippet) => factFitsStoryLanguage(snippet, storyLanguage))
     .filter((snippet) => snippet.length >= 35 && snippet.length <= 480)
     .filter((snippet) => acceptSearchGroundedSnippet(snippet, artist, title))
     .filter((snippet) => !isPlaylistJunkSnippet(snippet, artist, title))
@@ -64,9 +68,11 @@ export function pickRelaxedSnippetSeed(
   rawSnippets: string[],
   artist: string,
   title: string,
+  storyLanguage: StoryLanguageId = 'ru',
 ): SelectedReferenceFact | null {
   const ranked = rawSnippets
     .map((snippet) => snippet.trim())
+    .filter((snippet) => factFitsStoryLanguage(snippet, storyLanguage))
     .filter((snippet) => snippet.length >= 35 && snippet.length <= 480)
     .filter((snippet) => acceptIndieEmergingSnippet(snippet, artist, title))
     .filter((snippet) => !isPlaylistJunkSnippet(snippet, artist, title))

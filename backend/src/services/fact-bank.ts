@@ -11,6 +11,8 @@ import {
   poolHasTopicDuplicate,
   type FactTopicKey,
 } from './fact-topic.js';
+import { factFitsStoryLanguage } from './fact-language-fit.js';
+import type { StoryLanguageId } from './story-language.js';
 
 export interface StoredFact {
   id: string;
@@ -348,6 +350,7 @@ export function pickFromBank(
   startOffset = 0,
   rejectSimilarTo: string[] = [],
   blockedTopics: Set<FactTopicKey> = new Set(),
+  storyLanguage: StoryLanguageId = 'ru',
 ): StoredFact | null {
   const { track, artist: artistFacts } = listBankFacts(artist, title);
   const pools: Record<FactScope, StoredFact[]> = {
@@ -362,6 +365,7 @@ export function pickFromBank(
       if (usedFingerprints.has(factFingerprint(fact.fact))) continue;
       if (fact.topicKey && fact.topicKey !== 'misc' && blockedTopics.has(fact.topicKey)) continue;
       if (factsTooSimilar(fact.fact, rejectSimilarTo)) continue;
+      if (!factFitsStoryLanguage(fact.fact, storyLanguage)) continue;
       if (!(fact.isHot ?? fact.interestRating >= HOT_MIN_RATING)) continue;
       if (!isSpeakableReferenceFact(fact.fact, artist, title)) continue;
       if (isAmbiguousCommonWordArtist(artist) && !factMentionsArtistAsEntity(fact.fact, artist)) continue;

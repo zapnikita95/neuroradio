@@ -17,6 +17,8 @@ import { isMetadataOnlyFallbackFact } from './metadata-facts.js';
 import { isTruncatedMarketingSnippet, isUnspeakableWebSeed } from './web-snippet-accept.js';
 import { splitBundleByScope, type RankedFactScope } from './fact-ranking.js';
 import { isAlbumScopeFact, factMentionsOtherTrackTitle, isMisattributedBandTrackFact } from './fact-relevance.js';
+import { factFitsStoryLanguage } from './fact-language-fit.js';
+import type { StoryLanguageId } from './story-language.js';
 
 export type FactScope = RankedFactScope;
 
@@ -115,7 +117,8 @@ export function resolveScopeOrder(
   return storyIndex % 2 === 1 ? ['artist', 'album', 'track'] : ['track', 'album', 'artist'];
 }
 
-function isRejectedSeed(fact: string, title = ''): boolean {
+function isRejectedSeed(fact: string, title = '', storyLanguage: StoryLanguageId = 'ru'): boolean {
+  if (!factFitsStoryLanguage(fact, storyLanguage)) return true;
   if (isMetadataOnlyFallbackFact(fact)) return true;
   if (title && isMisattributedBandTrackFact(fact, title)) return true;
   if (WEAK_TRIVIA_PATTERNS.some((p) => p.test(fact))) return true;
@@ -145,9 +148,10 @@ function pickBestByInterest(
   title = '',
   narrator: StoryNarratorId = 'auto',
   blockedTopics: Set<FactTopicKey> = new Set(),
+  storyLanguage: StoryLanguageId = 'ru',
 ): string | null {
   for (const fact of sortByInterest(facts, narrator)) {
-    if (isRejectedSeed(fact, title)) continue;
+    if (isRejectedSeed(fact, title, storyLanguage)) continue;
     if (adjustedInterestScore(fact, narrator) < minScore) continue;
     if (isUsedFact(fact, usedFingerprints)) continue;
     const topic = classifyFactTopic(fact);
@@ -190,10 +194,12 @@ export function pickReferenceFact(
   options: {
     blockedTopics?: Set<FactTopicKey>;
     recentScopes?: FactScope[];
+    storyLanguage?: StoryLanguageId;
   } = {},
 ): SelectedReferenceFact | null {
   const pools = splitBundleByScope(bundle, artist, title);
   const blockedTopics = options.blockedTopics ?? new Set<FactTopicKey>();
+  const storyLanguage = options.storyLanguage ?? 'ru';
   const scopeOrder = resolveScopeOrder(storyIndex, options.recentScopes ?? []);
 
   for (const scope of scopeOrder) {
@@ -207,6 +213,7 @@ export function pickReferenceFact(
       title,
       narrator,
       blockedTopics,
+      storyLanguage,
     );
     if (picked && adjustedInterestScore(picked, narrator) >= MIN_GOOD_SCOPE_INTEREST) {
       return wrapSelected(picked, scope, narrator);
@@ -221,6 +228,7 @@ export function pickReferenceFact(
     title,
     narrator,
     blockedTopics,
+    storyLanguage,
   );
   if (globalBest) {
     const scope: FactScope = pools.track.includes(globalBest)
@@ -236,7 +244,7 @@ export function pickReferenceFact(
     if (isMetadataOnlyFallbackFact(fact)) continue;
     if (isMisattributedBandTrackFact(fact, title)) continue;
     if (isBoringFact(fact)) continue;
-    if (isRejectedSeed(fact, title)) continue;
+    if (isRejectedSeed(fact, title, storyLanguage)) continue;
     if (adjustedInterestScore(fact, narrator) < 6) continue;
     if (isUsedFact(fact, usedFingerprints)) continue;
     const topic = classifyFactTopic(fact);

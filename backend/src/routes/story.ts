@@ -24,6 +24,7 @@ import {
   reserveSeedForUser,
 } from '../services/fact-user-service.js';
 import { classifyFactTopic, FACT_TOPIC_LABELS_RU } from '../services/fact-topic.js';
+import { factFitsStoryLanguage } from '../services/fact-language-fit.js';
 import { ingestFacts, factFingerprint } from '../services/fact-bank.js';
 import { resolveArtistTier, isCatalogMajorArtist } from '../services/artist-notability.js';
 import { buildMetadataFallbackFacts, countGroundedFacts, isMetadataOnlyFallbackFact } from '../services/metadata-facts.js';
@@ -387,9 +388,11 @@ router.post('/full', extractClientSecrets, validateStoryFullBody, storyFullRateL
 
     const trackAlbum =
       typeof body.album === 'string' && body.album.trim() ? body.album.trim() : undefined;
+    const storyLang = storyLanguage ?? 'ru';
     const factPickCtx = await buildFactPickContext(installId, artist, title, {
       album: trackAlbum,
       storyNarrator,
+      storyLanguage: storyLang,
     });
     const usedFingerprints = factPickCtx.usedFingerprints;
     const rejectSimilarTo = factPickCtx.rejectSimilarTo;
@@ -426,6 +429,13 @@ router.post('/full', extractClientSecrets, validateStoryFullBody, storyFullRateL
 
     if (bankFact && usedFingerprints.has(factFingerprint(bankFact.fact))) {
       console.log(`[facts] bank seed already used for "${artist}" — "${title}", fetching fresh facts`);
+      bankFact = null;
+    }
+
+    if (bankFact && !factFitsStoryLanguage(bankFact.fact, storyLang)) {
+      console.log(
+        `[facts] bank seed wrong language (${storyLang}) for "${artist}" — "${title}", fetching fresh facts`,
+      );
       bankFact = null;
     }
 
@@ -517,6 +527,7 @@ router.post('/full', extractClientSecrets, validateStoryFullBody, storyFullRateL
           factCtx.rawSnippets,
           metadata.artist,
           metadata.title,
+          storyLang,
         );
         if (relaxedSeed) {
           factBundle =
@@ -680,8 +691,8 @@ router.post('/full', extractClientSecrets, validateStoryFullBody, storyFullRateL
         }
         if (!selectedFact) {
           const snippetSeed =
-            pickSalvageSnippetSeed(mergedSnippets, metadata.artist, metadata.title) ??
-            pickRelaxedSnippetSeed(mergedSnippets, metadata.artist, metadata.title);
+            pickSalvageSnippetSeed(mergedSnippets, metadata.artist, metadata.title, storyLang) ??
+            pickRelaxedSnippetSeed(mergedSnippets, metadata.artist, metadata.title, storyLang);
           if (snippetSeed) {
             selectedFact = snippetSeed;
             ingestFacts(metadata.artist, metadata.title, [
@@ -852,8 +863,8 @@ router.post('/full', extractClientSecrets, validateStoryFullBody, storyFullRateL
         );
       } else {
         const snippetSeed =
-          pickSalvageSnippetSeed(factCtx.rawSnippets, metadata.artist, metadata.title) ??
-          pickRelaxedSnippetSeed(factCtx.rawSnippets, metadata.artist, metadata.title);
+          pickSalvageSnippetSeed(factCtx.rawSnippets, metadata.artist, metadata.title, storyLang) ??
+          pickRelaxedSnippetSeed(factCtx.rawSnippets, metadata.artist, metadata.title, storyLang);
         if (snippetSeed) {
           selectedFact = snippetSeed;
           referenceFacts = [snippetSeed.fact];
@@ -892,8 +903,8 @@ router.post('/full', extractClientSecrets, validateStoryFullBody, storyFullRateL
         }
         if (!selectedFact) {
           const snippetSeed =
-            pickSalvageSnippetSeed(factCtx.rawSnippets, metadata.artist, metadata.title) ??
-            pickRelaxedSnippetSeed(factCtx.rawSnippets, metadata.artist, metadata.title);
+            pickSalvageSnippetSeed(factCtx.rawSnippets, metadata.artist, metadata.title, storyLang) ??
+            pickRelaxedSnippetSeed(factCtx.rawSnippets, metadata.artist, metadata.title, storyLang);
           if (snippetSeed) {
             selectedFact = snippetSeed;
             referenceFacts = [snippetSeed.fact];
@@ -1234,6 +1245,7 @@ router.post('/full', extractClientSecrets, validateStoryFullBody, storyFullRateL
             factCtx.rawSnippets,
             metadata.artist,
             metadata.title,
+            storyLang,
           );
           if (snippetFirst) {
             effectiveStoryInput = {
@@ -1347,8 +1359,8 @@ router.post('/full', extractClientSecrets, validateStoryFullBody, storyFullRateL
         (refFacts.length === 0 || refFacts.every(isMetadataOnlyFallbackFact))
       ) {
         const snippetSeed =
-          pickSalvageSnippetSeed(factCtx.rawSnippets, metadata.artist, metadata.title) ??
-          pickRelaxedSnippetSeed(factCtx.rawSnippets, metadata.artist, metadata.title);
+          pickSalvageSnippetSeed(factCtx.rawSnippets, metadata.artist, metadata.title, storyLang) ??
+          pickRelaxedSnippetSeed(factCtx.rawSnippets, metadata.artist, metadata.title, storyLang);
         if (snippetSeed) {
           effectiveStoryInput = {
             ...effectiveStoryInput,
