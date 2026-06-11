@@ -266,7 +266,11 @@ export async function generateStoryScript(
         );
         if (sanitizedQuality.ok) {
           const originalReason = quality.ok ? '' : quality.reason;
-          const sanitizedGarbage = findLlmGarbage(sanitized);
+          const sanitizedGarbage = findLlmGarbage(sanitized, {
+            allowVoiceoverPlaceholders: input.speakTrackNamesInVoiceover !== true,
+            skipHitMemoryWhenGrounded: true,
+            referenceFacts,
+          });
           const rejectSanitized =
             sanitizedGarbage != null ||
             originalReason.startsWith('no concrete fact') ||
@@ -305,7 +309,11 @@ export async function generateStoryScript(
           !referenceFactsAreAnchorable(referenceFacts, input.artist, input.title) &&
           !referenceFacts.every((f) => isWeakSnippetSeed(f)) &&
           factMentionsArtist(sanitized, input.artist) &&
-          !findLlmGarbage(sanitized)
+          !findLlmGarbage(sanitized, {
+            allowVoiceoverPlaceholders: input.speakTrackNamesInVoiceover !== true,
+            skipHitMemoryWhenGrounded: true,
+            referenceFacts,
+          })
         ) {
           console.warn(
             `[openrouter] accept story with junk seed — artist named, lore ok (${countWords(sanitized)} words)`,
@@ -357,7 +365,11 @@ export async function generateStoryScript(
       (storyMentionsPerformingArtist(sanitized, input.artist, input.title) ||
         hasConcreteFact(sanitized, input.artist, input.title) ||
         anchorsReferenceFact(sanitized, referenceFacts)) &&
-      !findLlmGarbage(sanitized) &&
+      !findLlmGarbage(sanitized, {
+        allowVoiceoverPlaceholders: input.speakTrackNamesInVoiceover !== true,
+        skipHitMemoryWhenGrounded: true,
+        referenceFacts,
+      }) &&
       !findHardScriptViolation(sanitized)
     ) {
       console.warn(

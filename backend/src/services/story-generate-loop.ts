@@ -140,6 +140,7 @@ export function finalizeAfterQualityLoop<T extends { script: string }>(
   }
   const water = findWateryContent(sanitized, input.artist, input.title, referenceFacts, {
     skipPersonaCliches: true,
+    speakTrackNamesInVoiceover: input.speakTrackNamesInVoiceover,
   });
   if (water) {
     logRejectedScript('last script rejected (watery/ungrounded)', sanitized, water);
@@ -150,7 +151,11 @@ export function finalizeAfterQualityLoop<T extends { script: string }>(
     logRejectedScript('last script rejected as hard violation', sanitized, hard);
     return null;
   }
-  const garbage = findLlmGarbage(sanitized);
+  const garbage = findLlmGarbage(sanitized, {
+    allowVoiceoverPlaceholders: input.speakTrackNamesInVoiceover !== true,
+    skipHitMemoryWhenGrounded: true,
+    referenceFacts,
+  });
   if (garbage) {
     logRejectedScript('last script rejected as llm garbage', sanitized, garbage);
     return null;
@@ -193,7 +198,11 @@ export function finalizeAfterQualityLoop<T extends { script: string }>(
       !referenceFactsAreAnchorable(referenceFacts, input.artist, input.title) &&
       !referenceFacts.every((f) => isWeakSnippetSeed(f)) &&
       factMentionsArtist(sanitized, input.artist) &&
-      !findLlmGarbage(sanitized)
+      !findLlmGarbage(sanitized, {
+        allowVoiceoverPlaceholders: input.speakTrackNamesInVoiceover !== true,
+        skipHitMemoryWhenGrounded: true,
+        referenceFacts,
+      })
     ) {
       console.warn('[story] accepting last script — junk seed, artist lore ok');
     } else {

@@ -824,7 +824,11 @@ export function validateStoryScript(
   }
 
   if (!skipWatery) {
-    const garbage = findLlmGarbage(trimmed);
+    const garbage = findLlmGarbage(trimmed, {
+      allowVoiceoverPlaceholders: noTrackNames,
+      skipHitMemoryWhenGrounded: true,
+      referenceFacts,
+    });
     if (garbage) {
       return { ok: false, reason: garbage };
     }
@@ -955,6 +959,21 @@ export function findGenericFiction(script: string): string | null {
   return persona.replace('persona cliche:', 'generic fiction:');
 }
 
+/** Обязательные замены в режиме «озвучка без имён» — не браковать (см. voiceover-no-names.ts). */
+const VOICEOVER_PLACEHOLDER_GARBAGE_PATTERNS: RegExp[] = [
+  /этот\s+артист/i,
+  /этот\s+исполнитель/i,
+  /эта\s+исполнительница/i,
+  /эта\s+артистка/i,
+];
+
+/** Штамп «хит в памяти» — бракуем только если нет якоря в seed-фактах. */
+const HIT_MEMORY_CLICHE_PATTERNS: RegExp[] = [
+  /стал\s+[а-яё]*\s*хитом[^.]{0,55}в\s+памят/i,
+  /хитом\s+[^.]{0,45}в\s+памят/i,
+  /не\s+только\s+в\s+чарте[^.]{0,45}в\s+памят/i,
+];
+
 const LLM_GARBAGE_PATTERNS: RegExp[] = [
   /крутить\s+к\s+блюду/i,
   /\bзвуким\b/i,
@@ -974,22 +993,35 @@ const LLM_GARBAGE_PATTERNS: RegExp[] = [
   /не\s+просто\s+(?:канал|музык|трек)[аи]?[^.]{0,40}не\s+просто/i,
   /(?:^|[\s,.!?«»])я\s+(?:слышал[аи]?|слышали)\s*,?\s*как\s/i,
   /(?:^|[\s,.!?«»])мне\s+(?:рассказывал[аи]?|говорил[аи]?)\s*,?\s*что\s/i,
-  /стал\s+[а-яё]*\s*хитом[^.]{0,55}в\s+памят/i,
-  /хитом\s+[^.]{0,45}в\s+памят/i,
-  /не\s+только\s+в\s+чарте[^.]{0,45}в\s+памят/i,
   /(?:^|[\s,.!?«»])я\s+(?:вложил|вложила|заплатил|заплатила|инвестировал[аи]?)\s[^.]{0,70}(?:миллион|тысяч|полмиллион|сот\s+тысяч|доллар)/i,
   /(?:^|[\s,.!?«»])меня\s+(?:до\s+сих\s+пор\s+)?мурашки\s+бегут/i,
   /переписывал[аи]?\s+кассет/i,
-  /этот\s+артист/i,
-  /этот\s+исполнитель/i,
   /псевдонимом\s+этот/i,
   /—\s*в\s+треке\s*[.!?]?$/i,
   /\+\s*б\s+\+\s*б/i,
   /\+[а-яё]/i,
 ];
 
-export function findLlmGarbage(script: string): string | null {
-  for (const pattern of LLM_GARBAGE_PATTERNS) {
+export interface LlmGarbageOptions {
+  /** Режим озвучки без латинских имён — «этот исполнитель» обязателен. */
+  allowVoiceoverPlaceholders?: boolean;
+  /** Не резать «хит в памяти», если текст опирается на seed-факты. */
+  skipHitMemoryWhenGrounded?: boolean;
+  referenceFacts?: string[];
+}
+
+export function findLlmGarbage(script: string, options?: LlmGarbageOptions): string | null {
+  const sets = [...LLM_GARBAGE_PATTERNS];
+  if (!options?.allowVoiceoverPlaceholders) {
+    sets.push(...VOICEOVER_PLACEHOLDER_GARBAGE_PATTERNS);
+  }
+  const skipHit =
+    options?.skipHitMemoryWhenGrounded &&
+    (options.referenceFacts?.length ? anchorsReferenceFact(script, options.referenceFacts) : false);
+  if (!skipHit) {
+    sets.push(...HIT_MEMORY_CLICHE_PATTERNS);
+  }
+  for (const pattern of sets) {
     if (pattern.test(script)) {
       return `llm garbage: ${pattern.source}`;
     }
@@ -1140,15 +1172,20 @@ export function findWateryContent(
   artist = '',
   title = '',
   referenceFacts: string[] = [],
-  options: { skipPersonaCliches?: boolean } = {},
+  options: { skipPersonaCliches?: boolean; speakTrackNamesInVoiceover?: boolean } = {},
 ): string | null {
   const skipPersona = options.skipPersonaCliches ?? false;
+  const noTrackNames = isVoiceoverWithoutTrackNames(options.speakTrackNamesInVoiceover);
   if (!skipPersona) {
     const genreWater = findGenreWater(script);
     if (genreWater) return genreWater;
   }
 
-  const garbage = findLlmGarbage(script);
+  const garbage = findLlmGarbage(script, {
+    allowVoiceoverPlaceholders: noTrackNames,
+    skipHitMemoryWhenGrounded: true,
+    referenceFacts,
+  });
   if (garbage) return garbage;
 
   if (referenceFacts.length > 0) {
