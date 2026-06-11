@@ -128,6 +128,12 @@ function savePromoteState(buckets: Map<string, PromoteBucket>): void {
   fs.writeFileSync(PROMOTE_STATE_PATH, JSON.stringify(out), 'utf8');
 }
 
+export function resetPromoteStateForBackfill(): void {
+  if (fs.existsSync(PROMOTE_STATE_PATH)) {
+    fs.unlinkSync(PROMOTE_STATE_PATH);
+  }
+}
+
 function passesPromoteQuality(
   script: string,
   seedFact: string,
@@ -143,17 +149,19 @@ function passesPromoteQuality(
       referenceFacts: [seedFact],
       storyLanguage: lang,
       skipPersonaCliches: true,
+      strictLength: false,
     });
     return check.ok;
   }
 
-  // Style-only gold (no seed in feedback) — still block obvious garbage.
   const styleOnly = validateStoryScript(script, DEFAULT_STORY_LENGTH, artist, title, {
     referenceFacts: ['style-like placeholder anchor'],
     storyLanguage: lang,
     skipReferenceAnchor: true,
     skipFirstSentenceAnchor: true,
     skipPersonaCliches: true,
+    strictLength: false,
+    minWordsOverride: 45,
   });
   return styleOnly.ok;
 }

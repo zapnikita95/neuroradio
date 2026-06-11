@@ -16,6 +16,7 @@ import {
   processFeedbackForStyleLearning,
   inferNarratorForInstall,
   inferNarratorFromScript,
+  resetPromoteStateForBackfill,
   type StyleFeedbackContext,
 } from './style-feedback-learn.js';
 const DATA_DIR = process.env.ACCOUNT_DATA_DIR?.trim() || path.join(process.cwd(), 'data');
@@ -175,6 +176,7 @@ export async function backfillStyleCorpusFromFeedback(): Promise<StyleBackfillRe
   if (hasPostgres()) {
     await hydrateAccountStoreFromPostgres();
   }
+  resetPromoteStateForBackfill();
   const goldBefore = countGoldCorpus();
   const entries = await loadAllStoryFeedback();
   let goodPersona = 0;
