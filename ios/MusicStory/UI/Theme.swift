@@ -144,6 +144,50 @@ struct SecondaryStoryButton: View {
     }
 }
 
+struct SettingsPreferenceRow: View {
+    let label: String
+    var subtitle: String? = nil
+    let selected: Bool
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            HStack(alignment: .top, spacing: 12) {
+                Image(systemName: selected ? "largecircle.fill.circle" : "circle")
+                    .foregroundStyle(selected ? AppTheme.accentViolet : AppTheme.mutedLavender)
+                    .padding(.top, 2)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(label)
+                        .font(.body)
+                        .foregroundStyle(AppTheme.creamText)
+                        .multilineTextAlignment(.leading)
+                    if let subtitle, !subtitle.isEmpty {
+                        Text(subtitle)
+                            .font(.caption)
+                            .foregroundStyle(AppTheme.mutedLavender)
+                            .multilineTextAlignment(.leading)
+                    }
+                }
+                Spacer(minLength: 0)
+            }
+            .padding(.vertical, 4)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+    }
+}
+
+struct SettingsSubheading: View {
+    let title: String
+
+    var body: some View {
+        Text(title)
+            .font(.caption.weight(.semibold))
+            .foregroundStyle(AppTheme.mutedLavender)
+            .padding(.top, 4)
+    }
+}
+
 struct SettingsSection<Content: View>: View {
     let title: String
     let summary: String

@@ -1,0 +1,37 @@
+---
+description: iOS настройки = зеркало Android. Не убирать амплуа/голоса, не показывать URL бэкенда.
+alwaysApply: true
+---
+
+# iOS Settings = Android Settings
+
+Правки **только вёрстки** — не удалять секции и выборы. Источник правды: `android/.../SettingsScreen.kt` + `strings.xml`.
+
+## Обязательные секции (сворачиваемые `SettingsSection`)
+
+1. **Общее** — уведомления, Shazam auto
+2. **Режим** — ручной / авто
+3. **Триггер** — режим, N треков
+4. **Рассказчик (амплуа)** — все `StoryNarrator` radio rows
+5. **Озвучка** — движок (premium), Edge **или** Yandex голоса, интонация, скорость, длина
+6. **Spotify** — Client ID, подключить
+7. **Ручной ввод** — артист / название
+8. **Офлайн-эфир** — только если есть доступ по тарифу
+
+## Запрещено в пользовательских настройках
+
+- **URL бэкенда** — только dev, не в Settings UI
+- Блок **Аккаунт** — вход на главной (иконка человека)
+- Офлайн-блок с текстом «нет доступа» — не показывать секцию вообще
+
+## Вёрстка
+
+- Все карточки `GlassCard` / `SettingsSection` — **одинаковая ширина** (`frame(maxWidth: .infinity)`)
+- Отступы: horizontal 20, spacing 16
+- Выборы: `SettingsPreferenceRow` (radio), не голые `Picker` без списка
+
+## API
+
+`StoryRequest` на iOS должен слать как Android: `story_narrator`, `tts_voice`, `tts_speed`, `tts_emotion`, `tts_provider`, `edge_voice_preset`, `client_platform: ios`.
+
+Док: `docs/IOS_SETTINGS_PARITY.md`

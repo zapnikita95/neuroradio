@@ -57,7 +57,9 @@ final class StoryRepository: ObservableObject {
             ttsVoice: settings.ttsVoice.rawValue,
             ttsSpeed: settings.ttsSpeedPreset.yandexSpeed,
             ttsEmotion: settings.ttsEmotion.rawValue,
-            clientPlatform: "ios"
+            clientPlatform: "ios",
+            ttsProvider: settings.effectiveServerTtsProvider.rawValue,
+            edgeVoicePreset: settings.edgeVoicePreset.rawValue
         )
 
         do {

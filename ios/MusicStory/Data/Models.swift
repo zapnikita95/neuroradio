@@ -10,6 +10,8 @@ struct StoryRequest: Encodable, Sendable {
     let ttsSpeed: Float
     let ttsEmotion: String
     let clientPlatform: String
+    let ttsProvider: String?
+    let edgeVoicePreset: String?
 
     enum CodingKeys: String, CodingKey {
         case artist
@@ -21,6 +23,8 @@ struct StoryRequest: Encodable, Sendable {
         case ttsSpeed = "tts_speed"
         case ttsEmotion = "tts_emotion"
         case clientPlatform = "client_platform"
+        case ttsProvider = "tts_provider"
+        case edgeVoicePreset = "edge_voice_preset"
     }
 }
 
