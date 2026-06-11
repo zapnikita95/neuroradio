@@ -37,6 +37,11 @@ import { hydrateAccountStoreFromPostgres, migrateAccountStoryDataToPostgres } fr
 import { hydrateDevTierStoreFromPostgres } from './services/dev-tier-store.js';
 import { buildTelegramWidgetPageHtml, telegramBotUsername } from './routes/telegram-widget-page.js';
 import { resolveTelegramWidgetBaseUrl, isTelegramConfigured } from './services/auth-config.js';
+import {
+  isTelegramOAuthConfigured,
+  resolveTelegramOAuthRedirectUri,
+  telegramBotNumericId,
+} from './services/telegram-oidc.js';
 import { resolveWebsiteDir, serveWebsite } from './serve-website.js';
 import publicRouter from './routes/public.js';
 import { startSubscriptionRenewalScheduler } from './services/subscription-renewal.js';
@@ -251,7 +256,14 @@ async function boot(): Promise<void> {
 
   const tgWidget = resolveTelegramWidgetBaseUrl();
   if (isTelegramConfigured() && tgWidget) {
-    console.log(`[boot] telegram widget origin=${tgWidget} (@BotFather /setdomain must match hostname)`);
+    console.log(`[boot] telegram widget origin=${tgWidget}`);
+  }
+  if (isTelegramOAuthConfigured()) {
+    console.log(
+      `[boot] telegram oauth client_id=${telegramBotNumericId()} redirect=${resolveTelegramOAuthRedirectUri()}`,
+    );
+  } else if (isTelegramConfigured()) {
+    console.warn('[boot] telegram oauth OFF — set TELEGRAM_OIDC_CLIENT_SECRET in Railway (BotFather → Login)');
   }
 
   const server = app.listen(PORT, '0.0.0.0', () => {

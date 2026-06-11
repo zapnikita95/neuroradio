@@ -26,14 +26,22 @@ struct AccountProfile: Codable, Sendable {
 struct AuthConfig: Sendable {
     let emailEnabled: Bool
     let telegramEnabled: Bool
+    let telegramOAuthEnabled: Bool
     let appleSignInEnabled: Bool
     let telegramBotUsername: String?
+    let telegramBotId: String?
+    let telegramOAuthRedirectUri: String?
     let telegramWidgetBaseUrl: String?
 
     var canUseTelegram: Bool {
-        telegramEnabled
-            && !(telegramBotUsername?.isEmpty ?? true)
-            && !(telegramWidgetBaseUrl?.isEmpty ?? true)
+        telegramOAuthEnabled
+            && !(telegramBotId?.isEmpty ?? true)
+            && !(telegramOAuthRedirectUri?.isEmpty ?? true)
+    }
+
+    /// Кнопка Telegram в UI — OAuth готов или бот объявлен в auth-config (до деплоя секрета).
+    var showsTelegramLogin: Bool {
+        canUseTelegram || !(telegramBotUsername?.isEmpty ?? true)
     }
 }
 
@@ -59,22 +67,25 @@ final class AccountAuthManager {
     func fetchConfig() async -> AuthConfig? {
         do {
             let json = try await backend.fetchPublicJSON(path: "v1/public/auth-config")
-            let widgetBase = (json["telegramWidgetBaseUrl"] as? String).map { raw in
-                raw.lowercased().contains("efir-ai.ru") ? TelegramWidgetHtml.widgetOrigin : raw
-            }
             return AuthConfig(
                 emailEnabled: json["emailEnabled"] as? Bool ?? true,
                 telegramEnabled: json["telegramEnabled"] as? Bool ?? false,
+                telegramOAuthEnabled: json["telegramOAuthEnabled"] as? Bool ?? false,
                 appleSignInEnabled: json["appleSignInEnabled"] as? Bool ?? true,
                 telegramBotUsername: json["telegramBotUsername"] as? String,
-                telegramWidgetBaseUrl: widgetBase
+                telegramBotId: json["telegramBotId"] as? String,
+                telegramOAuthRedirectUri: json["telegramOAuthRedirectUri"] as? String,
+                telegramWidgetBaseUrl: json["telegramWidgetBaseUrl"] as? String
             )
         } catch {
             return AuthConfig(
                 emailEnabled: true,
                 telegramEnabled: false,
+                telegramOAuthEnabled: false,
                 appleSignInEnabled: true,
                 telegramBotUsername: nil,
+                telegramBotId: nil,
+                telegramOAuthRedirectUri: nil,
                 telegramWidgetBaseUrl: nil
             )
         }
@@ -113,6 +124,44 @@ final class AccountAuthManager {
             let payload = try await AppleSignInCoordinator.shared.signIn()
             return await completeAppleSignIn(identityToken: payload.identityToken, email: payload.email)
         } catch let error as AppleSignInError {
+            return AccountLoginResult(error: error.localizedDescription)
+        } catch {
+            return AccountLoginResult(error: UserFacingError.message(for: error))
+        }
+    }
+
+    func signInWithTelegramOAuth() async -> AccountLoginResult {
+        guard let cfg = await fetchConfig(), cfg.canUseTelegram,
+              let botId = cfg.telegramBotId,
+              let redirectUri = cfg.telegramOAuthRedirectUri else {
+            return AccountLoginResult(error: "Telegram OAuth не настроен")
+        }
+        do {
+            let oauth = try await TelegramOAuthCoordinator.shared.signIn(
+                clientId: botId,
+                redirectUri: redirectUri
+            )
+            let payload: [String: Any] = [
+                "code": oauth.code,
+                "code_verifier": oauth.codeVerifier,
+                "redirect_uri": redirectUri,
+            ]
+            let body = try? JSONSerialization.data(withJSONObject: payload)
+            let data = try await backend.authorizedJSON(
+                path: "v1/account/telegram/oauth",
+                method: "POST",
+                body: body
+            )
+            if let err = data["error"] as? String, !err.isEmpty {
+                return AccountLoginResult(error: err)
+            }
+            let profile = parseProfile(data["profile"] as? [String: Any] ?? data)
+            settings.saveAccountProfile(profile)
+            if let plan = profile.plan, !plan.isEmpty {
+                settings.serverTier = plan
+            }
+            return AccountLoginResult(profile: profile)
+        } catch let error as TelegramOAuthError {
             return AccountLoginResult(error: error.localizedDescription)
         } catch {
             return AccountLoginResult(error: UserFacingError.message(for: error))

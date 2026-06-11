@@ -17,6 +17,7 @@ import { EDGE_VOICE_PRESETS } from '../services/edge-voices.js';
 import { hasYandexCredentials } from '../services/yandex-tts.js';
 import { getPublicDownloadLinks, getSiteApkUrl } from '../services/github-downloads.js';
 import { getPublicAuthConfig } from '../services/auth-config.js';
+import { oauthNativeBridgeHtml } from '../services/telegram-oidc.js';
 import {
   getWebCabinetStatus,
   startWebCabinetCode,
@@ -47,6 +48,14 @@ router.get('/downloads', async (_req: Request, res: Response) => {
 /** Login options for app UI — no JWT (shown before /v1/auth/token succeeds). */
 router.get('/auth-config', (_req: Request, res: Response) => {
   res.json(getPublicAuthConfig());
+});
+
+/** HTTPS redirect target for Telegram OIDC → efirai:// deep link (iOS ASWebAuthenticationSession). */
+router.get('/oauth/telegram/callback-bridge', (req: Request, res: Response) => {
+  const qs = req.url.includes('?') ? req.url.slice(req.url.indexOf('?') + 1) : '';
+  console.info('[telegram-oauth] callback-bridge qs_len=%s', qs.length);
+  res.setHeader('Cache-Control', 'no-store');
+  res.type('html').send(oauthNativeBridgeHtml(qs));
 });
 
 /** TTS options for free tier (Edge TTS vs paid SpeechKit). */

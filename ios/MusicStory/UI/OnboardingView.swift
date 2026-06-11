@@ -6,60 +6,63 @@ struct OnboardingView: View {
 
     @State private var step = 0
 
-    private let introSlotHeight: CGFloat = 96
-    private let vinylSlotHeight: CGFloat = 148
-    private let checklistSlotHeight: CGFloat = 196
-
     var body: some View {
         MusicStoryBackground {
-            VStack(spacing: 0) {
-                headerSlot
-                    .padding(.horizontal, 24)
-                    .padding(.top, 16)
+            GeometryReader { geo in
+                VStack(spacing: 0) {
+                    headerSlot
+                        .padding(.horizontal, 24)
+                        .padding(.top, step == 0 ? 12 : 8)
 
-                vinylSlot
-                    .padding(.horizontal, 24)
-                    .padding(.top, 8)
+                    Spacer(minLength: step == 0 ? 28 : 6)
+                        .layoutPriority(step == 0 ? 4 : 2)
 
-                checklistSlot
-                    .padding(.horizontal, 24)
-                    .padding(.top, 12)
+                    vinylSlot
+                        .padding(.horizontal, 24)
+                        .padding(.vertical, step == 0 ? 12 : 6)
 
-                Spacer(minLength: 12)
+                    Spacer(minLength: step == 0 ? 36 : 12)
+                        .layoutPriority(step == 0 ? 4 : 2)
 
-                bottomActions
-                    .padding(.horizontal, 24)
-                    .padding(.bottom, 12)
+                    checklistSlot
+                        .padding(.horizontal, 24)
+
+                    Spacer(minLength: step == 0 ? 8 : 10)
+                        .layoutPriority(step == 0 ? 0 : 1)
+
+                    bottomActions
+                        .padding(.horizontal, 24)
+                        .padding(.bottom, max(12, geo.safeAreaInsets.bottom > 0 ? 4 : 12))
+                }
             }
         }
     }
 
     private var headerSlot: some View {
-        VStack(spacing: 8) {
-            BrandTitle(fontSize: 26)
+        VStack(spacing: 10) {
+            BrandTitle(fontSize: step == 0 ? 28 : 24)
 
-            ZStack {
-                VStack(spacing: 8) {
-                    Text("Нейро-ведущий для Spotify и Apple Music")
-                        .font(.title3.weight(.semibold))
-                        .foregroundStyle(AppTheme.creamText)
-                        .multilineTextAlignment(.center)
+            if step == 0 {
+                Text("Нейро-ведущий для Spotify и Apple Music")
+                    .font(.title3.weight(.semibold))
+                    .foregroundStyle(AppTheme.creamText)
+                    .multilineTextAlignment(.center)
 
-                    Text("На iPhone — Spotify, Apple Music и ShazamKit. Истории голосом, пока играет ваш трек.")
-                        .font(.subheadline)
-                        .multilineTextAlignment(.center)
-                        .foregroundStyle(AppTheme.mutedLavender)
-                        .lineLimit(3)
-                }
-                .opacity(step == 0 ? 1 : 0)
+                Text("На iPhone — Spotify, Apple Music и ShazamKit. Истории голосом, пока играет ваш трек.")
+                    .font(.subheadline)
+                    .multilineTextAlignment(.center)
+                    .foregroundStyle(AppTheme.mutedLavender)
+                    .lineLimit(3)
+                    .fixedSize(horizontal: false, vertical: true)
             }
-            .frame(height: introSlotHeight)
         }
+        .frame(maxWidth: .infinity)
     }
 
     private var vinylSlot: some View {
         VinylDisc(spinning: true)
-            .frame(height: vinylSlotHeight)
+            .scaleEffect(step == 0 ? 1.02 : 0.86)
+            .frame(height: step == 0 ? 248 : 168)
             .frame(maxWidth: .infinity)
     }
 
@@ -86,7 +89,6 @@ struct OnboardingView: View {
                 )
             }
         }
-        .frame(height: checklistSlotHeight, alignment: .top)
     }
 
     @ViewBuilder
@@ -106,7 +108,6 @@ struct OnboardingView: View {
                     .foregroundStyle(AppTheme.mutedLavender)
                     .multilineTextAlignment(.center)
                     .lineLimit(3)
-                    .frame(minHeight: 36)
 
                 if let error = nowPlaying.spotify.connectionError {
                     Text(error)

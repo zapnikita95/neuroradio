@@ -1,4 +1,9 @@
 import { isEmailConfigured } from './email-sender.js';
+import {
+  isTelegramOAuthConfigured,
+  resolveTelegramOAuthRedirectUri,
+  telegramBotNumericId,
+} from './telegram-oidc.js';
 
 export function telegramBotUsername(): string | null {
   return process.env.TELEGRAM_BOT_USERNAME?.trim().replace(/^@/, '') ?? null;
@@ -61,18 +66,25 @@ function normalizeTelegramWidgetOrigin(hostOrOrigin: string): string {
 export function getPublicAuthConfig(): {
   emailEnabled: boolean;
   telegramEnabled: boolean;
+  telegramOAuthEnabled: boolean;
   appleSignInEnabled: boolean;
   telegramBotUsername: string | null;
+  telegramBotId: string | null;
+  telegramOAuthRedirectUri: string | null;
   telegramWidgetBaseUrl: string | null;
 } {
   const widgetBase = resolveTelegramWidgetBaseUrl();
   const botUsername = telegramBotUsername();
+  const oauthReady = isTelegramOAuthConfigured();
   return {
     // Email login works without SMTP (reviewer codes + server logs).
     emailEnabled: true,
-    telegramEnabled: isTelegramConfigured(),
+    telegramEnabled: oauthReady || isTelegramConfigured(),
+    telegramOAuthEnabled: oauthReady,
     appleSignInEnabled: true,
     telegramBotUsername: botUsername,
+    telegramBotId: telegramBotNumericId(),
+    telegramOAuthRedirectUri: oauthReady ? resolveTelegramOAuthRedirectUri() : null,
     telegramWidgetBaseUrl: widgetBase,
   };
 }

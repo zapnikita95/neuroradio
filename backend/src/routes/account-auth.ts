@@ -13,6 +13,11 @@ import {
 import { verifyAppleIdentityToken } from '../services/apple-sign-in.js';
 import { verifyTelegramLogin, type TelegramAuthPayload } from '../services/telegram-auth.js';
 import { getPublicAuthConfig } from '../services/auth-config.js';
+import {
+  exchangeTelegramOidcCode,
+  resolveTelegramOAuthRedirectUri,
+  verifyTelegramIdToken,
+} from '../services/telegram-oidc.js';
 
 const router = Router();
 
@@ -118,7 +123,64 @@ router.post('/apple', async (req: Request, res: Response) => {
   });
 });
 
-/** Telegram Login Widget — hash verified server-side (WebView in app, baseUrl = TELEGRAM_WIDGET_BASE_URL). */
+/** Telegram OIDC (oauth.telegram.org + PKCE) — как Movie Planner native iOS. */
+router.post('/telegram/oauth', async (req: Request, res: Response) => {
+  const code = typeof req.body?.code === 'string' ? req.body.code.trim() : '';
+  const redirectUri =
+    typeof req.body?.redirect_uri === 'string' && req.body.redirect_uri.trim()
+      ? req.body.redirect_uri.trim()
+      : resolveTelegramOAuthRedirectUri();
+  const codeVerifier =
+    typeof req.body?.code_verifier === 'string' ? req.body.code_verifier.trim() : '';
+
+  console.info(
+    '[telegram-oauth] POST /telegram/oauth install=%s code_len=%s',
+    req.installId?.slice(0, 8) ?? '-',
+    code.length,
+  );
+
+  if (!code || !codeVerifier) {
+    res.status(400).json({ error: 'missing_fields' });
+    return;
+  }
+
+  const exchanged = await exchangeTelegramOidcCode(code, redirectUri, codeVerifier);
+  if (!exchanged.ok) {
+    const status = exchanged.error === 'oauth_not_configured' ? 503 : 401;
+    res.status(status).json({ error: exchanged.error });
+    return;
+  }
+
+  const verified = await verifyTelegramIdToken(exchanged.idToken);
+  if (!verified.ok) {
+    res.status(401).json({ error: verified.error });
+    return;
+  }
+
+  const deviceFingerprint =
+    typeof req.body?.device_fingerprint === 'string' ? req.body.device_fingerprint : undefined;
+  const result = linkTelegramAccount(
+    req.installId!,
+    verified.telegramId,
+    verified.username,
+    deviceFingerprint,
+  );
+  if (!result.ok) {
+    res.status(400).json({ error: result.error });
+    return;
+  }
+  const cloud = await pullAccountCloudData(req.installId!);
+  const profile = await getAccountProfileLoaded(req.installId!);
+  res.json({
+    ok: true,
+    accountId: result.accountId,
+    profile,
+    history: cloud?.history ?? [],
+    scrobbles: cloud?.scrobbles ?? [],
+  });
+});
+
+/** Telegram Login Widget — hash verified server-side (legacy WebView). */
 router.post('/telegram', async (req: Request, res: Response) => {
   const botToken = process.env.TELEGRAM_BOT_TOKEN?.trim();
   if (!botToken) {

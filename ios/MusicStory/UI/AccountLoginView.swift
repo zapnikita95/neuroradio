@@ -16,7 +16,6 @@ struct AccountAuthPanel: View {
     @State private var message: String?
     @State private var loading = false
     @State private var authConfig: AuthConfig?
-    @State private var showTelegramSheet = false
     @State private var showEmailSheet = false
     @State private var emailSheetDetent: PresentationDetent = .height(300)
     @State private var backendReady = false
@@ -50,9 +49,9 @@ struct AccountAuthPanel: View {
                     }
                 }
 
-                if authConfig?.canUseTelegram == true {
+                if authConfig?.showsTelegramLogin == true {
                     TelegramLoginIconButton(loading: loading) {
-                        showTelegramSheet = true
+                        Task { await signInWithTelegram() }
                     }
                 }
 
@@ -67,17 +66,6 @@ struct AccountAuthPanel: View {
                 .foregroundStyle(AppTheme.mutedLavender)
         }
         .task { await bootstrap() }
-        .sheet(isPresented: $showTelegramSheet) {
-            if let cfg = authConfig, let bot = cfg.telegramBotUsername {
-                TelegramLoginSheet(
-                    botUsername: bot,
-                    onAuth: { payload in
-                        Task { await handleTelegramAuth(payload) }
-                    },
-                    onDismiss: { showTelegramSheet = false }
-                )
-            }
-        }
         .sheet(isPresented: $showEmailSheet, onDismiss: resetEmailFlow) {
             emailLoginSheet
         }
@@ -199,8 +187,11 @@ struct AccountAuthPanel: View {
         authConfig = AuthConfig(
             emailEnabled: true,
             telegramEnabled: false,
+            telegramOAuthEnabled: false,
             appleSignInEnabled: true,
             telegramBotUsername: nil,
+            telegramBotId: nil,
+            telegramOAuthRedirectUri: nil,
             telegramWidgetBaseUrl: nil
         )
         let prep = await BackendClient.shared.prepareForLogin()
@@ -209,6 +200,20 @@ struct AccountAuthPanel: View {
             authConfig = await AccountAuthManager.shared.fetchConfig()
         } else {
             message = prep.error
+        }
+    }
+
+    private func signInWithTelegram() async {
+        loading = true
+        defer { loading = false }
+        let result = await AccountAuthManager.shared.signInWithTelegramOAuth()
+        if let err = result.error {
+            if !err.localizedCaseInsensitiveContains("отменён") {
+                message = err
+            }
+        } else {
+            await StoryRepository.shared.refreshQuota()
+            onSuccess()
         }
     }
 
@@ -279,18 +284,6 @@ struct AccountAuthPanel: View {
         }
     }
 
-    private func handleTelegramAuth(_ payload: [String: Any]) async {
-        loading = true
-        defer { loading = false }
-        showTelegramSheet = false
-        let result = await AccountAuthManager.shared.linkTelegram(payload: payload)
-        if let err = result.error {
-            message = err
-        } else {
-            await StoryRepository.shared.refreshQuota()
-            onSuccess()
-        }
-    }
 }
 
 struct AppleLoginIconButton: View {
