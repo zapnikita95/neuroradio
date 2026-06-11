@@ -24,12 +24,12 @@ const YANDEX_LPCM_SAMPLE_RATE = 48_000;
 
 export type YandexAudioFormat = 'oggopus' | 'lpcm-wav';
 
-/** WAV by default — Android ExoPlayer reliably plays PCM WAV; oggopus fails on some devices. */
+/** OGG by default — Play Store app offline cache uses .ogg paths; WAV broke ExoPlayer for premium users. */
 export function resolveYandexAudioFormat(): YandexAudioFormat {
   const fmt = process.env.YANDEX_TTS_FORMAT?.trim().toLowerCase();
-  if (fmt === 'ogg' || fmt === 'oggopus') return 'oggopus';
   if (fmt === 'wav' || fmt === 'lpcm' || fmt === 'lpcm-wav') return 'lpcm-wav';
-  return 'lpcm-wav';
+  if (fmt === 'ogg' || fmt === 'oggopus') return 'oggopus';
+  return 'oggopus';
 }
 
 export function yandexAudioExtension(format: YandexAudioFormat = resolveYandexAudioFormat()): 'ogg' | 'wav' {

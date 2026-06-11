@@ -270,7 +270,7 @@ async function boot(): Promise<void> {
     console.log(`Music Story BFF listening on http://0.0.0.0:${PORT}`);
     console.log(`[boot] log file: ${process.env.LOCAL_LOG_FILE ?? '(console only)'}`);
     console.log(
-      `[boot] build=${BUILD_ID} llm=${resolveLlmProvider()} openrouter=${hasOpenRouterApiKey()} groq=${hasGroqApiKey()} gemini=${hasGeminiApiKey()} yandexTts=${hasYandexCredentials()} elevenLabs=${canUseElevenLabsProduction()} proxy=${Boolean(process.env.HTTPS_PROXY)} auth=${isAppAuthEnabled()} postgres=${hasPostgres()}`,
+      `[boot] build=${BUILD_ID} llm=${resolveLlmProvider()} openrouter=${hasOpenRouterApiKey()} groq=${hasGroqApiKey()} gemini=${hasGeminiApiKey()} yandexTts=${hasYandexCredentials()} yandexFormat=${process.env.YANDEX_TTS_FORMAT?.trim() || 'oggopus(default)'} elevenLabs=${canUseElevenLabsProduction()} proxy=${Boolean(process.env.HTTPS_PROXY)} auth=${isAppAuthEnabled()} postgres=${hasPostgres()}`,
     );
     console.log(`  POST /v1/auth/token — app JWT`);
     console.log(`  GET  /v1/account/* — email/Telegram auth + 7-day trial`);

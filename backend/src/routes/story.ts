@@ -54,7 +54,7 @@ import { isMusicArtistWikiExtract } from '../services/wikipedia-music.js';
 import { countWords, detectStoryQualityWarnings, sanitizeScriptForTts } from '../services/story-quality.js';
 import type { StoryScript } from '../services/groq.js';
 import { setLogDetail } from '../middleware/request-logger.js';
-import { hasYandexCredentials } from '../services/yandex-tts.js';
+import { hasYandexCredentials, yandexAudioExtension } from '../services/yandex-tts.js';
 import {
   canSynthesizeServerTts,
   hasUserTtsCredentials,
@@ -1505,7 +1505,7 @@ router.post('/full', extractClientSecrets, validateStoryFullBody, storyFullRateL
         ttsProvider: effectiveTtsProvider,
         script: story.script,
         voiceId,
-        fileName: `${id}.wav`,
+        fileName: `${id}.${yandexAudioExtension()}`,
         speed: delivery.speed,
         emotion: delivery.emotion,
         pauseProfile: delivery.pauseProfile,
