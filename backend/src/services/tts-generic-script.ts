@@ -20,6 +20,33 @@ export function isPrimarilyLatin(text: string): boolean {
   return latin >= cyrillic;
 }
 
+/**
+ * Настройка «без названий в озвучке»: только полностью латинский artist/title.
+ * Любая кириллица в метаданных — не трогаем (русские имена/названия остаются).
+ */
+export function shouldStripLatinTrackNames(text: string): boolean {
+  const trimmed = text.trim();
+  if (!trimmed) return false;
+  if (/[а-яёА-ЯЁ]/.test(trimmed)) return false;
+  return /[A-Za-zÀ-ÿ]/.test(trimmed);
+}
+
+/** Фразы artist/title для маски при транслитерации (озвучка с названиями). */
+export function latinTrackProtectPhrases(artist: string, title: string): string[] {
+  const out: string[] = [];
+  const add = (phrase: string) => {
+    const p = phrase.trim();
+    if (p.length >= 2 && shouldStripLatinTrackNames(p)) out.push(p);
+  };
+  add(artist);
+  add(title);
+  for (const p of [artist, title]) {
+    for (const v of phraseVariants(p)) add(v);
+    for (const a of latinAliasPhrases(p)) add(a);
+  }
+  return out.filter((v, i, arr) => arr.indexOf(v) === i);
+}
+
 function phraseVariants(phrase: string): string[] {
   const base = phrase.trim();
   const withoutParens = base.replace(/\s*\([^)]*\)\s*/g, ' ').replace(/\s+/g, ' ').trim();
@@ -34,7 +61,7 @@ const ARTICLE_PREFIX = /^(the|a|an)\s+/i;
 export function latinTrackBlocklist(artist: string, title: string): Set<string> {
   const blocked = new Set<string>();
   const addPhrase = (phrase: string) => {
-    if (!isPrimarilyLatin(phrase)) return;
+    if (!shouldStripLatinTrackNames(phrase)) return;
     for (const variant of phraseVariants(phrase)) {
       for (const part of variant.split(/[^\p{L}\p{N}]+/u)) {
         const word = part.trim().toLowerCase();
@@ -133,7 +160,7 @@ function replaceLatinPhrase(
 }
 
 function stripLatinArtistAfterOt(text: string, artist: string): string {
-  if (!isPrimarilyLatin(artist)) return text;
+  if (!shouldStripLatinTrackNames(artist)) return text;
   let result = text;
   for (const variant of phraseVariants(artist)) {
     const escaped = escapeRe(variant);
@@ -143,8 +170,8 @@ function stripLatinArtistAfterOt(text: string, artist: string): string {
 }
 
 function rewriteLead(script: string, title: string, artist: string): string {
-  const stripTitle = isPrimarilyLatin(title);
-  const stripArtist = isPrimarilyLatin(artist);
+  const stripTitle = shouldStripLatinTrackNames(title);
+  const stripArtist = shouldStripLatinTrackNames(artist);
 
   const leadRe = new RegExp(
     `^${escapeRe(title)}\\s+от\\s+${escapeRe(artist)}(\\s*[—–-]\\s*|\\s+)`,
@@ -215,6 +242,7 @@ function cleanupAfterGenericize(text: string): string {
     .replace(/\bна\s+трек\s+(?:эта песня|этот трек|эта композиция)\b/giu, 'на этот трек')
     .replace(/(^|\s)с\s+(?:артист|исполнитель|музыкант|группа)(?=\s|[,.!?—–-]|$)/giu, '$1с ним')
     .replace(/(^|\s)у\s+(?:артист|исполнитель|музыкант)(?=\s|[,.!?—–-]|$)/giu, '$1у него')
+    .replace(/(?:исполнитель|артист|музыкант|группа)\s+он(?=\s|[,.!?—–-]|$)/giu, 'он')
     .replace(/\s+,\s*,/g, ',')
     .replace(/,\s*,/g, ',')
     .replace(/\s{2,}/g, ' ')
@@ -237,8 +265,8 @@ export function genericizeScriptForVoiceover(
   const trimmed = script.trim();
   if (!trimmed) return trimmed;
 
-  const stripTitle = isPrimarilyLatin(title);
-  const stripArtist = isPrimarilyLatin(artist);
+  const stripTitle = shouldStripLatinTrackNames(title);
+  const stripArtist = shouldStripLatinTrackNames(artist);
   if (!stripTitle && !stripArtist) return trimmed;
 
   let result = rewriteLead(trimmed, title, artist);

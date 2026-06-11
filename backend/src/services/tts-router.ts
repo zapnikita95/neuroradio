@@ -20,7 +20,6 @@ import {
 import { synthesizeSpeechEdge } from './edge-tts-story.js';
 import type { EdgeVoicePresetId } from './edge-voices.js';
 import { resolveEdgeVoicePresetId } from './edge-voices.js';
-import { genericizeScriptForVoiceover } from './tts-generic-script.js';
 import type { TtsEmotion } from './tts-options.js';
 import type { TtsPauseProfile, TtsVoiceStyleId } from './tts-voice-profiles.js';
 import {
@@ -180,14 +179,9 @@ export function resolveEffectiveTtsProvider(
   return 'yandex';
 }
 
-function scriptForProvider(request: TtsRouteRequest, provider: EffectiveTtsProvider): string {
-  const speakNames = request.speakTrackNamesInVoiceover === true;
-  if (speakNames) return request.script;
-  return genericizeScriptForVoiceover(
-    request.script,
-    request.artist ?? '',
-    request.title ?? '',
-  );
+function scriptForProvider(request: TtsRouteRequest, _provider: EffectiveTtsProvider): string {
+  // genericize + транслитерация — в sanitizeScriptForTts (prepareYandexTtsText), без двойной обработки
+  return request.script;
 }
 
 function ttsMarkupFlags(request: TtsRouteRequest): { speakTrackNamesInVoiceover: boolean } {

@@ -1,7 +1,11 @@
 /**
  * Run: npm run build && node scripts/test-tts-generic-script.mjs
  */
-import { genericizeScriptForVoiceover, isPrimarilyLatin } from '../dist/services/tts-generic-script.js';
+import {
+  genericizeScriptForVoiceover,
+  isPrimarilyLatin,
+  shouldStripLatinTrackNames,
+} from '../dist/services/tts-generic-script.js';
 import { applyRussianStressSafe } from '../dist/services/russian-stress.js';
 
 function ok(cond, msg) {
@@ -16,6 +20,8 @@ function ok(cond, msg) {
 ok(isPrimarilyLatin('Killing in The Name') === true, 'latin title detected');
 ok(isPrimarilyLatin('Лагерная Пыль') === false, 'cyrillic title kept');
 ok(isPrimarilyLatin('Snow (Hey Oh)') === true, 'mixed latin title');
+ok(shouldStripLatinTrackNames('Король и Шут') === false, 'cyrillic artist not stripped');
+ok(shouldStripLatinTrackNames('Snow (Hey Oh)') === true, 'latin title stripped');
 
 const rhcp =
   'Snow от Red Hot Chili Peppers — гитарный рифф с альбома Stadium Arcadium. ' +

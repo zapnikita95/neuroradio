@@ -8,7 +8,13 @@ import { COVER_CONTEXT_RE, factMentionsArtist, factMentionsTitle, hasTrackContex
 import { hasRussianLeak } from './story-english-language.js';
 import { hasEnglishLeak } from './story-russian-language.js';
 import type { StoryLanguageId } from './story-language.js';
-import { prepareStoryScriptLanguage } from './story-english-normalize.js';
+import { prepareStoryScriptLanguage, transliterateLatinExceptPhrases } from './story-english-normalize.js';
+import { applyForeignPronunciation } from './tts-foreign-pronounce.js';
+import {
+  genericizeScriptForVoiceover,
+  latinTrackProtectPhrases,
+  shouldStripLatinTrackNames,
+} from './tts-generic-script.js';
 import { isTruncatedMarketingSnippet, isSpeakableReferenceFact } from './web-snippet-accept.js';
 import { interestScore } from './reference-fact-quality.js';
 import { fixSoloArtistPronounsRu } from './artist-grammar.js';
@@ -359,11 +365,12 @@ export function sanitizeScriptForTts(
   const allowed = allowedDigitSequences(artist, title, referenceFacts);
   const blockArtist = options?.trackArtist ?? artist;
   const blockTitle = options?.trackTitle ?? title;
-  const { text: localized, allowedLatin } = prepareStoryScriptLanguage(script, {
+  const speakNames = options?.speakTrackNamesInVoiceover === true;
+  const { text: localized } = prepareStoryScriptLanguage(script, {
     artist: blockArtist,
     title: blockTitle,
     referenceFacts,
-    speakTrackNamesInVoiceover: options?.speakTrackNamesInVoiceover,
+    speakTrackNamesInVoiceover: speakNames,
   });
   let result = stripTrackTitleGuillemets(localized, title);
 
@@ -375,17 +382,31 @@ export function sanitizeScriptForTts(
   result = result.replace(/\d+/g, (match) => (shouldKeepDigit(match, allowed) ? match : ''));
   const { masked: stageMasked, names: stageNames } = maskDottedStageNames(result);
   const { masked, quotes } = maskQuotedPassages(stageMasked);
-  result = masked.replace(/\b[a-z]{2,}\b/gi, (match) => {
-    return allowedLatin.has(match.toLowerCase()) ? match : '';
-  });
-  result = unmaskQuotedPassages(result, quotes);
+  result = unmaskQuotedPassages(masked, quotes);
   result = unmaskDottedStageNames(result, stageNames);
   result = result.replace(ORPHAN_ORDINAL_SUFFIX, ' тогда ');
   ORPHAN_ORDINAL_SUFFIX.lastIndex = 0;
   result = repairOrphanDatePhrases(result, referenceFacts);
+
+  if (
+    !speakNames &&
+    (shouldStripLatinTrackNames(blockArtist) || shouldStripLatinTrackNames(blockTitle))
+  ) {
+    result = genericizeScriptForVoiceover(result, blockArtist, blockTitle);
+  }
+
+  if (speakNames && latinTrackProtectPhrases(blockArtist, blockTitle).length > 0) {
+    result = transliterateLatinExceptPhrases(
+      result,
+      latinTrackProtectPhrases(blockArtist, blockTitle),
+    );
+  } else {
+    result = applyForeignPronunciation(result, '', '');
+  }
+
   result = result.replace(/\s{2,}/g, ' ').replace(/\s+([,.!?])/g, '$1').trim();
   result = stripBannedFluff(result);
-  result = fixSoloArtistPronounsRu(result, artist);
+  result = fixSoloArtistPronounsRu(result, blockArtist);
 
   return result;
 }

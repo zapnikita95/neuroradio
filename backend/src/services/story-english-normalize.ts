@@ -4,6 +4,7 @@
  */
 
 import { collectLatinTokens } from './tts-en-normalize.js';
+import { applyForeignPronunciation } from './tts-foreign-pronounce.js';
 import { latinTrackBlocklist } from './tts-generic-script.js';
 
 /** Multi-word brands / outlets — never translate or strip. */
@@ -268,6 +269,19 @@ function unmaskProtectedLatinPhrases(text: string, phrases: string[]): string {
     new RegExp(`${PHRASE_SLOT}(\\d+)${PHRASE_END}`, 'g'),
     (_, index) => phrases[Number(index)] ?? '',
   );
+}
+
+/** Транслитерация латиницы в кириллицу для озвучки; protectedPhrases остаются латиницей (artist/title). */
+export function transliterateLatinExceptPhrases(
+  text: string,
+  protectedPhrases: string[] = [],
+): string {
+  const merged = [...new Set([...PROTECTED_LATIN_PHRASES, ...protectedPhrases.filter(Boolean)])].sort(
+    (a, b) => b.length - a.length,
+  );
+  const { masked, phrases } = maskProtectedLatinPhrases(text, merged);
+  const ru = applyForeignPronunciation(masked, '', '');
+  return unmaskProtectedLatinPhrases(ru, phrases);
 }
 const LATIN_TITLE = /\b[A-Z][a-z]+(?:\s+[A-Z][a-z]+){0,5}\b/g;
 

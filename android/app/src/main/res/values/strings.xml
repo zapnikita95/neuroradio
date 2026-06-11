@@ -152,7 +152,7 @@
     <string name="settings_elevenlabs_hint">На английском языке расширенный тариф озвучивает истории через ElevenLabs.</string>
     <string name="settings_playback_mode_hint">Включено — истории запускаются сами при смене трека. Выключено — только вручную кнопкой «Рассказать».</string>
     <string name="settings_speak_track_names">Названия треков в озвучке</string>
-    <string name="settings_speak_track_names_hint">Включено — в голосе звучат название и исполнитель на английском. Выключено — латинские названия заменяются на «эта песня», «в треке» и т.п.; русские названия остаются.</string>
+    <string name="settings_speak_track_names_hint">Включено — в голосе звучат название и исполнитель латиницей. Выключено — только английские имя и трек заменяются на «эта песня»; русские названия не трогаются. Остальные имена в тексте — по-русски.</string>
     <string name="settings_offline_cache">Сохранять истории на телефоне</string>
     <string name="settings_offline_cache_hint">После генерации озвучка сохраняется на телефон. Без интернета можно переслушать уже готовые истории — в том числе из раздела «История».</string>
     <string name="settings_offline_pack_title">Офлайн-эфир</string>
