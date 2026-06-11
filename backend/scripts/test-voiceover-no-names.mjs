@@ -12,6 +12,7 @@ import {
 } from '../dist/services/voiceover-no-names.js';
 import { resolveArtistGrammarRu } from '../dist/services/artist-grammar.js';
 import { hasEnglishLeak } from '../dist/services/story-russian-language.js';
+import { sanitizeScriptForTts } from '../dist/services/story-quality.js';
 
 let failed = 0;
 function fail(msg) {
@@ -128,6 +129,24 @@ if (!goodVal.ok) {
   fail(`good no-names script rejected: ${goodVal.reason}`);
 } else {
   ok('natural no-names script accepted');
+}
+
+// --- sanitize must keep latin title when names ON (regression: PHRASE_SLOT + foreign pronounce) ---
+const mjScript =
+  'Dirty Diana — один из тех треков, где Dirty Diana решил сыграть. Bad album.';
+const mjSanitized = sanitizeScriptForTts(
+  mjScript,
+  'Michael Jackson',
+  'Dirty Diana',
+  [],
+  { speakTrackNamesInVoiceover: true },
+);
+if (/[\uE012\uE013]/.test(mjSanitized)) {
+  fail(`sanitize left phrase-slot garbage when names ON: ${mjSanitized}`);
+} else if (!/Dirty Diana/i.test(mjSanitized)) {
+  fail(`sanitize must preserve Dirty Diana when names ON: ${mjSanitized}`);
+} else {
+  ok('Dirty Diana preserved in sanitize when speak_track_names ON');
 }
 
 // --- Latin block when names off ---

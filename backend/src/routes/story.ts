@@ -343,9 +343,11 @@ router.post('/full', extractClientSecrets, validateStoryFullBody, storyFullRateL
   console.log(
     `[settings] install=${installId.slice(0, 8)} tier=${userTier} user_llm=${requestedProviderRaw ?? 'missing'} active_llm=${llmProvider}${modelLog} own_key=${ownLlmKey}`,
   );
+  const speakTrackNamesInVoiceover = (req.body as StoryFullBody).speak_track_names_in_voiceover === true;
   console.log(
     `[story] start install=${installId.slice(0, 8)} requested_llm=${requestedProviderRaw ?? 'missing'} llm=${llmProvider}${modelLog}` +
-      ` lang=${storyLanguage ?? 'ru'} narrator=${storyNarrator} artist="${artist}" title="${title}"`,
+      ` lang=${storyLanguage ?? 'ru'} narrator=${storyNarrator} speak_track_names=${speakTrackNamesInVoiceover}` +
+      ` artist="${artist}" title="${title}"`,
   );
 
   const timing = new StoryTiming(installId, artist, title);

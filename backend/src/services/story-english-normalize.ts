@@ -189,7 +189,8 @@ const PROTECTED_LATIN_PHRASES = [
   'The Rasmus',
 ];
 
-const PHRASE_SLOT = '\uE012P';
+/** Private-use markers only — no Latin letters (applyForeignPronunciation corrupts «P» in slots). */
+const PHRASE_SLOT = '\uE012';
 const PHRASE_END = '\uE013';
 
 function maskProtectedLatinPhrases(
