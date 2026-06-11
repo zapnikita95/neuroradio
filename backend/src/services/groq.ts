@@ -8,6 +8,7 @@ import { resolveStoryNarrator, StoryNarratorId } from './story-narrator.js';
 import { YandexVoiceId, voiceForYear } from './voices.js';
 import {
   countWords,
+  buildStoryRetryDirective,
   sanitizeScriptForTts,
   validateStoryScript,
 } from './story-quality.js';
@@ -265,6 +266,7 @@ export async function generateStoryScript(
   const voiceId = input.voiceId ?? voiceForYear(input.year, input.genre);
 
   let lastCandidate: StoryScript | null = null;
+  let lastRejectReason: string | undefined;
   const clientKey = input.clientGroqApiKey?.trim();
   const models = resolveGroqModelOrder(input.groqModel);
   const groqModelIndex = 0;
@@ -278,6 +280,7 @@ export async function generateStoryScript(
       selectedReferenceFact: input.selectedReferenceFact,
       storyLanguage,
       speakTrackNamesInVoiceover: input.speakTrackNamesInVoiceover,
+      retryReason: buildStoryRetryDirective(lastRejectReason, lengthPreset.wordsMin),
     });
 
     const result = await callGroq(
@@ -338,7 +341,8 @@ export async function generateStoryScript(
     }
 
     lastCandidate = { ...story, script: sanitized };
-    logRejectedScript('quality reject (single-shot)', sanitized, sanitizedQuality.reason ?? quality.reason ?? 'quality');
+    lastRejectReason = sanitizedQuality.reason ?? quality.reason ?? 'quality';
+    logRejectedScript('quality reject (single-shot)', sanitized, lastRejectReason);
   }
 
   const fallback = finalizeAfterQualityLoop(

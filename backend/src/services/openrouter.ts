@@ -11,6 +11,7 @@ import {
   findLlmGarbage,
   hasConcreteFact,
   referenceFactsAreAnchorable,
+  buildStoryRetryDirective,
   sanitizeScriptForTts,
   validateStoryScript,
 } from './story-quality.js';
@@ -187,6 +188,7 @@ export async function generateStoryScript(
 
   let lastCandidate: StoryScript | null = null;
   let lastError: Error | undefined;
+  let lastRejectReason: string | undefined;
 
   for (const model of models) {
     try {
@@ -199,6 +201,7 @@ export async function generateStoryScript(
           selectedReferenceFact: input.selectedReferenceFact,
           storyLanguage,
           speakTrackNamesInVoiceover: input.speakTrackNamesInVoiceover,
+          retryReason: buildStoryRetryDirective(lastRejectReason, lengthPreset.wordsMin),
         });
 
         const content = await callOpenRouter(
@@ -306,6 +309,7 @@ export async function generateStoryScript(
           );
           return finalizeStory({ ...story, script: sanitized }, { ...input, voiceId }, storyLength);
         }
+        lastRejectReason = rejectReason;
         logRejectedScript(
           'OpenRouter quality reject (single-shot)',
           sanitized,

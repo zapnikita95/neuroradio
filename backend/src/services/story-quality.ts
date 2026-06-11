@@ -994,6 +994,40 @@ function findFactPlatformMismatch(script: string, referenceFacts: string[]): str
   return null;
 }
 
+/** Абстрактная «лекция о жанре» без детали из семени. */
+const GENRE_WATER_PATTERNS: RegExp[] = [
+  /истори[яю]\s+о\s+том,\s+как/i,
+  /жанров(?:ая|ой)\s+механик/i,
+  /это\s+не\s+просто\s+(?:песн|трек|рок|групп)/i,
+  /настоящ(?:ий|им)\s+прорыв/i,
+  /большой\s+потенциал/i,
+  /уникальн\w*\s+звук/i,
+  /глубок(?:ий|ого)\s+смысл/i,
+  /запоминающ\w*/i,
+  /мастера\s+альтернатив/i,
+  /эталонн\w*\s+(?:ню|панк|поп|рок)/i,
+  /музык\w*,\s+которая\s+не\s+требует/i,
+  /звуковой\s+фон\s+для\s+размышлен/i,
+  /эмоциональн\w*\s+качел/i,
+  /психологическ\w*\s+(?:триллер|драм)/i,
+  /камерную\s+обстановк/i,
+  /лоу-?фай\s+эстетик/i,
+  /минимализм\w*\s+в\s+продакшн/i,
+  /смесь\s+разных\s+стилей/i,
+  /интересную\s+аранжировк/i,
+  /высококачественн\w*\s+музык/i,
+  /удивил\w*\s+всех\s+своей/i,
+  /когда-то\s+удивил/i,
+  /удивил\w*\s+всех/i,
+  /истори[яю]\s+о\s+фузии/i,
+  /настоящ(?:ий|им)\s+шедевр/i,
+  /уникальн\w*\s+стил/i,
+  /я\s+обожаю/i,
+  /зал\s+славы/i,
+  /механик\w*\s+успеха/i,
+  /визитной\s+карточкой\s+жанра/i,
+];
+
 const CLICHE_FILLER_PATTERNS: RegExp[] = [
   /мало кто знает/i,
   /стал[аи]?\s+легенд/i,
@@ -1016,13 +1050,55 @@ const CLICHE_FILLER_PATTERNS: RegExp[] = [
   /это\s+тот\s+случай[^.]{0,50}независим/i,
 ];
 
+export function findGenreWater(script: string): string | null {
+  for (const pattern of GENRE_WATER_PATTERNS) {
+    if (pattern.test(script)) {
+      return `genre water: ${pattern.source}`;
+    }
+  }
+  return null;
+}
+
 export function findClicheFiller(script: string): string | null {
+  const genreWater = findGenreWater(script);
+  if (genreWater) return genreWater;
   for (const pattern of CLICHE_FILLER_PATTERNS) {
     if (pattern.test(script)) {
       return `cliche filler: ${pattern.source}`;
     }
   }
   return null;
+}
+
+/** Подсказка модели при retry после брака quality gate. */
+export function buildStoryRetryDirective(
+  reason: string | undefined,
+  minWords: number,
+): string | undefined {
+  if (!reason?.trim()) return undefined;
+  const lower = reason.toLowerCase();
+  const parts: string[] = [`ПРИЧИНА БРАКА: ${reason}`];
+  if (lower.includes('no concrete fact') || lower.includes('genre water') || lower.includes('cliche filler')) {
+    parts.push(
+      'Убери воду про жанр и «уникальность». Каждое предложение — факт из семени: имя, событие, платформа, инструмент, курьёз.',
+    );
+  }
+  if (lower.includes('first sentence')) {
+    parts.push('Первая фраза = конкретный якорь из семени (не «эта группа — история о том»).');
+  }
+  if (lower.includes('ignores reference') || lower.includes('reference fact')) {
+    parts.push('Минимум два якоря из семени: имена людей, события, платформы — дословно из факта.');
+  }
+  if (lower.includes('voiceover names leak')) {
+    parts.push('Не называй артиста и трек — только «эта группа», «этот исполнитель», «эта песня».');
+  }
+  if (lower.includes('too short')) {
+    parts.push(`Добей до ${minWords}+ слов одной новой деталью из семени, не водой.`);
+  }
+  if (lower.includes('english')) {
+    parts.push('Только русский: переведи обычные английские слова.');
+  }
+  return parts.join(' ');
 }
 
 /** Reject generic filler — artist name alone is not enough. */
@@ -1034,6 +1110,9 @@ export function findWateryContent(
   options: { skipPersonaCliches?: boolean } = {},
 ): string | null {
   const skipPersona = options.skipPersonaCliches ?? false;
+  const genreWater = findGenreWater(script);
+  if (genreWater) return genreWater;
+
   const garbage = findLlmGarbage(script);
   if (garbage) return garbage;
 
@@ -1063,20 +1142,23 @@ export function findWateryContent(
     return 'only artist/title with cliche filler';
   }
 
+  const anchorable =
+    referenceFacts.length > 0 && referenceFactsAreAnchorable(referenceFacts, artist, title);
+
   if (referenceFacts.length > 0 && anchorsReferenceFact(script, referenceFacts)) {
     return null;
   }
 
+  if (anchorable) {
+    return 'no concrete fact — use detail from seed fact (instrument, label, scandal, sample)';
+  }
+
   const words = countWords(script);
-  if (words >= 65 && hasConcreteFact(script, artist, title)) {
+  if (words >= 65 && hasConcreteFact(script, artist, title) && !findGenreWater(script)) {
     return null;
   }
 
-  if (hasConcreteFact(stripped, '', '')) return null;
-  if (hasConcreteFact(script, artist, title)) {
-    const scriptNorm = normalizeForMatch(stripped);
-    if (scriptNorm.split(' ').filter((w) => w.length >= 5).length >= 3) return null;
-  }
+  if (hasConcreteFact(stripped, '', '') && !findGenreWater(script)) return null;
   return 'no concrete fact — use detail from seed fact (instrument, label, scandal, sample)';
 }
 

@@ -3,7 +3,7 @@
  * Live LLM: 20 tracks with speakTrackNamesInVoiceover=false — check model output, not unit mocks.
  * npm run build && node scripts/test-live-voiceover-20tracks.mjs
  */
-import { readFileSync, existsSync } from 'node:fs';
+import { readFileSync, existsSync, writeFileSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -28,7 +28,7 @@ loadEnv(resolve(root, '.env'));
 
 await import('./setup-hidemy-proxy.mjs');
 
-const TRACKS = [
+const ALL_TRACKS = [
   { artist: 'Foster The People', title: 'Sit Next to Me', cc: 'US' },
   { artist: 'The Offspring', title: 'Self Esteem', cc: 'US' },
   { artist: 'Red Hot Chili Peppers', title: 'Snow (Hey Oh)', cc: 'US' },
@@ -50,6 +50,9 @@ const TRACKS = [
   { artist: 'EV', title: 'Cuppa Tea', cc: 'GB' },
   { artist: 'Pearl Jam', title: 'Black', cc: 'US' },
 ];
+
+const limit = Number(process.env.LIVE_TEST_LIMIT ?? '0');
+const TRACKS = limit > 0 ? ALL_TRACKS.slice(0, limit) : ALL_TRACKS;
 
 const { fetchAggregatedFactBundle } = await import('../dist/services/fact-aggregator.js');
 const { pickReferenceFact } = await import('../dist/services/fact-picker.js');
@@ -73,6 +76,7 @@ console.log(
 );
 
 const results = [];
+const FULL_SCRIPTS = [];
 
 for (let i = 0; i < TRACKS.length; i++) {
   const { artist, title, cc } = TRACKS[i];
@@ -124,17 +128,35 @@ for (let i = 0; i < TRACKS.length; i++) {
 
     const ms = Date.now() - t0;
     const ok = !leak && quality.ok;
-    results.push({ artist, title, ok, leak, qualityReason: quality.ok ? null : quality.reason, ms, llmUsed });
+    results.push({
+      artist,
+      title,
+      ok,
+      leak,
+      qualityReason: quality.ok ? null : quality.reason,
+      ms,
+      llmUsed,
+      script,
+      seed: selected?.fact ?? facts[0],
+    });
+    FULL_SCRIPTS.push({ artist, title, ok, script, seed: selected?.fact ?? facts[0] });
 
     console.log(`LLM: ${llmUsed} | ${ms}ms | ${story.word_count ?? '?'} слов`);
     if (leak) console.log(`УТЕЧКА: ${leak}`);
     if (!quality.ok) console.log(`QUALITY: ${quality.reason}`);
-    console.log(`SCRIPT: ${script.slice(0, 320)}${script.length > 320 ? '…' : ''}`);
+    console.log('--- SCRIPT (полный) ---');
+    console.log(script);
+    console.log('--- /SCRIPT ---');
     console.log(ok ? '✓ OK' : '✗ FAIL');
   } catch (err) {
     const ms = Date.now() - t0;
-    results.push({ artist, title, ok: false, error: err.message, ms });
+    results.push({ artist, title, ok: false, error: err.message, ms, script: null });
     console.log(`ERROR (${ms}ms): ${err.message}`);
+    if (err.lastScript) {
+      console.log('--- SCRIPT (последний брак) ---');
+      console.log(err.lastScript);
+      console.log('--- /SCRIPT ---');
+    }
     console.log('✗ FAIL');
   }
   console.log('');
@@ -153,5 +175,9 @@ if (passed < TRACKS.length) {
     console.log(`  - ${r.artist} — ${r.title}: ${r.error ?? r.leak ?? r.qualityReason}`);
   }
 }
+
+const outPath = resolve(root, 'scripts/live-voiceover-20tracks-results.json');
+writeFileSync(outPath, JSON.stringify({ ranAt: new Date().toISOString(), results: FULL_SCRIPTS }, null, 2), 'utf8');
+console.log(`\nПолные скрипты: ${outPath}`);
 
 process.exit(passed === TRACKS.length ? 0 : 1);
