@@ -3,10 +3,12 @@ package com.musicstory.app.data.auth
 import android.app.Activity
 import android.content.Intent
 import android.net.Uri
+import androidx.browser.customtabs.CustomTabsIntent
 import com.musicstory.app.util.StoryLog
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeout
 import java.net.URLEncoder
 import java.nio.charset.StandardCharsets
 import java.security.MessageDigest
@@ -42,22 +44,45 @@ class TelegramOAuthCoordinator private constructor() {
         StoryLog.i("Telegram OAuth start clientId=$botId redirect=$redirect url=${startUrl.take(160)}")
 
         withContext(Dispatchers.Main) {
-            val intent = Intent(activity, TelegramOAuthActivity::class.java)
-                .putExtra(TelegramOAuthActivity.EXTRA_AUTH_URL, startUrl)
-            activity.startActivity(intent)
+            if (!launchCustomTab(activity, startUrl)) {
+                StoryLog.w("Telegram OAuth Custom Tab unavailable — falling back to WebView")
+                val intent = Intent(activity, TelegramOAuthActivity::class.java)
+                    .putExtra(TelegramOAuthActivity.EXTRA_AUTH_URL, startUrl)
+                activity.startActivity(intent)
+            }
         }
 
         return try {
-            val code = deferred.await()
+            val code = withTimeout(OAUTH_TIMEOUT_MS) { deferred.await() }
             StoryLog.i("Telegram OAuth callback code_len=${code.length}")
             code to verifier
         } catch (e: TelegramOAuthException) {
             throw e
+        } catch (e: kotlinx.coroutines.TimeoutCancellationException) {
+            cancelPending()
+            throw TelegramOAuthException.Cancelled
         } catch (e: Exception) {
             throw TelegramOAuthException.Failed(e.message ?: "Ошибка Telegram OAuth")
         } finally {
             pendingCode = null
             activeCodeVerifier = null
+        }
+    }
+
+    /** Chrome Custom Tab — oauth.telegram.org renders correctly (Huawei WebView often black screen). */
+    private fun launchCustomTab(activity: Activity, url: String): Boolean {
+        return try {
+            val uri = Uri.parse(url)
+            CustomTabsIntent.Builder()
+                .setShowTitle(true)
+                .setUrlBarHidingEnabled(false)
+                .build()
+                .launchUrl(activity, uri)
+            StoryLog.i("Telegram OAuth opened Custom Tab")
+            true
+        } catch (e: Exception) {
+            StoryLog.w("Telegram OAuth Custom Tab failed: ${e.message}")
+            false
         }
     }
 
@@ -97,8 +122,7 @@ class TelegramOAuthCoordinator private constructor() {
     }
 
     /**
-     * WebView preserves query params (Custom Tabs on Huawei strip them).
-     * Open BFF /authorize — server 302 → oauth.telegram.org with full params.
+     * Custom Tabs preserve query params on our BFF URL; server 302 → oauth.telegram.org with full params.
      */
     private fun buildStartUrl(
         backendBaseUrl: String,
@@ -109,22 +133,6 @@ class TelegramOAuthCoordinator private constructor() {
         val base = backendBaseUrl.trimEnd('/')
         val enc = URLEncoder.encode(challenge, StandardCharsets.UTF_8.name())
         return "$base/v1/public/oauth/telegram/authorize?code_challenge=$enc&code_challenge_method=S256"
-    }
-
-    @Suppress("unused")
-    private fun buildDirectAuthUri(clientId: String, redirectUri: String, challenge: String): Uri {
-        val enc = StandardCharsets.UTF_8
-        fun enc(v: String) = URLEncoder.encode(v, enc.name())
-        val url = buildString {
-            append(AUTH_URL)
-            append("?client_id=").append(enc(clientId))
-            append("&redirect_uri=").append(enc(redirectUri))
-            append("&response_type=code")
-            append("&scope=").append(enc("openid profile"))
-            append("&code_challenge=").append(challenge)
-            append("&code_challenge_method=S256")
-        }
-        return Uri.parse(url)
     }
 
     private fun makeCodeVerifier(): String {
@@ -152,10 +160,10 @@ class TelegramOAuthCoordinator private constructor() {
         fun resolveRedirectUri(fromConfig: String?): String =
             fromConfig?.trim()?.takeIf { it.isNotBlank() } ?: DEFAULT_REDIRECT_URI
 
-        private const val AUTH_URL = "https://oauth.telegram.org/auth"
         private const val CALLBACK_SCHEME = "efirai"
         private const val CALLBACK_HOST = "oauth"
         private const val CALLBACK_PATH = "/telegram"
+        private const val OAUTH_TIMEOUT_MS = 5 * 60 * 1000L
     }
 }
 

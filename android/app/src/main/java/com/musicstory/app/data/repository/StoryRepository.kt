@@ -698,6 +698,7 @@ class StoryRepository(
                                 (!TierAccess.isPremiumLike(serverTier) || serverTtsProvider == ServerTtsProvider.EDGE)
                         },
                         speakTrackNamesInVoiceover = speakTrackNamesInVoiceover,
+                        clientPlatform = "android",
                         ),
                     ),
                 )

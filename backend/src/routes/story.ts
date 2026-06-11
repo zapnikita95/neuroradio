@@ -240,8 +240,11 @@ router.post('/full', extractClientSecrets, validateStoryFullBody, storyFullRateL
     throw err;
   }
   const body = req.body as StoryFullBody;
+  const clientPlatform =
+    typeof body.client_platform === 'string' ? body.client_platform.trim().toLowerCase() : '';
   console.log(
     `[story] <<< request install=${installId.slice(0, 8)} llm=${body.llm_provider ?? 'missing'} ` +
+      `platform=${clientPlatform || 'unknown'} audio=${storyAudioExtensionForClient(body)} ` +
       `artist="${body.artist}" title="${body.title}"`,
   );
 

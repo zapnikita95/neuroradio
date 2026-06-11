@@ -47,6 +47,7 @@ interface StoryFullBody {
   edge_voice_preset?: unknown;
   speak_track_names_in_voiceover?: unknown;
   story_language?: unknown;
+  client_platform?: unknown;
 }
 
 const VALID_VOICE_TIERS = new Set<string>(['default', 'premium']);
@@ -185,6 +186,10 @@ export function validateStoryFullBody(req: Request, res: Response, next: NextFun
   const edgeVoicePreset = resolveEdgeVoicePresetId(legacyVoicePreset);
   const speakTrackNamesInVoiceover = body.speak_track_names_in_voiceover === true;
   const storyLanguage: StoryLanguageId = resolveStoryLanguage(body.story_language);
+  const clientPlatform =
+    typeof body.client_platform === 'string' && body.client_platform.trim()
+      ? body.client_platform.trim().toLowerCase().slice(0, 16)
+      : undefined;
 
   req.body = {
     artist,
@@ -217,6 +222,7 @@ export function validateStoryFullBody(req: Request, res: Response, next: NextFun
     edge_voice_preset: edgeVoicePreset,
     speak_track_names_in_voiceover: speakTrackNamesInVoiceover,
     story_language: storyLanguage,
+    ...(clientPlatform ? { client_platform: clientPlatform } : {}),
   };
   next();
 }

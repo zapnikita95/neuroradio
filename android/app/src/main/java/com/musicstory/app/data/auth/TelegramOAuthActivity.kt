@@ -19,13 +19,14 @@ import androidx.activity.ComponentActivity
 import androidx.activity.OnBackPressedCallback
 import com.musicstory.app.util.StoryLog
 
-/** In-app WebView for Telegram OIDC — Custom Tabs on Huawei/OEM drop oauth.telegram.org query params. */
+/** WebView fallback when Custom Tabs unavailable — BFF /authorize → oauth.telegram.org. */
 class TelegramOAuthActivity : ComponentActivity() {
 
     private var callbackHandled = false
     private lateinit var webView: WebView
     private lateinit var progressBar: ProgressBar
     private lateinit var errorText: TextView
+    private lateinit var allowedHosts: Set<String>
 
     @SuppressLint("SetJavaScriptEnabled")
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -39,7 +40,8 @@ class TelegramOAuthActivity : ComponentActivity() {
             return
         }
 
-        StoryLog.i("Telegram OAuth WebView load: ${authUrl.take(160)}")
+        allowedHosts = buildAllowedHosts(authUrl)
+        StoryLog.i("Telegram OAuth WebView load: ${authUrl.take(160)} hosts=${allowedHosts.size}")
 
         progressBar = ProgressBar(this).apply {
             isIndeterminate = true
@@ -53,11 +55,15 @@ class TelegramOAuthActivity : ComponentActivity() {
         }
         webView = WebView(this).apply {
             setBackgroundColor(Color.parseColor("#0F0F13"))
+            setLayerType(View.LAYER_TYPE_HARDWARE, null)
             CookieManager.getInstance().setAcceptCookie(true)
             CookieManager.getInstance().setAcceptThirdPartyCookies(this, true)
             settings.javaScriptEnabled = true
             settings.domStorageEnabled = true
             settings.loadsImagesAutomatically = true
+            settings.javaScriptCanOpenWindowsAutomatically = true
+            settings.setSupportMultipleWindows(true)
+            settings.mixedContentMode = android.webkit.WebSettings.MIXED_CONTENT_COMPATIBILITY_MODE
             settings.userAgentString =
                 "Mozilla/5.0 (Linux; Android 12; Mobile) AppleWebKit/537.36 " +
                     "(KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36 EfirAI/1.5"
@@ -65,6 +71,18 @@ class TelegramOAuthActivity : ComponentActivity() {
             webChromeClient = object : WebChromeClient() {
                 override fun onProgressChanged(view: WebView?, newProgress: Int) {
                     progressBar.visibility = if (newProgress in 1..99) View.VISIBLE else View.GONE
+                }
+
+                override fun onCreateWindow(
+                    view: WebView?,
+                    isDialog: Boolean,
+                    isUserGesture: Boolean,
+                    resultMsg: android.os.Message?,
+                ): Boolean {
+                    val transport = resultMsg?.obj as? WebView.WebViewTransport ?: return false
+                    transport.webView = webView
+                    resultMsg.sendToTarget()
+                    return true
                 }
             }
 
@@ -172,32 +190,47 @@ class TelegramOAuthActivity : ComponentActivity() {
             return handleOAuthRedirect(uri)
         }
         if (handleOAuthRedirect(uri)) return true
+        if (scheme in setOf("tg", "intent")) {
+            runCatching { startActivity(android.content.Intent(android.content.Intent.ACTION_VIEW, uri)) }
+            return true
+        }
         if (scheme !in ALLOWED_SCHEMES) {
             StoryLog.w("Telegram OAuth blocked scheme=$scheme host=${uri.host}")
             return true
         }
         val host = uri.host?.lowercase().orEmpty()
-        val allowed = ALLOWED_HOSTS.any { host == it || host.endsWith(".$it") }
-        if (!allowed) {
+        if (!isHostAllowed(host)) {
             StoryLog.w("Telegram OAuth blocked host=$host")
             return true
         }
         return false
     }
 
-    companion object {
-        const val EXTRA_AUTH_URL = "auth_url"
-        private const val CALLBACK_SCHEME = "efirai"
+    private fun isHostAllowed(host: String): Boolean {
+        if (host.isBlank()) return false
+        return allowedHosts.any { allowed ->
+            host == allowed || host.endsWith(".$allowed")
+        }
+    }
 
-        private val ALLOWED_SCHEMES = setOf("http", "https")
-        private val ALLOWED_HOSTS = setOf(
+    private fun buildAllowedHosts(authUrl: String): Set<String> {
+        val hosts = mutableSetOf(
             "efir-ai.ru",
-            "www.efir-ai.ru",
             "oauth.telegram.org",
             "telegram.org",
             "t.me",
             "music-story-production.up.railway.app",
             "neuroradio-production.up.railway.app",
         )
+        runCatching { Uri.parse(authUrl).host?.lowercase()?.takeIf { it.isNotBlank() } }
+            .getOrNull()
+            ?.let { hosts.add(it) }
+        return hosts
+    }
+
+    companion object {
+        const val EXTRA_AUTH_URL = "auth_url"
+        private const val CALLBACK_SCHEME = "efirai"
+        private val ALLOWED_SCHEMES = setOf("http", "https")
     }
 }
