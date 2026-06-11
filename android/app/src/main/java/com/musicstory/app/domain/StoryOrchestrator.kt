@@ -166,7 +166,7 @@ class StoryOrchestrator(
         scope.launch {
             val track = mediaControllerManager.effectiveNowPlaying.value
             val hasTrack = track?.isValid() == true
-            val tier = storyRepository.dailyQuota.value?.tier
+            val tier = storyRepository.resolveEffectiveTier()
             val hasPersonalKey = storyRepository.hasPersonalApiKeyConfigured()
             val canManual = TierAccess.canShowManualStoryButton(hasPersonalKey, tier)
             val preparing = MonitorNotificationState.preparingStory.value
@@ -208,7 +208,7 @@ class StoryOrchestrator(
 
     private suspend fun evaluateManualStoryGate(): ManualStoryGate.Result {
         val track = mediaControllerManager.effectiveNowPlaying.value
-        val tier = storyRepository.dailyQuota.value?.tier
+        val tier = storyRepository.resolveEffectiveTier()
         val hasPersonalKey = storyRepository.hasPersonalApiKeyConfigured()
         val canManual = TierAccess.canShowManualStoryButton(hasPersonalKey, tier)
         val generationActive = generationInFlight ||
@@ -513,7 +513,7 @@ class StoryOrchestrator(
                     return@launch
                 }
                 if (manual) {
-                    val tier = storyRepository.dailyQuota.value?.tier
+                    val tier = storyRepository.resolveEffectiveTier()
                     val hasPersonalKey = storyRepository.hasPersonalApiKeyConfigured()
                     if (!TierAccess.canShowManualStoryButton(hasPersonalKey, tier)) {
                         StoryLog.i("Manual story blocked: free tier without personal API key")
@@ -1007,6 +1007,17 @@ class StoryOrchestrator(
     /** Сброс залипшего «Готовим историю» при открытии главного экрана. */
     fun recoverStaleUi() {
         reconcileGenerationState()
+        publishUiState()
+    }
+
+    /** После welcome-trial / billing — обновить кнопку «Рассказать» и уведомление. */
+    fun notifyTierMayHaveChanged() {
+        val generationActive = generationInFlight ||
+            activeStoryJob?.isActive == true ||
+            _state.value == OrchestratorState.FETCHING_STORY ||
+            _state.value == OrchestratorState.PREPARING_PLAYBACK ||
+            _state.value == OrchestratorState.PLAYING_STORY
+        refreshManualStoryNotificationGate(generationActive)
         publishUiState()
     }
 

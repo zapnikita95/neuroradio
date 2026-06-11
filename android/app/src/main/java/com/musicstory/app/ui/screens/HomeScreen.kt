@@ -123,6 +123,7 @@ fun HomeScreen(
     val trialExpiredUpsellShown by app.settingsDataStore.trialExpiredUpsellShown.collectAsState(initial = false)
     val trialBannerDismissed by app.settingsDataStore.trialBannerDismissedMilestones.collectAsState(initial = emptySet())
     var billingEntitlement by remember { mutableStateOf<BillingEntitlementResponse?>(null) }
+    var cachedProfile by remember { mutableStateOf<com.musicstory.app.data.local.CachedAccountProfile?>(null) }
     var showTrialExpiredDialog by remember { mutableStateOf(false) }
     val storyHistory by app.storyRepository.storyHistory.collectAsState(initial = emptyList())
     val scope = rememberCoroutineScope()
@@ -135,15 +136,26 @@ fun HomeScreen(
     val density = LocalDensity.current
     val screenHeightPx = with(density) { LocalConfiguration.current.screenHeightDp.dp.toPx() }
 
+    LaunchedEffect(Unit) {
+        cachedProfile = app.settingsDataStore.readCachedAccountProfile()
+    }
+
     LaunchedEffect(backendUrl) {
         val url = backendUrl.trim().trimEnd('/')
         if (url.isBlank()) return@LaunchedEffect
         runCatching {
             billingEntitlement = app.apiClient.fetchBillingStatus(url).entitlement
+            cachedProfile = app.settingsDataStore.readCachedAccountProfile()
+            app.storyOrchestrator.notifyTierMayHaveChanged()
         }
     }
 
-    val effectiveTier = dailyQuota?.tier
+    val effectiveTier = TierAccess.resolveEffectiveTier(
+        dailyQuotaTier = dailyQuota?.tier,
+        plan = billingEntitlement?.plan ?: cachedProfile?.plan,
+        trialUntil = billingEntitlement?.trialUntil ?: cachedProfile?.trialUntil,
+        premiumUntil = billingEntitlement?.premiumUntil ?: cachedProfile?.premiumUntil,
+    )
     val trialUntil = billingEntitlement?.trialUntil
     var trialTick by remember { mutableIntStateOf(0) }
     LaunchedEffect(trialUntil) {
@@ -274,7 +286,7 @@ fun HomeScreen(
     val showMissingKeyBanner = !hasOwnProviderKey && !canUseServerStories
     val showManualStoryButton = TierAccess.canShowManualStoryButton(
         hasPersonalApiKey = hasOwnProviderKey,
-        tier = dailyQuota?.tier,
+        tier = effectiveTier,
     )
 
     LaunchedEffect(tourStep, showManualStoryButton) {

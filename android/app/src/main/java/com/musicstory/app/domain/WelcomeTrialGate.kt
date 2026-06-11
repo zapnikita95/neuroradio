@@ -2,6 +2,7 @@ package com.musicstory.app.domain
 
 import com.musicstory.app.MusicStoryApp
 import com.musicstory.app.data.local.CachedAccountProfile
+import com.musicstory.app.data.local.SettingsDataStore
 import com.musicstory.app.util.DeviceFingerprint
 import kotlinx.coroutines.flow.first
 
@@ -10,16 +11,23 @@ object WelcomeTrialGate {
         val trialActive = claimWelcomeTrialOnServer(app)
         app.settingsDataStore.setAccountLoginGateCompleted(true)
         if (trialActive) {
-            applyWelcomeTrialTtsDefaults(app)
+            applyWelcomeTrialDefaults(app)
         }
+        app.storyOrchestrator.notifyTierMayHaveChanged()
     }
 
     suspend fun completeAfterLogin(app: MusicStoryApp) {
         app.settingsDataStore.setAccountLoginGateCompleted(true)
         val profile = app.settingsDataStore.readCachedAccountProfile()
         if (isTrialActive(profile)) {
-            applyWelcomeTrialTtsDefaults(app)
+            applyWelcomeTrialDefaults(app)
         }
+        app.storyOrchestrator.notifyTierMayHaveChanged()
+    }
+
+    suspend fun applyWelcomeTrialDefaults(app: MusicStoryApp) {
+        applyWelcomeTrialTtsDefaults(app)
+        applyPremiumPlaybackDefaults(app)
     }
 
     suspend fun applyWelcomeTrialTtsDefaults(app: MusicStoryApp) {
@@ -29,6 +37,13 @@ object WelcomeTrialGate {
             ResolvedAppLanguage.RU -> app.settingsDataStore.setServerTtsProvider(ServerTtsProvider.YANDEX)
             ResolvedAppLanguage.EN -> app.settingsDataStore.setServerTtsProvider(ServerTtsProvider.EDGE)
         }
+    }
+
+    /** Авто-режим: история каждые 3 трека (дефолт trial/premium). */
+    suspend fun applyPremiumPlaybackDefaults(app: MusicStoryApp) {
+        app.settingsDataStore.setAutoPlaybackMode(true)
+        app.settingsDataStore.setEveryNTracks(SettingsDataStore.DEFAULT_EVERY_N_TRACKS)
+        app.settingsDataStore.setTriggerMode(TriggerMode.EVERY_N_TRACKS)
     }
 
     private suspend fun claimWelcomeTrialOnServer(app: MusicStoryApp): Boolean {

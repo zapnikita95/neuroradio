@@ -82,6 +82,18 @@ class StoryRepository(
 
     val storyHistory: Flow<List<StoryHistoryEntry>> = storyHistoryDao.observeAll()
 
+    suspend fun resolveEffectiveTier(): String? {
+        val quotaTier = _dailyQuota.value?.tier
+        if (TierAccess.isPremiumLike(quotaTier)) return quotaTier
+        val profile = settingsDataStore.readCachedAccountProfile()
+        return TierAccess.resolveEffectiveTier(
+            dailyQuotaTier = quotaTier,
+            plan = profile?.plan,
+            trialUntil = profile?.trialUntil,
+            premiumUntil = profile?.premiumUntil,
+        )
+    }
+
     fun cancelActiveStoryFetch(reason: String = "unknown") {
         apiClient.cancelActiveStoryRequest(reason)
     }
@@ -424,7 +436,7 @@ class StoryRepository(
         var backendError: String? = null
 
         val directApiKey = apiKeyForProvider(llmProvider, groqKey, geminiKey, openRouterKey, localOllamaUrl)
-        val tier = _dailyQuota.value?.tier
+        val tier = resolveEffectiveTier()
         val backendOpenRouterModel = resolveBackendOpenRouterModel(
             openRouterModel = openRouterModel,
             openRouterCustomModelId = openRouterCustomModelId,
@@ -1002,7 +1014,7 @@ class StoryRepository(
 
     private suspend fun canUseOfflineReplay(): Boolean {
         if (!settingsDataStore.offlineAudioCacheEnabled.first()) return false
-        val tier = _dailyQuota.value?.tier
+        val tier = resolveEffectiveTier()
         return TierAccess.canUseOfflineAudioCache(tier)
     }
 

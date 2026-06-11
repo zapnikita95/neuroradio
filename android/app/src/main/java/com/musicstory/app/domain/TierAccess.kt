@@ -5,6 +5,21 @@ object TierAccess {
     fun isPremiumLike(tier: String?): Boolean =
         tier?.lowercase() in setOf("premium", "trial", "unlimited")
 
+    /** Квота из последнего story-запроса + кэш профиля / billing (trial до первой истории). */
+    fun resolveEffectiveTier(
+        dailyQuotaTier: String?,
+        plan: String?,
+        trialUntil: Long?,
+        premiumUntil: Long?,
+    ): String? {
+        val now = System.currentTimeMillis()
+        val normalizedPlan = plan?.trim()?.lowercase()
+        if (normalizedPlan == "premium" && (premiumUntil ?: 0L) > now) return "premium"
+        if (normalizedPlan == "trial" && (trialUntil ?: 0L) > now) return "trial"
+        if (isPremiumLike(dailyQuotaTier)) return dailyQuotaTier
+        return dailyQuotaTier ?: normalizedPlan
+    }
+
     /** Manual «Рассказать историю» — свой API-ключ или платный тариф. */
     fun canShowManualStoryButton(hasPersonalApiKey: Boolean, tier: String?): Boolean =
         hasPersonalApiKey || isPremiumLike(tier)
