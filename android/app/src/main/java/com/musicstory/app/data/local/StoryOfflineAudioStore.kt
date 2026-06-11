@@ -111,14 +111,21 @@ class StoryOfflineAudioStore(context: Context) {
         }
     }
 
+    fun evictEphemeral(url: String) {
+        if (url.isBlank()) return
+        val ext = extensionFromUrl(url)
+        val hash = hashUrl(url)
+        File(playbackTempDir, "$hash.$ext").delete()
+        File(playbackTempDir, "$hash.$ext.part").delete()
+    }
+
     suspend fun downloadEphemeral(url: String, forceRefresh: Boolean = false): String? = withContext(Dispatchers.IO) {
         if (url.isBlank()) return@withContext null
         val ext = extensionFromUrl(url)
         val hash = hashUrl(url)
         val target = File(playbackTempDir, "$hash.$ext")
         if (forceRefresh) {
-            target.delete()
-            File(playbackTempDir, "$hash.$ext.part").delete()
+            evictEphemeral(url)
         }
         val maxAgeMs = 2L * 60L * 60L * 1000L
         if (target.isFile && target.length() > 512L && isLikelyValidAudio(target)) {
@@ -143,16 +150,8 @@ class StoryOfflineAudioStore(context: Context) {
                         return@use
                     }
                     val body = response.body ?: return@use
-                    val expectedLen = body.contentLength()
                     temp.outputStream().use { out ->
                         body.byteStream().copyTo(out)
-                    }
-                    if (expectedLen >= 0L && temp.length() != expectedLen) {
-                        StoryLog.w(
-                            "Playback audio truncated — got ${temp.length()} bytes, expected $expectedLen",
-                        )
-                        temp.delete()
-                        return@use
                     }
                     if (temp.length() < 512L || !isLikelyValidAudio(temp)) {
                         StoryLog.w("Playback audio invalid — discarding (${temp.length()} bytes)")

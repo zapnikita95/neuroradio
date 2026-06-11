@@ -819,7 +819,8 @@ class StoryOrchestrator(
                                 scope.launch {
                                     if (!playbackRetry) {
                                         storyRepository.evictLocalAudio(track.displayKey)
-                                        StoryLog.w("Retrying story audio from server after playback error")
+                                        storyRepository.evictEphemeralPlayback(response.audioUrl)
+                                        StoryLog.w("Retrying story audio: download full file after stream error")
                                         startStoryPlayback(response, playbackRetry = true)
                                         return@launch
                                     }

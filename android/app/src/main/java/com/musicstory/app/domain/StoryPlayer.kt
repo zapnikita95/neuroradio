@@ -169,7 +169,7 @@ class StoryPlayer(context: Context) {
         }
         try {
             val isLocalFile = audioUrl.startsWith("file://") || audioUrl.startsWith("content://")
-            StoryLog.i("Playing server audio (${if (isLocalFile) "local" else "stream"}): $audioUrl")
+            StoryLog.i("Playing server audio (${if (isLocalFile) "local" else "stream"}): ${audioUrl.take(120)}")
             playWithExoPlayer(audioUrl)
         } catch (e: Exception) {
             StoryLog.e("ExoPlayer init/play failed", e)

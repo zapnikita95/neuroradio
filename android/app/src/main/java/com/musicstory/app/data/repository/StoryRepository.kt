@@ -991,16 +991,13 @@ class StoryRepository(
     ): String? {
         val serverUrl = resolveAudioUrl(audioUrl) ?: return null
 
-        if (!serverUrl.isNullOrBlank() && serverUrl.startsWith("http", ignoreCase = true)) {
-            offlineAudioStore.downloadEphemeral(serverUrl, forceRefresh = forceFullDownload)?.let { path ->
-                StoryLog.i("Playback: local file ${path.substringAfterLast('/')} (${File(path).length()} bytes)")
+        if (forceFullDownload && !serverUrl.isNullOrBlank() && serverUrl.startsWith("http", ignoreCase = true)) {
+            offlineAudioStore.evictEphemeral(serverUrl)
+            offlineAudioStore.downloadEphemeral(serverUrl, forceRefresh = true)?.let { path ->
+                StoryLog.i("Playback retry: local file ${path.substringAfterLast('/')} (${File(path).length()} bytes)")
                 return offlineAudioStore.localFileUri(path)
             }
-            if (forceFullDownload) {
-                StoryLog.e("Playback retry: could not download audio file")
-                return null
-            }
-            StoryLog.w("Playback: download failed — falling back to stream")
+            StoryLog.w("Playback retry: download failed — streaming again")
         }
 
         if (!preferLocal || serverUrl.isNullOrBlank()) return serverUrl
@@ -1031,6 +1028,11 @@ class StoryRepository(
         offlineAudioStore.deleteFile(cached?.localAudioPath)
         offlineAudioStore.evictAllForTrack(trackKey)
         storyDao.updateLocalAudioPath(trackKey, null)
+    }
+
+    suspend fun evictEphemeralPlayback(audioUrl: String?) {
+        val url = resolveAudioUrl(audioUrl) ?: return
+        offlineAudioStore.evictEphemeral(url)
     }
 
     private fun localAudioMatchesServerFormat(localPath: String, audioUrl: String?): Boolean {

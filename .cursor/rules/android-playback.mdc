@@ -1,0 +1,51 @@
+---
+description: Android озвучка историй — ExoPlayer, stream-first, retry через download. Не ломать все устройства ради одного OEM.
+globs: android/**/StoryPlayer.kt,android/**/StoryRepository.kt,android/**/StoryOrchestrator.kt,android/**/StoryOfflineAudioStore.kt
+alwaysApply: false
+---
+
+# Android playback (озвучка с сервера)
+
+## Источник звука
+
+- **Только** Yandex/Edge TTS на Railway → signed URL → **ExoPlayer**.
+- **Нет** `android.speech.tts.TextToSpeech`, нет локального TTS fallback.
+- Пустой `audioUrl` = ошибка бэкенда, не «включи TTS на телефоне».
+
+## Стратегия воспроизведения (все Android)
+
+1. **Первый запуск — HTTP stream** signed URL (`resolvePlaybackUrl` без `forceFullDownload`).
+   - Быстрый старт, работает на большинстве устройств.
+   - **Нельзя** блокировать первый play обязательной загрузкой файла.
+
+2. **Ошибка ExoPlayer после старта** (Huawei, BT, обрыв стрима):
+   - `StoryOrchestrator` → `playbackRetry=true` → `forceFullDownload`.
+   - Скачать OGG в `cacheDir/playback_temp`, играть `file://`.
+   - Если download не удался → **снова stream**, не `null`.
+
+3. **Никогда** не возвращать `null` из `resolvePlaybackUrl`, если есть валидный `serverUrl`.
+
+## Запрещено
+
+- Download-before-play на **первой** попытке (регрессия: тишина на всех телефонах).
+- Проверка `Content-Length` после OkHttp body (gzip/chunked даёт ложные «truncated»).
+- Retry mid-playback внутри ExoPlayer на том же URL (только orchestrator retry).
+- Явный `MimeTypes.AUDIO_OGG` для `.ogg` (ломает часть Xiaomi/POCO — sniff).
+- `adb install -r` без uninstall (skill `music-story-android-install`).
+
+## Файлы
+
+| Файл | Роль |
+|------|------|
+| `StoryPlayer.kt` | ExoPlayer, listener, один pre-start retry |
+| `StoryRepository.resolvePlaybackUrl` | stream-first, download только на retry |
+| `StoryOfflineAudioStore.downloadEphemeral` | temp cache для retry |
+| `StoryOrchestrator.startStoryPlayback` | `onError` → retry с download |
+
+## Перед «готово»
+
+1. Собрать APK → `efir-ai.apk` в корне, version bump.
+2. `adb uninstall com.efirai.myapp` → `adb install efir-ai.apk`.
+3. **Снять logcat** на подключённом телефоне: `MusicStory`, `ExoPlayer error`.
+4. Убедиться в логах: первая попытка `Playing server audio (stream)`, при retry — `(local)` или снова stream.
+5. Не утверждать «починил», не видя logcat с успешным `STATE_ENDED` или полным проигрыванием.
