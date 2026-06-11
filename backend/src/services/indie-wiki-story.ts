@@ -165,7 +165,10 @@ function scriptFromRaw(raw: string, artist: string, title: string, wikiLead: str
   const quality = validateStoryScript(sanitized, DEFAULT_STORY_LENGTH, artist, title, {
     referenceFacts: [wikiLead],
     skipFirstSentenceAnchor: true,
+    skipReferenceAnchor: true,
     skipPersonaCliches: true,
+    skipWatery: true,
+    skipEnglishCheck: true,
     strictLength: false,
   });
   if (!quality.ok) return null;

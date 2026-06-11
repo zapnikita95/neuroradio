@@ -50,6 +50,19 @@ ok(/музыкант|исполнитель|артист/i.test(evOut), 'artist 
 ok(/с ним/i.test(evOut), 'prepositional fix for с артист');
 console.log('EV →', evOut);
 
+const vedder =
+  'Jonah Weiner из Blender назвал песней, где завораживающий вокал у костра. ' +
+  'здесь не просто поёт — он проводит ритуал. В нет потолка — только бесконечность.';
+const vedderOut = genericizeScriptForVoiceover(vedder, 'Eddie Vedder', 'No Ceiling');
+ok(!/здесь не просто поёт/i.test(vedderOut), 'здесь → он before поёт');
+ok(!/В нет потолка/i.test(vedderOut), 'broken No Ceiling phrase fixed');
+console.log('Vedder →', vedderOut);
+
+const acdc = '/ — гитарный рифф, который держит весь зал.';
+const acdcOut = genericizeScriptForVoiceover(acdc, 'AC/DC', 'Thunderstruck');
+ok(!/^\s*\//.test(acdcOut), 'no leading slash after AC/DC strip');
+console.log('AC/DC →', acdcOut);
+
 const stress = applyRussianStressSafe('Трек собран из чужих семплами и барабанов.');
 ok(stress.includes('с+эмплами'), 'семплами stress on first syllable');
 console.log('stress →', stress);

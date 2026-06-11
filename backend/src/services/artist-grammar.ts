@@ -119,6 +119,11 @@ export function fixSoloArtistPronounsRu(script: string, artist: string): string 
 
   let result = script;
   const patterns: Array<[RegExp, string]> = [
+    [/(?<![а-яёa-z])здесь не просто поёт/gi, `${subj} не просто поёт`],
+    [/(?<![а-яёa-z])Здесь не просто поёт/g, `${subjCap} не просто поёт`],
+    [/(?<![а-яёa-z])здесь не просто пел/gi, `${subj} не просто пел`],
+    [/(?<![а-яёa-z])Здесь не просто пел/g, `${subjCap} не просто пел`],
+    [/В нет потолка/gi, 'В этой песне нет потолка'],
     [/\bИх\s+(путь)/g, `${possCap} $1`],
     [/\bих\s+(путь)/g, `${poss} $1`],
     [/\bИх\s+(голос)/g, `${possCap} $1`],

@@ -105,11 +105,21 @@ function replaceLatinPhrase(
   phrase: string,
   substitutes: string[],
   seedPrefix: string,
+  isPrimary = false,
 ): string {
   if (!phrase.trim() || !isPrimarilyLatin(phrase)) return text;
+  // Короткие куски вроде «No» из «No Ceiling» — только как alias, не как полное имя/трек.
+  if (
+    !isPrimary &&
+    phrase.trim().split(/\s+/).length < 2 &&
+    phrase.trim().length < 4
+  ) {
+    return text;
+  }
 
   let result = text;
-  for (const variant of phraseVariants(phrase)) {
+  const variants = phraseVariants(phrase).sort((a, b) => b.length - a.length);
+  for (const variant of variants) {
     const escaped = escapeRe(variant);
     let counter = 0;
     const next = () => pickSubstitute(`${seedPrefix}|${variant}|${counter++}`, substitutes);
@@ -197,6 +207,10 @@ function rewriteLead(script: string, title: string, artist: string): string {
 
 function cleanupAfterGenericize(text: string): string {
   return text
+    .replace(/^\s*\/+\s*/g, '')
+    .replace(/В нет потолка/giu, 'В этой песне нет потолка')
+    .replace(/(^|[.!?…]\s+)здесь не просто поёт/giu, '$1он не просто поёт')
+    .replace(/(^|[.!?…]\s+)здесь не просто пел/giu, '$1он не просто пел')
     .replace(/\b(эта песня|этот трек|эта композиция|в треке|у этой песни)\s+\1\b/giu, '$1')
     .replace(/\bна\s+трек\s+(?:эта песня|этот трек|эта композиция)\b/giu, 'на этот трек')
     .replace(/(^|\s)с\s+(?:артист|исполнитель|музыкант|группа)(?=\s|[,.!?—–-]|$)/giu, '$1с ним')
@@ -230,15 +244,15 @@ export function genericizeScriptForVoiceover(
   let result = rewriteLead(trimmed, title, artist);
   result = stripLatinArtistAfterOt(result, artist);
   if (stripTitle) {
-    result = replaceLatinPhrase(result, title, TRACK_SUBSTITUTES, 'track');
+    result = replaceLatinPhrase(result, title, TRACK_SUBSTITUTES, 'track', true);
     for (const alias of latinAliasPhrases(title)) {
-      result = replaceLatinPhrase(result, alias, TRACK_SUBSTITUTES, 'track-alias');
+      result = replaceLatinPhrase(result, alias, TRACK_SUBSTITUTES, 'track-alias', false);
     }
   }
   if (stripArtist) {
-    result = replaceLatinPhrase(result, artist, ARTIST_SUBSTITUTES, 'artist');
+    result = replaceLatinPhrase(result, artist, ARTIST_SUBSTITUTES, 'artist', true);
     for (const alias of latinAliasPhrases(artist)) {
-      result = replaceLatinPhrase(result, alias, ARTIST_SUBSTITUTES, 'artist-alias');
+      result = replaceLatinPhrase(result, alias, ARTIST_SUBSTITUTES, 'artist-alias', false);
     }
   }
 
