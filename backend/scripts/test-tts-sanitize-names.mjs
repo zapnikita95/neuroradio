@@ -27,7 +27,8 @@ const vedderOut = sanitizeScriptForTts(vedder, 'Eddie Vedder', 'No Ceiling', [],
 console.log('vedderOut:', vedderOut);
 ok(!/Jonah Weiner/i.test(vedderOut), 'Jonah Weiner transliterated');
 ok(/Джон\s+Вайнер/i.test(vedderOut), 'Джон Вайнер present');
-ok(/Блендер/i.test(vedderOut), 'Blender → Блендер');
+ok(/Блэндер/i.test(vedderOut), 'Blender → Блэндер (э, не е)');
+ok(!/Блендер/i.test(vedderOut), 'not wrong Блендер with е');
 ok(!/Eddie Vedder/i.test(vedderOut), 'latin artist removed when names off');
 ok(!/No Ceiling/i.test(vedderOut), 'latin title removed when names off');
 ok(!/здесь не просто поёт/i.test(vedderOut), 'no broken здесь поёт');
