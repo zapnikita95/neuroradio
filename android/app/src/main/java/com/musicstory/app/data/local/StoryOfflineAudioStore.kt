@@ -11,7 +11,7 @@ import java.io.File
 import java.security.MessageDigest
 import java.util.concurrent.TimeUnit
 
-/** Saves story OGG on device for premium offline replay. */
+/** Saves story audio (OGG or WAV) on device for premium offline replay. */
 class StoryOfflineAudioStore(context: Context) {
 
     private val appContext = context.applicationContext
@@ -27,8 +27,15 @@ class StoryOfflineAudioStore(context: Context) {
 
     fun isWifi(): Boolean = NetworkUtils.isWifi(appContext)
 
-    fun localFileForTrack(trackKey: String): File =
-        File(storiesDir, "${hashTrackKey(trackKey)}.ogg")
+    fun extensionFromUrl(url: String): String =
+        when {
+            url.contains(".wav", ignoreCase = true) -> "wav"
+            url.contains(".ogg", ignoreCase = true) -> "ogg"
+            else -> "ogg"
+        }
+
+    fun localFileForTrack(trackKey: String, extension: String = "ogg"): File =
+        File(storiesDir, "${hashTrackKey(trackKey)}.${extension.lowercase()}")
 
     fun hasLocalFile(path: String?): Boolean {
         if (path.isNullOrBlank()) return false
@@ -38,9 +45,25 @@ class StoryOfflineAudioStore(context: Context) {
 
     fun localFileUri(path: String): String = File(path).toURI().toString()
 
+    /** Remove other extensions for the same track (e.g. stale .ogg when server now serves .wav). */
+    fun evictOtherExtensions(trackKey: String, keepExtension: String) {
+        val hash = hashTrackKey(trackKey)
+        val keep = keepExtension.lowercase()
+        storiesDir.listFiles()?.forEach { file ->
+            if (!file.isFile) return@forEach
+            val name = file.name
+            if (name.startsWith(hash) && name.substringAfterLast('.', "") != keep) {
+                file.delete()
+                StoryLog.i("Offline cache evicted stale ${file.name}")
+            }
+        }
+    }
+
     suspend fun downloadToTrack(url: String, trackKey: String): String? = withContext(Dispatchers.IO) {
         if (url.isBlank()) return@withContext null
-        val target = localFileForTrack(trackKey)
+        val ext = extensionFromUrl(url)
+        evictOtherExtensions(trackKey, ext)
+        val target = localFileForTrack(trackKey, ext)
         val temp = File(target.parentFile, "${target.name}.part")
         try {
             repeat(3) { attempt ->
@@ -82,7 +105,9 @@ class StoryOfflineAudioStore(context: Context) {
     }
 
     suspend fun enforceStorageLimit(maxBytes: Long = MAX_CACHE_BYTES) = withContext(Dispatchers.IO) {
-        val files = storiesDir.listFiles()?.filter { it.isFile && it.extension == "ogg" } ?: return@withContext
+        val files = storiesDir.listFiles()?.filter {
+            it.isFile && it.extension.lowercase() in AUDIO_EXTENSIONS
+        } ?: return@withContext
         var total = files.sumOf { it.length() }
         if (total <= maxBytes) return@withContext
         files.sortedBy { it.lastModified() }.forEach { file ->
@@ -101,5 +126,6 @@ class StoryOfflineAudioStore(context: Context) {
 
     companion object {
         const val MAX_CACHE_BYTES = 500L * 1024L * 1024L
+        private val AUDIO_EXTENSIONS = setOf("ogg", "wav")
     }
 }

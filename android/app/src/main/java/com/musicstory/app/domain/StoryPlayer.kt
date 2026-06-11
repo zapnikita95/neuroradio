@@ -194,11 +194,7 @@ class StoryPlayer(context: Context) {
         currentExoUrl = url
         _state.value = StoryPlaybackState.PREPARING
         scheduleExoBufferingTimeout()
-        val mimeType = when {
-            url.contains(".wav", ignoreCase = true) -> MimeTypes.AUDIO_WAV
-            url.contains(".ogg", ignoreCase = true) -> MimeTypes.AUDIO_OGG
-            else -> null
-        }
+        val mimeType = mimeTypeForPlaybackUrl(url)
         val mediaItemBuilder = MediaItem.Builder().setUri(url)
         if (mimeType != null) {
             mediaItemBuilder.setMimeType(mimeType)
@@ -364,5 +360,14 @@ class StoryPlayer(context: Context) {
         private const val EXO_START_TIMEOUT_MS = 45_000L
         /** One retry only if audio never started — avoids triple restart mid-playback. */
         private const val MAX_EXO_URL_RETRIES = 1
+
+        private fun mimeTypeForPlaybackUrl(url: String): String? {
+            val path = url.substringBefore('?').lowercase()
+            return when {
+                path.endsWith(".wav") -> MimeTypes.AUDIO_WAV
+                path.endsWith(".ogg") -> MimeTypes.AUDIO_OGG
+                else -> null
+            }
+        }
     }
 }

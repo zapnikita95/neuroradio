@@ -975,17 +975,35 @@ class StoryRepository(
         return resolved
     }
 
-    /** Local OGG if cached, else resolved server URL. */
+    /** Local cache if format matches server URL, else resolved server URL. */
     suspend fun resolvePlaybackUrl(trackKey: String, audioUrl: String?): String? {
+        val serverUrl = resolveAudioUrl(audioUrl)
         if (canUseOfflineReplay()) {
-            packPlaybackPath(trackKey)?.let { return offlineAudioStore.localFileUri(it) }
+            packPlaybackPath(trackKey)?.let { path ->
+                if (localAudioMatchesServerFormat(path, audioUrl)) {
+                    return offlineAudioStore.localFileUri(path)
+                }
+                StoryLog.w("Offline pack audio format mismatch — streaming from server")
+            }
             val cached = storyDao.getByTrackKey(trackKey)
             val localPath = cached?.localAudioPath
-            if (offlineAudioStore.hasLocalFile(localPath)) {
-                return offlineAudioStore.localFileUri(localPath!!)
+            if (
+                offlineAudioStore.hasLocalFile(localPath) &&
+                localAudioMatchesServerFormat(localPath!!, audioUrl)
+            ) {
+                return offlineAudioStore.localFileUri(localPath)
+            }
+            if (localPath != null && !localAudioMatchesServerFormat(localPath, audioUrl)) {
+                StoryLog.w("Cached audio extension mismatch for $trackKey — using server URL")
             }
         }
-        return resolveAudioUrl(audioUrl)
+        return serverUrl
+    }
+
+    private fun localAudioMatchesServerFormat(localPath: String, audioUrl: String?): Boolean {
+        val expected = audioUrl?.let { offlineAudioStore.extensionFromUrl(it) } ?: return true
+        val actual = localPath.substringAfterLast('.', "").lowercase()
+        return actual == expected
     }
 
     suspend fun canReplayOffline(trackKey: String): Boolean {
