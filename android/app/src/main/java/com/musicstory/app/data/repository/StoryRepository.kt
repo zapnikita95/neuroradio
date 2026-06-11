@@ -972,6 +972,14 @@ class StoryRepository(
         if (audioUrl.isNullOrBlank()) return null
         val baseUrl = settingsDataStore.backendUrl.first()
         val resolved = apiClient.resolveAudioUrl(baseUrl, audioUrl)
+        if (
+            !audioUrl.isNullOrBlank() &&
+            audioUrl.startsWith("http", ignoreCase = true) &&
+            resolved != null &&
+            !resolved.equals(audioUrl, ignoreCase = true)
+        ) {
+            StoryLog.i("Audio URL rewritten to backend: ${resolved.take(120)}")
+        }
         StoryLog.d("Audio URL: $resolved")
         return resolved
     }
@@ -989,13 +997,22 @@ class StoryRepository(
     ): String? {
         val serverUrl = resolveAudioUrl(audioUrl) ?: return null
 
-        if (forceFullDownload && !serverUrl.isNullOrBlank() && serverUrl.startsWith("http", ignoreCase = true)) {
-            offlineAudioStore.evictEphemeral(serverUrl)
-            offlineAudioStore.downloadEphemeral(serverUrl, forceRefresh = true)?.let { path ->
-                StoryLog.i("Playback retry: local file ${path.substringAfterLast('/')} (${File(path).length()} bytes)")
+        if (!serverUrl.isNullOrBlank() && serverUrl.startsWith("http", ignoreCase = true)) {
+            if (forceFullDownload) {
+                offlineAudioStore.evictEphemeral(serverUrl)
+            }
+            offlineAudioStore.downloadEphemeral(serverUrl, forceRefresh = forceFullDownload)?.let { path ->
+                StoryLog.i(
+                    "Playback: local file ${path.substringAfterLast('/')} " +
+                        "(${File(path).length()} bytes)",
+                )
                 return offlineAudioStore.localFileUri(path)
             }
-            StoryLog.w("Playback retry: download failed — streaming again")
+            StoryLog.w("Playback: download failed — falling back to stream")
+        }
+
+        if (forceFullDownload && !serverUrl.isNullOrBlank()) {
+            StoryLog.w("Playback retry: using stream after download miss")
         }
 
         if (!preferLocal || serverUrl.isNullOrBlank()) return serverUrl

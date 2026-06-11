@@ -328,15 +328,53 @@ fun AccountStatusSection(
                 )
             }
         } ?: run {
+            profile?.takeIf {
+                it.plan == "trial" && (it.trialUntil ?: 0L) > System.currentTimeMillis()
+            }?.let { p ->
+                Text(
+                    text = accountStatusText(context, p),
+                    style = MaterialTheme.typography.labelMedium,
+                    color = LiveGreen,
+                )
+                Spacer(modifier = Modifier.height(12.dp))
+            }
             Text(
                 text = context.getString(R.string.settings_auth_not_linked),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MutedLavender,
             )
             Spacer(modifier = Modifier.height(12.dp))
-            PrimaryStoryButton(
-                text = context.getString(R.string.settings_auth_open_login),
-                onClick = onOpenLogin,
+            if (authConfig?.emailEnabled != false) {
+                AccountEmailLoginContent(
+                    app = app,
+                    scope = scope,
+                    showSkip = false,
+                    compact = true,
+                    onSkip = {},
+                    onLoggedIn = {
+                        scope.launch {
+                            app.accountAuthManager.fetchProfile(backendUrl)?.let { fresh ->
+                                profile = fresh
+                                app.settingsDataStore.saveAccountProfile(fresh.toCached())
+                                app.settingsDataStore.setAccountLinked(true)
+                            }
+                        }
+                    },
+                )
+                Spacer(modifier = Modifier.height(12.dp))
+            }
+            AccountTelegramLoginSection(
+                app = app,
+                scope = scope,
+                onLoggedIn = {
+                    scope.launch {
+                        app.accountAuthManager.fetchProfile(backendUrl)?.let { fresh ->
+                            profile = fresh
+                            app.settingsDataStore.saveAccountProfile(fresh.toCached())
+                            app.settingsDataStore.setAccountLinked(true)
+                        }
+                    }
+                },
             )
         }
 

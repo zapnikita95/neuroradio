@@ -327,12 +327,18 @@ class ApiClient(
 
     fun resolveAudioUrl(baseUrl: String, audioUrl: String?): String? {
         if (audioUrl.isNullOrBlank()) return null
-        if (audioUrl.startsWith("http://") || audioUrl.startsWith("https://")) {
-            return audioUrl
-        }
         val base = normalizeBaseUrl(baseUrl).trimEnd('/')
-        val path = if (audioUrl.startsWith("/")) audioUrl else "/$audioUrl"
-        return base + path
+        val pathAndQuery = when {
+            audioUrl.startsWith("http://") || audioUrl.startsWith("https://") -> {
+                val uri = android.net.Uri.parse(audioUrl)
+                val path = uri.encodedPath.orEmpty()
+                val query = uri.encodedQuery
+                if (query.isNullOrBlank()) path else "$path?$query"
+            }
+            audioUrl.startsWith("/") -> audioUrl
+            else -> "/$audioUrl"
+        }
+        return base + pathAndQuery
     }
 
     suspend fun submitStoryPlaybackComplete(
