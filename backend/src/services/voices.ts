@@ -84,7 +84,7 @@ export function resolveTtsVoice(value: unknown): TtsVoiceSetting {
   if (typeof value === 'string' && VALID_VOICE_SETTINGS.has(value)) {
     return value as TtsVoiceSetting;
   }
-  return 'auto';
+  return 'zahar';
 }
 
 export function resolveVoiceForStory(

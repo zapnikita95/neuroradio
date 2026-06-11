@@ -35,7 +35,7 @@ class TelegramOAuthCoordinator private constructor() {
 
         val verifier = makeCodeVerifier()
         val challenge = makeCodeChallenge(verifier)
-        val startUrl = buildStartUrl(backendBaseUrl, botId, redirect, challenge)
+        val startUrl = buildStartUrl(redirect, challenge)
 
         val deferred = CompletableDeferred<String>()
         pendingCode = deferred
@@ -122,15 +122,14 @@ class TelegramOAuthCoordinator private constructor() {
     }
 
     /**
-     * Custom Tabs preserve query params on our BFF URL; server 302 → oauth.telegram.org with full params.
+     * Always efir-ai.ru for OAuth — API may go to Railway, but Custom Tabs must open our domain
+     * (BotFather redirect URI + HTML bridge). Railway URL in browser breaks OAuth on Huawei.
      */
-    private fun buildStartUrl(
-        backendBaseUrl: String,
-        @Suppress("UNUSED_PARAMETER") clientId: String,
-        @Suppress("UNUSED_PARAMETER") redirectUri: String,
-        challenge: String,
-    ): String {
-        val base = backendBaseUrl.trimEnd('/')
+    private fun buildStartUrl(redirectUri: String, challenge: String): String {
+        val uri = Uri.parse(redirectUri.trim())
+        val host = uri.host?.takeIf { it.isNotBlank() } ?: "www.efir-ai.ru"
+        val scheme = uri.scheme?.takeIf { it.isNotBlank() } ?: "https"
+        val base = "$scheme://$host".trimEnd('/')
         val enc = URLEncoder.encode(challenge, StandardCharsets.UTF_8.name())
         return "$base/v1/public/oauth/telegram/authorize?code_challenge=$enc&code_challenge_method=S256"
     }

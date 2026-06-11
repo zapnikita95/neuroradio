@@ -721,7 +721,7 @@ class SettingsDataStore(private val context: Context) {
             specificGenres = prefs[KEY_SPECIFIC_GENRES]?.toList() ?: emptyList(),
             storyLength = prefs[KEY_STORY_LENGTH] ?: StoryLength.SEC_60.id,
             storyNarrator = prefs[KEY_STORY_NARRATOR] ?: StoryNarrator.AUTO.id,
-            ttsVoice = prefs[KEY_TTS_VOICE] ?: TtsVoice.AUTO.id,
+            ttsVoice = prefs[KEY_TTS_VOICE] ?: TtsVoice.ZAHAR.id,
             ttsSpeed = prefs[KEY_TTS_SPEED] ?: TtsSpeed.NORMAL.id,
             ttsEmotion = prefs[KEY_TTS_EMOTION] ?: TtsEmotion.LIVELY.id,
             ttsPlaybackEngine = prefs[KEY_TTS_PLAYBACK_ENGINE] ?: TtsPlaybackEngine.YANDEX_SERVER.id,

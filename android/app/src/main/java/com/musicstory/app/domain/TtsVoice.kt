@@ -27,6 +27,7 @@ enum class TtsVoice(
 
     companion object {
         fun fromId(id: String?): TtsVoice =
-            entries.firstOrNull { it.id == id } ?: AUTO
+            if (id.isNullOrBlank()) ZAHAR
+            else entries.firstOrNull { it.id == id } ?: ZAHAR
     }
 }

@@ -73,6 +73,22 @@ export function oauthNativeBridgeHtml(queryString: string): string {
 </body></html>`;
 }
 
+/** Huawei/Poco Custom Tabs strip query params on 302 → oauth.telegram.org; JS redirect keeps them. */
+export function oauthAuthorizeRedirectHtml(targetUrl: string): string {
+  const js = JSON.stringify(targetUrl);
+  const esc = targetUrl.replace(/&/g, '&amp;').replace(/"/g, '&quot;');
+  return `<!DOCTYPE html>
+<html lang="ru"><head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Эфир AI — Telegram</title>
+<script>setTimeout(function(){location.replace(${js});},80);</script>
+</head><body style="margin:0;font-family:system-ui,sans-serif;text-align:center;padding:48px 20px;background:#0f0f13;color:#e8eaed">
+<p style="font-size:17px;margin-bottom:16px">Открываем Telegram…</p>
+<p><a href="${esc}" style="color:#a855f7;font-size:16px;text-decoration:none;font-weight:600">Продолжить</a></p>
+</body></html>`;
+}
+
 export async function exchangeTelegramOidcCode(
   code: string,
   redirectUri: string,
