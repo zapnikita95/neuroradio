@@ -725,6 +725,9 @@ class SettingsDataStore(private val context: Context) {
             ttsSpeed = prefs[KEY_TTS_SPEED] ?: TtsSpeed.NORMAL.id,
             ttsEmotion = prefs[KEY_TTS_EMOTION] ?: TtsEmotion.LIVELY.id,
             ttsPlaybackEngine = prefs[KEY_TTS_PLAYBACK_ENGINE] ?: TtsPlaybackEngine.YANDEX_SERVER.id,
+            serverTtsProvider = prefs[KEY_SERVER_TTS_PROVIDER] ?: ServerTtsProvider.YANDEX.id,
+            speakTrackNamesInVoiceover = prefs[KEY_SPEAK_TRACK_NAMES_IN_VOICEOVER]
+                ?: DEFAULT_SPEAK_TRACK_NAMES_IN_VOICEOVER,
             llmProvider = prefs[KEY_LLM_PROVIDER] ?: LlmProvider.OPENROUTER.id,
             appLanguage = prefs[KEY_APP_LANGUAGE] ?: AppLanguage.SYSTEM.id,
             updatedAt = System.currentTimeMillis(),
@@ -755,6 +758,8 @@ class SettingsDataStore(private val context: Context) {
             remote.ttsSpeed?.let { prefs[KEY_TTS_SPEED] = it }
             remote.ttsEmotion?.let { prefs[KEY_TTS_EMOTION] = it }
             remote.ttsPlaybackEngine?.let { prefs[KEY_TTS_PLAYBACK_ENGINE] = it }
+            remote.serverTtsProvider?.let { prefs[KEY_SERVER_TTS_PROVIDER] = it }
+            remote.speakTrackNamesInVoiceover?.let { prefs[KEY_SPEAK_TRACK_NAMES_IN_VOICEOVER] = it }
             remote.llmProvider?.let { prefs[KEY_LLM_PROVIDER] = it }
             remote.appLanguage?.let {
                 prefs[KEY_APP_LANGUAGE] = it

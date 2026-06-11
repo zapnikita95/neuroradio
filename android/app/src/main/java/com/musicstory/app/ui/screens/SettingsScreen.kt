@@ -144,7 +144,9 @@ fun SettingsScreen(
 
     DisposableEffect(Unit) {
         onDispose {
-            scope.launch { app.syncSettingsWithServer() }
+            app.appScope.launch {
+                runCatching { app.syncSettingsWithServer() }
+            }
         }
     }
 
@@ -1868,6 +1870,9 @@ fun SettingsScreen(
                                     yandexKeyInput = ApiKeySanitizer.clean(yandexKeyInput)
                                     StoryLog.i("SETTINGS saved")
                                     saveFeedback = savedLabel
+                                    app.appScope.launch {
+                                        runCatching { app.syncSettingsWithServer() }
+                                    }
                                     if (languageChanged) {
                                         (context as? Activity)?.recreate()
                                     }

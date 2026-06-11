@@ -87,6 +87,8 @@ class AccountSyncManager(
             payload.ttsSpeed?.let { body.put("ttsSpeed", it) }
             payload.ttsEmotion?.let { body.put("ttsEmotion", it) }
             payload.ttsPlaybackEngine?.let { body.put("ttsPlaybackEngine", it) }
+            payload.serverTtsProvider?.let { body.put("serverTtsProvider", it) }
+            payload.speakTrackNamesInVoiceover?.let { body.put("speakTrackNamesInVoiceover", it) }
             payload.llmProvider?.let { body.put("llmProvider", it) }
             body.put("updatedAt", payload.updatedAt)
             val req = Request.Builder()
@@ -137,6 +139,12 @@ class AccountSyncManager(
                     ttsSpeed = s.optString("ttsSpeed").ifBlank { null },
                     ttsEmotion = s.optString("ttsEmotion").ifBlank { null },
                     ttsPlaybackEngine = s.optString("ttsPlaybackEngine").ifBlank { null },
+                    serverTtsProvider = s.optString("serverTtsProvider").ifBlank { null },
+                    speakTrackNamesInVoiceover = if (s.has("speakTrackNamesInVoiceover")) {
+                        s.optBoolean("speakTrackNamesInVoiceover")
+                    } else {
+                        null
+                    },
                     llmProvider = s.optString("llmProvider").ifBlank { null },
                     updatedAt = s.optLong("updatedAt", 0L),
                 )
@@ -335,6 +343,8 @@ class AccountSyncManager(
         val ttsSpeed: String? = null,
         val ttsEmotion: String? = null,
         val ttsPlaybackEngine: String? = null,
+        val serverTtsProvider: String? = null,
+        val speakTrackNamesInVoiceover: Boolean? = null,
         val llmProvider: String? = null,
         val appLanguage: String? = null,
         val updatedAt: Long = System.currentTimeMillis(),

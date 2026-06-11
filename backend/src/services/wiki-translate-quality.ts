@@ -31,6 +31,9 @@ const ACT_NAME_LATIN: Record<string, string> = {
   't.a.t.u.': 't.A.T.u.',
   tatu: 't.A.T.u.',
   'feel good inc': 'Feel Good Inc.',
+  'fatboy slim': 'Fatboy Slim',
+  'norman cook': 'Norman Cook',
+  'norman quentin cook': 'Norman Quentin Cook',
   maneskin: 'Måneskin',
   måneskin: 'Måneskin',
 };
@@ -93,6 +96,53 @@ function restoreLatinPersonNames(script: string): string {
     result = result.replace(re, latin);
   }
   return result;
+}
+
+/** Reject broken wiki translations before they reach TTS or the client. */
+export function findWikiTranslationDefects(
+  script: string,
+  artist: string,
+  title: string,
+): string | null {
+  const s = script.trim();
+  if (!s) return 'empty wiki script';
+  if (/\+[а-яё]/i.test(s) || /\b[а-яё]+\+[а-яё]+/i.test(s)) {
+    return 'stress markup leaked into script';
+  }
+  if (/этот\s+артист/i.test(s) || /этот\s+исполнитель/i.test(s) || /эта\s+группа(?!\s+[«A-Za-z])/i.test(s)) {
+    return 'generic placeholder instead of artist name';
+  }
+  if (/псевдонимом\s+этот/i.test(s) || /под\s+псевдонимом\s+(?:артист|исполнител)/i.test(s)) {
+    return 'missing stage name after pseudonym';
+  }
+  if (/—\s*в\s+треке\s*[.!?]?$/i.test(s) || /\bодин\s+из\s+(?:его\s+)?треков\s*—\s*в\s+треке/i.test(s)) {
+    return 'broken track mention';
+  }
+  if (/sloganes/i.test(s) || /\+б\s+\+б/i.test(s)) {
+    return 'garbled genre or calque';
+  }
+  const artistLatin = artist.trim();
+  const titleLatin = title.trim();
+  if (artistLatin.length >= 3 && /[A-Za-zÀ-ÿ]/.test(artistLatin)) {
+    const artistNorm = artistLatin.toLowerCase();
+    const scriptNorm = s.toLowerCase();
+    if (!scriptNorm.includes(artistNorm)) {
+      const parts = artistNorm.split(/\s+/).filter((p) => p.length >= 4);
+      if (parts.length > 0 && !parts.some((p) => scriptNorm.includes(p))) {
+        return 'artist name missing from wiki translation';
+      }
+    }
+  }
+  if (titleLatin.length >= 3 && /[A-Za-zÀ-ÿ]/.test(titleLatin)) {
+    const titleNorm = titleLatin.toLowerCase();
+    if (!s.toLowerCase().includes(titleNorm)) {
+      const short = titleNorm.replace(/\s*\([^)]*\)\s*/g, '').trim();
+      if (short.length >= 3 && !s.toLowerCase().includes(short)) {
+        return 'track title missing from wiki translation';
+      }
+    }
+  }
+  return null;
 }
 
 export function fixWikiTranslationArtifacts(

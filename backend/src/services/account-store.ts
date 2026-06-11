@@ -48,6 +48,8 @@ export interface SyncSettings {
   ttsSpeed?: string;
   ttsEmotion?: string;
   ttsPlaybackEngine?: string;
+  serverTtsProvider?: string;
+  speakTrackNamesInVoiceover?: boolean;
   llmProvider?: string;
   appLanguage?: string;
   updatedAt?: number;

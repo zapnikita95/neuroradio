@@ -28,7 +28,7 @@ object WelcomeTrialGate {
     suspend fun completeAfterLogin(app: MusicStoryApp) {
         app.settingsDataStore.setAccountLoginGateCompleted(true)
         val profile = app.settingsDataStore.readCachedAccountProfile()
-        if (isTrialActive(profile)) {
+        if (isTrialActive(profile) || isPremiumActive(profile)) {
             applyWelcomeTrialDefaults(app)
         }
         app.storyOrchestrator.notifyTierMayHaveChanged()
@@ -81,5 +81,11 @@ object WelcomeTrialGate {
         if (profile == null) return false
         return profile.plan == "trial" &&
             (profile.trialUntil ?: 0L) > System.currentTimeMillis()
+    }
+
+    private fun isPremiumActive(profile: CachedAccountProfile?): Boolean {
+        if (profile == null) return false
+        return profile.plan == "premium" &&
+            (profile.premiumUntil ?: 0L) > System.currentTimeMillis()
     }
 }

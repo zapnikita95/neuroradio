@@ -681,6 +681,8 @@ class StoryRepository(
                                 resolvedLang == ResolvedAppLanguage.EN &&
                                     TierAccess.isPremiumLike(serverTier) -> "auto"
                                 TierAccess.isPremiumLike(serverTier) &&
+                                    resolvedLang == ResolvedAppLanguage.RU -> "yandex"
+                                TierAccess.isPremiumLike(serverTier) &&
                                     serverTtsProvider == ServerTtsProvider.YANDEX -> "yandex"
                                 else -> "edge"
                             }
