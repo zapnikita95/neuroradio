@@ -23,6 +23,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import android.app.Activity
 import android.content.Context
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
@@ -32,6 +33,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.musicstory.app.MusicStoryApp
 import com.musicstory.app.R
+import com.musicstory.app.data.auth.TelegramOAuthCoordinator
+import com.musicstory.app.data.auth.TelegramOAuthException
 import com.musicstory.app.data.local.toCached
 import com.musicstory.app.data.local.toProfile
 import com.musicstory.app.data.remote.AccountAuthManager
@@ -106,6 +109,62 @@ private fun authMessageColor(context: Context, message: String): Color {
     }
 }
 
+private fun CoroutineScope.launchTelegramAuth(
+    app: MusicStoryApp,
+    context: Context,
+    backendUrl: String,
+    cfg: AccountAuthManager.AuthConfig,
+    onSuccess: (AccountAuthManager.AccountProfile) -> Unit,
+    onError: (String) -> Unit,
+    onWidgetFallback: () -> Unit,
+) {
+    launch {
+        if (cfg.canUseTelegramOAuth) {
+            val activity = context as? Activity
+            if (activity == null) {
+                onError(context.getString(R.string.settings_auth_verify_failed))
+                return@launch
+            }
+            val botId = cfg.telegramBotId.orEmpty()
+            val redirectUri = cfg.telegramOAuthRedirectUri.orEmpty()
+            try {
+                val (code, verifier) = TelegramOAuthCoordinator.instance.signIn(activity, botId, redirectUri)
+                val login = withContext(Dispatchers.IO) {
+                    app.accountAuthManager.linkTelegramOAuth(
+                        backendUrl,
+                        code,
+                        verifier,
+                        redirectUri,
+                        context,
+                    )
+                }
+                if (login.profile != null) {
+                    withContext(Dispatchers.IO) {
+                        finishAccountLogin(app, login)
+                    }
+                    onSuccess(login.profile)
+                } else {
+                    onError(login.error ?: context.getString(R.string.settings_auth_verify_failed))
+                }
+            } catch (err: TelegramOAuthException) {
+                if (err !is TelegramOAuthException.Cancelled) {
+                    onError(err.message ?: context.getString(R.string.settings_auth_verify_failed))
+                }
+            } catch (err: Exception) {
+                StoryLog.e("Telegram OAuth failed", err)
+                onError(err.message ?: context.getString(R.string.settings_auth_verify_failed))
+            }
+            return@launch
+        }
+
+        if (!cfg.telegramBotUsername.isNullOrBlank() && !cfg.telegramWidgetBaseUrl.isNullOrBlank()) {
+            onWidgetFallback()
+        } else {
+            onError(context.getString(R.string.settings_auth_telegram_not_configured))
+        }
+    }
+}
+
 @Composable
 fun AccountStatusSection(
     app: MusicStoryApp,
@@ -134,7 +193,9 @@ fun AccountStatusSection(
     }
 
     authConfig?.let { cfg ->
-        if (showTelegramSheet && !cfg.telegramBotUsername.isNullOrBlank() && !cfg.telegramWidgetBaseUrl.isNullOrBlank()) {
+        if (showTelegramSheet && !cfg.canUseTelegramOAuth &&
+            !cfg.telegramBotUsername.isNullOrBlank() && !cfg.telegramWidgetBaseUrl.isNullOrBlank()
+        ) {
             TelegramLoginWidgetSheet(
                 visible = true,
                 botUsername = cfg.telegramBotUsername,
@@ -222,11 +283,25 @@ fun AccountStatusSection(
                 )
             }
 
-            if (p.telegramId == null && authConfig?.telegramEnabled == true) {
+            if (p.telegramId == null && authConfig?.showsTelegramLogin == true) {
                 Spacer(modifier = Modifier.height(12.dp))
                 SecondaryStoryButton(
                     text = context.getString(R.string.settings_auth_link_telegram),
-                    onClick = { showTelegramSheet = true },
+                    onClick = {
+                        val cfg = authConfig ?: return@SecondaryStoryButton
+                        scope.launchTelegramAuth(
+                            app = app,
+                            context = context,
+                            backendUrl = backendUrl,
+                            cfg = cfg,
+                            onSuccess = { fresh ->
+                                message = context.getString(R.string.settings_auth_success)
+                                profile = fresh
+                            },
+                            onError = { message = it },
+                            onWidgetFallback = { showTelegramSheet = true },
+                        )
+                    },
                 )
             }
         } ?: run {
@@ -517,7 +592,9 @@ fun AccountTelegramLoginSection(
     }
 
     authConfig?.let { cfg ->
-        if (showSheet && !cfg.telegramBotUsername.isNullOrBlank() && !cfg.telegramWidgetBaseUrl.isNullOrBlank()) {
+        if (showSheet && !cfg.canUseTelegramOAuth &&
+            !cfg.telegramBotUsername.isNullOrBlank() && !cfg.telegramWidgetBaseUrl.isNullOrBlank()
+        ) {
             TelegramLoginWidgetSheet(
                 visible = true,
                 botUsername = cfg.telegramBotUsername,
@@ -568,11 +645,23 @@ fun AccountTelegramLoginSection(
                     message = context.getString(R.string.auth_privacy_required)
                     return@PrimaryStoryButton
                 }
-                if (authConfig?.telegramWidgetBaseUrl.isNullOrBlank()) {
+                val cfg = authConfig
+                if (cfg == null || !cfg.showsTelegramLogin) {
                     message = context.getString(R.string.settings_auth_telegram_not_configured)
-                } else {
-                    showSheet = true
+                    return@PrimaryStoryButton
                 }
+                scope.launchTelegramAuth(
+                    app = app,
+                    context = context,
+                    backendUrl = backendUrl,
+                    cfg = cfg,
+                    onSuccess = {
+                        message = context.getString(R.string.settings_auth_success)
+                        onLoggedIn()
+                    },
+                    onError = { message = it },
+                    onWidgetFallback = { showSheet = true },
+                )
             },
         )
         message?.let {

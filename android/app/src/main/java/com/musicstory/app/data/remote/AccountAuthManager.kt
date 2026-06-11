@@ -146,7 +146,10 @@ class AccountAuthManager(
         AuthConfig(
             emailEnabled = json.optBoolean("emailEnabled"),
             telegramEnabled = json.optBoolean("telegramEnabled"),
+            telegramOAuthEnabled = json.optBoolean("telegramOAuthEnabled"),
             telegramBotUsername = parseOptionalString(json, "telegramBotUsername"),
+            telegramBotId = parseOptionalString(json, "telegramBotId"),
+            telegramOAuthRedirectUri = parseOptionalString(json, "telegramOAuthRedirectUri"),
             telegramWidgetBaseUrl = normalizeHttpsOrigin(parseOptionalString(json, "telegramWidgetBaseUrl")),
         )
 
@@ -202,6 +205,38 @@ class AccountAuthManager(
                 }
             }.getOrDefault(AccountLoginResult(error = "Ошибка сети"))
         }
+
+    suspend fun linkTelegramOAuth(
+        baseUrl: String,
+        code: String,
+        codeVerifier: String,
+        redirectUri: String,
+        context: Context,
+    ): AccountLoginResult = withContext(Dispatchers.IO) {
+        val token = authManager.getAccessToken(baseUrl) ?: return@withContext AccountLoginResult(error = "Нет связи с сервером")
+        val body = JSONObject()
+            .put("code", code)
+            .put("code_verifier", codeVerifier)
+            .put("redirect_uri", redirectUri)
+            .put("device_fingerprint", DeviceFingerprint.get(context))
+            .toString()
+        val req = Request.Builder()
+            .url("${baseUrl.trimEnd('/')}/v1/account/telegram/oauth")
+            .header("Authorization", "Bearer $token")
+            .post(body.toRequestBody("application/json".toMediaType()))
+            .build()
+        runCatching {
+            http.newCall(req).execute().use { resp ->
+                val raw = resp.body?.string().orEmpty()
+                if (!resp.isSuccessful) {
+                    return@withContext AccountLoginResult(
+                        error = JSONObject(raw).optString("error").ifBlank { "Ошибка Telegram OAuth" },
+                    )
+                }
+                parseLoginResponse(raw, "Ошибка Telegram OAuth")
+            }
+        }.getOrDefault(AccountLoginResult(error = "Ошибка сети"))
+    }
 
     suspend fun startEmailLogin(baseUrl: String, email: String): String? = withContext(Dispatchers.IO) {
         val token = authManager.getAccessToken(baseUrl) ?: return@withContext null
@@ -275,9 +310,20 @@ class AccountAuthManager(
     data class AuthConfig(
         val emailEnabled: Boolean,
         val telegramEnabled: Boolean,
+        val telegramOAuthEnabled: Boolean = false,
         val telegramBotUsername: String?,
+        val telegramBotId: String?,
+        val telegramOAuthRedirectUri: String?,
         val telegramWidgetBaseUrl: String?,
-    )
+    ) {
+        val canUseTelegramOAuth: Boolean
+            get() = telegramOAuthEnabled &&
+                !telegramBotId.isNullOrBlank() &&
+                !telegramOAuthRedirectUri.isNullOrBlank()
+
+        val showsTelegramLogin: Boolean
+            get() = canUseTelegramOAuth || !telegramBotUsername.isNullOrBlank()
+    }
 
     data class AccountProfile(
         val accountId: String?,

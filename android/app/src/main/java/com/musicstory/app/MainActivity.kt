@@ -17,6 +17,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
+import com.musicstory.app.data.auth.TelegramOAuthCoordinator
 import com.musicstory.app.ui.navigation.MusicStoryStartupGate
 import com.musicstory.app.ui.theme.MusicStoryTheme
 
@@ -38,6 +39,7 @@ class MainActivity : ComponentActivity() {
         app = application as MusicStoryApp
         openListeningPage = intent?.getBooleanExtra(EXTRA_OPEN_LISTENING, false) == true
         openSettingsPage = intent?.getBooleanExtra(EXTRA_OPEN_SETTINGS, false) == true
+        handleOAuthIntent(intent)
 
         setContent {
             MusicStoryTheme {
@@ -73,12 +75,17 @@ class MainActivity : ComponentActivity() {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
+        handleOAuthIntent(intent)
         if (intent.getBooleanExtra(EXTRA_OPEN_LISTENING, false)) {
             openListeningPage = true
         }
         if (intent.getBooleanExtra(EXTRA_OPEN_SETTINGS, false)) {
             openSettingsPage = true
         }
+    }
+
+    private fun handleOAuthIntent(intent: Intent?) {
+        TelegramOAuthCoordinator.instance.handleCallback(intent?.data)
     }
 
     override fun onResume() {

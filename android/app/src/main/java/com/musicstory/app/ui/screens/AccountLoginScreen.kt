@@ -63,7 +63,7 @@ fun AccountLoginScreen(
             authConfig = app.accountAuthManager.fetchConfig(url)
             loginMode = when {
                 authConfig?.emailEnabled == true -> LoginMode.EMAIL
-                authConfig?.telegramEnabled == true -> LoginMode.TELEGRAM
+                authConfig?.showsTelegramLogin == true -> LoginMode.TELEGRAM
                 else -> LoginMode.EMAIL
             }
         }
@@ -139,7 +139,7 @@ fun AccountLoginScreen(
                 Spacer(modifier = Modifier.height(16.dp))
                 GlassCard(accentBorder = true, modifier = Modifier.fillMaxWidth()) {
                     Column {
-                        if (authConfig?.emailEnabled == true && authConfig?.telegramEnabled == true) {
+                        if (authConfig?.emailEnabled == true && authConfig?.showsTelegramLogin == true) {
                             LoginModeSwitch(
                                 mode = loginMode,
                                 onModeChange = { loginMode = it },
@@ -148,7 +148,7 @@ fun AccountLoginScreen(
                         }
 
                         when {
-                            loginMode == LoginMode.TELEGRAM && authConfig?.telegramEnabled == true ->
+                            loginMode == LoginMode.TELEGRAM && authConfig?.showsTelegramLogin == true ->
                                 AccountTelegramLoginSection(
                                     app = app,
                                     scope = scope,
@@ -162,7 +162,7 @@ fun AccountLoginScreen(
                                     onSkip = onSkip,
                                     onLoggedIn = onLoggedIn,
                                 )
-                            authConfig?.telegramEnabled == true ->
+                            authConfig?.showsTelegramLogin == true ->
                                 AccountTelegramLoginSection(
                                     app = app,
                                     scope = scope,

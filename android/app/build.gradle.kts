@@ -33,8 +33,8 @@ android {
         applicationId = "com.efirai.myapp"
         minSdk = 26
         targetSdk = 35
-        versionCode = 106
-        versionName = "1.5.68"
+        versionCode = 107
+        versionName = "1.5.69"
 
         buildConfigField("String", "VERSION_NAME", "\"$versionName\"")
         buildConfigField("int", "VERSION_CODE", "$versionCode")
@@ -170,6 +170,7 @@ dependencies {
     implementation(libs.androidx.datastore.preferences)
     implementation(libs.androidx.security.crypto)
     implementation(libs.billing.ktx)
+    implementation(libs.androidx.browser)
 
     testImplementation(libs.junit4)
 }
