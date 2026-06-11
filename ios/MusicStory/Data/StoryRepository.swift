@@ -52,9 +52,11 @@ final class StoryRepository: ObservableObject {
             artist: track.artist,
             title: track.title,
             previousScripts: previousScripts,
-            storyLength: "30s",
+            storyLength: settings.storyLength.rawValue,
+            storyNarrator: settings.storyNarrator.rawValue,
+            ttsVoice: settings.ttsVoice.rawValue,
             ttsSpeed: settings.ttsSpeedPreset.yandexSpeed,
-            ttsEmotion: "lively"
+            ttsEmotion: settings.ttsEmotion.rawValue
         )
 
         do {

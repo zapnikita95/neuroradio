@@ -123,6 +123,7 @@
 		F1000037 /* TrackDurationResolver.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrackDurationResolver.swift; sourceTree = "<group>"; };
 		F1000038 /* ShazamAutoPolicy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShazamAutoPolicy.swift; sourceTree = "<group>"; };
 		F1000039 /* ShazamFloatingButton.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShazamFloatingButton.swift; sourceTree = "<group>"; };
+		F1000040 /* MusicStory.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = MusicStory.entitlements; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -167,6 +168,7 @@
 				G100000B /* UI */,
 				F1000016 /* Assets.xcassets */,
 				F1000018 /* Info.plist */,
+				F1000040 /* MusicStory.entitlements */,
 			);
 			path = MusicStory;
 			sourceTree = "<group>";
@@ -497,9 +499,10 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = MusicStory/MusicStory.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = "";
+				DEVELOPMENT_TEAM = Y52BT2N4L8;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = MusicStory/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = "Music Story";
@@ -511,7 +514,7 @@
 					"@executable_path/Frameworks",
 				);
 				MARKETING_VERSION = 1.0.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.efirai.myapp;
+				PRODUCT_BUNDLE_IDENTIFIER = com.efirai.appname;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				TARGETED_DEVICE_FAMILY = "1,2";
@@ -522,9 +525,10 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = MusicStory/MusicStory.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = "";
+				DEVELOPMENT_TEAM = Y52BT2N4L8;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = MusicStory/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = "Music Story";
@@ -536,7 +540,7 @@
 					"@executable_path/Frameworks",
 				);
 				MARKETING_VERSION = 1.0.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.efirai.myapp;
+				PRODUCT_BUNDLE_IDENTIFIER = com.efirai.appname;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				TARGETED_DEVICE_FAMILY = "1,2";
@@ -548,7 +552,7 @@
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = "";
+				DEVELOPMENT_TEAM = Y52BT2N4L8;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = MusicStoryWidget/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = "Music Story Widget";
@@ -559,7 +563,7 @@
 					"@executable_path/../../Frameworks",
 				);
 				MARKETING_VERSION = 1.0.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.efirai.myapp.widget;
+				PRODUCT_BUNDLE_IDENTIFIER = com.efirai.appname.widget;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SKIP_INSTALL = YES;
 				SWIFT_EMIT_LOC_STRINGS = YES;
@@ -573,7 +577,7 @@
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = "";
+				DEVELOPMENT_TEAM = Y52BT2N4L8;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = MusicStoryWidget/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = "Music Story Widget";
@@ -584,7 +588,7 @@
 					"@executable_path/../../Frameworks",
 				);
 				MARKETING_VERSION = 1.0.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.efirai.myapp.widget;
+				PRODUCT_BUNDLE_IDENTIFIER = com.efirai.appname.widget;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SKIP_INSTALL = YES;
 				SWIFT_EMIT_LOC_STRINGS = YES;

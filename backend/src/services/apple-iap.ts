@@ -1,4 +1,4 @@
-const EXPECTED_BUNDLE_ID = 'com.efirai.myapp';
+const EXPECTED_BUNDLE_IDS = new Set(['com.efirai.appname', 'com.efirai.myapp']);
 
 export const APPLE_IAP_PRODUCT_IDS = [
   'premium_voice_monthly',
@@ -106,7 +106,7 @@ export function verifyApplePurchaseInput(
   if (!isKnownProductId(productId)) {
     return { ok: false, error: 'Unknown product id', code: 'APPLE_PRODUCT_UNKNOWN' };
   }
-  if (bundleId && bundleId !== EXPECTED_BUNDLE_ID) {
+  if (bundleId && !EXPECTED_BUNDLE_IDS.has(bundleId)) {
     return { ok: false, error: 'Bundle id mismatch', code: 'APPLE_BUNDLE_MISMATCH' };
   }
 

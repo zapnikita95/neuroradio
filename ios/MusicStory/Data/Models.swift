@@ -5,6 +5,8 @@ struct StoryRequest: Encodable, Sendable {
     let title: String
     let previousScripts: [String]
     let storyLength: String
+    let storyNarrator: String
+    let ttsVoice: String
     let ttsSpeed: Float
     let ttsEmotion: String
 
@@ -13,6 +15,8 @@ struct StoryRequest: Encodable, Sendable {
         case title
         case previousScripts = "previous_scripts"
         case storyLength = "story_length"
+        case storyNarrator = "story_narrator"
+        case ttsVoice = "tts_voice"
         case ttsSpeed = "tts_speed"
         case ttsEmotion = "tts_emotion"
     }

@@ -93,7 +93,7 @@ export function getAuthJwtSecret(): string | null {
   return crypto.createHmac('sha256', 'music-story-app-jwt-v1').update(groqKey).digest('hex');
 }
 
-const DEFAULT_PACKAGE_NAMES = ['com.efirai.myapp', 'com.musicstory.app'];
+const DEFAULT_PACKAGE_NAMES = ['com.efirai.appname', 'com.efirai.myapp', 'com.musicstory.app'];
 
 /** TestFlight / App Store — без Railway ALLOWED_IOS_TEAM_ID. */
 const DEFAULT_IOS_TEAM_IDS = ['Y52BT2N4L8'];
@@ -154,6 +154,7 @@ export function getAllowedCertFingerprints(): Set<string> {
   if (SECURITY.allowDebugCert) {
     allowed.add(normalizeCertSha256(DEBUG_CERT_SHA256));
     allowed.add(normalizeCertSha256(iosAttestationHash('com.musicstory.app', 'DEVELOPMENT')));
+    allowed.add(normalizeCertSha256(iosAttestationHash('com.efirai.appname', 'DEVELOPMENT')));
     allowed.add(normalizeCertSha256(iosAttestationHash('com.efirai.myapp', 'DEVELOPMENT')));
   }
 

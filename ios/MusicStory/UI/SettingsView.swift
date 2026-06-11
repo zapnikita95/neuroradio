@@ -20,6 +20,7 @@ struct SettingsView: View {
                 VStack(alignment: .leading, spacing: 20) {
                     header
                     accountSection
+                    voiceAndLengthSection
                     generalSection
                     backendSection
                     modeSection
@@ -88,6 +89,32 @@ struct SettingsView: View {
         Text("Подключение и триггеры")
             .font(.title2.bold())
             .foregroundStyle(AppTheme.creamText)
+    }
+
+    private var voiceAndLengthSection: some View {
+        GlassCard {
+            VStack(alignment: .leading, spacing: 12) {
+                Text("Голос и длина")
+                    .font(.headline)
+                    .foregroundStyle(AppTheme.creamText)
+
+                Picker("Персонаж", selection: $settings.storyNarrator) {
+                    ForEach(StoryNarrator.allCases) { narrator in
+                        Text(narrator.labelRu).tag(narrator)
+                    }
+                }
+                .pickerStyle(.menu)
+                .tint(AppTheme.goldBright)
+
+                Picker("Длина истории", selection: $settings.storyLength) {
+                    ForEach(StoryLength.allCases) { length in
+                        Text(length.labelRu).tag(length)
+                    }
+                }
+                .pickerStyle(.menu)
+                .tint(AppTheme.goldBright)
+            }
+        }
     }
 
     private var generalSection: some View {
