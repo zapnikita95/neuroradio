@@ -1,6 +1,7 @@
 /**
  * Bulk harvest facts into facts-bank.json / facts-bank-seed.json.
- * Run: npm run build && node scripts/bulk-seed-fact-bank.mjs [--target=8000] [--concurrency=4] [--resume]
+ * Checkpoint every 10 tracks (bank + hot-seed + progress).
+ * Run: npm run build && node scripts/bulk-seed-fact-bank.mjs [--target=8000] [--concurrency=4] [--resume] [--retry-zero]
  */
 import './setup-hidemy-proxy.mjs';
 import '../dist/load-env.js';
@@ -25,12 +26,14 @@ const target = parseInt(args.find((a) => a.startsWith('--target='))?.split('=')[
 const concurrency = parseInt(args.find((a) => a.startsWith('--concurrency='))?.split('=')[1] ?? '4', 10);
 const trackLimit = parseInt(args.find((a) => a.startsWith('--limit='))?.split('=')[1] ?? '0', 10);
 const resume = args.includes('--resume');
+const retryZero = args.includes('--retry-zero');
 const backfillLastfm = !args.includes('--no-backfill-lastfm');
 
 const JUNK_ARTIST =
   /^(karaoke version|ameritz|party allstars|the latin party allstars|the latin party)$/i;
 const JUNK_TITLE =
   /originally recorded|in the style of|\(karaoke|\(radio edit\)|\(instrumental\)/i;
+const JUNK_FACT = /\b(?:in the style of|karaoke version)\b/i;
 
 function trackKey(artist, title) {
   return `${artist.trim().toLowerCase()}|${title.trim().toLowerCase()}`;
@@ -58,6 +61,12 @@ function trackPriority(track) {
   return 5;
 }
 
+function hasFactsInBank(bank, artist, title) {
+  const tk = trackKey(artist, title);
+  const ak = artistKey(artist);
+  return (bank.byTrack[tk]?.length ?? 0) > 0 || (bank.byArtist[ak]?.length ?? 0) > 0;
+}
+
 function hasLastfmInBank(bank, artist, title) {
   const tk = trackKey(artist, title);
   const ak = artistKey(artist);
@@ -75,9 +84,49 @@ function saveBank(path, bank) {
   writeFileSync(path, JSON.stringify(bank, null, 2), 'utf8');
 }
 
+function buildHotSeed(bank) {
+  const hotOnly = { byTrack: {}, byArtist: {} };
+  for (const [k, pool] of Object.entries(bank.byTrack ?? {})) {
+    const hot = pool.filter((f) => f.isHot);
+    if (hot.length) hotOnly.byTrack[k] = hot;
+  }
+  for (const [k, pool] of Object.entries(bank.byArtist ?? {})) {
+    const hot = pool.filter((f) => f.isHot);
+    if (hot.length) hotOnly.byArtist[k] = hot;
+  }
+  return hotOnly;
+}
+
+function saveCheckpoint(bank, stats, doneKeys, zeroFactKeys) {
+  saveBank(BANK_PATH, bank);
+  saveBank(SEED_OUT, buildHotSeed(bank));
+  writeFileSync(
+    PROGRESS,
+    JSON.stringify(
+      {
+        doneKeys: [...doneKeys],
+        zeroFactKeys: [...zeroFactKeys],
+        stats,
+        savedAt: new Date().toISOString(),
+      },
+      null,
+      2,
+    ),
+  );
+}
+
+function shouldRejectFact(trimmed, item) {
+  if (JUNK_FACT.test(trimmed)) return true;
+  if (item.scope === 'artist' && item.source === 'wiki' && trimmed.length >= 80) {
+    return interestScore(trimmed) < 2;
+  }
+  if (isBoringFact(trimmed)) return true;
+  return false;
+}
+
 function upsertFact(bank, artist, title, item) {
   const trimmed = item.fact.trim();
-  if (trimmed.length < 35 || isBoringFact(trimmed)) return false;
+  if (trimmed.length < 35 || shouldRejectFact(trimmed, item)) return false;
   const score = interestScore(trimmed);
   if (score < 3) return false;
   const rating = interestRating10(trimmed);
@@ -91,7 +140,7 @@ function upsertFact(bank, artist, title, item) {
     interestScore: score,
     interestRating: rating,
     source: 'api',
-    isHot: rating >= 6,
+    isHot: rating >= 6 && !JUNK_FACT.test(trimmed),
     harvestSource: item.source,
     topicKey,
     timesUsed: 0,
@@ -131,16 +180,25 @@ async function processTrack(bank, track, stats) {
       saved += 1;
       stats.bySource[f.source] = (stats.bySource[f.source] ?? 0) + 1;
       if (f.source === 'lastfm') savedLastfm += 1;
-      if (interestRating10(f.fact) >= 6) savedHot += 1;
+      if (interestRating10(f.fact) >= 6 && !JUNK_FACT.test(f.fact)) savedHot += 1;
     }
   }
   stats.total += saved;
   stats.hot += savedHot;
   stats.tracks += 1;
-  return { saved, savedLastfm };
+  return { saved, savedLastfm, harvested: facts.length };
 }
 
-function orderTracks(tracks, doneKeys, bank) {
+function orderTracks(tracks, doneKeys, bank, zeroFactKeys) {
+  if (retryZero) {
+    const retry = tracks.filter((t) => {
+      const key = trackKey(t.artist, t.title);
+      return zeroFactKeys.has(key) || (doneKeys.has(key) && !hasFactsInBank(bank, t.artist, t.title));
+    });
+    console.log(`Retry-zero queue: ${retry.length} tracks with no facts in bank`);
+    return retry.sort((a, b) => trackPriority(a) - trackPriority(b));
+  }
+
   const pending = [];
   const backfill = [];
   for (const t of tracks) {
@@ -155,7 +213,7 @@ function orderTracks(tracks, doneKeys, bank) {
   return [...pending.sort(byPri), ...backfill.sort(byPri)];
 }
 
-async function runPool(tracks, bank, stats, doneKeys) {
+async function runPool(tracks, bank, stats, doneKeys, zeroFactKeys) {
   let idx = 0;
   async function worker() {
     while (idx < tracks.length && stats.total < target) {
@@ -163,15 +221,21 @@ async function runPool(tracks, bank, stats, doneKeys) {
       const track = tracks[i];
       const key = trackKey(track.artist, track.title);
       try {
-        const { saved, savedLastfm } = await processTrack(bank, track, stats);
+        const { saved, savedLastfm, harvested } = await processTrack(bank, track, stats);
         doneKeys.add(key);
-        if (saved > 0) {
+        if (saved === 0) {
+          zeroFactKeys.add(key);
+          stats.zeroFacts = (stats.zeroFacts ?? 0) + 1;
+          console.warn(
+            `[${stats.tracks}] ZERO ${track.artist} — ${track.title} (harvested=${harvested}, zeroTotal=${stats.zeroFacts})`,
+          );
+        } else {
+          zeroFactKeys.delete(key);
           const lf = savedLastfm > 0 ? ` lastfm=${savedLastfm}` : '';
           console.log(`[${stats.tracks}] ${track.artist} — ${track.title}: +${saved}${lf} (total=${stats.total})`);
         }
         if (stats.tracks % 10 === 0) {
-          saveBank(BANK_PATH, bank);
-          writeFileSync(PROGRESS, JSON.stringify({ doneKeys: [...doneKeys], stats }, null, 2));
+          saveCheckpoint(bank, stats, doneKeys, zeroFactKeys);
         }
       } catch (e) {
         console.warn(`fail ${track.artist} — ${track.title}:`, e.message);
@@ -187,38 +251,44 @@ async function main() {
   if (trackLimit > 0) tracks = tracks.slice(0, trackLimit);
 
   const bank = loadBank(BANK_PATH);
-  const stats = { total: 0, hot: 0, tracks: 0, bySource: {} };
+  const stats = { total: 0, hot: 0, tracks: 0, zeroFacts: 0, bySource: {} };
   const doneKeys = new Set();
+  const zeroFactKeys = new Set();
 
   if (resume && existsSync(PROGRESS)) {
     const prog = JSON.parse(readFileSync(PROGRESS, 'utf8'));
     for (const k of prog.doneKeys ?? []) doneKeys.add(k);
+    for (const k of prog.zeroFactKeys ?? []) zeroFactKeys.add(k);
     Object.assign(stats, prog.stats ?? {});
-    console.log(`Resuming: ${doneKeys.size} tracks marked done, facts=${stats.total}`);
+    console.log(
+      `Resuming: ${doneKeys.size} tracks done, zero=${zeroFactKeys.size}, facts=${stats.total}`,
+    );
   }
 
-  const ordered = orderTracks(tracks, doneKeys, bank);
+  saveCheckpoint(bank, stats, doneKeys, zeroFactKeys);
+  console.log(`Checkpoint: hot-seed rebuilt from bank (${Object.keys(buildHotSeed(bank).byTrack).length} track keys)`);
+
+  const ordered = orderTracks(tracks, doneKeys, bank, zeroFactKeys);
   const backfillCount = ordered.filter((t) => doneKeys.has(trackKey(t.artist, t.title))).length;
   console.log(
-    `Catalog: ${tracks.length} harvestable / ${(catalog.tracks ?? []).length} total | queue: ${ordered.length} (${backfillCount} lastfm backfill)`,
+    `Catalog: ${tracks.length} harvestable / ${(catalog.tracks ?? []).length} total | queue: ${ordered.length} (${backfillCount} backfill)`,
   );
 
-  await runPool(ordered, bank, stats, doneKeys);
+  await runPool(ordered, bank, stats, doneKeys, zeroFactKeys);
 
-  saveBank(BANK_PATH, bank);
-  const hotOnly = { byTrack: {}, byArtist: {} };
-  for (const [k, pool] of Object.entries(bank.byTrack)) {
-    const hot = pool.filter((f) => f.isHot);
-    if (hot.length) hotOnly.byTrack[k] = hot;
-  }
-  for (const [k, pool] of Object.entries(bank.byArtist)) {
-    const hot = pool.filter((f) => f.isHot);
-    if (hot.length) hotOnly.byArtist[k] = hot;
-  }
-  saveBank(SEED_OUT, hotOnly);
+  saveCheckpoint(bank, stats, doneKeys, zeroFactKeys);
   writeFileSync(
     PROGRESS,
-    JSON.stringify({ doneKeys: [...doneKeys], stats, finishedAt: new Date().toISOString() }, null, 2),
+    JSON.stringify(
+      {
+        doneKeys: [...doneKeys],
+        zeroFactKeys: [...zeroFactKeys],
+        stats,
+        finishedAt: new Date().toISOString(),
+      },
+      null,
+      2,
+    ),
   );
 
   const hotCount =
@@ -227,6 +297,7 @@ async function main() {
   console.log('\n=== Bulk seed report ===');
   console.log(`Tracks processed: ${stats.tracks}`);
   console.log(`Facts saved: ${stats.total}`);
+  console.log(`Tracks with zero facts: ${stats.zeroFacts ?? zeroFactKeys.size}`);
   console.log(`Hot facts in bank: ${hotCount}`);
   console.log('By source:', stats.bySource);
   console.log(`Bank: ${BANK_PATH}`);

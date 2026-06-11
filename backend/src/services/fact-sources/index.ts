@@ -1,5 +1,6 @@
 import { fetchAggregatedFactContext } from '../fact-aggregator.js';
-import { factAppliesToRequest } from '../fact-relevance.js';
+import { factAppliesToRequest, factMentionsArtist } from '../fact-relevance.js';
+import { fetchArtistWikiLeadWithRetry } from '../wikipedia-lead.js';
 import type { HarvestContext, HarvestedFact } from './types.js';
 import { fetchGeniusFacts } from './genius-facts.js';
 import { fetchSongfactsFacts } from './songfacts-facts.js';
@@ -11,6 +12,7 @@ import { fetchRapRuFacts } from './rap-ru-facts.js';
 import { fetchTheFlowFacts } from './the-flow-facts.js';
 import { fetchDiscogsFacts } from './discogs-facts.js';
 import { fetchMusixmatchFacts } from './musixmatch-facts.js';
+import { fetchDedicatedSourceFacts } from './dedicated-fetch.js';
 
 function dedupeFacts(facts: HarvestedFact[]): HarvestedFact[] {
   const seen = new Set<string>();
@@ -24,45 +26,75 @@ function dedupeFacts(facts: HarvestedFact[]): HarvestedFact[] {
   return out;
 }
 
-function filterRelevant(facts: HarvestedFact[], ctx: HarvestContext): HarvestedFact[] {
+function mergeCollected(base: HarvestedFact[], extra: HarvestedFact[]): HarvestedFact[] {
+  return dedupeFacts([...base, ...extra]);
+}
+
+/** Bulk harvest: dedicated parsers first, then aggregator; artist wiki if track empty. */
+function filterForBulk(facts: HarvestedFact[], ctx: HarvestContext): HarvestedFact[] {
   return facts.filter((f) => {
+    const trimmed = f.fact.trim();
+    if (trimmed.length < 35) return false;
+    if (f.scope === 'artist') {
+      return factMentionsArtist(trimmed, ctx.artist) || factAppliesToRequest(trimmed, ctx.artist, ctx.title, 'artist', 'indie');
+    }
     const scope = f.scope === 'album' ? 'track' : f.scope;
-    return factAppliesToRequest(f.fact, ctx.artist, ctx.title, scope, 'indie');
+    return factAppliesToRequest(trimmed, ctx.artist, ctx.title, scope, 'indie');
   });
 }
 
-/** Parallel harvest from dedicated parsers + existing aggregator snippets. */
+async function artistWikiFallback(ctx: HarvestContext): Promise<HarvestedFact[]> {
+  const lead = await fetchArtistWikiLeadWithRetry(ctx.artist, 3);
+  if (!lead?.text?.trim() || lead.text.trim().length < 80) return [];
+  return [{ fact: lead.text.trim().slice(0, 520), scope: 'artist', source: 'wiki' }];
+}
+
+/** Parallel harvest: dedicated + aggregator + artist fallback when track is empty. */
 export async function harvestAllFacts(ctx: HarvestContext): Promise<HarvestedFact[]> {
-  const collected: HarvestedFact[] = [];
+  let collected: HarvestedFact[] = [];
+
+  const dedicated = await fetchDedicatedSourceFacts(ctx);
+  collected = mergeCollected(collected, dedicated);
 
   try {
-    const agg = await fetchAggregatedFactContext(
-      ctx.artist,
-      ctx.title,
-      ctx.countryCode,
-    );
+    const agg = await fetchAggregatedFactContext(ctx.artist, ctx.title, ctx.countryCode);
     const sources = agg.snippetSources ?? [];
     for (let i = 0; i < (agg.rawSnippets ?? []).length; i++) {
       const text = agg.rawSnippets[i];
       if (!text) continue;
-      const src = sources[i] ?? 'web';
-      collected.push({
-        fact: text,
-        scope: 'track',
-        source: src,
-      });
+      const src = (sources[i] ?? 'web') as HarvestedFact['source'];
+      collected = mergeCollected(collected, [{ fact: text, scope: 'track', source: src }]);
     }
     for (const fact of agg.bundle.trackFacts ?? []) {
-      collected.push({ fact, scope: 'track', source: 'wiki' });
+      collected = mergeCollected(collected, [{ fact, scope: 'track', source: 'wiki' }]);
     }
     for (const fact of agg.bundle.artistFacts ?? []) {
-      collected.push({ fact, scope: 'artist', source: 'wiki' });
+      collected = mergeCollected(collected, [{ fact, scope: 'artist', source: 'wiki' }]);
     }
   } catch {
-    // aggregator optional for bulk seed
+    // aggregator optional when flaky
   }
 
-  return dedupeFacts(filterRelevant(collected, ctx));
+  let filtered = filterForBulk(collected, ctx);
+
+  const hasTrack = filtered.some((f) => f.scope === 'track' || f.scope === 'album');
+  const hasArtist = filtered.some((f) => f.scope === 'artist');
+  if (!hasTrack || !hasArtist) {
+    const wikiArtist = await artistWikiFallback(ctx);
+    if (wikiArtist.length > 0) {
+      collected = mergeCollected(collected, wikiArtist);
+      filtered = filterForBulk(collected, ctx);
+    }
+  }
+
+  if (filtered.length === 0 && collected.length > 0) {
+    // Last resort: keep best artist-level lines that mention the artist.
+    filtered = collected.filter(
+      (f) => f.scope === 'artist' && factMentionsArtist(f.fact, ctx.artist) && f.fact.trim().length >= 80,
+    );
+  }
+
+  return dedupeFacts(filtered);
 }
 
 export { fetchDedicatedSourceFacts, dedicatedFactsBySource } from './dedicated-fetch.js';
