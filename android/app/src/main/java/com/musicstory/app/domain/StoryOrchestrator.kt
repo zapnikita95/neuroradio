@@ -792,6 +792,7 @@ class StoryOrchestrator(
                                 }
                                 _errorMessage.value = null
                                 scope.launch {
+                                    storyRepository.recordStoryPlaybackComplete(response)
                                     val trackKey = requestedTrack.displayKey
                                     val existingVote = storyRepository.hasVoteForStory(
                                         trackKey,

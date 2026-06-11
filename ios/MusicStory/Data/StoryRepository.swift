@@ -89,8 +89,8 @@ final class StoryRepository: ObservableObject {
         backend.resolveAudioURL(audioURL)
     }
 
-    func resolvePlaybackURL(trackKey: String, audioURL: String?) -> URL? {
-        if canUseOfflineReplay() {
+    func resolvePlaybackURL(trackKey: String, audioURL: String?, preferLocal: Bool = false) -> URL? {
+        if preferLocal, canUseOfflineReplay() {
             if let pack = OfflinePackStore.shared.readyEntry(for: trackKey),
                let path = pack.localAudioPath,
                offlineStore.hasLocalFile(at: path) {
@@ -102,6 +102,21 @@ final class StoryRepository: ObservableObject {
             }
         }
         return resolveAudioURL(audioURL)
+    }
+
+    func recordStoryPlaybackComplete(_ response: StoryResponse) async {
+        guard let seedFact = response.seedFact?.trimmingCharacters(in: .whitespacesAndNewlines),
+              !seedFact.isEmpty else { return }
+        await backend.submitStoryPlaybackComplete(
+            artist: response.artist,
+            title: response.title,
+            script: response.script,
+            seedFact: seedFact,
+            seedScope: response.seedScope,
+            seedInterestScore: response.seedInterestScore,
+            seedInterestRating: response.seedInterestRating,
+            storyNarrator: settings.storyNarrator.rawValue
+        )
     }
 
     func canReplayOffline(trackKey: String) -> Bool {

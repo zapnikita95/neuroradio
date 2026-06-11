@@ -190,6 +190,31 @@ export async function pgInsertUsedSeed(
   return (res.rowCount ?? 0) > 0;
 }
 
+export async function pgDeleteUsedSeedByFingerprint(
+  installId: string,
+  accountId: string | null,
+  artist: string,
+  title: string,
+  fingerprint: string,
+): Promise<void> {
+  const normalized = installId.trim().toLowerCase();
+  if (accountId) {
+    await getPool().query(
+      `DELETE FROM used_seeds
+       WHERE account_id = $1 AND fact_fingerprint = $2
+         AND lower(artist) = lower($3) AND lower(title) = lower($4)`,
+      [accountId, fingerprint, artist, title],
+    );
+    return;
+  }
+  await getPool().query(
+    `DELETE FROM used_seeds
+     WHERE install_id = $1 AND account_id IS NULL AND fact_fingerprint = $2
+       AND lower(artist) = lower($3) AND lower(title) = lower($4)`,
+    [normalized, fingerprint, artist, title],
+  );
+}
+
 export async function pgGetUsedSeedFingerprints(
   installId: string,
   accountId: string | null,

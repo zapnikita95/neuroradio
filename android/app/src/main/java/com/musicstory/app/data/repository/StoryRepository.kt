@@ -1060,6 +1060,19 @@ class StoryRepository(
         StoryLog.i("Offline playback cache purged")
     }
 
+    suspend fun recordStoryPlaybackComplete(response: StoryResponse) {
+        val seedFact = response.seedFact?.trim().orEmpty()
+        if (seedFact.isEmpty()) return
+        val baseUrl = settingsDataStore.backendUrl.first()
+        val narrator = settingsDataStore.storyNarrator.first().id
+        try {
+            apiClient.submitStoryPlaybackComplete(baseUrl, response, narrator)
+            StoryLog.i("Story playback marked complete on server")
+        } catch (e: Exception) {
+            StoryLog.w("Story complete sync failed: ${e.message}")
+        }
+    }
+
     private suspend fun tryOfflineReplay(trackKey: String): Result<StoryResponse>? {
         if (!canUseOfflineReplay()) return null
         tryOfflinePackReplay(trackKey)?.let { return it }

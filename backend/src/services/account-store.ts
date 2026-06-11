@@ -15,6 +15,7 @@ import {
   pgGetUsedSeedFingerprints,
   pgInsertStoryHistory,
   pgInsertUsedSeed,
+  pgDeleteUsedSeedByFingerprint,
   pgListStoryHistory,
   pgUpdateStoryHistoryVote,
 } from './story-history-store.js';
@@ -1674,6 +1675,38 @@ export async function recordAccountUsedSeedAsync(
   }
 
   recordAccountUsedSeed(installId, input);
+}
+
+export async function removeAccountUsedSeedByFactAsync(
+  installId: string,
+  artist: string,
+  title: string,
+  fact: string,
+): Promise<void> {
+  const fp = factFingerprint(fact);
+  const normalized = installId.trim().toLowerCase();
+  const accountId = resolveAccountId(installId);
+
+  if (hasPostgres()) {
+    await pgDeleteUsedSeedByFingerprint(normalized, accountId, artist, title, fp);
+    return;
+  }
+
+  const store = loadStore();
+  if (!accountId) return;
+  const account = store.accountsById[accountId];
+  if (!account?.usedSeeds) return;
+  const artistNorm = artist.trim().toLowerCase();
+  const titleNorm = title.trim().toLowerCase();
+  account.usedSeeds = account.usedSeeds.filter(
+    (s) =>
+      !(
+        s.factFingerprint === fp &&
+        s.artist.trim().toLowerCase() === artistNorm &&
+        s.title.trim().toLowerCase() === titleNorm
+      ),
+  );
+  saveStore(store);
 }
 
 export function getAccountUsedFingerprints(

@@ -56,6 +56,10 @@ data class StoryResponse(
     val ttsHint: String? = null,
     val sources: StorySources? = null,
     val quota: StoryQuotaInfo? = null,
+    @SerializedName("seed_fact") val seedFact: String? = null,
+    @SerializedName("seed_scope") val seedScope: String? = null,
+    @SerializedName("seed_interest_score") val seedInterestScore: Int? = null,
+    @SerializedName("seed_interest_rating") val seedInterestRating: Int? = null,
 )
 
 data class StorySources(

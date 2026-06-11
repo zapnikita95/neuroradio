@@ -36,6 +36,10 @@ struct StoryResponse: Decodable, Sendable {
     let audioFile: String?
     let ttsHint: String?
     let quota: StoryQuotaInfo?
+    let seedFact: String?
+    let seedScope: String?
+    let seedInterestScore: Int?
+    let seedInterestRating: Int?
 
     enum CodingKeys: String, CodingKey {
         case artist
@@ -51,6 +55,10 @@ struct StoryResponse: Decodable, Sendable {
         case audioFile
         case ttsHint
         case quota
+        case seedFact = "seed_fact"
+        case seedScope = "seed_scope"
+        case seedInterestScore = "seed_interest_score"
+        case seedInterestRating = "seed_interest_rating"
     }
 
     init(
@@ -66,7 +74,11 @@ struct StoryResponse: Decodable, Sendable {
         audioUrl: String?,
         audioFile: String?,
         ttsHint: String?,
-        quota: StoryQuotaInfo?
+        quota: StoryQuotaInfo?,
+        seedFact: String? = nil,
+        seedScope: String? = nil,
+        seedInterestScore: Int? = nil,
+        seedInterestRating: Int? = nil
     ) {
         self.artist = artist
         self.title = title
@@ -81,6 +93,10 @@ struct StoryResponse: Decodable, Sendable {
         self.audioFile = audioFile
         self.ttsHint = ttsHint
         self.quota = quota
+        self.seedFact = seedFact
+        self.seedScope = seedScope
+        self.seedInterestScore = seedInterestScore
+        self.seedInterestRating = seedInterestRating
     }
 
     init(from decoder: Decoder) throws {
@@ -98,6 +114,10 @@ struct StoryResponse: Decodable, Sendable {
         audioFile = try container.decodeIfPresent(String.self, forKey: .audioFile)
         ttsHint = try container.decodeIfPresent(String.self, forKey: .ttsHint)
         quota = try container.decodeIfPresent(StoryQuotaInfo.self, forKey: .quota)
+        seedFact = try container.decodeIfPresent(String.self, forKey: .seedFact)
+        seedScope = try container.decodeIfPresent(String.self, forKey: .seedScope)
+        seedInterestScore = try container.decodeIfPresent(Int.self, forKey: .seedInterestScore)
+        seedInterestRating = try container.decodeIfPresent(Int.self, forKey: .seedInterestRating)
     }
 }
 

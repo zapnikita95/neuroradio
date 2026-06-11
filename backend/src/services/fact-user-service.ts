@@ -8,6 +8,7 @@ import {
   pushHistoryAsync,
   recordAccountListen,
   recordAccountUsedSeedAsync,
+  removeAccountUsedSeedByFactAsync,
   resolveAccountId,
   type SyncHistoryEntry,
 } from './account-store.js';
@@ -261,26 +262,29 @@ export async function getUsedFingerprints(
   return fps;
 }
 
-/** Reserve seed immediately so rapid persona/track retries cannot reuse it. */
+/** Hold seed during generation — do not mark as told until playback completes. */
 export async function reserveSeedForUser(
   installId: string,
   artist: string,
   title: string,
   seed: SelectedReferenceFact,
-  album?: string,
+  _album?: string,
 ): Promise<void> {
   ensureAccount(installId);
   setPendingTrackSeed(installId, artist, title, seed.fact);
-  await recordAccountUsedSeedAsync(installId, {
-    fact: seed.fact,
-    artist,
-    title,
-    scope: seed.scope,
-    interestScore: seed.interestScore,
-    interestRating: seed.interestRating,
-    topicKey: classifyFactTopic(seed.fact),
-    album,
-  });
+}
+
+/** Release pending seed and undo premature used-seed marks from older app builds. */
+export async function rollbackReservedSeed(
+  installId: string,
+  artist: string,
+  title: string,
+): Promise<void> {
+  const pending = peekPendingTrackSeed(installId, artist, title);
+  clearPendingTrackSeed(installId, artist, title);
+  if (pending) {
+    await removeAccountUsedSeedByFactAsync(installId, artist, title, pending);
+  }
 }
 
 export function ingestBundleToBank(artist: string, title: string, bundle: ReferenceFactBundle): number {

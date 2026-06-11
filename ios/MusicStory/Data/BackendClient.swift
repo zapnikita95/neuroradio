@@ -266,8 +266,34 @@ final class BackendClient {
     func fetchFullStory(request: StoryRequest) async throws -> StoryResponse {
         let body = try JSONEncoder().encode(request)
         let (data, response) = try await dataFromAPI(path: "v1/story/full", method: "POST", body: body, authorized: true)
-        try validateHTTP(response)
+        if let http = response as? HTTPURLResponse, !(200...299).contains(http.statusCode) {
+            throw BackendError.serverError(http.statusCode, Self.parseErrorMessage(from: data))
+        }
         return try decode(StoryResponse.self, from: data)
+    }
+
+    func submitStoryPlaybackComplete(
+        artist: String,
+        title: String,
+        script: String,
+        seedFact: String,
+        seedScope: String?,
+        seedInterestScore: Int?,
+        seedInterestRating: Int?,
+        storyNarrator: String?
+    ) async {
+        var payload: [String: Any] = [
+            "artist": artist,
+            "title": title,
+            "script": script,
+            "seed_fact": seedFact,
+        ]
+        if let seedScope, !seedScope.isEmpty { payload["seed_scope"] = seedScope }
+        if let seedInterestScore { payload["seed_interest_score"] = seedInterestScore }
+        if let seedInterestRating { payload["seed_interest_rating"] = seedInterestRating }
+        if let storyNarrator, !storyNarrator.isEmpty { payload["story_narrator"] = storyNarrator }
+        let body = try? JSONSerialization.data(withJSONObject: payload)
+        _ = try? await dataFromAPI(path: "v1/story/complete", method: "POST", body: body, authorized: true)
     }
 
     func submitStoryFeedback(_ request: StoryFeedbackRequest) async throws {

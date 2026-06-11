@@ -46,6 +46,9 @@ interface StoryApi {
     @POST("v1/public/payment/create")
     suspend fun createPayment(@Body request: PaymentCreateRequest): PaymentCreateResponse
 
+    @POST("v1/story/complete")
+    suspend fun submitStoryComplete(@Body request: StoryCompleteRequest): Map<String, Any?>
+
     @POST("v1/story/feedback")
     suspend fun submitStoryFeedback(@Body request: StoryFeedbackRequest): Map<String, Any?>
 
@@ -59,6 +62,17 @@ interface StoryApi {
 data class FactHintResponse(
     val hasHotFact: Boolean = false,
     val hotCount: Int = 0,
+)
+
+data class StoryCompleteRequest(
+    val artist: String,
+    val title: String,
+    val script: String,
+    @com.google.gson.annotations.SerializedName("seed_fact") val seedFact: String,
+    @com.google.gson.annotations.SerializedName("seed_scope") val seedScope: String? = null,
+    @com.google.gson.annotations.SerializedName("seed_interest_score") val seedInterestScore: Int? = null,
+    @com.google.gson.annotations.SerializedName("seed_interest_rating") val seedInterestRating: Int? = null,
+    @com.google.gson.annotations.SerializedName("story_narrator") val storyNarrator: String? = null,
 )
 
 data class StoryFeedbackRequest(

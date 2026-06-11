@@ -296,6 +296,7 @@ final class StoryOrchestrator: ObservableObject {
                             self.nowPlaying.resumeMusic()
                         }
                         self.isStoryRunning = false
+                        await self.storyRepository.recordStoryPlaybackComplete(response)
                         let trackKey = track.displayKey
                         let script = response.script
                         if !self.historyStore.hasVoteForStory(trackKey: trackKey, script: script) {

@@ -332,6 +332,33 @@ class ApiClient(
         return base + path
     }
 
+    suspend fun submitStoryPlaybackComplete(
+        baseUrl: String,
+        response: StoryResponse,
+        storyNarrator: String?,
+    ) {
+        val seedFact = response.seedFact?.trim().orEmpty()
+        if (seedFact.isEmpty()) return
+        val body = StoryCompleteRequest(
+            artist = response.artist,
+            title = response.title,
+            script = response.script,
+            seedFact = seedFact,
+            seedScope = response.seedScope,
+            seedInterestScore = response.seedInterestScore,
+            seedInterestRating = response.seedInterestRating,
+            storyNarrator = storyNarrator,
+        )
+        try {
+            getApi(baseUrl).submitStoryComplete(body)
+        } catch (first: Exception) {
+            val http = first as? retrofit2.HttpException
+            if (http != null && http.code() != 401) return
+            authManager.invalidateToken()
+            getApi(baseUrl).submitStoryComplete(body)
+        }
+    }
+
     suspend fun submitStoryFeedback(
         baseUrl: String,
         artist: String,

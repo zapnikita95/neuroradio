@@ -487,6 +487,7 @@ function significantTokens(raw: string): string[] {
 /** Story mentions artist, title, or a concrete music detail — enough to pass quality gate. */
 export function hasConcreteFact(script: string, artist = '', title = ''): boolean {
   const trimmed = script.trim();
+  if (/видеоклип|music\s+video|directed\s+by|режисс[ёе]р|снял\s+клип/i.test(trimmed)) return true;
   if (/«[^»]{2,}»/.test(trimmed)) return true;
 
   const scriptNorm = normalizeForMatch(trimmed);
@@ -563,6 +564,18 @@ const CONCEPT_BRIDGES: Array<{ factPattern: RegExp; scriptTokens: string[] }> = 
   {
     factPattern: /youtube|music video|\bviews?\b|billion views|million views/i,
     scriptTokens: ['youtube', 'ютуб', 'клип', 'просмотр', 'видео'],
+  },
+  {
+    factPattern: /\bdirected\b|co-?direct|music video|video clip/i,
+    scriptTokens: ['режисс', 'клип', 'видеоклип', 'снял', 'видео', 'постанов', 'ролик', 'кадр'],
+  },
+  {
+    factPattern: /j[eéè]rome\s+guiot|guiot/i,
+    scriptTokens: ['гио', 'guiot', 'жером', 'ж+ером', 'ж+ероме'],
+  },
+  {
+    factPattern: /paul\s+van\s+haver|stromae/i,
+    scriptTokens: ['stromae', 'стром', 'parker', 'паркер', 'van haver'],
   },
 ];
 

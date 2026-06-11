@@ -194,7 +194,7 @@ final class SettingsStore: ObservableObject {
         storyLength = StoryLength.fromId(defaults.string(forKey: Keys.storyLength))
         serverTtsProvider = ServerTtsProvider.fromId(defaults.string(forKey: Keys.serverTtsProvider))
         serverTier = defaults.string(forKey: Keys.serverTier)
-        offlineAudioCacheEnabled = defaults.object(forKey: Keys.offlineAudioCacheEnabled) as? Bool ?? true
+        offlineAudioCacheEnabled = defaults.object(forKey: Keys.offlineAudioCacheEnabled) as? Bool ?? false
         offlinePackPhase = defaults.string(forKey: Keys.offlinePackPhase) ?? OfflinePackPhase.idle.rawValue
         offlinePackSessionId = Int64(defaults.object(forKey: Keys.offlinePackSessionId) as? Int ?? 0)
         factNotificationsEnabled = defaults.object(forKey: Keys.factNotificationsEnabled) as? Bool ?? true

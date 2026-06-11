@@ -22,6 +22,7 @@ import {
   prefetchArtistFactsToBank,
   recordUserStory,
   reserveSeedForUser,
+  rollbackReservedSeed,
 } from '../services/fact-user-service.js';
 import { classifyFactTopic, FACT_TOPIC_LABELS_RU } from '../services/fact-topic.js';
 import { factFitsStoryLanguage } from '../services/fact-language-fit.js';
@@ -1544,13 +1545,10 @@ router.post('/full', extractClientSecrets, validateStoryFullBody, storyFullRateL
       skipDailyQuota: shouldSkipDailyStoryQuota({ ownLlmKey: ownLlmKey, userTtsCredentials }),
     });
     if (selectedFact?.fact) {
-      await recordUserStory(installId, {
-        artist: metadata.artist,
-        title: metadata.title,
-        script: story.script,
-        seed: selectedFact,
-        storyNarrator,
-      });
+      response.seed_fact = selectedFact.fact;
+      response.seed_scope = selectedFact.scope;
+      response.seed_interest_score = selectedFact.interestScore;
+      response.seed_interest_rating = selectedFact.interestRating;
     }
     attachStoryQuotaHeaders(res, installId);
     console.log(
@@ -1591,6 +1589,8 @@ router.post('/full', extractClientSecrets, validateStoryFullBody, storyFullRateL
       });
       return;
     }
+
+    await rollbackReservedSeed(installId, artist, title);
 
     const rawMessage = err instanceof Error ? err.message : String(err);
     timing.mark('failed', rawMessage.slice(0, 80));
@@ -1641,6 +1641,56 @@ router.post('/full', extractClientSecrets, validateStoryFullBody, storyFullRateL
     });
   } finally {
     releaseStoryGeneration(installId, clientAbort);
+  }
+});
+
+router.post('/complete', async (req: Request, res: Response) => {
+  const installId = req.installId!;
+  const artist = typeof req.body?.artist === 'string' ? req.body.artist.trim() : '';
+  const title = typeof req.body?.title === 'string' ? req.body.title.trim() : '';
+  const script = typeof req.body?.script === 'string' ? req.body.script.trim() : '';
+  const seedFact = typeof req.body?.seed_fact === 'string' ? req.body.seed_fact.trim() : '';
+  const seedScopeRaw = typeof req.body?.seed_scope === 'string' ? req.body.seed_scope.trim() : 'track';
+  const storyNarratorRaw =
+    typeof req.body?.story_narrator === 'string' ? req.body.story_narrator.trim() : 'auto';
+
+  if (!artist || !title || !script || !seedFact) {
+    res.status(400).json({ error: 'artist, title, script and seed_fact required' });
+    return;
+  }
+
+  const scope =
+    seedScopeRaw === 'artist' || seedScopeRaw === 'album' || seedScopeRaw === 'track'
+      ? seedScopeRaw
+      : 'track';
+  const interestScore =
+    typeof req.body?.seed_interest_score === 'number' ? req.body.seed_interest_score : 10;
+  const interestRating =
+    typeof req.body?.seed_interest_rating === 'number' ? req.body.seed_interest_rating : 6;
+  const storyNarrator = (storyNarratorRaw || 'auto') as StoryNarratorId;
+
+  try {
+    await recordUserStory(installId, {
+      artist,
+      title,
+      script,
+      seed: {
+        fact: seedFact,
+        scope,
+        scopeLabelRu:
+          scope === 'artist' ? 'группа/артист' : scope === 'album' ? 'альбом' : 'трек',
+        interestScore,
+        interestRating,
+      },
+      storyNarrator,
+    });
+    res.json({ ok: true });
+  } catch (err) {
+    console.error(
+      `[story/complete] fail install=${installId.slice(0, 8)} artist="${artist}" title="${title}"`,
+      err,
+    );
+    res.status(500).json({ error: 'Failed to record completed story' });
   }
 });
 

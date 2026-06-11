@@ -10,6 +10,7 @@ import {
   findHardScriptViolation,
   findLlmGarbage,
   hasConcreteFact,
+  anchorsReferenceFact,
   referenceFactsAreAnchorable,
   buildStoryRetryDirective,
   sanitizeScriptForTts,
@@ -355,7 +356,8 @@ export async function generateStoryScript(
     if (
       countWords(sanitized) >= 35 &&
       (storyMentionsPerformingArtist(sanitized, input.artist, input.title) ||
-        hasConcreteFact(sanitized, input.artist, input.title)) &&
+        hasConcreteFact(sanitized, input.artist, input.title) ||
+        anchorsReferenceFact(sanitized, referenceFacts)) &&
       !findLlmGarbage(sanitized) &&
       !findHardScriptViolation(sanitized)
     ) {

@@ -172,9 +172,18 @@ export function classifyStoryLlmError(
     };
   }
 
+  if (/could not produce a story grounded in reference facts/i.test(lower)) {
+    return {
+      code: 'STORY_QUALITY_FAILED',
+      message:
+        'Не удалось собрать историю по этому факту. Попробуй ещё раз через минуту — возьмём другой угол.',
+      httpStatus: 503,
+    };
+  }
+
   return {
     code: 'STORY_FAILED',
-    message: rawMessage.slice(0, 200) || 'Story generation failed',
+    message: 'Не удалось сгенерировать историю. Попробуй ещё раз.',
     httpStatus: 500,
   };
 }

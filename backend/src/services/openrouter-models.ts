@@ -74,6 +74,7 @@ export function buildOpenRouterFreeStoryModelChain(preferred?: string): string[]
     primary,
     OPENROUTER_FREE_STABLE_MODEL,
     OPENROUTER_FREE_FACT_MODEL_FALLBACK,
+    OPENROUTER_DEFAULT_FACT_MODEL,
   ].filter((m, i, arr) => arr.indexOf(m) === i);
 }
 
