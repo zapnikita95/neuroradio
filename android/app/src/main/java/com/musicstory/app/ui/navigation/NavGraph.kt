@@ -91,12 +91,13 @@ fun MusicStoryNavGraph(
                 },
                 onSkip = {
                     scope.launch {
-                        WelcomeTrialGate.completeAfterSkip(app)
+                        app.settingsDataStore.setAccountLoginGateCompleted(true)
                         app.settingsDataStore.setHomeTourPending(true)
                         navController.navigate(Routes.HOME) {
                             popUpTo(Routes.ACCOUNT_LOGIN) { inclusive = true }
                             launchSingleTop = true
                         }
+                        WelcomeTrialGate.completeAfterSkip(app)
                     }
                 },
             )

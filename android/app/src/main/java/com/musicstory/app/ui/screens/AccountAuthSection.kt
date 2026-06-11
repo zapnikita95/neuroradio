@@ -56,13 +56,16 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeout
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
 private const val EMAIL_CODE_RESEND_COOLDOWN_SEC = 20
+private const val LOGIN_BACKGROUND_SYNC_TIMEOUT_MS = 25_000L
 
-private suspend fun finishAccountLogin(
+/** Быстро сохраняет сессию локально — без сетевого push (не блокирует переход на HOME). */
+private suspend fun persistAccountLogin(
     app: MusicStoryApp,
     login: AccountAuthManager.AccountLoginResult,
 ) {
@@ -87,15 +90,30 @@ private suspend fun finishAccountLogin(
     }.onFailure { err ->
         StoryLog.e("Account login: cloud merge failed (login kept)", err)
     }
-    val url = app.settingsDataStore.backendUrl.first()
-    if (url.isNotBlank()) {
+}
+
+/** Push истории/настроек на сервер — в фоне, с таймаутом (не держит кнопку «Войти»). */
+private fun scheduleAccountLoginSync(app: MusicStoryApp) {
+    app.appScope.launch {
+        val url = runCatching { app.settingsDataStore.backendUrl.first() }.getOrNull()?.trim().orEmpty()
+        if (url.isBlank()) return@launch
         runCatching {
-            app.syncAccountDataWithServer(url)
-            app.storyRepository.dedupeStoryHistory()
+            withTimeout(LOGIN_BACKGROUND_SYNC_TIMEOUT_MS) {
+                app.syncAccountDataWithServer(url)
+                app.storyRepository.dedupeStoryHistory()
+            }
         }.onFailure { err ->
-            StoryLog.e("Account login: sync failed (login kept)", err)
+            StoryLog.e("Account login: background sync failed (login kept)", err)
         }
     }
+}
+
+private suspend fun finishAccountLogin(
+    app: MusicStoryApp,
+    login: AccountAuthManager.AccountLoginResult,
+) {
+    persistAccountLogin(app, login)
+    scheduleAccountLoginSync(app)
 }
 
 private fun authMessageColor(context: Context, message: String): Color {
@@ -440,6 +458,7 @@ fun AccountEmailLoginContent(
         if (!codeSent) {
             PrimaryStoryButton(
                 text = context.getString(R.string.settings_auth_send_code),
+                loading = busy,
                 onClick = {
                     if (busy || email.isBlank()) return@PrimaryStoryButton
                     if (!agreePrivacy) {
@@ -514,6 +533,7 @@ fun AccountEmailLoginContent(
             Spacer(modifier = Modifier.height(8.dp))
             PrimaryStoryButton(
                 text = context.getString(R.string.settings_auth_verify),
+                loading = busy,
                 onClick = {
                     if (busy || code.length < 4) return@PrimaryStoryButton
                     if (!agreePrivacy) {
@@ -530,9 +550,9 @@ fun AccountEmailLoginContent(
                             }
                             if (login.profile != null) {
                                 withContext(Dispatchers.IO) {
-                                    finishAccountLogin(app, login)
+                                    persistAccountLogin(app, login)
                                 }
-                                message = context.getString(R.string.settings_auth_success)
+                                scheduleAccountLoginSync(app)
                                 onLoggedIn()
                             } else {
                                 message = login.error ?: context.getString(R.string.settings_auth_verify_failed)

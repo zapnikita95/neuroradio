@@ -4,16 +4,25 @@ import com.musicstory.app.MusicStoryApp
 import com.musicstory.app.data.local.CachedAccountProfile
 import com.musicstory.app.data.local.SettingsDataStore
 import com.musicstory.app.util.DeviceFingerprint
+import com.musicstory.app.util.StoryLog
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
 
 object WelcomeTrialGate {
     suspend fun completeAfterSkip(app: MusicStoryApp) {
-        val trialActive = claimWelcomeTrialOnServer(app)
         app.settingsDataStore.setAccountLoginGateCompleted(true)
-        if (trialActive) {
-            applyWelcomeTrialDefaults(app)
-        }
         app.storyOrchestrator.notifyTierMayHaveChanged()
+        app.appScope.launch {
+            runCatching {
+                val trialActive = claimWelcomeTrialOnServer(app)
+                if (trialActive) {
+                    applyWelcomeTrialDefaults(app)
+                    app.storyOrchestrator.notifyTierMayHaveChanged()
+                }
+            }.onFailure { err ->
+                StoryLog.e("Welcome trial claim failed after skip", err)
+            }
+        }
     }
 
     suspend fun completeAfterLogin(app: MusicStoryApp) {
