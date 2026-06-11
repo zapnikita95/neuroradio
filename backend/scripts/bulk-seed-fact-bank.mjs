@@ -190,15 +190,6 @@ async function processTrack(bank, track, stats) {
 }
 
 function orderTracks(tracks, doneKeys, bank, zeroFactKeys) {
-  if (retryZero) {
-    const retry = tracks.filter((t) => {
-      const key = trackKey(t.artist, t.title);
-      return zeroFactKeys.has(key) || (doneKeys.has(key) && !hasFactsInBank(bank, t.artist, t.title));
-    });
-    console.log(`Retry-zero queue: ${retry.length} tracks with no facts in bank`);
-    return retry.sort((a, b) => trackPriority(a) - trackPriority(b));
-  }
-
   const pending = [];
   const backfill = [];
   for (const t of tracks) {
@@ -210,6 +201,18 @@ function orderTracks(tracks, doneKeys, bank, zeroFactKeys) {
     }
   }
   const byPri = (a, b) => trackPriority(a) - trackPriority(b);
+
+  if (retryZero) {
+    const retry = tracks.filter((t) => {
+      const key = trackKey(t.artist, t.title);
+      return zeroFactKeys.has(key) || (doneKeys.has(key) && !hasFactsInBank(bank, t.artist, t.title));
+    });
+    console.log(
+      `Retry-zero: ${retry.length} empty tracks first, then ${pending.length} pending + ${backfill.length} backfill`,
+    );
+    return [...retry.sort(byPri), ...pending.sort(byPri), ...backfill.sort(byPri)];
+  }
+
   return [...pending.sort(byPri), ...backfill.sort(byPri)];
 }
 
@@ -263,6 +266,16 @@ async function main() {
     console.log(
       `Resuming: ${doneKeys.size} tracks done, zero=${zeroFactKeys.size}, facts=${stats.total}`,
     );
+  }
+
+  if (retryZero && zeroFactKeys.size === 0) {
+    for (const t of tracks) {
+      const key = trackKey(t.artist, t.title);
+      if (doneKeys.has(key) && !hasFactsInBank(bank, t.artist, t.title)) {
+        zeroFactKeys.add(key);
+      }
+    }
+    console.log(`Bootstrapped ${zeroFactKeys.size} zero-fact track keys from bank gap`);
   }
 
   saveCheckpoint(bank, stats, doneKeys, zeroFactKeys);
