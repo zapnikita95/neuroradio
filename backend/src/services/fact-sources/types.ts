@@ -31,6 +31,9 @@ export const PARSER_TRUSTED_SOURCES: ReadonlySet<HarvestSource> = new Set([
   'musixmatch',
 ]);
 
+/** Album liner notes — dedicated Discogs pass in bulk seed. */
+export const DISCOGS_HARVEST_SOURCE = 'discogs' as const;
+
 export function isParserTrustedHarvestSource(source: HarvestSource): boolean {
   return PARSER_TRUSTED_SOURCES.has(source);
 }

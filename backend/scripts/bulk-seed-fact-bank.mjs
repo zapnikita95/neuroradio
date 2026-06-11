@@ -9,7 +9,7 @@ import crypto from 'node:crypto';
 import { mkdirSync, readFileSync, writeFileSync, existsSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { harvestAllFacts } from '../dist/services/fact-sources/index.js';
+import { harvestAllFacts, fetchDiscogsFacts } from '../dist/services/fact-sources/index.js';
 import { interestScore } from '../dist/services/reference-fact-quality.js';
 import { interestRating10 } from '../dist/services/fact-interest-log.js';
 import { isBoringFact } from '../dist/services/reference-fact-quality.js';
@@ -23,12 +23,18 @@ const PROGRESS = join(__dir, '../data/bulk-seed-progress.json');
 const SEED_OUT = join(__dir, '../data/facts-bank-seed.json');
 
 const args = process.argv.slice(2);
-const target = parseInt(args.find((a) => a.startsWith('--target='))?.split('=')[1] ?? '8000', 10);
-const concurrency = parseInt(args.find((a) => a.startsWith('--concurrency='))?.split('=')[1] ?? '4', 10);
+const target = parseInt(args.find((a) => a.startsWith('--target='))?.split('=')[1] ?? '60000', 10);
+const hotTarget = parseInt(args.find((a) => a.startsWith('--hot-target='))?.split('=')[1] ?? '20000', 10);
+const concurrency = parseInt(
+  args.find((a) => a.startsWith('--concurrency='))?.split('=')[1] ?? (args.includes('--discogs-only') ? '1' : '2'),
+  10,
+);
 const trackLimit = parseInt(args.find((a) => a.startsWith('--limit='))?.split('=')[1] ?? '0', 10);
 const resume = args.includes('--resume');
 const retryZero = args.includes('--retry-zero');
-const backfillLastfm = !args.includes('--no-backfill-lastfm');
+const discogsOnly = args.includes('--discogs-only');
+const backfillDiscogs = args.includes('--backfill-discogs') || discogsOnly;
+const backfillLastfm = !args.includes('--no-backfill-lastfm') && !discogsOnly;
 
 const JUNK_ARTIST =
   /^(karaoke version|ameritz|party allstars|the latin party allstars|the latin party)$/i;
@@ -73,6 +79,23 @@ function hasLastfmInBank(bank, artist, title) {
   const ak = artistKey(artist);
   const pool = [...(bank.byTrack[tk] ?? []), ...(bank.byArtist[ak] ?? [])];
   return pool.some((f) => f.harvestSource === 'lastfm');
+}
+
+function hasDiscogsInBank(bank, artist, title) {
+  const tk = trackKey(artist, title);
+  const pool = bank.byTrack[tk] ?? [];
+  return pool.some((f) => f.harvestSource === 'discogs' || f.scope === 'album');
+}
+
+function countHotInBank(bank) {
+  return (
+    Object.values(bank.byTrack ?? {})
+      .flat()
+      .filter((f) => f.isHot).length +
+    Object.values(bank.byArtist ?? {})
+      .flat()
+      .filter((f) => f.isHot).length
+  );
 }
 
 function loadBank(path) {
@@ -195,10 +218,7 @@ function upsertFact(bank, artist, title, item) {
   return true;
 }
 
-async function processTrack(bank, track, stats) {
-  const { artist, title } = track;
-  const countryCode = /[\u0400-\u04FF]/.test(artist + title) ? 'RU' : undefined;
-  const facts = await harvestAllFacts({ artist, title, countryCode });
+async function saveFacts(bank, artist, title, facts, stats) {
   let saved = 0;
   let savedHot = 0;
   let savedLastfm = 0;
@@ -215,23 +235,39 @@ async function processTrack(bank, track, stats) {
     }
   }
   stats.total += saved;
-  stats.hot += savedHot;
+  stats.hot = countHotInBank(bank);
   stats.tracks += 1;
-  return { saved, savedLastfm, harvested: facts.length, rejectCounts };
+  return { saved, savedHot, savedLastfm, harvested: facts.length, rejectCounts };
+}
+
+async function processTrack(bank, track, stats) {
+  const { artist, title } = track;
+  const countryCode = /[\u0400-\u04FF]/.test(artist + title) ? 'RU' : undefined;
+  const facts = discogsOnly
+    ? await fetchDiscogsFacts({ artist, title, countryCode })
+    : await harvestAllFacts({ artist, title, countryCode });
+  return saveFacts(bank, artist, title, facts, stats);
 }
 
 function orderTracks(tracks, doneKeys, bank, zeroFactKeys) {
   const pending = [];
   const backfill = [];
+  const discogsBackfill = [];
   for (const t of tracks) {
     const key = trackKey(t.artist, t.title);
     if (!doneKeys.has(key)) {
       pending.push(t);
+    } else if (backfillDiscogs && !hasDiscogsInBank(bank, t.artist, t.title)) {
+      discogsBackfill.push(t);
     } else if (backfillLastfm && !hasLastfmInBank(bank, t.artist, t.title)) {
       backfill.push(t);
     }
   }
   const byPri = (a, b) => trackPriority(a) - trackPriority(b);
+
+  if (backfillDiscogs && discogsBackfill.length) {
+    console.log(`Discogs backfill: ${discogsBackfill.length} tracks without album facts`);
+  }
 
   if (retryZero) {
     const retry = tracks.filter((t) => {
@@ -241,16 +277,25 @@ function orderTracks(tracks, doneKeys, bank, zeroFactKeys) {
     console.log(
       `Retry-zero: ${retry.length} empty tracks first, then ${pending.length} pending + ${backfill.length} backfill`,
     );
-    return [...retry.sort(byPri), ...pending.sort(byPri), ...backfill.sort(byPri)];
+    return [
+      ...retry.sort(byPri),
+      ...discogsBackfill.sort(byPri),
+      ...pending.sort(byPri),
+      ...backfill.sort(byPri),
+    ];
   }
 
-  return [...pending.sort(byPri), ...backfill.sort(byPri)];
+  return [...discogsBackfill.sort(byPri), ...pending.sort(byPri), ...backfill.sort(byPri)];
 }
 
 async function runPool(tracks, bank, stats, doneKeys, zeroFactKeys) {
   let idx = 0;
   async function worker() {
-    while (idx < tracks.length && stats.total < target) {
+    while (
+      idx < tracks.length &&
+      stats.total < target &&
+      countHotInBank(bank) < hotTarget
+    ) {
       const i = idx++;
       const track = tracks[i];
       const key = trackKey(track.artist, track.title);
@@ -319,7 +364,10 @@ async function main() {
   const ordered = orderTracks(tracks, doneKeys, bank, zeroFactKeys);
   const backfillCount = ordered.filter((t) => doneKeys.has(trackKey(t.artist, t.title))).length;
   console.log(
-    `Catalog: ${tracks.length} harvestable / ${(catalog.tracks ?? []).length} total | queue: ${ordered.length} (${backfillCount} backfill)`,
+    `Targets: facts=${target} hot=${hotTarget} | mode=${discogsOnly ? 'discogs-only' : 'full'} concurrency=${concurrency}`,
+  );
+  console.log(
+    `Catalog: ${tracks.length} harvestable / ${(catalog.tracks ?? []).length} total | queue: ${ordered.length} (${backfillCount} backfill) | bank hot=${countHotInBank(bank)}`,
   );
 
   await runPool(ordered, bank, stats, doneKeys, zeroFactKeys);

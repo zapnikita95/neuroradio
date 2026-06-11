@@ -38,8 +38,13 @@ function filterForBulk(facts: HarvestedFact[], ctx: HarvestContext): HarvestedFa
     if (f.scope === 'artist') {
       return factMentionsArtist(trimmed, ctx.artist) || factAppliesToRequest(trimmed, ctx.artist, ctx.title, 'artist', 'indie');
     }
-    const scope = f.scope === 'album' ? 'track' : f.scope;
-    return factAppliesToRequest(trimmed, ctx.artist, ctx.title, scope, 'indie');
+    if (f.scope === 'album') {
+      return (
+        factMentionsArtist(trimmed, ctx.artist) ||
+        factAppliesToRequest(trimmed, ctx.artist, ctx.title, 'track', 'indie')
+      );
+    }
+    return factAppliesToRequest(trimmed, ctx.artist, ctx.title, f.scope, 'indie');
   });
 }
 
@@ -55,6 +60,13 @@ export async function harvestAllFacts(ctx: HarvestContext): Promise<HarvestedFac
 
   const dedicated = await fetchDedicatedSourceFacts(ctx);
   collected = mergeCollected(collected, dedicated);
+
+  try {
+    const discogs = await fetchDiscogsFacts(ctx);
+    collected = mergeCollected(collected, discogs);
+  } catch {
+    // discogs optional (rate limit / missing token)
+  }
 
   try {
     const agg = await fetchAggregatedFactContext(ctx.artist, ctx.title, ctx.countryCode);

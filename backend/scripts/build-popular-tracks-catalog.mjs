@@ -16,13 +16,17 @@ const KNOWN_ARTISTS = join(__dir, '../src/data/known-artists.json');
 const COVER_CLASSICS = join(__dir, '../src/data/cover-classics.json');
 
 const args = process.argv.slice(2);
-const TARGET = parseInt(args.find((a) => a.startsWith('--target='))?.split('=')[1] ?? '10000', 10);
-const TRACKS_PER_ARTIST = 10;
+const TARGET = parseInt(args.find((a) => a.startsWith('--target='))?.split('=')[1] ?? '20000', 10);
+const TRACKS_PER_ARTIST = 15;
 const DEEZER_RPS = 10;
 const LASTFM_RPS = 4;
 const PLAYLIST_TRACK_LIMIT = 200;
 const LASTFM_KEY = process.env.LASTFM_API_KEY?.trim() ?? '';
-const LASTFM_GEOS = ['Russia', 'United States', 'United Kingdom', 'Germany', 'Ukraine', 'France'];
+const LASTFM_GEOS = [
+  'Russia', 'United States', 'United Kingdom', 'Germany', 'Ukraine', 'France',
+  'Japan', 'Brazil', 'Poland', 'Italy', 'Spain', 'Canada', 'Australia', 'Mexico',
+];
+const LASTFM_TAGS = ['rock', 'pop', 'hip-hop', 'electronic', 'indie', 'metal', 'punk', 'jazz', 'classical', 'soul'];
 const mergeExisting = !args.includes('--fresh');
 
 const RU_SEED_TRACKS = [
@@ -154,6 +158,19 @@ async function fetchLastfmGeoTop(country, limit = 1000) {
     artist: t.artist?.name ?? t.artist?.['#text'] ?? '',
     title: t.name ?? '',
     source: `lastfm-geo-${country.toLowerCase().replace(/\s+/g, '-')}`,
+  }));
+}
+
+async function fetchLastfmTagTop(tag, limit = 400) {
+  const data = await fetchLastFmMethod({
+    method: 'tag.gettoptracks',
+    tag,
+    limit: String(limit),
+  });
+  return (data?.tracks?.track ?? []).map((t) => ({
+    artist: t.artist?.name ?? t.artist?.['#text'] ?? '',
+    title: t.name ?? '',
+    source: `lastfm-tag-${tag}`,
   }));
 }
 
@@ -302,6 +319,20 @@ async function main() {
       }
     } catch (e) {
       console.warn('lastfm charts:', e.message);
+    }
+
+    try {
+      for (const tag of LASTFM_TAGS) {
+        if (catalog.size >= TARGET) break;
+        for (const t of await fetchLastfmTagTop(tag, 400)) {
+          if (catalog.size >= TARGET) break;
+          addTrack(catalog, t.artist, t.title, t.source);
+        }
+        console.log(`+ lastfm tag ${tag}: ${catalog.size}`);
+        await sleep(300);
+      }
+    } catch (e) {
+      console.warn('lastfm tags:', e.message);
     }
   }
 

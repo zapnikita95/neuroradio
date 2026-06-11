@@ -25,11 +25,13 @@
     "generate:website-demos-en": "node scripts/generate-website-demos-en.mjs --preview",
     "generate:website-demos-en:all": "node scripts/generate-website-demos-en.mjs --all",
     "test:fact-sources": "npm run build && node scripts/benchmark-fact-sources.mjs",
-    "build:catalog": "npm run build && node scripts/build-popular-tracks-catalog.mjs --target=10000",
-    "seed:facts": "npm run build && node scripts/bulk-seed-fact-bank.mjs --target=8000 --concurrency=4 --resume",
+    "build:catalog": "node scripts/build-popular-tracks-catalog.mjs --target=20000 --no-proxy",
+    "build:catalog:10k": "node scripts/build-popular-tracks-catalog.mjs --target=10000 --no-proxy",
+    "seed:facts": "node scripts/bulk-seed-fact-bank.mjs --target=60000 --hot-target=20000 --concurrency=2 --resume --no-proxy --backfill-discogs",
+    "seed:facts:discogs": "node scripts/bulk-seed-fact-bank.mjs --target=60000 --hot-target=20000 --concurrency=1 --resume --no-proxy --discogs-only --backfill-discogs",
     "test:facts": "npm run build && node scripts/test-fact-topic.mjs && node scripts/test-live-facts-5tracks.mjs",
     "audit:bulk": "npm run build && node scripts/audit-bulk-coverage.mjs",
-    "seed:facts:retry-zero": "node scripts/bulk-seed-fact-bank.mjs --target=8000 --concurrency=2 --resume --retry-zero --no-proxy"
+    "seed:facts:retry-zero": "node scripts/bulk-seed-fact-bank.mjs --target=60000 --hot-target=20000 --concurrency=2 --resume --retry-zero --no-proxy --backfill-discogs"
   },
   "keywords": [
     "music",
