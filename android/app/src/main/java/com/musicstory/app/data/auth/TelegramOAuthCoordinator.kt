@@ -97,26 +97,15 @@ class TelegramOAuthCoordinator private constructor() {
     }
 
     /**
-     * WebView preserves the full query string (Custom Tabs on Huawei strip params).
-     * BFF /authorize is optional; direct oauth.telegram.org works in WebView on all OEMs.
+     * WebView preserves query params (Custom Tabs on Huawei strip them).
+     * Always open oauth.telegram.org directly — BFF /authorize is optional fallback only.
      */
     private fun buildStartUrl(
-        backendBaseUrl: String,
+        @Suppress("UNUSED_PARAMETER") backendBaseUrl: String,
         clientId: String,
         redirectUri: String,
         challenge: String,
-    ): String {
-        val base = backendBaseUrl.trim().trimEnd('/')
-        if (base.contains("efir-ai.ru", ignoreCase = true)) {
-            return Uri.parse("$base/v1/public/oauth/telegram/authorize")
-                .buildUpon()
-                .appendQueryParameter("code_challenge", challenge)
-                .appendQueryParameter("code_challenge_method", "S256")
-                .build()
-                .toString()
-        }
-        return buildDirectAuthUri(clientId, redirectUri, challenge).toString()
-    }
+    ): String = buildDirectAuthUri(clientId, redirectUri, challenge).toString()
 
     private fun buildDirectAuthUri(clientId: String, redirectUri: String, challenge: String): Uri {
         val enc = StandardCharsets.UTF_8

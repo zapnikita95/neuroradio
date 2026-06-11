@@ -154,10 +154,12 @@ class MediaControllerManager(
     }
 
     suspend fun resumeMusicWithFade(seconds: Float) {
+        val savedOriginal = fadedStreamOriginalVolume
         restoreSystemMusicVolumeIfNeeded()
         val controls = activeController?.transportControls ?: return
         val maxVolume = audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC)
-        val original = audioManager.getStreamVolume(AudioManager.STREAM_MUSIC).coerceAtLeast(1)
+        val original = (savedOriginal ?: audioManager.getStreamVolume(AudioManager.STREAM_MUSIC))
+            .coerceIn(1, maxVolume)
         val startVolume = (maxVolume * 0.08f).toInt().coerceAtLeast(1)
         audioManager.setStreamVolume(AudioManager.STREAM_MUSIC, startVolume, 0)
         controls.play()
@@ -176,7 +178,16 @@ class MediaControllerManager(
     }
 
     fun resumeMusic() {
+        val savedOriginal = fadedStreamOriginalVolume
         restoreSystemMusicVolumeIfNeeded()
+        if (savedOriginal != null) {
+            val max = audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC)
+            audioManager.setStreamVolume(
+                AudioManager.STREAM_MUSIC,
+                savedOriginal.coerceIn(1, max),
+                0,
+            )
+        }
         activeController?.transportControls?.play()
     }
 

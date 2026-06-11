@@ -27,6 +27,7 @@ import androidx.work.ExistingPeriodicWorkPolicy
 import androidx.work.NetworkType
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
+import com.musicstory.app.domain.WelcomeTrialGate
 import com.musicstory.app.worker.AuthRefreshWorker
 import com.musicstory.app.util.StoryLog
 import kotlinx.coroutines.CoroutineScope
@@ -147,6 +148,7 @@ class MusicStoryApp : Application() {
         )
         scheduleBackgroundAuthRefresh()
         prefetchBackendAuth()
+        WelcomeTrialGate.ensureDeviceWelcomeTrial(this)
         prefetchAccountHistory()
         appScope.launch {
             storyRepository.dedupeStoryHistory()

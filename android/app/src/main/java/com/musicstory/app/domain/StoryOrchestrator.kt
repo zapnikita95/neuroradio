@@ -1048,7 +1048,14 @@ class StoryOrchestrator(
         cancelInFlightGenerationImmediate("stopped by user")
         storyPlayer.stop()
         mediaControllerManager.restoreSystemMusicVolumeIfNeeded()
-        mediaControllerManager.resumeMusic()
+        scope.launch {
+            val fadeSeconds = settingsDataStore.musicFadeSeconds.first()
+            if (fadeSeconds > 0f) {
+                mediaControllerManager.resumeMusicWithFade(fadeSeconds)
+            } else {
+                mediaControllerManager.resumeMusic()
+            }
+        }
         _pendingFeedback.value = null
         _state.value = OrchestratorState.LISTENING
         publishUiState()

@@ -9,6 +9,35 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
 object WelcomeTrialGate {
+    /** Claim 7-day device trial on cold start (works without login). */
+    fun ensureDeviceWelcomeTrial(app: MusicStoryApp) {
+        app.appScope.launch {
+            runCatching {
+                val profile = app.settingsDataStore.readCachedAccountProfile()
+                val tier = TierAccess.resolveEffectiveTier(
+                    dailyQuotaTier = null,
+                    plan = profile?.plan,
+                    trialUntil = profile?.trialUntil,
+                    premiumUntil = profile?.premiumUntil,
+                )
+                if (TierAccess.isPremiumLike(tier)) {
+                    StoryLog.i("Welcome trial skip: already premium-like tier=$tier")
+                    return@launch
+                }
+                val active = claimWelcomeTrialOnServer(app)
+                if (active) {
+                    StoryLog.i("Welcome trial activated on device")
+                    applyWelcomeTrialDefaults(app)
+                    app.storyOrchestrator.notifyTierMayHaveChanged()
+                } else {
+                    StoryLog.w("Welcome trial not active after claim")
+                }
+            }.onFailure { err ->
+                StoryLog.e("Welcome trial claim on startup failed", err)
+            }
+        }
+    }
+
     suspend fun completeAfterSkip(app: MusicStoryApp) {
         app.settingsDataStore.setAccountLoginGateCompleted(true)
         app.storyOrchestrator.notifyTierMayHaveChanged()

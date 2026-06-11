@@ -296,7 +296,8 @@ class AccountAuthManager(
         val trialActive: Boolean
             get() {
                 val until = trialUntil ?: entitlement?.trialUntil ?: 0L
-                return until > System.currentTimeMillis() && entitlement?.plan == "trial"
+                if (until <= System.currentTimeMillis()) return false
+                return entitlement?.plan == "trial" || granted
             }
     }
 

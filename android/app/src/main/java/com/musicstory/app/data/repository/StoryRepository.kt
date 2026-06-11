@@ -453,7 +453,8 @@ class StoryRepository(
         )
         StoryLog.i(
             "fetchStory ${track.artist} — ${track.title}: provider=${llmProvider.id}, " +
-                "ownKey=${directApiKey.isNotEmpty()}, backend=$useBackend",
+                "ownKey=${directApiKey.isNotEmpty()}, backend=$useBackend, tier=$tier, " +
+                "tts=${if (userTtsBilling == UserTtsBilling.SERVER) serverTtsProvider.id else userTtsBilling.id}",
         )
 
         if (llmProvider == LlmProvider.GEMINI && geminiKey.isEmpty() && !useBackend) {
@@ -679,12 +680,9 @@ class StoryRepository(
                             UserTtsBilling.YANDEX -> "yandex"
                             UserTtsBilling.SBER -> "sber"
                             UserTtsBilling.SERVER -> when {
-                                resolvedLang == ResolvedAppLanguage.EN &&
-                                    TierAccess.isPremiumLike(serverTier) -> "auto"
-                                TierAccess.isPremiumLike(serverTier) &&
-                                    resolvedLang == ResolvedAppLanguage.RU -> "yandex"
-                                TierAccess.isPremiumLike(serverTier) &&
-                                    serverTtsProvider == ServerTtsProvider.YANDEX -> "yandex"
+                                !TierAccess.isPremiumLike(serverTier) -> "edge"
+                                resolvedLang == ResolvedAppLanguage.EN -> "auto"
+                                serverTtsProvider == ServerTtsProvider.YANDEX -> "yandex"
                                 else -> "edge"
                             }
                         },
