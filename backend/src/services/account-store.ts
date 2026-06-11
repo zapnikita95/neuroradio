@@ -373,6 +373,23 @@ export function getAccountByInstallId(installId: string): AccountRecord | null {
   return store.accountsById[accountId] ?? null;
 }
 
+/** Settings for install — including secondary devices on linked account. */
+export function resolveAccountSettingsForInstall(installId: string): SyncSettings | null {
+  const norm = installId.trim().toLowerCase();
+  const store = loadStore();
+  let accountId = store.installToAccount[norm];
+  if (!accountId) {
+    for (const acc of Object.values(store.accountsById)) {
+      if (acc.installIds.some((id) => id.toLowerCase() === norm)) {
+        accountId = acc.accountId;
+        break;
+      }
+    }
+  }
+  if (!accountId) return null;
+  return store.accountsById[accountId]?.settings ?? null;
+}
+
 export function saveSecretsTransportEnc(installId: string, blob: string): void {
   const store = loadStore();
   const accountId = store.installToAccount[installId.trim().toLowerCase()];

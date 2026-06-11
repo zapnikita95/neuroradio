@@ -401,6 +401,10 @@ router.post('/style-corpus/backfill', async (req: Request, res: Response) => {
     return;
   }
   try {
+    const { hydrateAccountStoreFromPostgres } = await import('../services/account-store.js');
+    if (process.env.DATABASE_URL?.trim()) {
+      await hydrateAccountStoreFromPostgres();
+    }
     const { backfillStyleCorpusFromFeedback, summarizeGoodPersonaFeedback } = await import(
       '../services/style-feedback-backfill.js'
     );

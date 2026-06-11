@@ -22,17 +22,30 @@ import {
   type StyleNarratorId,
 } from './style-corpus.js';
 import type { StoryFeedbackEntry } from './story-feedback.js';
-import { getAccountByInstallId } from './account-store.js';
+import { resolveAccountSettingsForInstall } from './account-store.js';
 
 const DATA_DIR = process.env.ACCOUNT_DATA_DIR?.trim() || path.join(process.cwd(), 'data');
 const PROMOTE_STATE_PATH = path.join(DATA_DIR, 'style-corpus', 'promote-state.json');
 
 export function inferNarratorForInstall(installId: string): StyleNarratorId | undefined {
-  const account = getAccountByInstallId(installId);
-  const raw = account?.settings?.storyNarrator?.trim();
+  const settings = resolveAccountSettingsForInstall(installId);
+  const raw = settings?.storyNarrator?.trim();
   if (!raw) return undefined;
   const id = resolveStoryNarrator(raw);
   return id === 'auto' ? undefined : id;
+}
+
+/** Guess narrator from liked script when settings/history lack it (backfill). */
+export function inferNarratorFromScript(script: string): StyleNarratorId | undefined {
+  const s = script.trim();
+  if (!s) return undefined;
+  if (/(?:я обожаю|я знаю каждую|пересматривал|коллекцион|on vinyl|by heart)/i.test(s)) return 'fan';
+  if (/(?:я помню|мы тогда|в те годы|мы смотрели|i remember those)/i.test(s)) return 'contemporary';
+  if (/(?:между нами|off the record|инсайд|полушёпот|коридоре студии)/i.test(s)) return 'backstage';
+  if (/(?:жанр|поджанр|механик|suite|аранж|french house|modal jazz)/i.test(s)) return 'expert';
+  if (/(?:тихий час|ночной эфир|good night|этой ночью|полумраке)/i.test(s)) return 'night_dj';
+  if (/(?:поехали|на максимум|stay on our|волне)/i.test(s)) return 'radio_host';
+  return undefined;
 }
 
 interface PromoteBucket {
@@ -190,9 +203,11 @@ export function processFeedbackForStyleLearning(
   entry: StoryFeedbackEntry,
   ctx: StyleFeedbackContext = {},
 ): void {
-  const narrator =
-    resolveStyleNarrator(ctx.storyNarrator) ?? inferNarratorForInstall(entry.installId);
   const script = entry.script?.trim();
+  const narrator =
+    resolveStyleNarrator(ctx.storyNarrator) ??
+    inferNarratorForInstall(entry.installId) ??
+    (script ? inferNarratorFromScript(script) : undefined);
   if (!narrator || !script) return;
 
   const hash = scriptFingerprint(script);

@@ -1,6 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { resolveAccountId } from './account-store.js';
+import { resolveAccountId, hydrateAccountStoreFromPostgres, resolveAccountSettingsForInstall } from './account-store.js';
 import { getPool, hasPostgres } from './db.js';
 import { resolveStoryNarrator, type StoryNarratorId } from './story-narrator.js';
 import type { StoryLanguageId } from './story-language.js';
@@ -15,6 +15,7 @@ import type { StoryFeedbackEntry } from './story-feedback.js';
 import {
   processFeedbackForStyleLearning,
   inferNarratorForInstall,
+  inferNarratorFromScript,
   type StyleFeedbackContext,
 } from './style-feedback-learn.js';
 const DATA_DIR = process.env.ACCOUNT_DATA_DIR?.trim() || path.join(process.cwd(), 'data');
@@ -93,7 +94,8 @@ export async function enrichFeedbackContext(
     overrides.storyNarrator ??
     resolveStyleNarrator(entry.storyNarrator) ??
     narratorFromHistory ??
-    inferNarratorForInstall(entry.installId);
+    inferNarratorForInstall(entry.installId) ??
+    (entry.script?.trim() ? inferNarratorFromScript(entry.script) : undefined);
 
   const lang = (overrides.lang ?? entry.lang === 'en' ? 'en' : 'ru') as StoryLanguageId;
 
@@ -170,6 +172,9 @@ export interface StyleBackfillResult {
 }
 
 export async function backfillStyleCorpusFromFeedback(): Promise<StyleBackfillResult> {
+  if (hasPostgres()) {
+    await hydrateAccountStoreFromPostgres();
+  }
   const goldBefore = countGoldCorpus();
   const entries = await loadAllStoryFeedback();
   let goodPersona = 0;
