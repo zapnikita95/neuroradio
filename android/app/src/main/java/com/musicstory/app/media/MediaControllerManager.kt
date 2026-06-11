@@ -9,6 +9,7 @@ import android.os.Handler
 import android.os.Looper
 import com.musicstory.app.data.model.TrackInfo
 import com.musicstory.app.service.MediaNotificationListener
+import com.musicstory.app.util.StoryLog
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -131,6 +132,7 @@ class MediaControllerManager(
         if (seconds <= 0.2f) {
             audioManager.setStreamVolume(AudioManager.STREAM_MUSIC, targetVolume, 0)
             controls.pause()
+            restoreStreamVolumeForStoryPlayback()
             return
         }
         val steps = (seconds * 12f).toInt().coerceIn(8, 20)
@@ -142,9 +144,20 @@ class MediaControllerManager(
             delay(stepDelayMs)
         }
         controls.pause()
+        restoreStreamVolumeForStoryPlayback()
     }
 
-    /** Call when story ends, track changes, or user stops — fixes stuck silent STREAM_MUSIC. */
+    /**
+     * ExoPlayer uses STREAM_MUSIC — after ducking to 0 the story was inaudible.
+     * Music stays paused; restore system stream level for narration only.
+     */
+    fun restoreStreamVolumeForStoryPlayback() {
+        val original = fadedStreamOriginalVolume ?: return
+        val max = audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC)
+        val level = original.coerceIn(1, max)
+        audioManager.setStreamVolume(AudioManager.STREAM_MUSIC, level, 0)
+        StoryLog.i("Story playback: STREAM_MUSIC restored to $level (saved duck level)")
+    }
     fun restoreSystemMusicVolumeIfNeeded() {
         val original = fadedStreamOriginalVolume ?: return
         val max = audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC)

@@ -998,25 +998,24 @@ class StoryRepository(
     ): String? {
         val serverUrl = resolveAudioUrl(audioUrl) ?: return null
 
-        if (!serverUrl.isNullOrBlank() && serverUrl.startsWith("http", ignoreCase = true)) {
-            if (forceFullDownload) {
-                offlineAudioStore.evictEphemeral(serverUrl)
-            }
-            offlineAudioStore.downloadEphemeral(serverUrl, forceRefresh = forceFullDownload)?.let { path ->
-                StoryLog.i(
-                    "Playback: local file ${path.substringAfterLast('/')} " +
-                        "(${File(path).length()} bytes)",
-                )
+        if (!serverUrl.startsWith("http", ignoreCase = true)) return serverUrl
+
+        if (forceFullDownload) {
+            offlineAudioStore.evictEphemeral(serverUrl)
+            offlineAudioStore.downloadEphemeral(serverUrl, forceRefresh = true)?.let { path ->
+                StoryLog.i("Playback: full download ${path.substringAfterLast('/')} (${File(path).length()} bytes)")
                 return offlineAudioStore.localFileUri(path)
             }
             StoryLog.w("Playback: download failed — falling back to stream")
+            return serverUrl
         }
 
-        if (forceFullDownload && !serverUrl.isNullOrBlank()) {
-            StoryLog.w("Playback retry: using stream after download miss")
+        offlineAudioStore.findEphemeralCached(serverUrl)?.let { path ->
+            StoryLog.i("Playback: reuse cached ${path.substringAfterLast('/')}")
+            return offlineAudioStore.localFileUri(path)
         }
 
-        if (!preferLocal || serverUrl.isNullOrBlank()) return serverUrl
+        if (!preferLocal) return serverUrl
         if (!canUseOfflineReplay()) return serverUrl
         packPlaybackPath(trackKey)?.let { path ->
             if (localAudioMatchesServerFormat(path, audioUrl)) {

@@ -120,6 +120,20 @@ class StoryOfflineAudioStore(context: Context) {
         File(playbackTempDir, "$hash.$ext.part").delete()
     }
 
+    /** Cached ephemeral file if valid — no network. */
+    fun findEphemeralCached(url: String): String? {
+        if (url.isBlank()) return null
+        val ext = extensionFromUrl(url)
+        val target = File(playbackTempDir, "${hashUrl(url)}.$ext")
+        val maxAgeMs = 2L * 60L * 60L * 1000L
+        if (target.isFile && target.length() > 512L && isLikelyValidAudio(target) &&
+            System.currentTimeMillis() - target.lastModified() < maxAgeMs
+        ) {
+            return target.absolutePath
+        }
+        return null
+    }
+
     suspend fun downloadEphemeral(url: String, forceRefresh: Boolean = false): String? = withContext(Dispatchers.IO) {
         if (url.isBlank()) return@withContext null
         val ext = extensionFromUrl(url)

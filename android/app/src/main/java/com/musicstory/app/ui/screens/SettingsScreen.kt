@@ -1899,7 +1899,7 @@ fun SettingsScreen(
                                     if (languageChanged) {
                                         (context as? Activity)?.recreate()
                                     }
-                                    delay(2500)
+                                    delay(1200)
                                     if (saveFeedback == savedLabel) {
                                         saveFeedback = null
                                     }

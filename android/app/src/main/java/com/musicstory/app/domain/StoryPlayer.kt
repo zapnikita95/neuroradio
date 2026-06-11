@@ -209,6 +209,7 @@ class StoryPlayer(context: Context) {
             mediaItemBuilder.setMimeType(mimeType)
         }
         player.setMediaItem(mediaItemBuilder.build())
+        player.volume = 1f
         player.prepare()
         player.playWhenReady = true
     }
