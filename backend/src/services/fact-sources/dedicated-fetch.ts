@@ -7,6 +7,7 @@ import {
   factNamesForeignEntity,
   hasTrackContextSignal,
 } from '../fact-relevance.js';
+import { poolHasTopicDuplicate } from '../fact-topic.js';
 import { interestScore } from '../reference-fact-quality.js';
 import { isTruncatedMarketingSnippet } from '../web-snippet-accept.js';
 import type { HarvestContext, HarvestedFact, HarvestSource } from './types.js';
@@ -112,12 +113,15 @@ export function dedicatedHarvestToBundle(
   const seen = new Set<string>();
 
   const sorted = [...harvest].sort((a, b) => interestScore(b.fact) - interestScore(a.fact));
+  const acceptedFacts: string[] = [];
 
   for (const item of sorted) {
     const key = normalizeKey(item.fact);
     if (seen.has(key)) continue;
     if (!dedicatedFactRelevant(item.fact, item.scope, artist, title)) continue;
+    if (poolHasTopicDuplicate(item.fact, acceptedFacts)) continue;
     seen.add(key);
+    acceptedFacts.push(item.fact);
     if (item.scope === 'artist') {
       if (artistFacts.length < 5) artistFacts.push(item.fact);
     } else if (trackFacts.length < 8) {

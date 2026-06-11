@@ -6,6 +6,11 @@ import { factMentionsArtistAsEntity, isAmbiguousCommonWordArtist } from './fact-
 import { interestScore } from './reference-fact-quality.js';
 import { isSpeakableReferenceFact } from './web-snippet-accept.js';
 import { factsTooSimilar, type FactScope } from './fact-picker.js';
+import {
+  classifyFactTopic,
+  poolHasTopicDuplicate,
+  type FactTopicKey,
+} from './fact-topic.js';
 
 export interface StoredFact {
   id: string;
@@ -20,6 +25,8 @@ export interface StoredFact {
   isHot?: boolean;
   /** Source parser used during bulk harvest (genius, wiki, rap-ru, …). */
   harvestSource?: string;
+  /** Generic topic for cross-source dedup (no track names). */
+  topicKey?: FactTopicKey;
   timesUsed: number;
   addedAt: number;
   lastUsedAt?: number;
@@ -94,6 +101,26 @@ function upsertIntoPool(pool: StoredFact[], entry: StoredFact): void {
     }
     return;
   }
+  const topicDup = pool.find(
+    (f) =>
+      f.topicKey &&
+      entry.topicKey &&
+      f.topicKey === entry.topicKey &&
+      f.topicKey !== 'misc',
+  );
+  if (topicDup && entry.interestScore <= topicDup.interestScore) return;
+  if (topicDup && entry.interestScore > topicDup.interestScore) {
+    const dupIdx = pool.indexOf(topicDup);
+    if (dupIdx >= 0) pool.splice(dupIdx, 1);
+  }
+  if (poolHasTopicDuplicate(entry.fact, pool.map((p) => p.fact))) {
+    const weaker = pool.find((f) => poolHasTopicDuplicate(entry.fact, [f.fact]));
+    if (weaker && entry.interestScore <= weaker.interestScore) return;
+    if (weaker) {
+      const wi = pool.indexOf(weaker);
+      if (wi >= 0) pool.splice(wi, 1);
+    }
+  }
   pool.push(entry);
   pool.sort((a, b) => b.interestScore - a.interestScore);
   if (pool.length > MAX_POOL_SIZE) pool.length = MAX_POOL_SIZE;
@@ -127,6 +154,7 @@ function buildStoredFact(
     source: item.source ?? 'api',
     isHot: rating >= HOT_MIN_RATING,
     harvestSource: item.harvestSource,
+    topicKey: classifyFactTopic(trimmed),
     timesUsed: 0,
     addedAt: Date.now(),
   };
@@ -319,6 +347,7 @@ export function pickFromBank(
   preferScope: FactScope[] = ['track', 'album', 'artist'],
   startOffset = 0,
   rejectSimilarTo: string[] = [],
+  blockedTopics: Set<FactTopicKey> = new Set(),
 ): StoredFact | null {
   const { track, artist: artistFacts } = listBankFacts(artist, title);
   const pools: Record<FactScope, StoredFact[]> = {
@@ -331,6 +360,7 @@ export function pickFromBank(
   for (const scope of preferScope) {
     for (const fact of pools[scope] ?? []) {
       if (usedFingerprints.has(factFingerprint(fact.fact))) continue;
+      if (fact.topicKey && fact.topicKey !== 'misc' && blockedTopics.has(fact.topicKey)) continue;
       if (factsTooSimilar(fact.fact, rejectSimilarTo)) continue;
       if (!(fact.isHot ?? fact.interestRating >= HOT_MIN_RATING)) continue;
       if (!isSpeakableReferenceFact(fact.fact, artist, title)) continue;

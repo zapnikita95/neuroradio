@@ -76,6 +76,9 @@ export interface UsedSeedRecord {
   interestScore: number;
   interestRating: number;
   usedAt: number;
+  /** Generic topic — no track names (award_ceremony, music_video, …). */
+  topicKey?: string;
+  album?: string;
 }
 
 export interface ListenStat {
@@ -1522,6 +1525,27 @@ export async function getAccountUsedFingerprintsAsync(
   }
 
   return getAccountUsedFingerprints(installId, artist, title);
+}
+
+export function getAccountUsedSeedsForArtist(installId: string, artist: string): UsedSeedRecord[] {
+  const store = loadStore();
+  const accountId = store.installToAccount[installId.trim().toLowerCase()];
+  if (!accountId) return [];
+  const account = store.accountsById[accountId];
+  if (!account?.usedSeeds) return [];
+  const artistNorm = artist.trim().toLowerCase();
+  return account.usedSeeds.filter((s) => s.artist.trim().toLowerCase() === artistNorm);
+}
+
+export async function getAccountUsedSeedsForArtistAsync(
+  installId: string,
+  artist: string,
+): Promise<UsedSeedRecord[]> {
+  if (hasPostgres()) {
+    const { pgGetUsedSeedsForArtist } = await import('./story-history-store.js');
+    return pgGetUsedSeedsForArtist(installId, artist);
+  }
+  return getAccountUsedSeedsForArtist(installId, artist);
 }
 
 export function recordAccountListen(installId: string, artist: string, _title: string): void {

@@ -1,4 +1,5 @@
 import { factFingerprint } from './fact-bank.js';
+import { classifyFactTopic, factsShareTopicOrOverlap, type FactTopicKey } from './fact-topic.js';
 import {
   filterAndRankFacts,
   interestScore,
@@ -90,10 +91,28 @@ export function factOverlapsPrevious(fact: string, previousScripts: string[], st
   return false;
 }
 
-/** Same track/artist — reject near-duplicate seeds (e.g. two «music video in Saint Lucia» facts). */
+/** Same track/artist — reject duplicate topic or near-duplicate text across sources. */
 export function factsTooSimilar(candidate: string, recentFacts: string[]): boolean {
   if (!candidate.trim() || recentFacts.length === 0) return false;
-  return factOverlapsPrevious(candidate, recentFacts, true);
+  for (const recent of recentFacts) {
+    if (factsShareTopicOrOverlap(candidate, recent)) return true;
+    if (factOverlapsPrevious(candidate, [recent], true)) return true;
+  }
+  return false;
+}
+
+export function resolveScopeOrder(
+  storyIndex: number,
+  recentScopes: FactScope[] = [],
+): FactScope[] {
+  const last3 = recentScopes.slice(0, 3);
+  if (last3.length >= 2 && last3.every((s) => s === 'track')) {
+    return ['artist', 'album', 'track'];
+  }
+  if (last3.length >= 2 && last3.every((s) => s === 'artist')) {
+    return ['track', 'album', 'artist'];
+  }
+  return storyIndex % 2 === 1 ? ['artist', 'album', 'track'] : ['track', 'album', 'artist'];
 }
 
 function isRejectedSeed(fact: string, title = ''): boolean {
@@ -125,11 +144,15 @@ function pickBestByInterest(
   minScore = MIN_PICK_INTEREST_SCORE,
   title = '',
   narrator: StoryNarratorId = 'auto',
+  blockedTopics: Set<FactTopicKey> = new Set(),
 ): string | null {
   for (const fact of sortByInterest(facts, narrator)) {
     if (isRejectedSeed(fact, title)) continue;
     if (adjustedInterestScore(fact, narrator) < minScore) continue;
     if (isUsedFact(fact, usedFingerprints)) continue;
+    const topic = classifyFactTopic(fact);
+    if (topic !== 'misc' && blockedTopics.has(topic)) continue;
+    if (factsTooSimilar(fact, previousScripts)) continue;
     if (factOverlapsPrevious(fact, previousScripts)) continue;
     return fact;
   }
@@ -164,11 +187,14 @@ export function pickReferenceFact(
   title = '',
   usedFingerprints: Set<string> = new Set(),
   narrator: StoryNarratorId = 'auto',
+  options: {
+    blockedTopics?: Set<FactTopicKey>;
+    recentScopes?: FactScope[];
+  } = {},
 ): SelectedReferenceFact | null {
   const pools = splitBundleByScope(bundle, artist, title);
-
-  const scopeOrder: FactScope[] =
-    storyIndex % 2 === 1 ? ['artist', 'album', 'track'] : ['track', 'album', 'artist'];
+  const blockedTopics = options.blockedTopics ?? new Set<FactTopicKey>();
+  const scopeOrder = resolveScopeOrder(storyIndex, options.recentScopes ?? []);
 
   for (const scope of scopeOrder) {
     const pool = pools[scope];
@@ -180,6 +206,7 @@ export function pickReferenceFact(
       MIN_PICK_INTEREST_SCORE,
       title,
       narrator,
+      blockedTopics,
     );
     if (picked && adjustedInterestScore(picked, narrator) >= MIN_GOOD_SCOPE_INTEREST) {
       return wrapSelected(picked, scope, narrator);
@@ -193,6 +220,7 @@ export function pickReferenceFact(
     MIN_PICK_INTEREST_SCORE,
     title,
     narrator,
+    blockedTopics,
   );
   if (globalBest) {
     const scope: FactScope = pools.track.includes(globalBest)
@@ -211,6 +239,9 @@ export function pickReferenceFact(
     if (isRejectedSeed(fact, title)) continue;
     if (adjustedInterestScore(fact, narrator) < 6) continue;
     if (isUsedFact(fact, usedFingerprints)) continue;
+    const topic = classifyFactTopic(fact);
+    if (topic !== 'misc' && blockedTopics.has(topic)) continue;
+    if (factsTooSimilar(fact, previousScripts)) continue;
     if (!factOverlapsPrevious(fact, previousScripts)) {
       const scope: FactScope = pools.track.includes(fact)
         ? 'track'

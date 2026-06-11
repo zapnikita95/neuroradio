@@ -13,6 +13,7 @@ import { interestScore } from '../dist/services/reference-fact-quality.js';
 import { interestRating10 } from '../dist/services/fact-interest-log.js';
 import { isBoringFact } from '../dist/services/reference-fact-quality.js';
 import { BANK_PATH } from '../dist/services/fact-bank.js';
+import { classifyFactTopic, poolHasTopicDuplicate } from '../dist/services/fact-topic.js';
 
 const __dir = dirname(fileURLToPath(import.meta.url));
 const CATALOG = join(__dir, '../src/data/popular-tracks-catalog.json');
@@ -80,6 +81,7 @@ function upsertFact(bank, artist, title, item) {
   const score = interestScore(trimmed);
   if (score < 3) return false;
   const rating = interestRating10(trimmed);
+  const topicKey = classifyFactTopic(trimmed);
   const stored = {
     id: crypto.randomUUID(),
     artist,
@@ -91,6 +93,7 @@ function upsertFact(bank, artist, title, item) {
     source: 'api',
     isHot: rating >= 6,
     harvestSource: item.source,
+    topicKey,
     timesUsed: 0,
     addedAt: Date.now(),
   };
@@ -99,6 +102,15 @@ function upsertFact(bank, artist, title, item) {
   const ak = artistKey(artist);
   const pool = item.scope === 'artist' ? (bank.byArtist[ak] ??= []) : (bank.byTrack[tk] ??= []);
   if (pool.some((f) => f.fact.toLowerCase().replace(/\s+/g, ' ').trim().slice(0, 200) === fp)) {
+    return false;
+  }
+  if (
+    topicKey !== 'misc' &&
+    pool.some((f) => f.topicKey === topicKey && f.topicKey !== 'misc')
+  ) {
+    return false;
+  }
+  if (poolHasTopicDuplicate(trimmed, pool.map((f) => f.fact))) {
     return false;
   }
   pool.push(stored);

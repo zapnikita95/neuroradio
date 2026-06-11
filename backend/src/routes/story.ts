@@ -12,11 +12,10 @@ import { formatFactPickLog, logFactCandidatePools } from '../services/fact-inter
 import { interestScore, isWikiBiographyLead } from '../services/reference-fact-quality.js';
 import { interestRating10 } from '../services/fact-interest-log.js';
 import {
+  buildFactPickContext,
   collectPreviousScripts,
   countUnusedBankFactsForUser,
   ensureAccount,
-  getUsedFingerprints,
-  getRecentSeedFactsForTrack,
   ingestBundleToBank,
   pickBankFactForUser,
   pickFactForUser,
@@ -24,6 +23,7 @@ import {
   recordUserStory,
   reserveSeedForUser,
 } from '../services/fact-user-service.js';
+import { classifyFactTopic, FACT_TOPIC_LABELS_RU } from '../services/fact-topic.js';
 import { ingestFacts, factFingerprint } from '../services/fact-bank.js';
 import { resolveArtistTier, isCatalogMajorArtist } from '../services/artist-notability.js';
 import { buildMetadataFallbackFacts, countGroundedFacts, isMetadataOnlyFallbackFact } from '../services/metadata-facts.js';
@@ -127,6 +127,7 @@ router.use(requireAppAuth);
 interface StoryFullBody {
   artist: string;
   title: string;
+  album?: string;
   previous_scripts?: string[];
   story_length?: StoryLengthId;
   story_narrator: StoryNarratorId;
@@ -384,7 +385,14 @@ router.post('/full', extractClientSecrets, validateStoryFullBody, storyFullRateL
 
     ensureAccount(installId);
 
-    const usedFingerprints = await getUsedFingerprints(installId, artist, title);
+    const trackAlbum =
+      typeof body.album === 'string' && body.album.trim() ? body.album.trim() : undefined;
+    const factPickCtx = await buildFactPickContext(installId, artist, title, {
+      album: trackAlbum,
+      storyNarrator,
+    });
+    const usedFingerprints = factPickCtx.usedFingerprints;
+    const rejectSimilarTo = factPickCtx.rejectSimilarTo;
 
     const curatedHit =
       lookupCuratedFact(coverCtx.factArtist, coverCtx.factTitle) ??
@@ -413,7 +421,7 @@ router.post('/full', extractClientSecrets, validateStoryFullBody, storyFullRateL
         );
       }
     } else {
-      bankFact = await pickBankFactForUser(installId, artist, title, coverCtx);
+      bankFact = await pickBankFactForUser(installId, artist, title, coverCtx, factPickCtx);
     }
 
     if (bankFact && usedFingerprints.has(factFingerprint(bankFact.fact))) {
@@ -421,8 +429,7 @@ router.post('/full', extractClientSecrets, validateStoryFullBody, storyFullRateL
       bankFact = null;
     }
 
-    const recentTrackSeeds = await getRecentSeedFactsForTrack(installId, artist, title);
-    if (bankFact && factsTooSimilar(bankFact.fact, recentTrackSeeds)) {
+    if (bankFact && factsTooSimilar(bankFact.fact, rejectSimilarTo)) {
       console.log(
         `[facts] bank seed repeats recent topic for "${artist}" — "${title}", fetching fresh facts`,
       );
@@ -555,6 +562,7 @@ router.post('/full', extractClientSecrets, validateStoryFullBody, storyFullRateL
         metadata.title,
         previousScripts.length,
         storyNarrator,
+        factPickCtx,
       );
       console.log(formatFactPickLog(selectedFact, 'rules'));
     }
@@ -712,7 +720,7 @@ router.post('/full', extractClientSecrets, validateStoryFullBody, storyFullRateL
       ? [selectedFact.fact]
       : [...factBundle.trackFacts, ...factBundle.artistFacts]
           .filter((f) => !isWeakSnippetSeed(f) && !isMetadataOnlyFallbackFact(f))
-          .filter((f) => !factsTooSimilar(f, recentTrackSeeds))
+          .filter((f) => !factsTooSimilar(f, rejectSimilarTo))
           .sort((a, b) => interestScore(b) - interestScore(a))
           .slice(0, 4);
 
@@ -743,7 +751,7 @@ router.post('/full', extractClientSecrets, validateStoryFullBody, storyFullRateL
         .filter(
           (fact) =>
             !isWeakSnippetSeed(fact) &&
-            !factsTooSimilar(fact, recentTrackSeeds) &&
+            !factsTooSimilar(fact, rejectSimilarTo) &&
             interestScore(fact) >= 6 &&
             (factAppliesToRequest(fact, metadata.artist, metadata.title, 'track') ||
               factAppliesToRequest(fact, metadata.artist, metadata.title, 'artist')),
@@ -798,6 +806,7 @@ router.post('/full', extractClientSecrets, validateStoryFullBody, storyFullRateL
           metadata.title,
           previousScripts.length,
           storyNarrator,
+          factPickCtx,
         );
         if (selectedFact) {
           console.log(formatFactPickLog(selectedFact, 'rules'));
@@ -874,6 +883,7 @@ router.post('/full', extractClientSecrets, validateStoryFullBody, storyFullRateL
             metadata.title,
             previousScripts.length,
             storyNarrator,
+            factPickCtx,
           );
           if (selectedFact) {
             referenceFacts = [selectedFact.fact];
@@ -989,14 +999,14 @@ router.post('/full', extractClientSecrets, validateStoryFullBody, storyFullRateL
       storyReferenceFacts = [coverCtx.coverNoteRu, ...storyReferenceFacts];
     }
 
-    if (selectedFact?.fact && factsTooSimilar(selectedFact.fact, recentTrackSeeds)) {
+    if (selectedFact?.fact && factsTooSimilar(selectedFact.fact, rejectSimilarTo)) {
       console.warn(
         `[facts] reject consecutive similar seed for "${metadata.title}": "${selectedFact.fact.slice(0, 90)}"`,
       );
       const rejectedFp = factFingerprint(selectedFact.fact);
       usedFingerprints.add(rejectedFp);
       selectedFact = null;
-      storyReferenceFacts = storyReferenceFacts.filter((f) => !factsTooSimilar(f, recentTrackSeeds));
+      storyReferenceFacts = storyReferenceFacts.filter((f) => !factsTooSimilar(f, rejectSimilarTo));
 
       let alt = await pickFactForUser(
         installId,
@@ -1005,10 +1015,11 @@ router.post('/full', extractClientSecrets, validateStoryFullBody, storyFullRateL
         metadata.title,
         previousScripts.length + 1,
         storyNarrator,
+        factPickCtx,
       );
       let altFromCatalog = false;
 
-      if (!alt || factsTooSimilar(alt.fact, recentTrackSeeds)) {
+      if (!alt || factsTooSimilar(alt.fact, rejectSimilarTo)) {
         const extraTrack = await fetchFastTrackWikiFacts(metadata.artist, metadata.title);
         const artistLead = await fetchArtistWikiLead(metadata.artist);
         const supplemental = [
@@ -1016,7 +1027,7 @@ router.post('/full', extractClientSecrets, validateStoryFullBody, storyFullRateL
           ...(artistLead?.text?.trim() ? [artistLead.text.trim().slice(0, 480)] : []),
         ].filter(
           (f) =>
-            !factsTooSimilar(f, recentTrackSeeds) &&
+            !factsTooSimilar(f, rejectSimilarTo) &&
             factFingerprint(f) !== rejectedFp &&
             interestScore(f) >= 5,
         );
@@ -1037,11 +1048,12 @@ router.post('/full', extractClientSecrets, validateStoryFullBody, storyFullRateL
             metadata.title,
             previousScripts.length + 2,
             storyNarrator,
+            factPickCtx,
           );
         }
       }
 
-      if ((!alt || factsTooSimilar(alt.fact, recentTrackSeeds)) && isCatalogMajorArtist(metadata.artist)) {
+      if ((!alt || factsTooSimilar(alt.fact, rejectSimilarTo)) && isCatalogMajorArtist(metadata.artist)) {
         const factModels =
           ownLlmKey && openrouterModelFact.includes('/')
             ? [openrouterModelFact]
@@ -1055,13 +1067,13 @@ router.post('/full', extractClientSecrets, validateStoryFullBody, storyFullRateL
           openRouterModel: openrouterModelFact,
           openRouterModels: factModels,
         });
-        if (catalogAlt && !factsTooSimilar(catalogAlt.fact, recentTrackSeeds)) {
+        if (catalogAlt && !factsTooSimilar(catalogAlt.fact, rejectSimilarTo)) {
           alt = catalogAlt;
           altFromCatalog = true;
         }
       }
 
-      if (alt && !factsTooSimilar(alt.fact, recentTrackSeeds)) {
+      if (alt && !factsTooSimilar(alt.fact, rejectSimilarTo)) {
         selectedFact = alt;
         factFromBank = false;
         factHuntLlm = altFromCatalog;
@@ -1078,7 +1090,7 @@ router.post('/full', extractClientSecrets, validateStoryFullBody, storyFullRateL
     }
 
     if (selectedFact?.fact) {
-      await reserveSeedForUser(installId, metadata.artist, metadata.title, selectedFact);
+      await reserveSeedForUser(installId, metadata.artist, metadata.title, selectedFact, trackAlbum);
     }
 
     const storyInput = {
@@ -1117,9 +1129,10 @@ router.post('/full', extractClientSecrets, validateStoryFullBody, storyFullRateL
 
     if (selectedFact?.fact) {
       const seedSource = factFromBank ? 'bank' : factHuntLlm ? 'llm' : 'rules';
+      const topic = classifyFactTopic(selectedFact.fact);
       console.log(
         formatFactPickLog(selectedFact, seedSource) +
-          ` track="${metadata.title}" artist="${metadata.artist}"`,
+          ` track="${metadata.title}" artist="${metadata.artist}" topic=${topic} (${FACT_TOPIC_LABELS_RU[topic]})`,
       );
       console.log(`[story-seed-why] ${selectedFactWhy}`);
     }

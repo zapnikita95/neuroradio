@@ -2,6 +2,7 @@ import crypto from 'node:crypto';
 import { factFingerprint } from './fact-bank.js';
 import { getPool, hasPostgres } from './db.js';
 import type { SyncHistoryEntry, UsedSeedRecord } from './account-store.js';
+import { classifyFactTopic } from './fact-topic.js';
 
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -168,8 +169,8 @@ export async function pgInsertUsedSeed(
   const res = await getPool().query(
     `INSERT INTO used_seeds (
       id, install_id, account_id, artist, title, scope, fact_fingerprint, fact,
-      interest_score, interest_rating, used_at
-    ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)`,
+      interest_score, interest_rating, used_at, topic_key, album
+    ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)`,
     [
       crypto.randomUUID(),
       normalized,
@@ -182,6 +183,8 @@ export async function pgInsertUsedSeed(
       input.interestScore,
       input.interestRating,
       input.usedAt ?? Date.now(),
+      input.topicKey ?? classifyFactTopic(input.fact),
+      input.album ?? null,
     ],
   );
   return (res.rowCount ?? 0) > 0;
@@ -215,6 +218,42 @@ export async function pgGetUsedSeedFingerprints(
     }
   }
   return out;
+}
+
+export async function pgGetUsedSeedsForArtist(
+  installId: string,
+  artist: string,
+): Promise<UsedSeedRecord[]> {
+  const artistNorm = artist.trim().toLowerCase();
+  const normalized = installId.trim().toLowerCase();
+  const accountId = (await import('./account-store.js')).resolveAccountId(installId);
+
+  const params: string[] = [artistNorm];
+  let sql = `SELECT fact, artist, title, scope, fact_fingerprint, interest_score, interest_rating, used_at, topic_key, album
+    FROM used_seeds WHERE LOWER(artist) = $1`;
+
+  if (accountId) {
+    params.push(accountId);
+    sql += ` AND account_id = $2`;
+  } else {
+    params.push(normalized);
+    sql += ` AND install_id = $2 AND account_id IS NULL`;
+  }
+  sql += ` ORDER BY used_at DESC LIMIT 120`;
+
+  const res = await getPool().query(sql, params);
+  return res.rows.map((row) => ({
+    fact: String(row.fact),
+    artist: String(row.artist),
+    title: String(row.title),
+    scope: row.scope as UsedSeedRecord['scope'],
+    factFingerprint: String(row.fact_fingerprint),
+    interestScore: Number(row.interest_score),
+    interestRating: Number(row.interest_rating),
+    usedAt: Number(row.used_at),
+    topicKey: row.topic_key ? String(row.topic_key) : undefined,
+    album: row.album ? String(row.album) : undefined,
+  }));
 }
 
 export async function pgReassignStoryHistoryForInstall(

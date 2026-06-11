@@ -22,7 +22,13 @@ import {
 import type { CoverFactContext } from './cover-resolve.js';
 import { splitBundleByScope, rankScopedFacts } from './fact-ranking.js';
 import { factMentionsArtistAsEntity, isAmbiguousCommonWordArtist } from './fact-relevance.js';
-import type { ReferenceFactBundle } from './fact-picker.js';
+import type { FactScope, ReferenceFactBundle } from './fact-picker.js';
+import {
+  classifyFactTopic,
+  topicKeySet,
+  type FactTopicKey,
+} from './fact-topic.js';
+import { getAccountUsedSeedsForArtistAsync } from './account-store.js';
 
 const PENDING_SEED_TTL_MS = 3 * 60_000;
 const pendingTrackSeeds = new Map<string, { fact: string; at: number }>();
@@ -48,6 +54,132 @@ export function setPendingTrackSeed(installId: string, artist: string, title: st
 
 export function clearPendingTrackSeed(installId: string, artist: string, title: string): void {
   pendingTrackSeeds.delete(pendingTrackKey(installId, artist, title));
+}
+
+export async function getRecentSeedFactsForArtist(
+  installId: string,
+  artist: string,
+  limit = 12,
+): Promise<string[]> {
+  const out: string[] = [];
+  const artistNorm = artist.trim().toLowerCase();
+  const used = await getAccountUsedSeedsForArtistAsync(installId, artist);
+  for (const seed of used.slice(0, limit)) {
+    if (seed.fact?.trim()) out.push(seed.fact.trim());
+  }
+  const history = await pullHistoryAsync(installId, 0);
+  if (history) {
+    for (const h of history) {
+      if (h.artist.trim().toLowerCase() !== artistNorm) continue;
+      if (h.seedFact?.trim()) out.push(h.seedFact.trim());
+      if (out.length >= limit) break;
+    }
+  }
+  return [...new Set(out)].slice(0, limit);
+}
+
+export async function getRecentSeedScopesForArtist(
+  installId: string,
+  artist: string,
+  limit = 4,
+): Promise<FactScope[]> {
+  const scopes: FactScope[] = [];
+  const artistNorm = artist.trim().toLowerCase();
+  const history = await pullHistoryAsync(installId, 0);
+  if (history) {
+    for (const h of history) {
+      if (h.artist.trim().toLowerCase() !== artistNorm) continue;
+      const scope = h.seedScope as FactScope | undefined;
+      if (scope === 'track' || scope === 'album' || scope === 'artist') {
+        scopes.push(scope);
+      }
+      if (scopes.length >= limit) break;
+    }
+  }
+  return scopes;
+}
+
+export async function getBlockedTopicsForUser(
+  installId: string,
+  artist: string,
+  album?: string,
+): Promise<Set<FactTopicKey>> {
+  const blocked = new Set<FactTopicKey>();
+  const artistNorm = artist.trim().toLowerCase();
+  const albumNorm = album?.trim().toLowerCase();
+
+  const used = await getAccountUsedSeedsForArtistAsync(installId, artist);
+  for (const seed of used) {
+    if (albumNorm && seed.album?.trim().toLowerCase() === albumNorm) {
+      blocked.add(classifyFactTopic(seed.fact));
+      if (seed.topicKey) blocked.add(seed.topicKey as FactTopicKey);
+    }
+    blocked.add(classifyFactTopic(seed.fact));
+    if (seed.topicKey) blocked.add(seed.topicKey as FactTopicKey);
+  }
+
+  const history = await pullHistoryAsync(installId, 0);
+  if (history) {
+    for (const h of history) {
+      if (h.artist.trim().toLowerCase() !== artistNorm) continue;
+      if (h.seedFact?.trim()) {
+        blocked.add(classifyFactTopic(h.seedFact));
+      }
+    }
+  }
+
+  blocked.delete('misc');
+  return blocked;
+}
+
+/** При смене амплуа — блокируем тему последнего семени этого трека. */
+export async function getNarratorSwitchBlockedTopic(
+  installId: string,
+  artist: string,
+  title: string,
+  currentNarrator: StoryNarratorId,
+): Promise<FactTopicKey | null> {
+  const tk = trackKey(artist, title);
+  const history = await pullHistoryAsync(installId, 0);
+  if (!history) return null;
+  for (const h of history) {
+    if (h.trackKey !== tk || !h.seedFact?.trim()) continue;
+    if (h.storyNarrator && h.storyNarrator !== currentNarrator) {
+      const topic = classifyFactTopic(h.seedFact);
+      return topic === 'misc' ? null : topic;
+    }
+    return null;
+  }
+  return null;
+}
+
+export interface FactPickContext {
+  usedFingerprints: Set<string>;
+  rejectSimilarTo: string[];
+  blockedTopics: Set<FactTopicKey>;
+  recentScopes: FactScope[];
+}
+
+export async function buildFactPickContext(
+  installId: string,
+  artist: string,
+  title: string,
+  options: { album?: string; storyNarrator?: StoryNarratorId } = {},
+): Promise<FactPickContext> {
+  const [used, recentTrack, recentArtist, blockedTopics, recentScopes, narratorTopic] =
+    await Promise.all([
+      getUsedFingerprints(installId, artist, title),
+      getRecentSeedFactsForTrack(installId, artist, title),
+      getRecentSeedFactsForArtist(installId, artist),
+      getBlockedTopicsForUser(installId, artist, options.album),
+      getRecentSeedScopesForArtist(installId, artist),
+      options.storyNarrator
+        ? getNarratorSwitchBlockedTopic(installId, artist, title, options.storyNarrator)
+        : Promise.resolve(null),
+    ]);
+  if (narratorTopic) blockedTopics.add(narratorTopic);
+  const rejectSimilarTo = [...new Set([...recentTrack, ...recentArtist])];
+  return { usedFingerprints: used, rejectSimilarTo, blockedTopics, recentScopes };
 }
 
 export async function getRecentSeedFactsForTrack(
@@ -132,6 +264,7 @@ export async function reserveSeedForUser(
   artist: string,
   title: string,
   seed: SelectedReferenceFact,
+  album?: string,
 ): Promise<void> {
   ensureAccount(installId);
   setPendingTrackSeed(installId, artist, title, seed.fact);
@@ -142,6 +275,8 @@ export async function reserveSeedForUser(
     scope: seed.scope,
     interestScore: seed.interestScore,
     interestRating: seed.interestRating,
+    topicKey: classifyFactTopic(seed.fact),
+    album,
   });
 }
 
@@ -177,17 +312,27 @@ export async function pickBankFactForUser(
   artist: string,
   title: string,
   cover?: CoverFactContext,
+  pickCtx?: FactPickContext,
 ): Promise<SelectedReferenceFact | null> {
   ensureAccount(installId);
-  const recentForTrack = await getRecentSeedFactsForTrack(installId, artist, title);
-  const used = await getUsedFingerprints(installId, artist, title);
+  const ctx =
+    pickCtx ?? (await buildFactPickContext(installId, artist, title));
+  const { usedFingerprints: used, rejectSimilarTo, blockedTopics } = ctx;
   const keys: Array<[string, string]> = [[artist, title]];
   if (cover?.isCover) {
     keys.push([cover.factArtist, cover.factTitle]);
   }
   for (const [a, t] of keys) {
-    const fromBank = pickFromBank(a, t, used, ['track', 'album', 'artist'], 0, recentForTrack);
-    if (fromBank && !factsTooSimilar(fromBank.fact, recentForTrack)) {
+    const fromBank = pickFromBank(
+      a,
+      t,
+      used,
+      ['track', 'album', 'artist'],
+      0,
+      rejectSimilarTo,
+      blockedTopics,
+    );
+    if (fromBank && !factsTooSimilar(fromBank.fact, rejectSimilarTo)) {
       return storedFactToSelected(fromBank);
     }
   }
@@ -217,10 +362,14 @@ export async function pickFactForUser(
   artist: string,
   title: string,
   storyIndex = 0,
-  _narrator: StoryNarratorId = 'auto',
+  narrator: StoryNarratorId = 'auto',
+  pickCtx?: FactPickContext,
 ): Promise<SelectedReferenceFact | null> {
-  const recentForTrack = await getRecentSeedFactsForTrack(installId, artist, title);
-  const used = await getUsedFingerprints(installId, artist, title);
+  const ctx =
+    pickCtx ??
+    (await buildFactPickContext(installId, artist, title, { storyNarrator: narrator }));
+  const { usedFingerprints: used, rejectSimilarTo, blockedTopics, recentScopes } = ctx;
+
   for (let offset = 0; offset < 8; offset += 1) {
     const fromBank = pickFromBank(
       artist,
@@ -228,18 +377,22 @@ export async function pickFactForUser(
       used,
       ['track', 'album', 'artist'],
       offset,
-      recentForTrack,
+      rejectSimilarTo,
+      blockedTopics,
     );
-    if (fromBank && !factsTooSimilar(fromBank.fact, recentForTrack)) {
+    if (fromBank && !factsTooSimilar(fromBank.fact, rejectSimilarTo)) {
       return storedFactToSelected(fromBank);
     }
     if (!fromBank) break;
   }
 
   const previous = await collectPreviousScripts(installId, artist, title);
-  const mergedPrevious = [...new Set([...previous, ...recentForTrack])];
-  const picked = pickReferenceFact(bundle, mergedPrevious, storyIndex, artist, title, used, _narrator);
-  if (picked && factsTooSimilar(picked.fact, recentForTrack)) return null;
+  const mergedPrevious = [...new Set([...previous, ...rejectSimilarTo])];
+  const picked = pickReferenceFact(bundle, mergedPrevious, storyIndex, artist, title, used, narrator, {
+    blockedTopics,
+    recentScopes,
+  });
+  if (picked && factsTooSimilar(picked.fact, rejectSimilarTo)) return null;
   return picked;
 }
 
@@ -262,6 +415,7 @@ export async function recordUserStory(
     scope: input.seed.scope,
     interestScore: input.seed.interestScore,
     interestRating: input.seed.interestRating,
+    topicKey: classifyFactTopic(input.seed.fact),
   });
 
   await pushHistoryAsync(installId, {
