@@ -72,4 +72,49 @@ enum AppStrings {
             "оформите международную подписку через App Store."
         static let enUpgradeCta = "Перейти к оплате"
     }
+
+    enum Onboarding {
+        static let title = "Music Story"
+        static let iosIntro =
+            "На iPhone нет доступа к уведомлениям других приложений, как на Android. " +
+            "Мы подключаемся к плеерам напрямую или распознаём звук через Shazam."
+
+        static let appleMusicTitle = "Apple Music"
+        static let appleMusicSubtitle = "Подключается автоматически — трек виден на главном экране."
+
+        static let spotifyTitle = "Spotify (опционально)"
+        static let spotifySubtitle = "Client ID в настройках — тогда трек и пауза работают сами."
+
+        static let shazamTitle = "Другие плееры (Яндекс, VK и др.)"
+        static let shazamSubtitle =
+            "Музыка ловится через Shazam: короткое распознавание, затем история по треку."
+
+        static let headphonesTitle = "Наушники"
+        static let headphonesSubtitle =
+            "AirPods — распознавание прямо из наушников. Обычные наушники — поднесите телефон к источнику звука, как в Shazam."
+
+        static let notificationsTitle = "Уведомления"
+        static let notificationsSubtitle = "Кнопка «Рассказать историю» в push о новом треке."
+
+        static let allowNotifications = "Разрешить уведомления"
+        static let connectSpotify = "Подключить Spotify"
+        static let skip = "Пропустить"
+        static let begin = "Начать"
+        static let next = "Далее"
+    }
+
+    enum Shazam {
+        static let micDenied = "Нужен доступ к микрофону. Настройки → Эфир AI → Микрофон."
+        static let noMatch = "Трек не распознан. Поднесите телефон к колонке или снимите один наушник на пару секунд."
+        static let engineFailure = "Микрофон занят. Остановите запись в других приложениях и попробуйте снова."
+
+        static let autoDetectTitle = "Shazam для других плееров"
+        static let autoDetectHint =
+            "Когда играет музыка не из Spotify / Apple Music, приложение коротко слушает и узнаёт трек — " +
+            "как авто-режим на Android. Не non-stop: ~10 секунд раз в минуту, пока играет плеер."
+        static let recognizeButton = "Распознать через Shazam"
+        static let listeningHint = "Слушаю… поднесите к колонке"
+        static let homeIdleSubtitle =
+            "Spotify или Apple Music — сами. Другой плеер — Shazam в настройках или кнопка ниже."
+    }
 }

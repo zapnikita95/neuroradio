@@ -104,6 +104,15 @@ struct SettingsView: View {
                 Text("В ручном режиме — подсказка, если по треку есть интересный факт.")
                     .font(.footnote)
                     .foregroundStyle(AppTheme.mutedLavender)
+
+                Toggle(isOn: $settings.shazamAutoDetectEnabled) {
+                    Text(AppStrings.Shazam.autoDetectTitle)
+                        .foregroundStyle(AppTheme.creamText)
+                }
+                .tint(AppTheme.goldBright)
+                Text(AppStrings.Shazam.autoDetectHint)
+                    .font(.footnote)
+                    .foregroundStyle(AppTheme.mutedLavender)
             }
         }
     }

@@ -46,6 +46,7 @@ final class SettingsStore: ObservableObject {
         static let offlinePackPhase = "offline_pack_phase"
         static let offlinePackSessionId = "offline_pack_session_id"
         static let factNotificationsEnabled = "fact_notifications_enabled"
+        static let shazamAutoDetectEnabled = "shazam_auto_detect_enabled"
     }
 
     private let defaults = UserDefaults.standard
@@ -155,6 +156,10 @@ final class SettingsStore: ObservableObject {
         didSet { defaults.set(factNotificationsEnabled, forKey: Keys.factNotificationsEnabled) }
     }
 
+    @Published var shazamAutoDetectEnabled: Bool {
+        didSet { defaults.set(shazamAutoDetectEnabled, forKey: Keys.shazamAutoDetectEnabled) }
+    }
+
     private init() {
         Self.migrateOnboardingIfNeeded(defaults: defaults)
         let storedBackend = defaults.string(forKey: Keys.backendURL) ?? SettingsDefaults.backendURL
@@ -193,12 +198,13 @@ final class SettingsStore: ObservableObject {
         offlinePackPhase = defaults.string(forKey: Keys.offlinePackPhase) ?? OfflinePackPhase.idle.rawValue
         offlinePackSessionId = Int64(defaults.object(forKey: Keys.offlinePackSessionId) as? Int ?? 0)
         factNotificationsEnabled = defaults.object(forKey: Keys.factNotificationsEnabled) as? Bool ?? true
+        shazamAutoDetectEnabled = defaults.object(forKey: Keys.shazamAutoDetectEnabled) as? Bool ?? true
         accountProfile = loadAccountProfile()
     }
 
-    /// Сброс онбординга при крупном обновлении потока входа (v2: Telegram на шаге 3).
+    /// Сброс онбординга при крупном обновлении потока входа (v3: Shazam / плееры iOS).
     private static func migrateOnboardingIfNeeded(defaults: UserDefaults) {
-        let currentVersion = 2
+        let currentVersion = 3
         if defaults.integer(forKey: Keys.onboardingVersion) < currentVersion {
             defaults.set(false, forKey: Keys.onboardingComplete)
             defaults.set(currentVersion, forKey: Keys.onboardingVersion)

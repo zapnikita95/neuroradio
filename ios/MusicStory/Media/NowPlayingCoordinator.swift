@@ -1,5 +1,6 @@
-import Foundation
+import AVFoundation
 import Combine
+import Foundation
 
 @MainActor
 final class NowPlayingCoordinator: ObservableObject {
@@ -14,6 +15,7 @@ final class NowPlayingCoordinator: ObservableObject {
     private var cancellables = Set<AnyCancellable>()
     private var lastPublishedKey: String?
     private let volumeFader = SystemVolumeFader()
+    private let otherAudioWatcher = OtherAudioShazamWatcher()
     var onTrackChanged: ((TrackInfo) -> Void)?
 
     func prepareSpotify(settings: SettingsStore) {
@@ -35,6 +37,14 @@ final class NowPlayingCoordinator: ObservableObject {
                 self?.merge(spotifyTrack: spotifyTrack, spotifyPlaying: spotifyPlaying, appleTrack: appleTrack, applePlaying: applePlaying)
             }
             .store(in: &cancellables)
+
+        otherAudioWatcher.start(nowPlaying: self, settings: settings)
+    }
+
+    func stop() {
+        otherAudioWatcher.stop()
+        cancellables.removeAll()
+        appleMusic.stop()
     }
 
     func pauseMusic() {
@@ -91,7 +101,10 @@ final class NowPlayingCoordinator: ObservableObject {
 
     func recognizeWithShazam() async throws -> TrackInfo {
         let track = try await shazam.recognizeOnce()
-        publish(track: track)
+        let playing = AVAudioSession.sharedInstance().isOtherAudioPlaying
+            || spotify.isPlaying
+            || appleMusic.isPlaying
+        publish(track: track, isPlaying: playing)
         return track
     }
 
@@ -115,6 +128,13 @@ final class NowPlayingCoordinator: ObservableObject {
         }
         if let appleTrack, appleTrack.isValid() {
             publish(track: appleTrack, isPlaying: applePlaying)
+            return
+        }
+        if let existing = currentTrack,
+           existing.isValid(),
+           existing.source == .shazam || existing.source == .manual,
+           AVAudioSession.sharedInstance().isOtherAudioPlaying {
+            isPlaying = true
             return
         }
         currentTrack = nil

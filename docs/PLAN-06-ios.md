@@ -32,7 +32,8 @@ Widget (efirai://tell-story) ─────────────────
 | `NowPlayingCoordinator.swift` | Единый источник текущего трека, приоритет Spotify → Apple Music |
 | `SpotifyAppRemoteManager.swift` | Spotify App Remote (опционально, нужен SDK) |
 | `AppleMusicNowPlaying.swift` | System music player |
-| `ShazamTrackRecognizer.swift` | One-shot распознавание для любого плеера |
+| `ShazamTrackRecognizer.swift` | One-shot распознавание (SHManagedSession, AirPods) |
+| `OtherAudioShazamWatcher.swift` | Авто-Shazam при `isOtherAudioPlaying` (не non-stop) |
 | `StoryOrchestrator.swift` | AUTO/MANUAL, pause → story → resume |
 | `NotificationService.swift` | UNNotificationCategory + action «Рассказать историю» |
 | `TellStoryWidget.swift` | Виджет → deep link `efirai://tell-story` |
@@ -112,7 +113,8 @@ iOS отправляет `POST /v1/auth/token`:
 2. Пройдите онбординг: уведомления → Spotify (опционально) → Shazam
 3. **Настройки → URL бэкенда** — адрес BFF (для симулятора: `http://127.0.0.1:3000`, для телефона: `http://<IP>:3000`)
 4. Запустите Spotify или Apple Music — трек появится на главном экране
-5. Для Яндекс Музыки: **Распознать через Shazam** или ручной ввод в настройках
+5. Для Яндекс Музыки: **Настройки → Shazam для других плееров** (авто) или кнопка на главном
+6. AirPods — распознавание из наушников; обычные наушники — поднести телефон к источнику звука
 
 ## Уведомления
 

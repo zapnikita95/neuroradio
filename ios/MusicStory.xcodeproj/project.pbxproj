@@ -46,6 +46,7 @@
 		B1000033 /* AccountLoginView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1000033 /* AccountLoginView.swift */; };
 		B1000034 /* TelegramLoginWebView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1000034 /* TelegramLoginWebView.swift */; };
 		B1000035 /* StoryFeedbackSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1000035 /* StoryFeedbackSheet.swift */; };
+		B1000036 /* OtherAudioShazamWatcher.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1000036 /* OtherAudioShazamWatcher.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -115,6 +116,7 @@
 		F1000033 /* AccountLoginView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AccountLoginView.swift; sourceTree = "<group>"; };
 		F1000034 /* TelegramLoginWebView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TelegramLoginWebView.swift; sourceTree = "<group>"; };
 		F1000035 /* StoryFeedbackSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StoryFeedbackSheet.swift; sourceTree = "<group>"; };
+		F1000036 /* OtherAudioShazamWatcher.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OtherAudioShazamWatcher.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -207,6 +209,7 @@
 				F1000005 /* SpotifyAppRemoteManager.swift */,
 				F1000006 /* ShazamTrackRecognizer.swift */,
 				F1000007 /* NowPlayingCoordinator.swift */,
+				F1000036 /* OtherAudioShazamWatcher.swift */,
 				F1000031 /* SystemVolumeFader.swift */,
 			);
 			path = Media;
@@ -380,6 +383,7 @@
 				B1000005 /* SpotifyAppRemoteManager.swift in Sources */,
 				B1000006 /* ShazamTrackRecognizer.swift in Sources */,
 				B1000007 /* NowPlayingCoordinator.swift in Sources */,
+				B1000036 /* OtherAudioShazamWatcher.swift in Sources */,
 				B1000008 /* Models.swift in Sources */,
 				B1000009 /* SettingsStore.swift in Sources */,
 				B100000A /* BackendClient.swift in Sources */,

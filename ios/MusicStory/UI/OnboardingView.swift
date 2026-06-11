@@ -5,95 +5,104 @@ struct OnboardingView: View {
     @EnvironmentObject private var nowPlaying: NowPlayingCoordinator
 
     @State private var step = 0
+    @State private var notificationsGranted = false
 
     var body: some View {
         MusicStoryBackground {
-            ScrollView {
-                VStack(spacing: 24) {
-                    BrandTitle(fontSize: 28)
-                        .padding(.top, 24)
+            VStack(spacing: 24) {
+                Text(AppStrings.Onboarding.title)
+                    .font(.largeTitle.bold())
+                    .foregroundStyle(AppTheme.goldBright)
 
-                    Text("Нейро-ведущий для Spotify и Apple Music")
-                        .font(.title3.weight(.semibold))
-                        .foregroundStyle(AppTheme.creamText)
-                        .multilineTextAlignment(.center)
-                        .padding(.horizontal)
-
-                    Text("На iPhone — Spotify, Apple Music и ShazamKit. Истории голосом, пока играет ваш трек.")
-                        .multilineTextAlignment(.center)
-                        .foregroundStyle(AppTheme.mutedLavender)
-                        .padding(.horizontal)
-
-                    VinylDisc(spinning: true)
-                        .padding(.vertical, 8)
-
-                    GlassCard(accentBorder: true) {
-                        VStack(alignment: .leading, spacing: 12) {
-                            onboardingRow(done: step > 0, title: "Уведомления", subtitle: "Кнопка «Рассказать историю» на push")
-                            onboardingRow(done: step > 1, title: "Spotify", subtitle: "Опционально — для авто-режима")
-                            onboardingRow(done: step > 2, title: "Аккаунт", subtitle: "Telegram или email — история в облаке")
-                        }
-                    }
+                Text(introText)
+                    .multilineTextAlignment(.center)
+                    .foregroundStyle(AppTheme.creamText)
                     .padding(.horizontal)
 
-                    stepContent
-                        .padding(.horizontal)
-
-                    Spacer(minLength: 24)
+                GlassCard {
+                    VStack(alignment: .leading, spacing: 12) {
+                        ForEach(visibleRows, id: \.title) { row in
+                            onboardingRow(done: row.done, title: row.title, subtitle: row.subtitle)
+                        }
+                    }
                 }
+                .padding(.horizontal)
+
+                actionArea
+
+                Spacer()
             }
+            .padding(.top, 40)
+        }
+    }
+
+    private var introText: String {
+        switch step {
+        case 0:
+            return AppStrings.Onboarding.iosIntro
+        case 3:
+            return AppStrings.Onboarding.headphonesSubtitle
+        default:
+            return ""
+        }
+    }
+
+    private var visibleRows: [(done: Bool, title: String, subtitle: String)] {
+        switch step {
+        case 0:
+            return [
+                (false, AppStrings.Onboarding.appleMusicTitle, AppStrings.Onboarding.appleMusicSubtitle),
+                (false, AppStrings.Onboarding.spotifyTitle, AppStrings.Onboarding.spotifySubtitle),
+                (false, AppStrings.Onboarding.shazamTitle, AppStrings.Onboarding.shazamSubtitle),
+            ]
+        case 1:
+            return [
+                (step > 0, AppStrings.Onboarding.notificationsTitle, AppStrings.Onboarding.notificationsSubtitle),
+                (false, AppStrings.Onboarding.spotifyTitle, AppStrings.Onboarding.spotifySubtitle),
+                (false, AppStrings.Onboarding.shazamTitle, AppStrings.Onboarding.shazamSubtitle),
+            ]
+        case 2:
+            return [
+                (true, AppStrings.Onboarding.notificationsTitle, AppStrings.Onboarding.notificationsSubtitle),
+                (step > 2, AppStrings.Onboarding.spotifyTitle, AppStrings.Onboarding.spotifySubtitle),
+                (false, AppStrings.Onboarding.shazamTitle, AppStrings.Onboarding.shazamSubtitle),
+            ]
+        default:
+            return [
+                (true, AppStrings.Onboarding.notificationsTitle, AppStrings.Onboarding.notificationsSubtitle),
+                (true, AppStrings.Onboarding.spotifyTitle, AppStrings.Onboarding.spotifySubtitle),
+                (true, AppStrings.Onboarding.shazamTitle, AppStrings.Onboarding.shazamSubtitle),
+                (step > 3, AppStrings.Onboarding.headphonesTitle, AppStrings.Onboarding.headphonesSubtitle),
+            ]
         }
     }
 
     @ViewBuilder
-    private var stepContent: some View {
+    private var actionArea: some View {
         switch step {
         case 0:
-            PrimaryStoryButton(title: "Разрешить уведомления") {
-                Task {
-                    _ = await NotificationService.shared.requestAuthorization()
-                    step = 1
-                }
+            PrimaryStoryButton(title: AppStrings.Onboarding.next) {
+                step = 1
             }
         case 1:
-            VStack(spacing: 12) {
-                Text("В Spotify включите трек, затем подтвердите доступ — приложение вернётся само.")
-                    .font(.caption)
-                    .foregroundStyle(AppTheme.mutedLavender)
-                    .multilineTextAlignment(.center)
-
-                if let error = nowPlaying.spotify.connectionError {
-                    Text(error)
-                        .font(.caption)
-                        .foregroundStyle(AppTheme.errorCoral)
-                        .multilineTextAlignment(.center)
+            PrimaryStoryButton(title: AppStrings.Onboarding.allowNotifications) {
+                Task {
+                    notificationsGranted = await NotificationService.shared.requestAuthorization()
+                    step = 2
                 }
-
-                PrimaryStoryButton(title: nowPlaying.spotify.isConnected ? "Spotify подключён" : "Подключить Spotify") {
-                    if nowPlaying.spotify.isConnected {
-                        step = 2
-                    } else {
-                        nowPlaying.spotify.connect()
-                    }
-                }
-                .disabled(nowPlaying.spotify.isAuthorizing)
-
-                if nowPlaying.spotify.isAuthorizing {
-                    ProgressView().tint(AppTheme.accentViolet)
-                }
-
-                Button("Пропустить") { step = 2 }
-                    .foregroundStyle(AppTheme.mutedLavender)
             }
-            .onChange(of: nowPlaying.spotify.isConnected) { connected in
-                if connected { step = 2 }
+        case 2:
+            PrimaryStoryButton(title: AppStrings.Onboarding.connectSpotify) {
+                nowPlaying.spotify.connect()
+                step = 3
             }
+            Button(AppStrings.Onboarding.skip) { step = 3 }
+                .foregroundStyle(AppTheme.mutedLavender)
         default:
-            AccountAuthPanel(
-                onSuccess: { settings.onboardingComplete = true },
-                onSkip: { settings.onboardingComplete = true },
-                skipTitle: "Начать без входа"
-            )
+            PrimaryStoryButton(title: AppStrings.Onboarding.begin) {
+                settings.shazamAutoDetectEnabled = true
+                settings.onboardingComplete = true
+            }
         }
     }
 

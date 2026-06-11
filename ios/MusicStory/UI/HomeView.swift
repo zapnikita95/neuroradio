@@ -161,7 +161,7 @@ struct HomeView: View {
             }
 
             SecondaryStoryButton(
-                title: nowPlaying.shazam.isListening ? "Слушаю… поднесите к колонке" : "Распознать через Shazam",
+                title: nowPlaying.shazam.isListening ? AppStrings.Shazam.listeningHint : AppStrings.Shazam.recognizeButton,
                 enabled: !nowPlaying.shazam.isListening
             ) {
                 Task {
@@ -207,7 +207,7 @@ struct HomeView: View {
         if let artist = nowPlaying.currentTrack?.artist, !artist.isEmpty {
             return artist
         }
-        return "Spotify или Apple Music — сами. Другой плеер — кнопка Shazam и доступ к микрофону."
+        return AppStrings.Shazam.homeIdleSubtitle
     }
 
     private var statusText: String {
