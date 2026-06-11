@@ -1,5 +1,11 @@
 import type { HarvestContext, HarvestedFact } from './types.js';
-import { cleanTrackTitle, fetchJson, splitSentences, stripHtml } from './fetch-utils.js';
+import {
+  cleanTrackTitle,
+  domToPlainText,
+  fetchJson,
+  splitSentences,
+  stripHtml,
+} from './fetch-utils.js';
 
 const TOKEN = process.env.GENIUS_ACCESS_TOKEN?.trim() ?? '';
 
@@ -16,13 +22,30 @@ interface GeniusSearchResponse {
   };
 }
 
+interface GeniusDomNode {
+  tag?: string;
+  children?: unknown[];
+}
+
 interface GeniusSongResponse {
   response?: {
     song?: {
-      description?: { plain?: string };
-      description_annotation?: { annotations?: Array<{ body?: { plain?: string } }> };
+      description?: { plain?: string; dom?: GeniusDomNode };
+      description_annotation?: {
+        annotations?: Array<{ body?: { plain?: string; dom?: GeniusDomNode } }>;
+      };
     };
   };
+}
+
+function extractGeniusText(
+  plain?: string,
+  dom?: GeniusDomNode,
+): string {
+  const fromPlain = plain?.trim();
+  if (fromPlain && fromPlain.length >= 35) return fromPlain;
+  const fromDom = domToPlainText(dom).replace(/\s+/g, ' ').trim();
+  return fromDom.length >= 35 ? fromDom : '';
 }
 
 function geniusHeaders(): Record<string, string> | null {
@@ -58,27 +81,31 @@ export async function fetchGeniusFacts(ctx: HarvestContext): Promise<HarvestedFa
   const query = `${ctx.artist} ${cleanTrackTitle(ctx.title)}`.trim();
   const search = await fetchJson<GeniusSearchResponse>(
     `https://api.genius.com/search?q=${encodeURIComponent(query)}`,
-    { headers, timeoutMs: 8000 },
+    { headers, timeoutMs: 10_000 },
   );
   const songId = pickBestHit(search?.response?.hits, ctx.artist, ctx.title);
   if (!songId) return [];
 
   const song = await fetchJson<GeniusSongResponse>(
     `https://api.genius.com/songs/${songId}`,
-    { headers, timeoutMs: 8000 },
+    { headers, timeoutMs: 10_000 },
   );
   const facts: HarvestedFact[] = [];
-  const desc = song?.response?.song?.description?.plain?.trim();
-  if (desc && desc.length >= 35) {
-    for (const sentence of splitSentences(stripHtml(desc))) {
+  const songData = song?.response?.song;
+  const descText = extractGeniusText(
+    songData?.description?.plain,
+    songData?.description?.dom,
+  );
+  if (descText) {
+    for (const sentence of splitSentences(stripHtml(descText))) {
       facts.push({ fact: sentence, scope: 'track', source: 'genius' });
     }
   }
-  const annotations = song?.response?.song?.description_annotation?.annotations ?? [];
+  const annotations = songData?.description_annotation?.annotations ?? [];
   for (const ann of annotations) {
-    const plain = ann.body?.plain?.trim();
-    if (!plain || plain.length < 35) continue;
-    for (const sentence of splitSentences(stripHtml(plain))) {
+    const annText = extractGeniusText(ann.body?.plain, ann.body?.dom);
+    if (!annText) continue;
+    for (const sentence of splitSentences(stripHtml(annText))) {
       facts.push({ fact: sentence, scope: 'track', source: 'genius' });
     }
   }

@@ -1,6 +1,6 @@
 import { fetchAggregatedFactContext } from '../fact-aggregator.js';
 import { factAppliesToRequest } from '../fact-relevance.js';
-import type { HarvestContext, HarvestedFact, HarvestSource } from './types.js';
+import type { HarvestContext, HarvestedFact } from './types.js';
 import { fetchGeniusFacts } from './genius-facts.js';
 import { fetchSongfactsFacts } from './songfacts-facts.js';
 import { fetchLastfmFacts } from './lastfm-facts.js';
@@ -11,36 +11,6 @@ import { fetchRapRuFacts } from './rap-ru-facts.js';
 import { fetchTheFlowFacts } from './the-flow-facts.js';
 import { fetchDiscogsFacts } from './discogs-facts.js';
 import { fetchMusixmatchFacts } from './musixmatch-facts.js';
-
-const SOURCE_TIMEOUT_MS = 12_000;
-
-async function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T | null> {
-  try {
-    return await Promise.race([
-      promise,
-      new Promise<null>((resolve) => setTimeout(() => resolve(null), ms)),
-    ]);
-  } catch {
-    return null;
-  }
-}
-
-type SourceFetcher = (ctx: HarvestContext) => Promise<HarvestedFact[]>;
-
-const DEDICATED_SOURCES: Array<{ source: HarvestSource; fetch: SourceFetcher }> = [
-  { source: 'genius', fetch: fetchGeniusFacts },
-  { source: 'songfacts', fetch: fetchSongfactsFacts },
-  { source: 'lastfm', fetch: fetchLastfmFacts },
-  // Discogs disabled — registration blocked from RU; enable when DISCOGS_TOKEN available.
-  // { source: 'discogs', fetch: fetchDiscogsFacts },
-  { source: 'whosampled', fetch: fetchWhoSampledFacts },
-  { source: 'secondhandsongs', fetch: fetchSecondHandSongsFacts },
-  { source: 'setlistfm', fetch: fetchSetlistfmFacts },
-  { source: 'rap-ru', fetch: fetchRapRuFacts },
-  { source: 'the-flow', fetch: fetchTheFlowFacts },
-  // Musixmatch disabled — paid API (~$50/mo).
-  // { source: 'musixmatch', fetch: fetchMusixmatchFacts },
-];
 
 function dedupeFacts(facts: HarvestedFact[]): HarvestedFact[] {
   const seen = new Set<string>();
@@ -65,24 +35,6 @@ function filterRelevant(facts: HarvestedFact[], ctx: HarvestContext): HarvestedF
 export async function harvestAllFacts(ctx: HarvestContext): Promise<HarvestedFact[]> {
   const collected: HarvestedFact[] = [];
 
-  // Last.fm first (RU needs hidemy proxy) — never let parallel timeout starve it.
-  const lastfmItems = await withTimeout(fetchLastfmFacts(ctx), 15_000);
-  if (lastfmItems?.length) {
-    collected.push(...lastfmItems.map((f) => ({ ...f, source: 'lastfm' as const })));
-  }
-
-  const otherSources = DEDICATED_SOURCES.filter((s) => s.source !== 'lastfm');
-  const dedicatedResults = await Promise.allSettled(
-    otherSources.map(async ({ source, fetch }) => {
-      const items = await withTimeout(fetch(ctx), SOURCE_TIMEOUT_MS);
-      return (items ?? []).map((f) => ({ ...f, source }));
-    }),
-  );
-
-  for (const result of dedicatedResults) {
-    if (result.status === 'fulfilled') collected.push(...result.value);
-  }
-
   try {
     const agg = await fetchAggregatedFactContext(
       ctx.artist,
@@ -97,7 +49,7 @@ export async function harvestAllFacts(ctx: HarvestContext): Promise<HarvestedFac
       collected.push({
         fact: text,
         scope: 'track',
-        source: src as HarvestSource,
+        source: src,
       });
     }
     for (const fact of agg.bundle.trackFacts ?? []) {
@@ -112,6 +64,8 @@ export async function harvestAllFacts(ctx: HarvestContext): Promise<HarvestedFac
 
   return dedupeFacts(filterRelevant(collected, ctx));
 }
+
+export { fetchDedicatedSourceFacts, dedicatedFactsBySource } from './dedicated-fetch.js';
 
 export {
   fetchGeniusFacts,

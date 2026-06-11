@@ -18,6 +18,15 @@ export function stripHtml(s: string): string {
     .trim();
 }
 
+/** Genius API v2 — description/body as nested DOM nodes instead of plain text. */
+export function domToPlainText(node: unknown): string {
+  if (typeof node === 'string') return node;
+  if (!node || typeof node !== 'object') return '';
+  const obj = node as { children?: unknown[] };
+  if (!Array.isArray(obj.children)) return '';
+  return obj.children.map(domToPlainText).join('');
+}
+
 export function splitSentences(text: string): string[] {
   return text
     .split(/(?<=[.!?…])\s+/)

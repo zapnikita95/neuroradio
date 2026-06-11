@@ -29,7 +29,11 @@ import {
 export { buildDdgInstantQueries } from './web-search-facts.js';
 import { acceptSearchGroundedSnippet, acceptIndieEmergingSnippet, hasActionableSnippets, isLyricsPageSeed, isWrongEntityDisambiguation, isArtistIdentityBioSnippet } from './web-snippet-accept.js';
 import { lookupCuratedFact } from './curated-facts.js';
-import { fetchLastfmFacts } from './fact-sources/lastfm-facts.js';
+import {
+  dedicatedFactsBySource,
+  fetchDedicatedSourceFacts,
+} from './fact-sources/dedicated-fetch.js';
+import type { HarvestSource } from './fact-sources/types.js';
 const USER_AGENT = 'MusicStoryBFF/1.0 (contact@example.com)';
 const RAW_SNIPPET_MIN_LEN = 30;
 const RAW_SNIPPET_MAX = 18;
@@ -70,7 +74,13 @@ function resolveFactCountryCode(artist: string, title: string, countryCode?: str
   return undefined;
 }
 
-export type SnippetSource = 'wiki' | 'ddg' | 'web' | 'wikidata' | 'mb' | 'lastfm';
+export type SnippetSource =
+  | 'wiki'
+  | 'ddg'
+  | 'web'
+  | 'wikidata'
+  | 'mb'
+  | HarvestSource;
 
 export interface AggregatedFactContext {
   bundle: ReferenceFactBundle;
@@ -437,7 +447,7 @@ function buildRawSnippets(
   wdRaw: string[],
   mbTrackRaw: string[],
   mbArtistRaw: string[],
-  lastfmRaw: string[],
+  dedicatedRaw: Array<{ fact: string; source: SnippetSource }>,
   artist: string,
   title: string,
 ): { rawSnippets: string[]; snippetSources: SnippetSource[] } {
@@ -456,7 +466,7 @@ function buildRawSnippets(
   for (const text of webRaw) addCandidate(text, 'web');
   for (const text of wdRaw) addCandidate(text, 'wikidata');
   for (const text of [...mbTrackRaw, ...mbArtistRaw]) addCandidate(text, 'mb');
-  for (const text of lastfmRaw) addCandidate(text, 'lastfm');
+  for (const { fact, source } of dedicatedRaw) addCandidate(fact, source);
 
   const seen = new Set<string>();
   const ranked = candidates
@@ -598,13 +608,21 @@ export async function fetchAggregatedFactContext(
 ): Promise<AggregatedFactContext> {
   const t0 = Date.now();
   const cc = resolveFactCountryCode(artist, title, countryCode);
-  const [wiki, wikiLead, ddgUnfiltered, webUnfiltered, webTitleFirst, wdUnfiltered, mbTrackRaw, mbArtistRaw, wikiFastTrack, lastfmHarvest] =
+  const harvestCtx = { artist, title, countryCode: cc };
+  // Phase 1: Genius/Last.fm/Setlist — не конкурируют с wiki/web за прокси.
+  const dedicatedHarvest = await fetchWithCap(
+    'dedicated',
+    () => fetchDedicatedSourceFacts(harvestCtx),
+    [],
+    12_000,
+  );
+  const [wiki, wikiLead, ddgUnfiltered, webUnfiltered, webTitleFirst, wdUnfiltered, mbTrackRaw, mbArtistRaw, wikiFastTrack] =
     await Promise.all([
       fetchWithCap(
         'wiki',
         () => fetchWikiBundleMerged(artist, title, cc, options),
         EMPTY_WIKI,
-        9_000,
+        11_000,
       ),
       fetchWithCap('wiki-lead', () => fetchArtistWikiLeadWithRetry(artist, 3), null, 14_000),
       fetchWithCap('ddg', () => fetchDuckDuckGoUnfiltered(artist, title), [], 12_000),
@@ -624,13 +642,19 @@ export async function fetchAggregatedFactContext(
         8_000,
       ),
       fetchWithCap('wiki-fast-track', () => fetchFastTrackWikiFacts(artist, title), [], 15_000),
-      fetchWithCap('lastfm', () => fetchLastfmFacts({ artist, title }), [], 8_000),
     ]);
-  const lastfmTrack = lastfmHarvest.filter((f) => f.scope === 'track').map((f) => f.fact);
-  const lastfmArtist = lastfmHarvest.filter((f) => f.scope === 'artist').map((f) => f.fact);
-  if (lastfmHarvest.length > 0) {
+  const dedicatedTrack = dedicatedHarvest
+    .filter((f) => f.scope === 'track' || f.scope === 'album')
+    .map((f) => f.fact);
+  const dedicatedArtist = dedicatedHarvest
+    .filter((f) => f.scope === 'artist')
+    .map((f) => f.fact);
+  if (dedicatedHarvest.length > 0) {
+    const bySrc = dedicatedFactsBySource(dedicatedHarvest);
     console.log(
-      `[facts] lastfm ok artist="${artist}" title="${title}" track=${lastfmTrack.length} artist=${lastfmArtist.length}`,
+      `[facts] dedicated ok artist="${artist}" title="${title}" ` +
+        `track=${dedicatedTrack.length} artist=${dedicatedArtist.length} ` +
+        `bySource=${JSON.stringify(bySrc)}`,
     );
   }
   const wikiLeadBundle = wikiLead ? wikiLeadToFacts(wikiLead, artist, title) : EMPTY_WIKI;
@@ -661,7 +685,7 @@ export async function fetchAggregatedFactContext(
     `[facts] parallel fetch ${artist} — ${title}: ${Date.now() - t0}ms ` +
       `wiki=${wiki.trackFacts.length + wiki.artistFacts.length} ` +
       `wikiLead=${wikiLeadBundle.trackFacts.length + wikiLeadBundle.artistFacts.length} ` +
-      `ddg=${ddgUnfiltered.length} web=${webAllUnfiltered.length} lastfm=${lastfmHarvest.length}`,
+      `ddg=${ddgUnfiltered.length} web=${webAllUnfiltered.length} dedicated=${dedicatedHarvest.length}`,
   );
 
   const ddg = filterAndRankFacts([...ddgUnfiltered, ...webAllUnfiltered], 10);
@@ -688,7 +712,7 @@ export async function fetchAggregatedFactContext(
     externalSplit.track,
     wdSplit.track,
     mbTrack,
-    filterAndRankFacts(lastfmTrack, 4),
+    filterAndRankFacts(dedicatedTrack, 6),
   );
   const artistCandidates = mergeFactsWithWikiLead(
     wikiLeadBundle.artistFacts,
@@ -697,7 +721,7 @@ export async function fetchAggregatedFactContext(
     webRanked,
     wdSplit.artist,
     mbArtist,
-    filterAndRankFacts(lastfmArtist, 4),
+    filterAndRankFacts(dedicatedArtist, 4),
   );
 
   const finalized = finalizeFactBundle(trackCandidates, artistCandidates, artist, title);
@@ -747,7 +771,7 @@ export async function fetchAggregatedFactContext(
     wdUnfiltered,
     mbTrackRaw,
     mbArtistRaw,
-    lastfmHarvest.map((f) => f.fact),
+    dedicatedHarvest.map((f) => ({ fact: f.fact, source: f.source })),
     artist,
     title,
   );
