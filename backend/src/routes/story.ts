@@ -122,6 +122,7 @@ import type { StoryLengthId } from '../services/story-length.js';
 import { getNarratorPreset, type StoryNarratorId } from '../services/story-narrator.js';
 import type { TtsVoiceSetting } from '../services/voices.js';
 import type { TtsEmotion } from '../services/tts-options.js';
+import { formatUserFacingTranscript } from '../services/tts-user-display.js';
 const router = Router();
 
 router.use(requireAppAuth);
@@ -1542,7 +1543,7 @@ router.post('/full', extractClientSecrets, validateStoryFullBody, storyFullRateL
       response.audioFile = audio.fileName;
       response.ttsProvider = audio.provider;
       if (audio.ttsTranscript) {
-        response.tts_transcript = audio.ttsTranscript;
+        response.tts_transcript = formatUserFacingTranscript(audio.ttsTranscript);
       }
     } else {
       response.audioUrl = null;

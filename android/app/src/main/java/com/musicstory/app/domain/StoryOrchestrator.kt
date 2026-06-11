@@ -94,6 +94,8 @@ class StoryOrchestrator(
     /** True only while POST /v1/story/full is in flight. */
     private var backendFetchInFlight = false
     private var manualStoryGateAllowed = true
+    /** User pressed «Отменить» / «Остановить» — no auto story on this track until next track or manual. */
+    private val userCancelledTrackKeys = mutableSetOf<String>()
 
     private val _mode = MutableStateFlow(OrchestratorMode.AUTO)
     val mode: StateFlow<OrchestratorMode> = _mode.asStateFlow()
@@ -447,6 +449,7 @@ class StoryOrchestrator(
                 return@launch
             }
             StoryLog.i("Manual story requested: ${track.artist} — ${track.title}")
+            clearTrackStoryCancelled(track)
             backendFetchInFlight = true
             MonitorNotificationState.setPreparing(true)
             _state.value = OrchestratorState.FETCHING_STORY
@@ -465,6 +468,10 @@ class StoryOrchestrator(
 
     private fun playStoryForTrack(requestedTrack: TrackInfo, manual: Boolean) {
         val manualSession = if (manual) ++manualStorySession else 0
+        if (!manual && isTrackStoryCancelled(requestedTrack)) {
+            StoryLog.i("Auto story skipped — user cancelled ${requestedTrack.artist} — ${requestedTrack.title}")
+            return
+        }
         if (!manual && manualStoryInFlight) {
             StoryLog.i("Auto story skipped — manual fetch in flight")
             return
@@ -534,7 +541,12 @@ class StoryOrchestrator(
                 try {
                     executeStoryPipeline(session, requestedTrack, manual)
                 } catch (e: CancellationException) {
-                    if (e is TimeoutCancellationException) {
+                    if (isUserCancelReason(e.message)) {
+                        StoryLog.i("Story cancelled by user")
+                        _errorMessage.value = null
+                        _state.value = OrchestratorState.LISTENING
+                        publishUiState()
+                    } else if (e is TimeoutCancellationException) {
                         StoryLog.e("Story pipeline timeout", e)
                         val isLocal = settingsDataStore.llmProvider.first() == LlmProvider.LOCAL
                         _errorMessage.value = if (isLocal) {
@@ -544,13 +556,18 @@ class StoryOrchestrator(
                         }
                         _state.value = OrchestratorState.ERROR
                         publishUiState()
-                    } else if (manual) {
+                    } else if (manual && !isUserCancelReason(e.message)) {
                         StoryLog.w("Manual story cancelled by app: ${e.message}")
                         _errorMessage.value = "Запрос прерван приложением. Нажми «Рассказать историю» ещё раз."
                         _state.value = OrchestratorState.ERROR
                         publishUiState()
                     } else {
                         StoryLog.i("Story pipeline cancelled: ${e.message}")
+                        _errorMessage.value = null
+                        if (_state.value != OrchestratorState.LISTENING) {
+                            _state.value = OrchestratorState.LISTENING
+                            publishUiState()
+                        }
                     }
                 } catch (e: Exception) {
                     StoryLog.e("Story pipeline failed: ${e.message}", e)
@@ -688,15 +705,11 @@ class StoryOrchestrator(
         } else {
             STORY_FETCH_TIMEOUT_MS
         }
-        suspend fun runFetch(): Result<com.musicstory.app.data.model.StoryResponse> {
-            return try {
-                withTimeout(fetchTimeoutMs) {
-                    storyRepository.fetchStory(track, forceRefresh = true)
-                }
-            } catch (e: CancellationException) {
-                Result.failure(e)
+        suspend fun runFetch(): Result<com.musicstory.app.data.model.StoryResponse> =
+            withTimeout(fetchTimeoutMs) {
+                storyRepository.fetchStory(track, forceRefresh = true)
             }
-        }
+
         val result = try {
             runFetch()
         } finally {
@@ -718,8 +731,17 @@ class StoryOrchestrator(
                     abortGeneration(session, manual, rollbackAutoTrigger = !manual)
                     return@fold
                 }
+                if (isTrackStoryCancelled(track)) {
+                    StoryLog.i("Story ready but user cancelled this track — discard playback")
+                    abortGeneration(session, manual, rollbackAutoTrigger = false)
+                    return@fold
+                }
 
-                startGenerationPreview(response.ttsTranscript ?: response.script, session, response.ttsTranscript != null)
+                startGenerationPreview(
+                    normalizeUserFacingTranscript(response.ttsTranscript ?: response.script),
+                    session,
+                    response.ttsTranscript != null,
+                )
 
                 if (!isSessionCurrent(session)) return@fold
 
@@ -841,10 +863,14 @@ class StoryOrchestrator(
                 }
             },
             onFailure = { error ->
-                if (!manual && error is CancellationException) return@fold
-                if (!manual && error.message?.contains("cancel", ignoreCase = true) == true) return@fold
-                if (!manual && error.message?.contains("отмен", ignoreCase = true) == true) return@fold
-                if (!manual && error.message?.contains("499", ignoreCase = false) == true) return@fold
+                if (error is CancellationException || error.wasStoryRequestCancelled()) {
+                    _errorMessage.value = null
+                    if (_state.value != OrchestratorState.LISTENING) {
+                        _state.value = OrchestratorState.LISTENING
+                    }
+                    publishUiState()
+                    return@fold
+                }
                 cancelGenerationPreview()
                 if (!manual) {
                     val everyN = settingsDataStore.everyNTracks.first()
@@ -883,6 +909,25 @@ class StoryOrchestrator(
 
     private fun trackTitleKey(track: TrackInfo): String =
         TrackTitleNormalizer.matchKey(track)
+
+    private fun resolveActiveTrackKey(): String? =
+        inFlightTrackKey ?: mediaControllerManager.effectiveNowPlaying.value?.let { trackTitleKey(it) }
+
+    private fun markTrackStoryCancelled(trackKey: String) {
+        userCancelledTrackKeys.add(trackKey)
+        StoryLog.i("Story cancelled for track key=$trackKey — wait for next track or manual")
+    }
+
+    private fun isTrackStoryCancelled(track: TrackInfo): Boolean =
+        userCancelledTrackKeys.contains(trackTitleKey(track))
+
+    private fun clearTrackStoryCancelled(track: TrackInfo) {
+        userCancelledTrackKeys.remove(trackTitleKey(track))
+    }
+
+    private fun isUserCancelReason(reason: String?): Boolean =
+        reason == "stopped by user" ||
+            reason?.contains("stopped by user", ignoreCase = true) == true
 
     private fun cancelInFlightGenerationImmediate(reason: String) {
         if (!shouldAbortInFlightStory(reason)) {
@@ -1047,10 +1092,27 @@ class StoryOrchestrator(
     }
 
     fun stopStory() {
+        val cancelledTrackKey = resolveActiveTrackKey()
+        val wasManual = manualStoryInFlight
+        manualStoryInFlight = false
+        manualStorySession++
+        cancelledTrackKey?.let(::markTrackStoryCancelled)
         cancelInFlightGenerationImmediate("stopped by user")
         storyPlayer.stop()
         mediaControllerManager.restoreSystemMusicVolumeIfNeeded()
+        _errorMessage.value = null
+        _hintMessage.value = null
+        _pendingFeedback.value = null
+        _state.value = OrchestratorState.LISTENING
         scope.launch {
+            if (!wasManual) {
+                val everyN = settingsDataStore.everyNTracks.first()
+                triggerEngine.rollbackFailedStoryTrigger(everyN)
+                settingsDataStore.setTracksSinceLastStory(
+                    triggerEngine.currentTracksSinceLastStory(),
+                )
+                refreshTracksUntilNext()
+            }
             val fadeSeconds = settingsDataStore.musicFadeSeconds.first()
             if (fadeSeconds > 0f) {
                 mediaControllerManager.resumeMusicWithFade(fadeSeconds)
@@ -1058,8 +1120,6 @@ class StoryOrchestrator(
                 mediaControllerManager.resumeMusic()
             }
         }
-        _pendingFeedback.value = null
-        _state.value = OrchestratorState.LISTENING
         publishUiState()
     }
 
@@ -1162,6 +1222,11 @@ class StoryOrchestrator(
         previewJob = null
         _generationPreview.value = GenerationPreviewState()
     }
+
+    private fun normalizeUserFacingTranscript(text: String): String =
+        text
+            .replace(Regex("""й\+?утй\+?уб""", RegexOption.IGNORE_CASE), "YouTube")
+            .replace(Regex("""ют\+?уб""", RegexOption.IGNORE_CASE), "YouTube")
 
     private fun startGenerationPreview(script: String, session: Int, isSpokenTranscript: Boolean = false) {
         val words = script.trim().split(Regex("\\s+")).filter { it.isNotEmpty() }
