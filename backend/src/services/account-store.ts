@@ -101,6 +101,13 @@ export interface PendingWebCabinetCode {
   expiresAt: number;
 }
 
+/** Один welcome-trial на физическое устройство (хеш отпечатка с клиента). */
+export interface DeviceWelcomeTrialRecord {
+  grantedAt: number;
+  trialUntil: number;
+  accountId: string;
+}
+
 export type WebCabinetStatus = {
   email: string;
   plan: AccountPlan;
@@ -183,6 +190,7 @@ interface StoreFile {
   telegramToAccount?: Record<string, string>;
   pendingEmailCodes?: Record<string, PendingEmailCode>;
   pendingWebCabinetCodes?: Record<string, PendingWebCabinetCode>;
+  deviceWelcomeTrialFingerprints?: Record<string, DeviceWelcomeTrialRecord>;
 }
 
 const DATA_DIR = process.env.ACCOUNT_DATA_DIR?.trim() || path.join(process.cwd(), 'data');
@@ -204,6 +212,7 @@ export async function hydrateAccountStoreFromPostgres(): Promise<void> {
         telegramToAccount: parsed.telegramToAccount ?? {},
         pendingEmailCodes: parsed.pendingEmailCodes ?? {},
         pendingWebCabinetCodes: parsed.pendingWebCabinetCodes ?? {},
+        deviceWelcomeTrialFingerprints: parsed.deviceWelcomeTrialFingerprints ?? {},
       };
     },
     emptyStore,
@@ -219,7 +228,28 @@ function emptyStore(): StoreFile {
     telegramToAccount: {},
     pendingEmailCodes: {},
     pendingWebCabinetCodes: {},
+    deviceWelcomeTrialFingerprints: {},
   };
+}
+
+function hashDeviceFingerprint(raw: string): string {
+  return crypto.createHash('sha256').update(raw.trim()).digest('hex');
+}
+
+function recordDeviceWelcomeFingerprint(
+  store: StoreFile,
+  fpHash: string,
+  accountId: string,
+  trialUntil: number,
+): void {
+  store.deviceWelcomeTrialFingerprints = store.deviceWelcomeTrialFingerprints ?? {};
+  if (!store.deviceWelcomeTrialFingerprints[fpHash]) {
+    store.deviceWelcomeTrialFingerprints[fpHash] = {
+      grantedAt: Date.now(),
+      trialUntil,
+      accountId,
+    };
+  }
 }
 
 function loadStore(): StoreFile {
@@ -1183,14 +1213,101 @@ export async function unlinkCardViaWebCabinet(
 const TRIAL_MS_MONTH = 31 * 24 * 60 * 60 * 1000;
 export const WELCOME_TRIAL_MS = 7 * 24 * 60 * 60 * 1000;
 
-function grantWelcomeTrialIfEligible(account: AccountRecord): void {
+function grantWelcomeTrialIfEligible(account: AccountRecord, deviceFingerprint?: string): boolean {
+  const store = loadStore();
+  const fpRaw = deviceFingerprint?.trim();
+  let fpHash: string | null = null;
+  if (fpRaw && fpRaw.length >= 16) {
+    fpHash = hashDeviceFingerprint(fpRaw);
+    if (store.deviceWelcomeTrialFingerprints?.[fpHash]) {
+      return false;
+    }
+  }
   const now = Date.now();
-  if (account.plan === 'premium' && (account.premiumUntil ?? 0) > now) return;
-  if (account.plan === 'trial' && (account.trialUntil ?? 0) > now) return;
+  if (account.plan === 'premium' && (account.premiumUntil ?? 0) > now) return false;
+  if (account.plan === 'trial' && (account.trialUntil ?? 0) > now) {
+    if (fpHash) {
+      recordDeviceWelcomeFingerprint(store, fpHash, account.accountId, account.trialUntil!);
+      saveStore(store);
+    }
+    return false;
+  }
   account.plan = 'trial';
   account.trialUntil = now + WELCOME_TRIAL_MS;
   account.trialStoriesUsed = 0;
+  if (fpHash) {
+    recordDeviceWelcomeFingerprint(store, fpHash, account.accountId, account.trialUntil);
+    saveStore(store);
+  }
   console.log(`[account] welcome trial 7d account=${account.accountId.slice(0, 8)} until=${new Date(account.trialUntil).toISOString()}`);
+  return true;
+}
+
+/** Пробная неделя без регистрации — один раз на устройство (отпечаток с клиента). */
+export async function claimDeviceWelcomeTrial(
+  installId: string,
+  deviceFingerprint: string,
+): Promise<
+  | { ok: true; granted: boolean; trialUntil: number | null; entitlement: AccountEntitlement }
+  | { ok: false; error: string }
+> {
+  const fpRaw = deviceFingerprint.trim();
+  if (!fpRaw || fpRaw.length < 16) {
+    return { ok: false, error: 'Некорректный отпечаток устройства' };
+  }
+  const fpHash = hashDeviceFingerprint(fpRaw);
+  const store = await ensureAccountStoreLoaded();
+  store.deviceWelcomeTrialFingerprints = store.deviceWelcomeTrialFingerprints ?? {};
+  const normalized = installId.trim().toLowerCase();
+  const existingFp = store.deviceWelcomeTrialFingerprints[fpHash];
+  const now = Date.now();
+
+  const attachInstall = (accountId: string): { ok: true } | { ok: false; error: string } => {
+    const account = store.accountsById[accountId];
+    if (!account) return { ok: false, error: 'Аккаунт недоступен' };
+    if (!account.installIds.includes(normalized)) {
+      if (account.installIds.length >= MAX_DEVICES) {
+        return { ok: false, error: `Максимум ${MAX_DEVICES} устройств` };
+      }
+      account.installIds.push(normalized);
+    }
+    store.installToAccount[normalized] = accountId;
+    return { ok: true };
+  };
+
+  if (existingFp) {
+    const trialActive = existingFp.trialUntil > now;
+    const attach = attachInstall(existingFp.accountId);
+    if (!attach.ok) return attach;
+    await saveStoreAsync(store);
+    const account = store.accountsById[existingFp.accountId];
+    return {
+      ok: true,
+      granted: false,
+      trialUntil: trialActive ? existingFp.trialUntil : null,
+      entitlement: entitlementFromAccount(account),
+    };
+  }
+
+  let accountId = store.installToAccount[normalized];
+  if (!accountId) {
+    accountId = createAccount(installId).accountId;
+  }
+  const account = store.accountsById[accountId];
+  if (!account) return { ok: false, error: 'Аккаунт недоступен' };
+
+  const granted = grantWelcomeTrialIfEligible(account, fpRaw);
+  const trialUntil = account.trialUntil ?? null;
+  if (granted && trialUntil) {
+    recordDeviceWelcomeFingerprint(store, fpHash, account.accountId, trialUntil);
+  }
+  await saveStoreAsync(store);
+  return {
+    ok: true,
+    granted,
+    trialUntil: trialUntil && trialUntil > now ? trialUntil : null,
+    entitlement: entitlementFromAccount(account),
+  };
 }
 
 export function grantTrialSubscription(
@@ -1331,6 +1448,7 @@ export async function verifyEmailLogin(
   installId: string,
   emailRaw: string,
   codeRaw: string,
+  deviceFingerprint?: string,
 ): Promise<{ ok: true; accountId: string } | { ok: false; error: string }> {
   const email = normalizeEmail(emailRaw);
   const code = codeRaw.replace(/\D/g, '').trim();
@@ -1373,7 +1491,7 @@ export async function verifyEmailLogin(
   if (isYookassaReviewerEmail(email)) {
     provisionYookassaReviewerAccount(account);
   } else if (isFirstRegistration) {
-    grantWelcomeTrialIfEligible(account);
+    grantWelcomeTrialIfEligible(account, deviceFingerprint);
   }
   const attach = attachInstallToAccount(store, account, normalized);
   if (!attach.ok) {
@@ -1427,6 +1545,7 @@ export function linkTelegramAccount(
   installId: string,
   telegramId: number,
   username: string | undefined,
+  deviceFingerprint?: string,
 ): { ok: true; accountId: string } | { ok: false; error: string } {
   const store = loadStore();
   store.telegramToAccount = store.telegramToAccount ?? {};
@@ -1444,7 +1563,7 @@ export function linkTelegramAccount(
   account.telegramId = telegramId;
   account.telegramUsername = username ?? null;
   if (isFirstRegistration) {
-    grantWelcomeTrialIfEligible(account);
+    grantWelcomeTrialIfEligible(account, deviceFingerprint);
   }
   if (!account.installIds.includes(normalized)) {
     if (account.installIds.length >= MAX_DEVICES) {

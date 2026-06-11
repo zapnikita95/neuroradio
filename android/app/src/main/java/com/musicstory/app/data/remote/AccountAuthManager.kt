@@ -1,7 +1,10 @@
 package com.musicstory.app.data.remote
 
+import android.content.Context
 import com.musicstory.app.data.local.ScrobbleEntry
 import com.musicstory.app.data.local.StoryHistoryEntry
+import com.musicstory.app.data.remote.BillingEntitlementResponse
+import com.musicstory.app.util.DeviceFingerprint
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.MediaType.Companion.toMediaType
@@ -147,9 +150,41 @@ class AccountAuthManager(
             telegramWidgetBaseUrl = normalizeHttpsOrigin(parseOptionalString(json, "telegramWidgetBaseUrl")),
         )
 
-    suspend fun linkTelegram(baseUrl: String, authJson: JSONObject): AccountLoginResult =
+    suspend fun claimDeviceWelcomeTrial(baseUrl: String, deviceFingerprint: String): WelcomeTrialClaimResult? =
+        withContext(Dispatchers.IO) {
+            val token = authManager.getAccessToken(baseUrl) ?: return@withContext null
+            val body = JSONObject().put("device_fingerprint", deviceFingerprint).toString()
+            val req = Request.Builder()
+                .url("${baseUrl.trimEnd('/')}/v1/account/welcome-device")
+                .header("Authorization", "Bearer $token")
+                .post(body.toRequestBody("application/json".toMediaType()))
+                .build()
+            runCatching {
+                http.newCall(req).execute().use { resp ->
+                    val raw = resp.body?.string().orEmpty()
+                    if (!resp.isSuccessful) return@withContext null
+                    val json = JSONObject(raw)
+                    val entJson = json.optJSONObject("entitlement")
+                    WelcomeTrialClaimResult(
+                        granted = json.optBoolean("granted"),
+                        trialUntil = json.optLong("trialUntil").takeIf { it > 0L },
+                        entitlement = entJson?.let { parseEntitlement(it) },
+                    )
+                }
+            }.getOrNull()
+        }
+
+    private fun parseEntitlement(json: JSONObject): BillingEntitlementResponse =
+        BillingEntitlementResponse(
+            plan = parseOptionalString(json, "plan"),
+            premiumUntil = json.optLong("premiumUntil").takeIf { it > 0L },
+            trialUntil = json.optLong("trialUntil").takeIf { it > 0L },
+        )
+
+    suspend fun linkTelegram(baseUrl: String, authJson: JSONObject, context: Context): AccountLoginResult =
         withContext(Dispatchers.IO) {
             val token = authManager.getAccessToken(baseUrl) ?: return@withContext AccountLoginResult(error = "Нет связи с сервером")
+            authJson.put("device_fingerprint", DeviceFingerprint.get(context))
             val req = Request.Builder()
                 .url("${baseUrl.trimEnd('/')}/v1/account/telegram")
                 .header("Authorization", "Bearer $token")
@@ -187,12 +222,18 @@ class AccountAuthManager(
         }.getOrNull()
     }
 
-    suspend fun verifyEmailLogin(baseUrl: String, email: String, code: String): AccountLoginResult =
+    suspend fun verifyEmailLogin(
+        baseUrl: String,
+        email: String,
+        code: String,
+        context: Context,
+    ): AccountLoginResult =
         withContext(Dispatchers.IO) {
             val token = authManager.getAccessToken(baseUrl) ?: return@withContext AccountLoginResult(error = "Нет связи с сервером")
             val body = JSONObject()
                 .put("email", email.trim())
                 .put("code", code.trim())
+                .put("device_fingerprint", DeviceFingerprint.get(context))
                 .toString()
             val req = Request.Builder()
                 .url("${baseUrl.trimEnd('/')}/v1/account/email/verify")
@@ -211,6 +252,18 @@ class AccountAuthManager(
                 }
             }.getOrDefault(AccountLoginResult(error = "Ошибка сети"))
         }
+
+    data class WelcomeTrialClaimResult(
+        val granted: Boolean,
+        val trialUntil: Long?,
+        val entitlement: BillingEntitlementResponse?,
+    ) {
+        val trialActive: Boolean
+            get() {
+                val until = trialUntil ?: entitlement?.trialUntil ?: 0L
+                return until > System.currentTimeMillis() && entitlement?.plan == "trial"
+            }
+    }
 
     data class AccountLoginResult(
         val profile: AccountProfile? = null,

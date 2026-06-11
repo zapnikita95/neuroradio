@@ -1,6 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { requireAppAuth } from '../middleware/app-auth.js';
 import {
+  claimDeviceWelcomeTrial,
   getAccountProfileLoaded,
   getSyncStatus,
   linkTelegramAccount,
@@ -42,10 +43,28 @@ router.post('/email/start', async (req: Request, res: Response) => {
   res.json({ ok: true, expiresInSec: result.expiresInSec });
 });
 
+router.post('/welcome-device', async (req: Request, res: Response) => {
+  const deviceFingerprint =
+    typeof req.body?.device_fingerprint === 'string' ? req.body.device_fingerprint : '';
+  const result = await claimDeviceWelcomeTrial(req.installId!, deviceFingerprint);
+  if (!result.ok) {
+    res.status(400).json({ error: result.error });
+    return;
+  }
+  res.json({
+    ok: true,
+    granted: result.granted,
+    trialUntil: result.trialUntil,
+    entitlement: result.entitlement,
+  });
+});
+
 router.post('/email/verify', async (req: Request, res: Response) => {
   const email = typeof req.body?.email === 'string' ? req.body.email : '';
   const code = typeof req.body?.code === 'string' ? req.body.code : '';
-  const result = await verifyEmailLogin(req.installId!, email, code);
+  const deviceFingerprint =
+    typeof req.body?.device_fingerprint === 'string' ? req.body.device_fingerprint : undefined;
+  const result = await verifyEmailLogin(req.installId!, email, code, deviceFingerprint);
   if (!result.ok) {
     res.status(400).json({ error: result.error });
     return;
@@ -80,7 +99,9 @@ router.post('/telegram', async (req: Request, res: Response) => {
     return;
   }
 
-  const result = linkTelegramAccount(req.installId!, body.id, body.username);
+  const deviceFingerprint =
+    typeof req.body?.device_fingerprint === 'string' ? req.body.device_fingerprint : undefined;
+  const result = linkTelegramAccount(req.installId!, body.id, body.username, deviceFingerprint);
   if (!result.ok) {
     res.status(400).json({ error: result.error });
     return;

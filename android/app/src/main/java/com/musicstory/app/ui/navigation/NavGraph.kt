@@ -2,13 +2,19 @@ package com.musicstory.app.ui.navigation
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
+import androidx.navigation.compose.rememberNavController
 import com.musicstory.app.MusicStoryApp
+import com.musicstory.app.domain.WelcomeTrialGate
 import com.musicstory.app.ui.screens.AccountScreen
 import com.musicstory.app.ui.screens.AccountLoginScreen
 import com.musicstory.app.ui.screens.HistoryScreen
@@ -49,11 +55,18 @@ fun MusicStoryNavGraph(
                 onAccessGranted = {
                     onNotificationAccessChanged()
                     scope.launch {
-                        if (!app.settingsDataStore.homeTourCompleted.first()) {
-                            app.settingsDataStore.setHomeTourPending(true)
-                        }
-                        navController.navigate(Routes.HOME) {
-                            popUpTo(Routes.ONBOARDING) { inclusive = true }
+                        val gateDone = app.settingsDataStore.accountLoginGateCompleted.first()
+                        if (!gateDone) {
+                            navController.navigate(Routes.ACCOUNT_LOGIN) {
+                                popUpTo(Routes.ONBOARDING) { inclusive = true }
+                            }
+                        } else {
+                            if (!app.settingsDataStore.homeTourCompleted.first()) {
+                                app.settingsDataStore.setHomeTourPending(true)
+                            }
+                            navController.navigate(Routes.HOME) {
+                                popUpTo(Routes.ONBOARDING) { inclusive = true }
+                            }
                         }
                     }
                 },
@@ -66,6 +79,7 @@ fun MusicStoryNavGraph(
             AccountLoginScreen(
                 onLoggedIn = {
                     scope.launch {
+                        WelcomeTrialGate.completeAfterLogin(app)
                         if (!app.settingsDataStore.homeTourCompleted.first()) {
                             app.settingsDataStore.setHomeTourPending(true)
                         }
@@ -77,6 +91,7 @@ fun MusicStoryNavGraph(
                 },
                 onSkip = {
                     scope.launch {
+                        WelcomeTrialGate.completeAfterSkip(app)
                         app.settingsDataStore.setHomeTourPending(true)
                         navController.navigate(Routes.HOME) {
                             popUpTo(Routes.ACCOUNT_LOGIN) { inclusive = true }
@@ -151,10 +166,6 @@ fun MusicStoryNavGraph(
 }
 
 @Composable
-fun rememberMusicStoryStartDestination(hasNotificationAccess: Boolean): String =
-    if (!hasNotificationAccess) Routes.ONBOARDING else Routes.HOME
-
-@Composable
 fun MusicStoryStartupGate(
     hasNotificationAccess: Boolean,
     onNotificationAccessChanged: () -> Unit,
@@ -162,8 +173,18 @@ fun MusicStoryStartupGate(
     openSettingsPage: Boolean = false,
     modifier: Modifier = Modifier,
 ) {
-    val startDestination = rememberMusicStoryStartDestination(hasNotificationAccess)
-    val navController = androidx.navigation.compose.rememberNavController()
+    val context = LocalContext.current
+    val app = context.applicationContext as MusicStoryApp
+    var startDestination by remember { mutableStateOf<String?>(null) }
+    val navController = rememberNavController()
+
+    LaunchedEffect(hasNotificationAccess) {
+        startDestination = when {
+            !hasNotificationAccess -> Routes.ONBOARDING
+            !app.settingsDataStore.accountLoginGateCompleted.first() -> Routes.ACCOUNT_LOGIN
+            else -> Routes.HOME
+        }
+    }
 
     LaunchedEffect(openListeningPage, hasNotificationAccess) {
         if (!openListeningPage || !hasNotificationAccess) return@LaunchedEffect
@@ -178,9 +199,11 @@ fun MusicStoryStartupGate(
         navController.navigate(Routes.SETTINGS) { launchSingleTop = true }
     }
 
+    val destination = startDestination ?: return
+
     MusicStoryNavGraph(
         navController = navController,
-        startDestination = startDestination,
+        startDestination = destination,
         hasNotificationAccess = hasNotificationAccess,
         onNotificationAccessChanged = onNotificationAccessChanged,
         modifier = modifier,

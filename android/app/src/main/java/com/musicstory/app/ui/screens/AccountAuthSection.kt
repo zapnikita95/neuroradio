@@ -144,7 +144,7 @@ fun AccountStatusSection(
                     scope.launch {
                         try {
                             val login = withContext(Dispatchers.IO) {
-                                app.accountAuthManager.linkTelegram(backendUrl, payload)
+                                app.accountAuthManager.linkTelegram(backendUrl, payload, context)
                             }
                             if (login.profile != null) {
                                 withContext(Dispatchers.IO) {
@@ -451,7 +451,7 @@ fun AccountEmailLoginContent(
                         try {
                             val login = withContext(Dispatchers.IO) {
                                 val url = app.settingsDataStore.backendUrl.first()
-                                app.accountAuthManager.verifyEmailLogin(url, email, code)
+                                app.accountAuthManager.verifyEmailLogin(url, email, code, context)
                             }
                             if (login.profile != null) {
                                 withContext(Dispatchers.IO) {
@@ -527,7 +527,7 @@ fun AccountTelegramLoginSection(
                     scope.launch {
                         try {
                             val login = withContext(Dispatchers.IO) {
-                                app.accountAuthManager.linkTelegram(backendUrl, payload)
+                                app.accountAuthManager.linkTelegram(backendUrl, payload, context)
                             }
                             if (login.profile != null) {
                                 withContext(Dispatchers.IO) {

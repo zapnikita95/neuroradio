@@ -93,6 +93,13 @@ class SettingsDataStore(private val context: Context) {
         prefs[KEY_HOME_TOUR_COMPLETED] ?: false
     }
 
+    /** Экран входа показываем один раз; старые установки без ключа — уже прошли онбординг. */
+    val accountLoginGateCompleted: Flow<Boolean> = context.settingsDataStore.data.map { prefs ->
+        prefs[KEY_ACCOUNT_LOGIN_GATE_COMPLETED]
+            ?: prefs[KEY_HOME_TOUR_COMPLETED]
+            ?: false
+    }
+
     val suppressAutoStoryUntilMs: Flow<Long> = context.settingsDataStore.data.map { prefs ->
         prefs[KEY_SUPPRESS_AUTO_STORY_UNTIL] ?: 0L
     }
@@ -394,6 +401,10 @@ class SettingsDataStore(private val context: Context) {
             it[KEY_HOME_TOUR_COMPLETED] = completed
             if (completed) it[KEY_HOME_TOUR_PENDING] = false
         }
+    }
+
+    suspend fun setAccountLoginGateCompleted(completed: Boolean) {
+        context.settingsDataStore.edit { it[KEY_ACCOUNT_LOGIN_GATE_COMPLETED] = completed }
     }
 
     suspend fun setBackendUrl(url: String) {
@@ -800,6 +811,7 @@ class SettingsDataStore(private val context: Context) {
         private val KEY_SETTINGS_TOUR_COMPLETED = booleanPreferencesKey("settings_tour_completed")
         private val KEY_HOME_TOUR_PENDING = booleanPreferencesKey("home_tour_pending")
         private val KEY_HOME_TOUR_COMPLETED = booleanPreferencesKey("home_tour_completed")
+        private val KEY_ACCOUNT_LOGIN_GATE_COMPLETED = booleanPreferencesKey("account_login_gate_completed")
         private val KEY_SUPPRESS_AUTO_STORY_UNTIL = longPreferencesKey("suppress_auto_story_until")
         private val KEY_BACKEND_URL = stringPreferencesKey("backend_url")
         private val KEY_AUTH_INSTALL_ID = stringPreferencesKey("auth_install_id")

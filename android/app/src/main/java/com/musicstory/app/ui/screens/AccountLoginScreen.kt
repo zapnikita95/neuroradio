@@ -8,11 +8,18 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.HelpOutline
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -48,6 +55,7 @@ fun AccountLoginScreen(
     val scope = rememberCoroutineScope()
     var authConfig by remember { mutableStateOf<AccountAuthManager.AuthConfig?>(null) }
     var loginMode by remember { mutableStateOf(LoginMode.EMAIL) }
+    var showHelpDialog by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) {
         val url = app.settingsDataStore.backendUrl.first()
@@ -61,6 +69,29 @@ fun AccountLoginScreen(
         }
     }
 
+    if (showHelpDialog) {
+        AlertDialog(
+            onDismissRequest = { showHelpDialog = false },
+            title = {
+                Text(
+                    text = context.getString(R.string.account_login_help_title),
+                    color = CreamText,
+                )
+            },
+            text = {
+                Text(
+                    text = context.getString(R.string.account_login_help_body),
+                    color = MutedLavender,
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = { showHelpDialog = false }) {
+                    Text(context.getString(R.string.account_login_help_ok), color = GoldBright)
+                }
+            },
+        )
+    }
+
     MusicStoryBackground(modifier = modifier) {
         Column(
             modifier = Modifier
@@ -68,18 +99,27 @@ fun AccountLoginScreen(
                 .statusBarsPadding()
                 .padding(horizontal = 24.dp),
         ) {
-            Column(
+            Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(top = 16.dp, bottom = 12.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
+                    .padding(top = 12.dp, bottom = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
             ) {
+                Spacer(modifier = Modifier.size(48.dp))
                 Text(
                     text = context.getString(R.string.account_login_title),
                     style = MaterialTheme.typography.headlineMedium,
                     textAlign = TextAlign.Center,
                     color = CreamText,
+                    modifier = Modifier.weight(1f),
                 )
+                IconButton(onClick = { showHelpDialog = true }) {
+                    Icon(
+                        imageVector = Icons.Default.HelpOutline,
+                        contentDescription = context.getString(R.string.account_login_help_title),
+                        tint = MutedLavender,
+                    )
+                }
             }
             Column(
                 modifier = Modifier
@@ -88,6 +128,13 @@ fun AccountLoginScreen(
                     .padding(bottom = 24.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
+                Text(
+                    text = context.getString(R.string.account_login_subtitle),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MutedLavender,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.padding(bottom = 12.dp),
+                )
                 VinylDisc(size = 88.dp, isSpinning = true)
                 Spacer(modifier = Modifier.height(16.dp))
                 GlassCard(accentBorder = true, modifier = Modifier.fillMaxWidth()) {
@@ -111,7 +158,7 @@ fun AccountLoginScreen(
                                 AccountEmailLoginContent(
                                     app = app,
                                     scope = scope,
-                                    showSkip = true,
+                                    showSkip = false,
                                     onSkip = onSkip,
                                     onLoggedIn = onLoggedIn,
                                 )
@@ -125,13 +172,19 @@ fun AccountLoginScreen(
                                 AccountEmailLoginContent(
                                     app = app,
                                     scope = scope,
-                                    showSkip = true,
+                                    showSkip = false,
                                     onSkip = onSkip,
                                     onLoggedIn = onLoggedIn,
                                 )
                         }
                     }
                 }
+                Spacer(modifier = Modifier.height(16.dp))
+                SecondaryStoryButton(
+                    text = context.getString(R.string.account_login_skip),
+                    onClick = onSkip,
+                    modifier = Modifier.fillMaxWidth(),
+                )
                 Spacer(modifier = Modifier.height(12.dp))
                 Text(
                     text = context.getString(R.string.account_login_trial_hint),
@@ -152,7 +205,7 @@ private fun LoginModeSwitch(
     onModeChange: (LoginMode) -> Unit,
 ) {
     val context = LocalContext.current
-    androidx.compose.foundation.layout.Row(
+    Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {

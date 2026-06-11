@@ -40,7 +40,7 @@
     <string name="onboarding_not_granted_yet">Сначала включите «Эфир AI — мониторинг медиа». Если ставили APK — проверьте, что в карточке приложения включено «Разрешить ограниченные настройки».</string>
 
     <string name="home_tour_welcome_title">Вас приветствует Эфир AI</string>
-    <string name="home_tour_welcome_body">Персональное нейро-радио о вашей музыке: факты находятся в реальном времени, истории озвучиваются голосом выбранного амплуа — каждый эфир уникален.</string>
+    <string name="home_tour_welcome_body">Первую неделю — полный доступ: Yandex SpeechKit (или ElevenLabs на английском), лучшие модели, офлайн-сохранение фактов. Потом — базовый тариф с Edge TTS и обычными моделями; расширенный — по подписке. Истории озвучиваются голосом выбранного амплуа — каждый эфир уникален.</string>
     <string name="home_tour_track_title">Сейчас играет</string>
     <string name="home_tour_track_body">Когда вы включаете трек в Spotify или Яндекс Музыке, он отображается здесь — название, артист и источник.</string>
     <string name="home_tour_counter_title">Следующая история</string>
@@ -319,9 +319,12 @@
     <string name="settings_auth_telegram_hint">Нажмите Telegram — в приложении появится кнопка, затем «Принять» или «Отклонить».</string>
     <string name="settings_auth_telegram_not_configured">Telegram не настроен на сервере (TELEGRAM_WIDGET_BASE_URL)</string>
     <string name="account_login_title">Вход в аккаунт</string>
-    <string name="account_login_subtitle">Код придёт на почту или войди через Telegram. Новый аккаунт — пробный Premium 7 дней.</string>
+    <string name="account_login_subtitle">Первая неделя — полный доступ на этом устройстве (вход или «Пропустить»). Войдите, чтобы сохранять историю и настройки на других телефонах.</string>
     <string name="account_login_skip">Продолжить без входа</string>
-    <string name="account_login_trial_hint">Без входа доступен бесплатный тариф с базовыми настройками.</string>
+    <string name="account_login_trial_hint">Без входа пробная неделя тоже доступна, но история останется только на этом устройстве.</string>
+    <string name="account_login_help_title">Зачем входить?</string>
+    <string name="account_login_help_body">При авторизации сохраняется история рассказов — её можно открыть на других устройствах. Запоминаются ваши лайки, дизлайки и предпочтения по амплуа. Вход не обязателен: первая неделя полного доступа начинается и без регистрации.</string>
+    <string name="account_login_help_ok">Понятно</string>
     <string name="nav_account">Аккаунт</string>
     <string name="billing_tab">Оплата</string>
     <string name="billing_intro">Расширенная подписка — для тех, кто слушает много: больше историй, умнее модель, больше голосов.</string>
