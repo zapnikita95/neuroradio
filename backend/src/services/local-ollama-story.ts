@@ -395,6 +395,7 @@ function finalizeStory(
     input.artist,
     input.title,
     input.referenceFacts ?? [],
+    { speakTrackNamesInVoiceover: input.speakTrackNamesInVoiceover },
   );
 
   return {
@@ -451,7 +452,11 @@ export async function generateStoryScriptLocal(input: GenerateStoryInput): Promi
 
   );
 
-  const systemPrompt = buildLocalSystemPrompt(persona, lengthPreset);
+  const systemPrompt = buildLocalSystemPrompt(persona, lengthPreset, {
+    speakTrackNamesInVoiceover: input.speakTrackNamesInVoiceover,
+    artist: input.artist,
+    title: input.title,
+  });
 
   const voiceId = input.voiceId ?? voiceForYear(input.year, input.genre);
 
@@ -509,6 +514,8 @@ export async function generateStoryScriptLocal(input: GenerateStoryInput): Promi
 
       referenceFacts,
 
+      speakTrackNamesInVoiceover: input.speakTrackNamesInVoiceover,
+
     });
 
 
@@ -560,10 +567,12 @@ export async function generateStoryScriptLocal(input: GenerateStoryInput): Promi
     input.artist,
     input.title,
     input.referenceFacts ?? [],
+    { speakTrackNamesInVoiceover: input.speakTrackNamesInVoiceover },
   );
 
     const qOpts = qualityOptionsForLocalAttempt(attempt, MAX_NARRATOR_ATTEMPTS, referenceFacts);
     qOpts.previousScripts = previousScripts;
+    qOpts.speakTrackNamesInVoiceover = input.speakTrackNamesInVoiceover;
 
 
 

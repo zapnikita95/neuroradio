@@ -18,6 +18,7 @@ import {
 import { isTruncatedMarketingSnippet, isSpeakableReferenceFact } from './web-snippet-accept.js';
 import { interestScore } from './reference-fact-quality.js';
 import { fixSoloArtistPronounsRu } from './artist-grammar.js';
+import { isVoiceoverWithoutTrackNames, scriptLeaksVoiceoverNames } from './voiceover-no-names.js';
 
 export { DEFAULT_STORY_LENGTH, getStoryLengthPreset };
 export type { StoryLengthId, StoryLengthPreset };
@@ -718,6 +719,7 @@ export function validateStoryScript(
     /** Override minimum word count (e.g. flash-lite models). */
     minWordsOverride?: number;
     previousScripts?: string[];
+    speakTrackNamesInVoiceover?: boolean;
   } = {},
 ): { ok: true } | { ok: false; reason: string } {
   const limits = getStoryLengthPreset(lengthId);
@@ -733,8 +735,14 @@ export function validateStoryScript(
     options.skipRussianCheck ?? options.storyLanguage !== 'en';
   const referenceFacts = options.referenceFacts ?? [];
   const previousScripts = options.previousScripts ?? [];
+  const noTrackNames = isVoiceoverWithoutTrackNames(options.speakTrackNamesInVoiceover);
   const trimmed = script.trim();
   if (!trimmed) return { ok: false, reason: 'empty script' };
+
+  if (noTrackNames) {
+    const leak = scriptLeaksVoiceoverNames(trimmed, artist, title);
+    if (leak) return { ok: false, reason: leak };
+  }
 
   if (previousScripts.length > 0 && isDuplicateScript(trimmed, previousScripts)) {
     return { ok: false, reason: 'duplicate of previous script for this track' };
@@ -749,7 +757,11 @@ export function validateStoryScript(
   }
 
   const coverStory = referenceFacts.some((f) => COVER_CONTEXT_RE.test(f));
-  if (!coverStory && !storyMentionsPerformingArtist(trimmed, artist, title)) {
+  if (
+    !noTrackNames &&
+    !coverStory &&
+    !storyMentionsPerformingArtist(trimmed, artist, title)
+  ) {
     return { ok: false, reason: 'story does not mention the performing artist' };
   }
 
@@ -772,7 +784,13 @@ export function validateStoryScript(
     }
   }
 
-  if (!skipEnglishCheck && hasEnglishLeak(trimmed, artist, title, { referenceFacts })) {
+  if (
+    !skipEnglishCheck &&
+    hasEnglishLeak(trimmed, artist, title, {
+      referenceFacts,
+      blockTrackLatin: noTrackNames,
+    })
+  ) {
     return { ok: false, reason: 'english words in Russian narration' };
   }
 

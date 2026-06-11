@@ -60,6 +60,7 @@ export interface GenerateStoryInput {
   geminiModel?: string;
   clientGeminiApiKey?: string;
   storyLanguage?: import('./story-language.js').StoryLanguageId;
+  speakTrackNamesInVoiceover?: boolean;
 }
 
 function parseStoryJson(raw: string): StoryScript | null {
@@ -255,7 +256,10 @@ function finalizeStory(
     input.artist,
     input.title,
     input.referenceFacts ?? [],
-    { storyLanguage: input.storyLanguage },
+    {
+      storyLanguage: input.storyLanguage,
+      speakTrackNamesInVoiceover: input.speakTrackNamesInVoiceover,
+    },
   );
   return {
     ...story,
@@ -327,7 +331,11 @@ export async function generateStoryScript(
     input.countryCode,
   );
   const storyLanguage = input.storyLanguage ?? 'ru';
-  const systemPrompt = buildSystemPrompt(persona, lengthPreset, storyLanguage);
+  const systemPrompt = buildSystemPrompt(persona, lengthPreset, storyLanguage, {
+    speakTrackNamesInVoiceover: input.speakTrackNamesInVoiceover,
+    artist: input.artist,
+    title: input.title,
+  });
   const voiceId = input.voiceId ?? voiceForYear(input.year, input.genre);
 
   let lastCandidate: StoryScript | null = null;
@@ -345,6 +353,7 @@ export async function generateStoryScript(
       selectedReferenceFact: input.selectedReferenceFact,
       retryReason: retryDirective ?? undefined,
       storyLanguage,
+      speakTrackNamesInVoiceover: input.speakTrackNamesInVoiceover,
     });
 
     const result = await callGemini(
@@ -369,6 +378,7 @@ export async function generateStoryScript(
     const qOpts = qualityOptionsForAttempt(attempt, MAX_ATTEMPTS, referenceFacts, storyLanguage);
     qOpts.skipReferenceAnchor = true;
     qOpts.previousScripts = previousScripts;
+    qOpts.speakTrackNamesInVoiceover = input.speakTrackNamesInVoiceover;
 
     const quality = validateGeneratedStory(
       story.script,
@@ -399,7 +409,10 @@ export async function generateStoryScript(
         input.artist,
         input.title,
         referenceFacts,
-        { storyLanguage },
+        {
+          storyLanguage,
+          speakTrackNamesInVoiceover: input.speakTrackNamesInVoiceover,
+        },
       );
       const sanitizedQuality = validateGeneratedStory(
         sanitized,

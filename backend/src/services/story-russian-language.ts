@@ -25,13 +25,15 @@ export function hasEnglishLeak(
   script: string,
   artist = '',
   title = '',
-  options: { referenceFacts?: string[] } = {},
+  options: { referenceFacts?: string[]; blockTrackLatin?: boolean } = {},
 ): boolean {
   const referenceFacts = options.referenceFacts ?? [];
   const normalized = replaceGenericEnglish(script.trim());
   if (FORBIDDEN_PHRASES.some((pattern) => pattern.test(normalized))) return true;
 
-  const allowed = buildAllowedLatinTokens(artist, title, referenceFacts, normalized);
+  const allowed = buildAllowedLatinTokens(artist, title, referenceFacts, normalized, {
+    blockTrackLatin: options.blockTrackLatin === true,
+  });
   const remaining = textForEnglishLeakCheck(normalized, allowed);
   return LATIN_WORD.test(remaining);
 }

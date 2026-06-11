@@ -72,6 +72,8 @@ export interface GenerateStoryInput {
   /** major = rich sources; indie = metadata-only honest bio OK. */
   artistTier?: 'major' | 'indie';
   storyLanguage?: import('./story-language.js').StoryLanguageId;
+  /** false / omitted → LLM пишет script без имён артиста и трека. */
+  speakTrackNamesInVoiceover?: boolean;
 }
 
 export class GroqApiError extends Error {
@@ -221,7 +223,10 @@ function finalizeStory(
     input.artist,
     input.title,
     input.referenceFacts ?? [],
-    { storyLanguage: input.storyLanguage },
+    {
+      storyLanguage: input.storyLanguage,
+      speakTrackNamesInVoiceover: input.speakTrackNamesInVoiceover,
+    },
   );
   return {
     ...story,
@@ -252,7 +257,11 @@ export async function generateStoryScript(
     input.countryCode,
   );
   const storyLanguage = input.storyLanguage ?? 'ru';
-  const systemPrompt = buildSystemPrompt(persona, lengthPreset, storyLanguage);
+  const systemPrompt = buildSystemPrompt(persona, lengthPreset, storyLanguage, {
+    speakTrackNamesInVoiceover: input.speakTrackNamesInVoiceover,
+    artist: input.artist,
+    title: input.title,
+  });
   const voiceId = input.voiceId ?? voiceForYear(input.year, input.genre);
 
   let lastCandidate: StoryScript | null = null;
@@ -268,6 +277,7 @@ export async function generateStoryScript(
       previousScripts,
       selectedReferenceFact: input.selectedReferenceFact,
       storyLanguage,
+      speakTrackNamesInVoiceover: input.speakTrackNamesInVoiceover,
     });
 
     const result = await callGroq(
@@ -292,6 +302,7 @@ export async function generateStoryScript(
         ? qualityOptionsForOpenRouterAttempt(attempt, MAX_ATTEMPTS, referenceFacts, storyLanguage)
         : qualityOptionsForAttempt(attempt, MAX_ATTEMPTS, referenceFacts, storyLanguage);
     qOpts.previousScripts = previousScripts;
+    qOpts.speakTrackNamesInVoiceover = input.speakTrackNamesInVoiceover;
 
     const quality = validateGeneratedStory(
       story.script,
@@ -309,7 +320,10 @@ export async function generateStoryScript(
       input.artist,
       input.title,
       input.referenceFacts ?? [],
-      { storyLanguage },
+      {
+        storyLanguage,
+        speakTrackNamesInVoiceover: input.speakTrackNamesInVoiceover,
+      },
     );
     const sanitizedQuality = validateGeneratedStory(
       sanitized,

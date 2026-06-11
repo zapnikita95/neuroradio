@@ -1136,6 +1136,7 @@ router.post('/full', extractClientSecrets, validateStoryFullBody, storyFullRateL
       localOllamaBaseUrl: clientLocal.baseUrl,
       localOllamaModel: clientLocal.model,
       storyLanguage: storyLanguage ?? 'ru',
+      speakTrackNamesInVoiceover: body.speak_track_names_in_voiceover === true,
     };
 
     if (selectedFact?.fact) {

@@ -49,7 +49,7 @@ export function latinTrackProtectPhrases(artist: string, title: string): string[
   return out.filter((v, i, arr) => arr.indexOf(v) === i);
 }
 
-function phraseVariants(phrase: string): string[] {
+export function phraseVariants(phrase: string): string[] {
   const base = phrase.trim();
   const withoutParens = base.replace(/\s*\([^)]*\)\s*/g, ' ').replace(/\s+/g, ' ').trim();
   const withoutArticle = base.replace(/^(the|a|an)\s+/i, '').trim();

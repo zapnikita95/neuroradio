@@ -34,6 +34,7 @@ export interface StoryQualityAttemptOptions {
   storyLanguage?: StoryLanguageId;
   minWordsOverride?: number;
   previousScripts?: string[];
+  speakTrackNamesInVoiceover?: boolean;
 }
 
 /** Production story checks — no word-count gate; length is a prompt/TTS concern. */
@@ -107,7 +108,7 @@ export function validateGeneratedStory(
 /** If strict checks fail on all attempts, still ship the last sanitized script when grounded. */
 export function finalizeAfterQualityLoop<T extends { script: string }>(
   lastCandidate: T | null,
-  input: { artist: string; title: string },
+  input: { artist: string; title: string; speakTrackNamesInVoiceover?: boolean },
   finalize: (story: T) => T,
   referenceFacts: string[] = [],
   _options: { relaxForWeakLlm?: boolean } = {},
@@ -129,6 +130,7 @@ export function finalizeAfterQualityLoop<T extends { script: string }>(
       input.artist,
       input.title,
       referenceFacts,
+      { speakTrackNamesInVoiceover: input.speakTrackNamesInVoiceover },
     ),
   );
   const wordCount = countWords(sanitized);

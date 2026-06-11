@@ -111,7 +111,10 @@ function finalizeStory(
     input.artist,
     input.title,
     input.referenceFacts ?? [],
-    { storyLanguage: input.storyLanguage },
+    {
+      storyLanguage: input.storyLanguage,
+      speakTrackNamesInVoiceover: input.speakTrackNamesInVoiceover,
+    },
   );
   return {
     ...story,
@@ -163,7 +166,11 @@ export async function generateStoryScript(
     input.countryCode,
   );
   const storyLanguage = input.storyLanguage ?? 'ru';
-  const systemPrompt = buildSystemPrompt(persona, lengthPreset, storyLanguage);
+  const systemPrompt = buildSystemPrompt(persona, lengthPreset, storyLanguage, {
+    speakTrackNamesInVoiceover: input.speakTrackNamesInVoiceover,
+    artist: input.artist,
+    title: input.title,
+  });
   const voiceId = input.voiceId ?? voiceForYear(input.year, input.genre);
 
   const models = [
@@ -191,6 +198,7 @@ export async function generateStoryScript(
           previousScripts,
           selectedReferenceFact: input.selectedReferenceFact,
           storyLanguage,
+          speakTrackNamesInVoiceover: input.speakTrackNamesInVoiceover,
         });
 
         const content = await callOpenRouter(
@@ -219,6 +227,7 @@ export async function generateStoryScript(
           storyLanguage,
         );
         qOpts.previousScripts = previousScripts;
+        qOpts.speakTrackNamesInVoiceover = input.speakTrackNamesInVoiceover;
 
         const quality = validateGeneratedStory(
           story.script,
@@ -236,7 +245,10 @@ export async function generateStoryScript(
           input.artist,
           input.title,
           input.referenceFacts ?? [],
-          { storyLanguage },
+          {
+            storyLanguage,
+            speakTrackNamesInVoiceover: input.speakTrackNamesInVoiceover,
+          },
         );
         const sanitizedQuality = validateGeneratedStory(
           sanitized,
@@ -328,7 +340,10 @@ export async function generateStoryScript(
       input.artist,
       input.title,
       referenceFacts,
-      { storyLanguage },
+      {
+        storyLanguage,
+        speakTrackNamesInVoiceover: input.speakTrackNamesInVoiceover,
+      },
     );
     if (
       countWords(sanitized) >= 35 &&
