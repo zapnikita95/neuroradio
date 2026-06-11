@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Live fact search — как в story: сбор + rules seed (+ подсказка про LLM).
+ * Live fact search — production path: fetch + pickFactForUser + snippet salvage.
  * npm run build && node scripts/test-live-facts-5tracks.mjs
  */
 import { readFileSync, existsSync } from 'node:fs';
@@ -28,6 +28,8 @@ loadEnv(resolve(root, '.env'));
 
 await import('./setup-hidemy-proxy.mjs');
 
+const INSTALL_ID = 'test-live-facts-5tracks';
+
 const TRACKS = [
   { artist: 'Queen', title: 'Bohemian Rhapsody', cc: 'US' },
   { artist: 'Eminem', title: 'Lose Yourself', cc: 'US' },
@@ -37,11 +39,22 @@ const TRACKS = [
 ];
 
 const { fetchAggregatedFactContext } = await import('../dist/services/fact-aggregator.js');
-const { pickReferenceFact, explainReferenceFactSelection } = await import('../dist/services/fact-picker.js');
+const { explainReferenceFactSelection } = await import('../dist/services/fact-picker.js');
 const { splitBundleByScope, rankScopedFacts } = await import('../dist/services/fact-ranking.js');
 const { shouldRunLlmFactHunt } = await import('../dist/services/story-llm-fact-hunt.js');
+const {
+  pickFactForUser,
+  buildFactPickContext,
+  ensureAccount,
+} = await import('../dist/services/fact-user-service.js');
+const { pickSalvageSnippetSeed, pickRelaxedSnippetSeed } = await import(
+  '../dist/services/search-snippet-salvage.js'
+);
+const { classifyFactTopic, FACT_TOPIC_LABELS_RU } = await import('../dist/services/fact-topic.js');
 
-console.log('LIVE fact pipeline (как story, без банка)\n');
+ensureAccount(INSTALL_ID);
+
+console.log('LIVE fact pipeline (production pick path)\n');
 
 let ok = 0;
 for (const { artist, title, cc } of TRACKS) {
@@ -53,7 +66,15 @@ for (const { artist, title, cc } of TRACKS) {
 
   const pools = splitBundleByScope(ctx.bundle, artist, title);
   const ranked = rankScopedFacts(pools).filter((r) => !r.junk);
-  const seed = pickReferenceFact(ctx.bundle, [], 0, artist, title);
+  const pickCtx = await buildFactPickContext(INSTALL_ID, artist, title, { storyNarrator: 'auto' });
+  let seed = await pickFactForUser(INSTALL_ID, ctx.bundle, artist, title, 0, 'auto', pickCtx);
+  let seedSource = 'rules';
+  if (!seed && ctx.rawSnippets.length > 0) {
+    seed =
+      pickSalvageSnippetSeed(ctx.rawSnippets, artist, title) ??
+      pickRelaxedSnippetSeed(ctx.rawSnippets, artist, title);
+    if (seed) seedSource = 'snippet-salvage';
+  }
   const needLlm = shouldRunLlmFactHunt(
     seed,
     ctx.rawSnippets.length,
@@ -63,9 +84,9 @@ for (const { artist, title, cc } of TRACKS) {
   const srcCounts = {};
   for (const s of ctx.snippetSources) srcCounts[s] = (srcCounts[s] ?? 0) + 1;
 
-  const hasFacts = ctx.bundle.trackFacts.length + ctx.bundle.artistFacts.length > 0;
+  const hasGrounding = ctx.bundle.trackFacts.length + ctx.bundle.artistFacts.length > 0 || ctx.rawSnippets.length > 0;
   const hasSeed = Boolean(seed);
-  if (hasFacts && hasSeed) ok += 1;
+  if (hasGrounding && hasSeed) ok += 1;
 
   console.log(
     `Время: ${(ms / 1000).toFixed(1)}с | bundle track=${ctx.bundle.trackFacts.length} artist=${ctx.bundle.artistFacts.length} | raw=${ctx.rawSnippets.length}`,
@@ -75,12 +96,16 @@ for (const { artist, title, cc } of TRACKS) {
   ranked.slice(0, 4).forEach((r, i) => {
     console.log(`  ${i + 1}. [${r.scope}] score=${r.interest} | ${r.fact.slice(0, 140)}…`);
   });
-  console.log(`СЕМЯ (rules): ${hasSeed ? seed.fact.slice(0, 200) : 'НЕТ'}`);
-  if (seed) console.log(`  (${explainReferenceFactSelection(ctx.bundle, seed, artist, title)})`);
+  console.log(`СЕМЯ (${seedSource}): ${hasSeed ? seed.fact.slice(0, 200) : 'НЕТ'}`);
+  if (seed) {
+    const topic = classifyFactTopic(seed.fact);
+    console.log(`  topic=${topic} (${FACT_TOPIC_LABELS_RU[topic]})`);
+    console.log(`  (${explainReferenceFactSelection(ctx.bundle, seed, artist, title)})`);
+  }
   console.log(`LLM fact-hunt в production: ${needLlm ? 'ДА (слабое семя)' : 'нет'}`);
   console.log('');
 }
 
 console.log('═'.repeat(68));
-console.log(`ИТОГ: ${ok}/${TRACKS.length} — bundle не пустой И rules выбрали семя`);
+console.log(`ИТОГ: ${ok}/${TRACKS.length} — есть grounding (bundle/raw) И выбрано семя`);
 process.exit(ok === TRACKS.length ? 0 : 1);

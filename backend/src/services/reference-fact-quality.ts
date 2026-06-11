@@ -234,6 +234,12 @@ export function interestScore(fact: string): number {
   if (/\b(?:widely considered|grunge anthem|ultimate grunge|song'?s success|omnipresence|grew tired of it|removed it from their live)\b/i.test(fact)) {
     score += 14;
   }
+  if (
+    /\b(?:opening track|lead single)\b/i.test(fact) &&
+    /\b(?:album|released|debut|second|third|nevermind)\b/i.test(fact)
+  ) {
+    score += 14;
+  }
   if (/\b(?:deodorant|Hanna was referring|inspired the title|wrote the song in)\b/i.test(fact)) score += 10;
   if (/(?:написал\w*|сочинил\w*|автором текста).*(?:Цой|цой|«Кино»|Кино)/i.test(fact)) score += 10;
   if (/\b(?:intended to|repudiat\w*|members? of the (?:band|group|four)|their past|dark past)\b/i.test(fact)) score += 8;
