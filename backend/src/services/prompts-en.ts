@@ -16,6 +16,7 @@ import {
 import { buildStylePromptBlock } from './style-corpus.js';
 import { eraContextForPrompt, resolveTrackLocale } from './track-locale.js';
 import type { StoryPersona } from './prompts.js';
+import { buildVoiceoverNamesEconomyPromptBlockEn } from './voiceover-no-names.js';
 
 function buildLengthStructurePlanEn(length: StoryLengthPreset): string {
   switch (length.id) {
@@ -45,7 +46,11 @@ const NARRATOR_LABELS_EN: Record<string, { label: string; description: string }>
   night_dj: { label: 'Night DJ', description: 'Late-night smooth delivery' },
 };
 
-export function buildEnglishSystemPrompt(persona: StoryPersona, length: StoryLengthPreset): string {
+export function buildEnglishSystemPrompt(
+  persona: StoryPersona,
+  length: StoryLengthPreset,
+  options: { artist?: string; title?: string } = {},
+): string {
   const durationHint = length.targetSeconds
     ? `~${length.targetSeconds} seconds of speech`
     : 'extended story without a hard cap';
@@ -60,6 +65,9 @@ export function buildEnglishSystemPrompt(persona: StoryPersona, length: StoryLen
 
   const lengthPlan = buildLengthStructurePlanEn(length);
   const narratorBlock = persona.narratorAddendum ? `\n${persona.narratorAddendum}\n` : '';
+  const artist = options.artist?.trim() ?? '';
+  const title = options.title?.trim() ?? '';
+  const namesBlock = artist ? `\n${buildVoiceoverNamesEconomyPromptBlockEn(artist, title)}\n` : '';
 
   return `You write VOICEOVER text — a charismatic music storyteller who knows the industry inside out.
 
@@ -73,9 +81,9 @@ RECIPE (scale to duration):
 - Find DRAMA and CONTRAST: conflict, breakthrough, scandal, comeback — what people felt.
 - Wikipedia seed = core. Do not invent people or events missing from the fact.
 - FIRST SENTENCE REQUIRED: at least one concrete anchor from the seed (event/name/chart/platform).
-- Latin in text — only: artist name, track title WITHOUT quotes (just Smooth, In The Shadows), established terms (moonwalk, anti-gravity lean, Billboard). Otherwise — REJECT, rewrite.
+- Artist name (max 2×), track title (max 1× in opener) WITHOUT quotes; then use they/this track/their album. Established terms OK (moonwalk, Billboard). Otherwise — REJECT, rewrite.
 - If below minimum word count for the selected length — REJECT, expand with facts from the same seed.
-
+${namesBlock}
 ${FACT_HUNT_PROMPT_BLOCK}
 
 IMPORTANT ABOUT PERSONA:
@@ -161,6 +169,8 @@ export function buildEnglishStoryUserPrompt(params: {
   const lines: string[] = [
     `Artist: ${params.artist}`,
     `Track: ${params.title}`,
+    '',
+    buildVoiceoverNamesEconomyPromptBlockEn(params.artist, params.title),
   ];
 
   if (params.genre) lines.push(`Genre: ${params.genre}`);

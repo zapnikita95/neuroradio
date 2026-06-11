@@ -1,3 +1,4 @@
+import { primaryArtistName } from './artist-primary.js';
 import { phraseVariants, shouldStripLatinTrackNames } from './tts-generic-script.js';
 import { resolveArtistGrammarRu } from './artist-grammar.js';
 
@@ -20,6 +21,38 @@ export function buildVoiceoverNoNamesPromptBlock(artist: string, title: string):
 - ЗАПРЕЩЕНО: «музыкант — это история», «в этой композиции — один из треков», голые «музыкант/исполнитель/группа» без «эта/этот».
 - Пиши текст сразу готовым для TTS — не рассчитывай на замену слов после генерации.
 - БЕЗ ВОДЫ: не «история о том, как», не лекции о жанре, не «уникальный звук/глубокий смысл» — только факты из семени.`;
+}
+
+/** Промпт: латинские имена разрешены, но не в каждом предложении — местоимения и «этот трек». */
+export function buildVoiceoverNamesEconomyPromptBlock(artist: string, title: string): string {
+  const grammar = resolveArtistGrammarRu(artist);
+  const primary = primaryArtistName(artist);
+  const pronouns =
+    grammar.kind === 'group'
+      ? 'они / этот коллектив / эта группа / их альбом / их концерты / у них'
+      : grammar.gender === 'feminine'
+        ? 'она / эта исполнительница / её альбом / у неё'
+        : 'он / этот исполнитель / его альбом / у него';
+  const trackAlt = 'этот трек / эта песня / у этой песни / в ней';
+
+  return `ЭКОНОМИЯ ИМЁН В ОЗВУЧКЕ (когда латинские имена РАЗРЕШЕНЫ):
+- Название трека «${title}» — максимум ОДИН раз на весь текст, только в первом предложении.
+- Имя артиста «${primary}» — максимум ДВА раза (обычно: в начале + ещё раз только если без него теряется смысл).
+- Дальше вместо артиста: ${pronouns}. Вместо названия трека: ${trackAlt}.
+- ЗАПРЕЩЕНО повторять «${primary}» или «${title}» в каждом предложении — это звучит бедно и роботизированно.
+- Живая речь: «они соединили», «этот трек стал визитной карточкой», «их концерты» — не «Gorillaz… Gorillaz… Gorillaz».
+- Восторг фаната — через факты из семени и местоимения, не через многократное имя артиста.
+- Имена людей ИЗ СЕМЕНИ (продюсер, feat, автор) — можно по смыслу.`;
+}
+
+export function buildVoiceoverNamesEconomyPromptBlockEn(artist: string, title: string): string {
+  const primary = primaryArtistName(artist);
+  return `NAME ECONOMY IN VOICEOVER (when Latin names ARE allowed):
+- Track title "${title}" — at most ONCE in the entire script, only in the first sentence.
+- Artist name "${primary}" — at most TWICE (usually: opener + once more only if meaning breaks without it).
+- After that use pronouns: they / this band / this artist / their album / this track / the song.
+- Do NOT repeat "${primary}" or "${title}" in every sentence — it sounds robotic and thin.
+- Enthusiasm through seed facts and pronouns, not by hammering the artist name.`;
 }
 
 export const RUSSIAN_LANGUAGE_NO_NAMES_OVERRIDE = `ЯЗЫК БЕЗ ИМЁН (перекрывает общие правила про латиницу):

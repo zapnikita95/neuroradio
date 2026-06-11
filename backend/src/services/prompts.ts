@@ -21,6 +21,7 @@ import { eraContextForPrompt, resolveTrackLocale, type TrackLocale } from './tra
 import { resolveArtistGrammarRu } from './artist-grammar.js';
 import { voiceStoryPromptHint } from './voices.js';
 import {
+  buildVoiceoverNamesEconomyPromptBlock,
   buildVoiceoverNoNamesPromptBlock,
   isVoiceoverWithoutTrackNames,
   RUSSIAN_LANGUAGE_NO_NAMES_OVERRIDE,
@@ -197,7 +198,7 @@ export function buildSystemPrompt(
   options: { speakTrackNamesInVoiceover?: boolean; artist?: string; title?: string } = {},
 ): string {
   if (storyLanguage === 'en') {
-    return buildEnglishSystemPrompt(persona, length);
+    return buildEnglishSystemPrompt(persona, length, options);
   }
   const durationHint = length.targetSeconds
     ? `~${length.targetSeconds} секунд речи`
@@ -221,10 +222,12 @@ export function buildSystemPrompt(
   const namesBlock =
     noNames && artist
       ? `\n${buildVoiceoverNoNamesPromptBlock(artist, title)}\n`
-      : '';
+      : !noNames && artist
+        ? `\n${buildVoiceoverNamesEconomyPromptBlock(artist, title)}\n`
+        : '';
   const latinRule = noNames
     ? '- В script НЕ вставляй имя артиста и название трека — см. блок «ОЗВУЧКА БЕЗ ИМЁН».'
-    : '- Латиница в тексте — только: имя артиста, название трека БЕЗ кавычек (просто Smooth, In The Shadows), устоявшиеся термины (moonwalk, anti-gravity lean, Billboard). Иначе — БРАК, перепиши.';
+    : '- Латиница в тексте — имя артиста (макс. 2×), название трека (макс. 1× в начале) БЕЗ кавычек, устоявшиеся термины (moonwalk, Billboard). Дальше — «они/этот трек». Иначе — БРАК, перепиши.';
   const langRule = noNames
     ? RUSSIAN_LANGUAGE_NO_NAMES_OVERRIDE
     : 'ЯЗЫК: русский. Английский/latin — имя артиста, название трека без кавычек и без «», устоявшиеся термины (moonwalk и т.п.).';
@@ -335,6 +338,8 @@ export function buildStoryUserPrompt(params: {
         `Артист: ${params.artist}`,
         `Трек: ${params.title}`,
         `ГРАММАТИКА: ${grammar.promptHint}`,
+        '',
+        buildVoiceoverNamesEconomyPromptBlock(params.artist, params.title),
       ];
 
   if (params.genre) lines.push(`Жанр: ${params.genre}`);
@@ -421,7 +426,7 @@ export function buildStoryUserPrompt(params: {
     }
     if (narratorId === 'fan') {
       lines.push(
-        'Для ФАНАТА: от первого лица, восторженный тон; обожание артиста + коллекционные детали только из семени.',
+        'Для ФАНАТА: от первого лица, восторженный тон; восторг через факты и «они/этот трек» — не повторяй имя артиста в каждом предложении.',
       );
       lines.push(
         'ФАНАТ: деньги/инвестиции из семени — это артист («он вложил», «Jackson вложил»), не «я вложил полмиллиона».',
@@ -509,10 +514,14 @@ export function buildLocalSystemPrompt(
   const focusBlock = persona.contentFocus ? `ФОКУС: ${persona.contentFocus}` : '';
   const narratorBlock = persona.narratorAddendum ? `\n${persona.narratorAddendum}\n` : '';
   const noNames = isVoiceoverWithoutTrackNames(options.speakTrackNamesInVoiceover);
+  const artist = options.artist?.trim() ?? '';
+  const title = options.title?.trim() ?? '';
   const namesBlock =
-    noNames && options.artist?.trim()
-      ? `\n${buildVoiceoverNoNamesPromptBlock(options.artist, options.title ?? '')}\n`
-      : '';
+    noNames && artist
+      ? `\n${buildVoiceoverNoNamesPromptBlock(artist, title)}\n`
+      : !noNames && artist
+        ? `\n${buildVoiceoverNamesEconomyPromptBlock(artist, title)}\n`
+        : '';
 
   return `Ты пишешь текст для ОЗВУЧКИ — локальная модель Ollama: проверенные факты + амплуа персонажа.
 
@@ -569,7 +578,12 @@ export function buildLocalStoryUserPrompt(params: {
         '',
         buildVoiceoverNoNamesPromptBlock(params.artist, params.title),
       ]
-    : [`Артист: ${params.artist}`, `Трек: ${params.title}`];
+    : [
+        `Артист: ${params.artist}`,
+        `Трек: ${params.title}`,
+        '',
+        buildVoiceoverNamesEconomyPromptBlock(params.artist, params.title),
+      ];
   if (params.genre) lines.push(`Жанр: ${params.genre}`);
   if (params.year) lines.push(`Год релиза (для контекста, в script — словами): ${params.year}`);
   lines.push('');

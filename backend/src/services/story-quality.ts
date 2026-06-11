@@ -18,6 +18,8 @@ import { isTruncatedMarketingSnippet, isSpeakableReferenceFact } from './web-sni
 import { interestScore } from './reference-fact-quality.js';
 import { fixSoloArtistPronounsRu } from './artist-grammar.js';
 import { isVoiceoverWithoutTrackNames, scriptLeaksVoiceoverNames } from './voiceover-no-names.js';
+import { primaryArtistName } from './artist-primary.js';
+import { phraseVariants } from './tts-generic-script.js';
 import { resolveStoryNarrator, type StoryNarratorId } from './story-narrator.js';
 
 export { DEFAULT_STORY_LENGTH, getStoryLengthPreset };
@@ -780,6 +782,13 @@ export function validateStoryScript(
     return { ok: false, reason: 'story does not mention the performing artist' };
   }
 
+  if (!noTrackNames && artist.trim() && title.trim()) {
+    const nameRep = findExcessiveNameRepetition(trimmed, artist, title);
+    if (nameRep) {
+      return { ok: false, reason: nameRep };
+    }
+  }
+
   if (!skipBannedPatterns) {
     const hard = findHardScriptViolation(trimmed);
     if (hard) {
@@ -1152,6 +1161,11 @@ export function buildStoryRetryDirective(
   if (lower.includes('voiceover names leak')) {
     parts.push('Не называй артиста и трек — только «эта группа», «этот исполнитель», «эта песня».');
   }
+  if (lower.includes('excessive name repetition')) {
+    parts.push(
+      'Имя трека — один раз в начале; артист — максимум два раза. Дальше «они», «этот трек», «их альбом» — не повторяй имя в каждом предложении.',
+    );
+  }
   if (lower.includes('too short')) {
     parts.push(`Добей до ${minWords}+ слов одной новой деталью из семени, не водой.`);
   }
@@ -1162,6 +1176,36 @@ export function buildStoryRetryDirective(
 }
 
 /** Reject generic filler — artist name alone is not enough. */
+export function countPhraseMentions(script: string, phrase: string): number {
+  const p = phrase.trim();
+  if (p.length < 2) return 0;
+  let max = 0;
+  for (const variant of phraseVariants(p)) {
+    const escaped = variant.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const matches = script.match(new RegExp(`\\b${escaped}\\b`, 'gi'));
+    max = Math.max(max, matches?.length ?? 0);
+  }
+  return max;
+}
+
+/** Soft gate: artist/title hammered in every sentence — prompt should prevent this. */
+export function findExcessiveNameRepetition(
+  script: string,
+  artist: string,
+  title: string,
+): string | null {
+  const primary = primaryArtistName(artist);
+  const artistCount = countPhraseMentions(script, primary);
+  if (artistCount > 2) {
+    return `excessive name repetition: artist "${primary}" ${artistCount}× (max 2)`;
+  }
+  const titleCount = countPhraseMentions(script, title);
+  if (titleCount > 1) {
+    return `excessive name repetition: track "${title}" ${titleCount}× (max 1)`;
+  }
+  return null;
+}
+
 export function findWateryContent(
   script: string,
   artist = '',
@@ -1171,6 +1215,10 @@ export function findWateryContent(
 ): string | null {
   const skipPersona = options.skipPersonaCliches ?? false;
   const noTrackNames = isVoiceoverWithoutTrackNames(options.speakTrackNamesInVoiceover);
+  if (options.speakTrackNamesInVoiceover === true && artist.trim() && title.trim()) {
+    const nameRep = findExcessiveNameRepetition(script, artist, title);
+    if (nameRep) return nameRep;
+  }
   if (!skipPersona) {
     const genreWater = findGenreWater(script);
     if (genreWater) return genreWater;
