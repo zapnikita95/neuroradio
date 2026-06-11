@@ -275,13 +275,13 @@ function orderTracks(tracks, doneKeys, bank, zeroFactKeys) {
       return zeroFactKeys.has(key) || (doneKeys.has(key) && !hasFactsInBank(bank, t.artist, t.title));
     });
     console.log(
-      `Retry-zero: ${retry.length} empty tracks first, then ${pending.length} pending + ${backfill.length} backfill`,
+      `Queue: discogs=${discogsBackfill.length} pending=${pending.length} backfill=${backfill.length} | retry-zero=${retry.length} (last)`,
     );
     return [
-      ...retry.sort(byPri),
       ...discogsBackfill.sort(byPri),
       ...pending.sort(byPri),
       ...backfill.sort(byPri),
+      ...retry.sort(byPri),
     ];
   }
 
