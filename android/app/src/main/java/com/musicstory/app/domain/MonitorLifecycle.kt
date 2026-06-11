@@ -76,13 +76,11 @@ class MonitorLifecycle(
 
     fun ensureListening() {
         if (!mediaControllerManager.hasNotificationAccess()) return
-        scope.launch {
+        scope.launch(Dispatchers.Main.immediate) {
             when (settingsDataStore.appPowerMode.first()) {
                 AppPowerMode.OFF -> return@launch
                 AppPowerMode.PARSE_ONLY, AppPowerMode.ON -> {
-                    withContext(Dispatchers.Main.immediate) {
-                        mediaControllerManager.start()
-                    }
+                    mediaControllerManager.start()
                     syncMonitorWithMedia()
                 }
             }

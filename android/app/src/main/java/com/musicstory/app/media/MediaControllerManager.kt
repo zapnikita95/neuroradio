@@ -40,21 +40,23 @@ class MediaControllerManager(
 
     private val controllerCallback = object : MediaController.Callback() {
         override fun onMetadataChanged(metadata: android.media.MediaMetadata?) {
-            updateFromController(activeController)
+            runOnMain { updateFromController(activeController) }
         }
 
         override fun onPlaybackStateChanged(state: android.media.session.PlaybackState?) {
-            _isPlaying.value = state?.state == android.media.session.PlaybackState.STATE_PLAYING
-            updateFromController(activeController)
+            runOnMain {
+                _isPlaying.value = state?.state == android.media.session.PlaybackState.STATE_PLAYING
+                updateFromController(activeController)
+            }
         }
 
         override fun onSessionDestroyed() {
-            refreshActiveController()
+            runOnMain { refreshActiveControllerOnMainThread() }
         }
     }
 
     private val sessionListener = MediaSessionManager.OnActiveSessionsChangedListener { controllers ->
-        selectAndBindController(controllers)
+        runOnMain { selectAndBindController(controllers) }
     }
 
     fun start() {
