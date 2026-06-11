@@ -152,6 +152,13 @@ class MusicStoryApp : Application() {
             storyRepository.dedupeStoryHistory()
         }
         appScope.launch {
+            val purgeMarker = settingsDataStore.offlineCachePurgeVersion.first()
+            if (purgeMarker < BuildConfig.VERSION_CODE) {
+                storyRepository.purgeOfflinePlaybackCache()
+                settingsDataStore.setOfflineCachePurgeVersion(BuildConfig.VERSION_CODE)
+            }
+        }
+        appScope.launch {
             offlinePackRepository.refreshState()
         }
         appScope.launch {

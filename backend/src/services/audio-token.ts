@@ -2,6 +2,20 @@ import crypto from 'node:crypto';
 import { getAuthJwtSecret } from './jwt.js';
 import { SECURITY } from '../config/security.js';
 
+function resolvePublicBffOrigin(): string | null {
+  const raw =
+    process.env.PUBLIC_BFF_URL?.trim() ||
+    process.env.SITE_URL?.trim() ||
+    null;
+  if (!raw) return null;
+  try {
+    const u = new URL(raw.startsWith('http') ? raw : `https://${raw}`);
+    return u.origin;
+  } catch {
+    return null;
+  }
+}
+
 export function signAudioAccess(fileName: string): string | null {
   const secret = getAuthJwtSecret();
   if (!secret) return null;
@@ -9,7 +23,9 @@ export function signAudioAccess(fileName: string): string | null {
   const safeName = pathBasename(fileName);
   const exp = Math.floor(Date.now() / 1000) + SECURITY.audioUrlTtlSec;
   const sig = crypto.createHmac('sha256', secret).update(`${safeName}:${exp}`).digest('hex');
-  return `/audio/${safeName}?exp=${exp}&sig=${sig}`;
+  const path = `/audio/${safeName}?exp=${exp}&sig=${sig}`;
+  const origin = resolvePublicBffOrigin();
+  return origin ? `${origin}${path}` : path;
 }
 
 export function verifyAudioAccess(fileName: string, expRaw: string | undefined, sigRaw: string | undefined): boolean {

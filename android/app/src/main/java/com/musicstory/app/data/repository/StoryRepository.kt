@@ -1046,9 +1046,18 @@ class StoryRepository(
     }
 
     private suspend fun canUseOfflineReplay(): Boolean {
+        // Disabled until offline cache is stable — local files broke ExoPlayer on Premium.
+        if (!OFFLINE_PLAYBACK_CACHE_ENABLED) return false
         if (!settingsDataStore.offlineAudioCacheEnabled.first()) return false
         val tier = resolveEffectiveTier()
         return TierAccess.canUseOfflineAudioCache(tier)
+    }
+
+    /** Wipe corrupt offline audio after format/backend regressions. */
+    suspend fun purgeOfflinePlaybackCache() {
+        offlineAudioStore.evictAll()
+        storyDao.clearAllLocalAudioPaths()
+        StoryLog.i("Offline playback cache purged")
     }
 
     private suspend fun tryOfflineReplay(trackKey: String): Result<StoryResponse>? {
@@ -1109,7 +1118,8 @@ class StoryRepository(
         response: StoryResponse,
         angle: String,
     ) {
-        val localPath = maybeDownloadOfflineAudio(trackKey, response.audioUrl)
+        // Never block playback on cache download — prefetch in background on Wi‑Fi.
+        val localPath: String? = null
         storyDao.insert(
             CachedStory(
                 trackKey = trackKey,
@@ -1221,6 +1231,8 @@ class StoryRepository(
         private const val MAX_PREVIOUS_SCRIPTS = 8
         const val OFFLINE_NO_CACHE_MESSAGE =
             "Нет интернета. Эта история ещё не сохранена на телефоне — один раз послушайте онлайн с расширенным тарифом."
+        /** Hotfix: local cache caused ExoPlayer failures on Premium devices. */
+        private const val OFFLINE_PLAYBACK_CACHE_ENABLED = false
     }
 }
 

@@ -290,7 +290,15 @@ class SettingsDataStore(private val context: Context) {
     }
 
     val offlineAudioCacheEnabled: Flow<Boolean> = context.settingsDataStore.data.map { prefs ->
-        prefs[KEY_OFFLINE_AUDIO_CACHE_ENABLED] ?: true
+        prefs[KEY_OFFLINE_AUDIO_CACHE_ENABLED] ?: false
+    }
+
+    val offlineCachePurgeVersion: Flow<Int> = context.settingsDataStore.data.map { prefs ->
+        prefs[KEY_OFFLINE_CACHE_PURGE_VERSION] ?: 0
+    }
+
+    suspend fun setOfflineCachePurgeVersion(versionCode: Int) {
+        context.settingsDataStore.edit { it[KEY_OFFLINE_CACHE_PURGE_VERSION] = versionCode }
     }
 
     val offlinePackPhase: Flow<String> = context.settingsDataStore.data.map { prefs ->
@@ -849,6 +857,7 @@ class SettingsDataStore(private val context: Context) {
         private val KEY_APP_LANGUAGE = stringPreferencesKey("app_language")
         private val KEY_ELEVENLABS_VOICE = stringPreferencesKey("elevenlabs_voice")
         private val KEY_OFFLINE_AUDIO_CACHE_ENABLED = booleanPreferencesKey("offline_audio_cache_enabled")
+        private val KEY_OFFLINE_CACHE_PURGE_VERSION = intPreferencesKey("offline_cache_purge_version")
         private val KEY_OFFLINE_PACK_PHASE = stringPreferencesKey("offline_pack_phase")
         private val KEY_OFFLINE_PACK_SESSION_ID = longPreferencesKey("offline_pack_session_id")
         private val KEY_SERVER_TTS_PROVIDER = stringPreferencesKey("server_tts_provider")

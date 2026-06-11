@@ -22,6 +22,9 @@ interface StoryDao {
     @Query("UPDATE cached_stories SET localAudioPath = :path WHERE trackKey = :trackKey")
     suspend fun updateLocalAudioPath(trackKey: String, path: String?)
 
+    @Query("UPDATE cached_stories SET localAudioPath = NULL")
+    suspend fun clearAllLocalAudioPaths()
+
     @Query("DELETE FROM cached_stories WHERE fetchedAt < :before")
     suspend fun deleteOlderThan(before: Long)
 

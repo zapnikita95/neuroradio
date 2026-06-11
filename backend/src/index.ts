@@ -72,7 +72,9 @@ process.on('uncaughtException', (err) => {
 
 app.use('/audio', requireSignedAudioAccess, (req, res, next) => {
   if (req.path.endsWith('.wav')) res.type('audio/wav');
-  else if (req.path.endsWith('.ogg')) res.type('audio/ogg');
+  else if (req.path.endsWith('.ogg')) res.type('audio/ogg; codecs=opus');
+  res.setHeader('Accept-Ranges', 'bytes');
+  res.setHeader('Cache-Control', 'private, max-age=3600');
   next();
 }, express.static(AUDIO_DIR, {
   dotfiles: 'deny',

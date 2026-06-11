@@ -369,7 +369,8 @@ class StoryPlayer(context: Context) {
             val path = url.substringBefore('?').lowercase()
             return when {
                 path.endsWith(".wav") -> MimeTypes.AUDIO_WAV
-                path.endsWith(".ogg") -> MimeTypes.AUDIO_OGG
+                // Sniff OGG/Opus — explicit AUDIO_OGG breaks playback on some Xiaomi/POCO builds.
+                path.endsWith(".ogg") -> null
                 else -> null
             }
         }

@@ -84,6 +84,15 @@ class StoryOfflineAudioStore(context: Context) {
         }
     }
 
+    fun evictAll() {
+        storiesDir.listFiles()?.forEach { file ->
+            if (file.isFile) {
+                file.delete()
+            }
+        }
+        StoryLog.i("Offline cache wiped")
+    }
+
     fun localFileUri(path: String): String = File(path).toURI().toString()
 
     /** Remove other extensions for the same track (e.g. stale .ogg when server now serves .wav). */
