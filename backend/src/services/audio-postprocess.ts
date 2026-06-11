@@ -5,7 +5,8 @@ import path from 'node:path';
 export function isAudioPostprocessEnabled(): boolean {
   const flag = process.env.TTS_AUDIO_POSTPROCESS?.trim().toLowerCase();
   if (flag === 'false' || flag === '0' || flag === 'off') return false;
-  return flag === 'true' || flag === '1' || flag === 'on' || process.env.NODE_ENV === 'production';
+  // Opt-in only — ffmpeg re-encode can break ExoPlayer on some devices; Yandex OGG is fine as-is.
+  return flag === 'true' || flag === '1' || flag === 'on';
 }
 
 async function ffmpegAvailable(): Promise<boolean> {

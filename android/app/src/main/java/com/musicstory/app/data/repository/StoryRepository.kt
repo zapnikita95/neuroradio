@@ -975,29 +975,44 @@ class StoryRepository(
         return resolved
     }
 
-    /** Local cache if format matches server URL, else resolved server URL. */
-    suspend fun resolvePlaybackUrl(trackKey: String, audioUrl: String?): String? {
+    /**
+     * Live story playback streams from server ([preferLocal]=false).
+     * Offline history replay may use local cache when [preferLocal]=true.
+     */
+    suspend fun resolvePlaybackUrl(
+        trackKey: String,
+        audioUrl: String?,
+        preferLocal: Boolean = false,
+    ): String? {
         val serverUrl = resolveAudioUrl(audioUrl)
-        if (canUseOfflineReplay()) {
-            packPlaybackPath(trackKey)?.let { path ->
-                if (localAudioMatchesServerFormat(path, audioUrl)) {
-                    return offlineAudioStore.localFileUri(path)
-                }
-                StoryLog.w("Offline pack audio format mismatch — streaming from server")
+        if (!preferLocal || serverUrl.isNullOrBlank()) return serverUrl
+        if (!canUseOfflineReplay()) return serverUrl
+        packPlaybackPath(trackKey)?.let { path ->
+            if (localAudioMatchesServerFormat(path, audioUrl)) {
+                return offlineAudioStore.localFileUri(path)
             }
-            val cached = storyDao.getByTrackKey(trackKey)
-            val localPath = cached?.localAudioPath
-            if (
-                offlineAudioStore.hasLocalFile(localPath) &&
-                localAudioMatchesServerFormat(localPath!!, audioUrl)
-            ) {
-                return offlineAudioStore.localFileUri(localPath)
-            }
-            if (localPath != null && !localAudioMatchesServerFormat(localPath, audioUrl)) {
-                StoryLog.w("Cached audio extension mismatch for $trackKey — using server URL")
-            }
+            StoryLog.w("Offline pack audio format mismatch — streaming from server")
+        }
+        val cached = storyDao.getByTrackKey(trackKey)
+        val localPath = cached?.localAudioPath
+        if (
+            offlineAudioStore.hasLocalFile(localPath) &&
+            localAudioMatchesServerFormat(localPath!!, audioUrl)
+        ) {
+            return offlineAudioStore.localFileUri(localPath)
+        }
+        if (localPath != null) {
+            StoryLog.w("Cached audio unusable for $trackKey — streaming from server")
+            evictLocalAudio(trackKey)
         }
         return serverUrl
+    }
+
+    suspend fun evictLocalAudio(trackKey: String) {
+        val cached = storyDao.getByTrackKey(trackKey)
+        offlineAudioStore.deleteFile(cached?.localAudioPath)
+        offlineAudioStore.evictAllForTrack(trackKey)
+        storyDao.updateLocalAudioPath(trackKey, null)
     }
 
     private fun localAudioMatchesServerFormat(localPath: String, audioUrl: String?): Boolean {

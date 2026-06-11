@@ -12,6 +12,7 @@ import androidx.media3.common.C
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MimeTypes
 import androidx.media3.common.Player
+import androidx.media3.datasource.DefaultDataSource
 import androidx.media3.datasource.DefaultHttpDataSource
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
@@ -43,6 +44,9 @@ class StoryPlayer(context: Context) {
         .setConnectTimeoutMs(30_000)
         .setReadTimeoutMs(90_000)
 
+    /** HTTP for signed URLs + file/content for premium offline cache. */
+    private val dataSourceFactory = DefaultDataSource.Factory(appContext, httpDataSourceFactory)
+
     /** Lazy init — ExoPlayer native libs can crash some devices at cold start (16KB page size, OEM builds). */
     private var exoPlayer: ExoPlayer? = null
 
@@ -70,7 +74,7 @@ class StoryPlayer(context: Context) {
     private fun ensurePlayer(): ExoPlayer {
         exoPlayer?.let { return it }
         val player = ExoPlayer.Builder(appContext)
-            .setMediaSourceFactory(DefaultMediaSourceFactory(httpDataSourceFactory))
+            .setMediaSourceFactory(DefaultMediaSourceFactory(dataSourceFactory))
             .setAudioAttributes(
                 MediaAudioAttributes.Builder()
                     .setUsage(C.USAGE_MEDIA)

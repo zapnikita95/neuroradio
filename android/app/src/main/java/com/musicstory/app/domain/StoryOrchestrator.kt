@@ -760,8 +760,15 @@ class StoryOrchestrator(
                         publishUiState()
                     }
 
-                    suspend fun startStoryPlayback(response: com.musicstory.app.data.model.StoryResponse) {
-                        val audioUrl = storyRepository.resolvePlaybackUrl(track.displayKey, response.audioUrl)
+                    suspend fun startStoryPlayback(
+                        response: com.musicstory.app.data.model.StoryResponse,
+                        playbackRetry: Boolean = false,
+                    ) {
+                        val audioUrl = storyRepository.resolvePlaybackUrl(
+                            track.displayKey,
+                            response.audioUrl,
+                            preferLocal = false,
+                        )
                         storyPlayer.playStory(
                             response = response,
                             audioUrl = audioUrl,
@@ -808,8 +815,18 @@ class StoryOrchestrator(
                             onError = {
                                 if (!isSessionCurrent(session)) return@playStory
                                 cancelGenerationPreview()
-                                StoryLog.w("Server audio playback failed after URL retries — not refetching story")
-                                handleAudioPlaybackFailed()
+                                scope.launch {
+                                    if (!playbackRetry) {
+                                        storyRepository.evictLocalAudio(track.displayKey)
+                                        StoryLog.w("Retrying story audio from server after playback error")
+                                        startStoryPlayback(response, playbackRetry = true)
+                                        return@launch
+                                    }
+                                    StoryLog.w(
+                                        "Server audio playback failed after URL retries — not refetching story",
+                                    )
+                                    handleAudioPlaybackFailed()
+                                }
                             },
                         )
                     }
@@ -1061,7 +1078,11 @@ class StoryOrchestrator(
                 mediaControllerManager.fadeOutAndPause(fadeSeconds)
             }
 
-            val audioUrl = storyRepository.resolvePlaybackUrl(entry.trackKey, response.audioUrl)
+            val audioUrl = storyRepository.resolvePlaybackUrl(
+                entry.trackKey,
+                response.audioUrl,
+                preferLocal = true,
+            )
             storyPlayer.playStory(
                 response = response,
                 audioUrl = audioUrl,

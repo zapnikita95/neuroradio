@@ -40,7 +40,48 @@ class StoryOfflineAudioStore(context: Context) {
     fun hasLocalFile(path: String?): Boolean {
         if (path.isNullOrBlank()) return false
         val file = File(path)
-        return file.isFile && file.length() > 512L
+        return file.isFile && file.length() > 512L && isLikelyValidAudio(file)
+    }
+
+    /** Reject stale cache (e.g. WAV bytes saved as .ogg after backend format change). */
+    fun isLikelyValidAudio(file: File): Boolean {
+        if (!file.isFile || file.length() < 512L) return false
+        return try {
+            file.inputStream().use { ins ->
+                val header = ByteArray(4)
+                if (ins.read(header) < 4) return false
+                val isOgg = header[0] == 'O'.code.toByte() &&
+                    header[1] == 'g'.code.toByte() &&
+                    header[2] == 'g'.code.toByte() &&
+                    header[3] == 'S'.code.toByte()
+                val isWav = header[0] == 'R'.code.toByte() &&
+                    header[1] == 'I'.code.toByte() &&
+                    header[2] == 'F'.code.toByte() &&
+                    header[3] == 'F'.code.toByte()
+                isOgg || isWav
+            }
+        } catch (_: Exception) {
+            false
+        }
+    }
+
+    fun deleteFile(path: String?) {
+        if (path.isNullOrBlank()) return
+        val file = File(path)
+        if (file.isFile) {
+            file.delete()
+            StoryLog.i("Offline cache deleted ${file.name}")
+        }
+    }
+
+    fun evictAllForTrack(trackKey: String) {
+        val hash = hashTrackKey(trackKey)
+        storiesDir.listFiles()?.forEach { file ->
+            if (file.isFile && file.name.startsWith(hash)) {
+                file.delete()
+                StoryLog.i("Offline cache evicted ${file.name}")
+            }
+        }
     }
 
     fun localFileUri(path: String): String = File(path).toURI().toString()
@@ -83,7 +124,8 @@ class StoryOfflineAudioStore(context: Context) {
                     temp.outputStream().use { out ->
                         body.byteStream().copyTo(out)
                     }
-                    if (temp.length() < 512L) {
+                    if (temp.length() < 512L || !isLikelyValidAudio(temp)) {
+                        StoryLog.w("Offline audio download invalid format — discarding")
                         temp.delete()
                         return@use
                     }
