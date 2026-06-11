@@ -84,7 +84,7 @@ class MediaControllerManager(
         if (!hasNotificationAccess()) return
         try {
             val component = ComponentName(context, MediaNotificationListener::class.java)
-            sessionManager.addOnActiveSessionsChangedListener(sessionListener, component)
+            sessionManager.addOnActiveSessionsChangedListener(sessionListener, component, mainHandler)
             refreshActiveControllerOnMainThread()
         } catch (_: SecurityException) {
             // Notification listener not granted
