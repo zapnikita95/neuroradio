@@ -364,17 +364,18 @@ export function sanitizeScriptForTts(
     let result = script.trim().replace(/\s{2,}/g, ' ').replace(/\s+([,.!?])/g, '$1').trim();
     return stripBannedFluff(result);
   }
+  let result = stripLlmStressLeakage(script.trim());
   const allowed = allowedDigitSequences(artist, title, referenceFacts);
   const blockArtist = options?.trackArtist ?? artist;
   const blockTitle = options?.trackTitle ?? title;
   const speakNames = options?.speakTrackNamesInVoiceover === true;
-  const { text: localized } = prepareStoryScriptLanguage(script, {
+  const { text: localized } = prepareStoryScriptLanguage(result, {
     artist: blockArtist,
     title: blockTitle,
     referenceFacts,
     speakTrackNamesInVoiceover: speakNames,
   });
-  let result = stripTrackTitleGuillemets(localized, title);
+  result = stripTrackTitleGuillemets(localized, title);
 
   result = result.replace(DIGIT_ORDINAL_SUFFIX, (match) => {
     const digits = match.match(/\d+/)?.[0];
@@ -416,6 +417,11 @@ export function sanitizeScriptForTts(
 /** TTS cleanup — whitespace only; do not rewrite grounded wording («уникальный», «согласно»). */
 export function stripBannedFluff(text: string): string {
   return text.replace(/\s{2,}/g, ' ').replace(/\s+([,.!?])/g, '$1').trim();
+}
+
+/** LLM sometimes leaks Yandex SpeechKit «+» stress marks into story text — never store them. */
+export function stripLlmStressLeakage(text: string): string {
+  return text.replace(/\+/g, '');
 }
 
 /** Soft flags for client/logs — story still ships but may need user scrutiny. */
@@ -750,7 +756,7 @@ export function validateStoryScript(
   const referenceFacts = options.referenceFacts ?? [];
   const previousScripts = options.previousScripts ?? [];
   const noTrackNames = isVoiceoverWithoutTrackNames(options.speakTrackNamesInVoiceover);
-  const trimmed = script.trim();
+  const trimmed = stripLlmStressLeakage(script.trim());
   if (!trimmed) return { ok: false, reason: 'empty script' };
 
   if (noTrackNames) {

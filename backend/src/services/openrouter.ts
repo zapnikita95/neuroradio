@@ -269,7 +269,6 @@ export async function generateStoryScript(
           const sanitizedGarbage = findLlmGarbage(sanitized);
           const rejectSanitized =
             sanitizedGarbage != null ||
-            originalReason.startsWith('llm garbage:') ||
             originalReason.startsWith('no concrete fact') ||
             originalReason.startsWith('ungrounded claim:');
           if (rejectSanitized) {
