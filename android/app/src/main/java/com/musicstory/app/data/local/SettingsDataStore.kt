@@ -267,7 +267,7 @@ class SettingsDataStore(private val context: Context) {
     }
 
     val speakTrackNamesInVoiceover: Flow<Boolean> = context.settingsDataStore.data.map { prefs ->
-        prefs[KEY_SPEAK_TRACK_NAMES_IN_VOICEOVER] ?: false
+        prefs[KEY_SPEAK_TRACK_NAMES_IN_VOICEOVER] ?: DEFAULT_SPEAK_TRACK_NAMES_IN_VOICEOVER
     }
 
     val factNotificationsEnabled: Flow<Boolean> = context.settingsDataStore.data.map { prefs ->
@@ -783,6 +783,7 @@ class SettingsDataStore(private val context: Context) {
         const val DEFAULT_SAME_TRACK_STORY_EVERY_N = 3
         const val DEFAULT_AUTO_INTERCEPT = true
         const val DEFAULT_FACT_NOTIFICATIONS_ENABLED = true
+        const val DEFAULT_SPEAK_TRACK_NAMES_IN_VOICEOVER = true
         const val DEFAULT_MUSIC_FADE_SECONDS = 1.5f
         const val DEFAULT_COUNT_TRACK_LISTEN_SECONDS = 10
         /** URL Ollama с точки зрения ПК с BFF (не телефона). */

@@ -178,7 +178,7 @@ fun SettingsScreen(
     val ttsSpeed by settings.ttsSpeed.collectAsState(initial = TtsSpeed.NORMAL)
     val ttsEmotion by settings.ttsEmotion.collectAsState(initial = TtsEmotion.LIVELY)
     val edgeVoicePreset by settings.edgeVoicePreset.collectAsState(initial = EdgeVoicePreset.SVETLANA_CALM)
-    val speakTrackNamesInVoiceover by settings.speakTrackNamesInVoiceover.collectAsState(initial = false)
+    val speakTrackNamesInVoiceover by settings.speakTrackNamesInVoiceover.collectAsState(initial = true)
     val factNotificationsEnabled by settings.factNotificationsEnabled.collectAsState(
         initial = SettingsDataStore.DEFAULT_FACT_NOTIFICATIONS_ENABLED,
     )

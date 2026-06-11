@@ -597,7 +597,7 @@ class StoryRepository(
         ttsSpeed: TtsSpeed,
         ttsEmotion: TtsEmotion,
         edgeVoicePreset: EdgeVoicePreset = EdgeVoicePreset.SVETLANA_CALM,
-        speakTrackNamesInVoiceover: Boolean = false,
+        speakTrackNamesInVoiceover: Boolean = true,
         llmProvider: LlmProvider,
         geminiModel: GeminiModel,
         groqModel: GroqModel,
