@@ -372,6 +372,6 @@
     <string name="feedback_skip">Пропустить</string>
     <string name="feedback_close">Закрыть</string>
 
-    <string name="server_audio_error_message">Не удалось воспроизвести озвучку Yandex с сервера — попробуй ещё раз</string>
+    <string name="server_audio_error_message">Не удалось воспроизвести озвучку с сервера — попробуй ещё раз</string>
     <string name="android_tts_error_message">Не удалось озвучить на телефоне — установи русский голос в настройках TTS или вернись на Yandex</string>
 </resources>
