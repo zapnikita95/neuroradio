@@ -208,7 +208,7 @@ class StoryRepository(
             script = entry.script,
             historyId = serverId,
             storyNarrator = storyNarrator.id,
-            lang = if (appLang == "en") "en" else "ru",
+            lang = resolveAppLanguage(appLang).toApiCode(),
         )
         if (!ok) return false
 
@@ -241,7 +241,7 @@ class StoryRepository(
             reasons = reasons,
             script = feedback.script,
             storyNarrator = storyNarrator.id,
-            lang = if (appLang == "en") "en" else "ru",
+            lang = resolveAppLanguage(appLang).toApiCode(),
         )
         if (ok) {
             storyHistoryDao.findLatestByTrackAndScript(feedback.trackKey, feedback.script)

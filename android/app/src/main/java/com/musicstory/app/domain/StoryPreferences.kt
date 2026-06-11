@@ -104,12 +104,12 @@ enum class UserTtsBilling(val id: String, val labelRu: String, val descriptionRu
     SERVER(
         id = "server",
         labelRu = "Сервер приложения",
-        descriptionRu = "Edge или Yandex SpeechKit — выбор ниже на trial и подписке",
+        descriptionRu = "",
     ),
     YANDEX(
         id = "yandex",
-        labelRu = "Свой Yandex SpeechKit",
-        descriptionRu = "API Key + Folder ID из Yandex Cloud — списание с вашего счёта",
+        labelRu = "Свой Yandex SpeechKit ключ",
+        descriptionRu = "",
     ),
     SBER(
         id = "sber",

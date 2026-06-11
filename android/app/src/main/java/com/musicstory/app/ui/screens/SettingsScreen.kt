@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -705,7 +706,8 @@ fun SettingsScreen(
                 modifier = Modifier
                     .fillMaxSize()
                     .verticalScroll(scrollState, enabled = tourStep == null)
-                    .padding(20.dp),
+                    .navigationBarsPadding()
+                    .padding(start = 20.dp, end = 20.dp, top = 20.dp, bottom = 32.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp),
             ) {
                 val autoPlaybackOn = autoPlaybackOnUi
@@ -739,11 +741,6 @@ fun SettingsScreen(
                             }
                         },
                     )
-                    Text(
-                        text = context.getString(R.string.settings_playback_mode_hint),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MutedLavender,
-                    )
                     if (!canManualMode) {
                         Text(
                             text = context.getString(R.string.settings_premium_locked_hint),
@@ -756,20 +753,10 @@ fun SettingsScreen(
                         checked = factNotificationsUi,
                         onCheckedChange = { factNotificationsUi = it },
                     )
-                    Text(
-                        text = context.getString(R.string.settings_fact_notifications_hint),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MutedLavender,
-                    )
                     SettingSwitchRow(
                         title = context.getString(R.string.settings_speak_track_names),
                         checked = speakTrackNamesUi,
                         onCheckedChange = { speakTrackNamesUi = it },
-                    )
-                    Text(
-                        text = context.getString(R.string.settings_speak_track_names_hint),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MutedLavender,
                     )
                     OfflinePackSettingsSection(
                         canUse = canUseOfflineCache,
@@ -930,18 +917,6 @@ fun SettingsScreen(
                                 modifier = Modifier.padding(start = 8.dp),
                             )
                         }
-                        Text(
-                            text = when {
-                                !countListenEnabledUi ->
-                                    context.getString(R.string.settings_count_listen_hint_off)
-                                canCustomizeListen ->
-                                    context.getString(R.string.settings_count_listen_hint_premium)
-                                else -> context.getString(R.string.settings_count_listen_hint_free)
-                            },
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MutedLavender,
-                            modifier = Modifier.padding(top = 4.dp),
-                        )
                         if (countListenEnabledUi && canCustomizeListen) {
                             Spacer(modifier = Modifier.height(8.dp))
                             OutlinedTextField(
@@ -1043,9 +1018,8 @@ fun SettingsScreen(
                     onTourLayout = tourLayoutHandler(3),
                 ) {
                     StoryNarrator.entries.forEach { narrator ->
-                        NarratorRadioRow(
+                        PreferenceRadioRow(
                             label = narrator.labelRu,
-                            description = narrator.descriptionRu,
                             selected = storyNarratorUi == narrator,
                             onSelect = { storyNarratorUi = narrator },
                         )
@@ -1086,17 +1060,15 @@ fun SettingsScreen(
                             Spacer(modifier = Modifier.height(8.dp))
                         }
                     }
-                    Text(
-                        text = context.getString(R.string.settings_tts_playback_engine_hint),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MutedLavender,
-                        modifier = Modifier.padding(top = 4.dp, bottom = 8.dp),
-                    )
                     if (showServerTtsProviderChoice) {
+                        Text(
+                            text = context.getString(R.string.settings_server_tts_engine),
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MutedLavender,
+                        )
                         ServerTtsProvider.entries.forEach { provider ->
-                            NarratorRadioRow(
+                            PreferenceRadioRow(
                                 label = provider.labelRu,
-                                description = provider.descriptionRu,
                                 selected = serverTtsProviderUi == provider,
                                 onSelect = { serverTtsProviderUi = provider },
                             )
@@ -1110,9 +1082,8 @@ fun SettingsScreen(
                             color = MutedLavender,
                         )
                         EdgeVoicePreset.entries.forEach { preset ->
-                            NarratorRadioRow(
+                            PreferenceRadioRow(
                                 label = preset.labelRu,
-                                description = preset.descriptionRu,
                                 selected = edgeVoicePresetUi == preset,
                                 onSelect = { edgeVoicePresetUi = preset },
                             )
@@ -1125,15 +1096,9 @@ fun SettingsScreen(
                             style = MaterialTheme.typography.labelMedium,
                             color = MutedLavender,
                         )
-                        Text(
-                            text = context.getString(R.string.settings_elevenlabs_hint),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MutedLavender,
-                        )
                         ElevenLabsVoice.entries.forEach { voice ->
-                            NarratorRadioRow(
+                            PreferenceRadioRow(
                                 label = voice.label(resolvedDraftLang),
-                                description = voice.description(resolvedDraftLang),
                                 selected = elevenLabsVoiceUi == voice,
                                 onSelect = { elevenLabsVoiceUi = voice },
                             )
@@ -1147,9 +1112,8 @@ fun SettingsScreen(
                         color = MutedLavender,
                     )
                     TtsVoice.entries.forEach { voice ->
-                        NarratorRadioRow(
+                        PreferenceRadioRow(
                             label = voice.labelRu,
-                            description = voice.descriptionRu,
                             selected = ttsVoiceUi == voice,
                             onSelect = { ttsVoiceUi = voice },
                         )
@@ -1161,9 +1125,8 @@ fun SettingsScreen(
                         color = MutedLavender,
                     )
                     TtsEmotion.entries.forEach { emotion ->
-                        NarratorRadioRow(
+                        PreferenceRadioRow(
                             label = emotion.labelRu,
-                            description = emotion.descriptionRu,
                             selected = ttsEmotionUi == emotion,
                             onSelect = { ttsEmotionUi = emotion },
                         )
@@ -1197,35 +1160,16 @@ fun SettingsScreen(
                     }
                     Spacer(modifier = Modifier.height(12.dp))
                     Text(
-                        text = context.getString(R.string.settings_user_tts_section),
+                        text = context.getString(R.string.settings_tts_synthesis_via),
                         style = MaterialTheme.typography.labelMedium,
                         color = MutedLavender,
-                    )
-                    Text(
-                        text = context.getString(R.string.settings_user_tts_hint),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MutedLavender,
-                        modifier = Modifier.padding(top = 4.dp, bottom = 8.dp),
+                        modifier = Modifier.padding(bottom = 4.dp),
                     )
                     userTtsBillingOptions.forEach { billing ->
-                        NarratorRadioRow(
+                        PreferenceRadioRow(
                             label = billing.labelRu,
-                            description = billing.descriptionRu,
                             selected = userTtsBillingUi == billing,
-                            onSelect = {
-                                userTtsBillingUi = billing
-                            },
-                        )
-                    }
-                    if (userTtsBillingUi != UserTtsBilling.SERVER) {
-                        Text(
-                            text = context.getString(
-                                R.string.settings_user_tts_active,
-                                userTtsBillingUi.labelRu,
-                            ),
-                            style = MaterialTheme.typography.labelMedium,
-                            color = GoldBright,
-                            modifier = Modifier.padding(top = 8.dp, bottom = 8.dp),
+                            onSelect = { userTtsBillingUi = billing },
                         )
                     }
                     if (userTtsBillingUi == UserTtsBilling.YANDEX) {
@@ -1249,27 +1193,6 @@ fun SettingsScreen(
                             colors = fieldColors,
                             shape = RoundedCornerShape(14.dp),
                         )
-                        Text(
-                            text = context.getString(R.string.settings_yandex_tts_hint),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MutedLavender,
-                            modifier = Modifier.padding(top = 6.dp, bottom = 4.dp),
-                        )
-                        Text(
-                            text = context.getString(R.string.settings_yandex_get_key),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = GoldBright,
-                            modifier = Modifier
-                                .padding(bottom = 8.dp)
-                                .clickable {
-                                    context.startActivity(
-                                        Intent(
-                                            Intent.ACTION_VIEW,
-                                            Uri.parse("https://yandex.cloud/ru/docs/speechkit/quickstart"),
-                                        ),
-                                    )
-                                },
-                        )
                     }
                 }
 
@@ -1285,12 +1208,6 @@ fun SettingsScreen(
                         text = context.getString(R.string.settings_music_interrupt_fade),
                         style = MaterialTheme.typography.bodyMedium,
                         color = CreamText,
-                    )
-                    Text(
-                        text = context.getString(R.string.settings_music_fade_hint),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MutedLavender,
-                        modifier = Modifier.padding(top = 4.dp, bottom = 8.dp),
                     )
                     if (canCustomizeFade) {
                         OutlinedTextField(
@@ -1311,27 +1228,15 @@ fun SettingsScreen(
                             colors = fieldColors,
                             shape = RoundedCornerShape(14.dp),
                         )
-                    } else {
-                        Text(
-                            text = context.getString(
-                                R.string.settings_music_fade_fixed_hint,
-                                SettingsDataStore.DEFAULT_MUSIC_FADE_SECONDS,
-                            ),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MutedLavender,
-                        )
                     }
                 }
 
                 val aiSummary = when {
-                    hasPersonalKey -> context.getString(R.string.settings_ai_own_key_active)
-                    isPaidServerTier -> context.getString(
-                        R.string.settings_server_llm_premium,
-                        OpenRouterModel.DEEPSEEK_V3.labelRu,
-                    )
+                    hasPersonalKey -> context.getString(R.string.settings_llm_active, llmProviderUi.labelRu)
+                    isPaidServerTier -> context.getString(R.string.settings_ai_fact_model_premium)
                     isFreeServerTier -> {
                         val quotaLabel = dailyQuota?.let { formatServerQuotaLabel(context, it) }.orEmpty()
-                        val modelLabel = OpenRouterModel.defaultFreeServer.labelRu
+                        val modelLabel = context.getString(R.string.settings_ai_fact_model_free)
                         if (quotaLabel.isNotBlank()) "$modelLabel · $quotaLabel" else modelLabel
                     }
                     dailyQuota != null -> formatServerQuotaLabel(context, dailyQuota!!)
@@ -1356,58 +1261,21 @@ fun SettingsScreen(
                     tourActive = tourStep == 6,
                     onTourLayout = tourLayoutHandler(6),
                 ) {
-                    if (hasPersonalKey) {
-                        Text(
-                            text = context.getString(R.string.settings_ai_own_key_active),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = LiveGreen,
-                            modifier = Modifier.padding(bottom = 8.dp),
-                        )
-                    }
-
                     if (isPaidServerTier) {
                         Text(
-                            text = context.getString(R.string.settings_ai_server_section),
-                            style = MaterialTheme.typography.labelMedium,
-                            color = MutedLavender,
-                        )
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Text(
-                            text = context.getString(
-                                R.string.settings_server_llm_premium,
-                                OpenRouterModel.DEEPSEEK_V3.labelRu,
-                            ),
+                            text = context.getString(R.string.settings_ai_fact_model_premium),
                             style = MaterialTheme.typography.bodyMedium,
                             color = CreamText,
-                        )
-                        Text(
-                            text = context.getString(R.string.settings_server_llm_premium_hint),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MutedLavender,
-                            modifier = Modifier.padding(top = 4.dp, bottom = 8.dp),
+                            modifier = Modifier.padding(bottom = 8.dp),
                         )
                     }
 
                     if (isFreeServerTier) {
                         Text(
-                            text = context.getString(R.string.settings_ai_server_section),
-                            style = MaterialTheme.typography.labelMedium,
-                            color = MutedLavender,
-                        )
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Text(
-                            text = context.getString(
-                                R.string.settings_server_llm_free,
-                                OpenRouterModel.defaultFreeServer.labelRu,
-                            ),
+                            text = context.getString(R.string.settings_ai_fact_model_free),
                             style = MaterialTheme.typography.bodyMedium,
                             color = CreamText,
-                        )
-                        Text(
-                            text = context.getString(R.string.settings_server_llm_free_hint),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MutedLavender,
-                            modifier = Modifier.padding(top = 4.dp, bottom = 8.dp),
+                            modifier = Modifier.padding(bottom = 8.dp),
                         )
                     }
 
@@ -1432,12 +1300,6 @@ fun SettingsScreen(
                     var groqModelMenuExpanded by remember { mutableStateOf(false) }
                     var openRouterModelMenuExpanded by remember { mutableStateOf(false) }
 
-                    Text(
-                        text = context.getString(R.string.settings_llm_provider_hint),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MutedLavender,
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
                     ExposedDropdownMenuBox(
                         expanded = providerMenuExpanded,
                         onExpandedChange = { providerMenuExpanded = it },
@@ -1985,34 +1847,40 @@ fun SettingsScreen(
                     }
                 }
 
+                val savedLabel = context.getString(R.string.settings_saved)
+                val showSavedFeedback = saveFeedback == savedLabel
                 PrimaryStoryButton(
                     text = when {
                         isSaving -> context.getString(R.string.settings_saving)
+                        showSavedFeedback -> savedLabel
                         saveFeedback != null -> saveFeedback!!
                         else -> context.getString(R.string.action_save)
                     },
-                    enabled = hasPendingChanges && !isSaving,
+                    enabled = hasPendingChanges || isSaving || showSavedFeedback,
+                    loading = isSaving,
                     onClick = {
-                        scope.launch {
-                            isSaving = true
-                            saveFeedback = null
-                            try {
-                                val languageChanged = applySettingsDraft()
-                                yandexKeyInput = ApiKeySanitizer.clean(yandexKeyInput)
-                                StoryLog.i("SETTINGS saved")
-                                saveFeedback = context.getString(R.string.settings_saved)
-                                if (languageChanged) {
-                                    (context as? Activity)?.recreate()
+                        if (hasPendingChanges && !isSaving) {
+                            scope.launch {
+                                isSaving = true
+                                saveFeedback = null
+                                try {
+                                    val languageChanged = applySettingsDraft()
+                                    yandexKeyInput = ApiKeySanitizer.clean(yandexKeyInput)
+                                    StoryLog.i("SETTINGS saved")
+                                    saveFeedback = savedLabel
+                                    if (languageChanged) {
+                                        (context as? Activity)?.recreate()
+                                    }
+                                    delay(2500)
+                                    if (saveFeedback == savedLabel) {
+                                        saveFeedback = null
+                                    }
+                                } catch (e: Exception) {
+                                    StoryLog.e("SETTINGS save failed: ${e.message}", e)
+                                    saveFeedback = e.message ?: context.getString(R.string.settings_groq_test_fail)
+                                } finally {
+                                    isSaving = false
                                 }
-                                delay(2500)
-                                if (saveFeedback == context.getString(R.string.settings_saved)) {
-                                    saveFeedback = null
-                                }
-                            } catch (e: Exception) {
-                                StoryLog.e("SETTINGS save failed: ${e.message}", e)
-                                saveFeedback = e.message ?: context.getString(R.string.settings_groq_test_fail)
-                            } finally {
-                                isSaving = false
                             }
                         }
                     },
@@ -2029,7 +1897,7 @@ fun SettingsScreen(
                     color = MutedLavender.copy(alpha = 0.65f),
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(top = 8.dp, bottom = 24.dp),
+                        .padding(top = 12.dp, bottom = 16.dp),
                 )
         }
 
@@ -2162,12 +2030,14 @@ private fun NarratorRadioRow(
         )
         Column(modifier = Modifier.padding(top = 12.dp, end = 8.dp)) {
             Text(text = label, style = MaterialTheme.typography.bodyMedium, color = CreamText)
-            Text(
-                text = description,
-                style = MaterialTheme.typography.bodySmall,
-                color = MutedLavender,
-                modifier = Modifier.padding(top = 2.dp),
-            )
+            if (description.isNotBlank()) {
+                Text(
+                    text = description,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MutedLavender,
+                    modifier = Modifier.padding(top = 2.dp),
+                )
+            }
         }
     }
 }

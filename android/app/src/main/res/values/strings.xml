@@ -110,6 +110,8 @@
     <string name="settings_server_llm_free_hint">На бесплатном тарифе сервер использует Llama 3.3 70B — без выбора модели.</string>
     <string name="settings_ai_advanced_collapsible">Продвинутые настройки</string>
     <string name="settings_ai_advanced_summary">%1$s · %2$s</string>
+    <string name="settings_ai_fact_model_premium">Улучшенная ИИ-модель поиска фактов</string>
+    <string name="settings_ai_fact_model_free">Базовая модель на сервере</string>
     <string name="settings_ai_server_section">Модель по подписке</string>
     <string name="settings_ai_own_key_active">Истории идут через ваш API-ключ — лимиты сервера не применяются.</string>
     <string name="settings_server_llm_premium">Модель сервера: %1$s</string>
@@ -239,8 +241,9 @@
     <string name="settings_story_length">Длина истории</string>
     <string name="settings_tts_speed">Скорость речи</string>
     <string name="settings_tts_emotion">Интонация</string>
-    <string name="settings_user_tts_section">Свои ключи озвучки</string>
-    <string name="settings_user_tts_hint">Если указать ключ Yandex — SpeechKit списывает с вашего счёта, не с сервера приложения. Тот же пайплайн ударений и транслита.</string>
+    <string name="settings_tts_synthesis_via">Синтез речи через</string>
+    <string name="settings_user_tts_section">Синтез речи через</string>
+    <string name="settings_user_tts_hint"></string>
     <string name="settings_user_tts_active">Озвучка идёт через ваш %1$s</string>
     <string name="settings_yandex_api_key">Yandex API Key</string>
     <string name="settings_yandex_folder_id">Yandex Folder ID</string>

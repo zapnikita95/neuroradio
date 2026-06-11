@@ -43,7 +43,7 @@ fun PrimaryStoryButton(
         modifier = modifier
             .fillMaxWidth()
             .height(56.dp)
-            .alpha(if (interactive) 1f else if (loading) 0.92f else 0.45f)
+            .alpha(if (loading || enabled) 1f else 0.45f)
             .clip(RoundedCornerShape(18.dp))
             .background(
                 Brush.horizontalGradient(
