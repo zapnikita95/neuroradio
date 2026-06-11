@@ -66,6 +66,7 @@ struct GlassCard<Content: View>: View {
     var body: some View {
         content()
             .padding()
+            .frame(maxWidth: .infinity, alignment: .leading)
             .background(AppTheme.surfaceGlass.opacity(0.72))
             .clipShape(RoundedRectangle(cornerRadius: 16))
             .overlay(

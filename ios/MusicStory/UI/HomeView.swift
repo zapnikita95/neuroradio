@@ -73,6 +73,8 @@ struct HomeView: View {
                 )
                 .transition(.move(edge: .bottom).combined(with: .opacity))
             }
+
+            shazamFloatingControl
             }
         }
         .navigationBarHidden(true)
@@ -150,6 +152,16 @@ struct HomeView: View {
         }
     }
 
+    private var shazamFloatingControl: some View {
+        ShazamFloatingButton(
+            isListening: nowPlaying.shazam.isListening,
+            action: { Task { await recognizeWithShazam() } }
+        )
+        .padding(.top, 56)
+        .padding(.trailing, 14)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
+    }
+
     private var actionButtons: some View {
         VStack(spacing: 12) {
             PrimaryStoryButton(
@@ -158,20 +170,6 @@ struct HomeView: View {
                 loading: orchestrator.uiState.state == .fetchingStory
             ) {
                 Task { await orchestrator.requestManualStory() }
-            }
-
-            SecondaryStoryButton(
-                title: nowPlaying.shazam.isListening ? "Слушаю… поднесите к колонке" : "Распознать через Shazam",
-                enabled: !nowPlaying.shazam.isListening
-            ) {
-                Task {
-                    orchestrator.clearError()
-                    do {
-                        _ = try await nowPlaying.recognizeWithShazam()
-                    } catch {
-                        orchestrator.showError(error.localizedDescription)
-                    }
-                }
             }
 
             if orchestrator.uiState.state == .playingStory || orchestrator.uiState.state == .preparingPlayback {
@@ -207,7 +205,16 @@ struct HomeView: View {
         if let artist = nowPlaying.currentTrack?.artist, !artist.isEmpty {
             return artist
         }
-        return "Spotify или Apple Music — сами. Другой плеер — кнопка Shazam и доступ к микрофону."
+        return AppStrings.Shazam.homeIdleSubtitle
+    }
+
+    private func recognizeWithShazam() async {
+        orchestrator.clearError()
+        do {
+            _ = try await nowPlaying.recognizeWithShazam()
+        } catch {
+            orchestrator.showError(error.localizedDescription)
+        }
     }
 
     private var statusText: String {

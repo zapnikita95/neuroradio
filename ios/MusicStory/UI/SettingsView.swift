@@ -8,7 +8,6 @@ struct SettingsView: View {
     @ObservedObject private var storyRepository = StoryRepository.shared
     @ObservedObject private var offlinePack = OfflinePackStore.shared
 
-    @State private var showAccount = false
     @State private var backendURL: String = ""
     @State private var spotifyClientId: String = ""
     @State private var manualArtist: String = ""
@@ -17,19 +16,19 @@ struct SettingsView: View {
     var body: some View {
         MusicStoryBackground {
             ScrollView {
-                VStack(alignment: .leading, spacing: 20) {
-                    header
-                    accountSection
+                VStack(alignment: .leading, spacing: 16) {
                     voiceAndLengthSection
                     generalSection
-                    backendSection
                     modeSection
-                    offlinePackSection
                     triggerSection
                     spotifySection
                     manualSection
+                    offlinePackSection
+                    backendSection
                 }
-                .padding()
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, 20)
+                .padding(.vertical, 16)
             }
         }
         .navigationBarBackButtonHidden(true)
@@ -47,9 +46,6 @@ struct SettingsView: View {
                     .foregroundStyle(AppTheme.creamText)
             }
         }
-        .navigationDestination(isPresented: $showAccount) {
-            AccountView()
-        }
         .onAppear {
             backendURL = settings.backendURL
             spotifyClientId = settings.spotifyClientId
@@ -59,36 +55,6 @@ struct SettingsView: View {
             await StoryRepository.shared.refreshQuota()
             _ = await AccountAuthManager.shared.fetchProfile()
         }
-    }
-
-    private var accountSection: some View {
-        GlassCard {
-            VStack(alignment: .leading, spacing: 12) {
-                Text("Аккаунт")
-                    .font(.headline)
-                    .foregroundStyle(AppTheme.creamText)
-                if settings.accountProfile?.isLoggedIn == true {
-                    Text(settings.accountProfile?.displayName ?? "")
-                        .foregroundStyle(AppTheme.creamText)
-                    Button("Аккаунт и подписка") { showAccount = true }
-                        .buttonStyle(.borderedProminent)
-                        .tint(AppTheme.goldBright)
-                } else {
-                    Text("Войдите — история сохранится в облаке.")
-                        .font(.caption)
-                        .foregroundStyle(AppTheme.mutedLavender)
-                    Button("Войти") { showAccount = true }
-                        .buttonStyle(.borderedProminent)
-                        .tint(AppTheme.goldBright)
-                }
-            }
-        }
-    }
-
-    private var header: some View {
-        Text("Подключение и триггеры")
-            .font(.title2.bold())
-            .foregroundStyle(AppTheme.creamText)
     }
 
     private var voiceAndLengthSection: some View {
@@ -137,9 +103,6 @@ struct SettingsView: View {
                         .foregroundStyle(AppTheme.creamText)
                 }
                 .tint(AppTheme.goldBright)
-                Text(AppStrings.Shazam.autoDetectHint)
-                    .font(.footnote)
-                    .foregroundStyle(AppTheme.mutedLavender)
             }
         }
     }
@@ -176,20 +139,17 @@ struct SettingsView: View {
         }
     }
 
+    @ViewBuilder
     private var offlinePackSection: some View {
         let canUse = TierAccess.canUseOfflineAudioCache(storyRepository.accountTier)
-        let state = offlinePack.uiState
-        return GlassCard {
-            VStack(alignment: .leading, spacing: 12) {
-                Text(AppStrings.OfflinePack.title)
-                    .font(.headline)
-                    .foregroundStyle(AppTheme.creamText)
+        if canUse {
+            let state = offlinePack.uiState
+            GlassCard {
+                VStack(alignment: .leading, spacing: 12) {
+                    Text(AppStrings.OfflinePack.title)
+                        .font(.headline)
+                        .foregroundStyle(AppTheme.creamText)
 
-                if !canUse {
-                    Text(AppStrings.OfflinePack.premiumLocked)
-                        .font(.caption)
-                        .foregroundStyle(AppTheme.mutedLavender)
-                } else {
                     switch state.phase {
                     case .idle:
                         Text(AppStrings.OfflinePack.intro)

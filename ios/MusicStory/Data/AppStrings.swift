@@ -117,6 +117,6 @@ enum AppStrings {
         static let recognizeButton = "Распознать через Shazam"
         static let listeningHint = "Слушаю… поднесите к колонке"
         static let homeIdleSubtitle =
-            "Spotify или Apple Music — сами. Другой плеер — Shazam в настройках или кнопка ниже."
+            "Spotify и Apple Music — сами. Другой плеер — круглая кнопка Shazam справа."
     }
 }
