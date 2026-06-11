@@ -4,13 +4,27 @@ export function telegramBotUsername(): string | null {
   return u || null;
 }
 
-export function buildTelegramWidgetPageHtml(botUsername: string, appEmbed = false): string {
+export type TelegramWidgetEmbed = false | 'android' | 'ios';
+
+export function buildTelegramWidgetPageHtml(
+  botUsername: string,
+  embed: TelegramWidgetEmbed = false,
+): string {
   const bot = botUsername.replace(/[^a-zA-Z0-9_]/g, '').replace(/^_+/, '') || 'bot';
-  const onAuthDone = appEmbed
-    ? `if (window.MusicStoryAndroid && window.MusicStoryAndroid.onTelegramAuth) {
+  const onAuthDone =
+    embed === 'android'
+      ? `if (window.MusicStoryAndroid && window.MusicStoryAndroid.onTelegramAuth) {
     window.MusicStoryAndroid.onTelegramAuth(JSON.stringify(user));
   }`
-    : `document.body.innerHTML = '<p style="padding:24px">Готово. Вернитесь в приложение Эфир AI.</p>';`;
+      : embed === 'ios'
+        ? `if (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.telegramAuth) {
+    window.webkit.messageHandlers.telegramAuth.postMessage(user);
+  }`
+        : `document.body.innerHTML = '<p style="padding:24px">Готово. Вернитесь в приложение Эфир AI.</p>';`;
+  const hint =
+    embed === false
+      ? 'Эфир AI — вход через Telegram'
+      : 'Нажмите кнопку — Telegram покажет «Принять» или «Отклонить».';
   return `<!DOCTYPE html>
 <html lang="ru">
 <head>
@@ -27,7 +41,7 @@ export function buildTelegramWidgetPageHtml(botUsername: string, appEmbed = fals
 </head>
 <body>
 <div id="tg-wrap"></div>
-<p>${appEmbed ? 'Нажмите кнопку — Telegram покажет «Принять» или «Отклонить».' : 'Эфир AI — вход через Telegram'}</p>
+<p>${hint}</p>
 <p class="err" id="err" hidden></p>
 <script>
 function showErr(msg) {

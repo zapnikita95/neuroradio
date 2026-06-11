@@ -8,7 +8,7 @@
 
 На экране входа (иконка профиля → «Войти») первой кнопкой идёт **Sign in with Apple**. Она эквивалентна Telegram/email по функциям аккаунта.
 
-В Developer Portal для `com.efirai.appname` включите capability **Sign In with Apple**.
+В Developer Portal для `com.efirai.myapp` включите capability **Sign In with Apple** (и ShazamKit в App Services).
 
 ## Guideline 2.1 — демо-аккаунт (email)
 

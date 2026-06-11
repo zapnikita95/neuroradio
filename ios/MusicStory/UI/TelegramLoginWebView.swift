@@ -24,64 +24,25 @@ struct TelegramLoginWebView: UIViewRepresentable {
         webView.scrollView.backgroundColor = .clear
         webView.navigationDelegate = context.coordinator
 
-        let bot = botUsername.trimmingCharacters(in: .whitespaces).replacingOccurrences(of: "@", with: "")
-        let base = widgetBaseURL.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
-        let pageBase = "\(base)/telegram-login"
-        webView.loadHTMLString(Self.widgetHTML(bot: bot), baseURL: URL(string: pageBase))
+        if let url = Self.pageURL(base: widgetBaseURL, bot: botUsername) {
+            webView.load(URLRequest(url: url))
+        } else {
+            onError("Некорректный URL для Telegram")
+        }
         return webView
     }
 
     func updateUIView(_ uiView: WKWebView, context: Context) {}
 
-    static func widgetHTML(bot: String) -> String {
-        let safeBot = bot.replacingOccurrences(of: "[^a-zA-Z0-9_]", with: "", options: .regularExpression)
-        return """
-        <!DOCTYPE html>
-        <html lang="ru">
-        <head>
-        <meta charset="utf-8">
-        <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
-        <style>
-          html,body{margin:0;min-height:100%;background:#1a1520;color:#f5efe6;font:16px system-ui,sans-serif}
-          body{display:flex;flex-direction:column;align-items:center;padding:28px 12px 32px;box-sizing:border-box;text-align:center}
-          #tg-wrap{min-height:72px;width:100%;display:flex;align-items:center;justify-content:center;margin-top:8px}
-          .hint{color:rgba(245,239,230,.55);font-size:13px;line-height:1.45;margin:20px 0 0;max-width:280px}
-          .err{color:#ff6b6b;font-size:13px;margin-top:12px}
-        </style>
-        </head>
-        <body>
-        <div id="tg-wrap"></div>
-        <p class="hint">Нажмите кнопку — Telegram покажет «Принять» или «Отклонить».</p>
-        <p class="err" id="err" hidden></p>
-        <script>
-        function onTelegramAuth(user) {
-          if (!user || !user.hash) {
-            var e = document.getElementById("err");
-            if (e) { e.textContent = "Вход отменён."; e.hidden = false; }
-            return;
-          }
-          if (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.telegramAuth) {
-            window.webkit.messageHandlers.telegramAuth.postMessage(user);
-          }
-        }
-        function showErr(msg) {
-          var e = document.getElementById("err");
-          if (e) { e.textContent = msg; e.hidden = false; }
-        }
-        var s = document.createElement("script");
-        s.async = true;
-        s.src = "https://telegram.org/js/telegram-widget.js?22";
-        s.setAttribute("data-telegram-login", "\(safeBot)");
-        s.setAttribute("data-size", "large");
-        s.setAttribute("data-radius", "12");
-        s.setAttribute("data-onauth", "onTelegramAuth(user)");
-        s.setAttribute("data-request-access", "write");
-        s.onerror = function () { showErr("Не удалось загрузить Telegram. Проверьте интернет."); };
-        document.getElementById("tg-wrap").appendChild(s);
-        </script>
-        </body>
-        </html>
-        """
+    static func pageURL(base: String, bot: String) -> URL? {
+        let trimmedBase = base.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+        let safeBot = bot.trimmingCharacters(in: .whitespaces).replacingOccurrences(of: "@", with: "")
+        var components = URLComponents(string: "\(trimmedBase)/telegram-login")
+        components?.queryItems = [
+            URLQueryItem(name: "embed", value: "ios"),
+            URLQueryItem(name: "bot", value: safeBot),
+        ]
+        return components?.url
     }
 
     final class Coordinator: NSObject, WKNavigationDelegate, WKScriptMessageHandler {
@@ -98,22 +59,37 @@ struct TelegramLoginWebView: UIViewRepresentable {
             onAuth(body)
         }
 
+        func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) {
+            onError(error.localizedDescription)
+        }
+
+        func webView(
+            _ webView: WKWebView,
+            didFailProvisionalNavigation navigation: WKNavigation!,
+            withError error: Error
+        ) {
+            onError(error.localizedDescription)
+        }
+
         func webView(_ webView: WKWebView, decidePolicyFor navigationAction: WKNavigationAction, decisionHandler: @escaping (WKNavigationActionPolicy) -> Void) {
             guard let host = navigationAction.request.url?.host?.lowercased() else {
                 decisionHandler(.cancel)
                 return
             }
-            let allowed = ["telegram.org", "oauth.telegram.org", "t.me", "efir-ai.ru", "www.efir-ai.ru"]
-                + allowedRailwayHosts()
+            let allowed = [
+                "telegram.org",
+                "oauth.telegram.org",
+                "t.me",
+                "efir-ai.ru",
+                "www.efir-ai.ru",
+                "railway.app",
+                "music-story-production.up.railway.app",
+            ]
             if allowed.contains(where: { host == $0 || host.hasSuffix(".\($0)") }) {
                 decisionHandler(.allow)
             } else {
                 decisionHandler(.cancel)
             }
-        }
-
-        private func allowedRailwayHosts() -> [String] {
-            ["railway.app", "music-story-production.up.railway.app"]
         }
     }
 }
@@ -124,14 +100,25 @@ struct TelegramLoginSheet: View {
     let onAuth: ([String: Any]) -> Void
     let onDismiss: () -> Void
 
+    @State private var errorMessage: String?
+
     var body: some View {
         NavigationStack {
-            TelegramLoginWebView(
-                botUsername: botUsername,
-                widgetBaseURL: widgetBaseURL,
-                onAuth: onAuth,
-                onError: { _ in }
-            )
+            VStack(spacing: 12) {
+                TelegramLoginWebView(
+                    botUsername: botUsername,
+                    widgetBaseURL: widgetBaseURL,
+                    onAuth: onAuth,
+                    onError: { errorMessage = $0 }
+                )
+                if let errorMessage {
+                    Text(errorMessage)
+                        .font(.caption)
+                        .foregroundStyle(AppTheme.errorCoral)
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal)
+                }
+            }
             .navigationTitle("Telegram")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {

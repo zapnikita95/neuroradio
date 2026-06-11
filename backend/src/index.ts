@@ -177,9 +177,14 @@ function sendTelegramWidgetPage(req: express.Request, res: express.Response): vo
     res.status(503).type('text/plain').send('TELEGRAM_BOT_USERNAME not configured');
     return;
   }
-  const appEmbed = req.query.app === '1' || req.query.embed === 'android';
+  const embed =
+    req.query.embed === 'android'
+      ? 'android'
+      : req.query.embed === 'ios' || req.query.app === '1'
+        ? 'ios'
+        : false;
   res.setHeader('Cache-Control', 'no-store');
-  res.type('html').send(buildTelegramWidgetPageHtml(bot, appEmbed));
+  res.type('html').send(buildTelegramWidgetPageHtml(bot, embed));
 }
 app.get('/telegram-login', (req, res) => sendTelegramWidgetPage(req, res));
 

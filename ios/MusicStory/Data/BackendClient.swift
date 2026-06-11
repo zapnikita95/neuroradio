@@ -2,7 +2,7 @@ import Foundation
 import CryptoKit
 import os
 
-private let backendLog = Logger(subsystem: "com.efirai.appname", category: "Backend")
+private let backendLog = Logger(subsystem: "com.efirai.myapp", category: "Backend")
 
 struct LoginPrepResult: Sendable {
     let ready: Bool
@@ -430,12 +430,12 @@ final class BackendClient {
         let teamId = Bundle.main.object(forInfoDictionaryKey: "AppleTeamIdentifier") as? String ?? "DEVELOPMENT"
         let attestation = Self.iosAttestationHash(
             teamId: teamId,
-            bundleId: Bundle.main.bundleIdentifier ?? "com.efirai.appname"
+            bundleId: Bundle.main.bundleIdentifier ?? "com.efirai.myapp"
         )
 
         let payload: [String: Any] = [
             "install_id": existingInstallId,
-            "package_name": Bundle.main.bundleIdentifier ?? "com.efirai.appname",
+            "package_name": Bundle.main.bundleIdentifier ?? "com.efirai.myapp",
             "cert_sha256": attestation,
             "app_version": Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0",
             "platform": "ios",
