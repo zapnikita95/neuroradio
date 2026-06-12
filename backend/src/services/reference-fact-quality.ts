@@ -318,6 +318,10 @@ export function interestScore(fact: string): number {
 
 /** Chart/metrics-only — не семя для истории. */
 export function isWeakChartSeed(fact: string): boolean {
+  if (/\bmost[- ]streamed (?:track|song)|most streamed (?:track|song)\b/i.test(fact)) return false;
+  if (/\bbillion streams?\b/i.test(fact) && /\b(?:song|track|single|this|was|is)\b/i.test(fact)) {
+    return false;
+  }
   return (
     /\b(?:topped the|weeks on the (?:UK )?singles|popularise.{0,25}music video format|peaked at number|reached number (?:one|\d+) on|billboard hot|charted for \d+ weeks)\b/i.test(fact) ||
     /\b(?:billion views|most-streamed|certified diamond|downloads across)\b/i.test(fact)

@@ -177,6 +177,17 @@ test('polish fixes зациклили and duplicate тогда after year', () =
   assert.doesNotMatch(out, /зациклили/i);
 });
 
+test('years after season spoken for TTS', () => {
+  const spoken = normalizeYearsForRussianTts('стал саундтреком лета 2014 тогда.');
+  assert.match(spoken, /лета две тысячи четырнадцатого года/i);
+  assert.doesNotMatch(spoken, /\b2014\b/);
+});
+
+test('polish removes тогда after season year', () => {
+  const out = polishScriptForSpeechDelivery('стал саундтреком лета 2014 тогда.');
+  assert.doesNotMatch(out, /2014\s+тогда/i);
+});
+
 test('years in начале 2010 года spoken for TTS', () => {
   const spoken = normalizeYearsForRussianTts('Тогда, в начале 2010 года, они уже были легендами.');
   assert.match(spoken, /в начале две тысячи десятого года/i);

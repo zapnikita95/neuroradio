@@ -683,6 +683,178 @@ export function factMentionsTitle(fact: string, title: string): boolean {
   return textMentionsTitle(fact, title);
 }
 
+/** Однословные названия вроде «Summer» / «Love» — ложное совпадение с энциклопедией и сезонами. */
+const AMBIGUOUS_COMMON_WORD_TITLES = new Set(
+  [
+    'summer',
+    'winter',
+    'spring',
+    'autumn',
+    'fall',
+    'love',
+    'pain',
+    'hello',
+    'home',
+    'time',
+    'angel',
+    'gold',
+    'fire',
+    'water',
+    'life',
+    'death',
+    'hope',
+    'dream',
+    'rain',
+    'snow',
+    'happy',
+    'young',
+    'blue',
+    'red',
+    'star',
+    'stars',
+    'moon',
+    'sun',
+    'day',
+    'night',
+    'alone',
+    'stay',
+    'run',
+    'fly',
+    'free',
+    'hero',
+    'ghost',
+    'gravity',
+    'paradise',
+    'heaven',
+    'hell',
+    'light',
+    'dark',
+    'crazy',
+    'beautiful',
+    'perfect',
+    'magic',
+    'power',
+    'faith',
+    'trust',
+    'control',
+    'work',
+    'play',
+    'dance',
+    'sing',
+    'believe',
+    'remember',
+    'forever',
+    'yesterday',
+    'tomorrow',
+    'today',
+    'changes',
+    'help',
+    'sorry',
+    'problem',
+    'radio',
+    'video',
+    'party',
+    'money',
+    'world',
+    'earth',
+    'sky',
+    'wind',
+    'wave',
+    'waves',
+    'river',
+    'ocean',
+    'island',
+    'city',
+    'town',
+    'street',
+    'road',
+    'drive',
+    'walk',
+    'move',
+    'wait',
+    'stop',
+    'start',
+    'break',
+    'fix',
+    'lost',
+    'found',
+    'goodbye',
+    'good',
+    'bad',
+    'right',
+    'wrong',
+    'true',
+    'fake',
+    'real',
+    'mine',
+    'yours',
+    'ours',
+    'theirs',
+  ].map(normalize),
+);
+
+const NON_MUSIC_TITLE_COLLISION_PATTERNS: RegExp[] = [
+  /\b(?:summer|winter|spring|autumn|fall)\s+(?:break|vacation|holiday|solstice|season)\b/i,
+  /\b(?:hottest|warmest|coldest|season(?:al)?)\s+(?:season|of the year)\b/i,
+  /\bchildren are out of school\b/i,
+  /\bfour seasons\b/i,
+  /\b(?:is one of the four seasons|is the warmest season|is the hottest season)\b/i,
+  /\b(?:зимн|летн|весенн|осенн)(?:ий|яя|ее|ем|ей)\s+(?:период|сезон|отпуск)\b/i,
+  /\b(?:сам(?:ый|ая|ое)\s+)?(?:жарк(?:ий|ая|ое)|тёпл(?:ый|ая|ое)|тепл(?:ый|ая|ое)|холодн(?:ый|ая|ое))\s+сезон\b/i,
+];
+
+export function isAmbiguousCommonWordTitle(title: string): boolean {
+  const clean = title.replace(/\s*\([^)]*\)\s*/g, ' ').trim();
+  const token = normalize(clean).split(' ').filter(Boolean)[0] ?? '';
+  if (!token) return false;
+  if (/\s/.test(normalize(clean))) return false;
+  return AMBIGUOUS_COMMON_WORD_TITLES.has(token);
+}
+
+/** Факт про сезон/энциклопедию, а не про трек — совпало одно слово названия. */
+export function isNonMusicTitleCollisionFact(fact: string, title: string, artist: string): boolean {
+  if (!isAmbiguousCommonWordTitle(title)) return false;
+  const titleWord = normalize(title.replace(/\s*\([^)]*\)\s*/g, ' ').trim());
+  const factNorm = normalize(fact);
+  if (!titleWord || !factNorm.includes(titleWord)) return false;
+
+  if (
+    hasTrackContextSignal(fact) ||
+    hasRussianTrackContextSignal(fact) ||
+    /\b(?:song|single|track|released|recorded|chart|spotify|stream|billboard|music video|most[- ]streamed)\b/i.test(
+      fact,
+    )
+  ) {
+    return false;
+  }
+
+  if (
+    factMentionsArtist(fact, artist) &&
+    (hasTrackContextSignal(fact) ||
+      hasRussianTrackContextSignal(fact) ||
+      /\b(?:song|single|track|released|recorded|chart|spotify|stream|billboard|music video|dj|producer)\b/i.test(
+        fact,
+      ))
+  ) {
+    return false;
+  }
+
+  if (NON_MUSIC_TITLE_COLLISION_PATTERNS.some((pattern) => pattern.test(fact))) return true;
+
+  if (
+    !hasTrackContextSignal(fact) &&
+    !hasRussianTrackContextSignal(fact) &&
+    !factMentionsArtist(fact, artist) &&
+    /\b(?:season|school|weather|climate|solstice|hemisphere|months?|vacation|holiday|children|students)\b/i.test(
+      fact,
+    )
+  ) {
+    return true;
+  }
+
+  return false;
+}
+
 /** @deprecated Use buildTitleMatchVariants from title-transliterate.ts */
 export function titleMentionVariants(title: string): string[] {
   return buildTitleMatchVariants(title);
@@ -703,7 +875,7 @@ export function hasTrackContextSignal(fact: string): boolean {
     /^It\s+(?:was|is|became|would|has|had|features|samples|opens|starts|tells|explores|remains)\b/i.test(
       trimmed,
     ) ||
-    /\b(?:music video|directed by|controversial nature|five different versions|operatic section|studio session|composed the|wrote the|recorded at|took three weeks|no chorus|gained popularity|viral|tiktok|signed with|influenced by|first single|lead single|first new (?:song|music|single)|announced on youtube|announced a new ep|new lead singer|hidden meaning|origin story|radio banned|refused to play|censored|banned by|intended to|repudiat\w*|members? of the (?:band|group|four)|far[- ]?right|extremist gang|documentary)\b/i.test(
+    /\b(?:music video|directed by|controversial nature|five different versions|operatic section|studio session|composed the|wrote the|recorded at|took three weeks|no chorus|gained popularity|viral|tiktok|signed with|influenced by|first single|lead single|first new (?:song|music|single)|announced on youtube|announced a new ep|new lead singer|hidden meaning|origin story|radio banned|refused to play|censored|banned by|intended to|repudiat\w*|members? of the (?:band|group|four)|far[- ]?right|extremist gang|documentary|most[- ]streamed|spotify|apple music|youtube music)\b/i.test(
       trimmed,
     ) ||
     /\b(?:single cut is significantly shorter|promo track under the name)\b/i.test(trimmed)
@@ -809,6 +981,7 @@ export function factAppliesToRequest(
   const trimmed = fact.trim();
   if (trimmed.length < 35) return false;
   if (isNonMusicProfessionText(trimmed)) return false;
+  if (title && artist && isNonMusicTitleCollisionFact(trimmed, title, artist)) return false;
   if (isAmbiguousCommonWordArtist(artist) && !factMentionsArtistAsEntity(trimmed, artist)) return false;
   if (isWebListicleJunk(trimmed)) return false;
   if (isGenericDisambiguationFact(trimmed, artist)) return false;
@@ -832,7 +1005,9 @@ export function factAppliesToRequest(
       const titleOnlyOk =
         hasTrackContextSignal(trimmed) ||
         hasRussianTrackContextSignal(trimmed) ||
-        /^[«"']/.test(trimmed);
+        /^[«"']/.test(trimmed) ||
+        (isAmbiguousCommonWordTitle(title) &&
+          /\b(?:spotify|stream|chart|single|song|track|released|billboard|most[- ]streamed)\b/i.test(trimmed));
       if (!titleOnlyOk) return false;
     }
     if (!mentionsArtist && !mentionsTitle) {

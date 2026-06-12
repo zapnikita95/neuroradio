@@ -260,6 +260,7 @@ const WRONG_MUSIC_TOPIC_PATTERNS: RegExp[] = [
   /\b(?:esoteric numerology|heavenly journeys|pseudonyms, claiming)\b/i,
   /\b(?:the novel is|this novel|literary genre)\b/i,
   /\b(?:master craftsman|old european guild|journeyman aspiring)\b/i,
+  /\b(?:is one of the four seasons|warmest season|hottest season|summer solstice|children are out of school)\b/i,
 ];
 
 function factMentionsArtist(fact: string, artist: string): boolean {
@@ -712,11 +713,17 @@ export async function fetchFastTrackWikiFacts(artist: string, title: string): Pr
   const lang: 'en' = 'en';
   const cleanTitle = cleanTrackTitle(title);
   const fromBuilder = buildTrackTitleCandidates(artist, title);
-  const candidates = [
-    cleanTitle,
-    `${cleanTitle} (song)`,
-    ...fromBuilder.filter((c) => c !== cleanTitle && c !== `${cleanTitle} (song)`),
-  ].slice(0, 10);
+  const ambiguousSingleWord = !/\s/.test(cleanTitle.trim()) && cleanTitle.trim().length >= 3;
+  const songCandidate = `${cleanTitle} (song)`;
+  const candidates = (
+    ambiguousSingleWord
+      ? [
+          songCandidate,
+          cleanTitle,
+          ...fromBuilder.filter((c) => c !== cleanTitle && c !== songCandidate),
+        ]
+      : [cleanTitle, songCandidate, ...fromBuilder.filter((c) => c !== cleanTitle && c !== songCandidate)]
+  ).slice(0, 10);
 
   for (const candidate of candidates) {
     let extract = await fetchFullExtract(lang, candidate, false);

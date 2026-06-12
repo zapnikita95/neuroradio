@@ -25,6 +25,7 @@ import {
   isAlbumScopeFact,
   factMentionsOtherTrackTitle,
   isMisattributedBandTrackFact,
+  isNonMusicTitleCollisionFact,
 } from './fact-relevance.js';
 import { factFitsStoryLanguage } from './fact-language-fit.js';
 import type { StoryLanguageId } from './story-language.js';
@@ -131,8 +132,10 @@ function isRejectedSeed(
   title = '',
   storyLanguage: StoryLanguageId = 'ru',
   trackPool: string[] = [],
+  artist = '',
 ): boolean {
   if (!factFitsStoryLanguage(fact, storyLanguage)) return true;
+  if (title && artist && isNonMusicTitleCollisionFact(fact, title, artist)) return true;
   if (isAlbumListingSeed(fact)) return true;
   if (isCatalogMetadataSeed(fact)) return true;
   if (
@@ -155,7 +158,7 @@ function isRejectedSeed(
   if (WEAK_TRIVIA_PATTERNS.some((p) => p.test(fact))) return true;
   if (isWeakChartSeed(fact)) return true;
   if (isBoringFact(fact)) return true;
-  if (isCollectorFact(fact)) return true;
+  if (isCollectorFact(fact) && !(title && factMentionsTitle(fact, title))) return true;
   if (isTruncatedMarketingSnippet(fact)) return true;
   if (isUnspeakableWebSeed(fact)) return true;
   return false;
@@ -181,9 +184,10 @@ function pickBestByInterest(
   blockedTopics: Set<FactTopicKey> = new Set(),
   storyLanguage: StoryLanguageId = 'ru',
   trackPool: string[] = [],
+  artist = '',
 ): string | null {
   for (const fact of sortByInterest(facts, narrator)) {
-    if (isRejectedSeed(fact, title, storyLanguage, trackPool)) continue;
+    if (isRejectedSeed(fact, title, storyLanguage, trackPool, artist)) continue;
     if (adjustedInterestScore(fact, narrator) < minScore) continue;
     if (isUsedFact(fact, usedFingerprints)) continue;
     const topic = classifyFactTopic(fact);
@@ -248,6 +252,7 @@ export function pickReferenceFact(
       blockedTopics,
       storyLanguage,
       trackPoolForReject,
+      artist,
     );
     if (picked && adjustedInterestScore(picked, narrator) >= MIN_GOOD_SCOPE_INTEREST) {
       return wrapSelected(picked, scope, narrator);
@@ -264,6 +269,7 @@ export function pickReferenceFact(
     blockedTopics,
     storyLanguage,
     trackPoolForReject,
+    artist,
   );
   if (globalBest) {
     const scope: FactScope = pools.track.includes(globalBest)
@@ -279,7 +285,7 @@ export function pickReferenceFact(
     if (isMetadataOnlyFallbackFact(fact)) continue;
     if (isMisattributedBandTrackFact(fact, title)) continue;
     if (isBoringFact(fact)) continue;
-    if (isRejectedSeed(fact, title, storyLanguage, trackPoolForReject)) continue;
+    if (isRejectedSeed(fact, title, storyLanguage, trackPoolForReject, artist)) continue;
     if (adjustedInterestScore(fact, narrator) < 6) continue;
     if (isUsedFact(fact, usedFingerprints)) continue;
     const topic = classifyFactTopic(fact);

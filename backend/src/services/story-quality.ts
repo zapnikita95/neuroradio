@@ -951,6 +951,14 @@ const UNGROUNDED_CLAIM_CHECKS: Array<{ claim: RegExp; factHint: RegExp }> = [
     factHint: /я\s+обожаю|i love|obsessed with/i,
   },
   {
+    claim: /летн(?:ий|ем)\s+бриз|смешав\s+.*(?:бит|гитар)|электронн\w*\s+бит.*гитар/i,
+    factHint: /breeze|guitar|studio|recorded|spotify|stream|chart|bit|electronic/i,
+  },
+  {
+    claim: /(?:записывал(?:ся|ась|и)|в\s+студии\s+все|между\s+турами|в\s+перерывах\s+между)/i,
+    factHint: /record|studio|tour|recorded|between tour|перерыв/i,
+  },
+  {
     claim: /синтезатор|шёпот|шепот|электроник\w*\s+и\s+шёпот|осколк\w*\s+электроник/i,
     factHint: /synth|electronic|deathtronica|electronicore|scream|hardcore|metalcore|шёпот|шепот|синтез|guitar|вокал/i,
   },

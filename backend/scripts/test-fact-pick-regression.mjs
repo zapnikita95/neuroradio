@@ -28,7 +28,9 @@ loadEnv(resolve(root, '.env'));
 
 const { pickReferenceFact } = await import('../dist/services/fact-picker.js');
 const { splitBundleByScope } = await import('../dist/services/fact-ranking.js');
-const { factAppliesToRequest, factMentionsTitle } = await import('../dist/services/fact-relevance.js');
+const { factAppliesToRequest, factMentionsTitle, isNonMusicTitleCollisionFact } = await import(
+  '../dist/services/fact-relevance.js'
+);
 const { dedicatedHarvestToBundle } = await import('../dist/services/fact-sources/dedicated-fetch.js');
 const { poolHasTopicDuplicate } = await import('../dist/services/fact-topic.js');
 const { isArtistFormationBioSeed, isTrackDurationCatalogSeed } = await import(
@@ -47,6 +49,12 @@ const FORMATION_BIO =
 const DURATION_CATALOG = 'На издании альбома «MMXX» трек «Hypa Hypa» идёт 3:33.';
 
 const WEAK_EP_STUB = 'Furthermore, Eskimo Callboy announced a new EP at the same time.';
+
+const SUMMER_ARTIST = 'Calvin Harris';
+const SUMMER_TITLE = 'Summer';
+const SEASON_COLLISION =
+  'In almost all countries, children are out of school during the summer break.';
+const SPOTIFY_FACT = "Summer was Spotify's most-streamed track of 2014 worldwide.";
 
 let failed = 0;
 
@@ -114,6 +122,29 @@ const badPick = pickReferenceFact(
 assert(
   badPick?.fact.includes('formed'),
   'without track facts, formation bio is acceptable fallback',
+);
+
+// --- 2b. Summer: season encyclopedia must lose to Spotify track fact ---
+assert(
+  isNonMusicTitleCollisionFact(SEASON_COLLISION, SUMMER_TITLE, SUMMER_ARTIST),
+  'summer break encyclopedia rejected as title collision',
+);
+const summerPick = pickReferenceFact(
+  {
+    trackFacts: [SPOTIFY_FACT],
+    artistFacts: [SEASON_COLLISION],
+    albumFacts: [],
+  },
+  [],
+  0,
+  SUMMER_ARTIST,
+  SUMMER_TITLE,
+  new Set(),
+  'night_dj',
+);
+assert(
+  summerPick?.fact.includes('Spotify') || summerPick?.fact.includes('streamed'),
+  `Summer pick is Spotify fact, not season trivia (got: ${summerPick?.fact?.slice(0, 80)})`,
 );
 
 // --- 3. Dedup: narrative + duration are not the same topic duplicate ---

@@ -66,6 +66,14 @@ function yearToSpoken(year: number, yearCase: YearCase): string {
   return String(year);
 }
 
+function yearToSpokenFullGenitive(year: number): string {
+  if (year >= 2000 && year <= 2099) {
+    const tail = year % 100;
+    return `две тысячи ${twoDigitOrdinal(tail, 'gen')}`;
+  }
+  return yearToSpoken(year, 'gen');
+}
+
 /** JS \\b is unreliable with Cyrillic — use explicit separators like story-quality.ts. */
 const PRE_V = /(^|[\s,.«"—-])([Вв])\s+((?:19|20)\d{2})\s+году(?=[\s,.!?»"—-]|$)/gu;
 const PRE_V_NOM = /(^|[\s,.«"—-])([Вв])\s+((?:19|20)\d{2})\s+год(?=[\s,.!?»"—-]|$)/gu;
@@ -73,6 +81,8 @@ const GEN_YEAR = /(^|[\s,.«"—-])((?:19|20)\d{2})\s+года(?=[\s,.!?»"—-]
 const NOM_YEAR = /(^|[\s,.«"—-])((?:19|20)\d{2})\s+год(?=[\s,.!?»"—-]|$)/gu;
 const IN_BEGINNING_YEAR =
   /(^|[\s,.«"—-])((?:[Вв]\s+)?(?:начале|конце|середине))\s+((?:19|20)\d{2})(\s+года(?=[\s,.!?»"—-]|$))?/gu;
+const SEASON_GEN_YEAR =
+  /(^|[\s,.«"—-])((?:лета|летом|зимой|зимы|весной|весны|осенью|осени))\s+((?:19|20)\d{2})(\s+года(?=[\s,.!?»"—-]|$))?/gu;
 
 /** «В 2021 году» → «В двадцать первом году»; «в начале 2010 года» → «в начале две тысячи десятого года». */
 export function normalizeYearsForRussianTts(text: string): string {
@@ -80,6 +90,11 @@ export function normalizeYearsForRussianTts(text: string): string {
     IN_BEGINNING_YEAR,
     (_match, lead: string, prep: string, digits: string, gada?: string) =>
       `${lead}${prep} ${yearToSpoken(Number(digits), 'gen')}${gada ?? ''}`,
+  );
+  result = result.replace(
+    SEASON_GEN_YEAR,
+    (_match, lead: string, season: string, digits: string, gada?: string) =>
+      `${lead}${season} ${yearToSpokenFullGenitive(Number(digits))}${gada ?? ' года'}`,
   );
   result = result.replace(
     PRE_V,
