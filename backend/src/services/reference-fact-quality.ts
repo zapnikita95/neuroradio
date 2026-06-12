@@ -163,6 +163,22 @@ const BACKSTORY_FACT_PATTERNS: RegExp[] = [
 
 export const MIN_PICK_INTEREST_SCORE = 6;
 
+/** «Directed by X» / «music video» без драмы — не топ семя; сильные клипы (бюджет, скандал) не штрафуем. */
+const GENERIC_MUSIC_VIDEO_SEED =
+  /\b(?:music video|official video|video was directed|directed by|promotional video|accompanying music video|клип(?:а|ом|е|у)?|режисс(?:ё|е)р(?:ом|а|у)?|filmed by|video for|premiered on mtv)\b/i;
+
+const STRONG_MUSIC_VIDEO_STORY =
+  /\b(?:controversial|scandal|banned|million|invested|sevenfold|optical illusion|vfx|cgi|first (?:ever )?(?:music )?video|national film registry|fourteen.minute|полмиллион|собственн\w+\s+денег|record registry|переснимал|бюджет)\b/i;
+
+export function isGenericMusicVideoSeed(fact: string): boolean {
+  const trimmed = fact.trim();
+  if (!GENERIC_MUSIC_VIDEO_SEED.test(trimmed)) return false;
+  if (STRONG_MUSIC_VIDEO_STORY.test(trimmed)) return false;
+  if (BACKSTORY_FACT_PATTERNS.some((p) => p.test(trimmed))) return false;
+  if (STORY_FACT_PATTERNS.some((p) => p.test(trimmed))) return false;
+  return true;
+}
+
 function normalizeForMatch(text: string): string {
   return text
     .toLowerCase()
@@ -250,9 +266,10 @@ export function interestScore(fact: string): number {
   if (/\b(million|billion|decade|generation)\b/i.test(fact)) score += 2;
   const isPromoRename = /\b(?:promo track under the name|originally released as a promo)\b/i.test(fact);
   const isRadioEdit = /\b(?:single cut is significantly shorter|album version featuring an introductory)\b/i.test(fact);
-  if (/\b(?:directed by|music video|controversial nature|five different versions|banned by|refused to)\b/i.test(fact)) {
+  if (/\b(?:controversial nature|five different versions|banned by|refused to)\b/i.test(fact)) {
     score += 10;
   }
+  if (isGenericMusicVideoSeed(fact)) score -= 14;
   if (isPromoRename || isRadioEdit) score += 10;
   if (/\b(?:avoid discrimination|appeal to (?:a )?white|change their name|stage name|heritage)\b/i.test(fact)) {
     score += 12;

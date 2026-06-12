@@ -2,7 +2,7 @@ import fetch from '../proxy-fetch.js';
 import { fuzzyTokenMatch } from './title-transliterate.js';
 import type { SelectedReferenceFact } from './fact-picker.js';
 import { factNamesForeignEntity, factMentionsArtist, factMentionsTitle, hasTrackContextSignal, hasRussianTrackContextSignal } from './fact-relevance.js';
-import { interestScore, isBoringFact, MIN_PICK_INTEREST_SCORE, isWeakChartSeed } from './reference-fact-quality.js';
+import { interestScore, isBoringFact, MIN_PICK_INTEREST_SCORE, isWeakChartSeed, isGenericMusicVideoSeed } from './reference-fact-quality.js';
 import { interestRating10 } from './fact-interest-log.js';
 import { MIN_GOOD_SCOPE_INTEREST } from './fact-picker.js';
 import { WEAK_TRIVIA_PATTERNS, FACT_HUNT_LLM_PROMPT_BLOCK } from './story-fact-hunt.js';
@@ -83,6 +83,7 @@ export function shouldRunLlmFactHunt(
   if (selected && isLyricsPageSeed(selected.fact)) return true;
   if (selected && !hasNarrativeSeedSignal(selected.fact)) return true;
   if (selected.interestScore >= FAST_SEED_INTEREST_SCORE) {
+    if (isGenericMusicVideoSeed(selected.fact)) return true;
     return false;
   }
   // No track-level facts — artist trivia is weak for a specific song; let LLM hunt from snippets.
@@ -111,6 +112,7 @@ export function explainFactHuntDecision(
   if (isLyricsPageSeed(selected.fact)) return 'lyrics-page-seed';
   if (!hasNarrativeSeedSignal(selected.fact)) return 'no-narrative-seed';
   if (selected.interestScore >= FAST_SEED_INTEREST_SCORE) {
+    if (isGenericMusicVideoSeed(selected.fact)) return 'generic-music-video-seed';
     return `fast-seed score=${selected.interestScore}`;
   }
   if (trackFactCount === 0 && selected.scope !== 'track') return 'no-track-facts';

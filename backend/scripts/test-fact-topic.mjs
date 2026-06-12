@@ -4,7 +4,7 @@
 import { classifyFactTopic, factsShareTopicOrOverlap, poolHasTopicDuplicate } from '../dist/services/fact-topic.js';
 import { factFitsStoryLanguage, isEnglishOnlyRussianMetaFact } from '../dist/services/fact-language-fit.js';
 import { isParserTrustedHarvestSource } from '../dist/services/fact-sources/types.js';
-import { interestScore, isBoringFact } from '../dist/services/reference-fact-quality.js';
+import { interestScore, isBoringFact, isGenericMusicVideoSeed } from '../dist/services/reference-fact-quality.js';
 
 const cases = [
   {
@@ -97,6 +97,19 @@ if (!bulkWouldAccept(museSingle)) {
 }
 if (!isBoringFact(museSingle.fact)) {
   console.error('FAIL bulk-trust: expected isBoringFact=true for first-single (live still keeps via parser trust)');
+  failed += 1;
+}
+
+const stromaeVideo = 'Directed by Stromae (Paul Van Haver) & Jérome Guiot.';
+const studioFact = 'The band recorded the track in three weeks at Sound City Studios.';
+if (isGenericMusicVideoSeed(stromaeVideo) !== true) {
+  console.error('FAIL: Stromae director credit should be generic music video seed');
+  failed += 1;
+}
+if (interestScore(stromaeVideo) >= interestScore(studioFact)) {
+  console.error(
+    `FAIL: generic video seed (${interestScore(stromaeVideo)}) should rank below studio (${interestScore(studioFact)})`,
+  );
   failed += 1;
 }
 
