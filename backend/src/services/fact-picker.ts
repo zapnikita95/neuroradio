@@ -4,6 +4,8 @@ import {
   filterAndRankFacts,
   interestScore,
   adjustedInterestScore,
+  isAlbumListingSeed,
+  isCatalogMetadataSeed,
   isBackstoryFact,
   isBoringFact,
   isCollectorFact,
@@ -119,6 +121,8 @@ export function resolveScopeOrder(
 
 function isRejectedSeed(fact: string, title = '', storyLanguage: StoryLanguageId = 'ru'): boolean {
   if (!factFitsStoryLanguage(fact, storyLanguage)) return true;
+  if (isAlbumListingSeed(fact)) return true;
+  if (isCatalogMetadataSeed(fact)) return true;
   if (isMetadataOnlyFallbackFact(fact)) return true;
   if (title && isMisattributedBandTrackFact(fact, title)) return true;
   if (WEAK_TRIVIA_PATTERNS.some((p) => p.test(fact))) return true;

@@ -8,7 +8,7 @@ import {
   hasTrackContextSignal,
 } from '../fact-relevance.js';
 import { poolHasTopicDuplicate } from '../fact-topic.js';
-import { interestScore } from '../reference-fact-quality.js';
+import { interestScore, isAlbumListingSeed } from '../reference-fact-quality.js';
 import { isTruncatedMarketingSnippet } from '../web-snippet-accept.js';
 import type { HarvestContext, HarvestedFact, HarvestSource } from './types.js';
 import { isParserTrustedHarvestSource } from './types.js';
@@ -90,6 +90,7 @@ function dedicatedFactRelevant(
 ): boolean {
   const trimmed = fact.trim();
   if (trimmed.length < 35 || isTruncatedMarketingSnippet(trimmed)) return false;
+  if (isAlbumListingSeed(trimmed)) return false;
   if (/multiple artists tracked as/i.test(trimmed)) return false;
   if (factNamesForeignEntity(trimmed, artist, title, artist, 'indie')) return false;
 
@@ -115,9 +116,11 @@ function parserTrustedDedicatedRelevant(
 ): boolean {
   const trimmed = item.fact.trim();
   if (trimmed.length < 35 || isTruncatedMarketingSnippet(trimmed)) return false;
+  if (isAlbumListingSeed(trimmed)) return false;
   if (/multiple artists tracked as/i.test(trimmed)) return false;
+  if (/creativecommons|user-contributed text is available/i.test(trimmed)) return false;
   if (item.scope === 'artist') {
-    if (item.source === 'discogs') return true;
+    if (item.source === 'discogs' || item.source === 'lastfm') return true;
     return factMentionsArtist(trimmed, artist);
   }
   if (factMentionsTitle(trimmed, title)) return true;

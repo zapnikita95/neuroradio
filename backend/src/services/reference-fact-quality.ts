@@ -25,18 +25,32 @@ export function isWikiBiographyLead(fact: string): boolean {
   return bioHits >= 2 || (bioHits >= 1 && trimmed.length >= 220);
 }
 
-/** Discogs/Last.fm/Setlist catalog seeds — допустимы для indie, когда других фактов нет. */
+/** Discogs/Setlist catalog seeds — допустимы для indie, когда других фактов нет. */
 const DEDICATED_CATALOG_SEED_PATTERNS: RegExp[] = [
   /Discogs датирован \d{4}/i,
   /выходил на лейбле/i,
   /трек «[^»]+» идёт \d+:\d+/i,
-  /на Last\.fm указан в альбоме/i,
   /впервые прозвучала на живом выступлении/i,
   /(?:electronicore|deathtronica|metalcore|post-punk|shoegaze)\s+band\s+from/i,
   /(?:piece|member)\s+.*\s+band\s+from/i,
 ];
 
+/** «Указан в альбоме X» — метаданные, не семя для истории (LLM выдумает звук). */
+export function isAlbumListingSeed(fact: string): boolean {
+  return /на Last\.fm указан в альбоме|указан в альбоме «/i.test(fact.trim());
+}
+
+/** Год/лейбл на Discogs — факт, но не ядро истории (LLM дорисует «синтезаторы»). */
+export function isCatalogMetadataSeed(fact: string): boolean {
+  const t = fact.trim();
+  if (isAlbumListingSeed(t)) return true;
+  if (/Discogs датирован \d{4}/i.test(t)) return true;
+  if (/выходил на лейбле/i.test(t)) return true;
+  return false;
+}
+
 export function isDedicatedCatalogSeed(fact: string): boolean {
+  if (isAlbumListingSeed(fact)) return false;
   return DEDICATED_CATALOG_SEED_PATTERNS.some((p) => p.test(fact.trim()));
 }
 
@@ -206,6 +220,7 @@ export function interestScore(fact: string): number {
   if (isUnspeakableWebSeed(trimmed)) score -= 50;
   if (isCollectorFact(fact)) score += 8;
   if (isDedicatedCatalogSeed(trimmed)) score += 12;
+  if (/\b(?:deathtronica|electronicore|metalcore|hardcore|scream\s+vocals?)\b/i.test(trimmed)) score += 20;
   if (BACKSTORY_FACT_PATTERNS.some((pattern) => pattern.test(fact))) score += 12;
   for (const pattern of STORY_FACT_PATTERNS) {
     if (pattern.test(fact)) score += 5;

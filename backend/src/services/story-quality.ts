@@ -947,6 +947,10 @@ const UNGROUNDED_CLAIM_CHECKS: Array<{ claim: RegExp; factHint: RegExp }> = [
     claim: /(?:^|[\s,.!?«»])я\s+обожаю\b/i,
     factHint: /я\s+обожаю|i love|obsessed with/i,
   },
+  {
+    claim: /синтезатор|шёпот|шепот|электроник\w*\s+и\s+шёпот|осколк\w*\s+электроник/i,
+    factHint: /synth|electronic|deathtronica|electronicore|scream|hardcore|metalcore|шёпот|шепот|синтез|guitar|вокал/i,
+  },
 ];
 
 export function findUngroundedClaims(script: string, referenceFacts: string[] = []): string | null {

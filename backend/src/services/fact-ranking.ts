@@ -53,12 +53,21 @@ function splitPoolsWithMode(
   for (const fact of bundle.artistFacts) {
     const trimmed = fact.trim();
     if (trimmed.length < 35) continue;
-    if (!factAppliesToRequest(trimmed, artist, title, 'artist', mode)) continue;
+    if (/creativecommons|user-contributed text is available/i.test(trimmed)) continue;
     if (factMentionsOtherTrackTitle(trimmed, title)) continue;
     if (!factMentionsTitle(trimmed, title) && /\b(?:did not chart|withheld from release|banned by several radio)\b/i.test(trimmed)) {
       continue;
     }
-    artistFacts.push(trimmed);
+    if (factAppliesToRequest(trimmed, artist, title, 'artist', mode)) {
+      artistFacts.push(trimmed);
+      continue;
+    }
+    if (
+      mode === 'indie' &&
+      /\b(?:deathtronica|electronicore|metalcore|hardcore|scream\s+vocals?)\b/i.test(trimmed)
+    ) {
+      artistFacts.push(trimmed);
+    }
   }
 
   return { track, album, artist: artistFacts };
@@ -70,12 +79,15 @@ export function splitBundleByScope(
   title: string,
 ): ScopedFactPools {
   const strict = splitPoolsWithMode(bundle, artist, title, 'strict');
-  if (strict.track.length + strict.album.length + strict.artist.length > 0) {
-    return strict;
-  }
   const indie = splitPoolsWithMode(bundle, artist, title, 'indie');
-  if (indie.track.length + indie.album.length + indie.artist.length > 0) {
-    return indie;
+  const artistMerged = [...new Set([...strict.artist, ...indie.artist])];
+  const merged: ScopedFactPools = {
+    track: strict.track.length > 0 ? strict.track : indie.track,
+    album: strict.album.length > 0 ? strict.album : indie.album,
+    artist: artistMerged,
+  };
+  if (merged.track.length + merged.album.length + merged.artist.length > 0) {
+    return merged;
   }
   return strict;
 }

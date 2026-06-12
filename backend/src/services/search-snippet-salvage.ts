@@ -2,7 +2,7 @@ import type { SelectedReferenceFact } from './fact-picker.js';
 import { factMentionsArtist, factMentionsTitle, factNamesForeignEntity, hasTrackContextSignal } from './fact-relevance.js';
 import { interestRating10 } from './fact-interest-log.js';
 import { isMetadataOnlyFallbackFact } from './metadata-facts.js';
-import { interestScore, isWikiBiographyLead } from './reference-fact-quality.js';
+import { interestScore, isAlbumListingSeed, isWikiBiographyLead } from './reference-fact-quality.js';
 import { acceptSearchGroundedSnippet, acceptIndieEmergingSnippet, isLyricsPageSeed, isPlaylistJunkSnippet, isSpeakableReferenceFact, isUnspeakableWebSeed } from './web-snippet-accept.js';
 import { factFitsStoryLanguage } from './fact-language-fit.js';
 import type { StoryLanguageId } from './story-language.js';
@@ -10,6 +10,7 @@ import type { StoryLanguageId } from './story-language.js';
 /** Seed too weak to ground LLM + quality gate — upgrade to wiki/better facts. */
 export function isWeakSnippetSeed(fact: string, score = interestScore(fact)): boolean {
   const trimmed = fact.trim();
+  if (isAlbumListingSeed(trimmed)) return true;
   if (isLyricsPageSeed(trimmed)) return true;
   if (score < 6) return true;
   if (isWikiBiographyLead(trimmed)) return true;
