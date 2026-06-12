@@ -37,13 +37,12 @@ if (findIncompleteEnding(trimmed)) {
 console.log('OK: incomplete ending trimmed to:', trimmed.slice(-60));
 
 const marked = prepareYandexTtsText(ellaScript, { artist: 'Ella Boh', title: 'babydoll' });
-if (!marked.includes('в кавычках')) {
-  console.error('FAIL: quotes not expanded for speech');
+if (marked.includes('в кавычках')) {
+  console.error('FAIL: must not expand quotes with "в кавычках"');
   process.exit(1);
 }
-if (marked.includes('фраза в кавычках')) {
-  console.error('FAIL: should not use "фраза в кавычках"');
-  process.exit(1);
+if (marked.includes('lalala')) {
+  console.log('OK: quoted phrase spoken as plain text');
 }
 if (marked.includes('On Mor Tim') || marked.includes('Spиrs')) {
   console.error('FAIL: should not transliterate Latin to fake Cyrillic');

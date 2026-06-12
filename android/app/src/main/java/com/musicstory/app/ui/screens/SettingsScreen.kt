@@ -128,6 +128,8 @@ import com.musicstory.app.ui.theme.SurfaceGlass
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.Dispatchers
 import kotlin.math.abs
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -724,26 +726,28 @@ fun SettingsScreen(
             scope.launch {
                 isSaving = true
                 saveFeedback = null
+                var languageChanged = false
                 try {
-                    val languageChanged = applySettingsDraft()
-                    yandexKeyInput = ApiKeySanitizer.clean(yandexKeyInput)
-                    StoryLog.i("SETTINGS saved")
-                    saveFeedback = savedLabel
-                    app.appScope.launch {
-                        runCatching { app.syncSettingsWithServer() }
+                    withContext(Dispatchers.IO) {
+                        settings.runBatchSettingsUpdate {
+                            languageChanged = applySettingsDraft()
+                        }
                     }
+                    yandexKeyInput = ApiKeySanitizer.clean(yandexKeyInput)
+                    StoryLog.i("SETTINGS saved (local)")
+                    saveFeedback = savedLabel
                     if (languageChanged) {
                         (context as? Activity)?.recreate()
-                    }
-                    delay(1200)
-                    if (saveFeedback == savedLabel) {
-                        saveFeedback = null
                     }
                 } catch (e: Exception) {
                     StoryLog.e("SETTINGS save failed: ${e.message}", e)
                     saveFeedback = e.message ?: context.getString(R.string.settings_groq_test_fail)
                 } finally {
                     isSaving = false
+                }
+                delay(900)
+                if (saveFeedback == savedLabel) {
+                    saveFeedback = null
                 }
             }
         }

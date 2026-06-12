@@ -147,7 +147,8 @@ export function prepareYandexTtsText(
   text = quality.text;
 
   text = normalizeYearsForRussianTts(text);
-  text = options.websitePreview ? stripGuillemetsForPreview(text) : expandQuotesForSpeech(text);
+  // Кавычки: только текст внутри, без «в кавычках …» — не занимает эфир.
+  text = stripGuillemetsForPreview(text);
   text = normalizeYandexSpeechTokens(text, artist, title);
   text = applyRussianStressSafe(text);
 
@@ -155,7 +156,6 @@ export function prepareYandexTtsText(
     text = addSentencePauses(text, pauseProfile);
     text = addCommaPauses(text, pauseProfile);
     text = addDashPauses(text, pauseProfile);
-    if (!options.websitePreview) text = addQuotePauses(text, pauseProfile);
   }
 
   text = options.websitePreview

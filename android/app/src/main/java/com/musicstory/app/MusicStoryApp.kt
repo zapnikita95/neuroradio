@@ -32,6 +32,7 @@ import com.musicstory.app.worker.AuthRefreshWorker
 import com.musicstory.app.util.StoryLog
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import com.musicstory.app.data.local.toCached
 import kotlinx.coroutines.delay
@@ -84,6 +85,15 @@ class MusicStoryApp : Application() {
         private set
 
     val appScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private var settingsCloudSyncJob: Job? = null
+
+    private fun scheduleSettingsCloudSync() {
+        settingsCloudSyncJob?.cancel()
+        settingsCloudSyncJob = appScope.launch {
+            delay(800)
+            runCatching { syncSettingsWithServer() }
+        }
+    }
 
     override fun onCreate() {
         super.onCreate()
@@ -98,7 +108,7 @@ class MusicStoryApp : Application() {
         apiClient = ApiClient(backendAuthManager)
         accountSyncManager = AccountSyncManager(backendAuthManager)
         settingsDataStore.setCloudSyncHook {
-            syncSettingsWithServer()
+            scheduleSettingsCloudSync()
         }
         accountAuthManager = AccountAuthManager(backendAuthManager)
         scrobbleRepository = ScrobbleRepository(

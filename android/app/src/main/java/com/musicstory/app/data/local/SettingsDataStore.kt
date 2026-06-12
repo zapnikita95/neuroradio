@@ -699,12 +699,32 @@ class SettingsDataStore(private val context: Context) {
     suspend fun isMonitorPausedByUser(): Boolean = monitorPausedByUser.first()
 
     private var cloudSyncHook: (suspend () -> Unit)? = null
+    @Volatile private var batchCloudSyncDepth = 0
+    private var batchCloudSyncPending = false
+
+    /** Coalesce cloud sync during multi-field saves (Settings «Сохранить»). */
+    suspend fun <T> runBatchSettingsUpdate(block: suspend () -> T): T {
+        batchCloudSyncDepth++
+        try {
+            return block()
+        } finally {
+            batchCloudSyncDepth--
+            if (batchCloudSyncDepth == 0 && batchCloudSyncPending) {
+                batchCloudSyncPending = false
+                cloudSyncHook?.invoke()
+            }
+        }
+    }
 
     fun setCloudSyncHook(hook: suspend () -> Unit) {
         cloudSyncHook = hook
     }
 
     private suspend fun notifyCloudSync() {
+        if (batchCloudSyncDepth > 0) {
+            batchCloudSyncPending = true
+            return
+        }
         cloudSyncHook?.invoke()
     }
 
