@@ -41,7 +41,6 @@ for (const { artist, title } of TRACKS) {
       voice_id: 'zahar',
       story_length: '30s',
       language: 'ru',
-      story_narrator: 'night_dj',
     }),
     signal: AbortSignal.timeout(180_000),
   });
@@ -61,6 +60,7 @@ for (const { artist, title } of TRACKS) {
     continue;
   }
   console.log(`HTTP ${storyRes.status} (${elapsed}s)`);
+  console.log('narrator:', body.story_narrator ?? body.storyNarrator ?? '(default/auto)');
   console.log('seed:', body.seed_fact ?? '(none)');
   console.log('scope:', body.seed_scope, 'interest:', body.seed_interest_rating ?? '?');
   console.log('words:', body.word_count, 'tts:', body.ttsProvider ?? body.tts_provider);

@@ -38,10 +38,9 @@ const storyRes = await fetch(`${BASE}/v1/story/full`, {
     artist: 'Error37',
     title: 'Ruining Art as a Medium',
     voice_id: 'zahar',
-    story_length: '30s',
-    language: 'ru',
-    story_narrator: 'night_dj',
-  }),
+      story_length: '30s',
+      language: 'ru',
+    }),
   signal: AbortSignal.timeout(180_000),
 });
 
@@ -64,6 +63,7 @@ if (!storyRes.ok) {
 
 console.log('\n--- seed ---');
 console.log('seed_fact:', body.seed_fact ?? body.seedFact ?? '(none)');
+console.log('narrator:', body.story_narrator ?? body.storyNarrator ?? '(default/auto)');
 console.log('seed_scope:', body.seed_scope ?? body.seedScope ?? '(none)');
 console.log('seed_interest:', body.seed_interest_rating ?? body.seedInterestRating ?? '?');
 
