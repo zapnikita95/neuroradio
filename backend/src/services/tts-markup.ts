@@ -45,19 +45,18 @@ function pauseTag(profile: TtsPauseProfile, size: 'small' | 'medium'): string {
 }
 
 function addSentencePauses(text: string, profile: TtsPauseProfile): string {
-  const tag = profile === 'tight' ? '<[sentence]>' : pauseTag(profile, 'medium');
+  const tag =
+    profile === 'airy' ? pauseTag(profile, 'medium') : '<[sentence]>';
   return text.replace(/([.!?…])(\s+)(?=[А-ЯЁа-яё«])/g, `$1 ${tag}$2`);
 }
 
 function addCommaPauses(text: string, profile: TtsPauseProfile): string {
-  if (profile === 'tight') return text;
   const small = pauseTag(profile, 'small');
   return text.replace(/,(\s+)(?=[А-ЯЁа-яё])/g, `, ${small}$1`);
 }
 
 function addDashPauses(text: string, profile: TtsPauseProfile): string {
-  if (profile === 'tight') return text;
-  const medium = pauseTag(profile, 'medium');
+  const medium = profile === 'tight' ? '<[medium]>' : pauseTag(profile, 'medium');
   return text
     .replace(/\s+—\s+/g, ` ${medium} `)
     .replace(/\s+-\s+/g, ` ${pauseTag(profile, 'small')} `);

@@ -1293,19 +1293,35 @@ class StoryOrchestrator(
     private fun estimatedStoryDurationMs(wordCount: Int): Long =
         (wordCount * 320L).coerceIn(5_000L, 240_000L)
 
-    /** Keep visible text in sync with speech — reveal from the first word, no initial burst. */
+    /** Keep visible text in sync with speech — reveal from the first word, no early jump to the end. */
     private fun visibleWordsFromPlayback(
         wordCount: Int,
         progress: Float,
         elapsedMs: Long,
         estimatedDurationMs: Long,
     ): Int {
-        if (progress > 0.001f) {
-            return (progress * wordCount).toInt().coerceIn(0, wordCount)
+        if (wordCount <= 0) return 0
+
+        val fromProgress = (progress * wordCount * 1.04f).toInt().coerceIn(0, wordCount)
+        val fromClock = if (elapsedMs > 0L) {
+            ((elapsedMs.toFloat() / estimatedDurationMs) * wordCount * 1.08f).toInt()
+                .coerceIn(0, wordCount)
+        } else {
+            0
         }
-        if (elapsedMs <= 0L) return 0
-        val fromClock = ((elapsedMs.toFloat() / estimatedDurationMs) * wordCount).toInt()
-        return fromClock.coerceIn(0, minOf(2, wordCount))
+
+        val warmUpCap = when {
+            elapsedMs < 450L -> 1
+            elapsedMs < 1_000L -> minOf(3, wordCount)
+            elapsedMs < 1_800L -> minOf(8, wordCount)
+            else -> wordCount
+        }
+
+        return if (elapsedMs < 1_800L) {
+            minOf(maxOf(fromProgress, fromClock), warmUpCap)
+        } else {
+            maxOf(fromProgress, fromClock).coerceIn(0, wordCount)
+        }
     }
 
     companion object {

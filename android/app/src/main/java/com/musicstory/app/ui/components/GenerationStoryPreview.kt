@@ -2,7 +2,6 @@ package com.musicstory.app.ui.components
 
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
-import androidx.compose.foundation.gestures.animateScrollBy
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
@@ -33,7 +32,7 @@ import com.musicstory.app.ui.theme.CreamText
 import com.musicstory.app.ui.theme.MutedLavender
 import kotlinx.coroutines.delay
 
-/** Story text during playback — docked above buttons, grows bottom → top with smooth scroll. */
+/** Story text during playback — top-aligned, reveals with speech, scrolls only when needed. */
 @Composable
 fun GenerationStoryPreview(
     preview: GenerationPreviewState,
@@ -53,12 +52,21 @@ fun GenerationStoryPreview(
     val previewHeight = (screenHeightDp * 0.38f).coerceIn(260f, 420f).dp
     val scrollState = rememberScrollState()
 
-    LaunchedEffect(visibleText) {
-        delay(32)
-        val target = scrollState.maxValue
-        val delta = target - scrollState.value
-        if (delta > 0) {
-            scrollState.animateScrollBy(delta.toFloat(), animationSpec = tween(durationMillis = 220))
+    LaunchedEffect(preview.words) {
+        scrollState.scrollTo(0)
+    }
+
+    LaunchedEffect(preview.visibleWordCount, preview.words.size) {
+        delay(48)
+        val max = scrollState.maxValue
+        if (max <= 0) return@LaunchedEffect
+        val total = preview.words.size.coerceAtLeast(1)
+        val fraction = preview.visibleWordCount.toFloat() / total
+        // Keep the opening readable — start scrolling only after ~35% of the story is visible.
+        val scrollFraction = ((fraction - 0.35f).coerceAtLeast(0f) / 0.65f).coerceIn(0f, 1f)
+        val target = (max * scrollFraction).toInt()
+        if (target > scrollState.value) {
+            scrollState.animateScrollTo(target, animationSpec = tween(durationMillis = 280))
         }
     }
 
@@ -92,7 +100,7 @@ fun GenerationStoryPreview(
                     modifier = Modifier
                         .weight(1f)
                         .fillMaxWidth(),
-                    contentAlignment = Alignment.BottomCenter,
+                    contentAlignment = Alignment.TopCenter,
                 ) {
                     Column(
                         modifier = Modifier

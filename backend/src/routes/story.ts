@@ -1568,7 +1568,7 @@ router.post('/full', extractClientSecrets, validateStoryFullBody, storyFullRateL
         preferIosPlayback: mobileWav,
         speed: delivery.speed,
         emotion: delivery.emotion,
-        pauseProfile: delivery.pauseProfile,
+        pauseProfile: storyLength === 'unlimited' ? delivery.pauseProfile : 'natural',
         ttsStyle: delivery.styleId,
         storyNarrator,
         artist: metadata.artist,

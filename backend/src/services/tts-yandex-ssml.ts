@@ -99,9 +99,9 @@ function pausesToPlaceholders(text: string): string {
 
 function placeholdersToBreaks(text: string): string {
   return text
-    .replaceAll(BREAK_SENTENCE, '<break time="260ms"/>')
-    .replaceAll(BREAK_SMALL, '')
-    .replaceAll(BREAK_MEDIUM, '<break time="80ms"/>');
+    .replaceAll(BREAK_SENTENCE, '<break time="420ms"/>')
+    .replaceAll(BREAK_SMALL, '<break time="120ms"/>')
+    .replaceAll(BREAK_MEDIUM, '<break time="220ms"/>');
 }
 
 /** No micro-pauses hugging <lang> — foreign words should flow into Russian. */
