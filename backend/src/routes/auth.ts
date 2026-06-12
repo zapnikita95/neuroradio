@@ -1,6 +1,7 @@
 import { Router, Request, Response } from 'express';
 import {
   DESKTOP_CLIENT_ID,
+  EXTENSION_CLIENT_ID,
   getAllowedCertFingerprints,
   getAllowedPackageName,
   getAllowedPackageNames,
@@ -30,11 +31,17 @@ interface TokenRequestBody {
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
-function issueDesktopToken(installId: string, jwtSecret: string, ttl: number, res: Response): void {
+function issueDesktopToken(
+  installId: string,
+  jwtSecret: string,
+  ttl: number,
+  res: Response,
+  clientId: string = DESKTOP_CLIENT_ID,
+): void {
   const accessToken = signJwt(
     {
       sub: installId,
-      client: DESKTOP_CLIENT_ID,
+      client: clientId,
     },
     jwtSecret,
     ttl,
@@ -64,7 +71,7 @@ router.post('/token', rateLimitAuth, (req: Request, res: Response) => {
   }
 
   const clientType = body.client_type?.trim().toLowerCase();
-  if (clientType === 'desktop') {
+  if (clientType === 'desktop' || clientType === 'extension') {
     if (!isDesktopAuthEnabled()) {
       res.status(503).json({ error: 'Desktop auth is not configured' });
       return;
@@ -76,7 +83,8 @@ router.post('/token', rateLimitAuth, (req: Request, res: Response) => {
       return;
     }
 
-    issueDesktopToken(installId, jwtSecret, getTokenTtlSeconds(), res);
+    const clientId = clientType === 'extension' ? EXTENSION_CLIENT_ID : DESKTOP_CLIENT_ID;
+    issueDesktopToken(installId, jwtSecret, getTokenTtlSeconds(), res, clientId);
     return;
   }
 

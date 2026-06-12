@@ -1,4 +1,5 @@
 const SITE_APK_PATH = '/efir-ai.apk';
+const SITE_EXTENSION_PATH = '/efir-extension.zip';
 
 function siteBaseUrl(): string {
   const raw =
@@ -10,6 +11,10 @@ function siteBaseUrl(): string {
 
 export function getSiteApkUrl(): string {
   return `${siteBaseUrl()}${SITE_APK_PATH}`;
+}
+
+export function getSiteExtensionUrl(): string {
+  return `${siteBaseUrl()}${SITE_EXTENSION_PATH}`;
 }
 
 const GH_REPO = process.env.GITHUB_RELEASES_REPO?.trim() || 'zapnikita95/neuroradio';
@@ -104,13 +109,18 @@ async function resolveFromGitHub(): Promise<PublicDownloadLinks> {
 
 export async function getPublicDownloadLinks(): Promise<PublicDownloadLinks> {
   const siteApk = getSiteApkUrl();
+  const siteExt = getSiteExtensionUrl();
   const now = Date.now();
   if (cache && now - cache.at < CACHE_MS) {
-    if (!cache.data.apkUrl) return { ...cache.data, apkUrl: siteApk };
-    return cache.data;
+    return {
+      ...cache.data,
+      apkUrl: cache.data.apkUrl || siteApk,
+      extensionUrl: siteExt,
+    };
   }
   let data = await resolveFromGitHub();
   if (!data.apkUrl) data = { ...data, apkUrl: siteApk };
+  data = { ...data, extensionUrl: siteExt };
   cache = { at: now, data };
   return data;
 }

@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Эфир AI</title>
+  <link rel="stylesheet" href="app.css" />
+</head>
+<body>
+  <div class="bg-aurora"></div>
+  <div class="app">
+    <header>
+      <h1 class="brand">Эфир AI</h1>
+      <p class="brand-sub">Истории о музыке · как в приложении</p>
+    </header>
+
+    <nav class="tabs" id="tabs">
+      <button type="button" class="tab active" data-tab="home">Эфир</button>
+      <button type="button" class="tab" data-tab="voice">Озвучка</button>
+      <button type="button" class="tab" data-tab="account">Аккаунт</button>
+      <button type="button" class="tab" data-tab="history">История</button>
+    </nav>
+
+    <section id="panel-home" class="panel active">
+      <div class="hero">
+        <div id="vinyl" class="vinyl paused"></div>
+        <p id="track-title" class="track-title">Откройте плеер</p>
+        <p id="track-artist" class="track-artist">Яндекс · Spotify · YouTube</p>
+        <div class="status-pill">
+          <span id="status-dot" class="dot"></span>
+          <span id="status-text">Слушаю…</span>
+        </div>
+        <p id="quota-line" class="quota"></p>
+      </div>
+
+      <div class="card" id="script-card" hidden>
+        <h3>Текст истории</h3>
+        <div id="script-text" class="script-box"></div>
+      </div>
+
+      <div class="btn-row">
+        <button type="button" id="btn-tell" class="btn btn-primary">Рассказать</button>
+        <button type="button" id="btn-stop" class="btn btn-secondary">Стоп</button>
+      </div>
+      <p id="home-toast" class="toast"></p>
+    </section>
+
+    <section id="panel-voice" class="panel">
+      <div class="card">
+        <h3>Персонаж</h3>
+        <div class="field">
+          <label for="storyNarrator">Рассказчик</label>
+          <select id="storyNarrator"></select>
+        </div>
+        <div class="field">
+          <label for="storyLength">Длина</label>
+          <select id="storyLength"></select>
+        </div>
+      </div>
+      <div class="card">
+        <h3>Озвучка Yandex</h3>
+        <div class="field">
+          <label for="ttsVoice">Голос</label>
+          <select id="ttsVoice"></select>
+        </div>
+        <div class="field">
+          <label for="ttsSpeed">Скорость</label>
+          <select id="ttsSpeed"></select>
+        </div>
+        <div class="field">
+          <label for="ttsEmotion">Интонация</label>
+          <select id="ttsEmotion"></select>
+        </div>
+        <p class="hint">Озвучка через сервер (Yandex TTS), как в APK.</p>
+      </div>
+      <div class="card">
+        <h3>Авто-эфир</h3>
+        <div class="field">
+          <label for="triggerMode">Режим</label>
+          <select id="triggerMode"></select>
+        </div>
+        <div class="field">
+          <label for="everyNTracks">Каждые N треков</label>
+          <input id="everyNTracks" type="number" min="1" max="50" />
+        </div>
+        <label class="check">
+          <input type="checkbox" id="manualMode" />
+          Только вручную (кнопка «Рассказать»)
+        </label>
+      </div>
+      <div class="card">
+        <h3>Сервер</h3>
+        <div class="field">
+          <label for="backendUrl">Railway BFF URL</label>
+          <input id="backendUrl" placeholder="https://…railway.app" />
+        </div>
+        <div class="field">
+          <label for="desktopSecret">Desktop secret (если на сервере)</label>
+          <input id="desktopSecret" type="password" />
+        </div>
+        <button type="button" id="btn-save-voice" class="btn btn-primary" style="width:100%">Сохранить</button>
+        <p id="voice-toast" class="toast"></p>
+      </div>
+    </section>
+
+    <section id="panel-account" class="panel">
+      <div class="card">
+        <h3>Вход по подписке</h3>
+        <p class="hint">Тот же email, что при оплате на efir-ai.ru — лимиты и Premium синхронизируются с Android.</p>
+        <div class="field">
+          <label for="email">Email</label>
+          <input id="email" type="email" placeholder="you@example.com" />
+        </div>
+        <div class="field">
+          <label for="emailCode">Код из письма</label>
+          <input id="emailCode" placeholder="6 цифр" />
+        </div>
+        <div class="btn-row">
+          <button type="button" id="btn-email-start" class="btn btn-secondary">Код</button>
+          <button type="button" id="btn-email-verify" class="btn btn-primary">Войти</button>
+        </div>
+        <button type="button" id="btn-trial" class="btn btn-secondary" style="width:100%;margin-top:8px">7 дней trial (новое устройство)</button>
+        <button type="button" id="btn-sync" class="btn btn-secondary" style="width:100%;margin-top:8px">Синхронизировать с приложением</button>
+        <p id="profile-line" class="quota"></p>
+        <p id="account-toast" class="toast"></p>
+      </div>
+    </section>
+
+    <section id="panel-history" class="panel">
+      <div class="card">
+        <h3>Недавние истории</h3>
+        <div id="history-list"></div>
+        <button type="button" id="btn-clear-history" class="btn btn-secondary" style="width:100%;margin-top:10px">Очистить</button>
+      </div>
+    </section>
+  </div>
+  <script type="module" src="panel.js"></script>
+</body>
+</html>

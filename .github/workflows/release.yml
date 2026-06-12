@@ -81,7 +81,8 @@ jobs:
           cd chrome-extension
           zip -r ../efir-extension.zip . -x '*.DS_Store'
           cd ..
-          ls -lh efir-extension.zip
+          cp efir-extension.zip website/efir-extension.zip
+          ls -lh efir-extension.zip website/efir-extension.zip
 
       - name: Resolve release tag
         id: tag

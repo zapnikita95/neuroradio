@@ -8,7 +8,7 @@
   var GH_REPO = 'zapnikita95/neuroradio';
   var MOBILE_TAG = 'mobile-latest';
   var APK_FALLBACK = '/efir-ai.apk';
-  var EXT_FALLBACK = 'https://github.com/' + GH_REPO + '/releases/download/' + MOBILE_TAG + '/efir-extension.zip';
+  var EXT_FALLBACK = '/efir-extension.zip';
 
   var $ = function (s, r) { return (r || document).querySelector(s); };
   var $$ = function (s, r) { return Array.prototype.slice.call((r || document).querySelectorAll(s)); };
@@ -499,7 +499,7 @@
         : (en ? 'latest build' : 'последняя сборка');
       var cacheBust = links.publishedAt ? ('?t=' + encodeURIComponent(links.publishedAt)) : '';
       var apkUrl = (links.apkUrl || APK_FALLBACK) + cacheBust;
-      var extUrl = (links.extensionUrl || EXT_FALLBACK) + cacheBust;
+      var extUrl = EXT_FALLBACK + cacheBust;
       apkEls.forEach(function (e) {
         e.href = apkUrl;
         e.setAttribute('download', 'efir-ai.apk');
@@ -511,7 +511,7 @@
         e.removeAttribute('target');
       });
       if (apkVer) apkVer.textContent = links.apkUrl ? tagLabel : tagLabel + (en ? ' (pending build)' : ' (ожидает сборку)');
-      if (extVer) extVer.textContent = links.extensionUrl ? tagLabel : tagLabel + (en ? ' (pending build)' : ' (ожидает сборку)');
+      if (extVer) extVer.textContent = links.tag ? tagLabel : (en ? 'latest on site' : 'актуальная на сайте');
     }
 
     function fetchGhMobileLatest() {

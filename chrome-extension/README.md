@@ -1,7 +1,33 @@
-# Music Story — Chrome extension (MVP)
+# Эфир AI — расширение Chrome / Яндекс Браузер
 
-Reads **Media Session** on Yandex Music / Spotify / YouTube and prepares track info for the Railway BFF.
+Полный клиент BFF: как Android APK (озвучка Yandex, персонажи, лимиты, email).
 
-1. Chrome → `chrome://extensions` → Developer mode → Load unpacked → this folder
-2. Popup: Railway URL + install ID (same as Android settings)
-3. Full auto-story requires JWT (`POST /v1/auth/token`) — wired in a follow-up
+## Возможности
+
+| Вкладка | Что внутри |
+|---------|------------|
+| **Эфир** | Винил, трек, статус, текст истории, Рассказать / Стоп |
+| **Озвучка** | Рассказчик, голос Yandex, скорость, интонация, авто-триггер |
+| **Аккаунт** | Email + код, trial 7 дней, синхронизация с APK |
+| **История** | Локальный список последних историй |
+
+- Side panel (клик по иконке → панель справа)
+- JWT `client_type: extension`
+- `POST /v1/story/full` с `tts_voice`, `story_narrator`, `tts_speed`, `tts_emotion`
+- Offscreen audio + пауза плеера на вкладке
+
+## Установка
+
+1. `chrome://extensions` → режим разработчика → **Загрузить распакованное** → папка `chrome-extension`
+2. Клик по иконке → **панель справа** (или «Открыть панель» в popup)
+3. Яндекс Музыка / Spotify / YouTube → трек → **Рассказать**
+
+## ZIP для сайта
+
+```powershell
+Compress-Archive -Path "chrome-extension\*" -DestinationPath "efir-extension.zip" -Force
+```
+
+## Сервер
+
+`ALLOW_DESKTOP_AUTH=true` или `DESKTOP_AUTH_SECRET` на Railway. Деплой с `client_type: extension` в auth.

@@ -2,23 +2,22 @@
 <html lang="ru">
 <head>
   <meta charset="UTF-8" />
-  <title>Music Story</title>
+  <link rel="stylesheet" href="app.css" />
   <style>
-    body { font-family: system-ui, sans-serif; margin: 12px; min-width: 260px; }
-    label { display: block; font-size: 12px; margin-top: 8px; }
-    input { width: 100%; box-sizing: border-box; padding: 6px; }
-    button { margin-top: 12px; width: 100%; padding: 8px; }
-    #status { font-size: 12px; margin-top: 8px; color: #444; }
+    body { width: 280px; padding: 14px; }
+    p { font-size: 13px; color: var(--muted); margin: 8px 0; }
   </style>
 </head>
 <body>
-  <strong>Music Story</strong>
-  <label>Railway BFF URL</label>
-  <input id="backendUrl" placeholder="https://…railway.app" />
-  <label>Install ID (как в APK)</label>
-  <input id="installId" placeholder="uuid из настроек" />
-  <button id="save">Сохранить</button>
-  <p id="status"></p>
-  <script src="popup.js"></script>
+  <div class="bg-aurora"></div>
+  <h1 class="brand">Эфир AI</h1>
+  <p>Откройте панель расширения справа — там эфир, озвучка и вход.</p>
+  <button type="button" id="open" class="btn btn-primary" style="width:100%">Открыть панель</button>
+  <script>
+    document.getElementById('open').onclick = () => {
+      chrome.runtime.sendMessage({ type: 'open-panel' });
+      window.close();
+    };
+  </script>
 </body>
 </html>

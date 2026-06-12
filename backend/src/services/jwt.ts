@@ -62,7 +62,7 @@ export function verifyJwt(token: string, secret: string): JwtPayload | null {
     if (typeof payload.exp !== 'number' || payload.exp < now) return null;
     if (typeof payload.sub !== 'string' || payload.sub.trim().length === 0) return null;
 
-    if (payload.client === DESKTOP_CLIENT_ID) {
+    if (isDesktopLikeClient(payload.client)) {
       if (!isDesktopAuthEnabled()) return null;
       return payload;
     }
@@ -191,6 +191,11 @@ export function isAppAuthEnabled(): boolean {
 }
 
 export const DESKTOP_CLIENT_ID = 'desktop';
+export const EXTENSION_CLIENT_ID = 'extension';
+
+export function isDesktopLikeClient(client: unknown): boolean {
+  return client === DESKTOP_CLIENT_ID || client === EXTENSION_CLIENT_ID;
+}
 
 /** Shared secret for desktop app token exchange (DESKTOP_AUTH_SECRET env). */
 export function getDesktopAuthSecret(): string | null {
