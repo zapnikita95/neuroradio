@@ -1,0 +1,70 @@
+{
+  "personas": [
+    {
+      "id": "backstage",
+      "nameRu": "Инсайдер с закулисья",
+      "source": "website/assets/personas/persona-backstage.png",
+      "files": {
+        "primary": "play-store/personas-round/persona-backstage-round.png",
+        "256": "play-store/personas-round/persona-backstage-round-256.png",
+        "512": "play-store/personas-round/persona-backstage-round-512.png",
+        "1024": "play-store/personas-round/persona-backstage-round-1024.png"
+      }
+    },
+    {
+      "id": "contemporary",
+      "nameRu": "Современник эпохи",
+      "source": "website/assets/personas/persona-contemporary.png",
+      "files": {
+        "primary": "play-store/personas-round/persona-contemporary-round.png",
+        "256": "play-store/personas-round/persona-contemporary-round-256.png",
+        "512": "play-store/personas-round/persona-contemporary-round-512.png",
+        "1024": "play-store/personas-round/persona-contemporary-round-1024.png"
+      }
+    },
+    {
+      "id": "expert",
+      "nameRu": "Эксперт жанра",
+      "source": "website/assets/personas/persona-expert.png",
+      "files": {
+        "primary": "play-store/personas-round/persona-expert-round.png",
+        "256": "play-store/personas-round/persona-expert-round-256.png",
+        "512": "play-store/personas-round/persona-expert-round-512.png",
+        "1024": "play-store/personas-round/persona-expert-round-1024.png"
+      }
+    },
+    {
+      "id": "fan",
+      "nameRu": "Фанат-коллекционер",
+      "source": "website/assets/personas/persona-fan.png",
+      "files": {
+        "primary": "play-store/personas-round/persona-fan-round.png",
+        "256": "play-store/personas-round/persona-fan-round-256.png",
+        "512": "play-store/personas-round/persona-fan-round-512.png",
+        "1024": "play-store/personas-round/persona-fan-round-1024.png"
+      }
+    },
+    {
+      "id": "night_dj",
+      "nameRu": "Ночной диджей",
+      "source": "website/assets/personas/persona-night_dj.png",
+      "files": {
+        "primary": "play-store/personas-round/persona-night_dj-round.png",
+        "256": "play-store/personas-round/persona-night_dj-round-256.png",
+        "512": "play-store/personas-round/persona-night_dj-round-512.png",
+        "1024": "play-store/personas-round/persona-night_dj-round-1024.png"
+      }
+    },
+    {
+      "id": "radio_host",
+      "nameRu": "Радиоведущий",
+      "source": "website/assets/personas/persona-radio_host.png",
+      "files": {
+        "primary": "play-store/personas-round/persona-radio_host-round.png",
+        "256": "play-store/personas-round/persona-radio_host-round-256.png",
+        "512": "play-store/personas-round/persona-radio_host-round-512.png",
+        "1024": "play-store/personas-round/persona-radio_host-round-1024.png"
+      }
+    }
+  ]
+}
