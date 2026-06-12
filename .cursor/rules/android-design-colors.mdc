@@ -1,0 +1,8 @@
+# Android UI — цвета Эфир AI
+
+Перед правками Compose UI читай `android/DESIGN.md`.
+
+- Акцент бренда — **фиолетовый** `AccentViolet` (#A855F7), не золото.
+- `PrimaryStoryButton`: градиент Violet → Pink → Cyan из `Color.kt`; pill 28.dp.
+- **Не** хардкодить `#E8A838`, `#FFC857`, `#B87333` — это старый gold, не наш бренд.
+- `GoldBright` / `GoldWarm` в коде = алиасы на Violet/Pink; для нового кода предпочитай `AccentViolet`, `AccentPink`, `AccentCyan`.

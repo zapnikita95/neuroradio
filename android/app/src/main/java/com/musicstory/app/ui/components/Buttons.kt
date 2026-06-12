@@ -22,21 +22,22 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.musicstory.app.ui.theme.AccentCyan
+import com.musicstory.app.ui.theme.AccentPink
+import com.musicstory.app.ui.theme.AccentViolet
 import com.musicstory.app.ui.theme.DeepVoid
 import com.musicstory.app.ui.theme.GlassBorder
-import com.musicstory.app.ui.theme.GoldBright
 
 private val PrimaryButtonShape = RoundedCornerShape(28.dp)
 
-/** Original gold CTA gradient — not the pink/violet theme aliases. */
+/** Brand CTA — violet / pink / cyan (see android/DESIGN.md). Never literal gold hex. */
 private val PrimaryButtonGradient = Brush.horizontalGradient(
     colors = listOf(
-        Color(0xFFE8A838),
-        Color(0xFFFFC857),
-        Color(0xFFB87333).copy(alpha = 0.92f),
+        AccentViolet,
+        AccentPink,
+        AccentCyan.copy(alpha = 0.88f),
     ),
 )
 
@@ -97,7 +98,7 @@ fun SecondaryStoryButton(
             containerColor = DeepVoid.copy(alpha = 0.94f),
         ),
     ) {
-        Text(text = text, color = GoldBright, fontWeight = FontWeight.SemiBold)
+        Text(text = text, color = AccentViolet, fontWeight = FontWeight.SemiBold)
     }
 }
 
