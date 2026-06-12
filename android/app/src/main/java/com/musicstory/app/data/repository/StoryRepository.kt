@@ -340,7 +340,7 @@ class StoryRepository(
             fetchStoryLocked(track, forceRefresh)
         }
 
-    /** Background offline-pack generation — always hits backend and saves OGG. */
+    /** Offline pack: fetch from backend (WAV via client_platform=android) and save locally. */
     suspend fun fetchStoryForOfflinePack(track: TrackInfo): Result<StoryResponse> =
         storyFetchMutex.withLock {
             val result = fetchStoryLocked(track, forceRefresh = true)
@@ -1087,11 +1087,15 @@ class StoryRepository(
     }
 
     private suspend fun canUseOfflineReplay(): Boolean {
-        // Disabled until offline cache is stable — local files broke ExoPlayer on Premium.
         if (!OFFLINE_PLAYBACK_CACHE_ENABLED) return false
         if (!settingsDataStore.offlineAudioCacheEnabled.first()) return false
         val tier = resolveEffectiveTier()
         return TierAccess.canUseOfflineAudioCache(tier)
+    }
+
+    /** Persistent offline cache only for WAV from server — OGG/Opus breaks ExoPlayer on Huawei/Premium. */
+    private fun isPersistentOfflineAudioUrl(url: String): Boolean {
+        return offlineAudioStore.extensionFromUrl(url) == "wav"
     }
 
     /** Wipe corrupt offline audio after format/backend regressions. */
@@ -1161,12 +1165,16 @@ class StoryRepository(
     private suspend fun maybeDownloadOfflineAudio(trackKey: String, audioUrl: String?): String? {
         if (!canUseOfflineReplay()) return null
         val resolved = resolveAudioUrl(audioUrl) ?: return null
+        if (!isPersistentOfflineAudioUrl(resolved)) {
+            StoryLog.w("Offline cache skip: not WAV (client_platform=android expected) — ${resolved.take(80)}")
+            return null
+        }
         val path = offlineAudioStore.downloadToTrack(resolved, trackKey) ?: return null
         offlineAudioStore.enforceStorageLimit()
         return path
     }
 
-    /** Mirror iOS: after story fetch, save OGG locally when premium offline cache is on. */
+    /** After story fetch — save WAV locally for offline pack / history (Wi‑Fi for live stories). */
     private suspend fun ensureOfflineAudioSaved(
         trackKey: String,
         audioUrl: String?,
@@ -1299,6 +1307,7 @@ class StoryRepository(
         private const val MAX_PREVIOUS_SCRIPTS = 8
         const val OFFLINE_NO_CACHE_MESSAGE =
             "Нет интернета. Эта история ещё не сохранена на телефоне — один раз послушайте онлайн с расширенным тарифом."
+        /** Offline pack + history replay — only WAV files from client_platform=android. */
         private const val OFFLINE_PLAYBACK_CACHE_ENABLED = true
     }
 }

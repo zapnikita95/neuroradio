@@ -11,7 +11,7 @@ import java.io.File
 import java.security.MessageDigest
 import java.util.concurrent.TimeUnit
 
-/** Saves story audio (OGG or WAV) on device for premium offline replay. */
+/** Saves story audio on device for premium offline replay — Android/iOS use WAV from server, not OGG. */
 class StoryOfflineAudioStore(context: Context) {
 
     private val appContext = context.applicationContext
