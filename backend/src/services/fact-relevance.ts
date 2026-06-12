@@ -777,6 +777,10 @@ export function factMentionsOtherTrackTitle(fact: string, title: string): boolea
     ) {
       continue;
     }
+    // «Succ My Life» after «альбом» / «релиз» — название альбома, не другой трек.
+    if (/(?:альбом|релиз|издани|album|release)\s*[«"]?$/i.test(before.trim())) {
+      continue;
+    }
     return true;
   }
   return false;

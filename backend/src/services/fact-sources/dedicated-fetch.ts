@@ -11,6 +11,7 @@ import { poolHasTopicDuplicate } from '../fact-topic.js';
 import { interestScore } from '../reference-fact-quality.js';
 import { isTruncatedMarketingSnippet } from '../web-snippet-accept.js';
 import type { HarvestContext, HarvestedFact, HarvestSource } from './types.js';
+import { isParserTrustedHarvestSource } from './types.js';
 import { fetchGeniusFacts } from './genius-facts.js';
 import { fetchSongfactsFacts } from './songfacts-facts.js';
 import { fetchLastfmFacts } from './lastfm-facts.js';
@@ -106,6 +107,24 @@ function dedicatedFactRelevant(
   return false;
 }
 
+/** Genius/Last.fm/Discogs/Setlist — уже привязаны к artist/title парсером. */
+function parserTrustedDedicatedRelevant(
+  item: HarvestedFact,
+  artist: string,
+  title: string,
+): boolean {
+  const trimmed = item.fact.trim();
+  if (trimmed.length < 35 || isTruncatedMarketingSnippet(trimmed)) return false;
+  if (/multiple artists tracked as/i.test(trimmed)) return false;
+  if (item.scope === 'artist') {
+    if (item.source === 'discogs') return true;
+    return factMentionsArtist(trimmed, artist);
+  }
+  if (factMentionsTitle(trimmed, title)) return true;
+  if (factMentionsArtist(trimmed, artist)) return true;
+  return false;
+}
+
 /** Dedicated parsers → bundle без strict/boring-фильтра wiki/web. */
 export function dedicatedHarvestToBundle(
   harvest: HarvestedFact[],
@@ -122,7 +141,10 @@ export function dedicatedHarvestToBundle(
   for (const item of sorted) {
     const key = normalizeKey(item.fact);
     if (seen.has(key)) continue;
-    if (!dedicatedFactRelevant(item.fact, item.scope, artist, title)) continue;
+    const relevant = isParserTrustedHarvestSource(item.source)
+      ? parserTrustedDedicatedRelevant(item, artist, title)
+      : dedicatedFactRelevant(item.fact, item.scope, artist, title);
+    if (!relevant) continue;
     if (poolHasTopicDuplicate(item.fact, acceptedFacts)) continue;
     seen.add(key);
     acceptedFacts.push(item.fact);

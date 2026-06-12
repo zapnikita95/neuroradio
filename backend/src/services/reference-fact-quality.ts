@@ -25,6 +25,21 @@ export function isWikiBiographyLead(fact: string): boolean {
   return bioHits >= 2 || (bioHits >= 1 && trimmed.length >= 220);
 }
 
+/** Discogs/Last.fm/Setlist catalog seeds — допустимы для indie, когда других фактов нет. */
+const DEDICATED_CATALOG_SEED_PATTERNS: RegExp[] = [
+  /Discogs датирован \d{4}/i,
+  /выходил на лейбле/i,
+  /трек «[^»]+» идёт \d+:\d+/i,
+  /на Last\.fm указан в альбоме/i,
+  /впервые прозвучала на живом выступлении/i,
+  /(?:electronicore|deathtronica|metalcore|post-punk|shoegaze)\s+band\s+from/i,
+  /(?:piece|member)\s+.*\s+band\s+from/i,
+];
+
+export function isDedicatedCatalogSeed(fact: string): boolean {
+  return DEDICATED_CATALOG_SEED_PATTERNS.some((p) => p.test(fact.trim()));
+}
+
 const BORING_FACT_PATTERNS: RegExp[] = [
   /\bconsists?\s+of\b/i,
   /\bcomposed\s+of\b/i,
@@ -190,6 +205,7 @@ export function interestScore(fact: string): number {
   if (isTruncatedMarketingSnippet(trimmed)) score -= 40;
   if (isUnspeakableWebSeed(trimmed)) score -= 50;
   if (isCollectorFact(fact)) score += 8;
+  if (isDedicatedCatalogSeed(trimmed)) score += 12;
   if (BACKSTORY_FACT_PATTERNS.some((pattern) => pattern.test(fact))) score += 12;
   for (const pattern of STORY_FACT_PATTERNS) {
     if (pattern.test(fact)) score += 5;
@@ -258,6 +274,7 @@ export function isWeakChartSeed(fact: string): boolean {
 export function isBoringFact(fact: string): boolean {
   const trimmed = fact.trim();
   if (trimmed.length < 30) return true;
+  if (isDedicatedCatalogSeed(trimmed)) return false;
   if (isWikiBiographyLead(trimmed)) return true;
   if (isCollectorFact(trimmed)) return false;
   // Promo rename, radio ban, Jimi Hendrix origin — keep even if sentence also mentions album/single.
