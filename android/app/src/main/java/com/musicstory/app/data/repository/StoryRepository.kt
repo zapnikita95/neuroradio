@@ -343,7 +343,12 @@ class StoryRepository(
     /** Background offline-pack generation — always hits backend and saves OGG. */
     suspend fun fetchStoryForOfflinePack(track: TrackInfo): Result<StoryResponse> =
         storyFetchMutex.withLock {
-            fetchStoryLocked(track, forceRefresh = true)
+            val result = fetchStoryLocked(track, forceRefresh = true)
+            if (result.isSuccess) {
+                val response = result.getOrThrow()
+                ensureOfflineAudioSaved(track.displayKey, response.audioUrl, blocking = true)
+            }
+            result
         }
 
     suspend fun getCachedLocalPath(trackKey: String): String? {
@@ -1058,6 +1063,7 @@ class StoryRepository(
 
     suspend fun canReplayOffline(trackKey: String): Boolean {
         if (!canUseOfflineReplay()) return false
+        if (packPlaybackPath(trackKey) != null) return true
         val cached = storyDao.getByTrackKey(trackKey) ?: return false
         return offlineAudioStore.hasLocalFile(cached.localAudioPath)
     }
@@ -1160,14 +1166,25 @@ class StoryRepository(
         return path
     }
 
+    /** Mirror iOS: after story fetch, save OGG locally when premium offline cache is on. */
+    private suspend fun ensureOfflineAudioSaved(
+        trackKey: String,
+        audioUrl: String?,
+        blocking: Boolean,
+    ): String? {
+        if (!canUseOfflineReplay()) return null
+        if (!blocking && !offlineAudioStore.isWifi()) return null
+        val path = maybeDownloadOfflineAudio(trackKey, audioUrl) ?: return null
+        storyDao.updateLocalAudioPath(trackKey, path)
+        return path
+    }
+
     private suspend fun persistStory(
         trackKey: String,
         track: TrackInfo,
         response: StoryResponse,
         angle: String,
     ) {
-        // Never block playback on cache download — prefetch in background on Wi‑Fi.
-        val localPath: String? = null
         storyDao.insert(
             CachedStory(
                 trackKey = trackKey,
@@ -1177,10 +1194,13 @@ class StoryRepository(
                 genre = response.genre,
                 script = response.script,
                 audioUrl = response.audioUrl,
-                localAudioPath = localPath,
+                localAudioPath = null,
                 demo = response.demo,
             ),
         )
+        kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.SupervisorJob() + kotlinx.coroutines.Dispatchers.IO).launch {
+            ensureOfflineAudioSaved(trackKey, response.audioUrl, blocking = false)
+        }
         val entry = StoryHistoryEntry(
             serverId = UUID.randomUUID().toString(),
             trackKey = trackKey,
@@ -1279,8 +1299,7 @@ class StoryRepository(
         private const val MAX_PREVIOUS_SCRIPTS = 8
         const val OFFLINE_NO_CACHE_MESSAGE =
             "Нет интернета. Эта история ещё не сохранена на телефоне — один раз послушайте онлайн с расширенным тарифом."
-        /** Hotfix: local cache caused ExoPlayer failures on Premium devices. */
-        private const val OFFLINE_PLAYBACK_CACHE_ENABLED = false
+        private const val OFFLINE_PLAYBACK_CACHE_ENABLED = true
     }
 }
 

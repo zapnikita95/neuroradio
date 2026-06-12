@@ -824,12 +824,6 @@ fun SettingsScreen(
                         checked = speakTrackNamesUi,
                         onCheckedChange = { speakTrackNamesUi = it },
                     )
-                    OfflinePackSettingsSection(
-                        canUse = canUseOfflineCache,
-                        state = offlinePackState,
-                        onStart = { scope.launch { app.offlinePackRepository.startCollecting() } },
-                        onCancel = { scope.launch { app.offlinePackRepository.cancelPack() } },
-                    )
                     Spacer(modifier = Modifier.height(8.dp))
                     Text(
                         text = context.getString(R.string.settings_language),
@@ -1855,6 +1849,19 @@ fun SettingsScreen(
                     }
                 }
 
+                CollapsibleSettingsSection(
+                    title = context.getString(R.string.settings_offline_pack_title),
+                    summary = offlinePackSummary(context, offlinePackState, canUseOfflineCache),
+                    initiallyExpanded = offlinePackState.phase != OfflinePackPhase.IDLE,
+                ) {
+                    OfflinePackSettingsSection(
+                        canUse = canUseOfflineCache,
+                        state = offlinePackState,
+                        onStart = { scope.launch { app.offlinePackRepository.startCollecting() } },
+                        onCancel = { scope.launch { app.offlinePackRepository.cancelPack() } },
+                    )
+                }
+
                 if (devTierSwitchEnabled) {
                     CollapsibleSettingsSection(
                         title = context.getString(R.string.settings_dev_tier_section),
@@ -2235,6 +2242,31 @@ private fun formatServerQuotaLabel(context: android.content.Context, quota: com.
     return context.getString(R.string.settings_free_quota, quota.remaining, quota.limit)
 }
 
+private fun offlinePackSummary(
+    context: android.content.Context,
+    state: OfflinePackUiState,
+    canUse: Boolean,
+): String {
+    if (!canUse) return context.getString(R.string.settings_premium_locked_hint)
+    return when (state.phase) {
+        OfflinePackPhase.IDLE -> context.getString(R.string.settings_offline_pack_summary_idle)
+        OfflinePackPhase.COLLECTING -> context.getString(
+            R.string.settings_offline_pack_progress,
+            state.collectedCount,
+            state.targetCount,
+        )
+        OfflinePackPhase.GENERATING -> context.getString(
+            R.string.settings_offline_pack_generating,
+            state.readyCount,
+            state.targetCount,
+        )
+        OfflinePackPhase.READY -> context.getString(
+            R.string.settings_offline_pack_ready,
+            state.readyCount,
+        )
+    }
+}
+
 @Composable
 private fun OfflinePackSettingsSection(
     canUse: Boolean,
@@ -2243,11 +2275,6 @@ private fun OfflinePackSettingsSection(
     onCancel: () -> Unit,
 ) {
     val context = LocalContext.current
-    Text(
-        text = context.getString(R.string.settings_offline_pack_title),
-        style = MaterialTheme.typography.labelMedium,
-        color = MutedLavender,
-    )
     if (!canUse) {
         Text(
             text = context.getString(R.string.settings_premium_locked_hint),

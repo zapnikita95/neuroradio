@@ -157,6 +157,7 @@
     <string name="settings_offline_cache">Сохранять истории на телефоне</string>
     <string name="settings_offline_cache_hint">После генерации озвучка сохраняется на телефон. Без интернета можно переслушать уже готовые истории — в том числе из раздела «История».</string>
     <string name="settings_offline_pack_title">Офлайн-эфир</string>
+    <string name="settings_offline_pack_summary_idle">Подготовить пакет из 10 треков</string>
     <string name="settings_offline_pack_intro">Соберите 10 разных треков — приложение подготовит для них истории заранее. Потом можно слушать без интернета.</string>
     <string name="settings_offline_pack_start">Подготовить офлайн-эфир</string>
     <string name="settings_offline_pack_cancel">Отменить</string>
