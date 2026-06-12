@@ -26,6 +26,24 @@ function showToast(el, text, isError = false) {
   el.classList.toggle('error', isError);
 }
 
+function planLabel(plan) {
+  if (plan === 'premium') return 'Premium';
+  if (plan === 'trial') return 'Пробный период';
+  if (plan === 'free') return 'Free';
+  return plan || 'Free';
+}
+
+function formatPlanLine(plan, until) {
+  const label = planLabel(plan);
+  if (plan === 'premium' || plan === 'trial') {
+    if (until) {
+      return `Тариф: ${label} до ${new Date(until).toLocaleDateString('ru')}`;
+    }
+    return `Тариф: ${label}`;
+  }
+  return `Тариф: ${label}`;
+}
+
 function switchTab(name) {
   document.querySelectorAll('.tab').forEach((t) => {
     t.classList.toggle('active', t.dataset.tab === name);
@@ -108,13 +126,10 @@ function renderState(data) {
     const q = data.lastStory.quota;
     els.quotaLine.innerHTML = `Лимит: <strong>${q.remaining ?? '—'}</strong> / ${q.limit ?? '—'}`;
   } else if (data.settings?.profilePlan) {
-    const plan = data.settings.profilePlan;
-    const until = data.settings.profilePremiumUntil;
-    const premium =
-      plan === 'premium' || plan === 'trial'
-        ? ` · ${plan}${until ? ` до ${new Date(until).toLocaleDateString('ru')}` : ''}`
-        : ' · free';
-    els.quotaLine.textContent = `Тариф: ${plan}${premium}`;
+    els.quotaLine.textContent = formatPlanLine(
+      data.settings.profilePlan,
+      data.settings.profilePremiumUntil,
+    );
   }
 
   if (data.lastStory?.script) {
@@ -126,7 +141,7 @@ function renderState(data) {
     applySettingsToForm(data.settings);
     const email = data.settings.profileEmail || data.settings.email;
     if (email) {
-      els.profileLine.innerHTML = `Аккаунт: <strong>${email}</strong> · ${data.settings.profilePlan || 'free'}`;
+      els.profileLine.innerHTML = `Аккаунт: <strong>${email}</strong> · ${planLabel(data.settings.profilePlan)}`;
     }
   }
 

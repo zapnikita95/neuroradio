@@ -1,5 +1,4 @@
-export const DEFAULT_BACKEND =
-  'https://music-story-production.up.railway.app';
+export const DEFAULT_BACKEND = 'https://www.efir-ai.ru';
 
 export const DEFAULT_SETTINGS = {
   backendUrl: DEFAULT_BACKEND,

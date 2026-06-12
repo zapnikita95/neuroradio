@@ -14,6 +14,14 @@ chrome.runtime.onInstalled.addListener(() => {
   void chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true }).catch(() => undefined);
 });
 
+const MUSIC_TAB_PATTERNS = [
+  '*://music.yandex.ru/*',
+  '*://music.yandex.com/*',
+  '*://open.spotify.com/*',
+  '*://www.youtube.com/*',
+  '*://music.youtube.com/*',
+];
+
 const triggerEngine = new TriggerEngine();
 
 /** @type {'IDLE' | 'LISTENING' | 'FETCHING' | 'PLAYING' | 'ERROR'} */
@@ -169,6 +177,46 @@ async function playStoryForTrack(track, manual = false) {
   } finally {
     busy = false;
   }
+}
+
+async function requestTrackFromTab(tabId) {
+  try {
+    return await chrome.tabs.sendMessage(tabId, { type: 'get-track' });
+  } catch {
+    try {
+      await chrome.scripting.executeScript({ target: { tabId }, files: ['content.js'] });
+      return await chrome.tabs.sendMessage(tabId, { type: 'get-track' });
+    } catch {
+      return null;
+    }
+  }
+}
+
+async function pollMusicTabs() {
+  const tabs = await chrome.tabs.query({ url: MUSIC_TAB_PATTERNS });
+  const ordered = [...tabs].sort((a, b) => Number(b.active) - Number(a.active));
+  let fallback = null;
+
+  for (const tab of ordered) {
+    if (!tab.id) continue;
+    const track = await requestTrackFromTab(tab.id);
+    if (!track?.artist || !track?.title) continue;
+    const payload = {
+      artist: track.artist,
+      title: track.title,
+      album: track.album || '',
+      isPlaying: track.isPlaying !== false,
+      tabId: tab.id,
+      url: tab.url || '',
+    };
+    if (track.isPlaying !== false) {
+      await onTrackUpdate(payload);
+      return;
+    }
+    if (!fallback) fallback = payload;
+  }
+
+  if (fallback) await onTrackUpdate(fallback);
 }
 
 async function onTrackUpdate(msg) {
@@ -362,9 +410,14 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   return false;
 });
 
+setInterval(() => {
+  void pollMusicTabs();
+}, 2000);
+
 void refreshSettings().then((s) => {
   if (s.accountLinked || s.email) {
     void pullSyncSettings(s).catch(() => undefined);
   }
   publishState();
+  void pollMusicTabs();
 });
