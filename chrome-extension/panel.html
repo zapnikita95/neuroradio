@@ -87,18 +87,7 @@
           <input type="checkbox" id="manualMode" />
           Только вручную (кнопка «Рассказать»)
         </label>
-      </div>
-      <div class="card">
-        <h3>Сервер</h3>
-        <div class="field">
-          <label for="backendUrl">Railway BFF URL</label>
-          <input id="backendUrl" placeholder="https://…railway.app" />
-        </div>
-        <div class="field">
-          <label for="desktopSecret">Desktop secret (если на сервере)</label>
-          <input id="desktopSecret" type="password" />
-        </div>
-        <button type="button" id="btn-save-voice" class="btn btn-primary" style="width:100%">Сохранить</button>
+        <button type="button" id="btn-save-voice" class="btn btn-primary" style="width:100%;margin-top:12px">Сохранить</button>
         <p id="voice-toast" class="toast"></p>
       </div>
     </section>
@@ -106,7 +95,7 @@
     <section id="panel-account" class="panel">
       <div class="card">
         <h3>Вход по подписке</h3>
-        <p class="hint">Email с efir-ai.ru — общие лимиты и Premium.</p>
+        <p class="hint">Email с efir-ai.ru — общие лимиты и Premium. Пробный период 7 дней при первом входе на этом браузере.</p>
         <div class="field">
           <label for="email">Email</label>
           <input id="email" type="email" placeholder="you@example.com" />
@@ -119,7 +108,6 @@
           <button type="button" id="btn-email-start" class="btn btn-secondary">Код</button>
           <button type="button" id="btn-email-verify" class="btn btn-primary">Войти</button>
         </div>
-        <button type="button" id="btn-trial" class="btn btn-secondary" style="width:100%;margin-top:8px">7 дней trial (новое устройство)</button>
         <button type="button" id="btn-sync" class="btn btn-secondary" style="width:100%;margin-top:8px">Синхронизировать настройки</button>
         <p id="profile-line" class="quota"></p>
         <p id="account-toast" class="toast"></p>

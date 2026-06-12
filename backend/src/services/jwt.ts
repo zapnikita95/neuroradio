@@ -62,7 +62,11 @@ export function verifyJwt(token: string, secret: string): JwtPayload | null {
     if (typeof payload.exp !== 'number' || payload.exp < now) return null;
     if (typeof payload.sub !== 'string' || payload.sub.trim().length === 0) return null;
 
-    if (isDesktopLikeClient(payload.client)) {
+    if (payload.client === EXTENSION_CLIENT_ID) {
+      if (!isExtensionAuthEnabled()) return null;
+      return payload;
+    }
+    if (payload.client === DESKTOP_CLIENT_ID) {
       if (!isDesktopAuthEnabled()) return null;
       return payload;
     }
@@ -207,6 +211,12 @@ export function getDesktopAuthSecret(): string | null {
 export function isDesktopAuthEnabled(): boolean {
   if (getDesktopAuthSecret()) return true;
   return process.env.ALLOW_DESKTOP_AUTH?.trim().toLowerCase() === 'true';
+}
+
+/** Browser extension — JWT by install_id, no shared secret (public client). */
+export function isExtensionAuthEnabled(): boolean {
+  if (process.env.ALLOW_EXTENSION_AUTH?.trim().toLowerCase() === 'false') return false;
+  return Boolean(getAuthJwtSecret());
 }
 
 export function verifyDesktopAuthSecret(provided: string): boolean {

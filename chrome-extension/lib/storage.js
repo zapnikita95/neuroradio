@@ -1,8 +1,9 @@
 export const DEFAULT_BACKEND = 'https://www.efir-ai.ru';
 
+const LEGACY_BACKEND = 'https://music-story-production.up.railway.app';
+
 export const DEFAULT_SETTINGS = {
   backendUrl: DEFAULT_BACKEND,
-  installId: '',
   desktopAuthSecret: '',
   accessToken: '',
   tokenExpiresAt: 0,
@@ -23,14 +24,23 @@ export const DEFAULT_SETTINGS = {
   profilePremiumUntil: 0,
 };
 
+const SYNC_KEYS = Object.keys(DEFAULT_SETTINGS);
+
 export async function loadSettings() {
-  const keys = Object.keys(DEFAULT_SETTINGS);
-  const data = await chrome.storage.sync.get(keys);
-  const merged = { ...DEFAULT_SETTINGS, ...data };
+  const data = await chrome.storage.sync.get(SYNC_KEYS);
+  const local = await chrome.storage.local.get(['installId']);
+  const merged = { ...DEFAULT_SETTINGS, ...data, installId: local.installId || '' };
+
   if (!merged.installId) {
     merged.installId = crypto.randomUUID();
-    await saveSettings(merged);
+    await chrome.storage.local.set({ installId: merged.installId });
   }
+
+  if (!merged.backendUrl?.trim() || merged.backendUrl === LEGACY_BACKEND) {
+    merged.backendUrl = DEFAULT_BACKEND;
+    await chrome.storage.sync.set({ backendUrl: DEFAULT_BACKEND });
+  }
+
   return merged;
 }
 
@@ -42,5 +52,7 @@ export async function patchSettings(patch) {
 }
 
 export async function saveSettings(settings) {
-  await chrome.storage.sync.set(settings);
+  const syncPart = { ...settings };
+  delete syncPart.installId;
+  await chrome.storage.sync.set(syncPart);
 }

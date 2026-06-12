@@ -2,7 +2,6 @@ import { loadSettings, patchSettings } from './lib/storage.js';
 import {
   fetchStory,
   fetchProfile,
-  claimWelcomeTrial,
   pullSyncSettings,
   resolveAudioUrl,
   checkHealth,
@@ -356,16 +355,6 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   if (msg?.type === 'fetch-profile') {
     void refreshSettings()
       .then((s) => fetchProfile(s))
-      .then(() => refreshSettings())
-      .then(() => publishState())
-      .then(() => sendResponse({ ok: true }))
-      .catch((e) => sendResponse({ ok: false, error: String(e) }));
-    return true;
-  }
-
-  if (msg?.type === 'welcome-trial') {
-    void refreshSettings()
-      .then((s) => claimWelcomeTrial(s))
       .then(() => refreshSettings())
       .then(() => publishState())
       .then(() => sendResponse({ ok: true }))

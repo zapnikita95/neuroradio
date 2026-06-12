@@ -44,7 +44,7 @@ export const TTS_EMOTIONS = [
 export const STORY_LENGTHS = [
   { id: '30s', label: '30 сек' },
   { id: '60s', label: '1 минута' },
-  { id: 'unlimited', label: 'Длинная' },
+  { id: 'unlimited', label: 'Не ограничено' },
 ];
 
 export const TRIGGER_MODES = [

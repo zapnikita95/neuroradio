@@ -19,7 +19,6 @@ export async function ensureAccessToken(settings) {
   const body = {
     install_id: settings.installId,
     client_type: 'extension',
-    desktop_secret: settings.desktopAuthSecret || '',
   };
 
   const res = await fetch(`${baseUrl(settings)}/v1/auth/token`, {
@@ -110,7 +109,11 @@ export async function startEmailLogin(settings, email) {
 export async function verifyEmailLogin(settings, email, code) {
   const res = await authFetch(settings, '/v1/account/email/verify', {
     method: 'POST',
-    body: JSON.stringify({ email, code }),
+    body: JSON.stringify({
+      email,
+      code,
+      device_fingerprint: settings.installId,
+    }),
   });
   const data = await res.json();
   if (!res.ok) throw new Error(data.error || `Email verify ${res.status}`);
@@ -128,16 +131,6 @@ export async function fetchProfile(settings) {
     profilePremiumUntil: data.premiumUntil || data.entitlement?.premiumUntil || 0,
     accountLinked: Boolean(data.email || data.linked),
   });
-  return data;
-}
-
-export async function claimWelcomeTrial(settings) {
-  const res = await authFetch(settings, '/v1/account/welcome-device', {
-    method: 'POST',
-    body: JSON.stringify({ device_fingerprint: 'extension' }),
-  });
-  const data = await res.json();
-  if (!res.ok) throw new Error(data.error || 'Trial failed');
   return data;
 }
 

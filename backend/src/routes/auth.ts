@@ -9,6 +9,7 @@ import {
   getAuthJwtSecret,
   getTokenTtlSeconds,
   isDesktopAuthEnabled,
+  isExtensionAuthEnabled,
   isValidCertFingerprint,
   normalizeCertSha256,
   signJwt,
@@ -71,20 +72,25 @@ router.post('/token', rateLimitAuth, (req: Request, res: Response) => {
   }
 
   const clientType = body.client_type?.trim().toLowerCase();
-  if (clientType === 'desktop' || clientType === 'extension') {
+  if (clientType === 'extension') {
+    if (!isExtensionAuthEnabled()) {
+      res.status(503).json({ error: 'Extension auth is not configured' });
+      return;
+    }
+    issueDesktopToken(installId, jwtSecret, getTokenTtlSeconds(), res, EXTENSION_CLIENT_ID);
+    return;
+  }
+  if (clientType === 'desktop') {
     if (!isDesktopAuthEnabled()) {
       res.status(503).json({ error: 'Desktop auth is not configured' });
       return;
     }
-
     const desktopSecret = body.desktop_secret?.trim() ?? '';
     if (!verifyDesktopAuthSecret(desktopSecret)) {
       res.status(403).json({ error: 'Forbidden' });
       return;
     }
-
-    const clientId = clientType === 'extension' ? EXTENSION_CLIENT_ID : DESKTOP_CLIENT_ID;
-    issueDesktopToken(installId, jwtSecret, getTokenTtlSeconds(), res, clientId);
+    issueDesktopToken(installId, jwtSecret, getTokenTtlSeconds(), res, DESKTOP_CLIENT_ID);
     return;
   }
 

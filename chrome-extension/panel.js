@@ -152,8 +152,6 @@ function renderState(data) {
 }
 
 function applySettingsToForm(s) {
-  document.getElementById('backendUrl').value = s.backendUrl || '';
-  document.getElementById('desktopSecret').value = s.desktopAuthSecret || '';
   document.getElementById('storyNarrator').value = s.storyNarrator || 'auto';
   document.getElementById('storyLength').value = s.storyLength || '60s';
   document.getElementById('ttsVoice').value = s.ttsVoice || 'auto';
@@ -167,8 +165,6 @@ function applySettingsToForm(s) {
 
 function settingsPatchFromForm() {
   return {
-    backendUrl: document.getElementById('backendUrl').value.trim(),
-    desktopAuthSecret: document.getElementById('desktopSecret').value.trim(),
     storyNarrator: document.getElementById('storyNarrator').value,
     storyLength: document.getElementById('storyLength').value,
     ttsVoice: document.getElementById('ttsVoice').value,
@@ -240,18 +236,6 @@ document.getElementById('btn-email-verify').addEventListener('click', async () =
     renderState(state);
   } else {
     showToast(els.accountToast, res?.error || 'Ошибка', true);
-  }
-});
-
-document.getElementById('btn-trial').addEventListener('click', async () => {
-  const res = await send('welcome-trial');
-  if (res?.ok) {
-    showToast(els.accountToast, 'Trial активирован');
-    await send('fetch-profile');
-    const state = await send('get-state');
-    renderState(state);
-  } else {
-    showToast(els.accountToast, res?.error || 'Trial недоступен', true);
   }
 });
 
