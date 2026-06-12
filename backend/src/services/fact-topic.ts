@@ -1,3 +1,5 @@
+import { isCatalogMetadataSeed, isTrackDurationCatalogSeed } from './reference-fact-quality.js';
+
 /**
  * Generic fact topics — no track/album names in keys.
  * Any fact text maps to one primary topic for dedup across sources.
@@ -139,11 +141,21 @@ export function sameFactTopic(a: string, b: string): boolean {
   return classifyFactTopic(a) === classifyFactTopic(b);
 }
 
+function isCatalogAlbumContextSeed(fact: string): boolean {
+  return isTrackDurationCatalogSeed(fact) || isCatalogMetadataSeed(fact);
+}
+
 /** Topic + token overlap — catches paraphrases from different sources. */
 export function factsShareTopicOrOverlap(a: string, b: string): boolean {
   const topicA = classifyFactTopic(a);
   const topicB = classifyFactTopic(b);
-  if (topicA !== 'misc' && topicA === topicB) return true;
+  if (topicA !== 'misc' && topicA === topicB) {
+    // Duration/label catalog vs «first new song» — both album_context, different stories.
+    if (topicA === 'album_context' && isCatalogAlbumContextSeed(a) !== isCatalogAlbumContextSeed(b)) {
+      return false;
+    }
+    return true;
+  }
 
   if (factsShareSalientEntity(a, b)) return true;
 

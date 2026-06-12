@@ -8,7 +8,12 @@ import {
   hasTrackContextSignal,
 } from '../fact-relevance.js';
 import { poolHasTopicDuplicate } from '../fact-topic.js';
-import { interestScore, isAlbumListingSeed } from '../reference-fact-quality.js';
+import {
+  interestScore,
+  isAlbumListingSeed,
+  isCatalogMetadataSeed,
+  isTrackDurationCatalogSeed,
+} from '../reference-fact-quality.js';
 import { isTruncatedMarketingSnippet } from '../web-snippet-accept.js';
 import type { HarvestContext, HarvestedFact, HarvestSource } from './types.js';
 import { isParserTrustedHarvestSource } from './types.js';
@@ -123,6 +128,7 @@ function parserTrustedDedicatedRelevant(
     if (item.source === 'discogs' || item.source === 'lastfm') return true;
     return factMentionsArtist(trimmed, artist);
   }
+  if (item.scope === 'track' && item.source === 'lastfm') return true;
   if (factMentionsTitle(trimmed, title)) return true;
   if (factMentionsArtist(trimmed, artist)) return true;
   return false;
@@ -138,7 +144,24 @@ export function dedicatedHarvestToBundle(
   const artistFacts: string[] = [];
   const seen = new Set<string>();
 
-  const sorted = [...harvest].sort((a, b) => interestScore(b.fact) - interestScore(a.fact));
+  const sorted = [...harvest].sort((a, b) => {
+    const aTitle = factMentionsTitle(a.fact, title) ? 1 : 0;
+    const bTitle = factMentionsTitle(b.fact, title) ? 1 : 0;
+    if (aTitle !== bTitle) return bTitle - aTitle;
+    const aCatalog =
+      isTrackDurationCatalogSeed(a.fact) || isCatalogMetadataSeed(a.fact) || isAlbumListingSeed(a.fact)
+        ? 0
+        : 1;
+    const bCatalog =
+      isTrackDurationCatalogSeed(b.fact) || isCatalogMetadataSeed(b.fact) || isAlbumListingSeed(b.fact)
+        ? 0
+        : 1;
+    if (aCatalog !== bCatalog) return bCatalog - aCatalog;
+    const aTrack = a.scope === 'track' ? 1 : 0;
+    const bTrack = b.scope === 'track' ? 1 : 0;
+    if (aTrack !== bTrack) return bTrack - aTrack;
+    return interestScore(b.fact) - interestScore(a.fact);
+  });
   const acceptedFacts: string[] = [];
 
   for (const item of sorted) {

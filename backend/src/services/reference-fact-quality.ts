@@ -44,9 +44,24 @@ export function isAlbumListingSeed(fact: string): boolean {
 export function isCatalogMetadataSeed(fact: string): boolean {
   const t = fact.trim();
   if (isAlbumListingSeed(t)) return true;
+  if (isTrackDurationCatalogSeed(t)) return true;
   if (/Discogs датирован \d{4}/i.test(t)) return true;
   if (/выходил на лейбле/i.test(t)) return true;
   return false;
+}
+
+/** «Трек идёт 3:33» — метаданные, не история про релиз. */
+export function isTrackDurationCatalogSeed(fact: string): boolean {
+  return /трек «[^»]+» идёт \d+:\d+/i.test(fact.trim());
+}
+
+/** «Band formed in CITY in YEAR» — слабое семя для истории конкретного трека. */
+export function isArtistFormationBioSeed(fact: string): boolean {
+  const t = fact.trim();
+  return (
+    /\b(?:is|was)\s+(?:an?\s+)?(?:\w+\s+){0,4}(?:band|group|artist|duo|trio)\s+formed\s+in\b/i.test(t) ||
+    /\b(?:band|group)\s+formed\s+in\s+[A-Z][\w-]+(?:\s+in\s+\d{4})?\b/i.test(t)
+  );
 }
 
 export function isDedicatedCatalogSeed(fact: string): boolean {
@@ -220,7 +235,13 @@ export function interestScore(fact: string): number {
   if (isUnspeakableWebSeed(trimmed)) score -= 50;
   if (isCollectorFact(fact)) score += 8;
   if (isDedicatedCatalogSeed(trimmed)) score += 12;
+  if (isTrackDurationCatalogSeed(trimmed)) score -= 10;
+  if (/^[«"']/.test(trimmed) && /\b(?:first|new|debut|lead)\b/i.test(trimmed)) score += 18;
+  if (/\b(?:first new (?:song|music|single)|announced (?:a )?new ep|new lead singer)\b/i.test(trimmed)) {
+    score += 14;
+  }
   if (/\b(?:deathtronica|electronicore|metalcore|hardcore|scream\s+vocals?)\b/i.test(trimmed)) score += 20;
+  if (isArtistFormationBioSeed(trimmed)) score -= 12;
   if (BACKSTORY_FACT_PATTERNS.some((pattern) => pattern.test(fact))) score += 12;
   for (const pattern of STORY_FACT_PATTERNS) {
     if (pattern.test(fact)) score += 5;

@@ -703,7 +703,7 @@ export function hasTrackContextSignal(fact: string): boolean {
     /^It\s+(?:was|is|became|would|has|had|features|samples|opens|starts|tells|explores|remains)\b/i.test(
       trimmed,
     ) ||
-    /\b(?:music video|directed by|controversial nature|five different versions|operatic section|studio session|composed the|wrote the|recorded at|took three weeks|no chorus|gained popularity|viral|tiktok|signed with|influenced by|first single|lead single|hidden meaning|origin story|radio banned|refused to play|censored|banned by|intended to|repudiat\w*|members? of the (?:band|group|four)|far[- ]?right|extremist gang|documentary)\b/i.test(
+    /\b(?:music video|directed by|controversial nature|five different versions|operatic section|studio session|composed the|wrote the|recorded at|took three weeks|no chorus|gained popularity|viral|tiktok|signed with|influenced by|first single|lead single|first new (?:song|music|single)|announced on youtube|announced a new ep|new lead singer|hidden meaning|origin story|radio banned|refused to play|censored|banned by|intended to|repudiat\w*|members? of the (?:band|group|four)|far[- ]?right|extremist gang|documentary)\b/i.test(
       trimmed,
     ) ||
     /\b(?:single cut is significantly shorter|promo track under the name)\b/i.test(trimmed)
@@ -814,13 +814,27 @@ export function factAppliesToRequest(
   if (isGenericDisambiguationFact(trimmed, artist)) return false;
   if (isWrongTitleMediumCollision(trimmed, title)) return false;
   if (factMentionsOtherTrackTitle(trimmed, title)) return false;
-  if (factNamesForeignEntity(trimmed, artist, title, '', mode)) return false;
 
   const mentionsArtist = factMentionsArtist(trimmed, artist);
   const mentionsTitle = factMentionsTitle(trimmed, title);
+  const trackPageTrusted =
+    scope === 'track' &&
+    (mentionsTitle ||
+      hasTrackContextSignal(trimmed) ||
+      hasRussianTrackContextSignal(trimmed) ||
+      /^[«"']/.test(trimmed));
+
+  if (!trackPageTrusted && factNamesForeignEntity(trimmed, artist, title, '', mode)) return false;
 
   if (scope === 'track') {
-    if (mentionsTitle && !mentionsArtist) return false;
+    // Last.fm/Discogs track pages often omit artist name in the sentence — title + context is enough.
+    if (mentionsTitle && !mentionsArtist) {
+      const titleOnlyOk =
+        hasTrackContextSignal(trimmed) ||
+        hasRussianTrackContextSignal(trimmed) ||
+        /^[«"']/.test(trimmed);
+      if (!titleOnlyOk) return false;
+    }
     if (!mentionsArtist && !mentionsTitle) {
       if (hasTrackContextSignal(trimmed)) return true;
       return false;
