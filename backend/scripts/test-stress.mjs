@@ -64,6 +64,24 @@ for (const [input, needle] of Object.entries(nuSamples)) {
   }
 }
 
+console.log('\n=== Metal genre TTS (Yandex pipeline) ===');
+const metalSamples = {
+  'смешала электронику и дэт-метал так': 'дэт-м+етал',
+  'стиль ню метала': 'ню м+етала',
+  'мостом ню-металом и попом': 'ню м+еталом',
+  'жанр метал рок': 'м+етал р+ок',
+  'заядлые металлисты чесали': 'металлисты',
+  'стены из металла': 'мет+алла',
+};
+for (const [input, needle] of Object.entries(metalSamples)) {
+  const got = prepareYandexTtsText(input, {});
+  if (!got.includes(needle)) {
+    fail(`metal "${input}": expected "${needle}" in "${got}"`);
+  } else {
+    ok(`${input} → ${got}`);
+  }
+}
+
 console.log('\n=== Dictionary size ===');
 ok(`${Object.keys(RUSSIAN_STRESS).length} stress entries`);
 

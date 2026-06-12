@@ -38,14 +38,18 @@ const GENRE_TTS_REPLACEMENTS: Array<[RegExp, string]> = [
   [genreRe('альт[\\s-]+рок'), 'альтрок'],
   [genreRe('alt[\\s-]+rock'), 'альтрок'],
 
-  // metal / punk / electronic
-  [genreRe('ню[\\s-]+метал'), 'нюметал'],
-  [genreRe('nu[\\s-]+metal'), 'нюметал'],
-  [genreRe('хэви[\\s-]+метал'), 'хэвиметал'],
-  [genreRe('heavy[\\s-]+metal'), 'хэвиметал'],
-  [genreRe('дэт[\\s-]+метал'), 'дэт-м+етал'],
+  // metal — ударение на «е» в -метал; отдельно «металл» → мет+алл (ниже)
+  [genreRe('дэт[\\s-]+метал(а|у|ом|е|ы|и|)?'), 'дэт-м+етал$1'],
   [genreRe('death[\\s-]+metal'), 'дэт-м+етал'],
   [genreRe('дэтметал'), 'дэт-м+етал'],
+  [genreRe('ню[\\s-]+метал(а|у|ом|е|ы|и|)?'), 'ню м+етал$1'],
+  [genreRe('nu[\\s-]+metal'), 'ню м+етал'],
+  [genreRe('нюметал'), 'ню м+етал'],
+  [genreRe('хэви[\\s-]+метал(а|у|ом|е|ы|и|)?'), 'хэви м+етал$1'],
+  [genreRe('heavy[\\s-]+metal'), 'хэви м+етал'],
+  [genreRe('хэвиметал'), 'хэви м+етал'],
+  [genreRe('метал[\\s-]+рок'), 'м+етал рок'],
+  [genreRe('metal[\\s-]+rock'), 'м+етал рок'],
   [genreRe('поп[\\s-]+панк'), 'поппанк'],
   [genreRe('pop[\\s-]+punk'), 'поппанк'],
   [genreRe('пост[\\s-]+панк'), 'постпанк'],
@@ -72,6 +76,14 @@ const GENRE_TTS_REPLACEMENTS: Array<[RegExp, string]> = [
   [genreRe("r'n'b|rnb"), 'рэндби'],
 ];
 
+/** «Металл» отдельным словом (не жанр *-метал, не «металлист*»). */
+export function normalizeStandaloneMetallForTts(text: string): string {
+  return text.replace(
+    /(?<![\p{L}\p{N}_+\-])металл(?!ист)(ами|ах|ов|ом|у|е|ы|и|а|)(?![\p{L}\p{N}_])/giu,
+    'мет+алл$1',
+  );
+}
+
 /** Genre / subgenre tokens for Russian speech synthesis. */
 export function normalizeGenreTermsForTts(text: string): string {
   if (!text.trim()) return text;
@@ -79,5 +91,6 @@ export function normalizeGenreTermsForTts(text: string): string {
   for (const [pattern, replacement] of GENRE_TTS_REPLACEMENTS) {
     result = result.replace(pattern, replacement);
   }
+  result = normalizeStandaloneMetallForTts(result);
   return result;
 }
