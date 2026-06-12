@@ -363,6 +363,8 @@ class StoryOrchestrator(
     suspend fun onTrackChanged(track: TrackInfo) {
         if (!track.isValid()) return
 
+        factHintNotifier.onPlaybackTrackChanged(track)
+
         _hintMessage.value = null
         _pendingFeedback.value?.takeIf { it.trackKey != track.displayKey }?.let {
             _pendingFeedback.value = null
@@ -429,7 +431,12 @@ class StoryOrchestrator(
         }
     }
 
-    fun requestManualStory(fromNotification: Boolean = false) {
+    fun requestManualStory(
+        fromNotification: Boolean = false,
+        artist: String? = null,
+        title: String? = null,
+        fromFactHint: Boolean = false,
+    ) {
         scope.launch {
             if (settingsDataStore.appPowerMode.first() == AppPowerMode.OFF) {
                 showManualStoryBlocked(
@@ -443,10 +450,17 @@ class StoryOrchestrator(
                 gate.userMessage?.let { showManualStoryBlocked(it, fromNotification) }
                 return@launch
             }
-            val track = mediaControllerManager.effectiveNowPlaying.value
+            val track = when {
+                !artist.isNullOrBlank() && !title.isNullOrBlank() ->
+                    TrackInfo(artist = artist, title = title)
+                else -> mediaControllerManager.effectiveNowPlaying.value
+            }
             if (track == null || !track.isValid()) {
                 showNoTrackHint()
                 return@launch
+            }
+            if (fromFactHint) {
+                factHintNotifier.dismissForTrack(track)
             }
             StoryLog.i("Manual story requested: ${track.artist} — ${track.title}")
             clearTrackStoryCancelled(track)

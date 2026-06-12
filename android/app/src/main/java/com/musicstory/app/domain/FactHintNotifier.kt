@@ -56,7 +56,7 @@ class FactHintNotifier(private val context: Context) {
             .addAction(
                 R.drawable.ic_notification,
                 context.getString(R.string.fact_hint_action_tell),
-                tellStoryIntent(),
+                tellStoryIntent(track),
             )
             .build()
 
@@ -65,6 +65,7 @@ class FactHintNotifier(private val context: Context) {
 
         prefs.edit()
             .putLong(keyLastTrack(trackKey), now)
+            .putString(KEY_LAST_NOTIFIED_TRACK_KEY, trackKey)
             .putString(KEY_HOURLY_TS, (recent + now).joinToString(","))
             .apply()
         StoryLog.i("Fact hint notification shown: ${track.artist} — ${track.title}")
@@ -91,14 +92,41 @@ class FactHintNotifier(private val context: Context) {
         PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
     )
 
-    private fun tellStoryIntent(): PendingIntent = PendingIntent.getBroadcast(
+    private fun tellStoryIntent(track: TrackInfo): PendingIntent = PendingIntent.getBroadcast(
         context,
-        21,
+        21 + track.displayKey.hashCode(),
         Intent(context, StoryActionReceiver::class.java).apply {
             action = StoryActionReceiver.ACTION_MANUAL_STORY
+            putExtra(StoryActionReceiver.EXTRA_ARTIST, track.artist)
+            putExtra(StoryActionReceiver.EXTRA_TITLE, track.title)
+            putExtra(StoryActionReceiver.EXTRA_FROM_FACT_HINT, true)
         },
         PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
     )
+
+    /** Dismiss fact-hint push when playback moved to another track. */
+    fun onPlaybackTrackChanged(currentTrack: TrackInfo) {
+        if (!currentTrack.isValid()) return
+        val lastKey = prefs.getString(KEY_LAST_NOTIFIED_TRACK_KEY, null) ?: return
+        if (lastKey == currentTrack.displayKey) return
+        cancelForTrackKey(lastKey)
+        prefs.edit().remove(KEY_LAST_NOTIFIED_TRACK_KEY).apply()
+        StoryLog.i("Fact hint notification cancelled (track changed): $lastKey")
+    }
+
+    fun dismissForTrack(track: TrackInfo) {
+        if (!track.isValid()) return
+        cancelForTrackKey(track.displayKey)
+        val lastKey = prefs.getString(KEY_LAST_NOTIFIED_TRACK_KEY, null)
+        if (lastKey == track.displayKey) {
+            prefs.edit().remove(KEY_LAST_NOTIFIED_TRACK_KEY).apply()
+        }
+    }
+
+    private fun cancelForTrackKey(trackKey: String) {
+        val manager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+        manager.cancel(NOTIFICATION_ID_BASE + trackKey.hashCode())
+    }
 
     private fun pruneHourlyTimestamps(now: Long) {
         val recent = prefs.getString(KEY_HOURLY_TS, "").orEmpty()
@@ -114,6 +142,7 @@ class FactHintNotifier(private val context: Context) {
         const val CHANNEL_FACT_HINT = "fact_hint"
         private const val PREFS_NAME = "fact_hint_notifier"
         private const val KEY_HOURLY_TS = "hourly_ts"
+        private const val KEY_LAST_NOTIFIED_TRACK_KEY = "last_notified_track_key"
         private const val MAX_PER_HOUR = 3
         private const val HOUR_MS = 3_600_000L
         private const val TRACK_COOLDOWN_MS = 86_400_000L
