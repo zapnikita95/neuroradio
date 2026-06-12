@@ -140,7 +140,10 @@ export function prepareYandexTtsText(
     trackArtist: options.artist ?? '',
     trackTitle: options.title ?? '',
   });
-  const quality = runTtsQualityPass(text);
+  const quality = runTtsQualityPass(text, {
+    artist: options.artist ?? '',
+    title: options.title ?? '',
+  });
   text = quality.text;
 
   text = normalizeYearsForRussianTts(text);

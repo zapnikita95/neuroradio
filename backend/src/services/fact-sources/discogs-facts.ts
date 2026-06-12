@@ -31,7 +31,10 @@ const DISCOGS_JUNK =
   /(?:licensed from|manufactured by|distributed by|marketed by|phono copyright|copyright control|all rights reserved|for promotional use|not for sale|discogs\.com)/i;
 
 function discogsHeaders(): Record<string, string> | null {
-  if (!TOKEN) return null;
+  if (!TOKEN) {
+    console.warn('[discogs] DISCOGS_TOKEN not set — artist/release facts disabled');
+    return null;
+  }
   return {
     Authorization: `Discogs token=${TOKEN}`,
     Accept: 'application/vnd.discogs.v2.discogs+json',

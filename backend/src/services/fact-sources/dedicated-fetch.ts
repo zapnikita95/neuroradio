@@ -99,6 +99,10 @@ function dedicatedFactRelevant(
     if (hasTrackContextSignal(trimmed) && !factMentionsOtherTrackTitle(trimmed, title)) return true;
   }
   if (trackScope === 'artist' && factMentionsArtist(trimmed, artist)) return true;
+  if (trackScope === 'artist' && artist.trim().length >= 3) {
+    const artistLc = artist.trim().toLowerCase();
+    if (trimmed.toLowerCase().includes(artistLc)) return true;
+  }
   return false;
 }
 

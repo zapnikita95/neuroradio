@@ -52,7 +52,7 @@ type TopicRule = { topic: FactTopicKey; pattern: RegExp };
 const TOPIC_RULES: TopicRule[] = [
   { topic: 'listening_stats', pattern: /\b(?:last\.?fm|слушател|прослушиван|scrobbles?|playcount)\b/i },
   { topic: 'award_ceremony', pattern: /\b(?:grammy|oscar|mtv video music|award|ceremony|номинац|преми[яю]|didn'?t attend)\b/i },
-  { topic: 'music_video', pattern: /\b(?:music video|official video|клип|directed by|promotional video|mtv)\b/i },
+  { topic: 'music_video', pattern: /\b(?:music video|official video|клип|directed by|promotional video|mtv|gondry|режисс|director|visual|анимац|optical illusion)\b/i },
   {
     topic: 'sampling_credits',
     pattern: /\b(?:sampled?|sampling|interpolation|rip(?:ped)? off|borrowed from|based on a riff)\b/i,
@@ -145,12 +145,52 @@ export function factsShareTopicOrOverlap(a: string, b: string): boolean {
   const topicB = classifyFactTopic(b);
   if (topicA !== 'misc' && topicA === topicB) return true;
 
+  if (factsShareSalientEntity(a, b)) return true;
+
   const wordsA = significantTokens(a);
   if (wordsA.length === 0) return false;
   const setB = new Set(significantTokens(b));
   const hits = wordsA.filter((w) => setB.has(w)).length;
   const ratio = hits / wordsA.length;
   return hits >= 3 && ratio >= 0.38;
+}
+
+const ENTITY_STOP = new Set([
+  'michel',
+  'official',
+  'music',
+  'video',
+  'album',
+  'single',
+  'track',
+  'band',
+  'group',
+  'artist',
+  'american',
+  'british',
+  'english',
+]);
+
+/** Имена/сущности из факта — чтобы не повторять тот же клип (Gondry) под другим текстом. */
+export function extractSalientEntities(fact: string): string[] {
+  const out = new Set<string>();
+  for (const match of fact.match(/\b[A-Z][a-z]+(?:\s+[A-Z][a-z]+)?\b/g) ?? []) {
+    const token = match.toLowerCase();
+    if (token.length >= 5 && !ENTITY_STOP.has(token.split(/\s+/)[0]!)) {
+      out.add(token);
+    }
+  }
+  for (const match of fact.match(/\b(?:gondry|michel gondry)\b/gi) ?? []) {
+    out.add(match.toLowerCase());
+  }
+  return [...out];
+}
+
+export function factsShareSalientEntity(a: string, b: string): boolean {
+  const entitiesA = extractSalientEntities(a);
+  if (entitiesA.length === 0) return false;
+  const setB = new Set(extractSalientEntities(b));
+  return entitiesA.some((entity) => setB.has(entity));
 }
 
 export function topicKeySet(facts: string[]): Set<FactTopicKey> {

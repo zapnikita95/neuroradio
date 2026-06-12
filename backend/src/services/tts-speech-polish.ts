@@ -2,6 +2,8 @@
  * Last-mile conversational polish before TTS — keeps facts, improves speakability.
  */
 
+import { fixTtsGrammarIssues } from './tts-grammar-fixes.js';
+
 const BUREAUCRATIC_REPLACEMENTS: Array<[RegExp, string]> = [
   [/(?:^|[\s,.])в\s+связи\s+с\s+тем,?\s+что/giu, ' потому что'],
   [/(?:^|[\s,.])следует\s+отметить,?\s+что/giu, ' '],
@@ -106,7 +108,10 @@ const NATURAL_SPEECH_FIXES: Array<[RegExp, string]> = [
   ],
 ];
 
-export function polishScriptForSpeechDelivery(script: string): string {
+export function polishScriptForSpeechDelivery(
+  script: string,
+  options: { artist?: string; title?: string } = {},
+): string {
   let result = script.trim();
 
   for (const [pattern, replacement] of BUREAUCRATIC_REPLACEMENTS) {
@@ -122,6 +127,7 @@ export function polishScriptForSpeechDelivery(script: string): string {
   }
 
   result = result.replace(/\s{2,}/g, ' ').replace(/\s+([,.!?])/g, '$1').replace(/,\./g, '.').trim();
+  result = fixTtsGrammarIssues(result, options);
   result = splitLongSentencesForSpeech(result);
 
   return result;

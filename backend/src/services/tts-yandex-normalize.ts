@@ -1,5 +1,6 @@
 /** Last-mile token fixes before Yandex SSML (no network). */
 
+import { mergeLatinCollaborationPhrases } from './tts-grammar-fixes.js';
 import { normalizeGenreTermsForTts } from './tts-genre-pronounce.js';
 
 const CURLY_APOSTROPHE = /[\u2018\u2019\u02BC\u0060]/g;
@@ -88,6 +89,8 @@ export function normalizeYandexSpeechTokens(text: string, artist = '', title = '
   result = normalizeVinylSideLabels(result);
 
   result = mergeKnownTitleOtArtist(result, artist, title);
+
+  result = mergeLatinCollaborationPhrases(result);
 
   result = normalizeGenreTermsForTts(result);
 

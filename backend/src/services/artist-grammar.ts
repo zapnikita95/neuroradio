@@ -3,7 +3,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { primaryArtistName } from './artist-primary.js';
 
-export type ArtistGenderRu = 'masculine' | 'feminine';
+export type ArtistGenderRu = 'masculine' | 'feminine' | 'neutral';
 export type ArtistCollectiveKind = 'solo' | 'group';
 
 export interface ArtistGrammarRu {
@@ -16,6 +16,60 @@ export interface ArtistGrammarRu {
 }
 
 type SoloMap = Record<string, 'm' | 'f'>;
+
+const FEMININE_FIRST_NAMES = new Set([
+  'adele',
+  'alicia',
+  'ariana',
+  'billie',
+  'britney',
+  'carly',
+  'celine',
+  'charli',
+  'cher',
+  'christina',
+  'diana',
+  'dua',
+  'grimes',
+  'halsey',
+  'janis',
+  'jennifer',
+  'joni',
+  'katy',
+  'kylie',
+  'lady',
+  'lauren',
+  'laurence',
+  'lana',
+  'lorde',
+  'madonna',
+  'mariah',
+  'miley',
+  'nancy',
+  'nicki',
+  'norah',
+  'olivia',
+  'pink',
+  'rihanna',
+  'rosalia',
+  'selena',
+  'shakira',
+  'sheryl',
+  'sia',
+  'taylor',
+  'tina',
+  'whitney',
+  'zara',
+  'zemfira',
+]);
+
+function inferGenderFromFirstName(artist: string): ArtistGenderRu | undefined {
+  const primary = primaryArtistName(artist).trim();
+  const first = primary.split(/\s+/)[0]?.toLowerCase().replace(/[^\p{L}]/gu, '');
+  if (!first) return undefined;
+  if (FEMININE_FIRST_NAMES.has(first)) return 'feminine';
+  return undefined;
+}
 
 const __dir = dirname(fileURLToPath(import.meta.url));
 let soloByName: Map<string, ArtistGenderRu> | null = null;
@@ -86,7 +140,7 @@ export function resolveArtistGrammarRu(artist: string): ArtistGrammarRu {
     };
   }
 
-  const gender = lookupSoloGender(artist) ?? 'masculine';
+  const gender = lookupSoloGender(artist) ?? inferGenderFromFirstName(artist);
   if (gender === 'feminine') {
     return {
       kind: 'solo',
@@ -99,21 +153,39 @@ export function resolveArtistGrammarRu(artist: string): ArtistGrammarRu {
     };
   }
 
+  if (gender === 'masculine') {
+    return {
+      kind: 'solo',
+      gender,
+      subject: 'он',
+      possessive: 'его',
+      reflexive: 'себя',
+      promptHint:
+        'Артист — сольный исполнитель. Пиши «он», «его», «у него». НЕ пиши «они/их» про одного артиста.',
+    };
+  }
+
   return {
     kind: 'solo',
-    gender,
-    subject: 'он',
-    possessive: 'его',
-    reflexive: 'себя',
+    gender: 'neutral',
+    subject: '',
+    possessive: '',
+    reflexive: '',
     promptHint:
-      'Артист — сольный исполнитель. Пиши «он», «его», «у него». НЕ пиши «они/их» про одного артиста.',
+      'Род артиста неизвестен. НЕ используй он/она/они/его/её/их и родовые окончания (-ый/-ая, вложил/вложила). ' +
+      'Пиши нейтрально: «Lauren Sanderson — единственный ребёнок…», «в треке сочетаются…», «артист записал» → «эта запись сочетает».',
   };
 }
 
 /** Safety net before TTS — fix «их путь» for solo artists when LLM slips. */
 export function fixSoloArtistPronounsRu(script: string, artist: string): string {
   const grammar = resolveArtistGrammarRu(artist);
-  if (grammar.kind !== 'solo' || !grammar.gender) return script;
+  if (grammar.kind !== 'solo') return script;
+
+  if (grammar.gender === 'neutral') {
+    return neutralizeGenderedPronounsRu(script, artist);
+  }
+  if (!grammar.gender) return script;
 
   const poss = grammar.possessive;
   const subj = grammar.subject;
@@ -147,6 +219,10 @@ export function fixSoloArtistPronounsRu(script: string, artist: string): string 
     const esc = artist.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     result = result.replace(new RegExp(`(${esc})\\s+не\\s+просто\\s+пел(?![а-яёa-z])`, 'gi'), '$1 не просто пела');
     result = result.replace(/(?<![а-яёa-z])не просто пел(?![а-яёa-z])/gi, 'не просто пела');
+    result = result.replace(/(?<![а-яёa-z])выросший(?![а-яёa-z])/gi, 'выросшая');
+    result = result.replace(/(?<![а-яёa-z])вложил(?![а-яёa-z])/gi, 'вложила');
+    result = result.replace(/(?<![а-яёa-z])его\s+(голос|боль|путь)/gi, 'её $1');
+    result = result.replace(/(?<![а-яёa-z])для него(?![а-яёa-z])/gi, 'для неё');
     result = result.replace(/он создавал(?![а-яёa-z])/gi, 'она создавала');
     result = result.replace(/она создавал(?![а-яёa-z])/gi, 'она создавала');
     result = result.replace(/он записал/gi, 'она записала');
@@ -158,6 +234,39 @@ export function fixSoloArtistPronounsRu(script: string, artist: string): string 
   }
 
   return result.replace(/\s{2,}/g, ' ').trim();
+}
+
+function neutralizeGenderedPronounsRu(script: string, artist: string): string {
+  const esc = artist.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  let result = script;
+  if (esc) {
+    result = result.replace(
+      new RegExp(`(${esc})\\s*,\\s*(?:выросший|выросшая|родившийся|родившая)(?=[\\s,.!?—–-]|$)`, 'giu'),
+      '$1',
+    );
+    result = result.replace(
+      new RegExp(`(${esc})\\s+—\\s+(?:он|она)\\s+`, 'giu'),
+      '$1 — ',
+    );
+  }
+  const replacements: Array<[RegExp, string]> = [
+    [/,\s*выросший(?=[\s,.!?—–-]|$)/giu, ''],
+    [/,\s*выросшая(?=[\s,.!?—–-]|$)/giu, ''],
+    [/,\s*родившийся(?=[\s,.!?—–-]|$)/giu, ''],
+    [/,\s*родившаяся(?=[\s,.!?—–-]|$)/giu, ''],
+    [/(?<![а-яёa-z])меня\s+до\s+сих\s+пор\s+цепляет,\s*как\s+он\s+/giu, 'меня до сих пор цепляет, как в треке '],
+    [/(?<![а-яёa-z])меня\s+до\s+сих\s+пор\s+цепляет,\s*как\s+она\s+/giu, 'меня до сих пор цепляет, как в треке '],
+    [/(?<![а-яёa-z])он\s+(?:соединил|создал|записал|вложил|стал|пел|написал|делает|проживает)\b/giu, ''],
+    [/(?<![а-яёa-z])она\s+(?:соединила|создала|записала|вложила|стала|пела|написала|делает|проживает)\b/giu, ''],
+    [/(?<![а-яёa-z])для\s+него\s+/giu, ''],
+    [/(?<![а-яёa-z])для\s+неё\s+/giu, ''],
+    [/(?<![а-яёa-z])Franz Ferdinand\s+не\s+просто\s+(?:играл|играла)/giu, 'Franz Ferdinand не просто играли'],
+    [/(?<![а-яёa-z])Franz Ferdinand\s+—\s+он\s+/giu, 'Franz Ferdinand — они '],
+  ];
+  for (const [re, repl] of replacements) {
+    result = result.replace(re, repl);
+  }
+  return result.replace(/\s{2,}/g, ' ').replace(/\s+([,.!?])/g, '$1').trim();
 }
 
 export function registerSoloArtist(name: string, gender: 'm' | 'f'): void {

@@ -521,20 +521,39 @@ router.post('/full', extractClientSecrets, validateStoryFullBody, storyFullRateL
             `track=${trackFactCount} artist=${artistFactCount}`,
           );
         } else {
-          const skipRetry =
-            trackFactCount + artistFactCount > 0 ||
-            (firstFetchMs >= 18_000 && factCtx.rawSnippets.length >= 2) ||
-            hasActionableSnippets(factCtx.rawSnippets, metadata.artist, metadata.title) ||
-            (factCtx.rawSnippets.length > 0 &&
-              !hasActionableSnippets(factCtx.rawSnippets, metadata.artist, metadata.title)) ||
-            (isCatalogMajorArtist(metadata.artist) && factCtx.rawSnippets.length === 0);
-          if (skipRetry) {
+          const indieCtx = await fetchIndieArtistFocusContext(
+            metadata.artist,
+            metadata.title,
+            metadata.countryCode,
+            metadata.artistMbid,
+          );
+          if (indieCtx.bundle.trackFacts.length + indieCtx.bundle.artistFacts.length > 0) {
+            factCtx = {
+              ...factCtx,
+              bundle: indieCtx.bundle,
+              rawSnippets: [...new Set([...factCtx.rawSnippets, ...indieCtx.rawSnippets])],
+              snippetSources: [...factCtx.snippetSources, ...indieCtx.snippetSources],
+            };
+            factBundle = indieCtx.bundle;
+            trackFactCount = factBundle.trackFacts.length;
+            artistFactCount = factBundle.artistFacts.length;
+            timing.mark(
+              'facts-indie-focus',
+              `track=${trackFactCount} artist=${artistFactCount}`,
+            );
+          } else if (
+            firstFetchMs >= 18_000 &&
+            (factCtx.rawSnippets.length >= 2 ||
+              hasActionableSnippets(factCtx.rawSnippets, metadata.artist, metadata.title))
+          ) {
             console.warn(
               `[facts] skip empty-bundle retry for "${metadata.artist}" — ${firstFetchMs}ms snippets=${factCtx.rawSnippets.length} grounded=${countGroundedFacts(factCtx.bundle)}`,
             );
           } else {
-            console.warn(`[facts] empty bundle for "${metadata.artist}" — "${metadata.title}", retrying sources`);
-            await new Promise((r) => setTimeout(r, 700));
+            console.warn(
+              `[facts] empty bundle for "${metadata.artist}" — "${metadata.title}", retrying wiki/web once`,
+            );
+            await new Promise((r) => setTimeout(r, 400));
             factCtx = await fetchAggregatedFactContext(
               metadata.artist,
               metadata.title,

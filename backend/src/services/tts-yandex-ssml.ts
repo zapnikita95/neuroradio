@@ -118,6 +118,7 @@ const LATIN_SSML_PRONUNCIATION: Record<string, string> = {
   onerepublic: 'One Republic',
   'anti-gravity lean': 'anti gravity lean',
   'anti-gravity': 'anti gravity',
+  startafight: 'start a fight',
 };
 
 function splitCamelCaseLatin(span: string): string {

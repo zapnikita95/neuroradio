@@ -181,6 +181,10 @@ export async function buildFactPickContext(
         : Promise.resolve(null),
     ]);
   if (narratorTopic) blockedTopics.add(narratorTopic);
+  for (const seed of recentTrack) {
+    const topic = classifyFactTopic(seed);
+    if (topic !== 'misc') blockedTopics.add(topic);
+  }
   const rejectSimilarTo = [...new Set([...recentTrack, ...recentArtist])];
   const storyLanguage = options.storyLanguage ?? 'ru';
   return { usedFingerprints: used, rejectSimilarTo, blockedTopics, recentScopes, storyLanguage };

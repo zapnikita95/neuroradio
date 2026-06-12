@@ -17,6 +17,7 @@ import {
 import { isTruncatedMarketingSnippet, isSpeakableReferenceFact } from './web-snippet-accept.js';
 import { interestScore } from './reference-fact-quality.js';
 import { fixSoloArtistPronounsRu } from './artist-grammar.js';
+import { fixTtsGrammarIssues } from './tts-grammar-fixes.js';
 import { isVoiceoverWithoutTrackNames, scriptLeaksVoiceoverNames } from './voiceover-no-names.js';
 import { primaryArtistName } from './artist-primary.js';
 import { phraseVariants } from './tts-generic-script.js';
@@ -407,6 +408,7 @@ export function sanitizeScriptForTts(
   result = result.replace(/\s{2,}/g, ' ').replace(/\s+([,.!?])/g, '$1').trim();
   result = stripBannedFluff(result);
   result = fixSoloArtistPronounsRu(result, blockArtist);
+  result = fixTtsGrammarIssues(result, { artist: blockArtist, title: blockTitle });
 
   return result;
 }

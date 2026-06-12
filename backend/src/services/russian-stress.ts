@@ -209,6 +209,11 @@ export const RUSSIAN_STRESS: Record<string, string> = {
 
 export const FORCE_RESTRESS = new Set(Object.keys(RUSSIAN_STRESS));
 
+/** Жанровые сложения *-рок-* — ударение на «о»: арт-р+оковым, инди-р+ок. */
+export function normalizeGenreRockStress(text: string): string {
+  return text.replace(/(?<=[\p{L}]-)рок(?=[\p{L}])/giu, 'р+ок');
+}
+
 /** nu metal / ну-метал — «ню» (англ. nu), ударение на «е»: ню м+еталом и склонения. */
 export function normalizeNuMetalPronunciation(text: string): string {
   let result = text.replace(/\bnu[\s-]metals?\b/gi, (match) =>
@@ -263,7 +268,7 @@ const LATIN_SLOT_END = '\uE015';
 
 /** Латиница не трогается ударениями и ё-нормализацией — иначе Hollywood → Hollywуd. */
 export function applyRussianStressSafe(text: string): string {
-  const prepped = normalizeNuMetalPronunciation(text);
+  const prepped = normalizeGenreRockStress(normalizeNuMetalPronunciation(text));
   const slots: string[] = [];
   const masked = prepped.replace(LATIN_RUN_RE, (match) => {
     const idx = slots.length;

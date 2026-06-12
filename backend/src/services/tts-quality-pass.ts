@@ -15,7 +15,10 @@ export interface TtsQualityPassResult {
   warnings: string[];
 }
 
-export function runTtsQualityPass(script: string): TtsQualityPassResult {
+export function runTtsQualityPass(
+  script: string,
+  options: { artist?: string; title?: string } = {},
+): TtsQualityPassResult {
   const warnings: string[] = [];
   let text = script.trim();
   let adjusted = false;
@@ -34,7 +37,7 @@ export function runTtsQualityPass(script: string): TtsQualityPassResult {
     }
   }
 
-  const polished = polishScriptForSpeechDelivery(text);
+  const polished = polishScriptForSpeechDelivery(text, options);
   if (polished !== text) {
     text = polished;
     adjusted = true;
