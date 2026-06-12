@@ -75,9 +75,10 @@ export async function synthesizeSpeechAzure(
 
   await mkdir(AUDIO_DIR, { recursive: true });
 
-  const outputFormat =
-    process.env.AZURE_SPEECH_OUTPUT_FORMAT?.trim() ||
-    'audio-ogg-48khz-16bit-mono-opus';
+  const wantWav = fileName.toLowerCase().endsWith('.wav');
+  const outputFormat = wantWav
+    ? 'riff-24khz-16bit-mono-pcm'
+    : process.env.AZURE_SPEECH_OUTPUT_FORMAT?.trim() || 'audio-ogg-48khz-16bit-mono-opus';
 
   const response = await fetch(ttsEndpoint(region), {
     method: 'POST',
@@ -97,12 +98,14 @@ export async function synthesizeSpeechAzure(
   }
 
   const buffer = Buffer.from(await response.arrayBuffer());
-  const safeName = fileName.endsWith('.ogg') ? fileName : `${fileName}.ogg`;
+  const safeName = wantWav
+    ? (fileName.endsWith('.wav') ? fileName : `${fileName.replace(/\.[^.]+$/, '')}.wav`)
+    : (fileName.endsWith('.ogg') ? fileName : `${fileName.replace(/\.[^.]+$/, '')}.ogg`);
   const filePath = path.join(AUDIO_DIR, safeName);
   await writeFile(filePath, buffer);
 
   console.log(
-    `[azure-tts] ok region=${region} voice=${voice} rate=${yandexSpeedToAzureRate(speed)} bytes=${buffer.length} chars=${plainText.length}`,
+    `[azure-tts] ok region=${region} voice=${voice} format=${wantWav ? 'wav' : 'ogg'} rate=${yandexSpeedToAzureRate(speed)} bytes=${buffer.length} chars=${plainText.length}`,
   );
 
   return {

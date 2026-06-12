@@ -1166,7 +1166,7 @@ class StoryRepository(
         if (!canUseOfflineReplay()) return null
         val resolved = resolveAudioUrl(audioUrl) ?: return null
         if (!isPersistentOfflineAudioUrl(resolved)) {
-            StoryLog.w("Offline cache skip: not WAV (client_platform=android expected) — ${resolved.take(80)}")
+            StoryLog.w("Offline cache skip: server must return WAV for android — ${resolved.take(80)}")
             return null
         }
         val path = offlineAudioStore.downloadToTrack(resolved, trackKey) ?: return null

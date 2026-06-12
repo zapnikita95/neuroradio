@@ -55,7 +55,11 @@ import { isMusicArtistWikiExtract } from '../services/wikipedia-music.js';
 import { countWords, detectStoryQualityWarnings, sanitizeScriptForTts } from '../services/story-quality.js';
 import type { StoryScript } from '../services/groq.js';
 import { setLogDetail } from '../middleware/request-logger.js';
-import { hasYandexCredentials, yandexAudioExtension } from '../services/yandex-tts.js';
+import { hasYandexCredentials } from '../services/yandex-tts.js';
+import {
+  requiresMobileWavPlayback,
+  storyAudioExtensionForClient,
+} from '../services/client-audio-format.js';
 import {
   canSynthesizeServerTts,
   hasUserTtsCredentials,
@@ -159,14 +163,8 @@ interface StoryFullBody {
   skip_server_tts?: boolean;
   edge_voice_preset?: string;
   speak_track_names_in_voiceover?: boolean;
-  /** ios/android — AVPlayer and Huawei ExoPlayer fail on Yandex OGG/Opus; use WAV. */
+  /** ios/android — server must synthesize WAV only (see client-audio-format.ts). */
   client_platform?: 'ios' | 'android' | string;
-}
-
-function storyAudioExtensionForClient(body: StoryFullBody): 'ogg' | 'wav' {
-  const platform = typeof body.client_platform === 'string' ? body.client_platform.trim().toLowerCase() : '';
-  if (platform === 'ios' || platform === 'android') return 'wav';
-  return yandexAudioExtension();
 }
 
 router.get('/quota', (req: Request, res: Response) => {
@@ -1512,7 +1510,7 @@ router.post('/full', extractClientSecrets, validateStoryFullBody, storyFullRateL
       console.log(
         `[tts] queue install=${installId.slice(0, 8)} voice=${voiceId} style=${delivery.styleId} speed=${delivery.speed} emotion=${delivery.emotion} tier=${effectiveVoiceTier} userTier=${userTier} provider=${effectiveTtsProvider} userBilling=${hasUserTtsCredentials(userTtsCredentials) ? userTtsCredentials?.provider : 'server'} words=${story.word_count}`,
       );
-      const iosPlayback = storyAudioExtensionForClient(body) === 'wav';
+      const mobileWav = requiresMobileWavPlayback(body);
       const audio = await synthesizeStoryAudio({
         installId,
         voiceTier: effectiveVoiceTier,
@@ -1520,7 +1518,8 @@ router.post('/full', extractClientSecrets, validateStoryFullBody, storyFullRateL
         script: story.script,
         voiceId,
         fileName: `${id}.${storyAudioExtensionForClient(body)}`,
-        preferIosPlayback: iosPlayback,
+        preferMobileWav: mobileWav,
+        preferIosPlayback: mobileWav,
         speed: delivery.speed,
         emotion: delivery.emotion,
         pauseProfile: delivery.pauseProfile,

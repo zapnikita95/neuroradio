@@ -24,7 +24,7 @@ const YANDEX_LPCM_SAMPLE_RATE = 48_000;
 
 export type YandexAudioFormat = 'oggopus' | 'lpcm-wav';
 
-/** OGG by default — Play Store app offline cache uses .ogg paths; WAV broke ExoPlayer for premium users. */
+/** Default OGG for web/desktop; mobile ios/android always request WAV via client-audio-format.ts. */
 export function resolveYandexAudioFormat(): YandexAudioFormat {
   const fmt = process.env.YANDEX_TTS_FORMAT?.trim().toLowerCase();
   if (fmt === 'wav' || fmt === 'lpcm' || fmt === 'lpcm-wav') return 'lpcm-wav';

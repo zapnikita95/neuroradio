@@ -96,7 +96,10 @@ export async function synthesizeSpeechSalute(
   }
 
   const buffer = Buffer.from(await response.arrayBuffer());
-  const safeName = fileName.endsWith('.ogg') ? fileName : `${fileName}.ogg`;
+  if (fileName.toLowerCase().endsWith('.wav')) {
+    throw new Error('SaluteSpeech outputs OGG only — cannot satisfy mobile WAV fileName');
+  }
+  const safeName = fileName.endsWith('.ogg') ? fileName : `${fileName.replace(/\.[^.]+$/, '')}.ogg`;
   const filePath = path.join(AUDIO_DIR, safeName);
 
   await mkdir(AUDIO_DIR, { recursive: true });

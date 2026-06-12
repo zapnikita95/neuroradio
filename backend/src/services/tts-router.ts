@@ -59,7 +59,9 @@ export interface TtsRouteRequest {
   speakTrackNamesInVoiceover?: boolean;
   storyLanguage?: StoryLanguageId;
   elevenLabsVoice?: string;
-  /** iOS AVPlayer — WAV only; Salute OGG заменяем на Yandex WAV. */
+  /** ios/android clients — synthesize WAV only; OGG providers are blocked. */
+  preferMobileWav?: boolean;
+  /** @deprecated use preferMobileWav */
   preferIosPlayback?: boolean;
 }
 
@@ -190,14 +192,23 @@ function ttsMarkupFlags(request: TtsRouteRequest): { speakTrackNamesInVoiceover:
   return { speakTrackNamesInVoiceover: request.speakTrackNamesInVoiceover === true };
 }
 
+function mobileWavRequired(request: TtsRouteRequest): boolean {
+  return request.preferMobileWav === true || request.preferIosPlayback === true;
+}
+
+function providerOutputsMobileWav(provider: EffectiveTtsProvider): boolean {
+  return provider === 'edge' || provider === 'yandex' || provider === 'elevenlabs';
+}
+
 export async function synthesizeStoryAudio(request: TtsRouteRequest): Promise<TtsRouteResult> {
+  const mobileWav = mobileWavRequired(request);
   let provider = resolveEffectiveTtsProvider(request);
-  if (request.preferIosPlayback && provider === 'sber') {
-    console.warn('[tts-router] ios playback — Salute OGG skipped, using Yandex WAV');
+  if (mobileWav && !providerOutputsMobileWav(provider)) {
+    console.warn(`[tts-router] mobile WAV — ${provider} (OGG-only) blocked, using Yandex WAV`);
     provider = 'yandex';
   }
   const script = scriptForProvider(request, provider);
-  const yandexAudioFormat = request.preferIosPlayback ? ('lpcm-wav' as const) : undefined;
+  const yandexAudioFormat = mobileWav ? ('lpcm-wav' as const) : undefined;
   const edgePreset = resolveEdgeVoicePresetId(
     typeof request.edgeVoicePreset === 'string' ? request.edgeVoicePreset : undefined,
   );
@@ -256,6 +267,29 @@ export async function synthesizeStoryAudio(request: TtsRouteRequest): Promise<Tt
       audioFormat: yandexAudioFormat,
       ...ttsMarkupFlags(request),
     });
+  }
+
+  if (mobileWav) {
+    if (!result.fileName.toLowerCase().endsWith('.wav')) {
+      console.error(
+        `[tts-router] CRITICAL mobile client got non-WAV ${result.fileName} from ${provider} — Yandex WAV fallback`,
+      );
+      const wavName = request.fileName.toLowerCase().endsWith('.wav')
+        ? request.fileName
+        : `${request.fileName.replace(/\.[^.]+$/, '')}.wav`;
+      result = await synthesizeYandex(script, request.voiceId, wavName, {
+        speed: request.speed,
+        emotion: request.emotion,
+        artist: request.artist,
+        title: request.title,
+        pauseProfile: request.pauseProfile,
+        logContext: request.logContext,
+        credentials: request.userTtsCredentials?.yandex,
+        audioFormat: 'lpcm-wav',
+        speakTrackNamesInVoiceover: request.speakTrackNamesInVoiceover,
+      });
+      provider = 'yandex';
+    }
   }
 
   if (result.filePath.endsWith('.ogg')) {
