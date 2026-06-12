@@ -22,6 +22,11 @@ interface DiscogsRelease {
   tracklist?: Array<{ title?: string; position?: string; duration?: string }>;
 }
 
+interface DiscogsArtist {
+  name?: string;
+  profile?: string;
+}
+
 const DISCOGS_JUNK =
   /(?:licensed from|manufactured by|distributed by|marketed by|phono copyright|copyright control|all rights reserved|for promotional use|not for sale|discogs\.com)/i;
 
@@ -49,6 +54,29 @@ async function resolveAlbumName(ctx: HarvestContext): Promise<string | null> {
     { timeoutMs: 8000 },
   );
   return data?.track?.album?.title?.trim() ?? null;
+}
+
+function normalizeArtistName(name: string): string {
+  return name.toLowerCase().replace(/[^a-z0-9а-яё]+/gi, ' ').replace(/\s+/g, ' ').trim();
+}
+
+function pickArtistId(
+  results: DiscogsSearchResult['results'],
+  artist: string,
+): number | null {
+  if (!results?.length) return null;
+  const target = normalizeArtistName(artist);
+  const scored = results
+    .filter((r) => r.type === 'artist' && r.id)
+    .map((r) => {
+      const title = normalizeArtistName(r.title ?? '');
+      let score = 0;
+      if (title === target) score += 10;
+      else if (title.includes(target) || target.includes(title)) score += 5;
+      return { id: r.id!, score };
+    })
+    .sort((a, b) => b.score - a.score);
+  return scored[0]?.score >= 5 ? scored[0].id : null;
 }
 
 function pickRelease(
@@ -155,4 +183,59 @@ export async function fetchDiscogsFacts(ctx: HarvestContext): Promise<HarvestedF
   }
 
   return facts.slice(0, 8);
+}
+
+/** Профиль группы/артиста на Discogs — быстрый fallback, если по треку/релизу пусто. */
+export async function fetchDiscogsArtistFacts(artist: string): Promise<HarvestedFact[]> {
+  const headers = discogsHeaders();
+  if (!headers) return [];
+
+  const search = await rateLimited(() =>
+    fetchJson<DiscogsSearchResult>(
+      `https://api.discogs.com/database/search?q=${encodeURIComponent(artist)}&type=artist&per_page=8`,
+      { headers, timeoutMs: 12000 },
+    ),
+  );
+  const artistId = pickArtistId(search?.results, artist);
+  if (!artistId) return [];
+
+  const profileData = await rateLimited(() =>
+    fetchJson<DiscogsArtist>(`https://api.discogs.com/artists/${artistId}`, {
+      headers,
+      timeoutMs: 12000,
+    }),
+  );
+  const profile = profileData?.profile?.trim();
+  if (!profile) return [];
+
+  const facts: HarvestedFact[] = [];
+  const seen = new Set<string>();
+  for (const sentence of splitSentences(stripHtml(profile))) {
+    if (!sentenceOk(sentence)) continue;
+    const key = sentence.toLowerCase().replace(/\s+/g, ' ').trim().slice(0, 200);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    facts.push({ fact: sentence, scope: 'artist', source: 'discogs' });
+    if (facts.length >= 4) break;
+  }
+
+  if (facts.length === 0 && profile.length >= 35) {
+    const trimmed = profile.replace(/\s+/g, ' ').trim().slice(0, 480);
+    if (sentenceOk(trimmed)) {
+      facts.push({ fact: trimmed, scope: 'artist', source: 'discogs' });
+    }
+  }
+
+  return facts;
+}
+
+/**
+ * Live path: релиз (трек/альбом) + профиль артиста, если по релизу ничего не нашли.
+ * ~3–6 с при наличии DISCOGS_TOKEN.
+ */
+export async function fetchDiscogsLiveFacts(ctx: HarvestContext): Promise<HarvestedFact[]> {
+  const releaseFacts = await fetchDiscogsFacts(ctx);
+  if (releaseFacts.length > 0) return releaseFacts.slice(0, 8);
+  const artistFacts = await fetchDiscogsArtistFacts(ctx.artist);
+  return artistFacts.slice(0, 6);
 }

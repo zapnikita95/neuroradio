@@ -4,7 +4,13 @@ import { requireAppAuth } from '../middleware/app-auth.js';
 import { validateStoryFullBody } from '../middleware/validate-story.js';
 import { extractClientSecrets } from '../middleware/client-secrets.js';
 import { enrichTrackMetadata } from '../services/musicbrainz.js';
-import { fetchAggregatedFactContext, emptyAggregatedFactContext, fetchIndieArtistFocusContext, fetchEmergencyFactRescue } from '../services/fact-aggregator.js';
+import {
+  fetchAggregatedFactContext,
+  emptyAggregatedFactContext,
+  fetchIndieArtistFocusContext,
+  fetchEmergencyFactRescue,
+  fetchDiscogsFactFallback,
+} from '../services/fact-aggregator.js';
 import { fetchDeepWebSearchSnippets, fetchArtistIdentityWebSnippets } from '../services/web-search-facts.js';
 import { fetchFastTrackWikiFacts } from '../services/wikipedia-facts.js';
 import { explainReferenceFactSelection, factsTooSimilar, type SelectedReferenceFact } from '../services/fact-picker.js';
@@ -495,31 +501,52 @@ router.post('/full', extractClientSecrets, validateStoryFullBody, storyFullRateL
       artistFactCount = factBundle.artistFacts.length;
       const firstFetchMs = timing.totalMs();
       if (trackFactCount + artistFactCount === 0) {
-        const skipRetry =
-          trackFactCount + artistFactCount > 0 ||
-          (firstFetchMs >= 18_000 && factCtx.rawSnippets.length >= 2) ||
-          hasActionableSnippets(factCtx.rawSnippets, metadata.artist, metadata.title) ||
-          (factCtx.rawSnippets.length > 0 &&
-            !hasActionableSnippets(factCtx.rawSnippets, metadata.artist, metadata.title)) ||
-          (isCatalogMajorArtist(metadata.artist) && factCtx.rawSnippets.length === 0);
-        if (skipRetry) {
-          console.warn(
-            `[facts] skip empty-bundle retry for "${metadata.artist}" — ${firstFetchMs}ms snippets=${factCtx.rawSnippets.length} grounded=${countGroundedFacts(factCtx.bundle)}`,
-          );
-        } else {
-          console.warn(`[facts] empty bundle for "${metadata.artist}" — "${metadata.title}", retrying sources`);
-          await new Promise((r) => setTimeout(r, 700));
-          factCtx = await fetchAggregatedFactContext(
-            metadata.artist,
-            metadata.title,
-            metadata.countryCode,
-            metadata.mbid,
-            metadata.artistMbid,
-            { storyLanguage: storyLanguage ?? 'ru' },
-          );
-          factBundle = factCtx.bundle;
+        const discogsCtx = await fetchDiscogsFactFallback(
+          metadata.artist,
+          metadata.title,
+          metadata.countryCode,
+        );
+        if (discogsCtx) {
+          factCtx = {
+            ...factCtx,
+            bundle: discogsCtx.bundle,
+            rawSnippets: [...new Set([...factCtx.rawSnippets, ...discogsCtx.rawSnippets])],
+            snippetSources: [...factCtx.snippetSources, ...discogsCtx.snippetSources],
+          };
+          factBundle = discogsCtx.bundle;
           trackFactCount = factBundle.trackFacts.length;
           artistFactCount = factBundle.artistFacts.length;
+          timing.mark(
+            'facts-discogs-fallback',
+            `track=${trackFactCount} artist=${artistFactCount}`,
+          );
+        } else {
+          const skipRetry =
+            trackFactCount + artistFactCount > 0 ||
+            (firstFetchMs >= 18_000 && factCtx.rawSnippets.length >= 2) ||
+            hasActionableSnippets(factCtx.rawSnippets, metadata.artist, metadata.title) ||
+            (factCtx.rawSnippets.length > 0 &&
+              !hasActionableSnippets(factCtx.rawSnippets, metadata.artist, metadata.title)) ||
+            (isCatalogMajorArtist(metadata.artist) && factCtx.rawSnippets.length === 0);
+          if (skipRetry) {
+            console.warn(
+              `[facts] skip empty-bundle retry for "${metadata.artist}" — ${firstFetchMs}ms snippets=${factCtx.rawSnippets.length} grounded=${countGroundedFacts(factCtx.bundle)}`,
+            );
+          } else {
+            console.warn(`[facts] empty bundle for "${metadata.artist}" — "${metadata.title}", retrying sources`);
+            await new Promise((r) => setTimeout(r, 700));
+            factCtx = await fetchAggregatedFactContext(
+              metadata.artist,
+              metadata.title,
+              metadata.countryCode,
+              metadata.mbid,
+              metadata.artistMbid,
+              { storyLanguage: storyLanguage ?? 'ru' },
+            );
+            factBundle = factCtx.bundle;
+            trackFactCount = factBundle.trackFacts.length;
+            artistFactCount = factBundle.artistFacts.length;
+          }
         }
       }
       console.log(

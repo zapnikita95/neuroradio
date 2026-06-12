@@ -34,6 +34,7 @@ import {
   dedicatedHarvestToBundle,
   fetchDedicatedSourceFacts,
 } from './fact-sources/dedicated-fetch.js';
+import { fetchDiscogsArtistFacts, fetchDiscogsLiveFacts } from './fact-sources/discogs-facts.js';
 import type { HarvestSource } from './fact-sources/types.js';
 import { factFitsStoryLanguage, filterBundleForStoryLanguage } from './fact-language-fit.js';
 import { resolveStoryLanguage, type StoryLanguageId } from './story-language.js';
@@ -564,6 +565,33 @@ function wikiLeadToFacts(
   return { trackFacts: [], artistFacts: [text] };
 }
 
+/** Быстрый Discogs-only fallback (~3–6 с) — до тяжёлого retry wiki/web. */
+export async function fetchDiscogsFactFallback(
+  artist: string,
+  title: string,
+  countryCode?: string,
+): Promise<AggregatedFactContext | null> {
+  const harvest = await fetchWithCap(
+    'discogs-fallback',
+    () => fetchDiscogsLiveFacts({ artist, title, countryCode }),
+    [],
+    10_000,
+  );
+  if (harvest.length === 0) return null;
+  const bundle = dedicatedHarvestToBundle(harvest, artist, title);
+  if (bundle.trackFacts.length + bundle.artistFacts.length === 0) return null;
+  console.log(
+    `[facts] discogs fallback "${artist}" — "${title}": ` +
+      `track=${bundle.trackFacts.length} artist=${bundle.artistFacts.length}`,
+  );
+  const rawSnippets = harvest.map((f) => f.fact);
+  return {
+    bundle,
+    rawSnippets,
+    snippetSources: harvest.map((f) => f.source as SnippetSource),
+  };
+}
+
 /** Последняя попытка для indie: только факты об артисте, без привязки к треку. */
 export async function fetchIndieArtistFocusContext(
   artist: string,
@@ -572,6 +600,24 @@ export async function fetchIndieArtistFocusContext(
   artistMbid?: string,
 ): Promise<AggregatedFactContext> {
   const t0 = Date.now();
+  const discogsArtist = await fetchWithCap(
+    'discogs-artist',
+    () => fetchDiscogsArtistFacts(artist),
+    [],
+    8_000,
+  );
+  const discogsBundle = dedicatedHarvestToBundle(discogsArtist, artist, title);
+  if (discogsBundle.artistFacts.length > 0) {
+    console.log(
+      `[facts] indie discogs artist hit "${artist}": ${discogsBundle.artistFacts.length} fact(s) ${Date.now() - t0}ms`,
+    );
+    return {
+      bundle: discogsBundle,
+      rawSnippets: discogsBundle.artistFacts,
+      snippetSources: discogsBundle.artistFacts.map(() => 'discogs' as SnippetSource),
+    };
+  }
+
   const [wikiLead, ddgRaw, webRaw, mbArtistRaw] = await Promise.all([
     fetchArtistWikiLead(artist),
     fetchDuckDuckGoUnfiltered(artist, title),
@@ -628,14 +674,20 @@ export async function fetchAggregatedFactContext(
   const t0 = Date.now();
   const cc = resolveFactCountryCode(artist, title, countryCode);
   const harvestCtx = { artist, title, countryCode: cc };
-  // Phase 1: Genius/Last.fm/Setlist — не конкурируют с wiki/web за прокси.
-  const dedicatedHarvest = await fetchWithCap(
+  // Phase 1: dedicated + Discogs параллельно с wiki/web (Discogs ~3–6 с, не ждём конца wiki).
+  const dedicatedPromise = fetchWithCap(
     'dedicated',
     () => fetchDedicatedSourceFacts(harvestCtx),
     [],
     12_000,
   );
-  const [wiki, wikiLead, ddgUnfiltered, webUnfiltered, webTitleFirst, wdUnfiltered, mbTrackRaw, mbArtistRaw, wikiFastTrack] =
+  const discogsPromise = fetchWithCap(
+    'discogs',
+    () => fetchDiscogsLiveFacts(harvestCtx),
+    [],
+    12_000,
+  );
+  const [wiki, wikiLead, ddgUnfiltered, webUnfiltered, webTitleFirst, wdUnfiltered, mbTrackRaw, mbArtistRaw, wikiFastTrack, dedicatedHarvest, discogsHarvest] =
     await Promise.all([
       fetchWithCap(
         'wiki',
@@ -661,15 +713,23 @@ export async function fetchAggregatedFactContext(
         8_000,
       ),
       fetchWithCap('wiki-fast-track', () => fetchFastTrackWikiFacts(artist, title), [], 15_000),
+      dedicatedPromise,
+      discogsPromise,
     ]);
-  const dedicatedTrack = dedicatedHarvest
+  const combinedDedicated = [...dedicatedHarvest, ...discogsHarvest];
+  if (discogsHarvest.length > 0) {
+    console.log(
+      `[facts] discogs ok artist="${artist}" title="${title}" count=${discogsHarvest.length}`,
+    );
+  }
+  const dedicatedTrack = combinedDedicated
     .filter((f) => f.scope === 'track' || f.scope === 'album')
     .map((f) => f.fact);
-  const dedicatedArtist = dedicatedHarvest
+  const dedicatedArtist = combinedDedicated
     .filter((f) => f.scope === 'artist')
     .map((f) => f.fact);
-  if (dedicatedHarvest.length > 0) {
-    const bySrc = dedicatedFactsBySource(dedicatedHarvest);
+  if (combinedDedicated.length > 0) {
+    const bySrc = dedicatedFactsBySource(combinedDedicated);
     console.log(
       `[facts] dedicated ok artist="${artist}" title="${title}" ` +
         `track=${dedicatedTrack.length} artist=${dedicatedArtist.length} ` +
@@ -704,7 +764,7 @@ export async function fetchAggregatedFactContext(
     `[facts] parallel fetch ${artist} — ${title}: ${Date.now() - t0}ms ` +
       `wiki=${wiki.trackFacts.length + wiki.artistFacts.length} ` +
       `wikiLead=${wikiLeadBundle.trackFacts.length + wikiLeadBundle.artistFacts.length} ` +
-      `ddg=${ddgUnfiltered.length} web=${webAllUnfiltered.length} dedicated=${dedicatedHarvest.length}`,
+      `ddg=${ddgUnfiltered.length} web=${webAllUnfiltered.length} dedicated=${dedicatedHarvest.length} discogs=${discogsHarvest.length}`,
   );
 
   const ddg = filterAndRankFacts([...ddgUnfiltered, ...webAllUnfiltered], 10);
@@ -774,7 +834,7 @@ export async function fetchAggregatedFactContext(
   artistFacts = identityMerged.artistFacts;
   trackFacts = identityMerged.trackFacts;
 
-  const dedicatedBundle = dedicatedHarvestToBundle(dedicatedHarvest, artist, title);
+  const dedicatedBundle = dedicatedHarvestToBundle(combinedDedicated, artist, title);
   if (dedicatedBundle.trackFacts.length + dedicatedBundle.artistFacts.length > 0) {
     trackFacts = mergeDedicatedFacts(trackFacts, dedicatedBundle.trackFacts, 8);
     artistFacts = mergeDedicatedFacts(artistFacts, dedicatedBundle.artistFacts, 6);
@@ -799,7 +859,7 @@ export async function fetchAggregatedFactContext(
     wdUnfiltered,
     mbTrackRaw,
     mbArtistRaw,
-    dedicatedHarvest.map((f) => ({ fact: f.fact, source: f.source })),
+    combinedDedicated.map((f) => ({ fact: f.fact, source: f.source })),
     artist,
     title,
   );
@@ -847,6 +907,25 @@ export async function fetchEmergencyFactRescue(
   }
 
   console.log(`[facts] emergency rescue for "${artist}" — "${title}"`);
+  const discogsRescue = await fetchWithCap(
+    'discogs-rescue',
+    () => fetchDiscogsLiveFacts({ artist, title }),
+    [],
+    10_000,
+  );
+  const discogsBundle = dedicatedHarvestToBundle(discogsRescue, artist, title);
+  if (discogsBundle.trackFacts.length + discogsBundle.artistFacts.length > 0) {
+    console.log(
+      `[facts] emergency discogs rescue "${artist}" — "${title}": ` +
+        `track=${discogsBundle.trackFacts.length} artist=${discogsBundle.artistFacts.length}`,
+    );
+    return {
+      bundle: discogsBundle,
+      rawSnippets: discogsRescue.map((f) => f.fact),
+      snippetSources: discogsRescue.map((f) => f.source as SnippetSource),
+    };
+  }
+
   const junkOnly =
     existingSnippets.length > 0 && !hasActionableSnippets(existingSnippets, artist, title);
   const [wikiFast, webBack, titleFirst, webDeep, artistIdentity] = await Promise.all([
