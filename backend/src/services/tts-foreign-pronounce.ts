@@ -2,6 +2,7 @@ import {
   buildArtistPhrasePhoneticRu,
   lookupArtistPronunciation,
 } from './artist-pronunciation.js';
+import { normalizeGenreTermsForTts } from './tts-genre-pronounce.js';
 import { fixWikiTranslationArtifacts } from './wiki-translate-quality.js';
 import {
   englishPhraseToRussianPhonetic,
@@ -69,8 +70,8 @@ const PHRASE_PRONUNCIATION_RU: Record<string, string> = {
   'twenty one pilots': 'Твэнти Уан Пайлотс',
   'crazy town': 'Крейзи Таун',
   butterfly: 'Баттерфлай',
-  'nu metal': 'ню метал',
-  'nu-metal': 'ню метал',
+  'nu metal': 'ню м+етал',
+  'nu-metal': 'ню м+етал',
   ...GERMAN_PHRASE_PHONETIC,
   ...FRENCH_PHRASE_PHONETIC,
   ...buildArtistPhrasePhoneticRu(),
@@ -488,6 +489,7 @@ export function applyForeignPronunciationWithReplacements(
   }
 
   let result = mergeTitleOtArtistPhonetic(text, artist, title);
+  result = normalizeGenreTermsForTts(result);
 
   const { masked, slots } = maskTtsMarkup(result);
   result = applyPhraseDictionaryLogged(masked, extra, replacements, 'dictionary');
@@ -507,6 +509,7 @@ export function applyForeignPronunciation(
   const extra = buildArtistTitleExtra(artist, title);
 
   let merged = mergeTitleOtArtistPhonetic(text, artist, title);
+  merged = normalizeGenreTermsForTts(merged);
   const { masked, slots } = maskTtsMarkup(merged);
   let result = applyPhraseDictionary(masked, extra);
   result = transliterateRemainingLatin(result);

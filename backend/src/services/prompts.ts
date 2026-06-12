@@ -20,6 +20,7 @@ import { buildStylePromptBlock } from './style-corpus.js';
 import { eraContextForPrompt, resolveTrackLocale, type TrackLocale } from './track-locale.js';
 import { resolveArtistGrammarRu } from './artist-grammar.js';
 import { voiceStoryPromptHint } from './voices.js';
+import { buildClosingPhrasePromptBlock } from './story-closing-phrases.js';
 import {
   buildVoiceoverNamesEconomyPromptBlock,
   buildVoiceoverNoNamesPromptBlock,
@@ -486,6 +487,8 @@ export function buildStoryUserPrompt(params: {
     lines.push('Первый рассказ — сразу с факта из Wikipedia, не со студийного fiction.');
   }
 
+  lines.push('');
+  lines.push(buildClosingPhrasePromptBlock(narratorId, params.artist, params.title));
   lines.push('');
   lines.push(`Голос (voiceId): ${params.voiceId}`);
   const voiceHint = voiceStoryPromptHint(params.voiceId);

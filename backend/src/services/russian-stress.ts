@@ -225,6 +225,10 @@ export function normalizeNuMetalPronunciation(text: string): string {
   );
   // \b не работает с кириллицей в JS — явные границы слова.
   result = result.replace(
+    /(?<![а-яёА-ЯЁ])nu[\s-]+метал(ами|ах|ам|ом|ов|а|у|е|ы|)(?![а-яёА-ЯЁ])/gi,
+    (_full, ending) => `ню м+етал${ending}`,
+  );
+  result = result.replace(
     /(?<![а-яёА-ЯЁ])(?:ну|ню)[\s-]+?м([её])тал(ами|ах|ам|ом|ов|а|у|е|ы|)(?![а-яёА-ЯЁ])/gi,
     (_full, _vowel, ending) => `ню м+етал${ending}`,
   );
