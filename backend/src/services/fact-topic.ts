@@ -145,8 +145,23 @@ function isCatalogAlbumContextSeed(fact: string): boolean {
   return isTrackDurationCatalogSeed(fact) || isCatalogMetadataSeed(fact);
 }
 
+function isNarrativeTrackSeed(fact: string): boolean {
+  const t = fact.trim();
+  return (
+    (/^[«"']/.test(t) && /\b(?:first|new|debut|lead)\b/i.test(t)) ||
+    /\b(?:first new (?:song|music|single)|announced on youtube|new lead singer)\b/i.test(t)
+  );
+}
+
 /** Topic + token overlap — catches paraphrases from different sources. */
 export function factsShareTopicOrOverlap(a: string, b: string): boolean {
+  if (
+    (isCatalogAlbumContextSeed(a) && isNarrativeTrackSeed(b)) ||
+    (isCatalogAlbumContextSeed(b) && isNarrativeTrackSeed(a))
+  ) {
+    return false;
+  }
+
   const topicA = classifyFactTopic(a);
   const topicB = classifyFactTopic(b);
   if (topicA !== 'misc' && topicA === topicB) {
