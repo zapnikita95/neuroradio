@@ -2,8 +2,10 @@
 
 export type HarvestRateBucket = 'lastfm' | 'discogs' | 'genius' | 'setlistfm' | 'default';
 
-/** Off by default — live story /v1/story/full must never share this queue. */
-const ENABLED = process.env.HARVEST_RATE_LIMIT?.trim().toLowerCase() === 'true';
+/** Off unless bulk script sets BOTH flags — live /v1/story/full must never share this queue. */
+const ENABLED =
+  process.env.HARVEST_RATE_LIMIT?.trim().toLowerCase() === 'true' &&
+  process.env.BULK_HARVEST?.trim().toLowerCase() === 'true';
 
 /** Min ms between requests per bucket (conservative vs documented limits). */
 const INTERVAL_MS: Record<HarvestRateBucket, number> = {

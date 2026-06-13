@@ -6,6 +6,7 @@
 import './setup-hidemy-proxy.mjs';
 import '../dist/load-env.js';
 process.env.HARVEST_RATE_LIMIT = 'true';
+process.env.BULK_HARVEST = 'true';
 import crypto from 'node:crypto';
 import { mkdirSync, readFileSync, writeFileSync, existsSync } from 'node:fs';
 import { dirname, join } from 'node:path';

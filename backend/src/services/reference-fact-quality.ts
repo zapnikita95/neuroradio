@@ -34,6 +34,7 @@ const DEDICATED_CATALOG_SEED_PATTERNS: RegExp[] = [
   /(?:electronicore|deathtronica|metalcore|post-punk|shoegaze)\s+band\s+from/i,
   /(?:piece|member)\s+.*\s+band\s+from/i,
   /\bas the (?:first|second|third|fourth|fifth|lead|debut) single from\b/i,
+  /^It was released on .+ as the (?:first|second|third|fourth|fifth|lead|debut) single\b/i,
   /^The song was released on .+ as the (?:first|second|third|fourth|lead|debut) single\b/i,
   /^"[^"]+" is a song by .+ released on .+ as the (?:first|second|third|fourth|lead|debut) single\b/i,
 ];
@@ -94,6 +95,17 @@ export function isCatalogMetadataSeed(fact: string): boolean {
   if (/на Last\.fm указан в альбоме «[^»]+»/i.test(t)) return true;
   if (/исполнителя .+ на Last\.fm указан в альбоме/i.test(t)) return true;
   return false;
+}
+
+/** Discogs sleeve/runout filler — not a story seed. */
+export function isDiscogsLinerNotesSeed(fact: string): boolean {
+  const t = fact.trim();
+  return (
+    /\bthanks to friends and family\b/i.test(t) ||
+    /\bunauthorised copying\b/i.test(t) ||
+    /\ball rights of the owner of copyright\b/i.test(t) ||
+    /\bal rights of the owner\b/i.test(t)
+  );
 }
 
 /** «Трек идёт 3:33» — метаданные, не история про релиз. */
@@ -317,6 +329,8 @@ export function adjustedInterestScore(fact: string, narrator: StoryNarratorId = 
 export function interestScore(fact: string): number {
   let score = 0;
   const trimmed = fact.trim();
+  const quoteNorm = trimmed.replace(/[\u201c\u201d\u2018\u2019]/g, '"');
+  if (/The song(?:'|')s title comes from/i.test(quoteNorm)) return 22;
   if (isCitationBibliographySeed(trimmed)) return -40;
   if (isGenericConcertVenueSeed(trimmed)) return -25;
   if (isCatalogMetadataSeed(trimmed)) return -30;
@@ -334,7 +348,10 @@ export function interestScore(fact: string): number {
     score += 14;
   }
   if (isTrackDurationCatalogSeed(trimmed)) score -= 10;
-  if (/^[«"']/.test(trimmed) && /\b(?:first|new|debut|lead)\b/i.test(trimmed)) score += 18;
+  if (/^[«"']/.test(quoteNorm) && /\b(?:first|new|debut|lead|collaboration|song)\b/i.test(quoteNorm)) {
+    score += 18;
+  }
+  if (/^[«"'][\p{L}\p{N}\s'-]{2,40}[»"']\s+is a\b/iu.test(quoteNorm)) score += 16;
   if (/\b(?:first new (?:song|music|single)|announced (?:a )?new ep|new lead singer)\b/i.test(trimmed)) {
     score += 14;
   }
@@ -384,6 +401,7 @@ export function interestScore(fact: string): number {
   if (/\binspired by the music of\b/i.test(fact)) score += 14;
   if (/\b(?:anti-war|protest song|political protest)\b/i.test(fact)) score += 14;
   if (/\b(?:intended to reflect|refrain.*intended|chorus.*intended)\b/i.test(fact)) score += 12;
+  if (/The song(?:'|')s title comes from/i.test(quoteNorm)) score += 16;
   if (/\b(?:new musical elements|vocal counterpoint|incorporates a lot of new)\b/i.test(fact)) score += 14;
   if (/\bwas inspired by\b/i.test(fact) && /\b(?:Dylan|Beatles|Hendrix|Cohen|Springsteen)\b/i.test(fact)) {
     score += 8;

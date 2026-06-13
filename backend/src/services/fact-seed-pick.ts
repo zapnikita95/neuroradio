@@ -6,6 +6,7 @@ import {
   isCatalogMetadataSeed,
   isCitationBibliographySeed,
   isArtistDisambiguationListSeed,
+  isDiscogsLinerNotesSeed,
   isEncyclopediaDefinitionSeed,
   isGenericConcertVenueSeed,
   isGenericMusicVideoSeed,
@@ -24,6 +25,7 @@ import {
   isMisattributedBandTrackFact,
 } from './fact-relevance.js';
 import { isArtistIdentityBioSnippet } from './web-snippet-accept.js';
+import { artistHasSearchAliases } from './artist-search-aliases.js';
 import { hasAnchoredTrackContext, isTrackTitleAnchoredSeed, rejectSeedForTrackStory } from './fact-track-anchor.js';
 import { factFitsStoryLanguage } from './fact-language-fit.js';
 import type { StoryLanguageId } from './story-language.js';
@@ -46,12 +48,16 @@ export function isRejectedPickSeed(
   if (isCitationBibliographySeed(fact)) return true;
   if (isEncyclopediaDefinitionSeed(fact)) return true;
   if (isArtistDisambiguationListSeed(fact)) return true;
+  if (isDiscogsLinerNotesSeed(fact)) return true;
   if (
     title.trim() &&
-    isAmbiguousCommonWordTitle(title) &&
     isArtistIdentityBioSnippet(fact) &&
     !factMentionsTitle(fact, title) &&
-    !hasAnchoredTrackContext(fact, title)
+    !hasAnchoredTrackContext(fact, title) &&
+    (isAmbiguousCommonWordTitle(title) ||
+      artistHasSearchAliases(artist) ||
+      trackPool.some((t) => factMentionsTitle(t, title) && adjustedInterestScore(t) >= 8) ||
+      trackPool.some((t) => hasAnchoredTrackContext(t, title) && adjustedInterestScore(t) >= 8))
   ) {
     return true;
   }

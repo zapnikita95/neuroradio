@@ -99,6 +99,8 @@ const CATALOG_METADATA_PATTERNS: RegExp[] = [
   /\b(?:track «|трек «).*(?:» на (?:Last\.fm|Discogs)|album «)/i,
   /\b(?:на лейбле|выходил на лейбле)\b/i,
   /трек «[^»]+» идёт \d+:\d+/i,
+  /\btold the audience\b/i,
+  /\bthere'?s no going back from this point\b/i,
 ];
 
 /** Lyrical character from another song (Dani in «Dani California», not «Can't Stop»). */
@@ -178,6 +180,8 @@ export function isArtistCareerBioWithoutTrack(fact: string, title: string): bool
 
 /** Band bio sentence names a different single than the requested track. */
 export function isOtherNamedSingleBioFact(fact: string, title: string): boolean {
+  if (/\bdebut single check\b/i.test(fact)) return true;
+  if (/Then the (?:first|second|third|fourth|lead|debut) single \w+/i.test(fact)) return true;
   if (factMentionsTitle(fact, title)) return false;
   const match = fact.match(
     /\b(?:debut|lead|first|second|third)\s+single\s+(?!from\b|off\b|on\b|in\b|of\b|for\b)(?:«|"|'|)([A-Za-zА-Яа-яЁё0-9][\w\s'-]{0,48}?)(?:»|"|'|\s+was|\s+is|\s+from|,|\.|\s+recorded)/iu,

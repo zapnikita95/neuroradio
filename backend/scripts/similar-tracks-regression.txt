@@ -1,0 +1,34 @@
+# Format: artist|title|bad-seed-regex (; separates patterns)
+# --- pop-rock 2010s singles (Maroon 5 class: no formation/origin bio) ---
+Maroon 5|Payphone|originated in;formed in;originates in;was formed in
+Maroon 5|Maps|originated in;formed in;originates in;was formed in
+Maroon 5|Sugar|originated in;formed in;originates in;was formed in
+OneRepublic|Counting Stars|originated in;formed in;originates in;was formed in
+Train|Hey, Soul Sister|originated in;formed in;originates in;was formed in
+Maroon 5|Moves Like Jagger|originated in;formed in;originates in;was formed in
+OneRepublic|Apologize|originated in;formed in;originates in;was formed in
+Maroon 5|Animals|originated in;formed in;originates in;was formed in
+Maroon 5|Girls Like You|originated in;formed in;originates in;was formed in
+Imagine Dragons|Radioactive|originated in;formed in;originates in;was formed in
+# --- hip-hop/pop abbrev + ambiguous titles (mgk class: no dictionary/artist bio) ---
+mgk|emo girl|Nerval;is defined as;French poet;Colson Baker \(born;stylized in all lowercase.*born
+mgk|papercuts|Nerval;is defined as;French poet;Colson Baker \(born;stylized in all lowercase.*born
+mgk|my ex's best friend|Nerval;is defined as;French poet;Colson Baker \(born;stylized in all lowercase.*born
+YUNGBLUD|parents|is defined as;is a word;Merriam-Webster;Oxford English;means a person who
+Post Malone|Sunflower|is defined as;genus Helianthus;botanical;flowering plant
+The Kid LAROI|STAY|is defined as;verb meaning;Merriam-Webster
+Juice WRLD|Lucid Dreams|is defined as;is a type of;sleep disorder;REM sleep
+Eminem|Love the Way You Lie|is defined as;Merriam-Webster
+Drake|Hotline Bling|is defined as;Merriam-Webster
+Tyler, The Creator|EARFQUAKE|is defined as;seismic;earthquake magnitude
+# --- indie / disambiguation (Pompeya class: no Moscow list / wrong-track check) ---
+Pompeya|90|1\) A ;debut single check;Buenos Aires;funkpopjazz;Russian rock band from Moscow
+Pompeya|Passion|1\) A ;debut single check;Buenos Aires;funkpopjazz;Russian rock band from Moscow
+Pompeya|Easy|1\) A ;debut single check;Buenos Aires;funkpopjazz;Russian rock band from Moscow
+The Neighbourhood|Sweater Weather|1\) A ;debut single check;is defined as;weather forecast
+Arctic Monkeys|Do I Wanna Know?|1\) A ;debut single check;is defined as
+Tame Impala|The Less I Know The Better|1\) A ;debut single check;is defined as
+Phoenix|Lisztomania|1\) A ;debut single check;Franz Liszt;Hungarian composer
+Foals|My Number|1\) A ;debut single check;is defined as;telephone number
+Two Door Cinema Club|What You Know|1\) A ;debut single check;is defined as
+alt-J|Breezeblocks|1\) A ;debut single check;is defined as;building block

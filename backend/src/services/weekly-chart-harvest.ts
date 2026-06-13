@@ -65,6 +65,7 @@ export interface WeeklyChartHarvestResult {
 
 export async function runWeeklyChartHarvest(opts: { limit?: number; dryRun?: boolean } = {}): Promise<WeeklyChartHarvestResult> {
   process.env.HARVEST_RATE_LIMIT = 'true';
+  process.env.BULK_HARVEST = 'true';
   if (harvestRunning) {
     console.log('[chart-harvest] already running — skip');
     return {

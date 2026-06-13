@@ -1,0 +1,10 @@
+# Previously failed similar-track cases
+Maroon 5|Moves Like Jagger|originated in;formed in;Memories
+mgk|emo girl|Nerval;Colson Baker \(born
+mgk|my ex's best friend|Nerval;Colson Baker \(born
+Tyler, The Creator|EARFQUAKE|Nerval;Colson Baker \(born;is defined as
+Pompeya|90|1\) A ;debut single check;Moscow
+Pompeya|Passion|1\) A ;debut single check;Moscow
+Pompeya|Easy|1\) A ;debut single check;Moscow
+Tame Impala|The Less I Know The Better|1\) A ;thanks to friends;debut single check
+alt-J|Breezeblocks|1\) A ;debut single check;Matilda

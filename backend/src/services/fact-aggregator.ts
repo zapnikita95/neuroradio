@@ -11,6 +11,7 @@ import {
   isWebListicleJunk,
 } from './fact-relevance.js';
 import { filterAndRankFacts, interestScore, isArtistDisambiguationListSeed, isArtistFormationBioSeed, isEncyclopediaDefinitionSeed } from './reference-fact-quality.js';
+import { rejectSeedForTrackStory } from './fact-track-anchor.js';
 import { WEAK_TRIVIA_PATTERNS } from './story-fact-hunt.js';
 import { fetchReferenceFactBundle as fetchWikipediaBundle, fetchFastTrackWikiFacts } from './wikipedia-facts.js';
 import { fetchArtistWikiLead, fetchArtistWikiLeadWithRetry } from './wikipedia-lead.js';
@@ -28,6 +29,7 @@ import {
 
 export { buildDdgInstantQueries } from './web-search-facts.js';
 import { acceptSearchGroundedSnippet, acceptIndieEmergingSnippet, hasActionableSnippets, isLyricsPageSeed, isWrongEntityDisambiguation, isArtistIdentityBioSnippet } from './web-snippet-accept.js';
+import { artistHasSearchAliases } from './artist-search-aliases.js';
 import { lookupCuratedFact } from './curated-facts.js';
 import {
   dedicatedFactsBySource,
@@ -274,6 +276,11 @@ function salvageArtistBioFacts(
     if (isEncyclopediaDefinitionSeed(t)) return false;
     if (isArtistDisambiguationListSeed(t)) return false;
     if (isArtistFormationBioSeed(t)) return false;
+    if (/debut single check/i.test(t)) return false;
+    if (isArtistIdentityBioSnippet(t)) return false;
+    if (artistHasSearchAliases(artist) && /\b(?:born|родился|known professionally as|stage name)\b/i.test(t)) {
+      return false;
+    }
     if (artistSurnameInFact(t, artist)) return true;
     if (factMentionsArtist(t, artist)) return true;
     if (
@@ -851,6 +858,18 @@ export async function fetchAggregatedFactContext(
         `track=${dedicatedBundle.trackFacts.length} artist=${dedicatedBundle.artistFacts.length} ` +
         `(total track=${trackFacts.length} artist=${artistFacts.length})`,
     );
+  }
+
+  if (wikiFastTrack.length > 0) {
+    const fastTrackFacts = wikiFastTrack.filter(
+      (f) => !rejectSeedForTrackStory(f, artist, title, { trackPoolFacts: trackFacts }),
+    );
+    if (fastTrackFacts.length > 0) {
+      trackFacts = mergeDedicatedFacts(trackFacts, fastTrackFacts, 6);
+      console.log(
+        `[facts] wiki-fast-track merged "${artist}" — "${title}": +${fastTrackFacts.length} track fact(s)`,
+      );
+    }
   }
 
   if (trackFacts.length + artistFacts.length === 0) {

@@ -249,20 +249,22 @@ export function pickReferenceFact(
     trackPoolForReject,
     artist,
   );
-  if (globalBest && !isCatalogMetadataSeed(globalBest) && !isCitationBibliographySeed(globalBest)) {
-    const scope: FactScope = pools.track.includes(globalBest)
-      ? 'track'
-      : pools.album.includes(globalBest)
-        ? 'album'
-        : 'artist';
-    return wrapSelected(globalBest, scope, narrator);
+  if (globalBest && !isRejectedSeed(globalBest, title, storyLanguage, trackPoolForReject, artist)) {
+    if (!isCatalogMetadataSeed(globalBest) && !isCitationBibliographySeed(globalBest)) {
+      const scope: FactScope = pools.track.includes(globalBest)
+        ? 'track'
+        : pools.album.includes(globalBest)
+          ? 'album'
+          : 'artist';
+      return wrapSelected(globalBest, scope, narrator);
+    }
   }
 
   const anyPool = [...pools.track, ...pools.album, ...pools.artist];
   for (const fact of sortByInterest(anyPool, narrator)) {
     if (isMetadataOnlyFallbackFact(fact)) continue;
     if (isMisattributedBandTrackFact(fact, title)) continue;
-    if (isBoringFact(fact) && !(title && isTrackTitleAnchoredSeed(fact, title))) continue;
+    if (isBoringFact(fact) && !(title && (isTrackTitleAnchoredSeed(fact, title) || factMentionsTitle(fact, title)))) continue;
     if (isRejectedSeed(fact, title, storyLanguage, trackPoolForReject, artist)) continue;
     if (adjustedInterestScore(fact, narrator) < 6) continue;
     if (isUsedFact(fact, usedFingerprints)) continue;

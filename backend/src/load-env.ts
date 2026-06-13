@@ -41,6 +41,15 @@ for (const p of paths) {
   loadEnvFile(p);
 }
 
+/** Never throttle live /v1/story/full from a stray Railway env var — bulk scripts set BULK_HARVEST too. */
+if (
+  process.env.HARVEST_RATE_LIMIT?.trim().toLowerCase() === 'true' &&
+  process.env.BULK_HARVEST?.trim().toLowerCase() !== 'true'
+) {
+  delete process.env.HARVEST_RATE_LIMIT;
+  console.warn('[env] HARVEST_RATE_LIMIT ignored on live BFF (bulk harvest only)');
+}
+
 const loaded = paths.filter((p) => existsSync(p));
 if (loaded.length > 0) {
   console.log(`[env] loaded from: ${loaded.map((p) => p.replace(repoRoot, '.')).join(', ')}`);

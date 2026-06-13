@@ -881,6 +881,10 @@ export function hasTrackContextSignal(fact: string): boolean {
     /^(?:The song|The video|The single|The track|This track|This single|This song|This album|The album|The documentary|From being|Additionally)\b/i.test(
       trimmed,
     ) ||
+    /^This\s+(?:\w+\s+){0,3}(?:song|love song|track)\b/i.test(trimmed) ||
+    /\ba single from (?:their|the|his|her) (?:debut|first|second|third|fourth|fifth|sixth|seventh|\d+(?:st|nd|rd|th)) (?:studio )?album\b/i.test(
+      trimmed,
+    ) ||
     /^It\s+(?:was|is|became|would|has|had|features|samples|opens|starts|tells|explores|remains)\b/i.test(
       trimmed,
     ) ||

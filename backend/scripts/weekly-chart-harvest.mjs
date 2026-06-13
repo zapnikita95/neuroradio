@@ -5,6 +5,7 @@
 import './setup-hidemy-proxy.mjs';
 import '../dist/load-env.js';
 process.env.HARVEST_RATE_LIMIT = 'true';
+process.env.BULK_HARVEST = 'true';
 import { runWeeklyChartHarvest } from '../dist/services/weekly-chart-harvest.js';
 
 const args = process.argv.slice(2);

@@ -41,6 +41,10 @@ const EXTRA_ALIASES: Record<string, string[]> = {
   mgk: ['machine gun kelly', 'colson baker', "machine gun kelly's"],
 };
 
+export function artistHasSearchAliases(artist: string): boolean {
+  return expandArtistSearchNames(artist).length > 2;
+}
+
 /** All searchable names for an artist (original, primary, aliases). */
 export function expandArtistSearchNames(artist: string): string[] {
   const primary = primaryArtistName(artist);

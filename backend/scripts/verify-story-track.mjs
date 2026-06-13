@@ -109,7 +109,9 @@ if (!prodOnly) {
   const ctx = await fetchAggregatedFactContext(artist, title, 'US');
   const pick = pickReferenceFact(ctx.bundle, [], 0, artist, title);
   const salvage = pickSalvageSnippetSeed(ctx.rawSnippets, artist, title, 'ru');
-  const chosen = pick ?? salvage;
+    const chosen = pick && !isRejectedStorySeed(pick.fact, artist, title, ctx.bundle.trackFacts)
+      ? pick
+      : salvage;
 
   console.log('rules pick:', pick?.fact?.slice(0, 180) ?? '(none)');
   console.log('salvage:', salvage?.fact?.slice(0, 180) ?? '(none)');
