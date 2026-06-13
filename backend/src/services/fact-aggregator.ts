@@ -45,8 +45,13 @@ const USER_AGENT = 'MusicStoryBFF/1.0 (contact@example.com)';
 const RAW_SNIPPET_MIN_LEN = 30;
 const RAW_SNIPPET_MAX = 18;
 /** Весь параллельный сбор фактов — иначе трек уже сменился. */
-const FACT_FETCH_BUDGET_MS = parseInt(process.env.FACT_FETCH_TIMEOUT_MS ?? '28000', 10);
-const FACT_FETCH_HARD_CAP_MS = parseInt(process.env.FACT_FETCH_HARD_CAP_MS ?? '22000', 10);
+const FACT_FETCH_BUDGET_MS = parseInt(process.env.FACT_FETCH_TIMEOUT_MS ?? '12000', 10);
+const FACT_FETCH_HARD_CAP_MS = parseInt(process.env.FACT_FETCH_HARD_CAP_MS ?? '9000', 10);
+/** Per-source caps in parallel harvest (all run at once; wall time ≈ max of caps). */
+const FACT_WIKI_CAP_MS = parseInt(process.env.FACT_WIKI_CAP_MS ?? '7000', 10);
+const FACT_WIKI_FAST_CAP_MS = parseInt(process.env.FACT_WIKI_FAST_CAP_MS ?? '8000', 10);
+const FACT_WEB_CAP_MS = parseInt(process.env.FACT_WEB_CAP_MS ?? '8000', 10);
+const FACT_DEDICATED_CAP_MS = parseInt(process.env.FACT_DEDICATED_CAP_MS ?? '8000', 10);
 
 function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
   return Promise.race([
@@ -537,28 +542,28 @@ export async function fetchWikiBundleMerged(
       'wiki-primary',
       () => fetchWikipediaBundle(artist, title, primaryLang === 'RU' ? 'RU' : cc),
       EMPTY_WIKI,
-      11_000,
+      FACT_WIKI_CAP_MS,
     ),
     cc === 'RU'
       ? fetchWithCap(
           'wiki-en-fallback',
           () => fetchWikipediaBundle(artist, title, 'US'),
           EMPTY_WIKI,
-          11_000,
+          Math.min(FACT_WIKI_CAP_MS, 5000),
         )
       : inferRuRegionalContext(artist, title)
         ? fetchWithCap(
             'wiki-ru-fallback',
             () => fetchWikipediaBundle(artist, title, 'RU'),
             EMPTY_WIKI,
-            11_000,
+            Math.min(FACT_WIKI_CAP_MS, 5000),
           )
         : primaryLang !== 'RU'
           ? fetchWithCap(
               'wiki-en-fallback',
               () => fetchWikipediaBundle(artist, title, 'US'),
               EMPTY_WIKI,
-              11_000,
+              Math.min(FACT_WIKI_CAP_MS, 5000),
             )
           : Promise.resolve(EMPTY_WIKI),
   ]);
@@ -694,13 +699,13 @@ export async function fetchAggregatedFactContext(
     'dedicated',
     () => fetchDedicatedSourceFacts(harvestCtx),
     [],
-    12_000,
+    FACT_DEDICATED_CAP_MS,
   );
   const discogsPromise = fetchWithCap(
     'discogs',
     () => fetchDiscogsLiveFacts(harvestCtx),
     [],
-    12_000,
+    FACT_DEDICATED_CAP_MS,
   );
   const [wiki, wikiLead, ddgUnfiltered, webUnfiltered, webTitleFirst, wdUnfiltered, mbTrackRaw, mbArtistRaw, wikiFastTrack, dedicatedHarvest, discogsHarvest] =
     await Promise.all([
@@ -708,26 +713,26 @@ export async function fetchAggregatedFactContext(
         'wiki',
         () => fetchWikiBundleMerged(artist, lookupTitle, cc, options),
         EMPTY_WIKI,
-        11_000,
+        FACT_WIKI_CAP_MS + 500,
       ),
-      fetchWithCap('wiki-lead', () => fetchArtistWikiLeadWithRetry(artist, 3), null, 14_000),
-      fetchWithCap('ddg', () => fetchDuckDuckGoUnfiltered(artist, lookupTitle), [], 12_000),
-      fetchWithCap('web', () => fetchWebSearchFactSnippets(artist, lookupTitle), [], 14_000),
-      fetchWithCap('web-title', () => fetchTitleFirstWebSnippets(lookupTitle), [], 10_000),
-      fetchWithCap('wikidata', () => fetchWikidataUnfiltered(artist, lookupTitle, cc), [], 10_000),
+      fetchWithCap('wiki-lead', () => fetchArtistWikiLeadWithRetry(artist, 1), null, 6000),
+      fetchWithCap('ddg', () => fetchDuckDuckGoUnfiltered(artist, lookupTitle), [], 6000),
+      fetchWithCap('web', () => fetchWebSearchFactSnippets(artist, lookupTitle), [], FACT_WEB_CAP_MS),
+      fetchWithCap('web-title', () => fetchTitleFirstWebSnippets(lookupTitle), [], 6000),
+      fetchWithCap('wikidata', () => fetchWikidataUnfiltered(artist, lookupTitle, cc), [], 6000),
       fetchWithCap(
         'mb-track',
         () => fetchMusicBrainzAnnotationsUnfiltered('recording', recordingMbid),
         [],
-        8_000,
+        6000,
       ),
       fetchWithCap(
         'mb-artist',
         () => fetchMusicBrainzAnnotationsUnfiltered('artist', artistMbid),
         [],
-        8_000,
+        6000,
       ),
-      fetchWithCap('wiki-fast-track', () => fetchFastTrackWikiFacts(artist, lookupTitle), [], 22_000),
+      fetchWithCap('wiki-fast-track', () => fetchFastTrackWikiFacts(artist, lookupTitle), [], FACT_WIKI_FAST_CAP_MS),
       dedicatedPromise,
       discogsPromise,
     ]);

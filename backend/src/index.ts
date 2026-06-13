@@ -23,6 +23,7 @@ import {
   testOllamaChat,
 } from './services/local-ollama.js';
 import { resolveLlmProvider } from './services/llm-provider.js';
+import { isHarvestRateLimitEnabled } from './services/harvest-rate-limiter.js';
 import { hasYandexCredentials } from './services/yandex-tts.js';
 import { canUseElevenLabsProduction, hasElevenLabsCredentials } from './services/elevenlabs-tts.js';
 import { isElevenLabsEnabled } from './services/entitlements.js';
@@ -164,6 +165,8 @@ app.get('/health', (_req, res) => {
     proxy,
     lastfm,
     edgeTts: true,
+    harvestRateLimit: isHarvestRateLimitEnabled(),
+    factFetchHardCapMs: parseInt(process.env.FACT_FETCH_HARD_CAP_MS ?? '9000', 10),
     appAuthRequired: isAppAuthEnabled(),
     postgres: hasPostgres(),
   });
@@ -276,7 +279,7 @@ async function boot(): Promise<void> {
     console.log(`Music Story BFF listening on http://0.0.0.0:${PORT}`);
     console.log(`[boot] log file: ${process.env.LOCAL_LOG_FILE ?? '(console only)'}`);
     console.log(
-      `[boot] build=${BUILD_ID} llm=${resolveLlmProvider()} openrouter=${hasOpenRouterApiKey()} groq=${hasGroqApiKey()} gemini=${hasGeminiApiKey()} yandexTts=${hasYandexCredentials()} yandexFormat=${process.env.YANDEX_TTS_FORMAT?.trim() || 'oggopus(default)'} elevenLabs=${canUseElevenLabsProduction()} proxy=${Boolean(process.env.HTTPS_PROXY)} auth=${isAppAuthEnabled()} postgres=${hasPostgres()}`,
+      `[boot] build=${BUILD_ID} llm=${resolveLlmProvider()} openrouter=${hasOpenRouterApiKey()} groq=${hasGroqApiKey()} gemini=${hasGeminiApiKey()} yandexTts=${hasYandexCredentials()} yandexFormat=${process.env.YANDEX_TTS_FORMAT?.trim() || 'oggopus(default)'} elevenLabs=${canUseElevenLabsProduction()} proxy=${Boolean(process.env.HTTPS_PROXY)} auth=${isAppAuthEnabled()} postgres=${hasPostgres()} harvestRateLimit=${isHarvestRateLimitEnabled()} factFetchCapMs=${process.env.FACT_FETCH_HARD_CAP_MS ?? '9000'}`,
     );
     console.log(`  POST /v1/auth/token — app JWT`);
     console.log(`  GET  /v1/account/* — email/Telegram auth + 7-day trial`);

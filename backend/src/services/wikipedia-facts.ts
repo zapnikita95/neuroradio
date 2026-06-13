@@ -872,76 +872,100 @@ export async function fetchFastTrackWikiFacts(artist: string, title: string): Pr
     }
   }
 
-  for (const candidate of candidates) {
-    let extract = await fetchFullExtract(lang, candidate, false);
-    if (!extract) extract = await fetchSummary(lang, candidate);
-    if (!extract || isDisambiguationExtract(extract)) {
-      const searched = await searchWikiTitle(lang, `${cleanTitle} ${artist} song`, artist, title);
-      if (searched) {
-        extract =
-          (await fetchFullExtract(lang, searched, false)) ?? (await fetchSummary(lang, searched));
-      }
-    }
-        if (!extract || isDisambiguationExtract(extract)) continue;
-        if (isWrongMusicTopic(artist, extract, candidate)) continue;
-        if (!wikiPageTitleMatchesTrack(candidate, title)) continue;
-
-        const intro = extract.split(/\n+==/)[0]?.trim() ?? '';
-        const pickedIntro = pickIntroWikiFact(extract, artist, title, ambiguousSingleWord);
-        if (pickedIntro) {
-          console.log(`[wiki-fast-track] "${artist}" — "${title}" page="${candidate}" facts=1`);
-          return [pickedIntro];
-        }
-
-        const sectionFacts: string[] = [];
-    if (intro.length >= 60) {
-      sectionFacts.push(
-        ...filterMusicFacts(extractFactBullets(intro, 6), artist, title, false),
-      );
-    }
-
-    for (const section of FAST_TRACK_WIKI_SECTIONS) {
-      const body = extractWikiSection(extract, section);
-      if (!body || body.length < 50) continue;
-      sectionFacts.push(
-        ...filterMusicFacts(extractFactBullets(body, 8), artist, title, false),
-      );
-    }
-
-    const contextual = filterMusicFacts(
-      extractTrackContextFacts(extract, title, artist, 2, 8),
+  const parallelHits = await Promise.all(
+    candidates.slice(0, 5).map((candidate) =>
+      tryFastTrackWikiCandidate(lang, candidate, artist, title, cleanTitle, ambiguousSingleWord),
+    ),
+  );
+  for (const hit of parallelHits) {
+    if (hit?.length) return hit;
+  }
+  for (const candidate of candidates.slice(5)) {
+    const hit = await tryFastTrackWikiCandidate(
+      lang,
+      candidate,
       artist,
       title,
-      false,
+      cleanTitle,
+      ambiguousSingleWord,
     );
+    if (hit?.length) return hit;
+  }
+  return [];
+}
 
-    const merged = filterAndRankFacts([...sectionFacts, ...contextual], 8)
-      .filter((fact) => interestScore(fact) >= 4)
-      .filter((fact) => !ambiguousSingleWord || isTrackAnchored(fact, artist, title));
-    if (merged.length > 0) {
-      console.log(
-        `[wiki-fast-track] "${artist}" — "${title}" page="${candidate}" facts=${merged.length}`,
-      );
-      return merged;
+async function tryFastTrackWikiCandidate(
+  lang: 'en',
+  candidate: string,
+  artist: string,
+  title: string,
+  cleanTitle: string,
+  ambiguousSingleWord: boolean,
+): Promise<string[] | null> {
+  let extract = await fetchFullExtract(lang, candidate, false);
+  if (!extract) extract = await fetchSummary(lang, candidate);
+  if (!extract || isDisambiguationExtract(extract)) {
+    const searched = await searchWikiTitle(lang, `${cleanTitle} ${artist} song`, artist, title);
+    if (searched) {
+      extract =
+        (await fetchFullExtract(lang, searched, false)) ?? (await fetchSummary(lang, searched));
     }
+  }
+  if (!extract || isDisambiguationExtract(extract)) return null;
+  if (isWrongMusicTopic(artist, extract, candidate)) return null;
+  if (!wikiPageTitleMatchesTrack(candidate, title)) return null;
 
-    if (intro.length >= 60) {
-      const looseIntro = filterAndRankFacts(
-        splitWikiSentences(intro).slice(0, 6).filter(
+  const intro = extract.split(/\n+==/)[0]?.trim() ?? '';
+  const pickedIntro = pickIntroWikiFact(extract, artist, title, ambiguousSingleWord);
+  if (pickedIntro) {
+    console.log(`[wiki-fast-track] "${artist}" — "${title}" page="${candidate}" facts=1`);
+    return [pickedIntro];
+  }
+
+  const sectionFacts: string[] = [];
+  if (intro.length >= 60) {
+    sectionFacts.push(...filterMusicFacts(extractFactBullets(intro, 6), artist, title, false));
+  }
+
+  for (const section of FAST_TRACK_WIKI_SECTIONS) {
+    const body = extractWikiSection(extract, section);
+    if (!body || body.length < 50) continue;
+    sectionFacts.push(...filterMusicFacts(extractFactBullets(body, 8), artist, title, false));
+  }
+
+  const contextual = filterMusicFacts(
+    extractTrackContextFacts(extract, title, artist, 2, 8),
+    artist,
+    title,
+    false,
+  );
+
+  const merged = filterAndRankFacts([...sectionFacts, ...contextual], 8)
+    .filter((fact) => interestScore(fact) >= 4)
+    .filter((fact) => !ambiguousSingleWord || isTrackAnchored(fact, artist, title));
+  if (merged.length > 0) {
+    console.log(`[wiki-fast-track] "${artist}" — "${title}" page="${candidate}" facts=${merged.length}`);
+    return merged;
+  }
+
+  if (intro.length >= 60) {
+    const looseIntro = filterAndRankFacts(
+      splitWikiSentences(intro)
+        .slice(0, 6)
+        .filter(
           (f) =>
             factMentionsTrack(f, title) ||
             factMentionsArtist(f, artist) ||
             interestScore(f) >= 6,
         ),
-        4,
+      4,
+    );
+    if (looseIntro.length > 0) {
+      console.log(
+        `[wiki-fast-track] intro fallback "${artist}" — "${title}" page="${candidate}" facts=${looseIntro.length}`,
       );
-      if (looseIntro.length > 0) {
-        console.log(
-          `[wiki-fast-track] intro fallback "${artist}" — "${title}" page="${candidate}" facts=${looseIntro.length}`,
-        );
-        return looseIntro;
-      }
+      return looseIntro;
     }
   }
-  return [];
+  return null;
 }
