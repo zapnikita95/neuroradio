@@ -106,9 +106,17 @@ export async function fetchDeezerGlobalChart(limit = 100): Promise<ChartTrack[]>
 
 let spotifyToken: { token: string; expiresAt: number } | null = null;
 
+function resolveSpotifyClientSecret(): string {
+  return (
+    process.env.SPOTIFY_SECRET?.trim() ||
+    process.env.SPOTIFY_CLIENT_SECRET?.trim() ||
+    ''
+  );
+}
+
 async function getSpotifyToken(): Promise<string | null> {
   const id = process.env.SPOTIFY_CLIENT_ID?.trim();
-  const secret = process.env.SPOTIFY_CLIENT_SECRET?.trim();
+  const secret = resolveSpotifyClientSecret();
   if (!id || !secret) return null;
   if (spotifyToken && Date.now() < spotifyToken.expiresAt - 60_000) return spotifyToken.token;
 

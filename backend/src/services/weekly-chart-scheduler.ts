@@ -10,7 +10,11 @@ export function isWeeklyChartHarvestEnabled(): boolean {
   if (flag === 'false' || flag === '0' || flag === 'off') return false;
   // On by default when Last.fm or Spotify credentials exist (trending facts for push hints).
   if (flag === 'true' || flag === '1' || flag === 'on') return true;
-  return Boolean(process.env.LASTFM_API_KEY?.trim() || process.env.SPOTIFY_CLIENT_ID?.trim());
+  return Boolean(
+    process.env.LASTFM_API_KEY?.trim() ||
+      (process.env.SPOTIFY_CLIENT_ID?.trim() &&
+        (process.env.SPOTIFY_SECRET?.trim() || process.env.SPOTIFY_CLIENT_SECRET?.trim())),
+  );
 }
 
 export function startWeeklyChartHarvestScheduler(): void {
