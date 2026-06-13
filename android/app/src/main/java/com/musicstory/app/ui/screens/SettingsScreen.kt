@@ -96,6 +96,7 @@ import com.musicstory.app.domain.OpenRouterModel
 import com.musicstory.app.domain.ResolvedAppLanguage
 import com.musicstory.app.domain.resolveAppLanguage
 import com.musicstory.app.ui.uiLabel
+import com.musicstory.app.ui.uiDescription
 import com.musicstory.app.domain.toApiCode
 import com.musicstory.app.domain.StoryLength
 import com.musicstory.app.domain.StoryNarrator
@@ -1085,6 +1086,7 @@ fun SettingsScreen(
                     StoryNarrator.entries.forEach { narrator ->
                         PreferenceRadioRow(
                             label = narrator.uiLabel(resolvedDraftLang),
+                            description = narrator.uiDescription(resolvedDraftLang),
                             selected = storyNarratorUi == narrator,
                             onSelect = { storyNarratorUi = narrator },
                         )
@@ -1096,6 +1098,8 @@ fun SettingsScreen(
                     summary = when {
                         serverUsesEdge ->
                             "${edgeVoicePresetUi.uiLabel(resolvedDraftLang)} · ${ttsSpeedUi.uiLabel(resolvedDraftLang)} · ${storyLengthUi.uiLabel(resolvedDraftLang)}"
+                        showElevenLabsVoices ->
+                            "${elevenLabsVoiceUi.label(resolvedDraftLang)} · ${ttsSpeedUi.uiLabel(resolvedDraftLang)} · ${storyLengthUi.uiLabel(resolvedDraftLang)}"
                         else ->
                             "${ttsVoiceUi.uiLabel(resolvedDraftLang)} · ${ttsSpeedUi.uiLabel(resolvedDraftLang)} · ${storyLengthUi.uiLabel(resolvedDraftLang)}"
                     }.let { voices ->
@@ -1149,6 +1153,7 @@ fun SettingsScreen(
                         EdgeVoicePreset.entries.forEach { preset ->
                             PreferenceRadioRow(
                                 label = preset.uiLabel(resolvedDraftLang),
+                                description = preset.uiDescription(resolvedDraftLang),
                                 selected = edgeVoicePresetUi == preset,
                                 onSelect = { edgeVoicePresetUi = preset },
                             )
@@ -1164,6 +1169,7 @@ fun SettingsScreen(
                         ElevenLabsVoice.entries.forEach { voice ->
                             PreferenceRadioRow(
                                 label = voice.label(resolvedDraftLang),
+                                description = voice.description(resolvedDraftLang),
                                 selected = elevenLabsVoiceUi == voice,
                                 onSelect = { elevenLabsVoiceUi = voice },
                             )
@@ -1179,6 +1185,7 @@ fun SettingsScreen(
                     TtsVoice.entries.forEach { voice ->
                         PreferenceRadioRow(
                             label = voice.uiLabel(resolvedDraftLang),
+                            description = voice.uiDescription(resolvedDraftLang),
                             selected = ttsVoiceUi == voice,
                             onSelect = { ttsVoiceUi = voice },
                         )
@@ -1192,6 +1199,7 @@ fun SettingsScreen(
                     TtsEmotion.entries.forEach { emotion ->
                         PreferenceRadioRow(
                             label = emotion.uiLabel(resolvedDraftLang),
+                            description = emotion.uiDescription(resolvedDraftLang),
                             selected = ttsEmotionUi == emotion,
                             onSelect = { ttsEmotionUi = emotion },
                         )
@@ -2149,20 +2157,33 @@ private fun PreferenceRadioRow(
     label: String,
     selected: Boolean,
     onSelect: () -> Unit,
+    description: String = "",
 ) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(12.dp))
-            .padding(vertical = 2.dp),
-        verticalAlignment = Alignment.CenterVertically,
+            .padding(vertical = if (description.isNotBlank()) 4.dp else 2.dp),
+        verticalAlignment = if (description.isNotBlank()) Alignment.Top else Alignment.CenterVertically,
     ) {
         RadioButton(
             selected = selected,
             onClick = onSelect,
             colors = RadioButtonDefaults.colors(selectedColor = GoldBright),
         )
-        Text(text = label, style = MaterialTheme.typography.bodyMedium, color = CreamText)
+        if (description.isNotBlank()) {
+            Column(modifier = Modifier.padding(top = 12.dp, end = 8.dp)) {
+                Text(text = label, style = MaterialTheme.typography.bodyMedium, color = CreamText)
+                Text(
+                    text = description,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MutedLavender,
+                    modifier = Modifier.padding(top = 2.dp),
+                )
+            }
+        } else {
+            Text(text = label, style = MaterialTheme.typography.bodyMedium, color = CreamText)
+        }
     }
 }
 

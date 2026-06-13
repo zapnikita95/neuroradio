@@ -55,6 +55,24 @@ fun TtsVoice.uiLabel(lang: ResolvedAppLanguage): String =
         TtsVoice.LERA -> "Lera"
     } else labelRu
 
+fun TtsVoice.uiDescription(lang: ResolvedAppLanguage): String =
+    if (lang == ResolvedAppLanguage.EN) when (this) {
+        TtsVoice.AUTO -> "Voice matched to track era and genre"
+        TtsVoice.ALENA -> "Female · soft and friendly"
+        TtsVoice.FILIPP -> "Male · steady and pleasant"
+        TtsVoice.ERMIL -> "Male · neutral and calm"
+        TtsVoice.JANE -> "Female · strict and clear"
+        TtsVoice.OMAZH -> "Female · strict and dramatic"
+        TtsVoice.ZAHAR -> "Male · deep and confident"
+        TtsVoice.MARINA -> "Female · warm and soft"
+        TtsVoice.DASHA -> "Female · lively and modern"
+        TtsVoice.JULIA -> "Female · low, composed"
+        TtsVoice.KIRILL -> "Male · strict and businesslike"
+        TtsVoice.MASHA -> "Female · friendly and light"
+        TtsVoice.ALEXANDER -> "Male · neutral and versatile"
+        TtsVoice.LERA -> "Female · young and lively"
+    } else descriptionRu
+
 fun EdgeVoicePreset.uiLabel(lang: ResolvedAppLanguage): String =
     if (lang == ResolvedAppLanguage.EN) when (this) {
         EdgeVoicePreset.DMITRY_CALM -> "Dmitry — calm"
@@ -63,6 +81,15 @@ fun EdgeVoicePreset.uiLabel(lang: ResolvedAppLanguage): String =
         EdgeVoicePreset.SVETLANA_LIVELY -> "Svetlana — lively"
         EdgeVoicePreset.DARIA -> "Daria — soft"
     } else labelRu
+
+fun EdgeVoicePreset.uiDescription(lang: ResolvedAppLanguage): String =
+    if (lang == ResolvedAppLanguage.EN) when (this) {
+        EdgeVoicePreset.DMITRY_CALM -> "Male · steady Microsoft Edge voice"
+        EdgeVoicePreset.SVETLANA_CALM -> "Female · neutral Microsoft Edge voice"
+        EdgeVoicePreset.DMITRY_LIVELY -> "Male · energetic, radio-like delivery"
+        EdgeVoicePreset.SVETLANA_LIVELY -> "Female · expressive Microsoft Edge voice"
+        EdgeVoicePreset.DARIA -> "Female · soft Microsoft Edge tone"
+    } else descriptionRu
 
 fun StoryLength.uiLabel(lang: ResolvedAppLanguage): String =
     if (lang == ResolvedAppLanguage.EN) when (this) {
@@ -86,6 +113,13 @@ fun TtsEmotion.uiLabel(lang: ResolvedAppLanguage): String =
         TtsEmotion.LIVELY -> "Lively"
         TtsEmotion.STRICT -> "Strict"
     } else labelRu
+
+fun TtsEmotion.uiDescription(lang: ResolvedAppLanguage): String =
+    if (lang == ResolvedAppLanguage.EN) when (this) {
+        TtsEmotion.NEUTRAL -> "Even, calm delivery"
+        TtsEmotion.LIVELY -> "Friendly, warm intonation"
+        TtsEmotion.STRICT -> "Firm, dramatic — best with strict voices"
+    } else descriptionRu
 
 fun ServerTtsProvider.uiLabel(lang: ResolvedAppLanguage): String =
     if (lang == ResolvedAppLanguage.EN) when (this) {

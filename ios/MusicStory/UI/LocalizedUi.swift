@@ -66,28 +66,50 @@ extension TtsEmotion {
         guard lang == .en else { return labelRu }
         switch self {
         case .neutral: return "Neutral"
-        case .lively: return "Lively"
-        case .strict: return "Strict"
+        case .good: return "Lively"
+        case .evil: return "Strict"
         }
     }
 
     func uiDescription(_ lang: ResolvedAppLanguage) -> String {
         guard lang == .en else { return descriptionRu }
         switch self {
-        case .neutral: return "Even delivery"
-        case .lively: return "More energy"
-        case .strict: return "Measured, formal tone"
+        case .neutral: return "Even, calm delivery"
+        case .good: return "Friendly, warm intonation"
+        case .evil: return "Firm, dramatic — best with strict voices"
         }
     }
 }
 
 extension TtsVoice {
     func uiLabel(_ lang: ResolvedAppLanguage) -> String {
-        labelRu
+        guard lang == .en else { return labelRu }
+        switch self {
+        case .auto: return "Auto"
+        case .alena: return "Alena"
+        case .filipp: return "Filipp"
+        case .ermil: return "Ermil"
+        case .jane: return "Jane"
+        case .omazh: return "Omazh"
+        case .zahar: return "Zahar"
+        case .marina: return "Marina"
+        case .dasha: return "Dasha"
+        }
     }
 
     func uiDescription(_ lang: ResolvedAppLanguage) -> String {
-        descriptionRu
+        guard lang == .en else { return descriptionRu }
+        switch self {
+        case .auto: return "Voice matched to track era and genre"
+        case .alena: return "Female · soft and friendly"
+        case .filipp: return "Male · steady and pleasant"
+        case .ermil: return "Male · neutral and calm"
+        case .jane: return "Female · strict and clear"
+        case .omazh: return "Female · strict and dramatic"
+        case .zahar: return "Male · deep and confident"
+        case .marina: return "Female · warm and soft"
+        case .dasha: return "Female · lively and modern"
+        }
     }
 }
 
