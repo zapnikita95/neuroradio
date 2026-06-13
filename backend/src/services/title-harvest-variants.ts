@@ -1,4 +1,36 @@
-/** Title variants for Last.fm / Genius lookup — strip store suffixes, feat blocks. */
+/** Title variants for Last.fm / Genius / fact-bank lookup — strip store suffixes, feat blocks. */
+
+const PAREN_STRIP_PATTERNS: RegExp[] = [
+  /\s*\(feat\.[^)]+\)/gi,
+  /\s*\(ft\.[^)]+\)/gi,
+  /\s*\(featuring[^)]+\)/gi,
+  /\s*\(with[^)]+\)/gi,
+  /\s*\(Single\)/gi,
+  /\s*\(Radio Edit\)/gi,
+  /\s*\(Album Version\)/gi,
+  /\s*\(Remaster(?:ed)?[^)]*\)/gi,
+  /\s*\([^)]*(?:remaster|radio edit|explicit|version|mix|live|mono|stereo|deluxe|bonus)[^)]*\)/gi,
+];
+
+function stripHarvestParentheticalsOnce(title: string): string {
+  let t = title;
+  for (const re of PAREN_STRIP_PATTERNS) t = t.replace(re, '');
+  t = t.replace(/\s*\[[^\]]*\]/g, '');
+  return t.replace(/\s+/g, ' ').trim();
+}
+
+/** Iteratively strip feat/Single/remaster blocks until stable. */
+export function stripHarvestParentheticals(title: string): string {
+  let t = title.trim();
+  if (!t) return '';
+  for (let i = 0; i < 6; i++) {
+    const next = stripHarvestParentheticalsOnce(t);
+    if (next === t) break;
+    t = next;
+  }
+  return t;
+}
+
 export function harvestTitleVariants(title: string): string[] {
   const raw = title.trim();
   if (!raw) return [];
@@ -15,22 +47,21 @@ export function harvestTitleVariants(title: string): string[] {
   };
 
   push(raw);
-
-  let t = raw;
-  t = t.replace(/\s*\(feat\.[^)]+\)/gi, '');
-  t = t.replace(/\s*\(ft\.[^)]+\)/gi, '');
-  t = t.replace(/\s*\(featuring[^)]+\)/gi, '');
-  t = t.replace(/\s*\(with[^)]+\)/gi, '');
-  t = t.replace(/\s*\(Single\)/gi, '');
-  t = t.replace(/\s*\(Radio Edit\)/gi, '');
-  t = t.replace(/\s*\(Album Version\)/gi, '');
-  t = t.replace(/\s*\(Remaster(?:ed)?[^)]*\)/gi, '');
-  t = t.replace(/\s*\([^)]*(?:remaster|radio edit|explicit|version|mix|live|mono|stereo|deluxe|bonus)[^)]*\)/gi, '');
-  t = t.replace(/\s*\[[^\]]*\]/g, '');
-  push(t);
+  push(stripHarvestParentheticals(raw));
 
   const beforeParen = raw.split('(')[0]?.trim();
   if (beforeParen && beforeParen.length >= 3) push(beforeParen);
 
+  const stripped = stripHarvestParentheticals(raw);
+  const strippedBeforeParen = stripped.split('(')[0]?.trim();
+  if (strippedBeforeParen && strippedBeforeParen.length >= 3) push(strippedBeforeParen);
+
   return out;
+}
+
+/** Shortest useful title for API lookups (prod + bulk). */
+export function primaryHarvestLookupTitle(title: string): string {
+  const variants = harvestTitleVariants(title);
+  if (variants.length === 0) return title.trim();
+  return variants.reduce((best, v) => (v.length < best.length ? v : best));
 }

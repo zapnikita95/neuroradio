@@ -207,6 +207,30 @@ assert(
   `Chicago pick skips Porcaro/city bleed (got: ${mjPick?.fact?.slice(0, 80) ?? 'null'})`,
 );
 
+// --- 5b. Parenthetical title variants (Shakira-style catalog names) ---
+const { harvestTitleVariants, primaryHarvestLookupTitle } = await import(
+  '../dist/services/title-harvest-variants.js'
+);
+const { resolveTrackLookupKeys } = await import('../dist/services/fact-bank.js');
+
+const SHAKIRA_LONG =
+  'Waka Waka (This Time for Africa) (feat. Freshlyground) (Single)';
+const shakiraVariants = harvestTitleVariants(SHAKIRA_LONG);
+assert(
+  shakiraVariants.some((v) => v === 'Waka Waka (This Time for Africa)'),
+  `Shakira variants strip feat/Single (got: ${shakiraVariants.join(' | ')})`,
+);
+assert(
+  primaryHarvestLookupTitle(SHAKIRA_LONG).length < SHAKIRA_LONG.length,
+  'primaryHarvestLookupTitle shorter than catalog name',
+);
+
+const aliasKeys = resolveTrackLookupKeys('Shakira', SHAKIRA_LONG);
+assert(
+  aliasKeys.some((k) => k.includes('waka waka (this time for africa)')),
+  `bank alias keys cover stripped title (${aliasKeys.join(', ')})`,
+);
+
 assert(
   findUngroundedClaims(
     'Summer Calvin Harris стал саундтреком лета 2014 — его гитарные рифы',

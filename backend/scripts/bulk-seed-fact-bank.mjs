@@ -26,7 +26,7 @@ const args = process.argv.slice(2);
 const target = parseInt(args.find((a) => a.startsWith('--target='))?.split('=')[1] ?? '60000', 10);
 const hotTarget = parseInt(args.find((a) => a.startsWith('--hot-target='))?.split('=')[1] ?? '20000', 10);
 const concurrency = parseInt(
-  args.find((a) => a.startsWith('--concurrency='))?.split('=')[1] ?? (args.includes('--discogs-only') ? '1' : '2'),
+  args.find((a) => a.startsWith('--concurrency='))?.split('=')[1] ?? (args.includes('--discogs-only') ? '1' : '3'),
   10,
 );
 const trackLimit = parseInt(args.find((a) => a.startsWith('--limit='))?.split('=')[1] ?? '0', 10);

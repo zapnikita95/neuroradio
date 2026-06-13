@@ -14,6 +14,7 @@ import {
 } from './fact-topic.js';
 import { factFitsStoryLanguage } from './fact-language-fit.js';
 import type { StoryLanguageId } from './story-language.js';
+import { harvestTitleVariants } from './title-harvest-variants.js';
 
 export interface StoredFact {
   id: string;
@@ -82,6 +83,26 @@ function saveBank(bank: FactBankFile): void {
 
 export function trackKey(artist: string, title: string): string {
   return `${artist.trim().toLowerCase()}|${title.trim().toLowerCase()}`;
+}
+
+/** All bank keys to try for a playing title (long catalog name vs short lookup). */
+export function resolveTrackLookupKeys(artist: string, title: string): string[] {
+  const keys = new Set<string>();
+  keys.add(trackKey(artist, title));
+  for (const variant of harvestTitleVariants(title)) {
+    keys.add(trackKey(artist, variant));
+  }
+  return [...keys];
+}
+
+function mergeTrackPools(bank: FactBankFile, keys: string[]): StoredFact[] {
+  const byId = new Map<string, StoredFact>();
+  for (const k of keys) {
+    for (const fact of bank.byTrack[k] ?? []) {
+      byId.set(fact.id, fact);
+    }
+  }
+  return [...byId.values()].sort((a, b) => b.interestScore - a.interestScore);
 }
 
 export function artistKey(artist: string): string {
@@ -344,7 +365,7 @@ export function listBankFacts(
 ): { track: StoredFact[]; artist: StoredFact[] } {
   const bank = loadBank();
   return {
-    track: bank.byTrack[trackKey(artist, title)] ?? [],
+    track: mergeTrackPools(bank, resolveTrackLookupKeys(artist, title)),
     artist: bank.byArtist[artistKey(artist)] ?? [],
   };
 }
@@ -392,11 +413,14 @@ export function pickFromBank(
 
 function markFactUsed(id: string, artist: string, title: string): void {
   const bank = loadBank();
-  for (const pool of [bank.byTrack[trackKey(artist, title)] ?? [], bank.byArtist[artistKey(artist)] ?? []]) {
-    const hit = pool.find((f) => f.id === id);
-    if (hit) {
-      hit.timesUsed += 1;
-      hit.lastUsedAt = Date.now();
+  const keys = resolveTrackLookupKeys(artist, title);
+  for (const k of keys) {
+    for (const pool of [bank.byTrack[k] ?? [], bank.byArtist[artistKey(artist)] ?? []]) {
+      const hit = pool.find((f) => f.id === id);
+      if (hit) {
+        hit.timesUsed += 1;
+        hit.lastUsedAt = Date.now();
+      }
     }
   }
   saveBank(bank);

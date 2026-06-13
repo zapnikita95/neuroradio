@@ -38,6 +38,7 @@ import { fetchDiscogsArtistFacts, fetchDiscogsLiveFacts } from './fact-sources/d
 import type { HarvestSource } from './fact-sources/types.js';
 import { factFitsStoryLanguage, filterBundleForStoryLanguage } from './fact-language-fit.js';
 import { resolveStoryLanguage, type StoryLanguageId } from './story-language.js';
+import { primaryHarvestLookupTitle } from './title-harvest-variants.js';
 const USER_AGENT = 'MusicStoryBFF/1.0 (contact@example.com)';
 const RAW_SNIPPET_MIN_LEN = 30;
 const RAW_SNIPPET_MAX = 18;
@@ -672,8 +673,12 @@ export async function fetchAggregatedFactContext(
   options: { storyLanguage?: 'ru' | 'en' } = {},
 ): Promise<AggregatedFactContext> {
   const t0 = Date.now();
-  const cc = resolveFactCountryCode(artist, title, countryCode);
-  const harvestCtx = { artist, title, countryCode: cc };
+  const lookupTitle = primaryHarvestLookupTitle(title);
+  const cc = resolveFactCountryCode(artist, lookupTitle, countryCode);
+  const harvestCtx = { artist, title: lookupTitle, countryCode: cc };
+  if (lookupTitle !== title.trim()) {
+    console.log(`[facts] title lookup variant "${title}" → "${lookupTitle}"`);
+  }
   // Phase 1: dedicated + Discogs параллельно с wiki/web (Discogs ~3–6 с, не ждём конца wiki).
   const dedicatedPromise = fetchWithCap(
     'dedicated',
@@ -691,15 +696,15 @@ export async function fetchAggregatedFactContext(
     await Promise.all([
       fetchWithCap(
         'wiki',
-        () => fetchWikiBundleMerged(artist, title, cc, options),
+        () => fetchWikiBundleMerged(artist, lookupTitle, cc, options),
         EMPTY_WIKI,
         11_000,
       ),
       fetchWithCap('wiki-lead', () => fetchArtistWikiLeadWithRetry(artist, 3), null, 14_000),
-      fetchWithCap('ddg', () => fetchDuckDuckGoUnfiltered(artist, title), [], 12_000),
-      fetchWithCap('web', () => fetchWebSearchFactSnippets(artist, title), [], 14_000),
-      fetchWithCap('web-title', () => fetchTitleFirstWebSnippets(title), [], 10_000),
-      fetchWithCap('wikidata', () => fetchWikidataUnfiltered(artist, title, cc), [], 10_000),
+      fetchWithCap('ddg', () => fetchDuckDuckGoUnfiltered(artist, lookupTitle), [], 12_000),
+      fetchWithCap('web', () => fetchWebSearchFactSnippets(artist, lookupTitle), [], 14_000),
+      fetchWithCap('web-title', () => fetchTitleFirstWebSnippets(lookupTitle), [], 10_000),
+      fetchWithCap('wikidata', () => fetchWikidataUnfiltered(artist, lookupTitle, cc), [], 10_000),
       fetchWithCap(
         'mb-track',
         () => fetchMusicBrainzAnnotationsUnfiltered('recording', recordingMbid),
@@ -712,7 +717,7 @@ export async function fetchAggregatedFactContext(
         [],
         8_000,
       ),
-      fetchWithCap('wiki-fast-track', () => fetchFastTrackWikiFacts(artist, title), [], 15_000),
+      fetchWithCap('wiki-fast-track', () => fetchFastTrackWikiFacts(artist, lookupTitle), [], 15_000),
       dedicatedPromise,
       discogsPromise,
     ]);
@@ -751,7 +756,7 @@ export async function fetchAggregatedFactContext(
   let webAllUnfiltered = [...webUnfiltered, ...webTitleFirst];
   let deepWebSearchRan = false;
   if (webSnippetsNeedDeepSearch(webAllUnfiltered, artist, title)) {
-    const deepWeb = await fetchDeepWebSearchSnippets(artist, title);
+    const deepWeb = await fetchDeepWebSearchSnippets(artist, lookupTitle);
     deepWebSearchRan = true;
     if (deepWeb.length > 0) {
       webAllUnfiltered = [...new Set([...webAllUnfiltered, ...deepWeb])];

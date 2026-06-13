@@ -35,9 +35,11 @@ export function splitSentences(text: string): string[] {
 }
 
 import { cleanTrackTitleForSearch } from '../title-clean.js';
+import { primaryHarvestLookupTitle } from '../title-harvest-variants.js';
 
 export function cleanTrackTitle(title: string): string {
-  return cleanTrackTitleForSearch(title);
+  const harvest = primaryHarvestLookupTitle(title);
+  return cleanTrackTitleForSearch(harvest);
 }
 
 export function isCyrillic(text: string): boolean {
