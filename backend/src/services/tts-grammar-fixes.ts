@@ -1,7 +1,30 @@
-/**
- * Last-mile Russian grammar / pronunciation fixes before TTS.
- * Display script may stay unchanged upstream — call only in speech pipeline.
- */
+import { primaryArtistName } from './artist-primary.js';
+
+/** «Title Artist» подряд → «Title by Artist» (латиница) или «Title — Artist». */
+export function fixTitleArtistRunOn(text: string, title: string, artist: string): string {
+  const t = title.trim();
+  const primary = primaryArtistName(artist).trim();
+  if (!t || !primary) return text;
+  const sep = /[A-Za-z]/.test(t) && /[A-Za-z]/.test(primary) ? ' by ' : ' — ';
+  const esc = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const re = new RegExp(
+    `(?<![\\p{L}\\p{N}'’-])(${esc(t)})\\s+(${esc(primary)})(?![\\p{L}\\p{N}'’-])`,
+    'giu',
+  );
+  return text.replace(re, `$1${sep}$2`);
+}
+
+/** Сиды cover-classics «Wonderwall Oasis (1995)» → «Wonderwall — Oasis (1995)». */
+export function normalizeCatalogSeedFactDisplay(fact: string, artist: string, title: string): string {
+  const t = title.trim();
+  const primary = primaryArtistName(artist).trim();
+  if (!t || !primary) return fact;
+  const esc = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const re = new RegExp(`^${esc(t)}\\s+${esc(primary)}(?=\\s|\\(|$)`, 'i');
+  if (!re.test(fact)) return fact;
+  const sep = /[A-Za-z]/.test(t) && /[A-Za-z]/.test(primary) ? `${t} by ${primary}` : `${t} — ${primary}`;
+  return fact.replace(re, sep);
+}
 
 const LATIN_RUN =
   /[A-Za-zÀ-ÿ][A-Za-zÀ-ÿ0-9''.\-&]{0,}(?:\s+(?![.!?…]\s)[A-Za-zÀ-ÿ][A-Za-zÀ-ÿ0-9''.\-&]{0,})*/;
@@ -108,6 +131,9 @@ export function fixTtsGrammarIssues(
   result = fixCallingCardMalapropisms(result);
   result = fixPopMusicGenitive(result);
   result = mergeLatinCollaborationPhrases(result);
+  if (options.title?.trim() && options.artist?.trim()) {
+    result = fixTitleArtistRunOn(result, options.title, options.artist);
+  }
   if (options.title?.trim()) {
     result = restoreLatinTrackTitleInSpeech(result, options.title);
   }

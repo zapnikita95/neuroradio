@@ -27,6 +27,7 @@ import {
   isVoiceoverWithoutTrackNames,
   RUSSIAN_LANGUAGE_NO_NAMES_OVERRIDE,
 } from './voiceover-no-names.js';
+import { normalizeCatalogSeedFactDisplay } from './tts-grammar-fixes.js';
 
 export { eraContextForPrompt, resolveTrackLocale };
 export type { TrackLocale };
@@ -386,7 +387,7 @@ export function buildStoryUserPrompt(params: {
   );
   lines.push(
     `ЯКОРЬ К ТРЕКУ: история только про «${params.title}». Не переноси факты из других песен артиста. ` +
-      'Не выдумывай «саундтрек фильма/лета», дуэт→сольное, гитарные рифы — только если это ЕСТЬ в семени.',
+      'Не выдумывай факты про «саундтрек лета/фильма», дуэт→сольное, гитарные рифы — если в семени про саундтрек/фильм, это можно; если нет — нельзя.',
   );
   lines.push(`ЖЁСТКАЯ ДЛИНА: ${length.wordsMin}–${length.wordsMax} слов (${length.labelRu}).`);
   lines.push('Если меньше минимума слов — продолжи историю конкретикой из того же seed-факта.');
@@ -402,7 +403,7 @@ export function buildStoryUserPrompt(params: {
     lines.push('');
     lines.push(`ФОКУС ИСТОРИИ: факт про ${selected.scopeLabelRu.toUpperCase()} (не смешивай с другими темами).`);
     lines.push('СЕМЯ ИСТОРИИ (проверенный факт из интернета — только это ядро):');
-    lines.push(selected.fact);
+    lines.push(normalizeCatalogSeedFactDisplay(selected.fact, params.artist, params.title));
     lines.push('РЕЦЕПТ ПОДАЧИ:');
     lines.push('1. КРЮЧОК — первая фраза = контраст/парадокс из семени (не «интересный факт»).');
     lines.push('2. РАЗВИТИЕ — одна деталь из семени, переведённая в живую речь (не пересказ статьи).');
@@ -620,7 +621,7 @@ export function buildLocalStoryUserPrompt(params: {
   const selected = params.selectedReferenceFact;
   if (selected) {
     lines.push('');
-    lines.push(`Главный факт (${selected.scopeLabelRu}): ${selected.fact}`);
+    lines.push(`Главный факт (${selected.scopeLabelRu}): ${normalizeCatalogSeedFactDisplay(selected.fact, params.artist, params.title)}`);
   }
   if (facts.length > 0) {
     lines.push('');

@@ -963,8 +963,8 @@ const UNGROUNDED_CLAIM_CHECKS: Array<{ claim: RegExp; factHint: RegExp }> = [
     factHint: /synth|electronic|deathtronica|electronicore|scream|hardcore|metalcore|шёпот|шепот|синтез|guitar|вокал/i,
   },
   {
-    claim: /(?:стал\s+)?саундтреком\s+(?:лета|фильм|кино)|\bsoundtrack\b/i,
-    factHint: /soundtrack|film|movie|фильм|кино|сериал|video game/i,
+    claim: /(?:стал\s+)?саундтреком\s+(?:лета|фильма|кино)(?=[\s,.!?…]|$)|\bsoundtrack\s+of\s+(?:the\s+)?summer\b/i,
+    factHint: /soundtrack|film|movie|фильм|кино|сериал|video game|саундтрек/i,
   },
   {
     claim: /отголоски того периода|переход из дуэта в сольное/i,

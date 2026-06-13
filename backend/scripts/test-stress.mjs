@@ -69,7 +69,7 @@ const metalSamples = {
   'смешала электронику и дэт-метал так': 'дэт-м+етал',
   'стиль ню метала': 'ню м+етала',
   'мостом ню-металом и попом': 'ню м+еталом',
-  'мостом между ну-металом и поп-музыкой': 'попмузыкой',
+  'мостом между ну-металом и поп-музыкой': 'попм+узык',
   'В те годы nu-метал был на пике': 'ню м+етал',
   'жанр метал рок': 'м+етал р+ок',
   'заядлые металлисты чесали': 'металлисты',
@@ -79,6 +79,21 @@ for (const [input, needle] of Object.entries(metalSamples)) {
   const got = prepareYandexTtsText(input, {});
   if (!got.includes(needle)) {
     fail(`metal "${input}": expected "${needle}" in "${got}"`);
+  } else {
+    ok(`${input} → ${got}`);
+  }
+}
+
+console.log('\n=== pop music stress (Yandex pipeline) ===');
+const popSamples = {
+  'переписала pop-музыку': 'попм+узыку',
+  'король поп-музыки': 'попм+узыки',
+  'мостом между ну-металом и поп-музыкой': 'попм+узык',
+};
+for (const [input, needle] of Object.entries(popSamples)) {
+  const got = prepareYandexTtsText(input, {});
+  if (!got.includes(needle)) {
+    fail(`pop music "${input}": expected "${needle}" in "${got}"`);
   } else {
     ok(`${input} → ${got}`);
   }

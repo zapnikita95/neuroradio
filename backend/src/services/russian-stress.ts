@@ -238,6 +238,19 @@ export function normalizeNuMetalPronunciation(text: string): string {
   return result;
 }
 
+/** pop / поп-музык* — ударение на «у»: попм+узыку, попм+узыка (Yandex часто читает на «и»). */
+export function normalizePopMusicStress(text: string): string {
+  return text
+    .replace(
+      /(?<![\p{L}\p{N}_+\-])поп(?:[\s-]*)?музык(ами|ах|ою|ой|е|и|у|а)(?![\p{L}\p{N}_])/giu,
+      (_m, ending) => `попм+узык${ending}`,
+    )
+    .replace(
+      /(?<![\p{L}\p{N}_+\-])попмузык(ами|ах|ою|ой|е|и|у|а)(?![\p{L}\p{N}_])/giu,
+      (_m, ending) => `попм+узык${ending}`,
+    );
+}
+
 export function stripStressMarks(word: string): string {
   return word.replace(/\+/g, '');
 }
@@ -279,7 +292,9 @@ const LATIN_SLOT_END = '\uE015';
 
 /** Латиница не трогается ударениями и ё-нормализацией — иначе Hollywood → Hollywуd. */
 export function applyRussianStressSafe(text: string): string {
-  const prepped = normalizeGenreRockStress(normalizeNuMetalPronunciation(text));
+  const prepped = normalizeGenreRockStress(
+    normalizePopMusicStress(normalizeNuMetalPronunciation(text)),
+  );
   const slots: string[] = [];
   const masked = prepped.replace(LATIN_RUN_RE, (match) => {
     const idx = slots.length;
