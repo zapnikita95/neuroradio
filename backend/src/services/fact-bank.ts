@@ -4,7 +4,13 @@ import path from 'node:path';
 import { interestRating10 } from './fact-interest-log.js';
 import { rejectSeedForTrackStory } from './fact-track-anchor.js';
 import { factMentionsArtistAsEntity, isAmbiguousCommonWordArtist } from './fact-relevance.js';
-import { interestScore, isCatalogMetadataSeed } from './reference-fact-quality.js';
+import {
+  adjustedInterestScore,
+  interestScore,
+  isCatalogMetadataSeed,
+  MIN_PICK_INTEREST_SCORE,
+  isMetadataHarvestFact,
+} from './reference-fact-quality.js';
 import { isSpeakableReferenceFact } from './web-snippet-accept.js';
 import { factsTooSimilar, type FactScope } from './fact-picker.js';
 import {
@@ -15,6 +21,11 @@ import {
 import { factFitsStoryLanguage } from './fact-language-fit.js';
 import type { StoryLanguageId } from './story-language.js';
 import { harvestTitleVariants } from './title-harvest-variants.js';
+import {
+  computeLiveInterest,
+  isEligibleHotFact,
+  isRejectedPickSeed,
+} from './fact-seed-pick.js';
 
 export interface StoredFact {
   id: string;
@@ -169,6 +180,7 @@ function buildStoredFact(
   const minScore = item.minScore ?? 6;
   if (score < minScore) return null;
   const rating = interestRating10(trimmed);
+  const isMetadata = isMetadataHarvestFact(trimmed);
   const draft: StoredFact = {
     id: crypto.randomUUID(),
     artist,
@@ -178,7 +190,8 @@ function buildStoredFact(
     interestScore: score,
     interestRating: rating,
     source: item.source ?? 'api',
-    isHot: rating >= HOT_MIN_RATING,
+    isMetadata,
+    isHot: isEligibleHotFact(trimmed, { metadata: isMetadata, artist, title }),
     harvestSource: item.harvestSource,
     topicKey: classifyFactTopic(trimmed),
     timesUsed: 0,
@@ -292,15 +305,60 @@ export function ingestHarvestFacts(
   return saved;
 }
 
+/** Пересчёт interestScore/isHot в JSON-банке по актуальным правилам pick. */
+export function refreshBankInterestScores(): number {
+  const bank = loadBank();
+  let updated = 0;
+  const refreshPool = (pool: StoredFact[], artist: string, title: string) => {
+    const trackPoolFacts = pool.map((f) => f.fact);
+    for (const entry of pool) {
+      const live = computeLiveInterest(entry.fact);
+      const hot = isEligibleHotFact(entry.fact, {
+        metadata: entry.isMetadata,
+        artist: entry.artist || artist,
+        title: entry.title || title,
+        trackPool: trackPoolFacts,
+      });
+      if (
+        entry.interestScore !== live.score ||
+        entry.interestRating !== live.rating ||
+        Boolean(entry.isHot) !== hot
+      ) {
+        entry.interestScore = live.score;
+        entry.interestRating = live.rating;
+        entry.isHot = hot;
+        updated += 1;
+      }
+    }
+    pool.sort((a, b) => b.interestScore - a.interestScore);
+  };
+  for (const [key, pool] of Object.entries(bank.byTrack)) {
+    const [artist, ...titleParts] = key.split('|');
+    refreshPool(pool, artist ?? '', titleParts.join('|'));
+  }
+  for (const [artist, pool] of Object.entries(bank.byArtist)) {
+    refreshPool(pool, artist, '');
+  }
+  if (updated > 0) {
+    saveBank(bank);
+    console.log(`[fact-bank] refreshed interest scores for ${updated} fact(s)`);
+  }
+  return updated;
+}
+
 /** Count hot facts (rating ≥ 6) for push hint — no fact text returned. */
 export function countHotFacts(artist: string, title: string): { hotCount: number; hasHotFact: boolean } {
   const { track, artist: artistFacts } = listBankFacts(artist, title);
+  const trackPoolFacts = [...track, ...artistFacts].map((f) => f.fact);
   const all = [...track, ...artistFacts];
   const hot = all.filter(
     (f) =>
-      (f.isHot ?? f.interestRating >= HOT_MIN_RATING) &&
-      f.interestScore >= 6 &&
-      isSpeakableReferenceFact(f.fact, artist, title),
+      isEligibleHotFact(f.fact, {
+        metadata: f.isMetadata,
+        artist,
+        title,
+        trackPool: trackPoolFacts,
+      }) && isSpeakableReferenceFact(f.fact, artist, title),
   );
   return { hotCount: hot.length, hasHotFact: hot.length > 0 };
 }
@@ -400,13 +458,18 @@ export function pickFromBank(
       if (factsTooSimilar(fact.fact, rejectSimilarTo)) continue;
       if (!factFitsStoryLanguage(fact.fact, storyLanguage)) continue;
       if (rejectSeedForTrackStory(fact.fact, artist, title, { trackPoolFacts })) continue;
-      if (!(fact.isHot ?? fact.interestRating >= HOT_MIN_RATING)) continue;
+      if (isRejectedPickSeed(fact.fact, title, storyLanguage, trackPoolFacts, artist)) continue;
+      const live = computeLiveInterest(fact.fact);
+      if (live.score < MIN_PICK_INTEREST_SCORE || live.rating < HOT_MIN_RATING) continue;
       if (!isSpeakableReferenceFact(fact.fact, artist, title)) continue;
       if (isAmbiguousCommonWordArtist(artist) && !factMentionsArtistAsEntity(fact.fact, artist)) continue;
-      unused.push(fact);
+      unused.push({ ...fact, interestScore: live.score, interestRating: live.rating });
     }
   }
   if (unused.length === 0) return null;
+  unused.sort(
+    (a, b) => adjustedInterestScore(b.fact, 'auto') - adjustedInterestScore(a.fact, 'auto'),
+  );
   const picked = unused[startOffset % unused.length]!;
   markFactUsed(picked.id, artist, title);
   return picked;

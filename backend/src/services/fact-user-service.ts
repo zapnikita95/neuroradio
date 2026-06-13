@@ -22,6 +22,8 @@ import {
 } from './fact-bank.js';
 import type { CoverFactContext } from './cover-resolve.js';
 import { splitBundleByScope, rankScopedFacts } from './fact-ranking.js';
+import { computeLiveInterest } from './fact-seed-pick.js';
+import { MIN_PICK_INTEREST_SCORE } from './reference-fact-quality.js';
 import { factMentionsArtistAsEntity, isAmbiguousCommonWordArtist } from './fact-relevance.js';
 import type { FactScope, ReferenceFactBundle } from './fact-picker.js';
 import {
@@ -307,13 +309,14 @@ export function ingestBundleToBank(artist: string, title: string, bundle: Refere
 }
 
 function storedFactToSelected(fromBank: StoredFact): SelectedReferenceFact {
+  const live = computeLiveInterest(fromBank.fact);
   return {
     fact: fromBank.fact,
     scope: fromBank.scope,
     scopeLabelRu:
       fromBank.scope === 'track' ? 'трек' : fromBank.scope === 'album' ? 'альбом' : 'группа/артист',
-    interestScore: fromBank.interestScore,
-    interestRating: fromBank.interestRating,
+    interestScore: live.score,
+    interestRating: live.rating,
   };
 }
 
@@ -359,9 +362,11 @@ export async function countUnusedBankFactsForUser(
   ensureAccount(installId);
   const used = await getUsedFingerprints(installId, artist, title);
   const { track, artist: artistFacts } = listBankFacts(artist, title);
+  const trackPoolFacts = [...track, ...artistFacts].map((f) => f.fact);
   let count = 0;
   for (const item of [...track, ...artistFacts]) {
-    if (item.interestScore < 6) continue;
+    const live = computeLiveInterest(item.fact);
+    if (live.score < MIN_PICK_INTEREST_SCORE) continue;
     if (used.has(factFingerprint(item.fact))) continue;
     count += 1;
   }

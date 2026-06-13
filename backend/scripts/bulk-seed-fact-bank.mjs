@@ -14,7 +14,7 @@ import { harvestAllFacts, fetchDiscogsFacts } from '../dist/services/fact-source
 import { interestScore } from '../dist/services/reference-fact-quality.js';
 import { interestRating10 } from '../dist/services/fact-interest-log.js';
 import { isBoringFact, isMetadataHarvestFact } from '../dist/services/reference-fact-quality.js';
-import { BANK_PATH } from '../dist/services/fact-bank.js';
+import { BANK_PATH, refreshBankInterestScores } from '../dist/services/fact-bank.js';
 import { classifyFactTopic, poolHasTopicDuplicate } from '../dist/services/fact-topic.js';
 import { isParserTrustedHarvestSource } from '../dist/services/fact-sources/types.js';
 
@@ -397,6 +397,7 @@ async function runPool(tracks, bank, stats, doneKeys, zeroFactKeys) {
 }
 
 async function main() {
+  refreshBankInterestScores();
   const catalog = JSON.parse(readFileSync(CATALOG, 'utf8'));
   let tracks = (catalog.tracks ?? []).filter(isHarvestableTrack);
   if (trackLimit > 0) tracks = tracks.slice(0, trackLimit);

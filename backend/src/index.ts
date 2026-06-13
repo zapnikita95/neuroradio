@@ -30,7 +30,7 @@ import { securityHeaders } from './middleware/security-headers.js';
 import { requireSignedAudioAccess } from './middleware/audio-auth.js';
 import { requestLogger } from './middleware/request-logger.js';
 import { SECURITY } from './config/security.js';
-import { mergeSeedBankOnBoot, purgeInvalidBankFacts } from './services/fact-bank.js';
+import { mergeSeedBankOnBoot, purgeInvalidBankFacts, refreshBankInterestScores } from './services/fact-bank.js';
 import { ingestCuratedFactsOnBoot } from './services/curated-facts.js';
 import { initPostgres, hasPostgres, closePostgres } from './services/db.js';
 import { hydrateAccountStoreFromPostgres, migrateAccountStoryDataToPostgres } from './services/account-store.js';
@@ -248,6 +248,8 @@ async function boot(): Promise<void> {
   try {
     const purged = purgeInvalidBankFacts();
     if (purged > 0) console.log(`[boot] fact-bank cleanup removed ${purged} invalid entries`);
+    const refreshed = refreshBankInterestScores();
+    if (refreshed > 0) console.log(`[boot] fact-bank interest refresh updated ${refreshed} entries`);
     ingestCuratedFactsOnBoot();
     mergeSeedBankOnBoot();
   } catch (err) {

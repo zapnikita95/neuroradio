@@ -444,6 +444,20 @@ const ungroundedGroup = findUngroundedClaims(
 assert(ungroundedGroup, `group narrative flagged when seed lacks band context (got: ${ungroundedGroup ?? 'null'})`);
 void BAD_ROB_STORY;
 
+// --- 5c. Bank pick uses live interest rules (generic video ≠ hot) ---
+const { isEligibleHotFact, isRejectedPickSeed } = await import('../dist/services/fact-seed-pick.js');
+
+const GENERIC_VIDEO =
+  'The official music video for Waka Waka was directed by Miguel Escotet and filmed in Barcelona.';
+const STRONG_VIDEO =
+  'Shakira invested over one million dollars of her own money into the controversial Waka Waka music video.';
+
+assert(isGenericMusicVideoSeed(GENERIC_VIDEO), 'generic directed-by video detected');
+assert(!isGenericMusicVideoSeed(STRONG_VIDEO), 'strong video (budget) not generic');
+assert(!isEligibleHotFact(GENERIC_VIDEO, { artist: 'Shakira', title: 'Waka Waka' }), 'generic video not hot');
+assert(isEligibleHotFact(STRONG_VIDEO, { artist: 'Shakira', title: 'Waka Waka' }), 'strong video stays hot');
+assert(isRejectedPickSeed(GENERIC_VIDEO, 'Waka Waka', 'ru', [], 'Shakira'), 'generic video rejected at pick');
+
 // --- 6. Optional live: real Last.fm + aggregator ---
 if (LIVE) {
   if (!process.env.LASTFM_API_KEY?.trim()) {
