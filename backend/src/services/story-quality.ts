@@ -970,6 +970,38 @@ const UNGROUNDED_CLAIM_CHECKS: Array<{ claim: RegExp; factHint: RegExp }> = [
     claim: /отголоски того периода|переход из дуэта в сольное/i,
     factHint: /отголоск|дуэт|duo|period|период|transition|solo/i,
   },
+  {
+    claim: /ощущени(?:е|я)\s+эпох/i,
+    factHint: /эпох|era|epoch|decade|season|время|year/i,
+  },
+  {
+    claim: /(?:^|[\s,.!?«»])(?:у\s+меня\s+)?(?:до\s+сих\s+пор\s+)?мурашк/i,
+    factHint: /мураш|goosebump|chill|shiver/i,
+  },
+  {
+    claim: /с\s+годами\s+не\s+выцветает|вступлени(?:е|я)\s+по-прежнему\s+цепляет/i,
+    factHint: /intro|opening|вступлен|fade|year|age|outdat/i,
+  },
+  {
+    claim: /два\s+мира\s+столкнулись|на\s+одном\s+дыхании/i,
+    factHint: /world|мир|breath|one take|improvis|дыхан/i,
+  },
+  {
+    claim: /визитной\s+карточкой\s+артиста/i,
+    factHint: /signature|calling card|визитн|card|breakthrough/i,
+  },
+  {
+    claim: /лёгкий\s+поп-?звук\s+с\s+неожиданно\s+глубокой/i,
+    factHint: /pop|lyric|deep|sound|жанр/i,
+  },
+  {
+    claim: /электронн\w*\s+бит\w*\s+и\s+гитарн\w*\s+риф|атмосферу\s+ночных\s+поездок/i,
+    factHint: /electronic|bit|guitar|rif|night|drive|поезд|road/i,
+  },
+  {
+    claim: /саундтреком?\s+к\s+взрослению/i,
+    factHint: /soundtrack|взросл|growing up|coming of age/i,
+  },
 ];
 
 export function findUngroundedClaims(script: string, referenceFacts: string[] = []): string | null {

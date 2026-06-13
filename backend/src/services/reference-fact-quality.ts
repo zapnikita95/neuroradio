@@ -51,13 +51,16 @@ export function isMetadataHarvestFact(fact: string): boolean {
   return isListeningStatsFact(t) || isAlbumListingSeed(t);
 }
 
-/** Год/лейбл на Discogs — факт, но не ядро истории (LLM дорисует «синтезаторы»). */
+/** Год/лейбл/сборник на Discogs — факт, но не ядро истории (LLM дорисует «синтезаторы»). */
 export function isCatalogMetadataSeed(fact: string): boolean {
   const t = fact.trim();
   if (isAlbumListingSeed(t)) return true;
   if (isTrackDurationCatalogSeed(t)) return true;
   if (/Discogs датирован \d{4}/i.test(t)) return true;
   if (/выходил на лейбле/i.test(t)) return true;
+  if (/Релиз «[^»]+».*(?:выходил на лейбле|\([^)]+\)\s*выходил)/i.test(t)) return true;
+  if (/на Last\.fm указан в альбоме «[^»]+»/i.test(t)) return true;
+  if (/исполнителя .+ на Last\.fm указан в альбоме/i.test(t)) return true;
   return false;
 }
 

@@ -64,6 +64,32 @@ function replaceLongestFirst(text: string, dict: Record<string, string>): string
   return result;
 }
 
+function escapeRegExp(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function replaceWholePhrase(text: string, phrase: string, replacement: string): string {
+  if (!phrase.trim()) return text;
+  const re = new RegExp(`(?<![\\p{L}\\p{N}'’-])${escapeRegExp(phrase.trim())}(?![\\p{L}\\p{N}'’-])`, 'giu');
+  return text.replace(re, replacement);
+}
+
+/** Yandex/Edge: stylized artist tokens → Cyrillic (mgk → мджк), not letter-by-letter EN. */
+export function applyStylizedArtistTokensRu(text: string, artist: string, title = ''): string {
+  let result = text;
+  for (const seed of [artist, title]) {
+    const trimmed = seed.trim();
+    if (!trimmed) continue;
+    const entry = lookupArtistPronunciation(trimmed);
+    if (!entry?.ru) continue;
+    result = replaceWholePhrase(result, trimmed, entry.ru);
+    for (const alias of entry.aliases ?? []) {
+      result = replaceWholePhrase(result, alias, entry.ru);
+    }
+  }
+  return result;
+}
+
 /** English/ElevenLabs/Azure — respelling for stylized artist names. */
 export function applyEnglishArtistPronunciation(
   text: string,

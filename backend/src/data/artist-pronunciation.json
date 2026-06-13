@@ -560,6 +560,21 @@
     "ice spice": {
       "ru": "+айс spice",
       "en": "ice spice"
+    },
+    "mgk": {
+      "ru": "мджк",
+      "en": "M G K",
+      "aliases": ["machine gun kelly", "machine gun kelly's"]
+    },
+    "tkn": {
+      "ru": "тк+эн",
+      "en": "T K N",
+      "aliases": ["the kid laroi"]
+    },
+    "bbno$": {
+      "ru": "бибино",
+      "en": "baby no money",
+      "aliases": ["bbno", "bbno$"]
     }
   }
 }

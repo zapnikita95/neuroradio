@@ -1,4 +1,5 @@
 import type { StoryNarratorId } from './story-narrator.js';
+import { scriptSimilarity } from './story-quality.js';
 
 /** Short closing reactions per persona — LLM picks/adapts one, not always «мурашки». */
 const CLOSING_POOLS: Record<Exclude<StoryNarratorId, 'auto'>, string[]> = {
@@ -64,14 +65,36 @@ function hashSeed(input: string): number {
   return Math.abs(h);
 }
 
+const CLOSING_OVERUSE_MARKERS: RegExp[] = [
+  /мурашк/i,
+  /ощущени(?:е|я)\s+эпох/i,
+  /не\s+выцветает/i,
+  /цепляет/i,
+  /замираю/i,
+  /на\s+одном\s+дыхании/i,
+  /два\s+мира\s+столкнулись/i,
+];
+
+function closingPhraseOverused(phrase: string, previousScripts: string[]): boolean {
+  if (previousScripts.some((s) => scriptSimilarity(s, phrase) > 0.42)) return true;
+  return previousScripts.some(
+    (s) => CLOSING_OVERUSE_MARKERS.some((p) => p.test(s) && p.test(phrase)),
+  );
+}
+
 export function pickClosingPhraseHint(
   narratorId: StoryNarratorId,
   artist: string,
   title: string,
+  previousScripts: string[] = [],
 ): string {
   const key = narratorId === 'auto' ? 'contemporary' : narratorId;
-  const pool = CLOSING_POOLS[key];
-  const idx = hashSeed(`${key}|${artist.trim().toLowerCase()}|${title.trim().toLowerCase()}`) % pool.length;
+  const basePool = CLOSING_POOLS[key];
+  let pool = basePool.filter((phrase) => !closingPhraseOverused(phrase, previousScripts));
+  if (pool.length === 0) pool = basePool;
+  const idx =
+    hashSeed(`${key}|${artist.trim().toLowerCase()}|${title.trim().toLowerCase()}|${previousScripts.length}`) %
+    pool.length;
   return pool[idx] ?? pool[0]!;
 }
 
@@ -79,18 +102,20 @@ export function buildClosingPhrasePromptBlock(
   narratorId: StoryNarratorId,
   artist: string,
   title: string,
+  previousScripts: string[] = [],
 ): string {
-  const hint = pickClosingPhraseHint(narratorId, artist, title);
-  const alts = CLOSING_POOLS[narratorId === 'auto' ? 'contemporary' : narratorId]
-    .filter((line) => line !== hint)
-    .slice(0, 3)
+  const hint = pickClosingPhraseHint(narratorId, artist, title, previousScripts);
+  const key = narratorId === 'auto' ? 'contemporary' : narratorId;
+  const alts = CLOSING_POOLS[key]
+    .filter((line) => line !== hint && !closingPhraseOverused(line, previousScripts))
+    .slice(0, 4)
     .map((line) => `• ${line}`)
     .join('\n');
 
-  return `ФИНАЛЬНАЯ РЕПЛИКА (одна короткая фраза в конце — адаптируй, не копируй дословно каждый раз):
+  return `ФИНАЛЬНАЯ РЕПЛИКА (одна короткая фраза в конце — адаптируй, НЕ копируй дословно шаблон):
 - Вариант для этого трека: «${hint}»
-- Другие уместные финалы для твоего амплуа (чередуй, не зацикливайся на «мурашках от вступления»):
+- Другие уместные финалы для твоего амплуа (чередуй; ЗАПРЕЩЕНО повторять «мурашки», «ощущение эпохи», «не выцветает», «цепляет вступление» — если уже были в прошлых рассказах):
 ${alts}
 - ЗАПРЕЩЁН шаблон «ради чего … оставался после смены / задерживался после монтажа» и любые вариации с микшёром, монтажёром, звукорежиссёром.
-- Не повторяй один и тот же финал подряд в разных историях; финал = личная реакция на факт из семени, не пересказ факта и не generic-студия.`;
+- Финал = реакция на КОНКРЕТНЫЙ факт из семени (имя, событие, платформа, скандал). Без «ощущения эпохи» и «мурашек», если этого нет в семени.`;
 }

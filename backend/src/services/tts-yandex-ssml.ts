@@ -17,11 +17,23 @@ const BREAK_SENTENCE = '\uE022';
 
 /** Latin runs incl. curly apostrophe in Don't / Don't Matter To Me. */
 const LATIN_APOSTROPHE = "''\u2018\u2019\u02BC\u0060";
+const LATIN_HYPHENS = '\\-\u2010\u2011\u2012\u2013\u2014';
 
 const LATIN_RUN_RE = new RegExp(
-  `[A-Za-zÀ-ÿ][A-Za-zÀ-ÿ0-9${LATIN_APOSTROPHE}.\\-&]{0,}(?:\\s+(?![.!?…]\\s)[A-Za-zÀ-ÿ][A-Za-zÀ-ÿ0-9${LATIN_APOSTROPHE}.\\-&]{0,})*`,
+  `[A-Za-zÀ-ÿ][A-Za-zÀ-ÿ0-9${LATIN_APOSTROPHE}${LATIN_HYPHENS}:]{0,}(?:\\s+(?![.!?…]\\s)[A-Za-zÀ-ÿ][A-Za-zÀ-ÿ0-9${LATIN_APOSTROPHE}${LATIN_HYPHENS}:]{0,})*`,
   'g',
 );
+
+/** T-Shirt, Misfits T‐Shirt — one token; album «Alt: Title» — без рваного SSML. */
+export function normalizeLatinForSsml(text: string): string {
+  return normalizeLatinApostrophes(text)
+    .replace(
+      /\b([A-Za-z]{2,})\s+([A-Za-z]{1,4})[\u2010\u2011\u2012\u2013\u2014-]([A-Za-z]{2,})\b/g,
+      '$1 $2-$3',
+    )
+    .replace(/([A-Za-z][A-Za-z0-9 .'’\-]{5,}):\s+/g, '$1, ')
+    .replace(/\s+-\s+/g, '-');
+}
 
 export function hasLatinForSsml(text: string): boolean {
   const stripped = text.replace(/<\[(?:small|medium|large|tiny|huge|sentence)\]>/g, '');
@@ -119,6 +131,9 @@ const LATIN_SSML_PRONUNCIATION: Record<string, string> = {
   'anti-gravity lean': 'anti gravity lean',
   'anti-gravity': 'anti gravity',
   startafight: 'start a fight',
+  't-shirt': 't shirt',
+  tshirt: 't shirt',
+  'misfits t-shirt': 'Misfits T shirt',
 };
 
 function splitCamelCaseLatin(span: string): string {
@@ -161,7 +176,7 @@ function stripPausesBeforeLatin(text: string): string {
 /** Оборачивает латинские фрагменты в SSML lang; русский текст и +ударения — как есть. */
 export function wrapMixedLanguageBody(text: string): string {
   const prepared = pausesToPlaceholders(
-    stripPausesBeforeLatin(mergeLatinTitleOtArtist(normalizeLatinApostrophes(text))),
+    stripPausesBeforeLatin(mergeLatinTitleOtArtist(normalizeLatinForSsml(text))),
   );
   let last = 0;
   let out = '';

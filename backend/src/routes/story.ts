@@ -15,7 +15,7 @@ import { fetchDeepWebSearchSnippets, fetchArtistIdentityWebSnippets } from '../s
 import { fetchFastTrackWikiFacts } from '../services/wikipedia-facts.js';
 import { explainReferenceFactSelection, factsTooSimilar, type SelectedReferenceFact } from '../services/fact-picker.js';
 import { formatFactPickLog, logFactCandidatePools } from '../services/fact-interest-log.js';
-import { interestScore, isWikiBiographyLead } from '../services/reference-fact-quality.js';
+import { interestScore, isWikiBiographyLead, isCatalogMetadataSeed } from '../services/reference-fact-quality.js';
 import { interestRating10 } from '../services/fact-interest-log.js';
 import {
   buildFactPickContext,
@@ -790,6 +790,7 @@ router.post('/full', extractClientSecrets, validateStoryFullBody, storyFullRateL
       ? [selectedFact.fact]
       : [...factBundle.trackFacts, ...factBundle.artistFacts]
           .filter((f) => !isWeakSnippetSeed(f) && !isMetadataOnlyFallbackFact(f))
+          .filter((f) => !isCatalogMetadataSeed(f))
           .filter((f) => !factsTooSimilar(f, rejectSimilarTo))
           .sort((a, b) => interestScore(b) - interestScore(a))
           .slice(0, 4);
@@ -821,6 +822,7 @@ router.post('/full', extractClientSecrets, validateStoryFullBody, storyFullRateL
         .filter(
           (fact) =>
             !isWeakSnippetSeed(fact) &&
+            !isCatalogMetadataSeed(fact) &&
             !factsTooSimilar(fact, rejectSimilarTo) &&
             interestScore(fact) >= 6 &&
             (factAppliesToRequest(fact, metadata.artist, metadata.title, 'track') ||
@@ -1060,10 +1062,21 @@ router.post('/full', extractClientSecrets, validateStoryFullBody, storyFullRateL
 
     let storyReferenceFacts =
       coverSituation.action === 'pivot_artist'
-        ? coverSituation.referenceFacts
+        ? coverSituation.referenceFacts.filter((f) => !isCatalogMetadataSeed(f))
         : selectedFact
           ? [selectedFact.fact]
-          : finalReferenceFacts;
+          : finalReferenceFacts.filter((f) => !isCatalogMetadataSeed(f));
+
+    if (storyReferenceFacts.length === 0 && !selectedFact) {
+      recordFactMiss({
+        installId,
+        artist: metadata.artist,
+        title: metadata.title,
+        reason: 'metadata_only_no_seed',
+        artistTier,
+      });
+      throw new NoReferenceFactsError(metadata.artist, metadata.title);
+    }
 
     if (coverCtx.isCover && coverCtx.coverNoteRu) {
       storyReferenceFacts = [coverCtx.coverNoteRu, ...storyReferenceFacts];

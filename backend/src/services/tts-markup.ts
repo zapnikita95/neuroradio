@@ -10,6 +10,7 @@ import {
   applyForeignPronunciation,
   preserveMusicProperNames,
 } from './tts-foreign-pronounce.js';
+import { applyStylizedArtistTokensRu } from './artist-pronunciation.js';
 import { enhanceMixedLanguageText } from './tts-en-normalize.js';
 import {
   normalizeYandexSpeechTokens,
@@ -149,6 +150,7 @@ export function prepareYandexTtsText(
   // Кавычки: только текст внутри, без «в кавычках …» — не занимает эфир.
   text = stripGuillemetsForPreview(text);
   text = normalizeYandexSpeechTokens(text, artist, title);
+  text = applyStylizedArtistTokensRu(text, options.artist ?? artist, options.title ?? title);
   text = applyRussianStressSafe(text);
 
   if (options.sentencePauses !== false) {
