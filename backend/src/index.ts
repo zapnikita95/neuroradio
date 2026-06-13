@@ -31,7 +31,7 @@ import { securityHeaders } from './middleware/security-headers.js';
 import { requireSignedAudioAccess } from './middleware/audio-auth.js';
 import { requestLogger } from './middleware/request-logger.js';
 import { SECURITY } from './config/security.js';
-import { mergeSeedBankOnBoot, purgeInvalidBankFacts, refreshBankInterestScores } from './services/fact-bank.js';
+import { mergeSeedBankOnBoot, purgeInvalidBankFacts, refreshBankInterestScores, flushFactBankSync } from './services/fact-bank.js';
 import { ingestCuratedFactsOnBoot } from './services/curated-facts.js';
 import { initPostgres, hasPostgres, closePostgres } from './services/db.js';
 import { hydrateAccountStoreFromPostgres, migrateAccountStoryDataToPostgres } from './services/account-store.js';
@@ -302,6 +302,7 @@ async function boot(): Promise<void> {
 
   function shutdown(signal: string): void {
     console.log(`[shutdown] ${signal} — closing HTTP server`);
+    flushFactBankSync();
     server.close(async () => {
       await closePostgres();
       process.exit(0);

@@ -67,6 +67,14 @@ const HOT_MIN_RATING = 6;
 
 let cache: FactBankFile | null = null;
 
+const SAVE_DEBOUNCE_MS = Math.max(
+  500,
+  parseInt(process.env.FACT_BANK_SAVE_DEBOUNCE_MS ?? '3000', 10) || 3000,
+);
+let saveTimer: ReturnType<typeof setTimeout> | null = null;
+let saveInFlight = false;
+let saveQueued = false;
+
 function emptyBank(): FactBankFile {
   return { byTrack: {}, byArtist: {} };
 }
@@ -86,10 +94,85 @@ function loadBank(): FactBankFile {
   }
 }
 
-function saveBank(bank: FactBankFile): void {
+function writeBankFileSync(bank: FactBankFile): void {
   fs.mkdirSync(DATA_DIR, { recursive: true });
-  fs.writeFileSync(BANK_PATH, JSON.stringify(bank, null, 2), 'utf8');
+  const tmp = `${BANK_PATH}.${process.pid}.tmp`;
+  const json = JSON.stringify(bank);
+  fs.writeFileSync(tmp, json, 'utf8');
+  fs.renameSync(tmp, BANK_PATH);
+}
+
+function writeBankFileAsync(bank: FactBankFile): Promise<void> {
+  return new Promise((resolve, reject) => {
+    fs.mkdirSync(DATA_DIR, { recursive: true });
+    const tmp = `${BANK_PATH}.${process.pid}.tmp`;
+    const json = JSON.stringify(bank);
+    fs.writeFile(tmp, json, 'utf8', (err) => {
+      if (err) {
+        reject(err);
+        return;
+      }
+      fs.rename(tmp, BANK_PATH, (renameErr) => {
+        if (renameErr) reject(renameErr);
+        else resolve();
+      });
+    });
+  });
+}
+
+async function flushBankToDisk(): Promise<void> {
+  if (saveInFlight) {
+    saveQueued = true;
+    return;
+  }
+  const bank = cache;
+  if (!bank) return;
+  saveInFlight = true;
+  try {
+    await writeBankFileAsync(bank);
+  } catch (err) {
+    console.error('[fact-bank] async save failed:', err);
+  } finally {
+    saveInFlight = false;
+    if (saveQueued) {
+      saveQueued = false;
+      await flushBankToDisk();
+    }
+  }
+}
+
+function scheduleBankSave(): void {
+  if (saveTimer) return;
+  saveTimer = setTimeout(() => {
+    saveTimer = null;
+    void flushBankToDisk();
+  }, SAVE_DEBOUNCE_MS);
+  saveTimer.unref?.();
+}
+
+/** Memory-first update; disk write is debounced so live story requests do not block the event loop. */
+function saveBank(bank: FactBankFile): void {
   cache = bank;
+  scheduleBankSave();
+}
+
+/** Flush pending fact-bank writes before process exit (Railway SIGTERM). */
+export function flushFactBankSync(): void {
+  if (saveTimer) {
+    clearTimeout(saveTimer);
+    saveTimer = null;
+  }
+  const bank = cache;
+  if (!bank) return;
+  writeBankFileSync(bank);
+}
+
+export async function flushFactBank(): Promise<void> {
+  if (saveTimer) {
+    clearTimeout(saveTimer);
+    saveTimer = null;
+  }
+  await flushBankToDisk();
 }
 
 export function trackKey(artist: string, title: string): string {

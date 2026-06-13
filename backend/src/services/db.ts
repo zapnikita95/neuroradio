@@ -15,7 +15,11 @@ export function getPool(): pg.Pool {
       url.includes('railway') || process.env.PGSSLMODE === 'require'
         ? { rejectUnauthorized: false }
         : undefined;
-    pool = new Pool({ connectionString: url, ssl, max: 8 });
+    const max = Math.min(
+      50,
+      Math.max(4, parseInt(process.env.PG_POOL_MAX ?? '20', 10) || 20),
+    );
+    pool = new Pool({ connectionString: url, ssl, max });
     pool.on('error', (err) => console.error('[postgres] pool error:', err.message));
   }
   return pool;
