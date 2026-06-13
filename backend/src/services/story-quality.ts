@@ -1033,6 +1033,18 @@ const UNGROUNDED_CLAIM_CHECKS: Array<{ claim: RegExp; factHint: RegExp }> = [
     claim: /саундтреком?\s+к\s+взрослению/i,
     factHint: /soundtrack|взросл|growing up|coming of age/i,
   },
+  {
+    claim: /(?:истори\w*\s+групп|в\s+истории\s+групп|групп\w*\s+(?:записал|выпустил|написал))/i,
+    factHint: /\b(?:the band|the group|band members?|their (?:album|song|debut)|групп)\b/i,
+  },
+  {
+    claim: /(?:написал\s+не\s+сам\s+артист|не\s+сам\s+артист\s+написал|трек\s+написал\s+не\s+сам)/i,
+    factHint: /(?:not written by|song not written|recorded a song not written|чуж\w*\s+(?:текст|слова|автор))/i,
+  },
+  {
+    claim: /(?:стал[аи]?\s+(?:одним\s+из\s+)?(?:самых\s+)?(?:узнаваем|известн)|стала\s+хитом)/i,
+    factHint: /(?:\bhit\b|chart|billboard|top\s+\d|platinum|gold|million|хит|чарт)/i,
+  },
 ];
 
 export function findUngroundedClaims(script: string, referenceFacts: string[] = []): string | null {

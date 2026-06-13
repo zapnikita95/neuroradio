@@ -377,6 +377,73 @@ assert(
   `Lonely prefers track/artist narrative over clip (got: ${lonelyPick?.fact?.slice(0, 90) ?? 'null'})`,
 );
 
+const ROB_ARTIST = 'Rob Thomas';
+const ROB_TITLE = 'Lonely No More';
+const MATCHBOX_BAND_FACT =
+  'For the first time, the band recorded a song not written by Thomas.';
+const ROB_DEBUT_SINGLE =
+  '"Lonely No More" is the first single from Matchbox Twenty frontman Rob Thomas\' debut studio album, ...Something to Be.';
+
+const { isMisattributedBandTrackFact } = await import('../dist/services/fact-relevance.js');
+const { isTrackTitleAnchoredSeed } = await import('../dist/services/fact-track-anchor.js');
+const { isRejectedStorySeed } = await import('../dist/services/fact-picker.js');
+const { isWeakSelectedFact } = await import('../dist/services/search-snippet-salvage.js');
+
+assert(isMisattributedBandTrackFact(MATCHBOX_BAND_FACT, ROB_TITLE), 'Matchbox band fact misattributed to solo track');
+assert(isTrackTitleAnchoredSeed(ROB_DEBUT_SINGLE, ROB_TITLE), 'debut single fact anchors to Lonely No More');
+assert(
+  isRejectedStorySeed(MATCHBOX_BAND_FACT, ROB_ARTIST, ROB_TITLE, [ROB_DEBUT_SINGLE]),
+  'central gate rejects band-not-written-by for Lonely No More',
+);
+assert(
+  !isRejectedStorySeed(ROB_DEBUT_SINGLE, ROB_ARTIST, ROB_TITLE, [ROB_DEBUT_SINGLE]),
+  'central gate accepts title-anchored debut single',
+);
+assert(
+  !isWeakSelectedFact(
+    {
+      fact: ROB_DEBUT_SINGLE,
+      scope: 'track',
+      scopeLabelRu: 'трек',
+      interestScore: scoreFact(ROB_DEBUT_SINGLE),
+      interestRating: 8,
+    },
+    ROB_ARTIST,
+    ROB_TITLE,
+  ),
+  'salvage debut-single seed is not weak when title is anchored',
+);
+
+const robPick = pickReferenceFact(
+  {
+    trackFacts: [ROB_DEBUT_SINGLE],
+    artistFacts: [MATCHBOX_BAND_FACT],
+  },
+  [],
+  0,
+  ROB_ARTIST,
+  ROB_TITLE,
+);
+assert(
+  robPick && robPick.fact.includes('Lonely No More'),
+  `Rob Thomas pick prefers track-anchored fact (got: ${robPick?.fact?.slice(0, 90) ?? 'null'})`,
+);
+assert(
+  !robPick?.fact.includes('the band recorded'),
+  'Rob Thomas pick skips Matchbox Twenty band bleed',
+);
+
+const BAD_ROB_STORY =
+  'Lonely No More — Rob Thomas. Впервые в истории группы этот трек написал не сам артист. Песня стала хитом, доказав, что команда может работать и без его единоличного контроля.';
+const ungroundedHit = findUngroundedClaims('Песня стала хитом, доказав успех.', [ROB_DEBUT_SINGLE]);
+assert(ungroundedHit, `hit claim flagged without hit in seed (got: ${ungroundedHit ?? 'null'})`);
+const ungroundedGroup = findUngroundedClaims(
+  'Впервые в истории группы этот трек написал не сам артист.',
+  [ROB_DEBUT_SINGLE],
+);
+assert(ungroundedGroup, `group narrative flagged when seed lacks band context (got: ${ungroundedGroup ?? 'null'})`);
+void BAD_ROB_STORY;
+
 // --- 6. Optional live: real Last.fm + aggregator ---
 if (LIVE) {
   if (!process.env.LASTFM_API_KEY?.trim()) {

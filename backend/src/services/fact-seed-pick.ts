@@ -1,0 +1,110 @@
+import {
+  adjustedInterestScore,
+  interestScore,
+  isAlbumListingSeed,
+  isArtistFormationBioSeed,
+  isCatalogMetadataSeed,
+  isCitationBibliographySeed,
+  isGenericConcertVenueSeed,
+  isGenericMusicVideoSeed,
+  isBoringFact,
+  isCollectorFact,
+  isWeakChartSeed,
+  MIN_PICK_INTEREST_SCORE,
+} from './reference-fact-quality.js';
+import { WEAK_TRIVIA_PATTERNS } from './story-fact-hunt.js';
+import { isMetadataOnlyFallbackFact } from './metadata-facts.js';
+import { isTruncatedMarketingSnippet, isUnspeakableWebSeed } from './web-snippet-accept.js';
+import {
+  factMentionsTitle,
+  hasTrackContextSignal,
+  isMisattributedBandTrackFact,
+} from './fact-relevance.js';
+import { rejectSeedForTrackStory, isTrackTitleAnchoredSeed } from './fact-track-anchor.js';
+import { factFitsStoryLanguage } from './fact-language-fit.js';
+import type { StoryLanguageId } from './story-language.js';
+import { interestRating10 } from './fact-interest-log.js';
+
+/** Shared reject gates for live pick + bank pick + push hot — одна логика с pickReferenceFact. */
+export function isRejectedPickSeed(
+  fact: string,
+  title = '',
+  storyLanguage: StoryLanguageId = 'ru',
+  trackPool: string[] = [],
+  artist = '',
+): boolean {
+  if (!factFitsStoryLanguage(fact, storyLanguage)) return true;
+  if (title && artist && rejectSeedForTrackStory(fact, artist, title, { trackPoolFacts: trackPool })) {
+    return true;
+  }
+  if (isAlbumListingSeed(fact)) return true;
+  if (isCatalogMetadataSeed(fact)) return true;
+  if (isCitationBibliographySeed(fact)) return true;
+  if (isGenericConcertVenueSeed(fact)) return true;
+  if (isGenericMusicVideoSeed(fact)) return true;
+  if (
+    title.trim() &&
+    isArtistFormationBioSeed(fact) &&
+    trackPool.some((t) => factMentionsTitle(t, title) && adjustedInterestScore(t) >= 6)
+  ) {
+    return true;
+  }
+  if (
+    title.trim() &&
+    !factMentionsTitle(fact, title) &&
+    !hasTrackContextSignal(fact) &&
+    trackPool.some((t) => factMentionsTitle(t, title) && adjustedInterestScore(t) >= 12)
+  ) {
+    return true;
+  }
+  if (isMetadataOnlyFallbackFact(fact)) return true;
+  if (title && isMisattributedBandTrackFact(fact, title)) return true;
+  if (WEAK_TRIVIA_PATTERNS.some((p) => p.test(fact))) return true;
+  if (isWeakChartSeed(fact)) return true;
+  if (isBoringFact(fact) && !(title && isTrackTitleAnchoredSeed(fact, title))) return true;
+  if (
+    isCollectorFact(fact) &&
+    !(title && factMentionsTitle(fact, title)) &&
+    !/\b(?:inspired by|intended to|anti-war|protest song|meaning|metaphor)\b/i.test(fact)
+  ) {
+    return true;
+  }
+  if (isTruncatedMarketingSnippet(fact)) return true;
+  if (isUnspeakableWebSeed(fact)) return true;
+  return false;
+}
+
+export function computeLiveInterest(fact: string): { score: number; rating: number } {
+  const score = interestScore(fact);
+  return { score, rating: interestRating10(fact) };
+}
+
+const HOT_MIN_RATING = 6;
+
+/** Push hint + bank hot pool — пересчёт по текущим правилам, не замороженный isHot. */
+export function isEligibleHotFact(
+  fact: string,
+  opts: {
+    metadata?: boolean;
+    artist?: string;
+    title?: string;
+    trackPool?: string[];
+    storyLanguage?: StoryLanguageId;
+  } = {},
+): boolean {
+  if (opts.metadata) return false;
+  const { score, rating } = computeLiveInterest(fact);
+  if (rating < HOT_MIN_RATING || score < MIN_PICK_INTEREST_SCORE) return false;
+  if (
+    isRejectedPickSeed(
+      fact,
+      opts.title ?? '',
+      opts.storyLanguage ?? 'ru',
+      opts.trackPool ?? [],
+      opts.artist ?? '',
+    )
+  ) {
+    return false;
+  }
+  return true;
+}

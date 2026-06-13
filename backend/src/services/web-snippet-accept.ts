@@ -16,6 +16,7 @@ import {
   isGenericConcertVenueSeed,
   isGenericMusicVideoSeed,
 } from './reference-fact-quality.js';
+import { isTrackTitleAnchoredSeed } from './fact-track-anchor.js';
 
 const LOW_QUALITY_WEB_PREFIX =
   /^(?:Explore songs|Be the first to comment|Provided to YouTube|Nobody|Add your thoughts|Watch exclusive videos|There have been few stars)/i;
@@ -171,6 +172,9 @@ export function isSpeakableReferenceFact(
   if (isUnspeakableWebSeed(trimmed)) return false;
   if (isWebListicleJunk(trimmed)) return false;
   if (artist && isPlaylistJunkSnippet(trimmed, artist, title)) return false;
+  if (title && isTrackTitleAnchoredSeed(trimmed, title)) {
+    return interestScore(trimmed) >= 6;
+  }
   if (isBoringFact(trimmed) && !isBackstoryFact(trimmed)) return false;
   return interestScore(trimmed) >= 6 || isBackstoryFact(trimmed);
 }

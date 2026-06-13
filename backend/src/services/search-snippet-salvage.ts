@@ -1,5 +1,6 @@
 import type { SelectedReferenceFact } from './fact-picker.js';
 import { factMentionsArtist, factMentionsTitle, factNamesForeignEntity, hasTrackContextSignal } from './fact-relevance.js';
+import { isTrackTitleAnchoredSeed } from './fact-track-anchor.js';
 import { interestRating10 } from './fact-interest-log.js';
 import { isMetadataOnlyFallbackFact } from './metadata-facts.js';
 import {
@@ -13,25 +14,31 @@ import { factFitsStoryLanguage } from './fact-language-fit.js';
 import type { StoryLanguageId } from './story-language.js';
 
 /** Seed too weak to ground LLM + quality gate — upgrade to wiki/better facts. */
-export function isWeakSnippetSeed(fact: string, score = interestScore(fact)): boolean {
+export function isWeakSnippetSeed(fact: string, score = interestScore(fact), title = ''): boolean {
   const trimmed = fact.trim();
   if (isAlbumListingSeed(trimmed)) return true;
   if (isCatalogMetadataSeed(trimmed)) return true;
   if (isLyricsPageSeed(trimmed)) return true;
+  if (title && isTrackTitleAnchoredSeed(trimmed, title)) return false;
   if (score < 6) return true;
   if (isWikiBiographyLead(trimmed)) return true;
-  return isUnspeakableWebSeed(trimmed) || !isSpeakableReferenceFact(trimmed);
+  return isUnspeakableWebSeed(trimmed) || !isSpeakableReferenceFact(trimmed, '', title);
 }
 
-export function isWeakSelectedFact(selected: SelectedReferenceFact | null, artist = ''): boolean {
+export function isWeakSelectedFact(
+  selected: SelectedReferenceFact | null,
+  artist = '',
+  title = '',
+): boolean {
   if (!selected) return true;
   const trimmed = selected.fact.trim();
   if (isCatalogMetadataSeed(trimmed)) return true;
   if (isLyricsPageSeed(trimmed)) return true;
   const score = Math.max(selected.interestScore ?? 0, interestScore(trimmed));
+  if (title && isTrackTitleAnchoredSeed(trimmed, title) && score >= 10) return false;
   if (score < 6) return true;
   if (isWikiBiographyLead(trimmed)) return true;
-  return isUnspeakableWebSeed(trimmed) || !isSpeakableReferenceFact(trimmed, artist);
+  return isUnspeakableWebSeed(trimmed) || !isSpeakableReferenceFact(trimmed, artist, title);
 }
 
 /** Last-resort seed from HTML search snippets when wiki/MB timed out. */
@@ -48,7 +55,7 @@ export function pickSalvageSnippetSeed(
     .filter((snippet) => acceptSearchGroundedSnippet(snippet, artist, title))
     .filter((snippet) => !isPlaylistJunkSnippet(snippet, artist, title))
     .filter((snippet) => !factNamesForeignEntity(snippet, artist, title))
-    .filter((snippet) => !isWeakSnippetSeed(snippet))
+    .filter((snippet) => !isWeakSnippetSeed(snippet, interestScore(snippet), title))
     .sort((a, b) => {
       const boost = (s: string) =>
         (factMentionsArtist(s, artist) ? 25 : 0) +

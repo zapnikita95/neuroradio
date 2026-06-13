@@ -13,7 +13,7 @@ import {
 } from '../services/fact-aggregator.js';
 import { fetchDeepWebSearchSnippets, fetchArtistIdentityWebSnippets } from '../services/web-search-facts.js';
 import { fetchFastTrackWikiFacts } from '../services/wikipedia-facts.js';
-import { explainReferenceFactSelection, factsTooSimilar, type SelectedReferenceFact } from '../services/fact-picker.js';
+import { explainReferenceFactSelection, factsTooSimilar, isRejectedStorySeed, type SelectedReferenceFact } from '../services/fact-picker.js';
 import { formatFactPickLog, logFactCandidatePools } from '../services/fact-interest-log.js';
 import { interestScore, isWikiBiographyLead, isCatalogMetadataSeed } from '../services/reference-fact-quality.js';
 import { interestRating10 } from '../services/fact-interest-log.js';
@@ -784,7 +784,7 @@ router.post('/full', extractClientSecrets, validateStoryFullBody, storyFullRateL
       selectedFact = null;
     }
 
-    if (selectedFact && !factFromBank && isWeakSelectedFact(selectedFact, metadata.artist)) {
+    if (selectedFact && !factFromBank && isWeakSelectedFact(selectedFact, metadata.artist, metadata.title)) {
       console.warn(
         `[facts] reject weak seed score=${selectedFact.interestScore} fact="${selectedFact.fact.slice(0, 100)}"`,
       );
@@ -831,15 +831,18 @@ router.post('/full', extractClientSecrets, validateStoryFullBody, storyFullRateL
     }
 
     if (!selectedFact) {
+      const trackPool = factBundle.trackFacts;
       const validatedPool = [...factBundle.trackFacts, ...factBundle.artistFacts]
         .filter(
           (fact) =>
-            !isWeakSnippetSeed(fact) &&
-            !isCatalogMetadataSeed(fact) &&
-            !factsTooSimilar(fact, rejectSimilarTo) &&
-            interestScore(fact) >= 6 &&
-            (factAppliesToRequest(fact, metadata.artist, metadata.title, 'track') ||
-              factAppliesToRequest(fact, metadata.artist, metadata.title, 'artist')),
+            !isRejectedStorySeed(
+              fact,
+              metadata.artist,
+              metadata.title,
+              trackPool,
+              storyLang,
+            ) &&
+            !factsTooSimilar(fact, rejectSimilarTo),
         )
         .sort((a, b) => interestScore(b) - interestScore(a));
       const fallbackFact = validatedPool[0];
@@ -1267,11 +1270,11 @@ router.post('/full', extractClientSecrets, validateStoryFullBody, storyFullRateL
     throwIfStoryAborted(clientAbort, 'seed-ready');
 
     const { story, llmUsed } = await (async () => {
-      const hasGroundedSeed = Boolean(selectedFact?.fact && selectedFact.interestScore >= 6 && !isWeakSelectedFact(selectedFact, metadata.artist));
+      const hasGroundedSeed = Boolean(selectedFact?.fact && selectedFact.interestScore >= 6 && !isWeakSelectedFact(selectedFact, metadata.artist, metadata.title));
       let effectiveStoryInput = storyInput;
 
       if (!hasGroundedSeed && !factFromBank) {
-        if (selectedFact && isWeakSelectedFact(selectedFact, metadata.artist)) {
+        if (selectedFact && isWeakSelectedFact(selectedFact, metadata.artist, metadata.title)) {
           console.warn(
             `[story-pipeline] weak seed rejected score=${selectedFact.interestScore} fact="${selectedFact.fact.slice(0, 100)}"`,
           );

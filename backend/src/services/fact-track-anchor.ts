@@ -8,6 +8,7 @@ import {
   factMentionsTitle,
   hasRussianTrackContextSignal,
   hasTrackContextSignal,
+  isMisattributedBandTrackFact,
   isNonMusicTitleCollisionFact,
 } from './fact-relevance.js';
 
@@ -165,6 +166,13 @@ export function isArtistCareerBioWithoutTrack(fact: string, title: string): bool
   return ARTIST_CAREER_BIO_PATTERNS.some((p) => p.test(fact));
 }
 
+/** Fact names the requested track — valid seed even if «first single» boring pattern. */
+export function isTrackTitleAnchoredSeed(fact: string, title: string): boolean {
+  if (!title.trim()) return false;
+  const trimmed = fact.trim();
+  return factMentionsTitle(trimmed, title) && trimmed.length >= 35;
+}
+
 /** Stricter track context — «It was originally written» is NOT enough without the title. */
 export function hasAnchoredTrackContext(fact: string, title: string): boolean {
   if (factMentionsTitle(fact, title)) return true;
@@ -201,6 +209,7 @@ export function rejectSeedForTrackStory(
   if (factMentionsOtherTrackTitle(trimmed, title)) return true;
   if (isAlienSongOriginFact(trimmed, title)) return true;
   if (isArtistCareerBioWithoutTrack(trimmed, title)) return true;
+  if (isMisattributedBandTrackFact(trimmed, title)) return true;
 
   if (factMentionsTitle(trimmed, title)) return false;
 

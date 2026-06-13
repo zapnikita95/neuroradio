@@ -30,9 +30,10 @@ import {
   isMisattributedBandTrackFact,
   isNonMusicTitleCollisionFact,
 } from './fact-relevance.js';
-import { rejectSeedForTrackStory } from './fact-track-anchor.js';
+import { rejectSeedForTrackStory, isTrackTitleAnchoredSeed } from './fact-track-anchor.js';
 import { factFitsStoryLanguage } from './fact-language-fit.js';
 import type { StoryLanguageId } from './story-language.js';
+import { isRejectedPickSeed } from './fact-seed-pick.js';
 
 export type FactScope = RankedFactScope;
 
@@ -138,45 +139,7 @@ function isRejectedSeed(
   trackPool: string[] = [],
   artist = '',
 ): boolean {
-  if (!factFitsStoryLanguage(fact, storyLanguage)) return true;
-  if (title && artist && rejectSeedForTrackStory(fact, artist, title, { trackPoolFacts: trackPool })) {
-    return true;
-  }
-  if (isAlbumListingSeed(fact)) return true;
-  if (isCatalogMetadataSeed(fact)) return true;
-  if (isCitationBibliographySeed(fact)) return true;
-  if (isGenericConcertVenueSeed(fact)) return true;
-  if (isGenericMusicVideoSeed(fact)) return true;
-  if (
-    title.trim() &&
-    isArtistFormationBioSeed(fact) &&
-    trackPool.some((t) => factMentionsTitle(t, title) && adjustedInterestScore(t) >= 6)
-  ) {
-    return true;
-  }
-  if (
-    title.trim() &&
-    !factMentionsTitle(fact, title) &&
-    !hasTrackContextSignal(fact) &&
-    trackPool.some((t) => factMentionsTitle(t, title) && adjustedInterestScore(t) >= 12)
-  ) {
-    return true;
-  }
-  if (isMetadataOnlyFallbackFact(fact)) return true;
-  if (title && isMisattributedBandTrackFact(fact, title)) return true;
-  if (WEAK_TRIVIA_PATTERNS.some((p) => p.test(fact))) return true;
-  if (isWeakChartSeed(fact)) return true;
-  if (isBoringFact(fact)) return true;
-  if (
-    isCollectorFact(fact) &&
-    !(title && factMentionsTitle(fact, title)) &&
-    !/\b(?:inspired by|intended to|anti-war|protest song|meaning|metaphor)\b/i.test(fact)
-  ) {
-    return true;
-  }
-  if (isTruncatedMarketingSnippet(fact)) return true;
-  if (isUnspeakableWebSeed(fact)) return true;
-  return false;
+  return isRejectedPickSeed(fact, title, storyLanguage, trackPool, artist);
 }
 
 function sortByInterest(facts: string[], narrator: StoryNarratorId = 'auto'): string[] {
@@ -348,6 +311,17 @@ export function explainReferenceFactSelection(
 
 export function mergeReferenceFacts(bundle: ReferenceFactBundle, max = 6): string[] {
   return dedupeFacts([...bundle.trackFacts, ...bundle.artistFacts]).slice(0, max);
+}
+
+/** Central seed gate — picker, salvage fallback, story.ts validatedPool. */
+export function isRejectedStorySeed(
+  fact: string,
+  artist: string,
+  title: string,
+  trackPool: string[] = [],
+  storyLanguage: StoryLanguageId = 'ru',
+): boolean {
+  return isRejectedSeed(fact, title, storyLanguage, trackPool, artist);
 }
 
 export { isAlbumScopeFact, factMentionsOtherTrackTitle };
