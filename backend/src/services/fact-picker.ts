@@ -9,6 +9,7 @@ import {
   isCatalogMetadataSeed,
   isCitationBibliographySeed,
   isGenericConcertVenueSeed,
+  isGenericMusicVideoSeed,
   isBackstoryFact,
   isBoringFact,
   isCollectorFact,
@@ -145,6 +146,7 @@ function isRejectedSeed(
   if (isCatalogMetadataSeed(fact)) return true;
   if (isCitationBibliographySeed(fact)) return true;
   if (isGenericConcertVenueSeed(fact)) return true;
+  if (isGenericMusicVideoSeed(fact)) return true;
   if (
     title.trim() &&
     isArtistFormationBioSeed(fact) &&

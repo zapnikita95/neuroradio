@@ -14,6 +14,7 @@ import {
   isCatalogMetadataSeed,
   isCitationBibliographySeed,
   isGenericConcertVenueSeed,
+  isGenericMusicVideoSeed,
 } from './reference-fact-quality.js';
 
 const LOW_QUALITY_WEB_PREFIX =
@@ -205,6 +206,7 @@ export function hasNarrativeSeedSignal(text: string): boolean {
   if (isCatalogMetadataSeed(trimmed)) return false;
   if (isCitationBibliographySeed(trimmed)) return false;
   if (isGenericConcertVenueSeed(trimmed)) return false;
+  if (isGenericMusicVideoSeed(trimmed)) return false;
   if (isArtistIdentityBioSnippet(trimmed)) return true;
   if (hasTrackContextSignal(trimmed)) return true;
   if (isBackstoryFact(trimmed)) return true;

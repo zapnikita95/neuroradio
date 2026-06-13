@@ -345,6 +345,38 @@ assert(
   `Pompeya pick skips label junk (got: ${pompeyaPick?.fact?.slice(0, 90) ?? 'null'})`,
 );
 
+const { isGenericMusicVideoSeed } = await import('../dist/services/reference-fact-quality.js');
+const LONELY_MTV =
+  'Speaking of the video to MTV, Reynolds said "We read through a ton of scripts from really talented directors, and we came across one that stood out to us in particular, because it put into visuals the general theme of the song, which is kind of an empowering song about an awakening".';
+assert(isGenericMusicVideoSeed(LONELY_MTV), 'MTV script interview is generic music video seed');
+assert(scoreFact(LONELY_MTV) < 0, `MTV seed scores negative (got ${scoreFact(LONELY_MTV)})`);
+
+const lonelyPick = pickReferenceFact(
+  {
+    trackFacts: [
+      LONELY_MTV,
+      '“Lonely” serves as the second track from Imagine Dragons\' fifth studio album "Mercury Acts 1".',
+      'The song incorporates a lot of new musical elements for the band, such as vocal counterpoint harmonies.',
+    ],
+    artistFacts: ['They were the most streamed group of 2018 on Spotify, the first rock act to have four songs in the top 20.'],
+  },
+  [],
+  0,
+  'Imagine Dragons',
+  'Lonely',
+);
+assert(
+  !lonelyPick || !isGenericMusicVideoSeed(lonelyPick.fact),
+  `Lonely pick skips MTV clip junk (got: ${lonelyPick?.fact?.slice(0, 90) ?? 'null'})`,
+);
+assert(
+  lonelyPick?.fact.includes('musical elements') ||
+    lonelyPick?.fact.includes('Mercury') ||
+    lonelyPick?.fact.includes('Spotify') ||
+    lonelyPick === null,
+  `Lonely prefers track/artist narrative over clip (got: ${lonelyPick?.fact?.slice(0, 90) ?? 'null'})`,
+);
+
 // --- 6. Optional live: real Last.fm + aggregator ---
 if (LIVE) {
   if (!process.env.LASTFM_API_KEY?.trim()) {

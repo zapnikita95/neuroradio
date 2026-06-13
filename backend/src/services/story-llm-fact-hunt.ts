@@ -86,6 +86,7 @@ export function shouldRunLlmFactHunt(
   if (selected && isCatalogMetadataSeed(selected.fact)) return true;
   if (selected && isCitationBibliographySeed(selected.fact)) return true;
   if (selected && isGenericConcertVenueSeed(selected.fact)) return true;
+  if (selected && isGenericMusicVideoSeed(selected.fact)) return true;
   if (selected.interestScore >= FAST_SEED_INTEREST_SCORE) {
     if (selected.scope === 'track' && title.trim() && !factMentionsTitle(selected.fact, title)) return true;
     if (isGenericMusicVideoSeed(selected.fact)) return true;

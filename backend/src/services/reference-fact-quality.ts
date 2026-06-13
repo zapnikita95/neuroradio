@@ -211,17 +211,15 @@ export const MIN_PICK_INTEREST_SCORE = 6;
 
 /** «Directed by X» / «music video» без драмы — не топ семя; сильные клипы (бюджет, скандал) не штрафуем. */
 const GENERIC_MUSIC_VIDEO_SEED =
-  /\b(?:music video|official video|video was directed|directed by|promotional video|accompanying music video|клип(?:а|ом|е|у)?|режисс(?:ё|е)р(?:ом|а|у)?|filmed by|video for|premiered on mtv)\b/i;
+  /\b(?:music video|official video|video was directed|directed by|promotional video|accompanying music video|клип(?:а|ом|е|у)?|режисс(?:ё|е)р(?:ом|а|у)?|filmed by|video for|premiered on mtv|speaking of the video|video to mtv|read through a ton of scripts|scripts from.*directors|put into visuals|general theme of the song.*visuals?)\b/i;
 
 const STRONG_MUSIC_VIDEO_STORY =
-  /\b(?:controversial|scandal|banned|million|invested|sevenfold|optical illusion|vfx|cgi|first (?:ever )?(?:music )?video|national film registry|fourteen.minute|полмиллион|собственн\w+\s+денег|record registry|переснимал|бюджет)\b/i;
+  /\b(?:controversial|scandal|banned|million|invested|sevenfold|optical illusion|vfx|cgi|first (?:ever )?(?:music )?video|national film registry|fourteen.minute|полмиллион|собственн\w+\s+денег|record registry|переснимал|бюджет|one billion views)\b/i;
 
 export function isGenericMusicVideoSeed(fact: string): boolean {
   const trimmed = fact.trim();
   if (!GENERIC_MUSIC_VIDEO_SEED.test(trimmed)) return false;
   if (STRONG_MUSIC_VIDEO_STORY.test(trimmed)) return false;
-  if (BACKSTORY_FACT_PATTERNS.some((p) => p.test(trimmed))) return false;
-  if (STORY_FACT_PATTERNS.some((p) => p.test(trimmed))) return false;
   return true;
 }
 
@@ -294,6 +292,7 @@ export function interestScore(fact: string): number {
   if (isCitationBibliographySeed(trimmed)) return -40;
   if (isGenericConcertVenueSeed(trimmed)) return -25;
   if (isCatalogMetadataSeed(trimmed)) return -30;
+  if (isGenericMusicVideoSeed(trimmed)) return -25;
   if (isLyricsPageSeed(trimmed)) score -= 50;
   if (isArtistIdentityBioSnippet(trimmed)) score += 16;
   if (isTruncatedMarketingSnippet(trimmed)) score -= 40;
@@ -351,6 +350,7 @@ export function interestScore(fact: string): number {
   if (/\binspired by the music of\b/i.test(fact)) score += 14;
   if (/\b(?:anti-war|protest song|political protest)\b/i.test(fact)) score += 14;
   if (/\b(?:intended to reflect|refrain.*intended|chorus.*intended)\b/i.test(fact)) score += 12;
+  if (/\b(?:new musical elements|vocal counterpoint|incorporates a lot of new)\b/i.test(fact)) score += 14;
   if (/\bwas inspired by\b/i.test(fact) && /\b(?:Dylan|Beatles|Hendrix|Cohen|Springsteen)\b/i.test(fact)) {
     score += 8;
   }
@@ -389,6 +389,7 @@ export function isBoringFact(fact: string): boolean {
   if (isCitationBibliographySeed(trimmed)) return true;
   if (isGenericConcertVenueSeed(trimmed)) return true;
   if (isCatalogMetadataSeed(trimmed)) return true;
+  if (isGenericMusicVideoSeed(trimmed)) return true;
   if (isDedicatedCatalogSeed(trimmed)) return false;
   if (isWikiBiographyLead(trimmed)) return true;
   if (isCollectorFact(trimmed)) return false;

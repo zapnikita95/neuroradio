@@ -10,6 +10,7 @@ import {
   findHardScriptViolation,
   findLlmGarbage,
   findUngroundedClaims,
+  findPersonaCliche,
   hasConcreteFact,
   anchorsReferenceFact,
   referenceFactsAreAnchorable,
@@ -17,6 +18,7 @@ import {
   sanitizeScriptForTts,
   validateStoryScript,
 } from './story-quality.js';
+import { isGenericMusicVideoSeed } from './reference-fact-quality.js';
 import { factMentionsArtist, storyMentionsPerformingArtist } from './fact-relevance.js';
 import {
   DEFAULT_STORY_LENGTH,
@@ -372,7 +374,9 @@ export async function generateStoryScript(
         referenceFacts,
       }) &&
       !findUngroundedClaims(sanitized, referenceFacts) &&
-      !findHardScriptViolation(sanitized)
+      !findHardScriptViolation(sanitized) &&
+      !findPersonaCliche(sanitized) &&
+      !referenceFacts.some((f) => isGenericMusicVideoSeed(f))
     ) {
       console.warn(
         `[openrouter] last-resort ship — quality gate waived (${countWords(sanitized)} words) artist="${input.artist}"`,

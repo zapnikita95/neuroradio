@@ -990,6 +990,10 @@ const UNGROUNDED_CLAIM_CHECKS: Array<{ claim: RegExp; factHint: RegExp }> = [
     factHint: /electronic|guitar|bit|instrument|sound|жанр|синтез|гитар|бит/i,
   },
   {
+    claim: /режисс(?:ё|е)р\s+показал|внутренний\s+рост\s+через\s+метафор|визуализировал\s+эту\s+идею/i,
+    factHint: /director|режисс|metaphor|visual|script|сценари|visuals?/i,
+  },
+  {
     claim: /буквально\s+взорвал\s+зал|взорвал\s+зал\s+на\s+концерт|стало\s+легендарным:\s*энергия/i,
     factHint: /crowd|audience|riot|arrest|legendary|historic|standing ovation|sold out|взорвал|зал/i,
   },
