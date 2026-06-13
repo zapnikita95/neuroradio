@@ -53,6 +53,9 @@
 		B1000041 /* AppleSignInCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1000041 /* AppleSignInCoordinator.swift */; };
 		B1000042 /* TelegramWidgetHtml.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1000042 /* TelegramWidgetHtml.swift */; };
 		B1000043 /* TelegramOAuthCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1000043 /* TelegramOAuthCoordinator.swift */; };
+		B1000044 /* AppLanguage.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1000044 /* AppLanguage.swift */; };
+		B1000045 /* LocalizedUi.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1000045 /* LocalizedUi.swift */; };
+		B1000046 /* AppL10n.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1000046 /* AppL10n.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -130,6 +133,9 @@
 		F1000041 /* AppleSignInCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppleSignInCoordinator.swift; sourceTree = "<group>"; };
 		F1000042 /* TelegramWidgetHtml.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TelegramWidgetHtml.swift; sourceTree = "<group>"; };
 		F1000043 /* TelegramOAuthCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TelegramOAuthCoordinator.swift; sourceTree = "<group>"; };
+		F1000044 /* AppLanguage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppLanguage.swift; sourceTree = "<group>"; };
+		F1000045 /* LocalizedUi.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalizedUi.swift; sourceTree = "<group>"; };
+		F1000046 /* AppL10n.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppL10n.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -245,6 +251,8 @@
 				F1000020 /* OfflineAudioStore.swift */,
 				F1000023 /* OfflinePackStore.swift */,
 				F1000024 /* AppStrings.swift */,
+				F1000044 /* AppLanguage.swift */,
+				F1000046 /* AppL10n.swift */,
 				F1000021 /* TierAccess.swift */,
 			);
 			path = Data;
@@ -292,6 +300,7 @@
 				F1000042 /* TelegramWidgetHtml.swift */,
 				F1000035 /* StoryFeedbackSheet.swift */,
 				F1000039 /* ShazamFloatingButton.swift */,
+				F1000045 /* LocalizedUi.swift */,
 			);
 			path = UI;
 			sourceTree = "<group>";
@@ -437,6 +446,9 @@
 				B1000035 /* StoryFeedbackSheet.swift in Sources */,
 				B1000041 /* AppleSignInCoordinator.swift in Sources */,
 				B1000043 /* TelegramOAuthCoordinator.swift in Sources */,
+				B1000044 /* AppLanguage.swift in Sources */,
+				B1000045 /* LocalizedUi.swift in Sources */,
+				B1000046 /* AppL10n.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

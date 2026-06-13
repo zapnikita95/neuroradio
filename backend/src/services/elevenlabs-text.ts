@@ -57,15 +57,38 @@ function prepareEnglishSegment(text: string, artist: string, title: string): str
 
 type ForeignPhrase = { phrase: string; lang: 'de' | 'fr' };
 
-function textContainsPhrase(text: string, phrase: string): boolean {
-  return text.toLowerCase().includes(phrase.toLowerCase());
+function isWordChar(ch: string): boolean {
+  return /[\p{L}\p{N}']/u.test(ch);
+}
+
+/** Match phrase only on whole-word boundaries — avoids "she" inside "wishes". */
+function phraseAtPosition(text: string, pos: number, phrase: string): boolean {
+  if (text.slice(pos, pos + phrase.length).toLowerCase() !== phrase.toLowerCase()) return false;
+  const before = pos > 0 ? text[pos - 1]! : '';
+  const after = pos + phrase.length < text.length ? text[pos + phrase.length]! : '';
+  if (before && isWordChar(before)) return false;
+  if (after && isWordChar(after)) return false;
+  return true;
+}
+
+function textContainsWholePhrase(text: string, phrase: string): boolean {
+  const lower = text.toLowerCase();
+  const needle = phrase.toLowerCase();
+  let from = 0;
+  while (from < lower.length) {
+    const idx = lower.indexOf(needle, from);
+    if (idx === -1) return false;
+    if (phraseAtPosition(text, idx, phrase)) return true;
+    from = idx + 1;
+  }
+  return false;
 }
 
 function buildForeignPhrasesInText(text: string, artist: string, title: string): ForeignPhrase[] {
   const items: ForeignPhrase[] = [];
   const add = (phrase: string, lang: 'de' | 'fr') => {
     const p = phrase.trim();
-    if (p.length < 2 || !textContainsPhrase(text, p)) return;
+    if (p.length < 2 || !textContainsWholePhrase(text, p)) return;
     items.push({ phrase: p, lang });
   };
 
@@ -110,12 +133,19 @@ function buildForeignPhrasesInText(text: string, artist: string, title: string):
 
 function findNextForeignIndex(text: string, from: number, phrases: ForeignPhrase[]): number | null {
   let best: number | null = null;
-  const tail = text.slice(from).toLowerCase();
   for (const { phrase } of phrases) {
-    const idx = tail.indexOf(phrase.toLowerCase());
-    if (idx === -1) continue;
-    const abs = from + idx;
-    if (best === null || abs < best) best = abs;
+    const lower = text.toLowerCase();
+    const needle = phrase.toLowerCase();
+    let searchFrom = from;
+    while (searchFrom < text.length) {
+      const idx = lower.indexOf(needle, searchFrom);
+      if (idx === -1) break;
+      if (phraseAtPosition(text, idx, phrase)) {
+        if (best === null || idx < best) best = idx;
+        break;
+      }
+      searchFrom = idx + 1;
+    }
   }
   return best;
 }
@@ -151,8 +181,7 @@ export function splitEnglishNarrationForForeignNames(
   while (cursor < plain.length) {
     let matched: ForeignPhrase | null = null;
     for (const item of phrases) {
-      const slice = plain.slice(cursor, cursor + item.phrase.length);
-      if (slice.toLowerCase() === item.phrase.toLowerCase()) {
+      if (phraseAtPosition(plain, cursor, item.phrase)) {
         matched = item;
         break;
       }

@@ -155,7 +155,8 @@ final class StoryOrchestrator: ObservableObject {
 
     func replayHistoryStory(_ entry: StoryHistoryEntry) async {
         guard let response = storyRepository.offlineReplayResponse(for: entry.trackKey) else {
-            uiState.errorMessage = "Нет сохранённой озвучки. Послушайте трек онлайн с расширенным тарифом."
+            let copy = AppStrings.l10n(settings.resolvedLanguage)
+            uiState.errorMessage = copy.offlineNoCache
             uiState.state = .error
             return
         }
@@ -204,7 +205,8 @@ final class StoryOrchestrator: ObservableObject {
                     guard session == self?.playbackSession else { return }
                     if musicPaused { self?.nowPlaying.resumeMusic() }
                     self?.isStoryRunning = false
-                    self?.uiState.errorMessage = "Не удалось воспроизвести историю"
+                    let copy = AppStrings.l10n(self?.settings.resolvedLanguage ?? .ru)
+                    self?.uiState.errorMessage = copy.playbackFailed
                     self?.uiState.state = .error
                 }
             }
@@ -320,7 +322,8 @@ final class StoryOrchestrator: ObservableObject {
                             self?.nowPlaying.resumeMusic()
                         }
                         self?.isStoryRunning = false
-                        self?.uiState.errorMessage = "Не удалось воспроизвести историю"
+                        let copy = AppStrings.l10n(self?.settings.resolvedLanguage ?? .ru)
+                    self?.uiState.errorMessage = copy.playbackFailed
                         self?.uiState.state = .error
                     }
                 }
@@ -345,7 +348,8 @@ final class StoryOrchestrator: ObservableObject {
             storyPlayer.stop()
             if musicPaused { nowPlaying.resumeMusic() }
             isStoryRunning = false
-            uiState.errorMessage = "Озвучка не запустилась — попробуй ещё раз"
+            let copy = AppStrings.l10n(settings.resolvedLanguage)
+            uiState.errorMessage = copy.playbackRetry
             uiState.state = .error
         }
     }

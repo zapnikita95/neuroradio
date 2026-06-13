@@ -1,0 +1,143 @@
+import Foundation
+
+extension StoryNarrator {
+    func uiLabel(_ lang: ResolvedAppLanguage) -> String {
+        guard lang == .en else { return labelRu }
+        switch self {
+        case .auto: return "Auto"
+        case .radioHost: return "Radio host"
+        case .contemporary: return "Contemporary"
+        case .expert: return "Genre expert"
+        case .fan: return "Superfan"
+        case .backstage: return "Backstage insider"
+        case .nightDj: return "Night DJ"
+        }
+    }
+
+    func uiDescription(_ lang: ResolvedAppLanguage) -> String {
+        guard lang == .en else { return descriptionRu }
+        switch self {
+        case .auto: return "Persona picked from track genre and era"
+        case .radioHost: return "Warm on-air tone — lively but factual"
+        case .contemporary: return "First-person nostalgia — you lived when the track dropped"
+        case .expert: return "Podcast expertise — genre mechanics, not a lecture"
+        case .fan: return "Enthusiastic collector from the first person"
+        case .backstage: return "Insider tone when the fact has a twist"
+        case .nightDj: return "Quiet night shift — clear fact, slow tempo"
+        }
+    }
+}
+
+extension StoryLength {
+    func uiLabel(_ lang: ResolvedAppLanguage) -> String {
+        guard lang == .en else { return labelRu }
+        switch self {
+        case .sec30: return "30 seconds"
+        case .sec60: return "1 minute"
+        case .unlimited: return "Extended"
+        }
+    }
+
+    func uiDescription(_ lang: ResolvedAppLanguage) -> String {
+        guard lang == .en else { return descriptionRu }
+        switch self {
+        case .sec30: return "Short story — fast pace"
+        case .sec60: return "Default — about a minute of voice"
+        case .unlimited: return "Longer, more detailed story"
+        }
+    }
+}
+
+extension TtsSpeed {
+    func uiLabel(_ lang: ResolvedAppLanguage) -> String {
+        guard lang == .en else { return labelRu }
+        switch self {
+        case .verySlow: return "Very slow"
+        case .slow: return "Slow"
+        case .normal: return "Normal"
+        case .fast: return "Fast"
+        case .veryFast: return "Very fast"
+        }
+    }
+}
+
+extension TtsEmotion {
+    func uiLabel(_ lang: ResolvedAppLanguage) -> String {
+        guard lang == .en else { return labelRu }
+        switch self {
+        case .neutral: return "Neutral"
+        case .lively: return "Lively"
+        case .strict: return "Strict"
+        }
+    }
+
+    func uiDescription(_ lang: ResolvedAppLanguage) -> String {
+        guard lang == .en else { return descriptionRu }
+        switch self {
+        case .neutral: return "Even delivery"
+        case .lively: return "More energy"
+        case .strict: return "Measured, formal tone"
+        }
+    }
+}
+
+extension TtsVoice {
+    func uiLabel(_ lang: ResolvedAppLanguage) -> String {
+        labelRu
+    }
+
+    func uiDescription(_ lang: ResolvedAppLanguage) -> String {
+        descriptionRu
+    }
+}
+
+extension ServerTtsProvider {
+    func uiLabel(_ lang: ResolvedAppLanguage) -> String {
+        labelRu
+    }
+
+    func uiDescription(_ lang: ResolvedAppLanguage) -> String {
+        guard lang == .en else { return descriptionRu }
+        switch self {
+        case .edge: return "Neural Edge voices"
+        case .yandex: return "Professional SpeechKit voiceover"
+        }
+    }
+}
+
+extension EdgeVoicePreset {
+    func uiLabel(_ lang: ResolvedAppLanguage) -> String {
+        guard lang == .en else { return labelRu }
+        switch self {
+        case .dmitryCalm: return "Dmitry — calm"
+        case .svetlanaCalm: return "Svetlana — calm"
+        case .dmitryLively: return "Dmitry — lively"
+        case .svetlanaLively: return "Svetlana — lively"
+        case .daria: return "Daria — soft"
+        }
+    }
+
+    func uiDescription(_ lang: ResolvedAppLanguage) -> String {
+        guard lang == .en else { return descriptionRu }
+        switch self {
+        case .dmitryCalm: return "Steady male Microsoft Edge voice"
+        case .svetlanaCalm: return "Neutral female Microsoft Edge voice"
+        case .dmitryLively: return "Energetic male delivery, radio-like"
+        case .svetlanaLively: return "Expressive female voice"
+        case .daria: return "Soft female Microsoft Edge tone"
+        }
+    }
+}
+
+extension TriggerMode {
+    func uiLabel(_ lang: ResolvedAppLanguage) -> String {
+        guard lang == .en else { return label }
+        switch self {
+        case .everyNTracks: return "Every N tracks"
+        case .specificArtists: return "Selected artists"
+        case .specificGenres: return "Selected genres"
+        case .always: return "Always"
+        case .never: return "Never"
+        }
+    }
+}

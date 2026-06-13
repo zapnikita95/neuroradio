@@ -95,6 +95,7 @@ import com.musicstory.app.domain.ElevenLabsVoice
 import com.musicstory.app.domain.OpenRouterModel
 import com.musicstory.app.domain.ResolvedAppLanguage
 import com.musicstory.app.domain.resolveAppLanguage
+import com.musicstory.app.ui.uiLabel
 import com.musicstory.app.domain.toApiCode
 import com.musicstory.app.domain.StoryLength
 import com.musicstory.app.domain.StoryNarrator
@@ -1075,7 +1076,7 @@ fun SettingsScreen(
 
                 CollapsibleSettingsSection(
                     title = context.getString(R.string.settings_narrator_section),
-                    summary = storyNarratorUi.labelRu,
+                    summary = storyNarratorUi.uiLabel(resolvedDraftLang),
                     tourHighlight = tourStep == 3,
                     forceExpanded = tourStep == 3,
                     tourActive = tourStep == 3,
@@ -1083,7 +1084,7 @@ fun SettingsScreen(
                 ) {
                     StoryNarrator.entries.forEach { narrator ->
                         PreferenceRadioRow(
-                            label = narrator.labelRu,
+                            label = narrator.uiLabel(resolvedDraftLang),
                             selected = storyNarratorUi == narrator,
                             onSelect = { storyNarratorUi = narrator },
                         )
@@ -1094,15 +1095,15 @@ fun SettingsScreen(
                     title = context.getString(R.string.settings_voice_section),
                     summary = when {
                         serverUsesEdge ->
-                            "${edgeVoicePresetUi.labelRu} · ${ttsSpeedUi.labelRu} · ${storyLengthUi.labelRu}"
+                            "${edgeVoicePresetUi.uiLabel(resolvedDraftLang)} · ${ttsSpeedUi.uiLabel(resolvedDraftLang)} · ${storyLengthUi.uiLabel(resolvedDraftLang)}"
                         else ->
-                            "${ttsVoiceUi.labelRu} · ${ttsSpeedUi.labelRu} · ${storyLengthUi.labelRu}"
+                            "${ttsVoiceUi.uiLabel(resolvedDraftLang)} · ${ttsSpeedUi.uiLabel(resolvedDraftLang)} · ${storyLengthUi.uiLabel(resolvedDraftLang)}"
                     }.let { voices ->
                         val engineLabel = when {
-                            serverUsesEdge -> ServerTtsProvider.EDGE.labelRu
+                            serverUsesEdge -> ServerTtsProvider.EDGE.uiLabel(resolvedDraftLang)
                             showYandexVoices && userTtsBillingUi == UserTtsBilling.SERVER ->
-                                ServerTtsProvider.YANDEX.labelRu
-                            else -> ServerTtsProvider.EDGE.labelRu
+                                ServerTtsProvider.YANDEX.uiLabel(resolvedDraftLang)
+                            else -> ServerTtsProvider.EDGE.uiLabel(resolvedDraftLang)
                         }
                         "$engineLabel · $voices"
                     },
@@ -1132,7 +1133,7 @@ fun SettingsScreen(
                         )
                         ServerTtsProvider.entries.forEach { provider ->
                             PreferenceRadioRow(
-                                label = provider.labelRu,
+                                label = provider.uiLabel(resolvedDraftLang),
                                 selected = serverTtsProviderUi == provider,
                                 onSelect = { serverTtsProviderUi = provider },
                             )
@@ -1147,7 +1148,7 @@ fun SettingsScreen(
                         )
                         EdgeVoicePreset.entries.forEach { preset ->
                             PreferenceRadioRow(
-                                label = preset.labelRu,
+                                label = preset.uiLabel(resolvedDraftLang),
                                 selected = edgeVoicePresetUi == preset,
                                 onSelect = { edgeVoicePresetUi = preset },
                             )
@@ -1177,7 +1178,7 @@ fun SettingsScreen(
                     )
                     TtsVoice.entries.forEach { voice ->
                         PreferenceRadioRow(
-                            label = voice.labelRu,
+                            label = voice.uiLabel(resolvedDraftLang),
                             selected = ttsVoiceUi == voice,
                             onSelect = { ttsVoiceUi = voice },
                         )
@@ -1190,7 +1191,7 @@ fun SettingsScreen(
                     )
                     TtsEmotion.entries.forEach { emotion ->
                         PreferenceRadioRow(
-                            label = emotion.labelRu,
+                            label = emotion.uiLabel(resolvedDraftLang),
                             selected = ttsEmotionUi == emotion,
                             onSelect = { ttsEmotionUi = emotion },
                         )
@@ -1204,7 +1205,7 @@ fun SettingsScreen(
                     )
                     TtsSpeed.entries.forEach { speed ->
                         PreferenceRadioRow(
-                            label = speed.labelRu,
+                            label = speed.uiLabel(resolvedDraftLang),
                             selected = ttsSpeedUi == speed,
                             onSelect = { ttsSpeedUi = speed },
                         )
@@ -1217,7 +1218,7 @@ fun SettingsScreen(
                     )
                     StoryLength.entries.forEach { length ->
                         PreferenceRadioRow(
-                            label = length.labelRu,
+                            label = length.uiLabel(resolvedDraftLang),
                             selected = storyLengthUi == length,
                             onSelect = { storyLengthUi = length },
                         )
@@ -1231,7 +1232,7 @@ fun SettingsScreen(
                     )
                     userTtsBillingOptions.forEach { billing ->
                         PreferenceRadioRow(
-                            label = billing.labelRu,
+                            label = billing.uiLabel(resolvedDraftLang),
                             selected = userTtsBillingUi == billing,
                             onSelect = { userTtsBillingUi = billing },
                         )
@@ -1296,7 +1297,7 @@ fun SettingsScreen(
                 }
 
                 val aiSummary = when {
-                    hasPersonalKey -> context.getString(R.string.settings_llm_active, llmProviderUi.labelRu)
+                    hasPersonalKey -> context.getString(R.string.settings_llm_active, llmProviderUi.uiLabel(resolvedDraftLang))
                     isPaidServerTier -> context.getString(R.string.settings_ai_fact_model_premium)
                     isFreeServerTier -> {
                         val quotaLabel = dailyQuota?.let { formatServerQuotaLabel(context, it) }.orEmpty()
@@ -1308,7 +1309,7 @@ fun SettingsScreen(
                 }
                 val advancedAiSummary = context.getString(
                     R.string.settings_ai_advanced_summary,
-                    llmProviderUi.labelRu,
+                    llmProviderUi.uiLabel(resolvedDraftLang),
                     if (activeApiKey.isNotBlank()) {
                         context.getString(R.string.settings_groq_status_ok)
                     } else {
@@ -1370,7 +1371,7 @@ fun SettingsScreen(
                         modifier = Modifier.fillMaxWidth(),
                     ) {
                         OutlinedTextField(
-                            value = llmProviderUi.labelRu,
+                            value = llmProviderUi.uiLabel(resolvedDraftLang),
                             onValueChange = {},
                             readOnly = true,
                             label = { Text(context.getString(R.string.settings_llm_provider)) },
@@ -1389,7 +1390,7 @@ fun SettingsScreen(
                         ) {
                             LlmProvider.entries.forEach { provider ->
                                 DropdownMenuItem(
-                                    text = { Text(provider.labelRu, color = CreamText) },
+                                    text = { Text(provider.uiLabel(resolvedDraftLang), color = CreamText) },
                                     onClick = {
                                         providerMenuExpanded = false
                                         StoryLog.i(
@@ -1410,7 +1411,7 @@ fun SettingsScreen(
                     }
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(
-                        text = context.getString(R.string.settings_llm_active, llmProviderUi.labelRu),
+                        text = context.getString(R.string.settings_llm_active, llmProviderUi.uiLabel(resolvedDraftLang)),
                         style = MaterialTheme.typography.labelMedium,
                         color = GoldBright,
                     )
@@ -1775,9 +1776,9 @@ fun SettingsScreen(
                                     if (!ready) {
                                         checkSummary =
                                             if (llmProviderUi == LlmProvider.LOCAL) {
-                                                "Укажи URL сервера ПК и Ollama, потом «Сохранить и проверить»"
+                                                context.getString(R.string.settings_llm_check_local)
                                             } else {
-                                                "Сначала вставь API-ключ, потом нажми «Сохранить и проверить»"
+                                                context.getString(R.string.settings_llm_check_api_key)
                                             }
                                         StoryLog.i("SETTINGS API test skipped: not configured for ${llmProviderUi.id}")
                                         return@launch

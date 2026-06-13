@@ -50,6 +50,7 @@ final class SettingsStore: ObservableObject {
         static let factNotificationsEnabled = "fact_notifications_enabled"
         static let shazamAutoDetectEnabled = "shazam_auto_detect_enabled"
         static let playbackCachePurgeVersion = "playback_cache_purge_version"
+        static let appLanguage = "app_language"
     }
 
     /// Сброс битого OGG-кэша при обновлении (AVPlayer на iOS не играет OGG).
@@ -166,6 +167,14 @@ final class SettingsStore: ObservableObject {
         didSet { defaults.set(shazamAutoDetectEnabled, forKey: Keys.shazamAutoDetectEnabled) }
     }
 
+    @Published var appLanguage: AppLanguage {
+        didSet { defaults.set(appLanguage.rawValue, forKey: Keys.appLanguage) }
+    }
+
+    var resolvedLanguage: ResolvedAppLanguage {
+        resolveAppLanguage(appLanguage)
+    }
+
     private init() {
         Self.migrateOnboardingIfNeeded(defaults: defaults)
         let storedBackend = defaults.string(forKey: Keys.backendURL) ?? SettingsDefaults.backendURL
@@ -206,6 +215,7 @@ final class SettingsStore: ObservableObject {
         offlinePackSessionId = Int64(defaults.object(forKey: Keys.offlinePackSessionId) as? Int ?? 0)
         factNotificationsEnabled = defaults.object(forKey: Keys.factNotificationsEnabled) as? Bool ?? true
         shazamAutoDetectEnabled = defaults.object(forKey: Keys.shazamAutoDetectEnabled) as? Bool ?? true
+        appLanguage = AppLanguage.fromId(defaults.string(forKey: Keys.appLanguage))
         accountProfile = loadAccountProfile()
     }
 

@@ -13,8 +13,7 @@ final class StoryRepository: ObservableObject {
     @Published private(set) var dailyQuota: StoryQuotaInfo?
     @Published private(set) var accountTier: String?
 
-    static let offlineNoCacheMessage =
-        "Нет интернета. Эта история ещё не сохранена на телефоне — один раз послушайте онлайн с расширенным тарифом."
+    static let offlineNoCacheMessage = offlineNoCacheMessageRu
 
     func hasHotFactForTrack(artist: String, title: String) async -> Bool {
         do {
@@ -36,15 +35,17 @@ final class StoryRepository: ObservableObject {
     }
 
     func fetchStory(track: TrackInfo, forceRefresh: Bool = true) async -> Result<StoryResponse, Error> {
+        let lang = settings.resolvedLanguage
+        let copy = AppStrings.l10n(lang)
         guard track.isValid() else {
-            return .failure(BackendError.serverError(400, "Некорректные метаданные трека"))
+            return .failure(BackendError.serverError(400, copy.invalidTrack))
         }
 
         if !NetworkMonitor.isConnected {
             if let replay = offlinePackResponse(for: track.displayKey) ?? offlineReplayResponse(for: track.displayKey) {
                 return .success(replay)
             }
-            return .failure(BackendError.serverError(0, Self.offlineNoCacheMessage))
+            return .failure(BackendError.serverError(0, copy.offlineNoInternet))
         }
 
         let previousScripts = history.recentScripts(for: track.displayKey)
@@ -60,7 +61,8 @@ final class StoryRepository: ObservableObject {
             clientPlatform: "ios",
             ttsProvider: settings.effectiveServerTtsProvider.rawValue,
             edgeVoicePreset: settings.edgeVoicePreset.rawValue,
-            speakTrackNamesInVoiceover: settings.speakTrackNamesInVoiceover
+            speakTrackNamesInVoiceover: settings.speakTrackNamesInVoiceover,
+            lang: lang.apiCode
         )
 
         do {

@@ -260,7 +260,7 @@ class StoryOrchestrator(
                             _state.value == OrchestratorState.PLAYING_STORY
                         )
                 ) {
-                    _errorMessage.value = "Не удалось воспроизвести историю"
+                    _errorMessage.value = context.getString(R.string.error_story_playback_failed)
                     _hintMessage.value = null
                     _state.value = OrchestratorState.ERROR
                     publishUiState()
@@ -564,15 +564,15 @@ class StoryOrchestrator(
                         StoryLog.e("Story pipeline timeout", e)
                         val isLocal = settingsDataStore.llmProvider.first() == LlmProvider.LOCAL
                         _errorMessage.value = if (isLocal) {
-                            "Слишком долго ждём локальную модель (лимит 20 мин). Смотри логи: Music story\\logs\\local-bff.log"
+                            context.getString(R.string.error_story_timeout_local)
                         } else {
-                            "Сервер не ответил за 5 мин (факты + текст + озвучка). Подожди — история может ещё готовиться на сервере."
+                            context.getString(R.string.error_story_timeout_server)
                         }
                         _state.value = OrchestratorState.ERROR
                         publishUiState()
                     } else if (manual && !isUserCancelReason(e.message)) {
                         StoryLog.w("Manual story cancelled by app: ${e.message}")
-                        _errorMessage.value = "Запрос прерван приложением. Нажми «Рассказать историю» ещё раз."
+                        _errorMessage.value = context.getString(R.string.error_story_request_cancelled)
                         _state.value = OrchestratorState.ERROR
                         publishUiState()
                     } else {
@@ -586,7 +586,7 @@ class StoryOrchestrator(
                 } catch (e: Exception) {
                     StoryLog.e("Story pipeline failed: ${e.message}", e)
                     abortGeneration(session, manual, rollbackAutoTrigger = !manual)
-                    _errorMessage.value = e.message ?: "Не удалось получить историю"
+                    _errorMessage.value = e.message ?: context.getString(R.string.error_story_fetch_failed)
                     _state.value = OrchestratorState.ERROR
                     publishUiState()
                 } finally {
@@ -900,12 +900,12 @@ class StoryOrchestrator(
                     } else {
                         _errorMessage.value = null
                         _hintMessage.value = msg.take(160).ifBlank {
-                            "Не получилось рассказать историю"
+                            context.getString(R.string.error_story_tell_failed)
                         }
                         _state.value = OrchestratorState.LISTENING
                     }
                 } else {
-                    _errorMessage.value = error.message ?: "Не удалось получить историю"
+                    _errorMessage.value = error.message ?: context.getString(R.string.error_story_fetch_failed)
                     _hintMessage.value = null
                     _state.value = OrchestratorState.ERROR
                 }

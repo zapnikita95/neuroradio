@@ -67,7 +67,10 @@ import com.musicstory.app.util.BackendUrlRules
 import com.musicstory.app.domain.AppPowerMode
 import com.musicstory.app.domain.LlmProvider
 import com.musicstory.app.domain.OrchestratorState
+import com.musicstory.app.domain.AppLanguage
 import com.musicstory.app.domain.StoryNarrator
+import com.musicstory.app.domain.resolveAppLanguage
+import com.musicstory.app.ui.uiLabel
 import com.musicstory.app.domain.TierAccess
 import com.musicstory.app.ui.components.TrialCountdownBanner
 import com.musicstory.app.ui.components.TrialUi
@@ -111,6 +114,8 @@ fun HomeScreen(
     val isPlaying = app.mediaControllerManager.isPlaying.collectAsState().value
     val powerMode by app.settingsDataStore.appPowerMode.collectAsState(initial = AppPowerMode.ON)
     val storyNarrator by app.settingsDataStore.storyNarrator.collectAsState(initial = StoryNarrator.AUTO)
+    val appLanguage by app.settingsDataStore.appLanguage.collectAsState(initial = AppLanguage.SYSTEM)
+    val resolvedLang = resolveAppLanguage(appLanguage)
     val llmProvider by app.settingsDataStore.llmProvider.collectAsState(initial = LlmProvider.GROQ)
     val groqApiKey by app.settingsDataStore.groqApiKey.collectAsState(initial = "")
     val geminiApiKey by app.settingsDataStore.geminiApiKey.collectAsState(initial = "")
@@ -482,7 +487,7 @@ fun HomeScreen(
                 Spacer(modifier = Modifier.height(20.dp))
 
                 OrchestratorStatusLine(
-                    narratorLabel = storyNarrator.labelRu,
+                    narratorLabel = storyNarrator.uiLabel(resolvedLang),
                     state = uiState.state,
                     isBackendFetching = uiState.isBackendFetching,
                     tracksUntilNext = when {

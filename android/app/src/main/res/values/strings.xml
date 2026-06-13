@@ -382,4 +382,12 @@
 
     <string name="server_audio_error_message">Не удалось воспроизвести озвучку с сервера — попробуй ещё раз</string>
     <string name="android_tts_error_message">Не удалось озвучить на телефоне — установи русский голос в настройках TTS или вернись на Yandex</string>
+    <string name="error_story_playback_failed">Не удалось воспроизвести историю</string>
+    <string name="error_story_timeout_local">Слишком долго ждём локальную модель (лимит 20 мин). Смотри логи: Music story\\logs\\local-bff.log</string>
+    <string name="error_story_timeout_server">Сервер не ответил за 5 мин (факты + текст + озвучка). Подожди — история может ещё готовиться на сервере.</string>
+    <string name="error_story_request_cancelled">Запрос прерван приложением. Нажми «Рассказать историю» ещё раз.</string>
+    <string name="error_story_fetch_failed">Не удалось получить историю</string>
+    <string name="error_story_tell_failed">Не получилось рассказать историю</string>
+    <string name="settings_llm_check_local">Укажи URL сервера ПК и Ollama, потом «Сохранить и проверить»</string>
+    <string name="settings_llm_check_api_key">Сначала вставь API-ключ, потом нажми «Сохранить и проверить»</string>
 </resources>

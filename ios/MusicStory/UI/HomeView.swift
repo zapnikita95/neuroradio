@@ -9,6 +9,9 @@ struct HomeView: View {
     @State private var showHistory = false
     @State private var showAccount = false
 
+    private var lang: ResolvedAppLanguage { settings.resolvedLanguage }
+    private var copy: AppL10n { AppStrings.l10n(lang) }
+
     var body: some View {
         MusicStoryBackground {
             ZStack(alignment: .bottom) {
@@ -38,7 +41,7 @@ struct HomeView: View {
                         if orchestrator.uiState.state == .fetchingStory {
                             HStack(spacing: 10) {
                                 ProgressView().tint(AppTheme.accentViolet)
-                                Text("Готовим историю…")
+                                Text(copy.preparingStory)
                                     .foregroundStyle(AppTheme.mutedLavender)
                             }
                             .padding(.top, 12)
@@ -117,7 +120,7 @@ struct HomeView: View {
             Circle()
                 .fill(orchestrator.uiState.isMonitoringActive ? AppTheme.liveGreen : AppTheme.mutedLavender)
                 .frame(width: 8, height: 8)
-            Text(orchestrator.uiState.isMonitoringActive ? "Музыка играет" : "Ожидание трека")
+            Text(orchestrator.uiState.isMonitoringActive ? copy.musicPlaying : copy.waitingTrack)
                 .font(.caption.weight(.semibold))
                 .foregroundStyle(AppTheme.liveGreen)
         }
@@ -125,7 +128,7 @@ struct HomeView: View {
 
     private var trackInfo: some View {
         VStack(spacing: 8) {
-            Text(nowPlaying.currentTrack?.title ?? "Слушаем…")
+            Text(nowPlaying.currentTrack?.title ?? copy.listening)
                 .font(.title2.bold())
                 .foregroundStyle(AppTheme.creamText)
                 .multilineTextAlignment(.center)
@@ -143,7 +146,7 @@ struct HomeView: View {
 
     private var orchestratorStatus: some View {
         VStack(spacing: 4) {
-            Text(settings.storyNarrator.labelRu)
+            Text(settings.storyNarrator.uiLabel(lang))
                 .font(.caption.weight(.semibold))
                 .foregroundStyle(AppTheme.mutedLavender)
             Text(statusText)
@@ -173,7 +176,7 @@ struct HomeView: View {
             }
 
             if orchestrator.uiState.state == .playingStory || orchestrator.uiState.state == .preparingPlayback {
-                Button("Остановить историю") { orchestrator.stopStory() }
+                Button(copy.stopStory) { orchestrator.stopStory() }
                     .foregroundStyle(AppTheme.errorCoral)
             }
         }
@@ -195,9 +198,9 @@ struct HomeView: View {
 
     private var primaryButtonTitle: String {
         switch orchestrator.uiState.state {
-        case .fetchingStory: return "Генерируем историю…"
-        case .preparingPlayback, .playingStory: return "История играет…"
-        default: return "Рассказать историю"
+        case .fetchingStory: return copy.generatingStory
+        case .preparingPlayback, .playingStory: return copy.storyPlaying
+        default: return copy.tellStory
         }
     }
 
@@ -205,7 +208,7 @@ struct HomeView: View {
         if let artist = nowPlaying.currentTrack?.artist, !artist.isEmpty {
             return artist
         }
-        return AppStrings.Shazam.homeIdleSubtitle
+        return AppStrings.shazamHomeIdle(lang)
     }
 
     private func recognizeWithShazam() async {
@@ -219,18 +222,17 @@ struct HomeView: View {
 
     private var statusText: String {
         switch orchestrator.uiState.state {
-        case .fetchingStory: return "Готовим историю…"
-        case .preparingPlayback: return "Воспроизводим историю"
-        case .playingStory: return "Воспроизводим историю"
+        case .fetchingStory: return copy.preparingStory
+        case .preparingPlayback, .playingStory: return copy.playingStory
         default:
             switch orchestrator.uiState.mode {
             case .auto:
                 if let n = orchestrator.uiState.tracksUntilNext {
-                    return UserFacingError.tracksUntilLabel(n)
+                    return copy.tracksUntil(n)
                 }
-                return "Авто · мониторинг"
+                return copy.autoMonitoring
             case .manual:
-                return "Ручной режим"
+                return copy.manualModeStatus
             }
         }
     }

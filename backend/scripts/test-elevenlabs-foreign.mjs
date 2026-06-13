@@ -71,6 +71,15 @@ test('shouldUseElevenLabsForeignSegments true for DE/FR artists in English mode'
   );
 });
 
+test('English "wishes" and "revolution" stay single en segment (no fr "she")', () => {
+  const script =
+    "This track wasn't just a hit, it was a revolution. The way Michael Jackson fought to keep the full version against the label's wishes shows his genius.";
+  const segs = splitEnglishNarrationForForeignNames(script, 'Michael Jackson', 'Billie Jean', true);
+  assert.equal(segs.length, 1, JSON.stringify(segs));
+  assert.equal(segs[0].lang, 'en');
+  assert.ok(!segs.some((s) => s.lang === 'fr'), JSON.stringify(segs));
+});
+
 test('pure English artist stays single en segment', () => {
   const segs = splitEnglishNarrationForForeignNames(
     'Michael Jackson invented the moonwalk on stage.',

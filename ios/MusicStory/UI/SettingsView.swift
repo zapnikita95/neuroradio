@@ -12,22 +12,26 @@ struct SettingsView: View {
     @State private var manualArtist: String = ""
     @State private var manualTitle: String = ""
 
+    private var lang: ResolvedAppLanguage { settings.resolvedLanguage }
+    private var copy: AppL10n { AppStrings.l10n(lang) }
+
     private var usesEdgeVoices: Bool {
         settings.effectiveServerTtsProvider == .edge
     }
 
     private var voiceSectionSummary: String {
         let voicePart = usesEdgeVoices
-            ? settings.edgeVoicePreset.labelRu
-            : settings.ttsVoice.labelRu
-        let engine = settings.effectiveServerTtsProvider.labelRu
-        return "\(engine) · \(voicePart) · \(settings.ttsSpeedPreset.labelRu) · \(settings.storyLength.labelRu)"
+            ? settings.edgeVoicePreset.uiLabel(lang)
+            : settings.ttsVoice.uiLabel(lang)
+        let engine = settings.effectiveServerTtsProvider.uiLabel(lang)
+        return "\(engine) · \(voicePart) · \(settings.ttsSpeedPreset.uiLabel(lang)) · \(settings.storyLength.uiLabel(lang))"
     }
 
     var body: some View {
         MusicStoryBackground {
             ScrollView {
                 VStack(alignment: .leading, spacing: 16) {
+                    languageSection
                     generalSection
                     modeSection
                     triggerSection
@@ -53,7 +57,7 @@ struct SettingsView: View {
                 }
             }
             ToolbarItem(placement: .principal) {
-                Text("Настройки")
+                Text(copy.settingsTitle)
                     .foregroundStyle(AppTheme.creamText)
             }
         }
@@ -67,15 +71,43 @@ struct SettingsView: View {
         }
     }
 
+    private var languageSection: some View {
+        SettingsSection(
+            title: copy.languageSection,
+            summary: languageSummary
+        ) {
+            languageRow(.system, copy.languageSystem)
+            languageRow(.ru, copy.languageRu)
+            languageRow(.en, copy.languageEn)
+        }
+    }
+
+    private var languageSummary: String {
+        switch settings.appLanguage {
+        case .system: return copy.languageSystem
+        case .ru: return copy.languageRu
+        case .en: return copy.languageEn
+        }
+    }
+
+    private func languageRow(_ value: AppLanguage, _ label: String) -> some View {
+        SettingsPreferenceRow(
+            label: label,
+            selected: settings.appLanguage == value
+        ) {
+            settings.appLanguage = value
+        }
+    }
+
     private var narratorSection: some View {
         SettingsSection(
-            title: "Рассказчик (амплуа)",
-            summary: settings.storyNarrator.labelRu
+            title: copy.narratorSection,
+            summary: settings.storyNarrator.uiLabel(lang)
         ) {
             ForEach(StoryNarrator.allCases) { narrator in
                 SettingsPreferenceRow(
-                    label: narrator.labelRu,
-                    subtitle: narrator.descriptionRu,
+                    label: narrator.uiLabel(lang),
+                    subtitle: narrator.uiDescription(lang),
                     selected: settings.storyNarrator == narrator
                 ) {
                     settings.storyNarrator = narrator
@@ -86,15 +118,15 @@ struct SettingsView: View {
 
     private var voiceSection: some View {
         SettingsSection(
-            title: "Озвучка",
+            title: copy.voiceSection,
             summary: voiceSectionSummary
         ) {
             if settings.hasPremiumTtsAccess {
-                SettingsSubheading(title: "Движок озвучки")
+                SettingsSubheading(title: copy.ttsEngine)
                 ForEach(ServerTtsProvider.allCases) { provider in
                     SettingsPreferenceRow(
-                        label: provider.labelRu,
-                        subtitle: provider.descriptionRu,
+                        label: provider.uiLabel(lang),
+                        subtitle: provider.uiDescription(lang),
                         selected: settings.serverTtsProvider == provider
                     ) {
                         settings.serverTtsProvider = provider
@@ -103,33 +135,33 @@ struct SettingsView: View {
             }
 
             if usesEdgeVoices {
-                SettingsSubheading(title: "Голос Microsoft Edge")
+                SettingsSubheading(title: copy.edgeVoice)
                 ForEach(EdgeVoicePreset.allCases) { preset in
                     SettingsPreferenceRow(
-                        label: preset.labelRu,
-                        subtitle: preset.descriptionRu,
+                        label: preset.uiLabel(lang),
+                        subtitle: preset.uiDescription(lang),
                         selected: settings.edgeVoicePreset == preset
                     ) {
                         settings.edgeVoicePreset = preset
                     }
                 }
             } else {
-                SettingsSubheading(title: "Голос")
+                SettingsSubheading(title: copy.voice)
                 ForEach(TtsVoice.allCases) { voice in
                     SettingsPreferenceRow(
-                        label: voice.labelRu,
-                        subtitle: voice.descriptionRu,
+                        label: voice.uiLabel(lang),
+                        subtitle: voice.uiDescription(lang),
                         selected: settings.ttsVoice == voice
                     ) {
                         settings.ttsVoice = voice
                     }
                 }
 
-                SettingsSubheading(title: "Интонация")
+                SettingsSubheading(title: copy.emotion)
                 ForEach(TtsEmotion.allCases) { emotion in
                     SettingsPreferenceRow(
-                        label: emotion.labelRu,
-                        subtitle: emotion.descriptionRu,
+                        label: emotion.uiLabel(lang),
+                        subtitle: emotion.uiDescription(lang),
                         selected: settings.ttsEmotion == emotion
                     ) {
                         settings.ttsEmotion = emotion
@@ -137,21 +169,21 @@ struct SettingsView: View {
                 }
             }
 
-            SettingsSubheading(title: "Скорость речи")
+            SettingsSubheading(title: copy.speechSpeed)
             ForEach(TtsSpeed.allCases) { speed in
                 SettingsPreferenceRow(
-                    label: speed.labelRu,
+                    label: speed.uiLabel(lang),
                     selected: settings.ttsSpeedPreset == speed
                 ) {
                     settings.ttsSpeedPreset = speed
                 }
             }
 
-            SettingsSubheading(title: "Длина истории")
+            SettingsSubheading(title: copy.storyLength)
             ForEach(StoryLength.allCases) { length in
                 SettingsPreferenceRow(
-                    label: length.labelRu,
-                    subtitle: length.descriptionRu,
+                    label: length.uiLabel(lang),
+                    subtitle: length.uiDescription(lang),
                     selected: settings.storyLength == length
                 ) {
                     settings.storyLength = length
@@ -162,23 +194,23 @@ struct SettingsView: View {
 
     private var generalSection: some View {
         SettingsSection(
-            title: "Общее",
-            summary: "Уведомления и Shazam"
+            title: copy.generalSection,
+            summary: copy.generalSummary
         ) {
             Toggle(isOn: $settings.factNotificationsEnabled) {
-                Text("Уведомления о фактах")
+                Text(copy.factNotifications)
                     .foregroundStyle(AppTheme.creamText)
             }
             .tint(AppTheme.goldBright)
 
             Toggle(isOn: $settings.shazamAutoDetectEnabled) {
-                Text(AppStrings.Shazam.autoDetectTitle)
+                Text(AppStrings.shazamAutoDetectTitle(lang))
                     .foregroundStyle(AppTheme.creamText)
             }
             .tint(AppTheme.goldBright)
 
             Toggle(isOn: $settings.speakTrackNamesInVoiceover) {
-                Text("Названия треков в озвучке")
+                Text(copy.speakTrackNames)
                     .foregroundStyle(AppTheme.creamText)
             }
             .tint(AppTheme.goldBright)
@@ -187,8 +219,8 @@ struct SettingsView: View {
 
     private var modeSection: some View {
         SettingsSection(
-            title: "Режим",
-            summary: settings.manualMode ? "Ручной" : "Авто"
+            title: copy.modeSection,
+            summary: settings.manualMode ? copy.modeManual : copy.modeAuto
         ) {
             Toggle(isOn: Binding(
                 get: { settings.manualMode },
@@ -197,7 +229,7 @@ struct SettingsView: View {
                     orchestrator.syncModeFromSettings()
                 }
             )) {
-                Text("Ручной режим")
+                Text(copy.manualMode)
                     .foregroundStyle(AppTheme.creamText)
             }
             .tint(AppTheme.goldBright)
@@ -210,24 +242,24 @@ struct SettingsView: View {
         if canUse {
             let state = offlinePack.uiState
             SettingsSection(
-                title: AppStrings.OfflinePack.title,
+                title: AppStrings.offlinePackTitle(lang),
                 summary: offlinePackSummary(state)
             ) {
                 switch state.phase {
                 case .idle:
-                    Text(AppStrings.OfflinePack.intro)
+                    Text(AppStrings.offlinePackIntro(lang))
                         .font(.footnote)
                         .foregroundStyle(AppTheme.mutedLavender)
-                    Button(AppStrings.OfflinePack.start) {
+                    Button(AppStrings.offlinePackStart(lang)) {
                         Task { _ = await offlinePack.startCollecting() }
                     }
                     .buttonStyle(.borderedProminent)
                     .tint(AppTheme.goldBright)
                 case .collecting:
-                    Text(AppStrings.OfflinePack.collectingHint)
+                    Text(AppStrings.offlinePackCollectingHint(lang))
                         .font(.footnote)
                         .foregroundStyle(AppTheme.mutedLavender)
-                    Text(AppStrings.OfflinePack.progress(collected: state.collectedCount, target: state.targetCount))
+                    Text(AppStrings.offlinePackProgress(collected: state.collectedCount, target: state.targetCount, lang: lang))
                         .foregroundStyle(AppTheme.goldBright)
                     ForEach(state.entries.indices, id: \.self) { index in
                         let entry = state.entries[index]
@@ -235,26 +267,26 @@ struct SettingsView: View {
                             .font(.caption)
                             .foregroundStyle(AppTheme.mutedLavender)
                     }
-                    Button(AppStrings.OfflinePack.cancel, role: .cancel) {
+                    Button(AppStrings.offlinePackCancel(lang), role: .cancel) {
                         offlinePack.cancelPack()
                     }
                 case .generating:
-                    Text(AppStrings.OfflinePack.generating(ready: state.readyCount, target: state.targetCount))
+                    Text(AppStrings.offlinePackGenerating(ready: state.readyCount, target: state.targetCount, lang: lang))
                         .foregroundStyle(AppTheme.goldBright)
-                    Text(AppStrings.OfflinePack.tracksReadyBody(count: state.targetCount))
+                    Text(AppStrings.offlinePackTracksReadyBody(count: state.targetCount, lang: lang))
                         .font(.footnote)
                         .foregroundStyle(AppTheme.mutedLavender)
                 case .ready:
-                    Text(AppStrings.OfflinePack.ready(count: state.readyCount))
+                    Text(AppStrings.offlinePackReady(count: state.readyCount, lang: lang))
                         .foregroundStyle(AppTheme.creamText)
-                    Text(AppStrings.OfflinePack.readyHint)
+                    Text(AppStrings.offlinePackReadyHint(lang))
                         .font(.footnote)
                         .foregroundStyle(AppTheme.mutedLavender)
                     HStack {
-                        Button(AppStrings.OfflinePack.refresh) {
+                        Button(AppStrings.offlinePackRefresh(lang)) {
                             Task { _ = await offlinePack.startCollecting() }
                         }
-                        Button(AppStrings.OfflinePack.cancel, role: .cancel) {
+                        Button(AppStrings.offlinePackCancel(lang), role: .cancel) {
                             offlinePack.cancelPack()
                         }
                     }
@@ -265,24 +297,24 @@ struct SettingsView: View {
 
     private func offlinePackSummary(_ state: OfflinePackUiState) -> String {
         switch state.phase {
-        case .idle: return "Подготовить пакет"
+        case .idle: return copy.offlinePackPrepare
         case .collecting:
-            return AppStrings.OfflinePack.progress(collected: state.collectedCount, target: state.targetCount)
+            return AppStrings.offlinePackProgress(collected: state.collectedCount, target: state.targetCount, lang: lang)
         case .generating:
-            return AppStrings.OfflinePack.generating(ready: state.readyCount, target: state.targetCount)
+            return AppStrings.offlinePackGenerating(ready: state.readyCount, target: state.targetCount, lang: lang)
         case .ready:
-            return AppStrings.OfflinePack.ready(count: state.readyCount)
+            return AppStrings.offlinePackReady(count: state.readyCount, lang: lang)
         }
     }
 
     private var triggerSection: some View {
         SettingsSection(
-            title: "Триггер",
-            summary: settings.triggerMode.label
+            title: copy.triggerSection,
+            summary: settings.triggerMode.uiLabel(lang)
         ) {
             ForEach(TriggerMode.allCases) { mode in
                 SettingsPreferenceRow(
-                    label: mode.label,
+                    label: mode.uiLabel(lang),
                     selected: settings.triggerMode == mode
                 ) {
                     settings.triggerMode = mode
@@ -290,7 +322,7 @@ struct SettingsView: View {
             }
 
             if settings.triggerMode == .everyNTracks {
-                Stepper("Каждые N треков: \(settings.everyNTracks)", value: $settings.everyNTracks, in: 1...50)
+                Stepper(copy.everyNTracks(settings.everyNTracks), value: $settings.everyNTracks, in: 1...50)
                     .foregroundStyle(AppTheme.creamText)
             }
         }
@@ -298,10 +330,10 @@ struct SettingsView: View {
 
     private var spotifySection: some View {
         SettingsSection(
-            title: "Spotify",
-            summary: nowPlaying.spotify.isConnected ? "Подключён" : "Не подключён"
+            title: copy.spotifySection,
+            summary: nowPlaying.spotify.isConnected ? copy.spotifyConnected : copy.spotifyDisconnected
         ) {
-            TextField("Client ID из Spotify Developer Dashboard", text: $spotifyClientId)
+            TextField(copy.spotifyClientId, text: $spotifyClientId)
                 .textInputAutocapitalization(.never)
                 .autocorrectionDisabled()
                 .foregroundStyle(AppTheme.creamText)
@@ -319,7 +351,7 @@ struct SettingsView: View {
                     .foregroundStyle(AppTheme.errorCoral)
             }
 
-            PrimaryStoryButton(title: "Подключить Spotify") {
+            PrimaryStoryButton(title: copy.connectSpotify) {
                 nowPlaying.spotify.connect()
             }
         }
@@ -327,14 +359,14 @@ struct SettingsView: View {
 
     private var manualSection: some View {
         SettingsSection(
-            title: "Ручной ввод",
-            summary: "Яндекс Музыка и другие плееры"
+            title: copy.manualSection,
+            summary: copy.manualSummary
         ) {
-            TextField("Артист", text: $manualArtist)
+            TextField(copy.artistField, text: $manualArtist)
                 .foregroundStyle(AppTheme.creamText)
-            TextField("Название", text: $manualTitle)
+            TextField(copy.titleField, text: $manualTitle)
                 .foregroundStyle(AppTheme.creamText)
-            PrimaryStoryButton(title: "История для этого трека") {
+            PrimaryStoryButton(title: copy.storyForTrack) {
                 Task {
                     await orchestrator.requestManualStory(artist: manualArtist, title: manualTitle)
                 }
