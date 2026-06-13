@@ -928,6 +928,8 @@ export function factMentionsOtherTrackTitle(fact: string, title: string): boolea
     'we will rock you',
     'seven seas of rhye',
     'another one bites the dust',
+    'dani california',
+    'human nature',
     'группа крови',
     'кукушка',
     'звезда по имени солнце',
@@ -935,6 +937,14 @@ export function factMentionsOtherTrackTitle(fact: string, title: string): boolea
   for (const phrase of otherSongPhrases) {
     if (phrase === titleNorm || titleNorm.includes(phrase) || phrase.includes(titleNorm)) continue;
     if (factNorm.includes(phrase)) return true;
+  }
+
+  if (!/\bdani\b/.test(titleNorm) && /\bdani\b/.test(factNorm)) {
+    if (
+      /\b(?:laments?|death of|mourns?|young southern girl|throughout the song|lyricist)\b/i.test(factNorm)
+    ) {
+      return true;
+    }
   }
 
   if (

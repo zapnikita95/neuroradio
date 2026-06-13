@@ -90,6 +90,42 @@ const CATALOG_METADATA_PATTERNS: RegExp[] = [
   /трек «[^»]+» идёт \d+:\d+/i,
 ];
 
+/** Lyrical character from another song (Dani in «Dani California», not «Can't Stop»). */
+const LYRICAL_CHARACTER_BLEED: Array<{
+  name: RegExp;
+  unlessTitle: RegExp;
+  context: RegExp;
+}> = [
+  {
+    name: /\bDani\b/,
+    unlessTitle: /\bdani\b/,
+    context: /\b(?:laments?|death of|mourns?|young southern girl|throughout the song|lyricist)\b/i,
+  },
+];
+
+export function isAlienLyricalCharacterFact(fact: string, title: string): boolean {
+  if (factMentionsTitle(fact, title)) return false;
+  const titleNorm = normalize(title.replace(/\s*\([^)]*\)\s*/g, ' '));
+  const trimmed = fact.trim();
+
+  for (const rule of LYRICAL_CHARACTER_BLEED) {
+    if (rule.unlessTitle.test(titleNorm)) continue;
+    if (rule.name.test(trimmed) && rule.context.test(trimmed)) return true;
+  }
+
+  if (/\bthroughout the song\b/i.test(trimmed) && /\b(?:lyricist|laments?|mourns?|describes?)\b/i.test(trimmed)) {
+    const nameMatch = trimmed.match(
+      /\b(?:laments?|mourns?|death of|about)\s+(?:the\s+)?(?:early\s+)?(?:death\s+of\s+)?([A-Z][a-z]{2,})\b/,
+    );
+    if (nameMatch) {
+      const name = normalize(nameMatch[1]);
+      if (name.length >= 3 && !titleNorm.includes(name)) return true;
+    }
+  }
+
+  return false;
+}
+
 /** Song-origin narrative without naming the requested track (Human Nature → Chicago). */
 export function isAlienSongOriginFact(fact: string, title: string): boolean {
   if (factMentionsTitle(fact, title)) return false;
@@ -161,6 +197,7 @@ export function rejectSeedForTrackStory(
 
   if (isNonMusicTitleCollisionFact(trimmed, title, artist)) return true;
   if (isPlaceNameTitleCollision(trimmed, title, artist)) return true;
+  if (isAlienLyricalCharacterFact(trimmed, title)) return true;
   if (factMentionsOtherTrackTitle(trimmed, title)) return true;
   if (isAlienSongOriginFact(trimmed, title)) return true;
   if (isArtistCareerBioWithoutTrack(trimmed, title)) return true;
@@ -192,6 +229,7 @@ export function explainTrackAnchorRejection(
 ): string | null {
   if (!rejectSeedForTrackStory(fact, artist, title, options)) return null;
   if (isAlienSongOriginFact(fact, title)) return 'alien-song-origin';
+  if (isAlienLyricalCharacterFact(fact, title)) return 'alien-lyrical-character';
   if (isPlaceNameTitleCollision(fact, title, artist)) return 'place-title-collision';
   if (isArtistCareerBioWithoutTrack(fact, title)) return 'artist-career-bio';
   if (isNonMusicTitleCollisionFact(fact, title, artist)) return 'common-word-collision';

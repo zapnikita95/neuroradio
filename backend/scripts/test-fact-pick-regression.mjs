@@ -239,6 +239,17 @@ assert(
   'false soundtrack/guitar claim rejected when not in seed',
 );
 
+const DANI_FACT =
+  'Throughout the song, lyricist Anthony Kiedis laments the early death of Dani, a poor, young Southern girl who eventually lived in California.';
+assert(
+  rejectSeedForTrackStory(DANI_FACT, 'Red Hot Chili Peppers', "Can't Stop"),
+  'Dani California lyrical bleed rejected for Can\'t Stop',
+);
+assert(
+  !rejectSeedForTrackStory(DANI_FACT, 'Red Hot Chili Peppers', 'Dani California'),
+  'Dani fact allowed for Dani California',
+);
+
 // --- 6. Optional live: real Last.fm + aggregator ---
 if (LIVE) {
   if (!process.env.LASTFM_API_KEY?.trim()) {

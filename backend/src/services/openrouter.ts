@@ -9,6 +9,7 @@ import {
   countWords,
   findHardScriptViolation,
   findLlmGarbage,
+  findUngroundedClaims,
   hasConcreteFact,
   anchorsReferenceFact,
   referenceFactsAreAnchorable,
@@ -370,6 +371,7 @@ export async function generateStoryScript(
         skipHitMemoryWhenGrounded: true,
         referenceFacts,
       }) &&
+      !findUngroundedClaims(sanitized, referenceFacts) &&
       !findHardScriptViolation(sanitized)
     ) {
       console.warn(
