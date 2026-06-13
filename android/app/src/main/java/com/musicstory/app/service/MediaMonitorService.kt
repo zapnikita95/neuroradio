@@ -247,7 +247,9 @@ class MediaMonitorService : Service() {
         return builder
             .addAction(
                 R.drawable.ic_notification,
-                getString(R.string.action_stop_monitor),
+                getString(
+                    if (preparing) R.string.action_stop_story else R.string.action_stop_monitor,
+                ),
                 stopMonitor,
             )
             .setForegroundServiceBehavior(Notification.FOREGROUND_SERVICE_IMMEDIATE)

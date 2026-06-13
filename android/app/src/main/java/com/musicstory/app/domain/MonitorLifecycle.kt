@@ -118,6 +118,17 @@ class MonitorLifecycle(
 
     suspend fun pauseByUser() = setAppPowerMode(AppPowerMode.OFF)
 
+    /** Notification «Остановить»: cancel story if generating, else stop the app monitor. */
+    suspend fun handleStopFromNotification() {
+        if (storyOrchestrator.isStorySessionActive() || MonitorNotificationState.preparingStory.value) {
+            withContext(Dispatchers.Main.immediate) {
+                storyOrchestrator.stopStory()
+            }
+        } else {
+            pauseByUser()
+        }
+    }
+
     suspend fun resume() = setAppPowerMode(AppPowerMode.ON)
 
     fun tryWakeFromMusicApp(packageName: String) {

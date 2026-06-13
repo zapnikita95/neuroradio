@@ -29,7 +29,10 @@ class StoryActionReceiver : BroadcastReceiver() {
                             fromFactHint = fromFactHint,
                         )
                     }
-                    ACTION_STOP_MONITOR -> app.monitorLifecycle.pauseByUser()
+                    ACTION_STOP_MONITOR -> {
+                        StoryLog.i("Notification action: stop")
+                        app.monitorLifecycle.handleStopFromNotification()
+                    }
                 }
             } finally {
                 pendingResult.finish()
