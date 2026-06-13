@@ -117,6 +117,12 @@ test('prepareYandexTtsText reads filler as ф+иллер (no en-US lang wrap)', 
   assert.doesNotMatch(ssml, /\bfiller\b/i);
 });
 
+test('SSML keeps Last.fm as one English lang span', () => {
+  const ssml = buildYandexSsml('сингл попал в ротацию на Last.fm.');
+  assert.match(ssml, /<lang xml:lang="en-US">Last\.fm<\/lang>/i);
+  assert.doesNotMatch(ssml, /<\/lang>\.<lang[^>]*>fm/i);
+});
+
 test('prepareYandexTtsText stresses микстейпы', () => {
   const out = prepareYandexTtsText('он выпускал микстейпы Room for Improvement.', {
     artist: 'Drake',

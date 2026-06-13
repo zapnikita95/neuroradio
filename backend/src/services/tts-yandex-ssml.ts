@@ -19,14 +19,18 @@ const BREAK_SENTENCE = '\uE022';
 const LATIN_APOSTROPHE = "''\u2018\u2019\u02BC\u0060";
 const LATIN_HYPHENS = '\\-\u2010\u2011\u2012\u2013\u2014';
 
+/** Latin token: words, apostrophes, hyphens, dotted brands (Last.fm, R.E.M.). */
+const LATIN_TOKEN = `[A-Za-zÀ-ÿ][A-Za-zÀ-ÿ0-9${LATIN_APOSTROPHE}${LATIN_HYPHENS}:.&]{0,}`;
+
 const LATIN_RUN_RE = new RegExp(
-  `[A-Za-zÀ-ÿ][A-Za-zÀ-ÿ0-9${LATIN_APOSTROPHE}${LATIN_HYPHENS}:]{0,}(?:\\s+(?![.!?…]\\s)[A-Za-zÀ-ÿ][A-Za-zÀ-ÿ0-9${LATIN_APOSTROPHE}${LATIN_HYPHENS}:]{0,})*`,
+  `${LATIN_TOKEN}(?:\\s+(?![.!?…]\\s)${LATIN_TOKEN})*`,
   'g',
 );
 
 /** T-Shirt, Misfits T‐Shirt — one token; album «Alt: Title» — без рваного SSML. */
 export function normalizeLatinForSsml(text: string): string {
   return normalizeLatinApostrophes(text)
+    .replace(/\bLast\s*\.\s*fm\b/gi, 'Last.fm')
     .replace(/\bMaroon\s+5\b/gi, 'Maroon Five')
     .replace(
       /\b([A-Za-z]{2,})\s+([A-Za-z]{1,4})[\u2010\u2011\u2012\u2013\u2014-]([A-Za-z]{2,})\b/g,
@@ -156,6 +160,16 @@ function latinSpanForSsml(span: string): string {
   return stripLatinApostrophesForTts(splitCamelCaseLatin(span.trim()));
 }
 
+/** Last.fm. → SSML lang «Last.fm» + sentence «.» outside — not two lang tags. */
+function splitLatinSpanSentencePunct(span: string): { core: string; trailing: string } {
+  const trimmed = span.trim();
+  const domainEnd = trimmed.match(/^(.+\.[a-z]{2,})([.!?…])$/);
+  if (domainEnd) {
+    return { core: domainEnd[1]!, trailing: domainEnd[2]! };
+  }
+  return { core: trimmed, trailing: '' };
+}
+
 /** «Title от Artist» → одна EN-фраза — без рваного «от» между двумя <lang>. */
 export function mergeLatinTitleOtArtist(text: string): string {
   const latin = LATIN_RUN_RE.source;
@@ -195,7 +209,9 @@ export function wrapMixedLanguageBody(text: string): string {
     if (cyrillicAccent) {
       out += escapeSsml(cyrillicAccent);
     } else {
-      out += `<lang xml:lang="${lang}">${escapeSsml(latinSpanForSsml(match[0]))}</lang>`;
+      const { core, trailing } = splitLatinSpanSentencePunct(match[0]);
+      out += `<lang xml:lang="${lang}">${escapeSsml(latinSpanForSsml(core))}</lang>`;
+      if (trailing) out += escapeSsml(trailing);
     }
     last = match.index + match[0].length;
   }

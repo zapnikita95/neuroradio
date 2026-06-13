@@ -67,7 +67,7 @@ export function resolveAzureVoiceForStyle(
 
 function segmentWithForeignLang(text: string): string {
   const re =
-    /([A-Za-zÀ-ÿäöüßÄÖÜ][A-Za-zÀ-ÿäöüßÄÖÜ0-9&'’.-]*(?:\s+[A-Za-zÀ-ÿäöüßÄÖÜ][A-Za-zÀ-ÿäöüßÄÖÜ0-9&'’.-]*)*)/g;
+    /([A-Za-zÀ-ÿäöüßÄÖÜ][A-Za-zÀ-ÿäöüßÄÖÜ0-9&'’.\-:]*(?:\s+(?![.!?…]\s)[A-Za-zÀ-ÿäöüßÄÖÜ][A-Za-zÀ-ÿäöüßÄÖÜ0-9&'’.\-:]*)*)/g;
   let last = 0;
   let out = '';
   let match: RegExpExecArray | null;
