@@ -4,8 +4,10 @@
  */
 
 import {
+  factMentionsArtist,
   factMentionsOtherTrackTitle,
   factMentionsTitle,
+  factNamesForeignEntity,
   hasRussianTrackContextSignal,
   hasTrackContextSignal,
   isMisattributedBandTrackFact,
@@ -198,6 +200,39 @@ export function isOtherNamedSingleBioFact(fact: string, title: string): boolean 
   return true;
 }
 
+const ARTIST_CAREER_MILESTONE_PATTERNS: RegExp[] = [
+  /\b(?:first|only|second|third)\s+(?:Grammy|Oscar|Emmy|Brit|MTV\s+Video\s+Music)\s+(?:nomination|win|award)/i,
+  /\b(?:Grammy|Oscar|Emmy)\s+(?:nomination|nominat\w+|award|win)\b/i,
+  /\bnominated for (?:Best New Artist|Record of the Year|Album of the Year|Song of the Year)\b/i,
+  /\breceived (?:their|his|her) first (?:Grammy|Oscar|Emmy)\b/i,
+  /\b(?:Billboard|Hot 100|UK Singles Chart)\b.*\b(?:#1|number one|topped|topping)\b/i,
+  /\b(?:billion|million)\s+(?:streams|views|copies)\b/i,
+  /\b(?:debuted|peaked|reached)\s+(?:at\s+)?#?\d+\b/i,
+];
+
+/** Grammy/chart/stream milestone about the act — not this specific track unless title is named. */
+export function isArtistCareerMilestoneWithoutTrack(fact: string, title: string): boolean {
+  if (!title.trim()) return false;
+  if (factMentionsTitle(fact, title)) return false;
+  const trimmed = fact.trim();
+  if (!ARTIST_CAREER_MILESTONE_PATTERNS.some((p) => p.test(trimmed))) return false;
+  if (hasAnchoredTrackContext(trimmed, title)) return false;
+  return true;
+}
+
+/**
+ * Title token appears (e.g. «Pork Soda») but fact is about another act — Primus/Claypool on Glass Animals track.
+ */
+export function isTitleTokenForeignArtistFact(fact: string, artist: string, title: string): boolean {
+  if (!title.trim() || !artist.trim()) return false;
+  const trimmed = fact.trim();
+  if (!factMentionsTitle(trimmed, title)) return false;
+  if (factMentionsArtist(trimmed, artist)) return false;
+  if (factNamesForeignEntity(trimmed, artist, title, '', 'strict')) return true;
+  if (/\b(?:Claypool|Les Claypool|Primus)\b/i.test(trimmed)) return true;
+  return false;
+}
+
 /** Fact names the requested track — valid seed even if «first single» boring pattern. */
 export function isTrackTitleAnchoredSeed(fact: string, title: string): boolean {
   if (!title.trim()) return false;
@@ -257,6 +292,8 @@ export function rejectSeedForTrackStory(
   if (isArtistCareerBioWithoutTrack(trimmed, title)) return true;
   if (isMisattributedBandTrackFact(trimmed, title)) return true;
   if (isOtherNamedSingleBioFact(trimmed, title)) return true;
+  if (isArtistCareerMilestoneWithoutTrack(trimmed, title)) return true;
+  if (isTitleTokenForeignArtistFact(trimmed, artist, title)) return true;
 
   if (factMentionsTitle(trimmed, title)) return false;
 
@@ -286,6 +323,8 @@ export function explainTrackAnchorRejection(
   if (isAlienLyricalCharacterFact(fact, title)) return 'alien-lyrical-character';
   if (isPlaceNameTitleCollision(fact, title, artist)) return 'place-title-collision';
   if (isArtistCareerBioWithoutTrack(fact, title)) return 'artist-career-bio';
+  if (isArtistCareerMilestoneWithoutTrack(fact, title)) return 'artist-career-milestone';
+  if (isTitleTokenForeignArtistFact(fact, artist, title)) return 'title-foreign-artist';
   if (isNonMusicTitleCollisionFact(fact, title, artist)) return 'common-word-collision';
   if (factMentionsOtherTrackTitle(fact, title)) return 'other-track-title';
   return 'unanchored-to-track';

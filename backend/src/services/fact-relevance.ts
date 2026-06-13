@@ -897,7 +897,7 @@ export function hasTrackContextSignal(fact: string): boolean {
 
 /** Russian fact-hunt / catalog seed — song/album/recording context without English title tokens. */
 export function hasRussianTrackContextSignal(fact: string): boolean {
-  return /\b(?:песн(?:я|и|ю|ей|не)|трек(?:а|у|ом|е)?|сингл(?:а|ом|е)?|альбом(?:а|е|ом|у)?|клип(?:а|ом|е)?|запис(?:ал|али|ывал|ана|ыва)|написал(?:и)?|композици(?:я|и|ю)|мелоди(?:я|и)|гитар(?:а|е|у)|сингл|грэмми|grammy|american idiot|nevermind|billie joe)\b/i.test(
+  return /\b(?:песн(?:я|и|ю|ей|не)|трек(?:а|у|ом|е)?|сингл(?:а|ом|е)?|альбом(?:а|е|ом|у)?|клип(?:а|ом|е)?|запис(?:ал|али|ывал|ана|ыва)|написал(?:и)?|композици(?:я|и|ю)|мелоди(?:я|и)|гитар(?:а|е|у)|сингл|american idiot|nevermind|billie joe)\b/i.test(
     fact,
   );
 }

@@ -784,6 +784,23 @@ router.post('/full', extractClientSecrets, validateStoryFullBody, storyFullRateL
       selectedFact = null;
     }
 
+    if (
+      selectedFact &&
+      isRejectedStorySeed(
+        selectedFact.fact,
+        metadata.artist,
+        metadata.title,
+        factBundle.trackFacts,
+        storyLang,
+      )
+    ) {
+      console.warn(
+        `[facts] reject unanchored seed ORIGIN=${factFromBank ? 'bank' : factFromCurated ? 'curated' : 'online'} fact="${selectedFact.fact.slice(0, 100)}"`,
+      );
+      if (factFromBank) factFromBank = false;
+      selectedFact = null;
+    }
+
     if (selectedFact && !factFromBank && isWeakSelectedFact(selectedFact, metadata.artist, metadata.title)) {
       console.warn(
         `[facts] reject weak seed score=${selectedFact.interestScore} fact="${selectedFact.fact.slice(0, 100)}"`,

@@ -853,6 +853,10 @@ export function validateStoryScript(
     if (platformMismatch) {
       return { ok: false, reason: platformMismatch };
     }
+    const trackMisattribution = findArtistSeedTrackMisattribution(trimmed, title, referenceFacts);
+    if (trackMisattribution) {
+      return { ok: false, reason: trackMisattribution };
+    }
     const fictionIssue = skipPersonaCliches ? null : findGenericFiction(trimmed);
     if (fictionIssue) {
       return { ok: false, reason: fictionIssue };
@@ -1129,6 +1133,42 @@ export function findLlmGarbage(script: string, options?: LlmGarbageOptions): str
     if (pattern.test(script)) {
       return `llm garbage: ${pattern.source}`;
     }
+  }
+  return null;
+}
+
+/** Artist-level milestone in seed but story credits the requested track — e.g. Grammy via «Mama's Gun». */
+export function findArtistSeedTrackMisattribution(
+  script: string,
+  title: string,
+  referenceFacts: string[],
+): string | null {
+  if (!title.trim() || referenceFacts.length === 0) return null;
+  const primary = referenceFacts[0]?.trim() ?? '';
+  if (!primary || factMentionsTitle(primary, title)) return null;
+
+  const titleNorm = normalizeForMatch(title.replace(/\s*\([^)]*\)\s*/g, ' '));
+  if (!titleNorm || !normalizeForMatch(script).includes(titleNorm)) return null;
+
+  const milestoneInSeed =
+    /\b(?:Grammy|Oscar|Emmy|Brit Award|MTV Video Music)\b/i.test(primary) ||
+    /\bnominated for\b/i.test(primary) ||
+    /\breceived (?:their|his|her) first\b/i.test(primary);
+  if (!milestoneInSeed) return null;
+
+  if (
+    /(?:прин[ёе]с|принес\w*| brought| earned|получил\w*|дал\w*).{0,55}(?:grammy|номинац|прем|наград)/i.test(
+      script,
+    )
+  ) {
+    return 'artist milestone misattributed to track';
+  }
+  const titleNearAward = new RegExp(
+    `${titleNorm.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}[^.]{0,90}(?:grammy|номинац|прем|наград)`,
+    'i',
+  );
+  if (titleNearAward.test(script)) {
+    return 'artist milestone misattributed to track';
   }
   return null;
 }
