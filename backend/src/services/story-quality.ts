@@ -87,6 +87,11 @@ export const HARD_SCRIPT_REJECT_PATTERNS: RegExp[] = [
   /ради\s+чего\s+\S+\s+(?:оставал\w*|задерживал\w*)\s+после/i,
   /Первые\s+(?:секунды|кадры|ноты|такты|аккорды)\s*[—–-]\s*то,\s*ради\s+чего/i,
   /(?:монтаж|микш)\w*\s+(?:оставал\w*|задерживал\w*)\s+после\s+(?:смены|монтажа)/i,
+  /После такой истории\s+трек\s+звучит\s+не\s+как/i,
+  /звучит\s+не\s+как\s+(?:filler|филлер)/i,
+  /отделяют\s+хит\s+от\s+filler/i,
+  /отделяют\s+хит\s+от\s+филлер/i,
+  /\bне\s+как\s+filler,\s*а\s+как\s+событие/i,
 ];
 
 /**
@@ -775,6 +780,17 @@ export function validateStoryScript(
 
   if (previousScripts.length > 0 && isDuplicateScript(trimmed, previousScripts)) {
     return { ok: false, reason: 'duplicate of previous script for this track' };
+  }
+
+  const templateClosing = /После такой истории\s+трек\s+звучит|звучит\s+не\s+как\s+(?:filler|филлер)|отделяют\s+хит\s+от\s+(?:filler|филлер)/i;
+  if (templateClosing.test(trimmed)) {
+    return { ok: false, reason: 'template closing phrase — write a fresh reaction to the seed fact' };
+  }
+  if (
+    previousScripts.some((prev) => templateClosing.test(prev)) &&
+    /(?:не\s+как\s+(?:filler|филлер)|а\s+как\s+событие)/i.test(trimmed)
+  ) {
+    return { ok: false, reason: 'repeated filler/событие closing from a previous story' };
   }
 
   if (referenceFacts.length === 0) {

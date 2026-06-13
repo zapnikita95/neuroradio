@@ -52,6 +52,7 @@ const PHRASE_PRONUNCIATION_RU: Record<string, string> = {
   'vincent price': 'Винсент Прайс',
   mtv: 'эм-ти-ви',
   mp3: 'эмп+э три',
+  filler: 'ф+иллер',
   'john landis': 'Джон Ландис',
   'jonah weiner': 'Джон Вайнер',
   blender: 'Блэндер',

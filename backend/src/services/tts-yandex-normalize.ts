@@ -73,6 +73,11 @@ function normalizeTechAcronymsForRussianTts(text: string): string {
     .replace(/\bMP3\b/gi, 'эмп+э три');
 }
 
+/** English loanwords in Russian narration → Cyrillic phonetic (TTS only). */
+function normalizeLoanwordsForRussianTts(text: string): string {
+  return text.replace(/\bfiller\b/gi, 'ф+иллер');
+}
+
 /** Mixed RU/EN tokens that Yandex misreads inside `<lang en-US>` or after apostrophe splits. */
 export function normalizeYandexSpeechTokens(text: string, artist = '', title = ''): string {
   let result = normalizeLatinApostrophes(text);
@@ -103,6 +108,8 @@ export function normalizeYandexSpeechTokens(text: string, artist = '', title = '
   result = normalizeGenreTermsForTts(result);
 
   result = normalizeTechAcronymsForRussianTts(result);
+
+  result = normalizeLoanwordsForRussianTts(result);
 
   return result;
 }

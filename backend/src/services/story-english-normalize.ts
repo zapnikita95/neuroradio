@@ -108,6 +108,7 @@ export const GENERIC_ENGLISH_REPLACEMENTS: Array<[RegExp, string]> = [
   [/\bengineer\b/gi, 'звукорежиссёр'],
   [/\bmonitors\b/gi, 'мониторы'],
   [/\bfeedback\b/gi, 'обратная связь'],
+  [/\bfiller\b/gi, 'филлер'],
   [/\boverdub\b/gi, 'дубль'],
   [/\boverdubs\b/gi, 'дубли'],
   [/\bbootleg\b/gi, 'бутлег'],

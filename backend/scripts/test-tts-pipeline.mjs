@@ -105,6 +105,18 @@ test('prepareYandexTtsText reads MP3 as эмп+э три (no en-US lang wrap)', 
   assert.doesNotMatch(ssml, /MP3-/i);
 });
 
+test('prepareYandexTtsText reads filler as ф+иллер (no en-US lang wrap)', () => {
+  const out = prepareYandexTtsText(
+    'После такой истории трек звучит не как filler, а как событие.',
+    { artist: 'Queen', title: 'I Want To Break Free' },
+  );
+  assert.match(out, /ф(\+)?иллер/i);
+  assert.doesNotMatch(out, /\bfiller\b/i);
+  const ssml = buildYandexSsml(out);
+  assert.doesNotMatch(ssml, /<lang[^>]*>filler/i);
+  assert.doesNotMatch(ssml, /\bfiller\b/i);
+});
+
 test('prepareYandexTtsText stresses микстейпы', () => {
   const out = prepareYandexTtsText('он выпускал микстейпы Room for Improvement.', {
     artist: 'Drake',
