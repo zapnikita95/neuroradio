@@ -4,7 +4,7 @@ import path from 'node:path';
 import { interestRating10 } from './fact-interest-log.js';
 import { rejectSeedForTrackStory } from './fact-track-anchor.js';
 import { factMentionsArtistAsEntity, isAmbiguousCommonWordArtist } from './fact-relevance.js';
-import { interestScore } from './reference-fact-quality.js';
+import { interestScore, isCatalogMetadataSeed } from './reference-fact-quality.js';
 import { isSpeakableReferenceFact } from './web-snippet-accept.js';
 import { factsTooSimilar, type FactScope } from './fact-picker.js';
 import {
@@ -202,6 +202,7 @@ function isValidStoredFact(fact: StoredFact): boolean {
   if (rejectSeedForTrackStory(fact.fact, fact.artist, fact.title, { trackPoolFacts: trackPool })) {
     return false;
   }
+  if (isCatalogMetadataSeed(fact.fact)) return false;
   return true;
 }
 

@@ -283,6 +283,7 @@ assert(
 const {
   isCitationBibliographySeed,
   isGenericConcertVenueSeed,
+  isCatalogMetadataSeed,
   interestScore: scoreFact,
 } = await import('../dist/services/reference-fact-quality.js');
 
@@ -320,6 +321,28 @@ assert(
       holidayPick.fact.includes('protest') ||
       holidayPick.fact.includes('intended to reflect')),
   `Holiday pick prefers meaning/inspiration (got: ${holidayPick?.fact?.slice(0, 90) ?? 'null'})`,
+);
+
+const { hasNarrativeSeedSignal } = await import('../dist/services/web-snippet-accept.js');
+
+const POMPEYA_LABEL = 'Релиз «Foursome» (Pompeya) выходил на лейбле Gala Records (5).';
+assert(isCatalogMetadataSeed(POMPEYA_LABEL), 'Discogs label fact is catalog metadata');
+assert(scoreFact(POMPEYA_LABEL) < 0, `label seed scores negative (got ${scoreFact(POMPEYA_LABEL)})`);
+assert(!hasNarrativeSeedSignal(POMPEYA_LABEL), 'label fact has no narrative signal');
+
+const pompeyaPick = pickReferenceFact(
+  {
+    trackFacts: [POMPEYA_LABEL, "Трек «Nobody's Truth» исполнителя Pompeya на Last.fm указан в альбоме «Foursome»."],
+    artistFacts: ['1) A Russian rock band from Moscow.', '2) An Argentinian funkpopjazz band based in Buenos Aires.'],
+  },
+  [],
+  0,
+  'Pompeya',
+  "Nobody's Truth",
+);
+assert(
+  !pompeyaPick || !POMPEYA_LABEL.includes(pompeyaPick.fact.slice(0, 30)),
+  `Pompeya pick skips label junk (got: ${pompeyaPick?.fact?.slice(0, 90) ?? 'null'})`,
 );
 
 // --- 6. Optional live: real Last.fm + aggregator ---

@@ -11,6 +11,7 @@ import {
   interestScore,
   isBackstoryFact,
   isBoringFact,
+  isCatalogMetadataSeed,
   isCitationBibliographySeed,
   isGenericConcertVenueSeed,
 } from './reference-fact-quality.js';
@@ -201,6 +202,9 @@ export function isArtistIdentityBioSnippet(snippet: string): boolean {
 /** Narrative hook in a search snippet — even without repeating artist/title. */
 export function hasNarrativeSeedSignal(text: string): boolean {
   const trimmed = text.trim();
+  if (isCatalogMetadataSeed(trimmed)) return false;
+  if (isCitationBibliographySeed(trimmed)) return false;
+  if (isGenericConcertVenueSeed(trimmed)) return false;
   if (isArtistIdentityBioSnippet(trimmed)) return true;
   if (hasTrackContextSignal(trimmed)) return true;
   if (isBackstoryFact(trimmed)) return true;

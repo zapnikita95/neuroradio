@@ -284,7 +284,7 @@ export function pickReferenceFact(
     trackPoolForReject,
     artist,
   );
-  if (globalBest) {
+  if (globalBest && !isCatalogMetadataSeed(globalBest) && !isCitationBibliographySeed(globalBest)) {
     const scope: FactScope = pools.track.includes(globalBest)
       ? 'track'
       : pools.album.includes(globalBest)

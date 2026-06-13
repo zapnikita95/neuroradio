@@ -111,6 +111,7 @@ export function isArtistFormationBioSeed(fact: string): boolean {
 
 export function isDedicatedCatalogSeed(fact: string): boolean {
   if (isAlbumListingSeed(fact)) return false;
+  if (isCatalogMetadataSeed(fact)) return false;
   return DEDICATED_CATALOG_SEED_PATTERNS.some((p) => p.test(fact.trim()));
 }
 
@@ -292,6 +293,7 @@ export function interestScore(fact: string): number {
   const trimmed = fact.trim();
   if (isCitationBibliographySeed(trimmed)) return -40;
   if (isGenericConcertVenueSeed(trimmed)) return -25;
+  if (isCatalogMetadataSeed(trimmed)) return -30;
   if (isLyricsPageSeed(trimmed)) score -= 50;
   if (isArtistIdentityBioSnippet(trimmed)) score += 16;
   if (isTruncatedMarketingSnippet(trimmed)) score -= 40;
@@ -386,6 +388,7 @@ export function isBoringFact(fact: string): boolean {
   if (trimmed.length < 30) return true;
   if (isCitationBibliographySeed(trimmed)) return true;
   if (isGenericConcertVenueSeed(trimmed)) return true;
+  if (isCatalogMetadataSeed(trimmed)) return true;
   if (isDedicatedCatalogSeed(trimmed)) return false;
   if (isWikiBiographyLead(trimmed)) return true;
   if (isCollectorFact(trimmed)) return false;
