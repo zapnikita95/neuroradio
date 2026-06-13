@@ -11,6 +11,7 @@ import {
 } from './reference-fact-quality.js';
 import { acceptSearchGroundedSnippet, acceptIndieEmergingSnippet, isLyricsPageSeed, isPlaylistJunkSnippet, isSpeakableReferenceFact, isUnspeakableWebSeed } from './web-snippet-accept.js';
 import { isRejectedPickSeed } from './fact-seed-pick.js';
+import { isRejectedStorySeed } from './fact-picker.js';
 import { factFitsStoryLanguage } from './fact-language-fit.js';
 import type { StoryLanguageId } from './story-language.js';
 
@@ -58,6 +59,7 @@ export function pickSalvageSnippetSeed(
     .filter((snippet) => !factNamesForeignEntity(snippet, artist, title))
     .filter((snippet) => !isWeakSnippetSeed(snippet, interestScore(snippet), title))
     .filter((snippet) => !isRejectedPickSeed(snippet, title, storyLanguage, [], artist))
+    .filter((snippet) => !isRejectedStorySeed(snippet, artist, title, [], storyLanguage))
     .sort((a, b) => {
       const boost = (s: string) =>
         (factMentionsArtist(s, artist) ? 25 : 0) +

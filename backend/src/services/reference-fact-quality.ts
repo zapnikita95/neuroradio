@@ -331,6 +331,7 @@ export function interestScore(fact: string): number {
   const trimmed = fact.trim();
   const quoteNorm = trimmed.replace(/[\u201c\u201d\u2018\u2019]/g, '"');
   if (/The song(?:'|')s title comes from/i.test(quoteNorm)) return 22;
+  if (/\bdescribes the pain of a man feeling left out in a love triangle\b/i.test(quoteNorm)) return 20;
   if (isCitationBibliographySeed(trimmed)) return -40;
   if (isGenericConcertVenueSeed(trimmed)) return -25;
   if (isCatalogMetadataSeed(trimmed)) return -30;
