@@ -5,16 +5,10 @@ const INITIAL_DELAY_MS = parseInt(process.env.WEEKLY_CHART_HARVEST_DELAY_MS ?? S
 
 let schedulerStarted = false;
 
+/** Chart harvest is opt-in — never steal API budget from live /v1/story/full. */
 export function isWeeklyChartHarvestEnabled(): boolean {
   const flag = process.env.WEEKLY_CHART_HARVEST?.trim().toLowerCase();
-  if (flag === 'false' || flag === '0' || flag === 'off') return false;
-  // On by default when Last.fm or Spotify credentials exist (trending facts for push hints).
-  if (flag === 'true' || flag === '1' || flag === 'on') return true;
-  return Boolean(
-    process.env.LASTFM_API_KEY?.trim() ||
-      (process.env.SPOTIFY_CLIENT_ID?.trim() &&
-        (process.env.SPOTIFY_SECRET?.trim() || process.env.SPOTIFY_CLIENT_SECRET?.trim())),
-  );
+  return flag === 'true' || flag === '1' || flag === 'on';
 }
 
 export function startWeeklyChartHarvestScheduler(): void {

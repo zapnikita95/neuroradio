@@ -1,16 +1,17 @@
-/** Global harvest API rate limits — safe for bulk-seed concurrency=3. */
+/** Global harvest API rate limits — ONLY for bulk-seed / chart-harvest scripts (opt-in). */
 
 export type HarvestRateBucket = 'lastfm' | 'discogs' | 'genius' | 'setlistfm' | 'default';
 
-const ENABLED = process.env.HARVEST_RATE_LIMIT?.trim().toLowerCase() !== 'false';
+/** Off by default — live story /v1/story/full must never share this queue. */
+const ENABLED = process.env.HARVEST_RATE_LIMIT?.trim().toLowerCase() === 'true';
 
 /** Min ms between requests per bucket (conservative vs documented limits). */
 const INTERVAL_MS: Record<HarvestRateBucket, number> = {
-  lastfm: 260, // ~3.8/s (Last.fm ~5/s)
-  discogs: 1100, // ~54/min (Discogs 60/min)
-  genius: 2000, // ~30/min
-  setlistfm: 500, // ~2/s
-  default: 350, // wiki/web scrapes
+  lastfm: 260,
+  discogs: 1100,
+  genius: 2000,
+  setlistfm: 500,
+  default: 350,
 };
 
 const lastAt: Record<HarvestRateBucket, number> = {
@@ -42,7 +43,6 @@ export function classifyHarvestUrl(url: string): HarvestRateBucket {
   return 'default';
 }
 
-/** Serialize + pace requests per API so concurrency=3 stays within limits. */
 export async function acquireHarvestSlot(url: string): Promise<void> {
   if (!ENABLED) return;
   const bucket = classifyHarvestUrl(url);
@@ -55,7 +55,6 @@ export async function acquireHarvestSlot(url: string): Promise<void> {
   await run;
 }
 
-/** After 429, back off bucket before retry. */
 export function penalizeHarvestBucket(url: string, attempt: number): Promise<void> {
   if (!ENABLED) return Promise.resolve();
   const bucket = classifyHarvestUrl(url);
