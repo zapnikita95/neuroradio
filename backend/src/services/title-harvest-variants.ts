@@ -54,14 +54,24 @@ export function harvestTitleVariants(title: string): string[] {
 
   const stripped = stripHarvestParentheticals(raw);
   const strippedBeforeParen = stripped.split('(')[0]?.trim();
-  if (strippedBeforeParen && strippedBeforeParen.length >= 3) push(strippedBeforeParen);
+  if (strippedBeforeParen && strippedBeforeParen.length >= 3)   push(strippedBeforeParen);
+
+  for (const v of [...out]) {
+    if (/'/.test(v)) {
+      push(v.replace(/\b(\w+)y's\b/gi, '$1ies'));
+      push(v.replace(/'/g, ''));
+    }
+    if (/\bies\b/i.test(v)) {
+      push(v.replace(/\b(\w+)ies\b/gi, "$1y's"));
+    }
+  }
 
   return out;
 }
 
-/** Shortest useful title for API lookups (prod + bulk). */
+/** Best title for API lookups — prefer the richest variant (apostrophe/feat stripped), not the shortest token. */
 export function primaryHarvestLookupTitle(title: string): string {
   const variants = harvestTitleVariants(title);
   if (variants.length === 0) return title.trim();
-  return variants.reduce((best, v) => (v.length < best.length ? v : best));
+  return variants.reduce((best, v) => (v.length > best.length ? v : best));
 }

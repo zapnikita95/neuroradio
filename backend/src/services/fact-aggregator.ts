@@ -10,7 +10,7 @@ import {
   hasTrackContextSignal,
   isWebListicleJunk,
 } from './fact-relevance.js';
-import { filterAndRankFacts, interestScore } from './reference-fact-quality.js';
+import { filterAndRankFacts, interestScore, isArtistDisambiguationListSeed, isArtistFormationBioSeed, isEncyclopediaDefinitionSeed } from './reference-fact-quality.js';
 import { WEAK_TRIVIA_PATTERNS } from './story-fact-hunt.js';
 import { fetchReferenceFactBundle as fetchWikipediaBundle, fetchFastTrackWikiFacts } from './wikipedia-facts.js';
 import { fetchArtistWikiLead, fetchArtistWikiLeadWithRetry } from './wikipedia-lead.js';
@@ -271,6 +271,9 @@ function salvageArtistBioFacts(
     const t = fact.trim();
     if (t.length < 35) return false;
     if (isWebListicleJunk(t)) return false;
+    if (isEncyclopediaDefinitionSeed(t)) return false;
+    if (isArtistDisambiguationListSeed(t)) return false;
+    if (isArtistFormationBioSeed(t)) return false;
     if (artistSurnameInFact(t, artist)) return true;
     if (factMentionsArtist(t, artist)) return true;
     if (
@@ -717,7 +720,7 @@ export async function fetchAggregatedFactContext(
         [],
         8_000,
       ),
-      fetchWithCap('wiki-fast-track', () => fetchFastTrackWikiFacts(artist, lookupTitle), [], 15_000),
+      fetchWithCap('wiki-fast-track', () => fetchFastTrackWikiFacts(artist, lookupTitle), [], 22_000),
       dedicatedPromise,
       discogsPromise,
     ]);

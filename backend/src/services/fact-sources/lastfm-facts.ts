@@ -1,4 +1,6 @@
 import { harvestTitleVariants } from '../title-harvest-variants.js';
+import { expandArtistSearchNames } from '../artist-search-aliases.js';
+import { isArtistDisambiguationListSeed, isArtistFormationBioSeed } from '../reference-fact-quality.js';
 import type { HarvestContext, HarvestedFact } from './types.js';
 import { fetchJson, splitSentences, stripHtml } from './fetch-utils.js';
 
@@ -31,6 +33,15 @@ function wikiToSentences(raw: string | undefined, scope: 'track' | 'artist'): Ha
   if (!raw?.trim()) return [];
   const cleaned = stripHtml(raw.replace(/<a href="[^"]*">Read more on Last\.fm<\/a>/gi, ''));
   return splitSentences(cleaned)
+    .filter((sentence) => {
+      const t = sentence.trim();
+      if (t.length < 35) return false;
+      if (isArtistDisambiguationListSeed(t)) return false;
+      if (scope === 'artist' && isArtistFormationBioSeed(t) && !/\b(?:song|single|track|album|released|recorded)\b/i.test(t)) {
+        return false;
+      }
+      return true;
+    })
     .slice(0, 5)
     .map((fact) => ({ fact, scope, source: 'lastfm' as const }));
 }
@@ -51,17 +62,21 @@ async function fetchArtistInfo(artist: string): Promise<HarvestedFact[]> {
 async function fetchTrackInfo(artist: string, title: string): Promise<HarvestedFact[]> {
   let track: LastFmTrackInfo['track'] | undefined;
   let resolvedTitle = title;
-  for (const variant of harvestTitleVariants(title)) {
-    const data = await fetchJson<LastFmTrackInfo>(
-      `https://ws.audioscrobbler.com/2.0/?method=track.getInfo&artist=${encodeURIComponent(artist)}&track=${encodeURIComponent(variant)}&api_key=${API_KEY}&format=json&autocorrect=1`,
-      { timeoutMs: 8000 },
-    );
-    const candidate = data?.track;
-    const wiki = candidate?.wiki?.content?.trim() || candidate?.wiki?.summary?.trim();
-    if (wiki || candidate?.listeners || candidate?.album?.title) {
-      track = candidate;
-      resolvedTitle = variant;
-      if (wiki) break;
+  let resolvedArtist = artist;
+  outer: for (const artistName of expandArtistSearchNames(artist)) {
+    for (const variant of harvestTitleVariants(title)) {
+      const data = await fetchJson<LastFmTrackInfo>(
+        `https://ws.audioscrobbler.com/2.0/?method=track.getInfo&artist=${encodeURIComponent(artistName)}&track=${encodeURIComponent(variant)}&api_key=${API_KEY}&format=json&autocorrect=1`,
+        { timeoutMs: 8000 },
+      );
+      const candidate = data?.track;
+      const wiki = candidate?.wiki?.content?.trim() || candidate?.wiki?.summary?.trim();
+      if (wiki || candidate?.listeners || candidate?.album?.title) {
+        track = candidate;
+        resolvedTitle = variant;
+        resolvedArtist = artistName;
+        if (wiki) break outer;
+      }
     }
   }
 
@@ -73,7 +88,7 @@ async function fetchTrackInfo(artist: string, title: string): Promise<HarvestedF
   const playcount = parseInt(track?.playcount ?? '0', 10);
   if (listeners >= 50_000 && playcount >= 100_000) {
     facts.push({
-      fact: `На Last.fm у «${resolvedTitle}» (${artist}) ${listeners.toLocaleString('en-US')} слушателей и ${playcount.toLocaleString('en-US')} прослушиваний.`,
+      fact: `На Last.fm у «${resolvedTitle}» (${resolvedArtist}) ${listeners.toLocaleString('en-US')} слушателей и ${playcount.toLocaleString('en-US')} прослушиваний.`,
       scope: 'track',
       source: 'lastfm',
       metadataOnly: true,
@@ -81,7 +96,7 @@ async function fetchTrackInfo(artist: string, title: string): Promise<HarvestedF
   }
   if (track?.album?.title) {
     facts.push({
-      fact: `Трек «${resolvedTitle}» исполнителя ${artist} на Last.fm указан в альбоме «${track.album.title}».`,
+      fact: `Трек «${resolvedTitle}» исполнителя ${resolvedArtist} на Last.fm указан в альбоме «${track.album.title}».`,
       scope: 'track',
       source: 'lastfm',
       metadataOnly: true,

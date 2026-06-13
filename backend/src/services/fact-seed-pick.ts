@@ -5,6 +5,8 @@ import {
   isArtistFormationBioSeed,
   isCatalogMetadataSeed,
   isCitationBibliographySeed,
+  isArtistDisambiguationListSeed,
+  isEncyclopediaDefinitionSeed,
   isGenericConcertVenueSeed,
   isGenericMusicVideoSeed,
   isBoringFact,
@@ -18,9 +20,11 @@ import { isTruncatedMarketingSnippet, isUnspeakableWebSeed } from './web-snippet
 import {
   factMentionsTitle,
   hasTrackContextSignal,
+  isAmbiguousCommonWordTitle,
   isMisattributedBandTrackFact,
 } from './fact-relevance.js';
-import { rejectSeedForTrackStory, isTrackTitleAnchoredSeed } from './fact-track-anchor.js';
+import { isArtistIdentityBioSnippet } from './web-snippet-accept.js';
+import { hasAnchoredTrackContext, isTrackTitleAnchoredSeed, rejectSeedForTrackStory } from './fact-track-anchor.js';
 import { factFitsStoryLanguage } from './fact-language-fit.js';
 import type { StoryLanguageId } from './story-language.js';
 import { interestRating10 } from './fact-interest-log.js';
@@ -40,6 +44,17 @@ export function isRejectedPickSeed(
   if (isAlbumListingSeed(fact)) return true;
   if (isCatalogMetadataSeed(fact)) return true;
   if (isCitationBibliographySeed(fact)) return true;
+  if (isEncyclopediaDefinitionSeed(fact)) return true;
+  if (isArtistDisambiguationListSeed(fact)) return true;
+  if (
+    title.trim() &&
+    isAmbiguousCommonWordTitle(title) &&
+    isArtistIdentityBioSnippet(fact) &&
+    !factMentionsTitle(fact, title) &&
+    !hasAnchoredTrackContext(fact, title)
+  ) {
+    return true;
+  }
   if (isGenericConcertVenueSeed(fact)) return true;
   if (isGenericMusicVideoSeed(fact)) return true;
   if (

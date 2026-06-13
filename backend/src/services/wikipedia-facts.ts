@@ -1,10 +1,32 @@
-import fetch from '../proxy-fetch.js';
 import type { ReferenceFactBundle } from './fact-picker.js';
 import { collaboratorNames, primaryArtistName } from './artist-primary.js';
+import { expandArtistSearchNames, factMentionsArtistOrAlias } from './artist-search-aliases.js';
 import { factNamesForeignEntity } from './fact-relevance.js';
-import { filterAndRankFacts, interestScore, isBoringFact, isCollectorFact } from './reference-fact-quality.js';
+import { filterAndRankFacts, interestScore, isBoringFact, isCollectorFact, isEncyclopediaDefinitionSeed } from './reference-fact-quality.js';
 
-const USER_AGENT = 'MusicStoryBFF/1.0 (contact@example.com)';
+const USER_AGENT = 'MusicStoryBFF/1.0 (https://efir-ai.ru; contact@efir-ai.ru)';
+
+/** Wikipedia is not geo-blocked — bypass HTTP_PROXY (NO_PROXY wildcards are unreliable on Windows). */
+async function wikiFetch(input: Parameters<typeof fetch>[0], init?: RequestInit): Promise<Response> {
+  const saved = {
+    http: process.env.HTTP_PROXY,
+    https: process.env.HTTPS_PROXY,
+    use: process.env.NODE_USE_ENV_PROXY,
+  };
+  delete process.env.HTTP_PROXY;
+  delete process.env.HTTPS_PROXY;
+  delete process.env.NODE_USE_ENV_PROXY;
+  try {
+    return await globalThis.fetch(input, init);
+  } finally {
+    if (saved.http) process.env.HTTP_PROXY = saved.http;
+    else delete process.env.HTTP_PROXY;
+    if (saved.https) process.env.HTTPS_PROXY = saved.https;
+    else delete process.env.HTTPS_PROXY;
+    if (saved.use) process.env.NODE_USE_ENV_PROXY = saved.use;
+    else delete process.env.NODE_USE_ENV_PROXY;
+  }
+}
 
 function wikiLang(countryCode?: string): 'ru' | 'en' {
   return countryCode === 'RU' ? 'ru' : 'en';
@@ -17,7 +39,7 @@ function toWikiTitle(raw: string): string {
 async function fetchSummary(lang: 'ru' | 'en', title: string): Promise<string | null> {
   const url = `https://${lang}.wikipedia.org/api/rest_v1/page/summary/${toWikiTitle(title)}`;
   try {
-    const response = await fetch(url, {
+    const response = await wikiFetch(url, {
       headers: { 'User-Agent': USER_AGENT, Accept: 'application/json' },
       signal: AbortSignal.timeout(6000),
     });
@@ -40,7 +62,7 @@ async function searchWikiTitle(
     `https://${lang}.wikipedia.org/w/api.php?action=query&list=search&format=json&origin=*` +
     `&srlimit=5&srsearch=${encodeURIComponent(query)}`;
   try {
-    const response = await fetch(url, {
+    const response = await wikiFetch(url, {
       headers: { 'User-Agent': USER_AGENT, Accept: 'application/json' },
       signal: AbortSignal.timeout(6000),
     });
@@ -181,9 +203,18 @@ function cleanTrackTitle(title: string): string {
     .trim();
 }
 
+/** Wikipedia song pages use Title Case artist names — «cliché (machine gun kelly song)» is a miss. */
+function wikiTitleCaseArtist(name: string): string {
+  return name
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(' ');
+}
+
 function collabArtistVariants(artist: string): string[] {
   const names = collaboratorNames(artist);
-  const variants = [artist, primaryArtistName(artist), ...names];
+  const variants = [artist, primaryArtistName(artist), ...names, ...expandArtistSearchNames(artist)];
   if (names.length === 2) {
     variants.push(`${names[0]} and ${names[1]}`, `${names[0]} & ${names[1]}`);
   }
@@ -198,10 +229,11 @@ function buildTrackTitleCandidates(artist: string, title: string): string[] {
   const cleanTitle = cleanTrackTitle(title);
   const out: string[] = [];
   for (const artistVariant of collabArtistVariants(artist)) {
+    const wikiArtist = wikiTitleCaseArtist(artistVariant);
     out.push(
-      `${cleanTitle} (${artistVariant} song)`,
-      `${cleanTitle} by ${artistVariant}`,
-      `${artistVariant} ${cleanTitle}`,
+      `${cleanTitle} (${wikiArtist} song)`,
+      `${cleanTitle} by ${wikiArtist}`,
+      `${wikiArtist} ${cleanTitle}`,
     );
   }
   out.push(`${cleanTitle} (song)`, cleanTitle);
@@ -261,9 +293,14 @@ const WRONG_MUSIC_TOPIC_PATTERNS: RegExp[] = [
   /\b(?:the novel is|this novel|literary genre)\b/i,
   /\b(?:master craftsman|old european guild|journeyman aspiring)\b/i,
   /\b(?:is one of the four seasons|warmest season|hottest season|summer solstice|children are out of school)\b/i,
+  /\b(?:French poet|G[eé]rard de Nerval|Nerval once said)\b/i,
+  /\bA clich[eé] is\b/i,
+  /\bclich[eé] is a (?:phrase|figure|literary)\b/i,
+  /\bcompared a woman to a rose\b/i,
 ];
 
 function factMentionsArtist(fact: string, artist: string): boolean {
+  if (factMentionsArtistOrAlias(fact, artist)) return true;
   const tokens = normalizeForMatch(artist)
     .split(' ')
     .filter((part) => part.length >= 3);
@@ -279,6 +316,7 @@ function factMentionsTrack(fact: string, title: string): boolean {
 function isTrackAnchored(fact: string, artist: string, title: string): boolean {
   return (
     isCollectorFact(fact) ||
+    factMentionsArtistOrAlias(fact, artist) ||
     factMentionsArtist(fact, artist) ||
     (title.length > 0 && factMentionsTrack(fact, title))
   );
@@ -297,9 +335,15 @@ function scoreSearchTitle(title: string, artist: string, trackTitle: string): nu
   let score = 0;
   if (/\(song\)|\(.*song\)/i.test(lower)) score += 12;
   if (lower.includes('disambiguation')) score -= 20;
-  if (normalizeForMatch(lower).includes(normalizeForMatch(artist))) score += 8;
+  for (const name of expandArtistSearchNames(artist)) {
+    if (normalizeForMatch(lower).includes(normalizeForMatch(name))) {
+      score += 8;
+      break;
+    }
+  }
   if (normalizeForMatch(lower).includes(normalizeForMatch(trackTitle))) score += 6;
   if (/\bnovel\b/i.test(lower) && !/\(song\)/i.test(lower)) score -= 8;
+  if (/^clich[eé]$/i.test(lower.trim()) && !/\(song\)/i.test(lower)) score -= 15;
   return score;
 }
 
@@ -311,6 +355,59 @@ function isWeakFact(sentence: string): boolean {
     /\b(may refer to|most commonly refers to|Queen regnant|Queen consort|disambiguation|guild system|journeyman|master craftsman)\b/i.test(sentence) ||
     isBoringFact(sentence)
   );
+}
+
+export async function fetchWikiExtractDirect(lang: 'en' | 'ru', title: string): Promise<string | null> {
+  const encodedTitle = encodeURIComponent(title.trim().replace(/\s+/g, '_'));
+  const url =
+    `https://${lang}.wikipedia.org/w/api.php?action=query&prop=extracts&explaintext=1` +
+    `&format=json&origin=*&titles=${encodedTitle}`;
+  try {
+    const response = await wikiFetch(url, {
+      headers: { 'User-Agent': USER_AGENT, Accept: 'application/json' },
+      signal: AbortSignal.timeout(12_000),
+    });
+    if (!response.ok) return null;
+    const data = (await response.json()) as {
+      query?: { pages?: Record<string, { extract?: string; missing?: string }> };
+    };
+    const page = Object.values(data.query?.pages ?? {})[0];
+    if (page?.missing !== undefined) return null;
+    const extract = page?.extract?.trim();
+    return extract && extract.length > 40 ? extract : null;
+  } catch {
+    return null;
+  }
+}
+
+export function pickIntroWikiFact(
+  extract: string,
+  artist: string,
+  title: string,
+  ambiguousSingleWord: boolean,
+): string | null {
+  const intro = extract.split(/\n+==/)[0]?.trim() ?? '';
+  if (intro.length < 60) return null;
+  const introSentences = normalizeWikiText(intro)
+    .split(/(?<=[.!?…])\s+/)
+    .map((s) => s.trim())
+    .filter((s) => s.length >= 35 && s.length <= MAX_FACT_SENTENCE_LEN);
+  for (const sentence of introSentences) {
+    if (isEncyclopediaDefinitionSeed(sentence)) continue;
+    if (!factMentionsArtistOrAlias(sentence, artist) && !factMentionsTrack(sentence, title)) {
+      continue;
+    }
+    if (interestScore(sentence) < 6) continue;
+    if (
+      ambiguousSingleWord &&
+      !factMentionsArtistOrAlias(sentence, artist) &&
+      !factMentionsTrack(sentence, title)
+    ) {
+      continue;
+    }
+    return sentence;
+  }
+  return null;
 }
 
 async function fetchFullExtract(
@@ -331,9 +428,9 @@ async function fetchFullExtract(
   for (let attempt = 0; attempt < 3; attempt++) {
     try {
       if (attempt > 0) await sleep(400 * attempt);
-      const response = await fetch(url, {
+      const response = await wikiFetch(url, {
         headers: { 'User-Agent': USER_AGENT, Accept: 'application/json' },
-        signal: AbortSignal.timeout(8000),
+        signal: AbortSignal.timeout(12_000),
       });
       if (response.status === 429) continue;
       if (!response.ok) return null;
@@ -397,7 +494,7 @@ async function fetchWikiBodySections(lang: 'ru' | 'en', title: string): Promise<
     `https://${lang}.wikipedia.org/w/api.php?action=parse&page=${encodeURIComponent(title)}` +
     `&prop=sections&format=json&origin=*`;
   try {
-    const listResponse = await fetch(listUrl, {
+    const listResponse = await wikiFetch(listUrl, {
       headers: { 'User-Agent': USER_AGENT, Accept: 'application/json' },
       signal: AbortSignal.timeout(8000),
     });
@@ -418,7 +515,7 @@ async function fetchWikiBodySections(lang: 'ru' | 'en', title: string): Promise<
       const sectionUrl =
         `https://${lang}.wikipedia.org/w/api.php?action=parse&page=${encodeURIComponent(title)}` +
         `&prop=text&section=${index}&format=json&origin=*`;
-      const sectionResponse = await fetch(sectionUrl, {
+      const sectionResponse = await wikiFetch(sectionUrl, {
         headers: { 'User-Agent': USER_AGENT, Accept: 'application/json' },
         signal: AbortSignal.timeout(8000),
       });
@@ -715,15 +812,42 @@ export async function fetchFastTrackWikiFacts(artist: string, title: string): Pr
   const fromBuilder = buildTrackTitleCandidates(artist, title);
   const ambiguousSingleWord = !/\s/.test(cleanTitle.trim()) && cleanTitle.trim().length >= 3;
   const songCandidate = `${cleanTitle} (song)`;
+  const aliasSongCandidates = expandArtistSearchNames(artist)
+    .filter((name) => name.length > 5 && !/^mgk$/i.test(name.trim()))
+    .map((name) => `${cleanTitle} (${wikiTitleCaseArtist(name)} song)`);
   const candidates = (
     ambiguousSingleWord
       ? [
+          ...aliasSongCandidates,
           songCandidate,
           cleanTitle,
           ...fromBuilder.filter((c) => c !== cleanTitle && c !== songCandidate),
         ]
       : [cleanTitle, songCandidate, ...fromBuilder.filter((c) => c !== cleanTitle && c !== songCandidate)]
-  ).slice(0, 10);
+  ).slice(0, 12);
+
+  if (ambiguousSingleWord) {
+    const aliasName =
+      expandArtistSearchNames(artist).find((name) => name.length > 5 && !/^mgk$/i.test(name.trim())) ??
+      primaryArtistName(artist);
+    const searched = await searchWikiTitle(
+      lang,
+      `${cleanTitle} ${aliasName} song`,
+      artist,
+      title,
+    );
+    const directTitle =
+      searched ??
+      `${cleanTitle.charAt(0).toUpperCase()}${cleanTitle.slice(1)} (${wikiTitleCaseArtist(aliasName)} song)`;
+    const directExtract = await fetchWikiExtractDirect(lang, directTitle);
+    if (directExtract && !isDisambiguationExtract(directExtract) && !isWrongMusicTopic(artist, directExtract, directTitle)) {
+      const picked = pickIntroWikiFact(directExtract, artist, title, ambiguousSingleWord);
+      if (picked) {
+        console.log(`[wiki-fast-track] "${artist}" — "${title}" page="${directTitle}" facts=1`);
+        return [picked];
+      }
+    }
+  }
 
   for (const candidate of candidates) {
     let extract = await fetchFullExtract(lang, candidate, false);
@@ -735,11 +859,17 @@ export async function fetchFastTrackWikiFacts(artist: string, title: string): Pr
           (await fetchFullExtract(lang, searched, false)) ?? (await fetchSummary(lang, searched));
       }
     }
-    if (!extract || isDisambiguationExtract(extract)) continue;
-    if (isWrongMusicTopic(artist, extract, candidate)) continue;
+        if (!extract || isDisambiguationExtract(extract)) continue;
+        if (isWrongMusicTopic(artist, extract, candidate)) continue;
 
-    const sectionFacts: string[] = [];
-    const intro = extract.split(/\n+==/)[0]?.trim() ?? '';
+        const intro = extract.split(/\n+==/)[0]?.trim() ?? '';
+        const pickedIntro = pickIntroWikiFact(extract, artist, title, ambiguousSingleWord);
+        if (pickedIntro) {
+          console.log(`[wiki-fast-track] "${artist}" — "${title}" page="${candidate}" facts=1`);
+          return [pickedIntro];
+        }
+
+        const sectionFacts: string[] = [];
     if (intro.length >= 60) {
       sectionFacts.push(
         ...filterMusicFacts(extractFactBullets(intro, 6), artist, title, false),
@@ -761,9 +891,9 @@ export async function fetchFastTrackWikiFacts(artist: string, title: string): Pr
       false,
     );
 
-    const merged = filterAndRankFacts([...sectionFacts, ...contextual], 8).filter(
-      (fact) => interestScore(fact) >= 4,
-    );
+    const merged = filterAndRankFacts([...sectionFacts, ...contextual], 8)
+      .filter((fact) => interestScore(fact) >= 4)
+      .filter((fact) => !ambiguousSingleWord || isTrackAnchored(fact, artist, title));
     if (merged.length > 0) {
       console.log(
         `[wiki-fast-track] "${artist}" — "${title}" page="${candidate}" facts=${merged.length}`,
@@ -773,7 +903,7 @@ export async function fetchFastTrackWikiFacts(artist: string, title: string): Pr
 
     if (intro.length >= 60) {
       const looseIntro = filterAndRankFacts(
-        extractFactBullets(intro, 6).filter(
+        splitWikiSentences(intro).slice(0, 6).filter(
           (f) =>
             factMentionsTrack(f, title) ||
             factMentionsArtist(f, artist) ||

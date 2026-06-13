@@ -1,6 +1,7 @@
 /** Reject Wikipedia/DDG sentences about the wrong act — no hardcoded artist blocklists. */
 
 import { collaboratorNames } from './artist-primary.js';
+import { factMentionsArtistOrAlias } from './artist-search-aliases.js';
 import { buildTitleMatchVariants, cyrillicToLatin, fuzzyTokenMatch, textMentionsTitle } from './title-transliterate.js';
 import { latinPhraseToRussianTts } from './tts-foreign-pronounce.js';
 import { isNonMusicProfessionText } from './wikipedia-music.js';
@@ -587,6 +588,7 @@ export function factMentionsArtist(fact: string, artist: string): boolean {
   const artistNorm = normalize(artist);
   const factNorm = normalize(fact);
   if (artistNorm.length >= 3 && factNorm.includes(artistNorm)) return true;
+  if (factMentionsArtistOrAlias(fact, artist)) return true;
 
   const credits = collaboratorNames(artist);
   if (credits.length > 1) {
@@ -687,6 +689,8 @@ export function factMentionsTitle(fact: string, title: string): boolean {
 /** Однословные названия вроде «Summer» / «Love» — ложное совпадение с энциклопедией и сезонами. */
 const AMBIGUOUS_COMMON_WORD_TITLES = new Set(
   [
+    'cliche',
+    'cliché',
     'summer',
     'winter',
     'spring',

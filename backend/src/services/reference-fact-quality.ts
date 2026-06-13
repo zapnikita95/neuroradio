@@ -33,6 +33,9 @@ const DEDICATED_CATALOG_SEED_PATTERNS: RegExp[] = [
   /впервые прозвучала на живом выступлении/i,
   /(?:electronicore|deathtronica|metalcore|post-punk|shoegaze)\s+band\s+from/i,
   /(?:piece|member)\s+.*\s+band\s+from/i,
+  /\bas the (?:first|second|third|fourth|fifth|lead|debut) single from\b/i,
+  /^The song was released on .+ as the (?:first|second|third|fourth|lead|debut) single\b/i,
+  /^"[^"]+" is a song by .+ released on .+ as the (?:first|second|third|fourth|lead|debut) single\b/i,
 ];
 
 /** «Указан в альбоме X» — метаданные, не семя для истории (LLM выдумает звук). */
@@ -105,7 +108,32 @@ export function isArtistFormationBioSeed(fact: string): boolean {
     /\b(?:is|was)\s+(?:an?\s+)?(?:\w+\s+){0,4}(?:band|group|artist|duo|trio)\s+formed\s+in\b/i.test(t) ||
     /\b(?:band|group)\s+formed\s+in\s+[A-Z][\w-]+(?:\s+in\s+\d{4})?\b/i.test(t) ||
     /\b(?:originally )?started as a (?:duo|duet|band|group)\b/i.test(t) ||
-    /\bbefore transitioning to a solo\b/i.test(t)
+    /\bbefore transitioning to a solo\b/i.test(t) ||
+    /\b(?:pop rock band|rock band|band|group)\b.*\boriginated in\b/i.test(t) ||
+    (/\boriginated in\b/i.test(t) &&
+      /\b(?:band|group|artist|pop rock band|rock band)\b/i.test(t)) ||
+    /\bThe group was formed in\b/i.test(t)
+  );
+}
+
+/** Wikipedia/Last.fm disambiguation list — «1) Russian band 2) Argentinian…». */
+export function isArtistDisambiguationListSeed(fact: string): boolean {
+  const t = fact.trim();
+  return /^\d+\)\s/.test(t) && /\b\d+\)\s/.test(t.slice(3));
+}
+
+/** Dictionary/literary page bleed — «cliché» the word, not mgk track. */
+export function isEncyclopediaDefinitionSeed(fact: string): boolean {
+  const t = fact.trim();
+  return (
+    /\b(?:French poet|G[eé]rard de Nerval|Nerval once said)\b/i.test(t) ||
+    /\bA clich[eé] is\b/i.test(t) ||
+    /\bclich[eé] is a (?:phrase|figure|literary)\b/i.test(t) ||
+    /\bcompared a woman to a rose\b/i.test(t) ||
+    /\b(?:literary device|figure of speech|rhetorical device)\b/i.test(t) ||
+    (/\b(?:term for|means a|defined as|refers to a)\b/i.test(t) &&
+      /\bclich[eé]\b/i.test(t) &&
+      !/\b(?:song|single|track|album|mgk|machine gun kelly|colson baker)\b/i.test(t))
   );
 }
 
@@ -299,6 +327,12 @@ export function interestScore(fact: string): number {
   if (isUnspeakableWebSeed(trimmed)) score -= 50;
   if (isCollectorFact(fact)) score += 8;
   if (isDedicatedCatalogSeed(trimmed)) score += 12;
+  if (
+    /Трек «[^»]+» вошёл в альбом/i.test(trimmed) &&
+    /\b(?:Recorded|Mixed|mastered|Studio|studios?)\b/i.test(trimmed)
+  ) {
+    score += 14;
+  }
   if (isTrackDurationCatalogSeed(trimmed)) score -= 10;
   if (/^[«"']/.test(trimmed) && /\b(?:first|new|debut|lead)\b/i.test(trimmed)) score += 18;
   if (/\b(?:first new (?:song|music|single)|announced (?:a )?new ep|new lead singer)\b/i.test(trimmed)) {
@@ -359,8 +393,8 @@ export function interestScore(fact: string): number {
     score += 14;
   }
   if (
-    /\b(?:opening track|lead single)\b/i.test(fact) &&
-    /\b(?:album|released|debut|second|third|nevermind)\b/i.test(fact)
+    /\b(?:opening track|(?:first|second|third|fourth|lead|debut) single)\b/i.test(fact) &&
+    /\b(?:album|released|debut|studio album|from their|from the)\b/i.test(fact)
   ) {
     score += 14;
   }

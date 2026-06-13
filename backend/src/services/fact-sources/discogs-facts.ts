@@ -1,5 +1,6 @@
 import type { HarvestContext, HarvestedFact } from './types.js';
-import { fetchJson, cleanTrackTitle, splitSentences, stripHtml } from './fetch-utils.js';
+import { cleanTrackTitle, fetchJson, splitSentences, stripHtml } from './fetch-utils.js';
+import { harvestTitleVariants } from '../title-harvest-variants.js';
 
 const TOKEN = process.env.DISCOGS_TOKEN?.trim() ?? '';
 const LASTFM_KEY = process.env.LASTFM_API_KEY?.trim() ?? '';
@@ -96,6 +97,15 @@ function pickRelease(
   return scored[0]?.score >= 4 ? scored[0].id : results.find((r) => r.type === 'release')?.id ?? null;
 }
 
+function normalizeTrackTitleForMatch(title: string): string {
+  return title
+    .toLowerCase()
+    .replace(/[''`]/g, '')
+    .replace(/\bnobodies\b/g, 'nobodys')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
 function sentenceOk(sentence: string): boolean {
   const t = sentence.trim();
   if (t.length < 35 || t.length > 520) return false;
@@ -162,15 +172,29 @@ export async function fetchDiscogsFacts(ctx: HarvestContext): Promise<HarvestedF
     }
   }
 
-  const titleLc = cleanTrackTitle(ctx.title).toLowerCase();
+  const titleVariants = new Set(
+    harvestTitleVariants(ctx.title).map((variant) => normalizeTrackTitleForMatch(variant)),
+  );
+  let matchedTrack = false;
   for (const tr of release.tracklist ?? []) {
     const trTitle = tr.title?.trim();
-    if (!trTitle || trTitle.toLowerCase() !== titleLc) continue;
+    if (!trTitle || !titleVariants.has(normalizeTrackTitleForMatch(trTitle))) continue;
+    matchedTrack = true;
     if (tr.duration?.trim()) {
       const line = `На издании альбома «${release.title ?? album ?? ctx.title}» трек «${ctx.title}» идёт ${tr.duration.trim()}.`;
       if (sentenceOk(line)) push(line, 'track');
     }
     break;
+  }
+
+  if (matchedTrack && notes) {
+    for (const sentence of splitSentences(stripHtml(notes))) {
+      if (!sentenceOk(sentence)) continue;
+      if (!/\b(?:recorded|mixed|mastered|studio|produced)\b/i.test(sentence)) continue;
+      const line = `Трек «${ctx.title}» вошёл в альбом «${release.title ?? album ?? ctx.title}»: ${sentence}`;
+      if (sentenceOk(line)) push(line, 'track');
+      if (facts.filter((f) => f.scope === 'track').length >= 3) break;
+    }
   }
 
   return facts.slice(0, 8);

@@ -1,11 +1,7 @@
 import type { HarvestContext, HarvestedFact } from './types.js';
-import {
-  cleanTrackTitle,
-  domToPlainText,
-  fetchJson,
-  splitSentences,
-  stripHtml,
-} from './fetch-utils.js';
+import { artistsMatchForHarvest } from '../artist-search-aliases.js';
+import { cleanTrackTitle, domToPlainText, fetchJson, splitSentences, stripHtml } from './fetch-utils.js';
+import { expandArtistSearchNames } from '../artist-search-aliases.js';
 
 const TOKEN = process.env.GENIUS_ACCESS_TOKEN?.trim() ?? '';
 
@@ -59,13 +55,12 @@ function pickBestHit(
   title: string,
 ): number | null {
   const cleanTitle = cleanTrackTitle(title).toLowerCase();
-  const artistLower = artist.toLowerCase();
   for (const hit of hits ?? []) {
     const result = hit.result;
     if (!result?.id) continue;
-    const hitArtist = (result.primary_artist?.name ?? '').toLowerCase();
+    const hitArtist = result.primary_artist?.name ?? '';
     const hitTitle = (result.title ?? '').toLowerCase();
-    if (hitArtist.includes(artistLower) || artistLower.includes(hitArtist)) {
+    if (artistsMatchForHarvest(artist, hitArtist)) {
       if (hitTitle.includes(cleanTitle) || cleanTitle.includes(hitTitle)) {
         return result.id;
       }
@@ -78,7 +73,10 @@ export async function fetchGeniusFacts(ctx: HarvestContext): Promise<HarvestedFa
   const headers = geniusHeaders();
   if (!headers) return [];
 
-  const query = `${ctx.artist} ${cleanTrackTitle(ctx.title)}`.trim();
+  const queryArtist =
+    expandArtistSearchNames(ctx.artist).find((n) => n.length > 5 && !/^mgk$/i.test(n.trim())) ??
+    ctx.artist;
+  const query = `${queryArtist} ${cleanTrackTitle(ctx.title)}`.trim();
   const search = await fetchJson<GeniusSearchResponse>(
     `https://api.genius.com/search?q=${encodeURIComponent(query)}`,
     { headers, timeoutMs: 10_000 },

@@ -11,6 +11,14 @@ import {
   isMisattributedBandTrackFact,
   isNonMusicTitleCollisionFact,
 } from './fact-relevance.js';
+import {
+  adjustedInterestScore,
+  isAlbumListingSeed,
+  isArtistDisambiguationListSeed,
+  isCatalogMetadataSeed,
+  isEncyclopediaDefinitionSeed,
+} from './reference-fact-quality.js';
+import { isMetadataOnlyFallbackFact } from './metadata-facts.js';
 
 function normalize(text: string): string {
   return text
@@ -75,6 +83,8 @@ const ARTIST_CAREER_BIO_PATTERNS: RegExp[] = [
   /\btransitioned to a solo career\b/i,
   /\b(?:band|group|duo)\s+formed in\b/i,
   /\b(?:is|was)\s+(?:an?\s+)?(?:\w+\s+){0,4}(?:band|group|artist|duo|trio)\s+formed\s+in\b/i,
+  /\b(?:pop rock band|rock band|indie rock band)\b.*\boriginated in\b/i,
+  /\b(?:up-and-coming|indie rock band)\b.*\bfrom Moscow\b/i,
   /(?:^|[\s,.])начинал\w*\s+как\s+дуэт/i,
   /(?:^|[\s,.])начал\w*\s+как\s+дуэт/i,
   /как\s+дуэт\s+с\s+[А-ЯA-ZЁ]/u,
@@ -166,11 +176,43 @@ export function isArtistCareerBioWithoutTrack(fact: string, title: string): bool
   return ARTIST_CAREER_BIO_PATTERNS.some((p) => p.test(fact));
 }
 
+/** Band bio sentence names a different single than the requested track. */
+export function isOtherNamedSingleBioFact(fact: string, title: string): boolean {
+  if (factMentionsTitle(fact, title)) return false;
+  const match = fact.match(
+    /\b(?:debut|lead|first|second|third)\s+single\s+(?!from\b|off\b|on\b|in\b|of\b|for\b)(?:«|"|'|)([A-Za-zА-Яа-яЁё0-9][\w\s'-]{0,48}?)(?:»|"|'|\s+was|\s+is|\s+from|,|\.|\s+recorded)/iu,
+  );
+  if (!match?.[1]) return false;
+  const named = normalize(match[1]);
+  const titleNorm = normalize(title.replace(/\s*\([^)]*\)\s*/g, ' '));
+  if (named.length < 3 || titleNorm.length < 3) return false;
+  if (titleNorm.includes(named) || named.includes(titleNorm)) return false;
+  const titleToken = titleNorm.split(' ').filter((p) => p.length >= 4)[0] ?? titleNorm;
+  if (titleToken.length >= 4 && (named.includes(titleToken) || titleToken.includes(named))) {
+    return false;
+  }
+  return true;
+}
+
 /** Fact names the requested track — valid seed even if «first single» boring pattern. */
 export function isTrackTitleAnchoredSeed(fact: string, title: string): boolean {
   if (!title.trim()) return false;
   const trimmed = fact.trim();
-  return factMentionsTitle(trimmed, title) && trimmed.length >= 35;
+  if (trimmed.length < 35) return false;
+  if (factMentionsTitle(trimmed, title)) return true;
+  return hasAnchoredTrackContext(trimmed, title);
+}
+
+/** Track pool has a real anchor — not Discogs date/label or disambiguation junk. */
+function isStrongTrackPoolAnchor(fact: string, title: string): boolean {
+  const trimmed = fact.trim();
+  if (trimmed.length < 35 || !factMentionsTitle(trimmed, title)) return false;
+  if (isCatalogMetadataSeed(trimmed) || isAlbumListingSeed(trimmed)) return false;
+  if (isMetadataOnlyFallbackFact(trimmed)) return false;
+  if (isEncyclopediaDefinitionSeed(trimmed) || isArtistDisambiguationListSeed(trimmed)) {
+    return false;
+  }
+  return hasAnchoredTrackContext(trimmed, title) || adjustedInterestScore(trimmed) >= 6;
 }
 
 /** Stricter track context — «It was originally written» is NOT enough without the title. */
@@ -210,13 +252,12 @@ export function rejectSeedForTrackStory(
   if (isAlienSongOriginFact(trimmed, title)) return true;
   if (isArtistCareerBioWithoutTrack(trimmed, title)) return true;
   if (isMisattributedBandTrackFact(trimmed, title)) return true;
+  if (isOtherNamedSingleBioFact(trimmed, title)) return true;
 
   if (factMentionsTitle(trimmed, title)) return false;
 
   const trackPool = options.trackPoolFacts ?? [];
-  const hasStrongTrackFact = trackPool.some(
-    (f) => f.trim().length >= 35 && factMentionsTitle(f, title),
-  );
+  const hasStrongTrackFact = trackPool.some((f) => isStrongTrackPoolAnchor(f, title));
 
   if (hasStrongTrackFact && !hasAnchoredTrackContext(trimmed, title)) {
     return true;

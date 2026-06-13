@@ -221,8 +221,8 @@ assert(
   `Shakira variants strip feat/Single (got: ${shakiraVariants.join(' | ')})`,
 );
 assert(
-  primaryHarvestLookupTitle(SHAKIRA_LONG).length < SHAKIRA_LONG.length,
-  'primaryHarvestLookupTitle shorter than catalog name',
+  primaryHarvestLookupTitle(SHAKIRA_LONG).includes('Waka Waka (This Time for Africa)'),
+  'primaryHarvestLookupTitle keeps stripped feat/Single title',
 );
 
 const aliasKeys = resolveTrackLookupKeys('Shakira', SHAKIRA_LONG);
@@ -443,6 +443,75 @@ const ungroundedGroup = findUngroundedClaims(
 );
 assert(ungroundedGroup, `group narrative flagged when seed lacks band context (got: ${ungroundedGroup ?? 'null'})`);
 void BAD_ROB_STORY;
+
+const MAROON_ORIGIN =
+  'Maroon 5 is an American pop rock band that originated in Los Angeles, California, United States.';
+const MAROON_SINGLE =
+  'The song was released on June 19, 2012, as the second single from their fourth studio album.';
+const MGK_NERVAL =
+  'The French poet Gérard de Nerval once said, "The first who compared a woman to a rose was a poet, the second an imbecile." A cliché is often';
+const POMPEYA_DISAMBIG = '1) A Russian rock band from Moscow. 2) An Argentinian funkpopjazz band based in Buenos Aires.';
+const POMPEYA_MOSCOW = '1) POMPEYA is an up-and-coming indie rock band from Moscow, Russia.';
+
+const {
+  isEncyclopediaDefinitionSeed,
+  isArtistDisambiguationListSeed,
+} = await import('../dist/services/reference-fact-quality.js');
+const { artistsMatchForHarvest, factMentionsArtistOrAlias } = await import(
+  '../dist/services/artist-search-aliases.js'
+);
+
+assert(
+  rejectSeedForTrackStory(
+    'The debut single check was recorded in the beginning of 2007 and quickly became popular.',
+    'Pompeya',
+    "Nobody's Truth",
+  ),
+  'Pompeya wrong-track debut single rejected',
+);
+assert(isArtistFormationBioSeed(MAROON_ORIGIN), 'Maroon originated-in-LA is formation bio');
+assert(
+  isTrackTitleAnchoredSeed(MAROON_SINGLE, 'One More Night'),
+  'Maroon second-single fact anchors via release context',
+);
+assert(
+  isRejectedStorySeed(MAROON_ORIGIN, 'Maroon 5', 'One More Night', [MAROON_SINGLE]),
+  'Maroon LA origin rejected when track single exists',
+);
+assert(isEncyclopediaDefinitionSeed(MGK_NERVAL), 'mgk Nerval cliché definition rejected');
+assert(
+  isRejectedStorySeed(MGK_NERVAL, 'mgk', 'cliché', []),
+  'encyclopedia bleed rejected for mgk cliché',
+);
+assert(isArtistDisambiguationListSeed(POMPEYA_DISAMBIG), 'Pompeya disambig list is junk');
+assert(
+  rejectSeedForTrackStory(POMPEYA_MOSCOW, 'Pompeya', "Nobody's Truth"),
+  'Pompeya Moscow band bio rejected without track title',
+);
+assert(artistsMatchForHarvest('mgk', 'Machine Gun Kelly'), 'mgk matches Machine Gun Kelly harvest');
+assert(
+  factMentionsArtistOrAlias('Colson Baker released cliché in 2024', 'mgk'),
+  'mgk alias colson baker in facts',
+);
+
+const maroonPick = pickReferenceFact(
+  {
+    trackFacts: [MAROON_SINGLE, '"One More Night" is a song performed by American pop rock band Maroon 5.'],
+    artistFacts: [MAROON_ORIGIN, 'The group was formed in 1994 as Kara\'s Flowers while its members were still in high school.'],
+  },
+  [],
+  0,
+  'Maroon 5',
+  'One More Night',
+);
+assert(
+  maroonPick && (maroonPick.fact.includes('2012') || maroonPick.fact.includes('One More Night')),
+  `Maroon pick prefers track context (got: ${maroonPick?.fact?.slice(0, 90) ?? 'null'})`,
+);
+assert(
+  maroonPick && !/\boriginated in Los Angeles\b/i.test(maroonPick.fact),
+  `Maroon pick must not be LA origin bio (got: ${maroonPick?.fact?.slice(0, 90) ?? 'null'})`,
+);
 
 // --- 5c. Bank pick uses live interest rules (generic video ≠ hot) ---
 const { isEligibleHotFact, isRejectedPickSeed } = await import('../dist/services/fact-seed-pick.js');
