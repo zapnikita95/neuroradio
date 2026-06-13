@@ -1,3 +1,4 @@
+import { harvestTitleVariants } from '../title-harvest-variants.js';
 import type { HarvestContext, HarvestedFact } from './types.js';
 import { fetchJson, splitSentences, stripHtml } from './fetch-utils.js';
 
@@ -48,12 +49,23 @@ async function fetchArtistInfo(artist: string): Promise<HarvestedFact[]> {
 }
 
 async function fetchTrackInfo(artist: string, title: string): Promise<HarvestedFact[]> {
-  const data = await fetchJson<LastFmTrackInfo>(
-    `https://ws.audioscrobbler.com/2.0/?method=track.getInfo&artist=${encodeURIComponent(artist)}&track=${encodeURIComponent(title)}&api_key=${API_KEY}&format=json&autocorrect=1`,
-    { timeoutMs: 8000 },
-  );
+  let track: LastFmTrackInfo['track'] | undefined;
+  let resolvedTitle = title;
+  for (const variant of harvestTitleVariants(title)) {
+    const data = await fetchJson<LastFmTrackInfo>(
+      `https://ws.audioscrobbler.com/2.0/?method=track.getInfo&artist=${encodeURIComponent(artist)}&track=${encodeURIComponent(variant)}&api_key=${API_KEY}&format=json&autocorrect=1`,
+      { timeoutMs: 8000 },
+    );
+    const candidate = data?.track;
+    const wiki = candidate?.wiki?.content?.trim() || candidate?.wiki?.summary?.trim();
+    if (wiki || candidate?.listeners || candidate?.album?.title) {
+      track = candidate;
+      resolvedTitle = variant;
+      if (wiki) break;
+    }
+  }
+
   const facts: HarvestedFact[] = [];
-  const track = data?.track;
   const raw = track?.wiki?.content?.trim() || track?.wiki?.summary?.trim();
   facts.push(...wikiToSentences(raw, 'track'));
 
@@ -61,16 +73,18 @@ async function fetchTrackInfo(artist: string, title: string): Promise<HarvestedF
   const playcount = parseInt(track?.playcount ?? '0', 10);
   if (listeners >= 50_000 && playcount >= 100_000) {
     facts.push({
-      fact: `На Last.fm у «${title}» (${artist}) ${listeners.toLocaleString('en-US')} слушателей и ${playcount.toLocaleString('en-US')} прослушиваний.`,
+      fact: `На Last.fm у «${resolvedTitle}» (${artist}) ${listeners.toLocaleString('en-US')} слушателей и ${playcount.toLocaleString('en-US')} прослушиваний.`,
       scope: 'track',
       source: 'lastfm',
+      metadataOnly: true,
     });
   }
   if (track?.album?.title) {
     facts.push({
-      fact: `Трек «${title}» исполнителя ${artist} на Last.fm указан в альбоме «${track.album.title}».`,
+      fact: `Трек «${resolvedTitle}» исполнителя ${artist} на Last.fm указан в альбоме «${track.album.title}».`,
       scope: 'track',
       source: 'lastfm',
+      metadataOnly: true,
     });
   }
   return facts.slice(0, 6);

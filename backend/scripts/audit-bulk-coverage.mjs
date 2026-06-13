@@ -11,6 +11,7 @@ import { fileURLToPath } from 'node:url';
 
 const __dir = dirname(fileURLToPath(import.meta.url));
 const probeN = parseInt(process.argv.find((a) => a.startsWith('--probe='))?.split('=')[1] ?? '3', 10);
+const { isMetadataHarvestFact } = await import('../dist/services/reference-fact-quality.js');
 
 const bank = JSON.parse(readFileSync(join(__dir, '../data/facts-bank.json'), 'utf8'));
 const prog = JSON.parse(readFileSync(join(__dir, '../data/bulk-seed-progress.json'), 'utf8'));
@@ -42,6 +43,26 @@ console.log(`Zero-fact keys (logged): ${zeroListed.size}`);
 console.log(`Done with NO track pool: ${doneNoFacts.length} (${((doneNoFacts.length / done.size) * 100).toFixed(1)}%)`);
 console.log(`...but artist pool exists: ${doneNoTrackButMaybeArtist.length}`);
 console.log(`Bank: ${Object.keys(bank.byTrack).length} track keys, ${Object.keys(bank.byArtist).length} artist keys`);
+
+let scopeTrack = 0;
+let scopeAlbum = 0;
+let scopeArtist = 0;
+let metadata = 0;
+let substantive = 0;
+for (const pool of [...Object.values(bank.byTrack ?? {}), ...Object.values(bank.byArtist ?? {})]) {
+  for (const f of pool) {
+    if (f.isMetadata || isMetadataHarvestFact(f.fact)) {
+      metadata += 1;
+      continue;
+    }
+    substantive += 1;
+    if (f.scope === 'album') scopeAlbum += 1;
+    else if (f.scope === 'artist') scopeArtist += 1;
+    else scopeTrack += 1;
+  }
+}
+console.log(`Substantive facts: ${substantive} | metadata (not counted): ${metadata}`);
+console.log(`By scope: track=${scopeTrack} album=${scopeAlbum} artist=${scopeArtist}`);
 console.log(`Hot facts: ${hot.length}\n`);
 
 console.log('Hot by source:');

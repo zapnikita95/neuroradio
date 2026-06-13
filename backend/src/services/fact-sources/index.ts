@@ -1,5 +1,6 @@
 import { fetchAggregatedFactContext } from '../fact-aggregator.js';
 import { factAppliesToRequest, factMentionsArtist } from '../fact-relevance.js';
+import { harvestTitleVariants } from '../title-harvest-variants.js';
 import { fetchArtistWikiLeadWithRetry } from '../wikipedia-lead.js';
 import type { HarvestContext, HarvestedFact } from './types.js';
 import { fetchGeniusFacts } from './genius-facts.js';
@@ -58,8 +59,16 @@ async function artistWikiFallback(ctx: HarvestContext): Promise<HarvestedFact[]>
 export async function harvestAllFacts(ctx: HarvestContext): Promise<HarvestedFact[]> {
   let collected: HarvestedFact[] = [];
 
-  const dedicated = await fetchDedicatedSourceFacts(ctx);
-  collected = mergeCollected(collected, dedicated);
+  const titles = harvestTitleVariants(ctx.title);
+  for (let i = 0; i < titles.length; i++) {
+    const subCtx = i === 0 ? ctx : { ...ctx, title: titles[i]! };
+    const dedicated = await fetchDedicatedSourceFacts(subCtx);
+    collected = mergeCollected(collected, dedicated);
+    const hasTrackWiki = dedicated.some(
+      (f) => (f.scope === 'track' || f.scope === 'album') && !f.metadataOnly && f.fact.trim().length >= 35,
+    );
+    if (hasTrackWiki) break;
+  }
 
   try {
     const discogs = await fetchDiscogsFacts(ctx);
@@ -69,7 +78,8 @@ export async function harvestAllFacts(ctx: HarvestContext): Promise<HarvestedFac
   }
 
   try {
-    const agg = await fetchAggregatedFactContext(ctx.artist, ctx.title, ctx.countryCode);
+    const aggTitle = titles.find((t) => t.length <= ctx.title.length) ?? ctx.title;
+    const agg = await fetchAggregatedFactContext(ctx.artist, aggTitle, ctx.countryCode);
     const sources = agg.snippetSources ?? [];
     for (let i = 0; i < (agg.rawSnippets ?? []).length; i++) {
       const text = agg.rawSnippets[i];

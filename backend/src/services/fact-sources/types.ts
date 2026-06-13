@@ -42,6 +42,8 @@ export interface HarvestedFact {
   fact: string;
   scope: FactScope;
   source: HarvestSource;
+  /** Last.fm stats / album listing — store in bank, not progress success. */
+  metadataOnly?: boolean;
 }
 
 export interface HarvestContext {

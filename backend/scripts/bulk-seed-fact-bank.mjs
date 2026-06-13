@@ -12,7 +12,7 @@ import { fileURLToPath } from 'node:url';
 import { harvestAllFacts, fetchDiscogsFacts } from '../dist/services/fact-sources/index.js';
 import { interestScore } from '../dist/services/reference-fact-quality.js';
 import { interestRating10 } from '../dist/services/fact-interest-log.js';
-import { isBoringFact } from '../dist/services/reference-fact-quality.js';
+import { isBoringFact, isMetadataHarvestFact } from '../dist/services/reference-fact-quality.js';
 import { BANK_PATH } from '../dist/services/fact-bank.js';
 import { classifyFactTopic, poolHasTopicDuplicate } from '../dist/services/fact-topic.js';
 import { isParserTrustedHarvestSource } from '../dist/services/fact-sources/types.js';
@@ -68,10 +68,49 @@ function trackPriority(track) {
   return 5;
 }
 
-function hasFactsInBank(bank, artist, title) {
+function hasSubstantiveInPool(pool) {
+  return (pool ?? []).some((f) => !f.isMetadata);
+}
+
+function hasSubstantiveFactsInBank(bank, artist, title) {
   const tk = trackKey(artist, title);
+  if (hasSubstantiveInPool(bank.byTrack[tk])) return true;
   const ak = artistKey(artist);
-  return (bank.byTrack[tk]?.length ?? 0) > 0 || (bank.byArtist[ak]?.length ?? 0) > 0;
+  return hasSubstantiveInPool(bank.byArtist[ak]);
+}
+
+function summarizeBank(bank) {
+  const byScope = { track: 0, album: 0, artist: 0 };
+  let substantive = 0;
+  let metadata = 0;
+  let hot = 0;
+  for (const pool of [...Object.values(bank.byTrack ?? {}), ...Object.values(bank.byArtist ?? {})]) {
+    for (const f of pool) {
+      if (f.isMetadata) {
+        metadata += 1;
+        continue;
+      }
+      substantive += 1;
+      if (f.scope === 'album') byScope.album += 1;
+      else if (f.scope === 'artist') byScope.artist += 1;
+      else byScope.track += 1;
+      if (f.isHot) hot += 1;
+    }
+  }
+  return { byScope, substantive, metadata, hot };
+}
+
+function buildHotSeed(bank) {
+  const hotOnly = { byTrack: {}, byArtist: {} };
+  for (const [k, pool] of Object.entries(bank.byTrack ?? {})) {
+    const hot = pool.filter((f) => f.isHot && !f.isMetadata);
+    if (hot.length) hotOnly.byTrack[k] = hot;
+  }
+  for (const [k, pool] of Object.entries(bank.byArtist ?? {})) {
+    const hot = pool.filter((f) => f.isHot && !f.isMetadata);
+    if (hot.length) hotOnly.byArtist[k] = hot;
+  }
+  return hotOnly;
 }
 
 function hasLastfmInBank(bank, artist, title) {
@@ -91,10 +130,10 @@ function countHotInBank(bank) {
   return (
     Object.values(bank.byTrack ?? {})
       .flat()
-      .filter((f) => f.isHot).length +
+      .filter((f) => f.isHot && !f.isMetadata).length +
     Object.values(bank.byArtist ?? {})
       .flat()
-      .filter((f) => f.isHot).length
+      .filter((f) => f.isHot && !f.isMetadata).length
   );
 }
 
@@ -108,20 +147,24 @@ function saveBank(path, bank) {
   writeFileSync(path, JSON.stringify(bank, null, 2), 'utf8');
 }
 
-function buildHotSeed(bank) {
-  const hotOnly = { byTrack: {}, byArtist: {} };
-  for (const [k, pool] of Object.entries(bank.byTrack ?? {})) {
-    const hot = pool.filter((f) => f.isHot);
-    if (hot.length) hotOnly.byTrack[k] = hot;
+function normalizeBankMetadata(bank) {
+  for (const pool of [...Object.values(bank.byTrack ?? {}), ...Object.values(bank.byArtist ?? {})]) {
+    for (const f of pool) {
+      if (!f.isMetadata && isMetadataHarvestFact(f.fact)) {
+        f.isMetadata = true;
+        f.isHot = false;
+      }
+    }
   }
-  for (const [k, pool] of Object.entries(bank.byArtist ?? {})) {
-    const hot = pool.filter((f) => f.isHot);
-    if (hot.length) hotOnly.byArtist[k] = hot;
-  }
-  return hotOnly;
 }
 
 function saveCheckpoint(bank, stats, doneKeys, zeroFactKeys) {
+  normalizeBankMetadata(bank);
+  const bankSummary = summarizeBank(bank);
+  stats.hot = bankSummary.hot;
+  stats.metadata = bankSummary.metadata;
+  stats.byScope = bankSummary.byScope;
+  stats.substantive = bankSummary.substantive;
   saveBank(BANK_PATH, bank);
   saveBank(SEED_OUT, buildHotSeed(bank));
   writeFileSync(
@@ -175,9 +218,14 @@ function upsertRejectReason(bank, artist, title, item) {
   return null;
 }
 
+function isMetadataItem(item) {
+  return Boolean(item.metadataOnly) || isMetadataHarvestFact(item.fact);
+}
+
 function upsertFact(bank, artist, title, item) {
   const trimmed = item.fact.trim();
   if (upsertRejectReason(bank, artist, title, item)) return false;
+  const isMetadata = isMetadataItem(item);
   const score = interestScore(trimmed);
   const rating = interestRating10(trimmed);
   const topicKey = classifyFactTopic(trimmed);
@@ -190,7 +238,8 @@ function upsertFact(bank, artist, title, item) {
     interestScore: score,
     interestRating: rating,
     source: 'api',
-    isHot: rating >= 6 && !JUNK_FACT.test(trimmed),
+    isMetadata,
+    isHot: !isMetadata && rating >= 6 && !JUNK_FACT.test(trimmed),
     harvestSource: item.source,
     topicKey,
     timesUsed: 0,
@@ -215,29 +264,38 @@ function upsertFact(bank, artist, title, item) {
   pool.push(stored);
   pool.sort((a, b) => b.interestScore - a.interestScore);
   if (pool.length > 80) pool.length = 80;
-  return true;
+  return isMetadata ? 'metadata' : 'substantive';
 }
 
 async function saveFacts(bank, artist, title, facts, stats) {
-  let saved = 0;
-  let savedHot = 0;
+  let savedSubstantive = 0;
+  let savedMetadata = 0;
   let savedLastfm = 0;
   const rejectCounts = {};
   for (const f of facts) {
-    if (upsertFact(bank, artist, title, f)) {
-      saved += 1;
+    const result = upsertFact(bank, artist, title, f);
+    if (result === 'substantive') {
+      savedSubstantive += 1;
       stats.bySource[f.source] = (stats.bySource[f.source] ?? 0) + 1;
       if (f.source === 'lastfm') savedLastfm += 1;
-      if (interestRating10(f.fact) >= 6 && !JUNK_FACT.test(f.fact)) savedHot += 1;
+    } else if (result === 'metadata') {
+      savedMetadata += 1;
     } else {
       const why = upsertRejectReason(bank, artist, title, f) ?? 'unknown';
       rejectCounts[why] = (rejectCounts[why] ?? 0) + 1;
     }
   }
-  stats.total += saved;
+  stats.total += savedSubstantive;
+  stats.metadata = (stats.metadata ?? 0) + savedMetadata;
   stats.hot = countHotInBank(bank);
   stats.tracks += 1;
-  return { saved, savedHot, savedLastfm, harvested: facts.length, rejectCounts };
+  return {
+    saved: savedSubstantive,
+    savedMetadata,
+    savedLastfm,
+    harvested: facts.length,
+    rejectCounts,
+  };
 }
 
 async function processTrack(bank, track, stats) {
@@ -272,7 +330,7 @@ function orderTracks(tracks, doneKeys, bank, zeroFactKeys) {
   if (retryZero) {
     const retry = tracks.filter((t) => {
       const key = trackKey(t.artist, t.title);
-      return zeroFactKeys.has(key) || (doneKeys.has(key) && !hasFactsInBank(bank, t.artist, t.title));
+      return zeroFactKeys.has(key) || (doneKeys.has(key) && !hasSubstantiveFactsInBank(bank, t.artist, t.title));
     });
     console.log(
       `Queue: discogs=${discogsBackfill.length} pending=${pending.length} backfill=${backfill.length} | retry-zero=${retry.length} (last)`,
@@ -300,22 +358,31 @@ async function runPool(tracks, bank, stats, doneKeys, zeroFactKeys) {
       const track = tracks[i];
       const key = trackKey(track.artist, track.title);
       try {
-        const { saved, savedLastfm, harvested, rejectCounts } = await processTrack(bank, track, stats);
+        const { saved, savedMetadata, savedLastfm, harvested, rejectCounts } = await processTrack(
+          bank,
+          track,
+          stats,
+        );
         doneKeys.add(key);
-        if (saved === 0) {
+        const substantiveNow = hasSubstantiveFactsInBank(bank, track.artist, track.title);
+        if (!substantiveNow) {
           zeroFactKeys.add(key);
           stats.zeroFacts = (stats.zeroFacts ?? 0) + 1;
           const rejectHint =
             harvested > 0 && Object.keys(rejectCounts).length
               ? ` rejected=${JSON.stringify(rejectCounts)}`
               : '';
+          const metaHint = savedMetadata > 0 ? ` metaOnly=${savedMetadata}` : '';
           console.warn(
-            `[${stats.tracks}] ZERO ${track.artist} — ${track.title} (harvested=${harvested}${rejectHint}, zeroTotal=${stats.zeroFacts})`,
+            `[${stats.tracks}] ZERO ${track.artist} — ${track.title} (harvested=${harvested}${rejectHint}${metaHint}, zeroTotal=${stats.zeroFacts})`,
           );
         } else {
           zeroFactKeys.delete(key);
           const lf = savedLastfm > 0 ? ` lastfm=${savedLastfm}` : '';
-          console.log(`[${stats.tracks}] ${track.artist} — ${track.title}: +${saved}${lf} (total=${stats.total})`);
+          const meta = savedMetadata > 0 ? ` meta=${savedMetadata}` : '';
+          console.log(
+            `[${stats.tracks}] ${track.artist} — ${track.title}: +${saved}${lf}${meta} (total=${stats.total})`,
+          );
         }
         if (stats.tracks % 10 === 0) {
           saveCheckpoint(bank, stats, doneKeys, zeroFactKeys);
@@ -343,15 +410,23 @@ async function main() {
     for (const k of prog.doneKeys ?? []) doneKeys.add(k);
     for (const k of prog.zeroFactKeys ?? []) zeroFactKeys.add(k);
     Object.assign(stats, prog.stats ?? {});
+    // Recount substantive total without metadata after bank normalization.
+    normalizeBankMetadata(bank);
+    const recap = summarizeBank(bank);
+    stats.total = recap.substantive;
+    stats.metadata = recap.metadata;
+    stats.byScope = recap.byScope;
+    stats.substantive = recap.substantive;
+    stats.hot = recap.hot;
     console.log(
-      `Resuming: ${doneKeys.size} tracks done, zero=${zeroFactKeys.size}, facts=${stats.total}`,
+      `Resuming: ${doneKeys.size} tracks done, zero=${zeroFactKeys.size}, substantive=${recap.substantive}, metadata=${recap.metadata}`,
     );
   }
 
   if (retryZero && zeroFactKeys.size === 0) {
     for (const t of tracks) {
       const key = trackKey(t.artist, t.title);
-      if (doneKeys.has(key) && !hasFactsInBank(bank, t.artist, t.title)) {
+      if (doneKeys.has(key) && !hasSubstantiveFactsInBank(bank, t.artist, t.title)) {
         zeroFactKeys.add(key);
       }
     }
@@ -388,12 +463,15 @@ async function main() {
   );
 
   const hotCount =
-    Object.values(bank.byTrack).flat().filter((f) => f.isHot).length +
-    Object.values(bank.byArtist).flat().filter((f) => f.isHot).length;
+    Object.values(bank.byTrack).flat().filter((f) => f.isHot && !f.isMetadata).length +
+    Object.values(bank.byArtist).flat().filter((f) => f.isHot && !f.isMetadata).length;
+  const bankSummary = summarizeBank(bank);
   console.log('\n=== Bulk seed report ===');
   console.log(`Tracks processed: ${stats.tracks}`);
-  console.log(`Facts saved: ${stats.total}`);
-  console.log(`Tracks with zero facts: ${stats.zeroFacts ?? zeroFactKeys.size}`);
+  console.log(`Substantive facts: ${bankSummary.substantive} (progress total=${stats.total})`);
+  console.log(`Metadata stored (not counted): ${bankSummary.metadata}`);
+  console.log(`By scope: track=${bankSummary.byScope.track} album=${bankSummary.byScope.album} artist=${bankSummary.byScope.artist}`);
+  console.log(`Tracks with zero substantive facts: ${stats.zeroFacts ?? zeroFactKeys.size}`);
   console.log(`Hot facts in bank: ${hotCount}`);
   console.log('By source:', stats.bySource);
   console.log(`Bank: ${BANK_PATH}`);

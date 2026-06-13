@@ -30,6 +30,8 @@ export interface StoredFact {
   harvestSource?: string;
   /** Generic topic for cross-source dedup (no track names). */
   topicKey?: FactTopicKey;
+  /** Last.fm stats / album listing — stored but not a story seed. */
+  isMetadata?: boolean;
   timesUsed: number;
   addedAt: number;
   lastUsedAt?: number;

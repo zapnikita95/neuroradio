@@ -40,6 +40,17 @@ export function isAlbumListingSeed(fact: string): boolean {
   return /на Last\.fm указан в альбоме|указан в альбоме «/i.test(fact.trim());
 }
 
+/** Last.fm playcount/listeners — сохраняем в банк, но не считаем успешным фактом. */
+export function isListeningStatsFact(fact: string): boolean {
+  return /\b(?:last\.?fm|слушател|прослушиван|scrobbles?|playcount)\b/i.test(fact.trim());
+}
+
+/** Метаданные harvest — в банк можно, в прогресс/pick/hot не идут. */
+export function isMetadataHarvestFact(fact: string): boolean {
+  const t = fact.trim();
+  return isListeningStatsFact(t) || isAlbumListingSeed(t);
+}
+
 /** Год/лейбл на Discogs — факт, но не ядро истории (LLM дорисует «синтезаторы»). */
 export function isCatalogMetadataSeed(fact: string): boolean {
   const t = fact.trim();

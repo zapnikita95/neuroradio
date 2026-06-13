@@ -16,7 +16,7 @@ const KNOWN_ARTISTS = join(__dir, '../src/data/known-artists.json');
 const COVER_CLASSICS = join(__dir, '../src/data/cover-classics.json');
 
 const args = process.argv.slice(2);
-const TARGET = parseInt(args.find((a) => a.startsWith('--target='))?.split('=')[1] ?? '20000', 10);
+const TARGET = parseInt(args.find((a) => a.startsWith('--target='))?.split('=')[1] ?? '60000', 10);
 const TRACKS_PER_ARTIST = 15;
 const DEEZER_RPS = 10;
 const LASTFM_RPS = 4;
@@ -59,6 +59,10 @@ const GLOBAL_SEED_TRACKS = [
   ['AC/DC', 'Back In Black'], ['Guns N\' Roses', 'Sweet Child O\' Mine'], ['U2', 'With Or Without You'],
   ['The Killers', 'Mr. Brightside'], ['Imagine Dragons', 'Radioactive'], ['Post Malone', 'Circles'],
   ['Kanye West', 'Stronger'], ['Jay-Z', '99 Problems'],
+  ['Kesha', 'TiK ToK'], ['Shakira', 'Waka Waka (This Time for Africa)'],
+  ['Lady Gaga', 'Bad Romance'], ['Bruno Mars', 'Uptown Funk'],
+  ['Adele', 'Rolling in the Deep'], ['Justin Bieber', 'Baby'],
+  ['PSY', 'Gangnam Style'], ['Daft Punk', 'Get Lucky'],
 ];
 
 /** Deezer genre chart ids (each returns up to 300 tracks). */
@@ -81,6 +85,11 @@ const JUNK_ARTIST =
 
 function normalizeTitle(title) {
   return title
+    .replace(/\s*\(feat\.[^)]+\)/gi, '')
+    .replace(/\s*\(ft\.[^)]+\)/gi, '')
+    .replace(/\s*\(featuring[^)]+\)/gi, '')
+    .replace(/\s*\(with[^)]+\)/gi, '')
+    .replace(/\s*\(Single\)/gi, '')
     .replace(/\s*\([^)]*(?:remaster|radio edit|explicit|version|mix|live|mono|stereo|deluxe|bonus)[^)]*\)/gi, '')
     .replace(/\s*\[[^\]]*\]/g, '')
     .replace(/\s+/g, ' ')
