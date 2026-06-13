@@ -1,7 +1,10 @@
 import fetch from '../../proxy-fetch.js';
+import { acquireHarvestSlot, penalizeHarvestBucket } from '../harvest-rate-limiter.js';
 
 export const HARVEST_USER_AGENT =
   'Mozilla/5.0 (compatible; MusicStoryBFF/1.0; +https://efir-ai.ru)';
+
+const MAX_429_RETRIES = 3;
 
 export function stripHtml(s: string): string {
   return s
@@ -46,20 +49,47 @@ export function isCyrillic(text: string): boolean {
   return /[\u0400-\u04FF]/.test(text);
 }
 
+async function fetchWithRateLimit(
+  url: string,
+  opts: { headers?: Record<string, string>; timeoutMs?: number; accept?: string },
+): Promise<Response | null> {
+  for (let attempt = 0; attempt <= MAX_429_RETRIES; attempt++) {
+    await acquireHarvestSlot(url);
+    try {
+      const response = await fetch(url, {
+        headers: {
+          'User-Agent': HARVEST_USER_AGENT,
+          Accept: opts.accept ?? 'application/json,*/*',
+          ...opts.headers,
+        },
+        signal: AbortSignal.timeout(opts.timeoutMs ?? 10000),
+      });
+      if (response.status === 429 && attempt < MAX_429_RETRIES) {
+        await penalizeHarvestBucket(url, attempt + 1);
+        continue;
+      }
+      return response;
+    } catch {
+      if (attempt < MAX_429_RETRIES) {
+        await penalizeHarvestBucket(url, attempt + 1);
+        continue;
+      }
+      return null;
+    }
+  }
+  return null;
+}
+
 export async function fetchText(
   url: string,
   opts: { headers?: Record<string, string>; timeoutMs?: number } = {},
 ): Promise<string | null> {
+  const response = await fetchWithRateLimit(url, {
+    ...opts,
+    accept: 'text/html,application/json,*/*',
+  });
+  if (!response?.ok) return null;
   try {
-    const response = await fetch(url, {
-      headers: {
-        'User-Agent': HARVEST_USER_AGENT,
-        Accept: 'text/html,application/json,*/*',
-        ...opts.headers,
-      },
-      signal: AbortSignal.timeout(opts.timeoutMs ?? 10000),
-    });
-    if (!response.ok) return null;
     return await response.text();
   } catch {
     return null;
@@ -70,16 +100,9 @@ export async function fetchJson<T>(
   url: string,
   opts: { headers?: Record<string, string>; timeoutMs?: number } = {},
 ): Promise<T | null> {
+  const response = await fetchWithRateLimit(url, { ...opts, accept: 'application/json' });
+  if (!response?.ok) return null;
   try {
-    const response = await fetch(url, {
-      headers: {
-        'User-Agent': HARVEST_USER_AGENT,
-        Accept: 'application/json',
-        ...opts.headers,
-      },
-      signal: AbortSignal.timeout(opts.timeoutMs ?? 10000),
-    });
-    if (!response.ok) return null;
     return (await response.json()) as T;
   } catch {
     return null;

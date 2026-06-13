@@ -36,7 +36,8 @@
     "audit:bulk": "npm run build && node scripts/audit-bulk-coverage.mjs",
     "seed:facts:retry-zero": "node scripts/bulk-seed-fact-bank.mjs --target=60000 --hot-target=20000 --concurrency=3 --resume --retry-zero --no-proxy --backfill-discogs",
     "harvest:charts": "npm run build && node scripts/weekly-chart-harvest.mjs",
-    "harvest:charts:dry": "npm run build && node scripts/weekly-chart-harvest.mjs --dry-run"
+    "harvest:charts:dry": "npm run build && node scripts/weekly-chart-harvest.mjs --dry-run",
+    "expand:catalog": "npm run build && node scripts/merge-trending-into-catalog.mjs"
   },
   "keywords": [
     "music",

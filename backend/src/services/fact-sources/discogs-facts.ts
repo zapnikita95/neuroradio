@@ -1,12 +1,10 @@
 import type { HarvestContext, HarvestedFact } from './types.js';
-import { cleanTrackTitle, fetchJson, splitSentences, stripHtml } from './fetch-utils.js';
+import { fetchJson, cleanTrackTitle, splitSentences, stripHtml } from './fetch-utils.js';
 
 const TOKEN = process.env.DISCOGS_TOKEN?.trim() ?? '';
 const LASTFM_KEY = process.env.LASTFM_API_KEY?.trim() ?? '';
 
-/** Discogs authenticated: 60 requests/minute. */
-const MIN_INTERVAL_MS = 1100;
-let lastCallAt = 0;
+/** Discogs authenticated: 60 requests/minute — paced via harvest-rate-limiter in fetchJson. */
 
 interface DiscogsSearchResult {
   results?: Array<{ id?: number; title?: string; type?: string; year?: string }>;
@@ -42,12 +40,6 @@ function discogsHeaders(): Record<string, string> | null {
   };
 }
 
-async function rateLimited<T>(fn: () => Promise<T>): Promise<T> {
-  const wait = Math.max(0, MIN_INTERVAL_MS - (Date.now() - lastCallAt));
-  if (wait > 0) await new Promise((r) => setTimeout(r, wait));
-  lastCallAt = Date.now();
-  return fn();
-}
 
 async function resolveAlbumName(ctx: HarvestContext): Promise<string | null> {
   if (ctx.album?.trim()) return ctx.album.trim();
@@ -123,23 +115,19 @@ export async function fetchDiscogsFacts(ctx: HarvestContext): Promise<HarvestedF
 
   let releaseId: number | null = null;
   for (const query of queries) {
-    const search = await rateLimited(() =>
-      fetchJson<DiscogsSearchResult>(
-        `https://api.discogs.com/database/search?q=${encodeURIComponent(query)}&type=release&per_page=8`,
-        { headers, timeoutMs: 12000 },
-      ),
+    const search = await fetchJson<DiscogsSearchResult>(
+      `https://api.discogs.com/database/search?q=${encodeURIComponent(query)}&type=release&per_page=8`,
+      { headers, timeoutMs: 12000 },
     );
     releaseId = pickRelease(search?.results, ctx.artist, album ?? ctx.title);
     if (releaseId) break;
   }
   if (!releaseId) return [];
 
-  const release = await rateLimited(() =>
-    fetchJson<DiscogsRelease>(`https://api.discogs.com/releases/${releaseId}`, {
-      headers,
-      timeoutMs: 12000,
-    }),
-  );
+  const release = await fetchJson<DiscogsRelease>(`https://api.discogs.com/releases/${releaseId}`, {
+    headers,
+    timeoutMs: 12000,
+  });
   if (!release) return [];
 
   const facts: HarvestedFact[] = [];
@@ -193,21 +181,17 @@ export async function fetchDiscogsArtistFacts(artist: string): Promise<Harvested
   const headers = discogsHeaders();
   if (!headers) return [];
 
-  const search = await rateLimited(() =>
-    fetchJson<DiscogsSearchResult>(
-      `https://api.discogs.com/database/search?q=${encodeURIComponent(artist)}&type=artist&per_page=8`,
-      { headers, timeoutMs: 12000 },
-    ),
+  const search = await fetchJson<DiscogsSearchResult>(
+    `https://api.discogs.com/database/search?q=${encodeURIComponent(artist)}&type=artist&per_page=8`,
+    { headers, timeoutMs: 12000 },
   );
   const artistId = pickArtistId(search?.results, artist);
   if (!artistId) return [];
 
-  const profileData = await rateLimited(() =>
-    fetchJson<DiscogsArtist>(`https://api.discogs.com/artists/${artistId}`, {
-      headers,
-      timeoutMs: 12000,
-    }),
-  );
+  const profileData = await fetchJson<DiscogsArtist>(`https://api.discogs.com/artists/${artistId}`, {
+    headers,
+    timeoutMs: 12000,
+  });
   const profile = profileData?.profile?.trim();
   if (!profile) return [];
 
