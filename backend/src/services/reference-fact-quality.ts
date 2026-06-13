@@ -1,6 +1,6 @@
 import { highImpactBonus } from './story-fact-hunt.js';
 import type { StoryNarratorId } from './story-narrator.js';
-import { isTruncatedMarketingSnippet, isUnspeakableWebSeed, isLyricsPageSeed, isArtistIdentityBioSnippet } from './web-snippet-accept.js';
+import { isTruncatedMarketingSnippet, isUnspeakableWebSeed, isLyricsPageSeed, isArtistIdentityBioSnippet, decodeHtmlEntities } from './web-snippet-accept.js';
 
 /** Filters dry encyclopedia lines; ranks human drama, breakthroughs, meaning — not working titles. */
 
@@ -49,6 +49,35 @@ export function isListeningStatsFact(fact: string): boolean {
 export function isMetadataHarvestFact(fact: string): boolean {
   const t = fact.trim();
   return isListeningStatsFact(t) || isAlbumListingSeed(t);
+}
+
+/** Wikipedia/Genius citation debris — не семя для истории. */
+export function isCitationBibliographySeed(fact: string): boolean {
+  const t = decodeHtmlEntities(fact).trim();
+  if (/\bRetrieved\b/i.test(t) && /\b(?:via YouTube|from Wikipedia|from the original)\b/i.test(t)) {
+    return true;
+  }
+  if (/\^\s*[A-Za-z][\w\s]{0,40}\(/.test(t)) return true;
+  if (/&#\s*;/.test(t)) return true;
+  if (/;\s*\.\s*Retrieved/i.test(t)) return true;
+  if (/\|\s*March\s*,\s*;\s*\./i.test(t)) return true;
+  if (/\bLive at\b.{0,120}\bRetrieved\b/i.test(t)) return true;
+  if (/\bvia YouTube\b/i.test(t) && /\bRetrieved\b/i.test(t)) return true;
+  return false;
+}
+
+/** «Выступили в зале X» без драмы — не история про трек. */
+export function isGenericConcertVenueSeed(fact: string): boolean {
+  const t = decodeHtmlEntities(fact).trim();
+  if (isCitationBibliographySeed(t)) return true;
+  if (!/\b(?:live at|performed at|concert at|live in|concert in)\b/i.test(t)) return false;
+  if (/\b(?:banned|protest|scandal|controvers|riot|arrest|police|historic|milestone|withheld|refused)\b/i.test(t)) {
+    return false;
+  }
+  if (/\b(?:inspired by|intended to|meaning|metaphor|written about|anti-war|protest song)\b/i.test(t)) {
+    return false;
+  }
+  return true;
 }
 
 /** Год/лейбл/сборник на Discogs — факт, но не ядро истории (LLM дорисует «синтезаторы»). */
@@ -261,6 +290,8 @@ export function adjustedInterestScore(fact: string, narrator: StoryNarratorId = 
 export function interestScore(fact: string): number {
   let score = 0;
   const trimmed = fact.trim();
+  if (isCitationBibliographySeed(trimmed)) return -40;
+  if (isGenericConcertVenueSeed(trimmed)) return -25;
   if (isLyricsPageSeed(trimmed)) score -= 50;
   if (isArtistIdentityBioSnippet(trimmed)) score += 16;
   if (isTruncatedMarketingSnippet(trimmed)) score -= 40;
@@ -315,6 +346,12 @@ export function interestScore(fact: string): number {
   if (/^(?:This image would later be used|Filmed at the New London Theatre)\b/i.test(fact.trim())) score -= 18;
   if (/(?:предложил\w*|borrowed|suggested|названи\w*).{0,80}(?:«|")/i.test(fact)) score += 12;
   if (/(?:origin|originally|meaning|metaphor|hidden|disguised|ironic|paradox|заклинан|смысл|метафор|ирони|парадокс)/i.test(fact)) score += 6;
+  if (/\binspired by the music of\b/i.test(fact)) score += 14;
+  if (/\b(?:anti-war|protest song|political protest)\b/i.test(fact)) score += 14;
+  if (/\b(?:intended to reflect|refrain.*intended|chorus.*intended)\b/i.test(fact)) score += 12;
+  if (/\bwas inspired by\b/i.test(fact) && /\b(?:Dylan|Beatles|Hendrix|Cohen|Springsteen)\b/i.test(fact)) {
+    score += 8;
+  }
   // Genius / narrative parser facts (не chart-trivia).
   if (/\b(?:widely considered|grunge anthem|ultimate grunge|song'?s success|omnipresence|grew tired of it|removed it from their live)\b/i.test(fact)) {
     score += 14;
@@ -347,6 +384,8 @@ export function isWeakChartSeed(fact: string): boolean {
 export function isBoringFact(fact: string): boolean {
   const trimmed = fact.trim();
   if (trimmed.length < 30) return true;
+  if (isCitationBibliographySeed(trimmed)) return true;
+  if (isGenericConcertVenueSeed(trimmed)) return true;
   if (isDedicatedCatalogSeed(trimmed)) return false;
   if (isWikiBiographyLead(trimmed)) return true;
   if (isCollectorFact(trimmed)) return false;

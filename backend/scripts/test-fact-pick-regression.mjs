@@ -280,6 +280,48 @@ assert(
   'Maroon 5 respelled for RU TTS',
 );
 
+const {
+  isCitationBibliographySeed,
+  isGenericConcertVenueSeed,
+  interestScore: scoreFact,
+} = await import('../dist/services/reference-fact-quality.js');
+
+const MAKUHARI =
+  'Green Day: Live at Makauhari Messe ;Tokyo, Japan | March , ; . Retrieved June , &# ; via YouTube. ^ Tun-Dar Green Day - Holiday Live (Bullet In A Bible) . Retrieved June , &# ; via YouTube.';
+const DYLAN = '"Holiday" was inspired by the music of Bob Dylan .';
+const CHORUS =
+  'The chorus\'s refrain—"This is our lives on holiday"—was intended to reflect the average American\'s life.';
+const PROTEST = '"Holiday" is an anti-war protest song by American rock band Green Day.';
+
+assert(isCitationBibliographySeed(MAKUHARI), 'YouTube citation junk rejected');
+assert(isGenericConcertVenueSeed(MAKUHARI), 'generic venue listing rejected');
+assert(scoreFact(DYLAN) >= 12, `Dylan inspiration scores high (got ${scoreFact(DYLAN)})`);
+assert(scoreFact(CHORUS) >= 12, `chorus meaning scores high (got ${scoreFact(CHORUS)})`);
+assert(scoreFact(PROTEST) >= 12, `protest song scores high (got ${scoreFact(PROTEST)})`);
+assert(scoreFact(MAKUHARI) < 0, `Makuhari citation scores negative (got ${scoreFact(MAKUHARI)})`);
+
+const holidayPick = pickReferenceFact(
+  {
+    trackFacts: [MAKUHARI, DYLAN, '"Holiday" released as the third single off of Green Day\'s seventh studio album.'],
+    artistFacts: [CHORUS, PROTEST, 'On April 13, 2019, for Record Store Day, the band released their Woodstock 1994 performance.'],
+  },
+  [],
+  0,
+  'Green Day',
+  'Holiday',
+);
+assert(
+  holidayPick && !MAKUHARI.includes(holidayPick.fact.slice(0, 40)),
+  `Holiday pick skips Makuhari junk (got: ${holidayPick?.fact?.slice(0, 90) ?? 'null'})`,
+);
+assert(
+  holidayPick &&
+    (holidayPick.fact.includes('Dylan') ||
+      holidayPick.fact.includes('protest') ||
+      holidayPick.fact.includes('intended to reflect')),
+  `Holiday pick prefers meaning/inspiration (got: ${holidayPick?.fact?.slice(0, 90) ?? 'null'})`,
+);
+
 // --- 6. Optional live: real Last.fm + aggregator ---
 if (LIVE) {
   if (!process.env.LASTFM_API_KEY?.trim()) {

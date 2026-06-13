@@ -1,4 +1,8 @@
-import { isCollectorFact } from './reference-fact-quality.js';
+import {
+  isCitationBibliographySeed,
+  isCollectorFact,
+  isGenericConcertVenueSeed,
+} from './reference-fact-quality.js';
 
 /**
  * Методология поиска «семени» истории: сильный малоизвестный факт про трек или артиста.
@@ -122,6 +126,8 @@ export const FACT_HUNT_LLM_PROMPT_BLOCK = `${FACT_HUNT_PROMPT_BLOCK}
 - «Саундтрек фильма/лета», «гитарные рифы» — только если это прямо в сниппете про ЭТОТ трек; иначе ОТКАЗ.`;
 
 export function highImpactBonus(fact: string): number {
+  if (isCitationBibliographySeed(fact)) return -30;
+  if (isGenericConcertVenueSeed(fact)) return -20;
   if (isCollectorFact(fact)) return 8;
   let bonus = 0;
   for (const pattern of HIGH_IMPACT_FACT_PATTERNS) {

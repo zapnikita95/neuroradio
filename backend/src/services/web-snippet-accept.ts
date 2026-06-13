@@ -11,6 +11,8 @@ import {
   interestScore,
   isBackstoryFact,
   isBoringFact,
+  isCitationBibliographySeed,
+  isGenericConcertVenueSeed,
 } from './reference-fact-quality.js';
 
 const LOW_QUALITY_WEB_PREFIX =
@@ -112,6 +114,8 @@ export function isWrongEntityDisambiguation(snippet: string, artist: string): bo
 /** SEO, Reddit, platform UI — not a speakable story seed. */
 export function isUnspeakableWebSeed(snippet: string): boolean {
   const trimmed = decodeHtmlEntities(snippet).trim();
+  if (isCitationBibliographySeed(trimmed)) return true;
+  if (isGenericConcertVenueSeed(trimmed)) return true;
   if (isLyricsPageSeed(trimmed)) return true;
   if (isTruncatedMarketingSnippet(trimmed)) return true;
   if (LOW_QUALITY_WEB_PREFIX.test(trimmed)) return true;

@@ -7,6 +7,8 @@ import {
   isAlbumListingSeed,
   isArtistFormationBioSeed,
   isCatalogMetadataSeed,
+  isCitationBibliographySeed,
+  isGenericConcertVenueSeed,
   isBackstoryFact,
   isBoringFact,
   isCollectorFact,
@@ -141,6 +143,8 @@ function isRejectedSeed(
   }
   if (isAlbumListingSeed(fact)) return true;
   if (isCatalogMetadataSeed(fact)) return true;
+  if (isCitationBibliographySeed(fact)) return true;
+  if (isGenericConcertVenueSeed(fact)) return true;
   if (
     title.trim() &&
     isArtistFormationBioSeed(fact) &&
@@ -161,7 +165,13 @@ function isRejectedSeed(
   if (WEAK_TRIVIA_PATTERNS.some((p) => p.test(fact))) return true;
   if (isWeakChartSeed(fact)) return true;
   if (isBoringFact(fact)) return true;
-  if (isCollectorFact(fact) && !(title && factMentionsTitle(fact, title))) return true;
+  if (
+    isCollectorFact(fact) &&
+    !(title && factMentionsTitle(fact, title)) &&
+    !/\b(?:inspired by|intended to|anti-war|protest song|meaning|metaphor)\b/i.test(fact)
+  ) {
+    return true;
+  }
   if (isTruncatedMarketingSnippet(fact)) return true;
   if (isUnspeakableWebSeed(fact)) return true;
   return false;

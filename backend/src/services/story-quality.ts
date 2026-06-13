@@ -985,6 +985,10 @@ const UNGROUNDED_CLAIM_CHECKS: Array<{ claim: RegExp; factHint: RegExp }> = [
     factHint: /мураш|goosebump|chill|shiver/i,
   },
   {
+    claim: /буквально\s+взорвал\s+зал|взорвал\s+зал\s+на\s+концерт|стало\s+легендарным:\s*энергия/i,
+    factHint: /crowd|audience|riot|arrest|legendary|historic|standing ovation|sold out|взорвал|зал/i,
+  },
+  {
     claim: /настоящ(?:им|ый|ей)\s+прорыв(?:ом)?|стал[аи]?\s+(?:настоящ(?:им|ей|ым)\s+)?прорыв|прорыв(?:ом)?\s+для\s+(?:группы|коллектива|артист)/i,
     factHint: /breakthrough|прорыв|debut|first hit|kara'?s flowers|unknown artist/i,
   },
