@@ -76,6 +76,7 @@ import com.musicstory.app.BuildConfig
 import com.musicstory.app.MusicStoryApp
 import com.musicstory.app.util.StoryLog
 import com.musicstory.app.util.ApiKeySanitizer
+import com.musicstory.app.util.LocaleHelper
 import com.musicstory.app.util.BackendUrlRules
 import com.musicstory.app.R
 import com.musicstory.app.data.local.CachedAccountProfile
@@ -143,10 +144,13 @@ fun SettingsScreen(
     onOpenAccountBilling: () -> Unit = onOpenAccount,
     modifier: Modifier = Modifier,
 ) {
-    val context = LocalContext.current
-    val app = context.applicationContext as MusicStoryApp
+    val baseContext = LocalContext.current
+    val app = baseContext.applicationContext as MusicStoryApp
     val scope = rememberCoroutineScope()
     val settings = app.settingsDataStore
+    val appLanguage by settings.appLanguage.collectAsState(initial = AppLanguage.SYSTEM)
+    var appLanguageUi by remember(appLanguage) { mutableStateOf(appLanguage) }
+    val context = remember(appLanguageUi) { LocaleHelper.wrapContext(baseContext, appLanguageUi) }
 
     DisposableEffect(Unit) {
         onDispose {
@@ -190,7 +194,6 @@ fun SettingsScreen(
     val factNotificationsEnabled by settings.factNotificationsEnabled.collectAsState(
         initial = SettingsDataStore.DEFAULT_FACT_NOTIFICATIONS_ENABLED,
     )
-    val appLanguage by settings.appLanguage.collectAsState(initial = AppLanguage.SYSTEM)
     val elevenLabsVoice by settings.elevenLabsVoice.collectAsState(initial = ElevenLabsVoice.AUTO)
     val serverTtsProvider by settings.serverTtsProvider.collectAsState(initial = ServerTtsProvider.EDGE)
     val userTtsBilling by settings.userTtsBilling.collectAsState(initial = UserTtsBilling.SERVER)
@@ -310,7 +313,6 @@ fun SettingsScreen(
     var autoPlaybackOnUi by remember(manualMode) { mutableStateOf(!manualMode) }
     var speakTrackNamesUi by remember(speakTrackNamesInVoiceover) { mutableStateOf(speakTrackNamesInVoiceover) }
     var factNotificationsUi by remember(factNotificationsEnabled) { mutableStateOf(factNotificationsEnabled) }
-    var appLanguageUi by remember(appLanguage) { mutableStateOf(appLanguage) }
     var elevenLabsVoiceUi by remember(elevenLabsVoice) { mutableStateOf(elevenLabsVoice) }
     var triggerModeUi by remember(triggerMode) { mutableStateOf(triggerMode) }
     var specificArtistsUi: Set<String> by remember(specificArtists) { mutableStateOf(specificArtists) }
@@ -585,19 +587,22 @@ fun SettingsScreen(
     val canUseOfflineCache = TierAccess.canUseOfflineAudioCache(effectiveTier)
     val isFreeServerTier = TierAccess.isFreeServerTier(effectiveTier)
     val effectiveServerTtsProvider = if (isFreeServerTier) ServerTtsProvider.EDGE else serverTtsProviderUi
-    val serverUsesEdge = userTtsBillingUi == UserTtsBilling.SERVER &&
-        effectiveServerTtsProvider == ServerTtsProvider.EDGE
-    val showServerTtsProviderChoice = userTtsBillingUi == UserTtsBilling.SERVER && isPaidServerTier
-    val showEdgeVoices = serverUsesEdge
     val resolvedDraftLang = resolveAppLanguage(appLanguageUi)
-    val showElevenLabsVoices = resolvedDraftLang == ResolvedAppLanguage.EN
+    val showElevenLabsVoices = resolvedDraftLang == ResolvedAppLanguage.EN && isPaidServerTier
+    val serverUsesEdge = userTtsBillingUi == UserTtsBilling.SERVER &&
+        effectiveServerTtsProvider == ServerTtsProvider.EDGE && !showElevenLabsVoices
+    val showServerTtsProviderChoice =
+        userTtsBillingUi == UserTtsBilling.SERVER && isPaidServerTier && !showElevenLabsVoices
+    val showEdgeVoices = serverUsesEdge
     val showYandexVoices = !showElevenLabsVoices && (
         (userTtsBillingUi == UserTtsBilling.YANDEX) ||
             (userTtsBillingUi == UserTtsBilling.SERVER && isPaidServerTier &&
                 effectiveServerTtsProvider == ServerTtsProvider.YANDEX)
         )
-    val userTtsBillingOptions = remember {
-        UserTtsBilling.entries.filter { it != UserTtsBilling.SBER }
+    val userTtsBillingOptions = remember(showElevenLabsVoices) {
+        UserTtsBilling.entries.filter {
+            it != UserTtsBilling.SBER && !(showElevenLabsVoices && it == UserTtsBilling.YANDEX)
+        }
     }
 
     suspend fun applySettingsDraft(): Boolean {
@@ -861,6 +866,12 @@ fun SettingsScreen(
                                     }
                                 }
                                 appLanguageUi = lang
+                                scope.launch {
+                                    withContext(Dispatchers.IO) {
+                                        settings.setAppLanguage(lang)
+                                    }
+                                    (baseContext as? Activity)?.recreate()
+                                }
                             },
                         )
                     }
@@ -1096,20 +1107,22 @@ fun SettingsScreen(
                 CollapsibleSettingsSection(
                     title = context.getString(R.string.settings_voice_section),
                     summary = when {
-                        serverUsesEdge ->
-                            "${edgeVoicePresetUi.uiLabel(resolvedDraftLang)} · ${ttsSpeedUi.uiLabel(resolvedDraftLang)} · ${storyLengthUi.uiLabel(resolvedDraftLang)}"
-                        showElevenLabsVoices ->
-                            "${elevenLabsVoiceUi.label(resolvedDraftLang)} · ${ttsSpeedUi.uiLabel(resolvedDraftLang)} · ${storyLengthUi.uiLabel(resolvedDraftLang)}"
-                        else ->
-                            "${ttsVoiceUi.uiLabel(resolvedDraftLang)} · ${ttsSpeedUi.uiLabel(resolvedDraftLang)} · ${storyLengthUi.uiLabel(resolvedDraftLang)}"
-                    }.let { voices ->
-                        val engineLabel = when {
-                            serverUsesEdge -> ServerTtsProvider.EDGE.uiLabel(resolvedDraftLang)
-                            showYandexVoices && userTtsBillingUi == UserTtsBilling.SERVER ->
-                                ServerTtsProvider.YANDEX.uiLabel(resolvedDraftLang)
-                            else -> ServerTtsProvider.EDGE.uiLabel(resolvedDraftLang)
+                        showElevenLabsVoices -> {
+                            val engine = context.getString(R.string.settings_tts_engine_elevenlabs)
+                            "$engine · ${elevenLabsVoiceUi.label(resolvedDraftLang)} · " +
+                                "${ttsSpeedUi.uiLabel(resolvedDraftLang)} · ${storyLengthUi.uiLabel(resolvedDraftLang)}"
                         }
-                        "$engineLabel · $voices"
+                        serverUsesEdge ->
+                            "${ServerTtsProvider.EDGE.uiLabel(resolvedDraftLang)} · " +
+                                "${edgeVoicePresetUi.uiLabel(resolvedDraftLang)} · " +
+                                "${ttsSpeedUi.uiLabel(resolvedDraftLang)} · ${storyLengthUi.uiLabel(resolvedDraftLang)}"
+                        showYandexVoices ->
+                            "${ServerTtsProvider.YANDEX.uiLabel(resolvedDraftLang)} · " +
+                                "${ttsVoiceUi.uiLabel(resolvedDraftLang)} · ${ttsEmotionUi.uiLabel(resolvedDraftLang)} · " +
+                                "${ttsSpeedUi.uiLabel(resolvedDraftLang)} · ${storyLengthUi.uiLabel(resolvedDraftLang)}"
+                        else ->
+                            "${ttsVoiceUi.uiLabel(resolvedDraftLang)} · ${ttsSpeedUi.uiLabel(resolvedDraftLang)} · " +
+                                "${storyLengthUi.uiLabel(resolvedDraftLang)}"
                     },
                     tourHighlight = tourStep == 4,
                     forceExpanded = tourStep == 4,

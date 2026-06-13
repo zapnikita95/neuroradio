@@ -228,6 +228,7 @@
     <string name="settings_tts_playback_engine">Озвучка</string>
     <string name="settings_tts_playback_engine_hint">Microsoft Edge на бесплатном тарифе; на trial и подписке — Edge или Yandex SpeechKit на сервере.</string>
     <string name="settings_server_tts_engine">Движок серверной озвучки</string>
+    <string name="settings_tts_engine_elevenlabs">ElevenLabs</string>
     <string name="trial_countdown_title">Пробный Premium</string>
     <string name="trial_countdown_body">Осталось: %1$s</string>
     <string name="trial_countdown_hint">После окончания пробного периода озвучка переключится на Edge, если не оформить подписку.</string>

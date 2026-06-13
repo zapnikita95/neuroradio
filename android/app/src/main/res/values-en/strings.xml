@@ -224,6 +224,7 @@ Once:
     <string name="settings_tts_playback_engine">Voiceover</string>
     <string name="settings_tts_playback_engine_hint">Microsoft Edge on free; on trial/subscription — Edge or Yandex SpeechKit on server.</string>
     <string name="settings_server_tts_engine">Server TTS engine</string>
+    <string name="settings_tts_engine_elevenlabs">ElevenLabs</string>
     <string name="trial_countdown_title">Trial Premium</string>
     <string name="trial_countdown_body">Time left: %1$s</string>
     <string name="trial_countdown_hint">After trial, voiceover switches to Edge unless you subscribe.</string>
@@ -351,7 +352,7 @@ Once:
     <string name="billing_unlink_card_confirm">Yes, unlink</string>
     <string name="billing_unlink_card_done">Card unlinked. Access until period ends.</string>
     <string name="billing_unlink_card_failed">Could not unlink card</string>
-    <string name="billing_play_hint">Payment via Google Play. Manage in Google Play → Payments & subscriptions.</string>
+    <string name="billing_play_hint">Payment via Google Play. Manage in Google Play → Payments &amp; subscriptions.</string>
     <string name="billing_play_activity_required">Could not open Google Play billing</string>
     <string name="settings_language_en_blocked_title">International subscription required</string>
     <string name="settings_language_en_upgrade_hint">Your plan is tied to RUB billing. English uses costlier models — subscribe via Google Play.</string>
