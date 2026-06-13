@@ -44,6 +44,8 @@ export interface StoredFact {
   topicKey?: FactTopicKey;
   /** Last.fm stats / album listing — stored but not a story seed. */
   isMetadata?: boolean;
+  /** User dislikes (boring / hallucination) — lowers pick priority. */
+  feedbackDislikes?: number;
   timesUsed: number;
   addedAt: number;
   lastUsedAt?: number;
@@ -512,6 +514,53 @@ export function listBankFacts(
   };
 }
 
+const FEEDBACK_PENALTY: Record<'hallucination' | 'boring_fact', number> = {
+  hallucination: 12,
+  boring_fact: 6,
+};
+
+/** Lower pick priority after user marks seed boring or hallucinated. */
+export function applyFactFeedbackPenalty(
+  artist: string,
+  title: string,
+  factText: string,
+  reason: 'hallucination' | 'boring_fact',
+): boolean {
+  const bank = loadBank();
+  const fp = factFingerprint(factText);
+  const penalty = FEEDBACK_PENALTY[reason];
+  let found = false;
+
+  const touch = (pool: StoredFact[]) => {
+    for (const f of pool) {
+      if (factFingerprint(f.fact) !== fp) continue;
+      f.feedbackDislikes = (f.feedbackDislikes ?? 0) + 1;
+      f.interestScore = Math.max(0, f.interestScore - penalty);
+      f.interestRating = Math.max(1, f.interestRating - (reason === 'hallucination' ? 3 : 1));
+      f.isHot = false;
+      found = true;
+    }
+  };
+
+  for (const k of resolveTrackLookupKeys(artist, title)) {
+    touch(bank.byTrack[k] ?? []);
+  }
+  touch(bank.byArtist[artistKey(artist)] ?? []);
+
+  if (found) {
+    saveBank(bank);
+    console.log(
+      `[fact-bank] feedback penalty reason=${reason} artist="${artist}" title="${title}" ` +
+        `penalty=${penalty}`,
+    );
+  }
+  return found;
+}
+
+function effectivePickScore(fact: StoredFact, liveScore: number): number {
+  return Math.max(0, liveScore - (fact.feedbackDislikes ?? 0) * 4);
+}
+
 export function pickFromBank(
   artist: string,
   title: string,
@@ -543,10 +592,15 @@ export function pickFromBank(
       if (rejectSeedForTrackStory(fact.fact, artist, title, { trackPoolFacts })) continue;
       if (isRejectedPickSeed(fact.fact, title, storyLanguage, trackPoolFacts, artist)) continue;
       const live = computeLiveInterest(fact.fact);
-      if (live.score < MIN_PICK_INTEREST_SCORE || live.rating < HOT_MIN_RATING) continue;
+      const effective = effectivePickScore(fact, live.score);
+      if (effective < MIN_PICK_INTEREST_SCORE || live.rating < HOT_MIN_RATING) continue;
       if (!isSpeakableReferenceFact(fact.fact, artist, title)) continue;
       if (isAmbiguousCommonWordArtist(artist) && !factMentionsArtistAsEntity(fact.fact, artist)) continue;
-      unused.push({ ...fact, interestScore: live.score, interestRating: live.rating });
+      unused.push({
+        ...fact,
+        interestScore: effective,
+        interestRating: live.rating,
+      });
     }
   }
   if (unused.length === 0) return null;

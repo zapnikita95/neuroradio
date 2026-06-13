@@ -209,6 +209,9 @@ function tryPromoteBucket(bucket: PromoteBucket, artist: string, title: string):
 export interface StyleFeedbackContext {
   storyNarrator?: StoryNarratorId;
   seedFact?: string;
+  seedScope?: string;
+  seedInterestRating?: number;
+  seedInterestScore?: number;
   genre?: string;
   year?: number;
   lang?: StoryLanguageId;

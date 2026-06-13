@@ -1,14 +1,33 @@
 import { runWeeklyChartHarvest } from './weekly-chart-harvest.js';
+import {
+  isWeeklyChartHarvestEnabled,
+  msUntilNextSunday3amMsk,
+} from './chart-harvest-schedule.js';
 
-const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
-const INITIAL_DELAY_MS = parseInt(process.env.WEEKLY_CHART_HARVEST_DELAY_MS ?? String(5 * 60_000), 10);
+const FIRST_RUN_MS = parseInt(
+  process.env.WEEKLY_CHART_HARVEST_DELAY_MS ?? String(3 * 60 * 60_000),
+  10,
+);
 
 let schedulerStarted = false;
+let recurringTimer: ReturnType<typeof setTimeout> | null = null;
 
-/** Chart harvest is opt-in — never steal API budget from live /v1/story/full. */
-export function isWeeklyChartHarvestEnabled(): boolean {
-  const flag = process.env.WEEKLY_CHART_HARVEST?.trim().toLowerCase();
-  return flag === 'true' || flag === '1' || flag === 'on';
+export { isWeeklyChartHarvestEnabled, msUntilNextSunday3amMsk } from './chart-harvest-schedule.js';
+
+function scheduleRecurringSaturdayNight(): void {
+  if (recurringTimer) {
+    clearTimeout(recurringTimer);
+    recurringTimer = null;
+  }
+  const delay = msUntilNextSunday3amMsk();
+  recurringTimer = setTimeout(() => {
+    void runWeeklyChartHarvest().finally(() => scheduleRecurringSaturdayNight());
+  }, delay);
+  recurringTimer.unref?.();
+  console.log(
+    `[chart-harvest] next Sat→Sun run in ${Math.round(delay / 3_600_000)}h ` +
+      `(Sunday 03:00 MSK)`,
+  );
 }
 
 export function startWeeklyChartHarvestScheduler(): void {
@@ -16,14 +35,11 @@ export function startWeeklyChartHarvestScheduler(): void {
   schedulerStarted = true;
 
   setTimeout(() => {
-    void runWeeklyChartHarvest();
-  }, INITIAL_DELAY_MS).unref();
-
-  setInterval(() => {
-    void runWeeklyChartHarvest();
-  }, WEEK_MS).unref();
+    void runWeeklyChartHarvest().finally(() => scheduleRecurringSaturdayNight());
+  }, FIRST_RUN_MS).unref();
 
   console.log(
-    `[chart-harvest] scheduler started (every 7d, first run in ${Math.round(INITIAL_DELAY_MS / 60_000)}m)`,
+    `[chart-harvest] scheduler started — first run in ${Math.round(FIRST_RUN_MS / 60_000)}m, ` +
+      `then every Sat→Sun night (Sunday 03:00 MSK)`,
   );
 }

@@ -7,9 +7,14 @@ import {
   chartTrackKey,
   type ChartTrack,
 } from './chart-sources.js';
+import {
+  formatNextSunday3amMsk,
+  isWeeklyChartHarvestEnabled,
+} from './chart-harvest-schedule.js';
 
 const DATA_DIR = process.env.ACCOUNT_DATA_DIR?.trim() || path.join(process.cwd(), 'data');
 const SNAPSHOT_PATH = path.join(DATA_DIR, 'chart-weekly-snapshot.json');
+const LAST_RUN_PATH = path.join(DATA_DIR, 'chart-harvest-last-run.json');
 const DEFAULT_LIMIT = parseInt(process.env.WEEKLY_CHART_HARVEST_LIMIT ?? '60', 10);
 const HARVEST_CONCURRENCY = parseInt(process.env.WEEKLY_CHART_HARVEST_CONCURRENCY ?? '2', 10);
 
@@ -61,6 +66,51 @@ export interface WeeklyChartHarvestResult {
   factsIngested: number;
   hotTracks: number;
   errors: number;
+}
+
+export interface ChartHarvestStatus {
+  enabled: boolean;
+  snapshotPath: string;
+  lastRunPath: string;
+  snapshotUpdatedAt: string | null;
+  chartSourceCount: number;
+  uniqueTracks: number;
+  newTracksTracked: number;
+  lastRun: (WeeklyChartHarvestResult & { finishedAt: string }) | null;
+  nextScheduledMsk: string;
+}
+
+function saveLastRun(result: WeeklyChartHarvestResult): void {
+  fs.mkdirSync(DATA_DIR, { recursive: true });
+  fs.writeFileSync(
+    LAST_RUN_PATH,
+    JSON.stringify({ ...result, finishedAt: new Date().toISOString() }),
+    'utf8',
+  );
+}
+
+export function getChartHarvestStatus(): ChartHarvestStatus {
+  const snapshot = loadSnapshot();
+  let lastRun: ChartHarvestStatus['lastRun'] = null;
+  try {
+    if (fs.existsSync(LAST_RUN_PATH)) {
+      lastRun = JSON.parse(fs.readFileSync(LAST_RUN_PATH, 'utf8')) as ChartHarvestStatus['lastRun'];
+    }
+  } catch {
+    lastRun = null;
+  }
+
+  return {
+    enabled: isWeeklyChartHarvestEnabled(),
+    snapshotPath: SNAPSHOT_PATH,
+    lastRunPath: LAST_RUN_PATH,
+    snapshotUpdatedAt: snapshot.updatedAt || null,
+    chartSourceCount: Object.keys(snapshot.charts).length,
+    uniqueTracks: Object.keys(snapshot.firstSeen).length,
+    newTracksTracked: Object.keys(snapshot.firstSeen).length,
+    lastRun,
+    nextScheduledMsk: formatNextSunday3amMsk(),
+  };
 }
 
 export async function runWeeklyChartHarvest(opts: { limit?: number; dryRun?: boolean } = {}): Promise<WeeklyChartHarvestResult> {
@@ -191,6 +241,7 @@ export async function runWeeklyChartHarvest(opts: { limit?: number; dryRun?: boo
     }
 
     console.log(`[chart-harvest] done ${JSON.stringify(result)}`);
+    if (!opts.dryRun) saveLastRun(result);
     return result;
   } finally {
     harvestRunning = false;

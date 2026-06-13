@@ -24,6 +24,7 @@ import {
   cancelSubscriptionViaWebCabinet,
   unlinkCardViaWebCabinet,
 } from '../services/account-store.js';
+import { getChartHarvestStatus } from '../services/weekly-chart-harvest.js';
 
 const router = Router();
 
@@ -440,6 +441,16 @@ router.post('/style-corpus/backfill', async (req: Request, res: Response) => {
   } catch (err) {
     console.error('[public/style-corpus/backfill]', err instanceof Error ? err.message : err);
     res.status(500).json({ error: 'backfill_failed', detail: err instanceof Error ? err.message : String(err) });
+  }
+});
+
+/** Weekly chart harvest status — snapshot + last run (Railway volume / local data/). */
+router.get('/chart-harvest/status', (_req: Request, res: Response) => {
+  try {
+    res.json(getChartHarvestStatus());
+  } catch (err) {
+    console.warn('[public/chart-harvest/status]', err instanceof Error ? err.message : err);
+    res.status(500).json({ error: 'status_failed' });
   }
 });
 

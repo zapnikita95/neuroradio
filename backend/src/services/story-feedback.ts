@@ -4,6 +4,7 @@ import path from 'node:path';
 import { getPool, hasPostgres } from './db.js';
 import { processFeedbackForStyleLearning } from './style-feedback-learn.js';
 import { enrichFeedbackContext } from './style-feedback-backfill.js';
+import { processNegativeFactFeedback } from './feedback-fact-analysis.js';
 import type { StoryLanguageId } from './story-language.js';
 import { resolveStoryNarrator } from './story-narrator.js';
 
@@ -103,6 +104,12 @@ export function recordStoryFeedback(entry: StoryFeedbackRecordInput): StoryFeedb
         year: ctx.year ?? record.year,
         lang: ctx.lang ?? ((record.lang === 'en' ? 'en' : 'ru') as StoryLanguageId),
       });
+      if (
+        record.vote === 'dislike' &&
+        (record.reason === 'hallucination' || record.reason === 'boring_fact')
+      ) {
+        void processNegativeFactFeedback(record, ctx);
+      }
     });
   } catch (err) {
     console.warn('[style-learn] feedback hook failed:', err instanceof Error ? err.message : err);

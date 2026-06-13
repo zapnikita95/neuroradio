@@ -33,6 +33,9 @@ function normalizeScript(text: string): string {
 export interface FeedbackEnrichment {
   storyNarrator?: StoryNarratorId;
   seedFact?: string;
+  seedScope?: string;
+  seedInterestRating?: number;
+  seedInterestScore?: number;
   genre?: string;
   year?: number;
   lang?: StoryLanguageId;
@@ -43,12 +46,19 @@ async function findHistoryForFeedback(
   artist: string,
   title: string,
   script: string,
-): Promise<{ seedFact?: string; storyNarrator?: StoryNarratorId }> {
+): Promise<{
+  seedFact?: string;
+  storyNarrator?: StoryNarratorId;
+  seedScope?: string;
+  seedInterestRating?: number;
+  seedInterestScore?: number;
+}> {
   if (!hasPostgres()) return {};
   const normalized = installId.trim().toLowerCase();
   const accountId = resolveAccountId(installId);
   const res = await getPool().query(
-    `SELECT seed_fact, script, story_narrator FROM story_history
+    `SELECT seed_fact, script, story_narrator, seed_scope, interest_rating
+     FROM story_history
      WHERE (install_id = $1 OR ($4::text IS NOT NULL AND account_id = $4))
        AND lower(artist) = lower($2)
        AND lower(title) = lower($3)
@@ -64,9 +74,14 @@ async function findHistoryForFeedback(
       const seed = typeof row.seed_fact === 'string' ? row.seed_fact.trim() : '';
       const narratorRaw = typeof row.story_narrator === 'string' ? row.story_narrator.trim() : '';
       const resolved = narratorRaw ? resolveStoryNarrator(narratorRaw) : 'auto';
+      const seedScope = typeof row.seed_scope === 'string' ? row.seed_scope.trim() : undefined;
+      const seedInterestRating =
+        row.interest_rating != null ? Number(row.interest_rating) : undefined;
       return {
         seedFact: seed || undefined,
         storyNarrator: resolved === 'auto' ? undefined : resolved,
+        seedScope: seedScope || undefined,
+        seedInterestRating: Number.isFinite(seedInterestRating) ? seedInterestRating : undefined,
       };
     }
   }
@@ -79,6 +94,8 @@ export async function enrichFeedbackContext(
 ): Promise<StyleFeedbackContext> {
   let seedFact = overrides.seedFact ?? entry.seedFact?.trim();
   let narratorFromHistory: StoryNarratorId | undefined;
+  let seedScope = overrides.seedScope;
+  let seedInterestRating = overrides.seedInterestRating;
 
   if (entry.script?.trim()) {
     const hist = await findHistoryForFeedback(
@@ -89,6 +106,8 @@ export async function enrichFeedbackContext(
     );
     if (!seedFact) seedFact = hist.seedFact;
     narratorFromHistory = hist.storyNarrator;
+    if (!seedScope) seedScope = hist.seedScope;
+    if (seedInterestRating == null) seedInterestRating = hist.seedInterestRating;
   }
 
   const narrator =
@@ -103,6 +122,9 @@ export async function enrichFeedbackContext(
   return {
     storyNarrator: narrator,
     seedFact,
+    seedScope,
+    seedInterestRating,
+    seedInterestScore: overrides.seedInterestScore,
     genre: overrides.genre ?? entry.genre,
     year: overrides.year ?? entry.year,
     lang,
