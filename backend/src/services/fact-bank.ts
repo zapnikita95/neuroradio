@@ -8,6 +8,7 @@ import {
   adjustedInterestScore,
   interestScore,
   isCatalogMetadataSeed,
+  isEncyclopediaDefinitionSeed,
   MIN_PICK_INTEREST_SCORE,
   isMetadataHarvestFact,
 } from './reference-fact-quality.js';
@@ -301,6 +302,7 @@ function isValidStoredFact(fact: StoredFact): boolean {
     return false;
   }
   if (isCatalogMetadataSeed(fact.fact)) return false;
+  if (isEncyclopediaDefinitionSeed(fact.fact)) return false;
   return true;
 }
 

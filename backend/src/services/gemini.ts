@@ -452,7 +452,11 @@ export async function generateStoryScript(
 
   const fallback = finalizeAfterQualityLoop(
     lastCandidate,
-    { artist: input.artist, title: input.title },
+    {
+      artist: input.artist,
+      title: input.title,
+      speakTrackNamesInVoiceover: input.speakTrackNamesInVoiceover,
+    },
     (s) => finalizeStory(s, { ...input, voiceId }, storyLength),
     referenceFacts,
   );

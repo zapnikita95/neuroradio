@@ -137,6 +137,12 @@ export function isArtistDisambiguationListSeed(fact: string): boolean {
 /** Dictionary/literary page bleed — «cliché» the word, not mgk track. */
 export function isEncyclopediaDefinitionSeed(fact: string): boolean {
   const t = fact.trim();
+  if (
+    /\b(?:song|single|track)\s+originally\s+(?:performed|recorded|released)\s+by\b/i.test(t) ||
+    /\bis\s+(?:an?\s+)?(?:pop|rock|hip[- ]?hop|r[\s&]b|dance|electronic|country|folk|jazz|soul|metal|indie)\s+(?:song|single|track)\s+originally\b/i.test(t)
+  ) {
+    return true;
+  }
   return (
     /\b(?:French poet|G[eé]rard de Nerval|Nerval once said)\b/i.test(t) ||
     /\bA clich[eé] is\b/i.test(t) ||
@@ -164,6 +170,9 @@ const BORING_FACT_PATTERNS: RegExp[] = [
   /\b(?:musical\s+)?(?:duo|band|group)\s+from\b/i,
   /\bis\s+an?\s+(?:American|British|Canadian|Russian|Ukrainian|Swedish|German|French|Japanese|Korean|Australian)\s+(?:musical\s+)?(?:duo|band|group|artist|rock\s+band)\b/i,
   /\bis\s+a\s+song\s+by\b/i,
+  /\bis\s+(?:an?\s+)?(?:pop|rock|hip[- ]?hop|r[\s&]b|dance|electronic|country|folk|jazz|soul|metal|indie)\s+(?:song|single|track)\b/i,
+  /\b(?:song|single|track)\s+originally\s+(?:performed|recorded|released)\s+by\b/i,
+  /\boriginally\s+performed\s+by\b/i,
   /\b(?:was|were)\s+formed\s+in\b/i,
   /\b(?:name|назван\w*)\b.*\b(?:refers to|term for|means|происходит|отсылает|обозначает|термин)\b/i,
   /\boriginally\s+formed\b/i,

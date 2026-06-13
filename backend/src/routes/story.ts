@@ -15,7 +15,7 @@ import { fetchDeepWebSearchSnippets, fetchArtistIdentityWebSnippets } from '../s
 import { fetchFastTrackWikiFacts } from '../services/wikipedia-facts.js';
 import { explainReferenceFactSelection, factsTooSimilar, isRejectedStorySeed, type SelectedReferenceFact } from '../services/fact-picker.js';
 import { formatFactPickLog, logFactCandidatePools } from '../services/fact-interest-log.js';
-import { interestScore, isWikiBiographyLead, isCatalogMetadataSeed } from '../services/reference-fact-quality.js';
+import { interestScore, isWikiBiographyLead, isCatalogMetadataSeed, isEncyclopediaDefinitionSeed } from '../services/reference-fact-quality.js';
 import { interestRating10 } from '../services/fact-interest-log.js';
 import {
   buildFactPickContext,
@@ -478,6 +478,13 @@ router.post('/full', extractClientSecrets, validateStoryFullBody, storyFullRateL
     let factBundle = factCtx.bundle;
     let trackFactCount = 0;
     let artistFactCount = 0;
+    if (bankFact && isEncyclopediaDefinitionSeed(bankFact.fact)) {
+      console.log(
+        `[facts] bank seed trivial definition for "${metadata.artist}" — "${metadata.title}", fetching fresh facts`,
+      );
+      bankFact = null;
+    }
+
     let selectedFact: SelectedReferenceFact | null = bankFact;
     let factFromBank = Boolean(bankFact);
 
@@ -840,10 +847,11 @@ router.post('/full', extractClientSecrets, validateStoryFullBody, storyFullRateL
       }
     }
 
-    if (selectedFact && !factFromBank && isWeakSelectedFact(selectedFact, metadata.artist, metadata.title)) {
+    if (selectedFact && isWeakSelectedFact(selectedFact, metadata.artist, metadata.title)) {
       console.warn(
         `[facts] reject weak seed score=${selectedFact.interestScore} fact="${selectedFact.fact.slice(0, 100)}"`,
       );
+      if (factFromBank) factFromBank = false;
       selectedFact = null;
     }
 
