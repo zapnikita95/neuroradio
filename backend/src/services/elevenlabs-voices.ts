@@ -131,7 +131,8 @@ export function resolveElevenLabsVoiceId(
   options: { storyNarrator?: StoryNarratorId; genre?: string } = {},
 ): string {
   if (setting !== 'auto') {
-    return ELEVENLABS_VOICE_PRESETS[setting].voiceId;
+    const preset = ELEVENLABS_VOICE_PRESETS[setting];
+    if (preset) return preset.voiceId;
   }
   const narrator = options.storyNarrator ?? 'auto';
   const genre = (options.genre ?? '').toLowerCase();

@@ -72,6 +72,10 @@ import {
   parseUserTtsCredentials,
 } from '../services/user-tts-credentials.js';
 import { coerceVoiceForSpeechKit } from '../services/voices.js';
+import {
+  resolveElevenLabsVoiceId,
+  resolveElevenLabsVoiceSetting,
+} from '../services/elevenlabs-voices.js';
 import { resolveVoiceDelivery } from '../services/tts-voice-profiles.js';
 import type { TtsVoiceStyleId } from '../services/tts-voice-profiles.js';
 import {
@@ -145,6 +149,7 @@ interface StoryFullBody {
   story_length?: StoryLengthId;
   story_narrator: StoryNarratorId;
   tts_voice: TtsVoiceSetting;
+  elevenlabs_voice?: string;
   tts_speed: number;
   tts_emotion: TtsEmotion;
   tts_style: TtsVoiceStyleId;
@@ -1607,8 +1612,20 @@ router.post('/full', extractClientSecrets, validateStoryFullBody, storyFullRateL
       response.ttsHint = 'Озвучка на устройстве (skip_server_tts)';
     } else if (canSynthesizeServerTts(userTtsCredentials)) {
       const id = uuidv4();
+      const bodyFull = req.body as StoryFullBody;
+      const elevenSetting =
+        storyLanguage === 'en'
+          ? resolveElevenLabsVoiceSetting(bodyFull.elevenlabs_voice ?? ttsVoice)
+          : null;
+      const voiceLog =
+        storyLanguage === 'en' && elevenSetting
+          ? `eleven=${elevenSetting} apiVoice=${resolveElevenLabsVoiceId(elevenSetting, {
+              storyNarrator,
+              genre: metadata.genre,
+            })}`
+          : `yandexVoice=${voiceId}`;
       console.log(
-        `[tts] queue install=${installId.slice(0, 8)} voice=${voiceId} style=${delivery.styleId} speed=${delivery.speed} emotion=${delivery.emotion} tier=${effectiveVoiceTier} userTier=${userTier} provider=${effectiveTtsProvider} userBilling=${hasUserTtsCredentials(userTtsCredentials) ? userTtsCredentials?.provider : 'server'} words=${story.word_count}`,
+        `[tts] queue install=${installId.slice(0, 8)} ${voiceLog} style=${delivery.styleId} speed=${delivery.speed} emotion=${delivery.emotion} tier=${effectiveVoiceTier} userTier=${userTier} provider=${effectiveTtsProvider} userBilling=${hasUserTtsCredentials(userTtsCredentials) ? userTtsCredentials?.provider : 'server'} words=${story.word_count}`,
       );
       const mobileWav = requiresMobileWavPlayback(body);
       const audio = await synthesizeStoryAudio({
@@ -1630,7 +1647,7 @@ router.post('/full', extractClientSecrets, validateStoryFullBody, storyFullRateL
         edgeVoicePreset: (req.body as StoryFullBody).edge_voice_preset,
         speakTrackNamesInVoiceover: (req.body as StoryFullBody).speak_track_names_in_voiceover,
         storyLanguage: storyLanguage ?? 'ru',
-        elevenLabsVoice: ttsVoice,
+        elevenLabsVoice: bodyFull.elevenlabs_voice ?? ttsVoice,
         logContext: {
           installId,
           artist: metadata.artist,

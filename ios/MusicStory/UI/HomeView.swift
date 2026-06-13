@@ -12,6 +12,19 @@ struct HomeView: View {
     private var lang: ResolvedAppLanguage { settings.resolvedLanguage }
     private var copy: AppL10n { AppStrings.l10n(lang) }
 
+    private var personaVoiceLabel: String {
+        let narrator = settings.storyNarrator.uiLabel(lang)
+        let voice: String
+        if lang == .en && settings.hasPremiumTtsAccess {
+            voice = "ElevenLabs"
+        } else if settings.effectiveServerTtsProvider == .edge {
+            voice = settings.edgeVoicePreset.uiLabel(lang)
+        } else {
+            voice = settings.ttsVoice.uiLabel(lang)
+        }
+        return "\(narrator) · \(voice)"
+    }
+
     var body: some View {
         MusicStoryBackground {
             ZStack(alignment: .bottom) {
@@ -146,7 +159,7 @@ struct HomeView: View {
 
     private var orchestratorStatus: some View {
         VStack(spacing: 4) {
-            Text(settings.storyNarrator.uiLabel(lang))
+            Text(personaVoiceLabel)
                 .font(.caption.weight(.semibold))
                 .foregroundStyle(AppTheme.mutedLavender)
             Text(statusText)

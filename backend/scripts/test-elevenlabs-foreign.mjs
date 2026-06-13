@@ -105,4 +105,23 @@ test('single-shot model stays flash when not mixed', () => {
   if (prev) process.env.ELEVENLABS_MODEL_ID = prev;
 });
 
+import {
+  resolveElevenLabsVoiceId,
+  resolveElevenLabsVoiceSetting,
+} from '../dist/services/elevenlabs-voices.js';
+
+test('Yandex voice id zahar maps to auto elevenlabs preset (no crash)', () => {
+  const setting = resolveElevenLabsVoiceSetting('zahar');
+  assert.equal(setting, 'auto');
+  const apiId = resolveElevenLabsVoiceId(setting, { storyNarrator: 'radio_host' });
+  assert.ok(apiId.length > 8, apiId);
+});
+
+test('elevenlabs charlie resolves to API voice id', () => {
+  const setting = resolveElevenLabsVoiceSetting('charlie');
+  assert.equal(setting, 'charlie');
+  const apiId = resolveElevenLabsVoiceId(setting, {});
+  assert.equal(apiId, 'IKne3meq5aSn9XLyUdCD');
+});
+
 console.log(`\n[test-elevenlabs-foreign] ${passed} passed`);

@@ -68,7 +68,12 @@ import com.musicstory.app.domain.AppPowerMode
 import com.musicstory.app.domain.LlmProvider
 import com.musicstory.app.domain.OrchestratorState
 import com.musicstory.app.domain.AppLanguage
+import com.musicstory.app.domain.ElevenLabsVoice
+import com.musicstory.app.domain.EdgeVoicePreset
+import com.musicstory.app.domain.ServerTtsProvider
 import com.musicstory.app.domain.StoryNarrator
+import com.musicstory.app.domain.TtsVoice
+import com.musicstory.app.domain.ResolvedAppLanguage
 import com.musicstory.app.domain.resolveAppLanguage
 import com.musicstory.app.ui.uiLabel
 import com.musicstory.app.domain.TierAccess
@@ -114,6 +119,10 @@ fun HomeScreen(
     val isPlaying = app.mediaControllerManager.isPlaying.collectAsState().value
     val powerMode by app.settingsDataStore.appPowerMode.collectAsState(initial = AppPowerMode.ON)
     val storyNarrator by app.settingsDataStore.storyNarrator.collectAsState(initial = StoryNarrator.AUTO)
+    val ttsVoice by app.settingsDataStore.ttsVoice.collectAsState(initial = TtsVoice.ZAHAR)
+    val elevenLabsVoice by app.settingsDataStore.elevenLabsVoice.collectAsState(initial = ElevenLabsVoice.AUTO)
+    val edgeVoicePreset by app.settingsDataStore.edgeVoicePreset.collectAsState(initial = EdgeVoicePreset.SVETLANA_CALM)
+    val serverTtsProvider by app.settingsDataStore.serverTtsProvider.collectAsState(initial = ServerTtsProvider.EDGE)
     val appLanguage by app.settingsDataStore.appLanguage.collectAsState(initial = AppLanguage.SYSTEM)
     val resolvedLang = resolveAppLanguage(appLanguage)
     val llmProvider by app.settingsDataStore.llmProvider.collectAsState(initial = LlmProvider.GROQ)
@@ -161,6 +170,24 @@ fun HomeScreen(
         trialUntil = billingEntitlement?.trialUntil ?: cachedProfile?.trialUntil,
         premiumUntil = billingEntitlement?.premiumUntil ?: cachedProfile?.premiumUntil,
     )
+    val personaVoiceLabel = remember(
+        storyNarrator,
+        ttsVoice,
+        elevenLabsVoice,
+        edgeVoicePreset,
+        serverTtsProvider,
+        resolvedLang,
+        effectiveTier,
+    ) {
+        val voicePart = when {
+            resolvedLang == ResolvedAppLanguage.EN && TierAccess.isPremiumLike(effectiveTier) ->
+                elevenLabsVoice.label(resolvedLang)
+            !TierAccess.isPremiumLike(effectiveTier) || serverTtsProvider == ServerTtsProvider.EDGE ->
+                edgeVoicePreset.uiLabel(resolvedLang)
+            else -> ttsVoice.uiLabel(resolvedLang)
+        }
+        "${storyNarrator.uiLabel(resolvedLang)} · $voicePart"
+    }
     val trialUntil = billingEntitlement?.trialUntil
     var trialTick by remember { mutableIntStateOf(0) }
     LaunchedEffect(trialUntil) {
@@ -487,7 +514,7 @@ fun HomeScreen(
                 Spacer(modifier = Modifier.height(20.dp))
 
                 OrchestratorStatusLine(
-                    narratorLabel = storyNarrator.uiLabel(resolvedLang),
+                    narratorLabel = personaVoiceLabel,
                     state = uiState.state,
                     isBackendFetching = uiState.isBackendFetching,
                     tracksUntilNext = when {

@@ -11,6 +11,10 @@ import { resolveTtsVoiceStyle, type TtsVoiceStyleId } from '../services/tts-voic
 import type { TtsProviderId, VoiceTier } from '../services/tts-router.js';
 import { resolveStoryLanguage, type StoryLanguageId } from '../services/story-language.js';
 import { resolveEdgeVoicePresetId } from '../services/edge-voices.js';
+import {
+  resolveElevenLabsVoiceSetting,
+  type ElevenLabsVoiceSetting,
+} from '../services/elevenlabs-voices.js';
 
 interface StoryFullBody {
   artist?: unknown;
@@ -150,7 +154,11 @@ export function validateStoryFullBody(req: Request, res: Response, next: NextFun
 
   const storyLength: StoryLengthId = resolveStoryLength(body.story_length);
   const storyNarrator: StoryNarratorId = resolveStoryNarrator(body.story_narrator);
-  const ttsVoice: TtsVoiceSetting = resolveTtsVoice(body.tts_voice);
+  const storyLanguage: StoryLanguageId = resolveStoryLanguage(body.story_language);
+  const elevenlabsVoice: ElevenLabsVoiceSetting | undefined =
+    storyLanguage === 'en' ? resolveElevenLabsVoiceSetting(body.tts_voice) : undefined;
+  const ttsVoice: TtsVoiceSetting =
+    storyLanguage === 'en' ? 'auto' : resolveTtsVoice(body.tts_voice);
   const ttsSpeed = resolveTtsSpeed(
     typeof body.tts_speed === 'number' ? body.tts_speed : Number(body.tts_speed),
   );
@@ -185,7 +193,6 @@ export function validateStoryFullBody(req: Request, res: Response, next: NextFun
     asTrimmedString(body.silero_voice, 32);
   const edgeVoicePreset = resolveEdgeVoicePresetId(legacyVoicePreset);
   const speakTrackNamesInVoiceover = body.speak_track_names_in_voiceover === true;
-  const storyLanguage: StoryLanguageId = resolveStoryLanguage(body.story_language);
   const clientPlatform =
     typeof body.client_platform === 'string' && body.client_platform.trim()
       ? body.client_platform.trim().toLowerCase().slice(0, 16)
@@ -222,6 +229,7 @@ export function validateStoryFullBody(req: Request, res: Response, next: NextFun
     edge_voice_preset: edgeVoicePreset,
     speak_track_names_in_voiceover: speakTrackNamesInVoiceover,
     story_language: storyLanguage,
+    ...(elevenlabsVoice ? { elevenlabs_voice: elevenlabsVoice } : {}),
     ...(clientPlatform ? { client_platform: clientPlatform } : {}),
   };
   next();

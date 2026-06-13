@@ -10,7 +10,7 @@ import {
 } from './tts-access.js';
 import { hasPremiumEntitlement, isElevenLabsEnabled } from './entitlements.js';
 import { hasElevenLabsCredentials, synthesizeSpeechElevenLabs } from './elevenlabs-tts.js';
-import { resolveElevenLabsVoiceId } from './elevenlabs-voices.js';
+import { resolveElevenLabsVoiceId, resolveElevenLabsVoiceSetting } from './elevenlabs-voices.js';
 import type { StoryLanguageId } from './story-language.js';
 import {
   synthesizeSpeechSalute,
@@ -244,9 +244,13 @@ export async function synthesizeStoryAudio(request: TtsRouteRequest): Promise<Tt
       ...ttsMarkupFlags(request),
     });
   } else if (provider === 'elevenlabs') {
-    const elevenVoiceId = resolveElevenLabsVoiceId(
-      (request.elevenLabsVoice ?? request.voiceId ?? 'auto') as import('./elevenlabs-voices.js').ElevenLabsVoiceSetting,
-      { storyNarrator: request.storyNarrator, genre: undefined },
+    const elevenSetting = resolveElevenLabsVoiceSetting(request.elevenLabsVoice ?? 'auto');
+    const elevenVoiceId = resolveElevenLabsVoiceId(elevenSetting, {
+      storyNarrator: request.storyNarrator,
+      genre: undefined,
+    });
+    console.log(
+      `[elevenlabs-tts] resolve setting=${elevenSetting} narrator=${request.storyNarrator ?? 'auto'} apiVoice=${elevenVoiceId}`,
     );
     result = await synthesizeSpeechElevenLabs(script, request.fileName, {
       artist: request.artist,
