@@ -16,18 +16,50 @@ export function interestRating10(fact: string): number {
   return Math.max(1, Math.min(3, Math.round(raw / 2)));
 }
 
+export type FactSeedSource =
+  | 'curated'
+  | 'bank'
+  | 'online-pick'
+  | 'llm-hunt'
+  | 'web-salvage'
+  | 'wiki-fallback'
+  | 'none';
+
+const FACT_ORIGIN_LABELS: Record<FactSeedSource, string> = {
+  curated: 'ЗАГОТОВКА curated-facts.json',
+  bank: 'БАНК facts-bank (volume, ранее сохранён)',
+  'online-pick': 'ОНЛАЙН picker (свежий fetch wiki/lastfm/genius)',
+  'llm-hunt': 'LLM-HUNT (нейросеть из сниппетов)',
+  'web-salvage': 'SALVAGE (HTML-обрезок при timeout wiki)',
+  'wiki-fallback': 'WIKI-FALLBACK (биография/лид)',
+  none: 'NONE',
+};
+
 export function formatFactPickLog(
   selected: SelectedReferenceFact | null,
-  source: 'rules' | 'llm' | 'metadata' | 'bank' | 'none',
+  source: FactSeedSource | 'rules' | 'llm' | 'metadata' | 'bank' | 'none',
+  detail?: string,
 ): string {
+  const normalized: FactSeedSource =
+    source === 'rules'
+      ? detail?.includes('salvage')
+        ? 'web-salvage'
+        : 'online-pick'
+      : source === 'llm'
+        ? 'llm-hunt'
+        : source === 'metadata'
+          ? 'wiki-fallback'
+          : (source as FactSeedSource);
   if (!selected) {
-    return '[facts] seed=NONE source=none interestScore=0 interest=0/10';
+    return `[facts] seed=NONE ORIGIN=${normalized} (${FACT_ORIGIN_LABELS[normalized]}) interestScore=0 interest=0/10`;
   }
   const score = interestScore(selected.fact);
   const rating = interestRating10(selected.fact);
   const preview = selected.fact.replace(/\s+/g, ' ').slice(0, 120);
+  const detailSuffix = detail && !detail.includes('salvage') ? ` detail=${detail}` : '';
   return (
-    `[facts] seed source=${source} scope=${selected.scope} ` +
+    `[facts] seed ORIGIN=${normalized} (${FACT_ORIGIN_LABELS[normalized]})` +
+    `${detailSuffix} scope=${selected.scope} ` +
     `interestScore=${score} interest=${rating}/10 ` +
     `fact="${preview}${selected.fact.length > 120 ? '…' : ''}"`
   );

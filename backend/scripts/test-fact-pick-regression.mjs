@@ -250,6 +250,36 @@ assert(
   'Dani fact allowed for Dani California',
 );
 
+const { isWeakSnippetSeed } = await import('../dist/services/search-snippet-salvage.js');
+assert(
+  isWeakSnippetSeed('Альбом «Overexposed» (Maroon 5) на Discogs датирован 2016 годом.'),
+  'Discogs date catalog rejected as weak seed',
+);
+
+assert(
+  findUngroundedClaims(
+    'One More Night стала настоящим прорывом для группы, заняв верхние строчки чартов',
+    ['The song was released on June 19, 2012, as the second single from their fourth studio album.'],
+  ),
+  'false breakthrough claim rejected when not in seed',
+);
+
+const { findPersonaCliche } = await import('../dist/services/story-quality.js');
+assert(
+  findPersonaCliche('Вступление держит внимание лучше любого джингла.'),
+  'jingle intro closing rejected as persona cliche',
+);
+
+const { applyStylizedArtistTokensRu } = await import('../dist/services/artist-pronunciation.js');
+assert(
+  applyStylizedArtistTokensRu('трек by mgk', 'mgk', '').includes('эм-джей-к'),
+  'mgk spelled as em-jay-kay in RU TTS, not mdjk',
+);
+assert(
+  applyStylizedArtistTokensRu('One More Night by Maroon 5', 'Maroon 5', 'One More Night').includes('мар'),
+  'Maroon 5 respelled for RU TTS',
+);
+
 // --- 6. Optional live: real Last.fm + aggregator ---
 if (LIVE) {
   if (!process.env.LASTFM_API_KEY?.trim()) {

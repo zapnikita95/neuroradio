@@ -2,7 +2,12 @@ import type { SelectedReferenceFact } from './fact-picker.js';
 import { factMentionsArtist, factMentionsTitle, factNamesForeignEntity, hasTrackContextSignal } from './fact-relevance.js';
 import { interestRating10 } from './fact-interest-log.js';
 import { isMetadataOnlyFallbackFact } from './metadata-facts.js';
-import { interestScore, isAlbumListingSeed, isWikiBiographyLead } from './reference-fact-quality.js';
+import {
+  interestScore,
+  isAlbumListingSeed,
+  isCatalogMetadataSeed,
+  isWikiBiographyLead,
+} from './reference-fact-quality.js';
 import { acceptSearchGroundedSnippet, acceptIndieEmergingSnippet, isLyricsPageSeed, isPlaylistJunkSnippet, isSpeakableReferenceFact, isUnspeakableWebSeed } from './web-snippet-accept.js';
 import { factFitsStoryLanguage } from './fact-language-fit.js';
 import type { StoryLanguageId } from './story-language.js';
@@ -11,6 +16,7 @@ import type { StoryLanguageId } from './story-language.js';
 export function isWeakSnippetSeed(fact: string, score = interestScore(fact)): boolean {
   const trimmed = fact.trim();
   if (isAlbumListingSeed(trimmed)) return true;
+  if (isCatalogMetadataSeed(trimmed)) return true;
   if (isLyricsPageSeed(trimmed)) return true;
   if (score < 6) return true;
   if (isWikiBiographyLead(trimmed)) return true;
@@ -20,6 +26,7 @@ export function isWeakSnippetSeed(fact: string, score = interestScore(fact)): bo
 export function isWeakSelectedFact(selected: SelectedReferenceFact | null, artist = ''): boolean {
   if (!selected) return true;
   const trimmed = selected.fact.trim();
+  if (isCatalogMetadataSeed(trimmed)) return true;
   if (isLyricsPageSeed(trimmed)) return true;
   const score = Math.max(selected.interestScore ?? 0, interestScore(trimmed));
   if (score < 6) return true;

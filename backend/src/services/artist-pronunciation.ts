@@ -74,7 +74,7 @@ function replaceWholePhrase(text: string, phrase: string, replacement: string): 
   return text.replace(re, replacement);
 }
 
-/** Yandex/Edge: stylized artist tokens → Cyrillic (mgk → мджк), not letter-by-letter EN. */
+/** Yandex/Edge: stylized artist tokens → Cyrillic respelling (mgk → эм-джей-кей, maroon 5 → марун файв). */
 export function applyStylizedArtistTokensRu(text: string, artist: string, title = ''): string {
   let result = text;
   for (const seed of [artist, title]) {

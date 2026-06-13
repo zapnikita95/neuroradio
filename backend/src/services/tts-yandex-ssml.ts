@@ -27,6 +27,7 @@ const LATIN_RUN_RE = new RegExp(
 /** T-Shirt, Misfits T‐Shirt — one token; album «Alt: Title» — без рваного SSML. */
 export function normalizeLatinForSsml(text: string): string {
   return normalizeLatinApostrophes(text)
+    .replace(/\bMaroon\s+5\b/gi, 'Maroon Five')
     .replace(
       /\b([A-Za-z]{2,})\s+([A-Za-z]{1,4})[\u2010\u2011\u2012\u2013\u2014-]([A-Za-z]{2,})\b/g,
       '$1 $2-$3',
@@ -128,6 +129,8 @@ const LATIN_SSML_PRONUNCIATION: Record<string, string> = {
   moonwalk: 'moon walk',
   xscape: 'X scape',
   onerepublic: 'One Republic',
+  'maroon 5': 'maroon five',
+  'maroon five': 'maroon five',
   'anti-gravity lean': 'anti gravity lean',
   'anti-gravity': 'anti gravity',
   startafight: 'start a fight',

@@ -419,6 +419,7 @@ router.post('/full', extractClientSecrets, validateStoryFullBody, storyFullRateL
     const curatedHit =
       lookupCuratedFact(coverCtx.factArtist, coverCtx.factTitle) ??
       lookupCuratedFact(artist, title);
+    let factFromCurated = false;
     let bankFact: Awaited<ReturnType<typeof pickBankFactForUser>> = null;
     if (curatedHit) {
       const curatedFp = factFingerprint(curatedHit.fact);
@@ -434,8 +435,9 @@ router.post('/full', extractClientSecrets, validateStoryFullBody, storyFullRateL
           interestScore: curatedScore,
           interestRating: interestRating10(curatedHit.fact),
         };
+        factFromCurated = true;
         console.log(
-          `[facts] curated hit artist="${coverCtx.factArtist}" title="${coverCtx.factTitle}"`,
+          `[facts] ORIGIN=curated (ЗАГОТОВКА curated-facts.json) artist="${coverCtx.factArtist}" title="${coverCtx.factTitle}"`,
         );
       } else {
         console.log(
@@ -480,8 +482,8 @@ router.post('/full', extractClientSecrets, validateStoryFullBody, storyFullRateL
         `[facts] cache hit install=${installId.slice(0, 8)} artist="${metadata.artist}" title="${metadata.title}" ` +
           `unusedInBank=${unused} — skip wiki/web/ddg (seed already saved)`,
       );
-      timing.mark('facts-fetched', `source=bank unused=${unused}`);
-      console.log(formatFactPickLog(bankFact, 'bank'));
+      timing.mark('facts-fetched', `source=${factFromCurated ? 'curated' : 'bank'} unused=${unused}`);
+      console.log(formatFactPickLog(bankFact, factFromCurated ? 'curated' : 'bank'));
     } else {
       factCtx = await fetchAggregatedFactContext(
         metadata.artist,
@@ -650,6 +652,7 @@ router.post('/full', extractClientSecrets, validateStoryFullBody, storyFullRateL
     }
 
     let factHuntLlm = false;
+    let factFromSalvage = false;
     const bundleFactCount = trackFactCount + artistFactCount;
     const groundedFactCount = countGroundedFacts(factBundle);
 
@@ -754,10 +757,11 @@ router.post('/full', extractClientSecrets, validateStoryFullBody, storyFullRateL
             pickRelaxedSnippetSeed(mergedSnippets, metadata.artist, metadata.title, storyLang);
           if (snippetSeed) {
             selectedFact = snippetSeed;
+            factFromSalvage = true;
             ingestFacts(metadata.artist, metadata.title, [
               { fact: snippetSeed.fact, scope: snippetSeed.scope, source: 'api' },
             ]);
-            console.log(formatFactPickLog(selectedFact, 'rules') + ' (web-snippet salvage)');
+            console.log(formatFactPickLog(selectedFact, 'web-salvage'));
           }
         }
       }
@@ -773,6 +777,13 @@ router.post('/full', extractClientSecrets, validateStoryFullBody, storyFullRateL
       );
     }
 
+    if (selectedFact && isCatalogMetadataSeed(selectedFact.fact)) {
+      console.warn(
+        `[facts] reject catalog-metadata seed ORIGIN=${factFromCurated ? 'curated' : factFromBank ? 'bank' : 'online'} fact="${selectedFact.fact.slice(0, 100)}"`,
+      );
+      selectedFact = null;
+    }
+
     if (selectedFact && !factFromBank && isWeakSelectedFact(selectedFact, metadata.artist)) {
       console.warn(
         `[facts] reject weak seed score=${selectedFact.interestScore} fact="${selectedFact.fact.slice(0, 100)}"`,
@@ -780,7 +791,9 @@ router.post('/full', extractClientSecrets, validateStoryFullBody, storyFullRateL
       selectedFact = null;
     }
 
-    const selectedFactWhy = factFromBank
+    const selectedFactWhy = factFromCurated
+      ? 'seed from curated-facts.json — verified catalog entry'
+      : factFromBank
       ? 'seed from facts-bank — saved earlier, not yet told to this user'
       : factHuntLlm
         ? explainLlmFactSelection(selectedFact!)
@@ -1212,7 +1225,15 @@ router.post('/full', extractClientSecrets, validateStoryFullBody, storyFullRateL
     };
 
     if (selectedFact?.fact) {
-      const seedSource = factFromBank ? 'bank' : factHuntLlm ? 'llm' : 'rules';
+      const seedSource: 'curated' | 'bank' | 'llm-hunt' | 'online-pick' | 'web-salvage' = factFromCurated
+        ? 'curated'
+        : factFromBank
+          ? 'bank'
+          : factHuntLlm
+            ? 'llm-hunt'
+            : factFromSalvage
+              ? 'web-salvage'
+              : 'online-pick';
       const topic = classifyFactTopic(selectedFact.fact);
       console.log(
         formatFactPickLog(selectedFact, seedSource) +

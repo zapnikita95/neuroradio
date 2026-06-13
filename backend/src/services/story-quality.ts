@@ -158,6 +158,12 @@ export const PERSONA_CLICHE_PATTERNS: RegExp[] = [
   /хит-?пара[дт]\w*\s+христиан\w*\s+музык/i,
   /христиан\w*\s+хит-?пара[дт]/i,
   /возглавил\w*\s+.*христиан\w*\s+чарт/i,
+  /настоящ(?:им|ый|ей)\s+прорыв/i,
+  /прорыв(?:ом)?\s+для\s+(?:группы|коллектива|артист)/i,
+  /вступлени(?:е|я)\s+держит\s+внимание/i,
+  /лучше\s+любого\s+джингла/i,
+  /держит\s+внимание\s+лучше/i,
+  /замираю\s+—\s+будто\s+снова\s+в\s+тех\s+годах/i,
 ];
 
 /** @deprecated Prefer HARD_SCRIPT_REJECT_PATTERNS + PERSONA_CLICHE_PATTERNS. */
@@ -977,6 +983,18 @@ const UNGROUNDED_CLAIM_CHECKS: Array<{ claim: RegExp; factHint: RegExp }> = [
   {
     claim: /(?:^|[\s,.!?«»])(?:у\s+меня\s+)?(?:до\s+сих\s+пор\s+)?мурашк/i,
     factHint: /мураш|goosebump|chill|shiver/i,
+  },
+  {
+    claim: /настоящ(?:им|ый|ей)\s+прорыв(?:ом)?|стал[аи]?\s+(?:настоящ(?:им|ей|ым)\s+)?прорыв|прорыв(?:ом)?\s+для\s+(?:группы|коллектива|артист)/i,
+    factHint: /breakthrough|прорыв|debut|first hit|kara'?s flowers|unknown artist/i,
+  },
+  {
+    claim: /вступлени(?:е|я)\s+держит\s+внимание|лучше\s+любого\s+джингла|держит\s+внимание\s+лучше/i,
+    factHint: /intro|opening|вступлен|jingle|джингл|hook/i,
+  },
+  {
+    claim: /(?:^|[.!?…]\s+)вступлени(?:е|я)\s+(?:держит|цепляет|замира)/i,
+    factHint: /intro|opening|вступлен|first (?:note|second|beat)/i,
   },
   {
     claim: /с\s+годами\s+не\s+выцветает|вступлени(?:е|я)\s+по-прежнему\s+цепляет/i,
