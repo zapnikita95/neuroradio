@@ -2,6 +2,7 @@ import fetch from '../proxy-fetch.js';
 import { fuzzyTokenMatch } from './title-transliterate.js';
 import type { SelectedReferenceFact } from './fact-picker.js';
 import { factNamesForeignEntity, factMentionsArtist, factMentionsTitle, hasTrackContextSignal, hasRussianTrackContextSignal } from './fact-relevance.js';
+import { hasAnchoredTrackContext, rejectSeedForTrackStory } from './fact-track-anchor.js';
 import { interestScore, isBoringFact, MIN_PICK_INTEREST_SCORE, isWeakChartSeed, isGenericMusicVideoSeed } from './reference-fact-quality.js';
 import { interestRating10 } from './fact-interest-log.js';
 import { MIN_GOOD_SCOPE_INTEREST } from './fact-picker.js';
@@ -183,6 +184,9 @@ export function validateLlmSeedCandidate(
   }
   if (factNamesForeignEntity(fact, artist, title)) {
     return { ok: false, reason: 'foreign entity in fact' };
+  }
+  if (rejectSeedForTrackStory(fact, artist, title)) {
+    return { ok: false, reason: 'fact not anchored to requested track' };
   }
   const artistNorm = normalize(artist);
   if (/[\u0400-\u04FF]/.test(artist) && !factMentionsArtist(fact, artist)) {
@@ -447,9 +451,12 @@ export function validateMajorCatalogFact(
   if (fact.length < 35) return { ok: false, reason: 'too short' };
   if (WEAK_TRIVIA_PATTERNS.some((p) => p.test(fact))) return { ok: false, reason: 'weak trivia' };
   if (!factMentionsArtist(fact, artist)) return { ok: false, reason: 'no artist' };
+  if (rejectSeedForTrackStory(fact, artist, title)) {
+    return { ok: false, reason: 'not anchored to track' };
+  }
 
   const mentionsTitle = factMentionsTitle(fact, title);
-  const trackContext = hasTrackContextSignal(fact) || hasRussianTrackContextSignal(fact);
+  const trackContext = hasAnchoredTrackContext(fact, title);
   if (!mentionsTitle && !trackContext) {
     return { ok: false, reason: 'no title or track context' };
   }

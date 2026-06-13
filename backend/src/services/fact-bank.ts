@@ -2,6 +2,7 @@ import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { interestRating10 } from './fact-interest-log.js';
+import { rejectSeedForTrackStory } from './fact-track-anchor.js';
 import { factMentionsArtistAsEntity, isAmbiguousCommonWordArtist } from './fact-relevance.js';
 import { interestScore } from './reference-fact-quality.js';
 import { isSpeakableReferenceFact } from './web-snippet-accept.js';
@@ -172,6 +173,10 @@ function isValidStoredFact(fact: StoredFact): boolean {
     isAmbiguousCommonWordArtist(fact.artist) &&
     /(?:скандал|проститу|шантаж|измен|развод|арест|убий|наркот)/i.test(fact.fact)
   ) {
+    return false;
+  }
+  const trackPool = (loadBank().byTrack[trackKey(fact.artist, fact.title)] ?? []).map((f) => f.fact);
+  if (rejectSeedForTrackStory(fact.fact, fact.artist, fact.title, { trackPoolFacts: trackPool })) {
     return false;
   }
   return true;
@@ -358,6 +363,10 @@ export function pickFromBank(
     album: track.filter((f) => f.scope === 'album'),
     artist: artistFacts,
   };
+  const trackPoolFacts = [
+    ...pools.track.map((f) => f.fact),
+    ...pools.album.map((f) => f.fact),
+  ];
 
   const unused: StoredFact[] = [];
   for (const scope of preferScope) {
@@ -366,6 +375,7 @@ export function pickFromBank(
       if (fact.topicKey && fact.topicKey !== 'misc' && blockedTopics.has(fact.topicKey)) continue;
       if (factsTooSimilar(fact.fact, rejectSimilarTo)) continue;
       if (!factFitsStoryLanguage(fact.fact, storyLanguage)) continue;
+      if (rejectSeedForTrackStory(fact.fact, artist, title, { trackPoolFacts })) continue;
       if (!(fact.isHot ?? fact.interestRating >= HOT_MIN_RATING)) continue;
       if (!isSpeakableReferenceFact(fact.fact, artist, title)) continue;
       if (isAmbiguousCommonWordArtist(artist) && !factMentionsArtistAsEntity(fact.fact, artist)) continue;

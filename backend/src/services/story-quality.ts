@@ -962,6 +962,14 @@ const UNGROUNDED_CLAIM_CHECKS: Array<{ claim: RegExp; factHint: RegExp }> = [
     claim: /синтезатор|шёпот|шепот|электроник\w*\s+и\s+шёпот|осколк\w*\s+электроник/i,
     factHint: /synth|electronic|deathtronica|electronicore|scream|hardcore|metalcore|шёпот|шепот|синтез|guitar|вокал/i,
   },
+  {
+    claim: /(?:стал\s+)?саундтреком\s+(?:лета|фильм|кино)|\bsoundtrack\b/i,
+    factHint: /soundtrack|film|movie|фильм|кино|сериал|video game/i,
+  },
+  {
+    claim: /отголоски того периода|переход из дуэта в сольное/i,
+    factHint: /отголоск|дуэт|duo|period|период|transition|solo/i,
+  },
 ];
 
 export function findUngroundedClaims(script: string, referenceFacts: string[] = []): string | null {

@@ -36,6 +36,8 @@ const { poolHasTopicDuplicate } = await import('../dist/services/fact-topic.js')
 const { isArtistFormationBioSeed, isTrackDurationCatalogSeed } = await import(
   '../dist/services/reference-fact-quality.js'
 );
+const { rejectSeedForTrackStory } = await import('../dist/services/fact-track-anchor.js');
+const { findUngroundedClaims } = await import('../dist/services/story-quality.js');
 
 const HYPA_ARTIST = 'Eskimo Callboy';
 const HYPA_TITLE = 'Hypa Hypa';
@@ -120,8 +122,8 @@ const badPick = pickReferenceFact(
   HYPA_TITLE,
 );
 assert(
-  badPick?.fact.includes('formed'),
-  'without track facts, formation bio is acceptable fallback',
+  !badPick,
+  'without track facts, formation bio is rejected (no unanchored artist trivia for track story)',
 );
 
 // --- 2b. Summer: season encyclopedia must lose to Spotify track fact ---
@@ -167,7 +169,53 @@ assert(
 );
 assert(dedicated.trackFacts.length >= 2, 'dedicated bundle keeps multiple track facts');
 
-// --- 5. Optional live: real Last.fm + aggregator ---
+// --- 5. Track anchor: cross-song bleed, place collision, career bio ---
+const PORCARO_FACT =
+  'It was originally written by keyboardist Steve Porcaro, based on a conversation he had with his daughter.';
+const CHICAGO_CITY =
+  'The city of Chicago was first known reference to Checagou in a memoir by La Salle.';
+const SQWOZ_DUO_EN =
+  'Originally started as a duo with Igor Tsaregorodtsev in 2012 before transitioning to a solo career.';
+const SQWOZ_DUO_RU = 'SQWOZ BAB начинал как дуэт с Игорем Царегорodtsev в 2012 году.';
+
+assert(
+  rejectSeedForTrackStory(PORCARO_FACT, 'Michael Jackson', 'Chicago'),
+  'Porcaro/Human Nature origin rejected for Chicago',
+);
+assert(
+  rejectSeedForTrackStory(CHICAGO_CITY, 'Michael Jackson', 'Chicago'),
+  'Chicago city encyclopedia rejected for MJ Chicago track',
+);
+assert(
+  rejectSeedForTrackStory(SQWOZ_DUO_EN, 'SQWOZ BAB', 'КУПЕР'),
+  'English duo bio rejected without track title',
+);
+assert(
+  rejectSeedForTrackStory(SQWOZ_DUO_RU, 'SQWOZ BAB', 'КУПЕР'),
+  'Russian duo bio rejected without track title',
+);
+
+const mjPick = pickReferenceFact(
+  { trackFacts: [], artistFacts: [PORCARO_FACT, CHICAGO_CITY] },
+  [],
+  0,
+  'Michael Jackson',
+  'Chicago',
+);
+assert(
+  !mjPick || (!/Porcaro|Checagou|keyboardist/i.test(mjPick.fact)),
+  `Chicago pick skips Porcaro/city bleed (got: ${mjPick?.fact?.slice(0, 80) ?? 'null'})`,
+);
+
+assert(
+  findUngroundedClaims(
+    'Summer Calvin Harris стал саундтреком лета 2014 — его гитарные рифы',
+    ["Summer was Spotify's most-streamed track of 2014 worldwide."],
+  ),
+  'false soundtrack/guitar claim rejected when not in seed',
+);
+
+// --- 6. Optional live: real Last.fm + aggregator ---
 if (LIVE) {
   if (!process.env.LASTFM_API_KEY?.trim()) {
     console.warn('SKIP live: LASTFM_API_KEY not set');

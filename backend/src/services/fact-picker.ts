@@ -27,6 +27,7 @@ import {
   isMisattributedBandTrackFact,
   isNonMusicTitleCollisionFact,
 } from './fact-relevance.js';
+import { rejectSeedForTrackStory } from './fact-track-anchor.js';
 import { factFitsStoryLanguage } from './fact-language-fit.js';
 import type { StoryLanguageId } from './story-language.js';
 
@@ -135,7 +136,9 @@ function isRejectedSeed(
   artist = '',
 ): boolean {
   if (!factFitsStoryLanguage(fact, storyLanguage)) return true;
-  if (title && artist && isNonMusicTitleCollisionFact(fact, title, artist)) return true;
+  if (title && artist && rejectSeedForTrackStory(fact, artist, title, { trackPoolFacts: trackPool })) {
+    return true;
+  }
   if (isAlbumListingSeed(fact)) return true;
   if (isCatalogMetadataSeed(fact)) return true;
   if (

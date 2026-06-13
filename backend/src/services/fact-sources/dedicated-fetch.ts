@@ -7,6 +7,7 @@ import {
   factNamesForeignEntity,
   hasTrackContextSignal,
 } from '../fact-relevance.js';
+import { rejectSeedForTrackStory } from '../fact-track-anchor.js';
 import { poolHasTopicDuplicate } from '../fact-topic.js';
 import {
   interestScore,
@@ -96,6 +97,7 @@ function dedicatedFactRelevant(
   const trimmed = fact.trim();
   if (trimmed.length < 35 || isTruncatedMarketingSnippet(trimmed)) return false;
   if (isAlbumListingSeed(trimmed)) return false;
+  if (rejectSeedForTrackStory(trimmed, artist, title)) return false;
   if (/multiple artists tracked as/i.test(trimmed)) return false;
   if (factNamesForeignEntity(trimmed, artist, title, artist, 'indie')) return false;
 
@@ -122,6 +124,7 @@ function parserTrustedDedicatedRelevant(
   const trimmed = item.fact.trim();
   if (trimmed.length < 35 || isTruncatedMarketingSnippet(trimmed)) return false;
   if (isAlbumListingSeed(trimmed)) return false;
+  if (rejectSeedForTrackStory(trimmed, artist, title)) return false;
   if (/multiple artists tracked as/i.test(trimmed)) return false;
   if (/creativecommons|user-contributed text is available/i.test(trimmed)) return false;
   if (item.scope === 'artist') {

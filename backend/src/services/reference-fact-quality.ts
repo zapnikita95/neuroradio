@@ -60,7 +60,9 @@ export function isArtistFormationBioSeed(fact: string): boolean {
   const t = fact.trim();
   return (
     /\b(?:is|was)\s+(?:an?\s+)?(?:\w+\s+){0,4}(?:band|group|artist|duo|trio)\s+formed\s+in\b/i.test(t) ||
-    /\b(?:band|group)\s+formed\s+in\s+[A-Z][\w-]+(?:\s+in\s+\d{4})?\b/i.test(t)
+    /\b(?:band|group)\s+formed\s+in\s+[A-Z][\w-]+(?:\s+in\s+\d{4})?\b/i.test(t) ||
+    /\b(?:originally )?started as a (?:duo|duet|band|group)\b/i.test(t) ||
+    /\bbefore transitioning to a solo\b/i.test(t)
   );
 }
 

@@ -4,6 +4,7 @@ import { collaboratorNames } from './artist-primary.js';
 import { buildTitleMatchVariants, cyrillicToLatin, fuzzyTokenMatch, textMentionsTitle } from './title-transliterate.js';
 import { latinPhraseToRussianTts } from './tts-foreign-pronounce.js';
 import { isNonMusicProfessionText } from './wikipedia-music.js';
+import { rejectSeedForTrackStory } from './fact-track-anchor.js';
 
 function normalize(text: string): string {
   return text
@@ -864,6 +865,10 @@ export function titleMentionVariants(title: string): string[] {
 export function hasTrackContextSignal(fact: string): boolean {
   const trimmed = fact.trim();
   if (/^It['']s\b/i.test(trimmed)) return false;
+  if (/^It was originally written\b/i.test(trimmed)) return false;
+  if (/^It was written by\b/i.test(trimmed) && !/\bthis (?:song|track|single)\b/i.test(trimmed)) {
+    return false;
+  }
   if (/^(?:It'?s easy to understand|Delve into the|Join professional|Explore songs|Be the first to|The most successful and the best-known is)/i.test(trimmed)) {
     return false;
   }
@@ -932,6 +937,14 @@ export function factMentionsOtherTrackTitle(fact: string, title: string): boolea
     if (factNorm.includes(phrase)) return true;
   }
 
+  if (
+    titleNorm !== 'human nature' &&
+    /\b(?:porcaro|steve porcaro)\b/i.test(fact) &&
+    /\b(?:originally written|based on a conversation|human nature)\b/i.test(fact)
+  ) {
+    return true;
+  }
+
   for (const match of fact.matchAll(/[«"]([^»"]{4,80})[»"]/g)) {
     const quoted = normalize(match[1]);
     if (quoted.length < 4) continue;
@@ -987,6 +1000,7 @@ export function factAppliesToRequest(
   if (isGenericDisambiguationFact(trimmed, artist)) return false;
   if (isWrongTitleMediumCollision(trimmed, title)) return false;
   if (factMentionsOtherTrackTitle(trimmed, title)) return false;
+  if (title && artist && rejectSeedForTrackStory(trimmed, artist, title)) return false;
 
   const mentionsArtist = factMentionsArtist(trimmed, artist);
   const mentionsTitle = factMentionsTitle(trimmed, title);
