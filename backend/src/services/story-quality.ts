@@ -1137,6 +1137,12 @@ export function findLlmGarbage(script: string, options?: LlmGarbageOptions): str
   return null;
 }
 
+const ARTIST_HEALTH_SEED_PATTERNS =
+  /\b(?:surgery|an operation|chemotherapy|prolong (?:his|her|their) life|rejected (?:surgery|treatment|the operation)|refused (?:surgery|treatment)|was told that (?:he|she|they) would require|terminal cancer|lung cancer)\b/i;
+
+const HEALTH_LINKED_TO_RECORDING_PATTERNS =
+  /(?:записал\w*|записывал\w*|recorded|recording|в\s+студи|ст\+?уди|микрофон|скальпел|больничн|операц|hospital|could not appear|мог\s+бы\s+(?:и\s+)?не\s+появиться|выбрал\w*\s+музык|instead of (?:the )?hospital|вместо\s+больничн)/i;
+
 /** Artist-level milestone in seed but story credits the requested track — e.g. Grammy via «Mama's Gun». */
 export function findArtistSeedTrackMisattribution(
   script: string,
@@ -1149,6 +1155,10 @@ export function findArtistSeedTrackMisattribution(
 
   const titleNorm = normalizeForMatch(title.replace(/\s*\([^)]*\)\s*/g, ' '));
   if (!titleNorm || !normalizeForMatch(script).includes(titleNorm)) return null;
+
+  if (ARTIST_HEALTH_SEED_PATTERNS.test(primary) && HEALTH_LINKED_TO_RECORDING_PATTERNS.test(script)) {
+    return 'artist health fact misattributed to track recording';
+  }
 
   const milestoneInSeed =
     /\b(?:Grammy|Oscar|Emmy|Brit Award|MTV Video Music)\b/i.test(primary) ||

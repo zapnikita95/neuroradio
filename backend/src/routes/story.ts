@@ -806,6 +806,40 @@ router.post('/full', extractClientSecrets, validateStoryFullBody, storyFullRateL
       selectedFact = null;
     }
 
+    if (!selectedFact && bankFact && countGroundedFacts(factBundle) === 0) {
+      console.log(
+        `[facts] bank seed unusable for "${metadata.artist}" — "${metadata.title}", fetching fresh facts`,
+      );
+      factCtx = await fetchAggregatedFactContext(
+        metadata.artist,
+        metadata.title,
+        metadata.countryCode,
+        metadata.mbid,
+        metadata.artistMbid,
+        { storyLanguage: storyLanguage ?? 'ru' },
+      );
+      throwIfStoryAborted(clientAbort, 'facts-fetch-after-bank-reject');
+      factBundle = factCtx.bundle;
+      trackFactCount = factBundle.trackFacts.length;
+      artistFactCount = factBundle.artistFacts.length;
+      timing.mark(
+        'facts-refetch',
+        `track=${trackFactCount} artist=${artistFactCount} snippets=${factCtx.rawSnippets.length}`,
+      );
+      selectedFact = await pickFactForUser(
+        installId,
+        factBundle,
+        metadata.artist,
+        metadata.title,
+        previousScripts.length,
+        storyNarrator,
+        factPickCtx,
+      );
+      if (selectedFact) {
+        console.log(formatFactPickLog(selectedFact, 'rules'));
+      }
+    }
+
     if (selectedFact && !factFromBank && isWeakSelectedFact(selectedFact, metadata.artist, metadata.title)) {
       console.warn(
         `[facts] reject weak seed score=${selectedFact.interestScore} fact="${selectedFact.fact.slice(0, 100)}"`,

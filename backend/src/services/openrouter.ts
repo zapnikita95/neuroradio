@@ -7,6 +7,7 @@ import { resolveStoryNarrator, StoryNarratorId } from './story-narrator.js';
 import { YandexVoiceId, voiceForYear } from './voices.js';
 import {
   countWords,
+  findArtistSeedTrackMisattribution,
   findHardScriptViolation,
   findLlmGarbage,
   findUngroundedClaims,
@@ -19,6 +20,7 @@ import {
   validateStoryScript,
 } from './story-quality.js';
 import { isGenericMusicVideoSeed } from './reference-fact-quality.js';
+import { isArtistLateLifeHealthFactWithoutTrack } from './fact-track-anchor.js';
 import { factMentionsArtist, storyMentionsPerformingArtist } from './fact-relevance.js';
 import {
   DEFAULT_STORY_LENGTH,
@@ -374,6 +376,8 @@ export async function generateStoryScript(
         referenceFacts,
       }) &&
       !findUngroundedClaims(sanitized, referenceFacts) &&
+      !findArtistSeedTrackMisattribution(sanitized, input.title, referenceFacts) &&
+      !referenceFacts.some((f) => isArtistLateLifeHealthFactWithoutTrack(f, input.title)) &&
       !findHardScriptViolation(sanitized) &&
       !findPersonaCliche(sanitized) &&
       !referenceFacts.some((f) => isGenericMusicVideoSeed(f))

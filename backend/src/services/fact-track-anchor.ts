@@ -200,6 +200,21 @@ export function isOtherNamedSingleBioFact(fact: string, title: string): boolean 
   return true;
 }
 
+/** Terminal illness / surgery at end of life — not about a specific track unless title is named. */
+const ARTIST_LATE_LIFE_HEALTH_PATTERNS: RegExp[] = [
+  /\b(?:require|required|needs?|needed)\s+(?:surgery|an operation|chemotherapy|radiation)\b/i,
+  /\b(?:rejected|refused|declined)\s+(?:surgery|treatment|chemotherapy|the operation|radiation)\b/i,
+  /\bprolong (?:his|her|their) life\b/i,
+  /\b(?:was told that (?:he|she|they) would require)\b/i,
+  /\b(?:terminal|inoperable)\s+(?:cancer|illness|diagnosis|condition)\b/i,
+  /\b(?:lung|brain|pancreatic|liver|prostate)\s+cancer\b/i,
+  /\b(?:on (?:his|her|their) deathbed|final days|months to live)\b/i,
+  /\b(?:hospice|palliative care)\b/i,
+  /\b(?:withdrew from public life).{0,80}(?:cancer|illness|diagnosis)\b/i,
+  /(?:отказал\w*|отказ\w*).{0,40}(?:от\s+)?(?:операц|лечен|химиотерап)/i,
+  /(?:врач\w*|медик\w*).{0,50}(?:операц|продл\w*\s+жизн)/i,
+];
+
 const ARTIST_CAREER_MILESTONE_PATTERNS: RegExp[] = [
   /\b(?:first|only|second|third)\s+(?:Grammy|Oscar|Emmy|Brit|MTV\s+Video\s+Music)\s+(?:nomination|win|award)/i,
   /\b(?:Grammy|Oscar|Emmy)\s+(?:nomination|nominat\w+|award|win)\b/i,
@@ -209,6 +224,16 @@ const ARTIST_CAREER_MILESTONE_PATTERNS: RegExp[] = [
   /\b(?:billion|million)\s+(?:streams|views|copies)\b/i,
   /\b(?:debuted|peaked|reached)\s+(?:at\s+)?#?\d+\b/i,
 ];
+
+/** Late-life surgery/illness about the act — not this specific track unless title is named. */
+export function isArtistLateLifeHealthFactWithoutTrack(fact: string, title: string): boolean {
+  if (!title.trim()) return false;
+  if (factMentionsTitle(fact, title)) return false;
+  const trimmed = fact.trim();
+  if (!ARTIST_LATE_LIFE_HEALTH_PATTERNS.some((p) => p.test(trimmed))) return false;
+  if (hasAnchoredTrackContext(trimmed, title)) return false;
+  return true;
+}
 
 /** Grammy/chart/stream milestone about the act — not this specific track unless title is named. */
 export function isArtistCareerMilestoneWithoutTrack(fact: string, title: string): boolean {
@@ -293,6 +318,7 @@ export function rejectSeedForTrackStory(
   if (isMisattributedBandTrackFact(trimmed, title)) return true;
   if (isOtherNamedSingleBioFact(trimmed, title)) return true;
   if (isArtistCareerMilestoneWithoutTrack(trimmed, title)) return true;
+  if (isArtistLateLifeHealthFactWithoutTrack(trimmed, title)) return true;
   if (isTitleTokenForeignArtistFact(trimmed, artist, title)) return true;
 
   if (factMentionsTitle(trimmed, title)) return false;
@@ -324,6 +350,7 @@ export function explainTrackAnchorRejection(
   if (isPlaceNameTitleCollision(fact, title, artist)) return 'place-title-collision';
   if (isArtistCareerBioWithoutTrack(fact, title)) return 'artist-career-bio';
   if (isArtistCareerMilestoneWithoutTrack(fact, title)) return 'artist-career-milestone';
+  if (isArtistLateLifeHealthFactWithoutTrack(fact, title)) return 'artist-late-life-health';
   if (isTitleTokenForeignArtistFact(fact, artist, title)) return 'title-foreign-artist';
   if (isNonMusicTitleCollisionFact(fact, title, artist)) return 'common-word-collision';
   if (factMentionsOtherTrackTitle(fact, title)) return 'other-track-title';
