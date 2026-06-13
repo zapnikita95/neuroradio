@@ -51,6 +51,7 @@ const PHRASE_PRONUNCIATION_RU: Record<string, string> = {
   'national film registry': 'Нэшнл Фильм Р+еджистри',
   'vincent price': 'Винсент Прайс',
   mtv: 'эм-ти-ви',
+  mp3: 'эмп+э три',
   'john landis': 'Джон Ландис',
   'jonah weiner': 'Джон Вайнер',
   blender: 'Блэндер',

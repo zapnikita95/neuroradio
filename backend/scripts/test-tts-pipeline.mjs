@@ -93,6 +93,18 @@ test('prepareYandexTtsText reads R&B as ар эн би', () => {
   assert.doesNotMatch(out, /\bR\s*&\s*B\b/i);
 });
 
+test('prepareYandexTtsText reads MP3 as эмп+э три (no en-US lang wrap)', () => {
+  const out = prepareYandexTtsText(
+    'Трек стал основой для первого в истории MP3-кодирования.',
+    { artist: 'Suzanne Vega', title: "Tom's Diner" },
+  );
+  assert.match(out, /эмп(\+)?э три/i);
+  assert.doesNotMatch(out, /\bMP3\b/i);
+  const ssml = buildYandexSsml(out);
+  assert.doesNotMatch(ssml, /<lang[^>]*>.*?MP3/i);
+  assert.doesNotMatch(ssml, /MP3-/i);
+});
+
 test('prepareYandexTtsText stresses микстейпы', () => {
   const out = prepareYandexTtsText('он выпускал микстейпы Room for Improvement.', {
     artist: 'Drake',

@@ -65,6 +65,14 @@ function normalizeVinylSideLabels(text: string): string {
   return result;
 }
 
+/** Latin tech acronyms in Russian narration → Cyrillic phonetic (TTS only; UI script unchanged). */
+function normalizeTechAcronymsForRussianTts(text: string): string {
+  return text
+    .replace(/\bMP3-(?=[а-яёА-ЯЁ])/gi, 'эмп+э три-')
+    .replace(/\bMP3\s+(?=[а-яёА-ЯЁ])/gi, 'эмп+э три ')
+    .replace(/\bMP3\b/gi, 'эмп+э три');
+}
+
 /** Mixed RU/EN tokens that Yandex misreads inside `<lang en-US>` or after apostrophe splits. */
 export function normalizeYandexSpeechTokens(text: string, artist = '', title = ''): string {
   let result = normalizeLatinApostrophes(text);
@@ -93,6 +101,8 @@ export function normalizeYandexSpeechTokens(text: string, artist = '', title = '
   result = mergeLatinCollaborationPhrases(result);
 
   result = normalizeGenreTermsForTts(result);
+
+  result = normalizeTechAcronymsForRussianTts(result);
 
   return result;
 }

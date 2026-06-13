@@ -418,6 +418,15 @@ export function interestScore(fact: string): number {
     score += 14;
   }
   if (/\b(?:deodorant|Hanna was referring|inspired the title|wrote the song in)\b/i.test(fact)) score += 10;
+  if (
+    /\b(?:MP3|MPEG|Fraunhofer|Brandenburg)\b/i.test(trimmed) &&
+    /\b(?:encoding|encoded|codec|compression|reference|test(?:ing)?|format|layer 3)\b/i.test(trimmed)
+  ) {
+    score += 18;
+  }
+  if (/\b(?:acapella|a cappella)\b/i.test(trimmed) && /\b(?:1981|written|recorded|composed)\b/i.test(trimmed)) {
+    score += 10;
+  }
   if (/(?:написал\w*|сочинил\w*|автором текста).*(?:Цой|цой|«Кино»|Кино)/i.test(fact)) score += 10;
   if (/\b(?:intended to|repudiat\w*|members? of the (?:band|group|four)|their past|dark past)\b/i.test(fact)) score += 8;
   score += highImpactBonus(fact);
