@@ -417,7 +417,7 @@ class StoryRepository(
         val yandexFolderId = settingsDataStore.yandexFolderId.first().trim()
         val saluteAuthKey = ApiKeySanitizer.clean(settingsDataStore.saluteAuthKey.first())
         val geminiModel = settingsDataStore.geminiModel.first()
-        val narratorTag = storyNarrator.labelRu
+        val narratorTag = storyNarrator.id
         val inferredBackendFromLocal = if (llmProvider == LlmProvider.LOCAL) {
             BackendUrlRules.backendFromMistypedOllamaUrl(localOllamaUrl)
         } else {

@@ -26,6 +26,18 @@ fun StoryNarrator.uiLabel(lang: ResolvedAppLanguage): String =
         StoryNarrator.NIGHT_DJ -> "Night DJ"
     } else labelRu
 
+/** History `angle` may be narrator id (new) or legacy Russian label. */
+fun formatHistoryNarratorAngle(angle: String, lang: ResolvedAppLanguage): String {
+    val trimmed = angle.trim()
+    if (trimmed.isEmpty()) return trimmed
+    StoryNarrator.entries.firstOrNull { it.id == trimmed }?.let { return it.uiLabel(lang) }
+    StoryNarrator.entries.firstOrNull { it.labelRu.equals(trimmed, ignoreCase = true) }
+        ?.let { return it.uiLabel(lang) }
+    return trimmed.replaceFirstChar { ch ->
+        if (ch.isLowerCase()) ch.titlecase(java.util.Locale.getDefault()) else ch.toString()
+    }
+}
+
 fun StoryNarrator.uiDescription(lang: ResolvedAppLanguage): String =
     if (lang == ResolvedAppLanguage.EN) when (this) {
         StoryNarrator.AUTO -> "Persona picked from track genre and era"

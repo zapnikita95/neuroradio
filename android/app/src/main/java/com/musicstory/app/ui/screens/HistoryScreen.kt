@@ -50,6 +50,10 @@ import com.musicstory.app.MusicStoryApp
 import com.musicstory.app.R
 import com.musicstory.app.data.local.ScrobbleEntry
 import com.musicstory.app.data.local.StoryHistoryEntry
+import com.musicstory.app.domain.AppLanguage
+import com.musicstory.app.domain.ResolvedAppLanguage
+import com.musicstory.app.domain.resolveAppLanguage
+import com.musicstory.app.ui.formatHistoryNarratorAngle
 import com.musicstory.app.ui.components.GlassCard
 import com.musicstory.app.ui.components.MusicStoryBackground
 import com.musicstory.app.ui.components.SecondaryStoryButton
@@ -120,6 +124,8 @@ fun HistoryScreen(
 private fun StoryHistoryTab(app: MusicStoryApp) {
     val context = LocalContext.current
     val history by app.storyRepository.storyHistory.collectAsState(initial = emptyList())
+    val appLanguage by app.settingsDataStore.appLanguage.collectAsState(initial = AppLanguage.SYSTEM)
+    val resolvedLang = resolveAppLanguage(appLanguage)
     var expandedId by remember { mutableLongStateOf(-1L) }
 
     if (history.isEmpty()) {
@@ -140,6 +146,7 @@ private fun StoryHistoryTab(app: MusicStoryApp) {
                         expandedId = if (expandedId == entry.id) -1L else entry.id
                     },
                     app = app,
+                    resolvedLang = resolvedLang,
                 )
             }
         }
@@ -194,6 +201,7 @@ private fun StoryHistoryItem(
     expanded: Boolean,
     onToggle: () -> Unit,
     app: MusicStoryApp,
+    resolvedLang: ResolvedAppLanguage,
 ) {
     val context = LocalContext.current
     val formatter = rememberDateFormatter()
@@ -234,7 +242,7 @@ private fun StoryHistoryItem(
                 )
                 entry.angle?.takeIf { it.isNotBlank() }?.let { angle ->
                     Text(
-                        text = angle.replaceFirstChar { it.uppercase() },
+                        text = formatHistoryNarratorAngle(angle, resolvedLang),
                         style = MaterialTheme.typography.labelMedium,
                         color = GoldBright.copy(alpha = 0.85f),
                     )
