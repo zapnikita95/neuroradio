@@ -2,15 +2,7 @@
 
 Copy into Play Console: **Grow users → Store presence → Main store listing** (English — United States or your target locales).
 
-## App name (max 30 characters)
-
-```
-Broadcast AI — neural radio
-```
-
-(27 characters)
-
-Alternative if you want “host” in the title:
+## App name (max 30 characters) — **what users see in the store**
 
 ```
 Broadcast AI — AI radio host
@@ -18,7 +10,29 @@ Broadcast AI — AI radio host
 
 (28 characters)
 
-> **Note:** `Broadcast AI | Neural radiohost` is 35 characters — Google Play rejects titles over 30. Also use **radio host** (two words), not “radiohost”.
+Other options (all include **host**, not “radio” alone):
+
+```
+Broadcast AI — radio host
+```
+(25 characters)
+
+```
+Broadcast AI — neural host
+```
+(26 characters)
+
+> **Do not** use “neural radio” — the product is a **radio host / presenter** (нейроведущий), not a radio station.
+
+## Custom store listing — internal name (max 50, users never see it)
+
+For **Специальная страница → Имя** your screenshot is fine:
+
+```
+Broadcast AI | Neural radio host
+```
+
+(32/50 — OK; use **radio host** as two words, not “radiohost”)
 
 ## Short description (max 80 characters)
 
