@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <plurals name="label_tracks_until_story">
+        <item quantity="one">До следующей истории: %d трек</item>
+        <item quantity="few">До следующей истории: %d трека</item>
+        <item quantity="many">До следующей истории: %d треков</item>
+        <item quantity="other">До следующей истории: %d треков</item>
+    </plurals>
+</resources>

@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <plurals name="label_tracks_until_story">
+        <item quantity="one">Until next story: %d track</item>
+        <item quantity="other">Until next story: %d tracks</item>
+    </plurals>
+</resources>

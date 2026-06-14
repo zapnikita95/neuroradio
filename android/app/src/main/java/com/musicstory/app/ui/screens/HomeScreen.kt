@@ -851,7 +851,11 @@ private fun OrchestratorStatusLine(
         if (tracksUntilNext != null) {
             Spacer(modifier = Modifier.height(4.dp))
             Text(
-                text = context.getString(R.string.label_tracks_until_story, tracksUntilNext),
+                text = context.resources.getQuantityString(
+                    R.plurals.label_tracks_until_story,
+                    tracksUntilNext,
+                    tracksUntilNext,
+                ),
                 style = MaterialTheme.typography.bodySmall,
                 color = MutedLavender,
                 textAlign = TextAlign.Center,

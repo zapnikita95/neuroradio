@@ -18,6 +18,7 @@ import com.musicstory.app.domain.MonitorNotificationState
 import com.musicstory.app.domain.AppPowerMode
 import com.musicstory.app.receiver.StoryActionReceiver
 import com.musicstory.app.util.TrackTitleNormalizer
+import com.musicstory.app.util.streamingSourceLabel
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -178,11 +179,6 @@ class MediaMonitorService : Service() {
         manager.notify(NOTIFICATION_ID, notification)
     }
 
-    private fun friendlySourceLabel(packageName: String?): String? = when (packageName) {
-        "com.spotify.music" -> "Spotify"
-        "ru.yandex.music" -> "Яндекс Музыка"
-        else -> packageName?.substringAfterLast('.')?.takeIf { it.isNotBlank() }
-    }
 
     private fun buildNotification(track: TrackInfo?): Notification {
         val openApp = PendingIntent.getActivity(
@@ -223,7 +219,7 @@ class MediaMonitorService : Service() {
         val contentText = when {
             preparing -> getString(R.string.notification_preparing_story)
             manualUi.statusHint != null -> manualUi.statusHint
-            track != null && track.isValid() -> friendlySourceLabel(track.packageName)
+            track != null && track.isValid() -> streamingSourceLabel(track.packageName)
                 ?: getString(R.string.status_monitoring)
             else -> getString(R.string.notification_listening_hint)
         }

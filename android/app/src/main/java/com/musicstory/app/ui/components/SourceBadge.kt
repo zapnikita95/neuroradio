@@ -8,19 +8,18 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import com.musicstory.app.ui.theme.GoldBright
+import com.musicstory.app.util.streamingSourceLabel
 
 @Composable
 fun SourceBadge(
     packageName: String,
     modifier: Modifier = Modifier,
 ) {
-    val label = when {
-        packageName.contains("spotify", ignoreCase = true) -> "Spotify"
-        packageName.contains("yandex", ignoreCase = true) -> "Яндекс Музыка"
-        else -> packageName.substringAfterLast('.')
-    }
+    val context = LocalContext.current
+    val label = context.streamingSourceLabel(packageName) ?: packageName.substringAfterLast('.')
     Text(
         text = label,
         modifier = modifier

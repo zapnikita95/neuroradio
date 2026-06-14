@@ -122,8 +122,9 @@
     <string name="settings_server_llm_premium">Модель сервера: %1$s</string>
     <string name="settings_server_llm_premium_hint">На подписке сервер всегда использует одну модель — DeepSeek V3.</string>
     <string name="label_source">Источник: %1$s</string>
+    <string name="source_spotify">Spotify</string>
+    <string name="source_yandex_music">Яндекс Музыка</string>
     <string name="label_orchestrator">Режим работы</string>
-    <string name="label_tracks_until_story">До следующей истории: %1$d трек(ов)</string>
     <string name="label_last_story">Последняя история</string>
 
     <string name="mode_auto">Автоматический</string>
