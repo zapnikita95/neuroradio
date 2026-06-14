@@ -258,6 +258,7 @@ export async function synthesizeStoryAudio(request: TtsRouteRequest): Promise<Tt
       voiceId: elevenVoiceId,
       speakTrackNamesInVoiceover: request.speakTrackNamesInVoiceover,
       storyLanguage: request.storyLanguage,
+      logContext: request.logContext,
     });
   } else {
     result = await synthesizeYandex(script, request.voiceId, request.fileName, {

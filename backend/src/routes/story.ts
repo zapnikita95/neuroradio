@@ -1706,6 +1706,9 @@ router.post('/full', extractClientSecrets, validateStoryFullBody, storyFullRateL
           audio.ttsTranscript,
           speakNames ? story.script : undefined,
         );
+        console.warn('[story] tts-transcript-begin');
+        console.warn(audio.ttsTranscript.trim());
+        console.warn('[story] tts-transcript-end');
       }
     } else {
       response.audioUrl = null;

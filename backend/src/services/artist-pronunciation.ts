@@ -58,8 +58,7 @@ function replaceLongestFirst(text: string, dict: Record<string, string>): string
   let result = text;
   for (const key of keys) {
     if (key.length < 2) continue;
-    const re = new RegExp(key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi');
-    result = result.replace(re, () => dict[key]!);
+    result = replaceWholePhrase(result, key, dict[key]!);
   }
   return result;
 }
@@ -101,8 +100,7 @@ export function applyEnglishArtistPronunciation(
   for (const seed of [artist, title].filter(Boolean)) {
     const entry = lookupArtistPronunciation(seed);
     if (!entry) continue;
-    const re = new RegExp(seed.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi');
-    result = result.replace(re, entry.en);
+    result = replaceWholePhrase(result, seed, entry.en);
   }
   return replaceLongestFirst(result, dict);
 }

@@ -8,6 +8,8 @@ import {
   shouldUseElevenLabsForeignSegments,
   elevenLabsLanguageCode,
   resolveElevenLabsModelForMixed,
+  buildElevenLabsSpeechPlan,
+  formatElevenLabsTranscriptForLog,
 } from '../dist/services/elevenlabs-text.js';
 
 let passed = 0;
@@ -103,6 +105,40 @@ test('single-shot model stays flash when not mixed', () => {
   delete process.env.ELEVENLABS_MODEL_ID;
   assert.equal(resolveElevenLabsModelForMixed(false), 'eleven_flash_v2_5');
   if (prev) process.env.ELEVENLABS_MODEL_ID = prev;
+});
+
+test('buildElevenLabsSpeechPlan exposes full transcript for Railway logs', () => {
+  const plan = buildElevenLabsSpeechPlan(
+    "Never Gonna Give You Up wasn't just a hit — it conquered charts.",
+    'Rick Astley',
+    'Never Gonna Give You Up',
+    false,
+  );
+  assert.equal(plan.useForeignSegments, false);
+  assert.match(plan.ttsTranscript, /Never Gonna Give You Up/i);
+  assert.doesNotMatch(plan.ttsTranscript, /NE Ver/i);
+  assert.equal(formatElevenLabsTranscriptForLog(plan.segments), plan.ttsTranscript);
+});
+
+test('artist pronunciation dict does not split "believe" or "Never"', () => {
+  const plan = buildElevenLabsSpeechPlan(
+    'That voice made you believe every word.',
+    'Rick Astley',
+    'Never Gonna Give You Up',
+    false,
+  );
+  assert.match(plan.ttsTranscript, /believe/i);
+  assert.doesNotMatch(plan.ttsTranscript, /bel.*E V/i);
+});
+
+test('formatElevenLabsTranscriptForLog tags mixed lang segments', () => {
+  const card = formatElevenLabsTranscriptForLog([
+    { lang: 'en', text: 'The hit ' },
+    { lang: 'fr', text: 'Papaoutai' },
+    { lang: 'en', text: ' reshaped pop.' },
+  ]);
+  assert.match(card, /^\[en\]/m);
+  assert.match(card, /^\[fr\] Papaoutai/m);
 });
 
 import {

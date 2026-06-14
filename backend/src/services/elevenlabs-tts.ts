@@ -1,17 +1,15 @@
 import { writeFile, mkdir } from 'node:fs/promises';
 import path from 'node:path';
-import { AUDIO_DIR, type SynthesisResult } from './yandex-tts.js';
+import { AUDIO_DIR, type SynthesisResult, type YandexTtsLogContext } from './yandex-tts.js';
 import { isElevenLabsEnabled } from './entitlements.js';
 import { concatAudioBuffersToWav } from './audio-concat.js';
 import {
+  buildElevenLabsSpeechPlan,
   elevenLabsLanguageCode,
-  prepareEnglishSpeechText,
+  formatElevenLabsTranscriptForLog,
   resolveElevenLabsModelForMixed,
-  shouldUseElevenLabsForeignSegments,
-  splitEnglishNarrationForForeignNames,
   type ElevenLabsSegment,
 } from './elevenlabs-text.js';
-import { applyEnglishArtistPronunciation } from './artist-pronunciation.js';
 import fetch from '../proxy-fetch.js';
 
 const ELEVEN_API = 'https://api.elevenlabs.io/v1/text-to-speech';
@@ -31,6 +29,7 @@ export interface ElevenLabsSynthesisOptions {
   title?: string;
   speakTrackNamesInVoiceover?: boolean;
   storyLanguage?: 'ru' | 'en';
+  logContext?: YandexTtsLogContext;
 }
 
 async function fetchElevenChunk(
@@ -75,15 +74,17 @@ async function synthesizeForeignSegments(
   modelId: string,
   segments: ElevenLabsSegment[],
   filePath: string,
+  installTag: string,
+  trackTag: string,
 ): Promise<Buffer> {
   const chunks: Buffer[] = [];
   for (const seg of segments) {
     if (!seg.text.trim()) continue;
     const langCode = elevenLabsLanguageCode(seg.lang);
-    chunks.push(await fetchElevenChunk(apiKey, voiceId, modelId, seg.text, langCode));
     console.log(
-      `[elevenlabs-tts] segment lang=${langCode} chars=${seg.text.length} preview="${seg.text.slice(0, 48)}"`,
+      `[elevenlabs-tts] segment${installTag}${trackTag} lang=${langCode} chars=${seg.text.length} text="${seg.text}"`,
     );
+    chunks.push(await fetchElevenChunk(apiKey, voiceId, modelId, seg.text, langCode));
   }
 
   if (chunks.length === 0) {
@@ -96,6 +97,19 @@ async function synthesizeForeignSegments(
     return readFile(filePath);
   }
   return chunks[0]!;
+}
+
+function buildLogTags(
+  logContext: YandexTtsLogContext | undefined,
+  artist: string,
+  title: string,
+): { installTag: string; trackTag: string } {
+  const installTag = logContext?.installId ? ` install=${logContext.installId.slice(0, 8)}` : '';
+  const trackArtist = logContext?.artist ?? artist;
+  const trackTitle = logContext?.title ?? title;
+  const trackTag =
+    trackArtist && trackTitle ? ` track="${trackArtist}" — "${trackTitle}"` : '';
+  return { installTag, trackTag };
 }
 
 /**
@@ -121,13 +135,18 @@ export async function synthesizeSpeechElevenLabs(
   const artist = options.artist ?? '';
   const title = options.title ?? '';
   const speakNames = options.speakTrackNamesInVoiceover === true;
+  const { installTag, trackTag } = buildLogTags(options.logContext, artist, title);
 
-  const useForeignSegments =
-    speakNames &&
-    Boolean(artist || title) &&
-    shouldUseElevenLabsForeignSegments(text, artist, title, speakNames);
+  const plan = buildElevenLabsSpeechPlan(text, artist, title, speakNames);
+  const modelId = resolveElevenLabsModelForMixed(plan.useForeignSegments, options.modelId);
+  const logCard = formatElevenLabsTranscriptForLog(plan.segments);
 
-  const modelId = resolveElevenLabsModelForMixed(useForeignSegments, options.modelId);
+  console.log(
+    `[elevenlabs-tts] start${installTag}${trackTag} voice=${voiceId} model=${modelId} foreign=${plan.useForeignSegments} segments=${plan.segments.length} chars=${plan.ttsTranscript.length}`,
+  );
+  console.log(
+    `[elevenlabs-tts] speech-text-begin${installTag}${trackTag}\n${logCard}\n[elevenlabs-tts] speech-text-end`,
+  );
 
   await mkdir(AUDIO_DIR, { recursive: true });
   const safeName = fileName.endsWith('.ogg') ? fileName.replace(/\.ogg$/, '.wav') : fileName;
@@ -136,27 +155,30 @@ export async function synthesizeSpeechElevenLabs(
 
   let buffer: Buffer;
 
-  if (useForeignSegments) {
-    const segments = splitEnglishNarrationForForeignNames(text, artist, title, speakNames);
-    console.log(
-      `[elevenlabs-tts] en+foreign segments=${segments.length} model=${modelId} ` +
-        segments.map((s) => `${s.lang}:${s.text.slice(0, 24)}`).join(' | '),
+  if (plan.useForeignSegments) {
+    buffer = await synthesizeForeignSegments(
+      apiKey,
+      voiceId,
+      modelId,
+      plan.segments,
+      filePath,
+      installTag,
+      trackTag,
     );
-    buffer = await synthesizeForeignSegments(apiKey, voiceId, modelId, segments, filePath);
   } else {
-    let plainText = prepareEnglishSpeechText(text, artist, title, speakNames);
-    plainText = applyEnglishArtistPronunciation(plainText, artist, title);
+    const plainText = plan.segments[0]?.text ?? plan.ttsTranscript;
     buffer = await fetchElevenChunk(apiKey, voiceId, modelId, plainText, 'en');
     await writeFile(filePath, buffer);
   }
 
   console.log(
-    `[elevenlabs-tts] ok voice=${voiceId} model=${modelId} foreign=${useForeignSegments} bytes=${buffer.length}`,
+    `[elevenlabs-tts] ok${installTag}${trackTag} voice=${voiceId} model=${modelId} foreign=${plan.useForeignSegments} bytes=${buffer.length}`,
   );
 
   return {
     fileName: wavName,
     filePath,
     audioUrl: `/audio/${wavName}`,
+    ttsTranscript: plan.ttsTranscript,
   };
 }

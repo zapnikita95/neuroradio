@@ -236,3 +236,53 @@ export function resolveElevenLabsModelForMixed(useForeignSegments: boolean, expl
   }
   return process.env.ELEVENLABS_MODEL_ID?.trim() || 'eleven_flash_v2_5';
 }
+
+export interface ElevenLabsSpeechPlan {
+  useForeignSegments: boolean;
+  segments: ElevenLabsSegment[];
+  /** Plain text actually sent to ElevenLabs (joined segments). */
+  ttsTranscript: string;
+}
+
+/** Prepare exact ElevenLabs payload before synthesis — for logging and API transcript. */
+export function buildElevenLabsSpeechPlan(
+  script: string,
+  artist: string,
+  title: string,
+  speakTrackNamesInVoiceover: boolean,
+): ElevenLabsSpeechPlan {
+  const speakNames = speakTrackNamesInVoiceover === true;
+  const useForeignSegments =
+    speakNames &&
+    Boolean(artist || title) &&
+    shouldUseElevenLabsForeignSegments(script, artist, title, speakNames);
+
+  if (useForeignSegments) {
+    const segments = splitEnglishNarrationForForeignNames(script, artist, title, speakNames);
+    const ttsTranscript = segments
+      .map((s) => s.text.trim())
+      .filter(Boolean)
+      .join(' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+    return { useForeignSegments: true, segments, ttsTranscript };
+  }
+
+  let plainText = prepareEnglishSpeechText(script, artist, title, speakNames);
+  plainText = applyEnglishArtistPronunciation(plainText, artist, title);
+  return {
+    useForeignSegments: false,
+    segments: [{ lang: 'en', text: plainText }],
+    ttsTranscript: plainText,
+  };
+}
+
+/** Multi-line log card: single EN block or per-segment lang tags. */
+export function formatElevenLabsTranscriptForLog(segments: ElevenLabsSegment[]): string {
+  const nonEmpty = segments.filter((s) => s.text.trim());
+  if (nonEmpty.length === 0) return '';
+  if (nonEmpty.length === 1 && nonEmpty[0]!.lang === 'en') {
+    return nonEmpty[0]!.text;
+  }
+  return nonEmpty.map((s) => `[${s.lang}] ${s.text.trim()}`).join('\n');
+}
