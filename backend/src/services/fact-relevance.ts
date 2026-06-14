@@ -1,6 +1,7 @@
 /** Reject Wikipedia/DDG sentences about the wrong act — no hardcoded artist blocklists. */
 
 import { collaboratorNames } from './artist-primary.js';
+import { resolveArtistGrammarRu } from './artist-grammar.js';
 import { factMentionsArtistOrAlias } from './artist-search-aliases.js';
 import { buildTitleMatchVariants, cyrillicToLatin, fuzzyTokenMatch, textMentionsTitle } from './title-transliterate.js';
 import { latinPhraseToRussianTts } from './tts-foreign-pronounce.js';
@@ -627,6 +628,8 @@ const PRESS_CYRILLIC_TOKEN: Record<string, string[]> = {
   houston: ['хьюстон'],
   elvis: ['элвис'],
   presley: ['пресли'],
+  chubby: ['чубби'],
+  checker: ['чекер'],
   beatles: ['битлз', 'битлс'],
   landis: ['лэндис', 'лендис'],
 };
@@ -647,6 +650,20 @@ function tokenMentionedInCyrillicScript(scriptNorm: string, token: string): bool
     if (word.length >= 4 && fuzzyTokenMatch(cyrillicToLatin(word), token)) return true;
   }
   return false;
+}
+
+/** Contemporary / name-sparing scripts: «он/она» when solo artist gender is known. */
+function scriptUsesSoloArtistPronoun(script: string, artist: string): boolean {
+  const grammar = resolveArtistGrammarRu(artist);
+  if (grammar.kind !== 'solo' || !grammar.gender || grammar.gender === 'neutral') {
+    return false;
+  }
+  const SEP = String.raw`(?:^|[\s,.!?«"—-])`;
+  const END = String.raw`(?=[\s,.!?»"—-]|$)`;
+  if (grammar.gender === 'feminine') {
+    return new RegExp(`${SEP}(?:она|её|ее|ей|неё|ней)${END}`, 'iu').test(script);
+  }
+  return new RegExp(`${SEP}(?:он|его|ему|нем|нём|ним)${END}`, 'iu').test(script);
 }
 
 /**
@@ -678,6 +695,8 @@ export function storyMentionsPerformingArtist(
 
     if (matched >= 1 && cleanTitle && textMentionsTitle(script, cleanTitle)) return true;
   }
+
+  if (scriptUsesSoloArtistPronoun(script, artist)) return true;
 
   return false;
 }

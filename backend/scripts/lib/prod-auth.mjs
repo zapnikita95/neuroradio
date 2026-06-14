@@ -29,7 +29,7 @@ export async function fetchProdHealth() {
 
 export async function postProdStoryFull(
   token,
-  { artist, title, voiceId = 'filipp', storyLength = '30s', llmProvider = 'openrouter', openRouterApiKey },
+  { artist, title, voiceId = 'filipp', storyLength = '30s', llmProvider = 'openrouter', openRouterApiKey, narrator },
 ) {
   const body = {
     artist,
@@ -39,8 +39,12 @@ export async function postProdStoryFull(
     language: 'ru',
     llm_provider: llmProvider,
   };
+  if (narrator) body.narrator = narrator;
   if (openRouterApiKey?.trim()) {
     body.openrouter_api_key = openRouterApiKey.trim();
+  }
+  if (speakTrackNamesInVoiceover === true) {
+    body.speak_track_names_in_voiceover = true;
   }
 
   const t0 = Date.now();

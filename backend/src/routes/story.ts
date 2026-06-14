@@ -1559,9 +1559,51 @@ router.post('/full', extractClientSecrets, validateStoryFullBody, storyFullRateL
         }
       }
 
-      return generateStoryWithFallback(effectiveStoryInput, llmProvider, {
-        serverManaged: userTier === 'free' && !ownLlmKey,
-      });
+      const serverManaged = userTier === 'free' && !ownLlmKey;
+
+      try {
+        return await generateStoryWithFallback(effectiveStoryInput, llmProvider, {
+          serverManaged,
+        });
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        if (!/could not produce a (?:story grounded in reference facts|usable story)/i.test(msg)) {
+          throw err;
+        }
+        const failedSeed = effectiveStoryInput.selectedReferenceFact?.fact?.trim();
+        const retryCtx = {
+          ...factPickCtx,
+          usedFingerprints: new Set([
+            ...factPickCtx.usedFingerprints,
+            ...(failedSeed ? [factFingerprint(failedSeed)] : []),
+          ]),
+        };
+        const alt = await pickFactForUser(
+          installId,
+          factBundle,
+          metadata.artist,
+          metadata.title,
+          previousScripts.length + 3,
+          storyNarrator,
+          retryCtx,
+        );
+        if (!alt?.fact || alt.fact === failedSeed) {
+          throw err;
+        }
+        console.warn(
+          `[story-pipeline] quality fail — retry with alt seed: "${alt.fact.slice(0, 100)}"`,
+        );
+        return generateStoryWithFallback(
+          {
+            ...effectiveStoryInput,
+            referenceFacts: [alt.fact],
+            selectedReferenceFact: alt,
+            rawSnippets: undefined,
+          },
+          llmProvider,
+          { serverManaged },
+        );
+      }
     })();
 
     throwIfStoryAborted(clientAbort, 'story-text');
