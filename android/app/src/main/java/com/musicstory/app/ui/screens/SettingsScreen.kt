@@ -1107,11 +1107,9 @@ fun SettingsScreen(
                 CollapsibleSettingsSection(
                     title = context.getString(R.string.settings_voice_section),
                     summary = when {
-                        showElevenLabsVoices -> {
-                            val engine = context.getString(R.string.settings_tts_engine_elevenlabs)
-                            "$engine · ${elevenLabsVoiceUi.label(resolvedDraftLang)} · " +
+                        showElevenLabsVoices ->
+                            "${elevenLabsVoiceUi.label(resolvedDraftLang)} · " +
                                 "${ttsSpeedUi.uiLabel(resolvedDraftLang)} · ${storyLengthUi.uiLabel(resolvedDraftLang)}"
-                        }
                         serverUsesEdge ->
                             "${ServerTtsProvider.EDGE.uiLabel(resolvedDraftLang)} · " +
                                 "${edgeVoicePresetUi.uiLabel(resolvedDraftLang)} · " +
@@ -1175,10 +1173,11 @@ fun SettingsScreen(
                     }
                     if (showElevenLabsVoices) {
                         Text(
-                            text = context.getString(R.string.settings_elevenlabs_voice),
-                            style = MaterialTheme.typography.labelMedium,
+                            text = context.getString(R.string.settings_premium_voice_intro),
+                            style = MaterialTheme.typography.bodySmall,
                             color = MutedLavender,
                         )
+                        Spacer(modifier = Modifier.height(8.dp))
                         ElevenLabsVoice.entries.forEach { voice ->
                             PreferenceRadioRow(
                                 label = voice.label(resolvedDraftLang),
