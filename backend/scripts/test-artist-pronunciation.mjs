@@ -47,5 +47,15 @@ const artistCount = Object.keys(
 ).length;
 ok(artistCount >= 100, `artist dictionary has ${artistCount} entries`);
 
+ok(lookupArtistPronunciation('Charli XCX')?.ru.includes('экс'), 'Charli XCX RU X-C-X');
+ok(
+  applyEnglishArtistPronunciation('Track by Charli XCX.', 'Charli XCX', '').includes('X C X'),
+  'Charli XCX EN letter spelling',
+);
+
+const { resolveArtistGrammarRu } = await import('../dist/services/artist-grammar.js');
+ok(resolveArtistGrammarRu('Charli XCX').gender === 'feminine', 'Charli XCX feminine');
+ok(resolveArtistGrammarRu('Charlie XCX').gender === 'feminine', 'Charlie XCX alias feminine');
+
 if (process.exitCode) process.exit(process.exitCode);
 console.log('\nAll artist-pronunciation checks passed.');
