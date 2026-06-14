@@ -153,6 +153,19 @@ class StoryRepository(
             runCatching { storyHistoryDao.updateServerId(existing.id, remoteServerId) }
                 .onFailure { StoryLog.w("History serverId merge failed: ${it.message}") }
         }
+        val narrator = incoming.storyNarrator?.takeIf { it.isNotBlank() }
+        val scope = incoming.seedScope?.takeIf { it.isNotBlank() }
+        if ((narrator != null && existing.storyNarrator.isNullOrBlank()) ||
+            (scope != null && existing.seedScope.isNullOrBlank())
+        ) {
+            runCatching {
+                storyHistoryDao.updatePersonaMeta(
+                    existing.id,
+                    narrator?.takeIf { existing.storyNarrator.isNullOrBlank() },
+                    scope?.takeIf { existing.seedScope.isNullOrBlank() },
+                )
+            }.onFailure { StoryLog.w("History persona merge skipped: ${it.message}") }
+        }
     }
 
     /** Remove rows duplicated by sync (same track, script and timestamp). */
@@ -417,7 +430,6 @@ class StoryRepository(
         val yandexFolderId = settingsDataStore.yandexFolderId.first().trim()
         val saluteAuthKey = ApiKeySanitizer.clean(settingsDataStore.saluteAuthKey.first())
         val geminiModel = settingsDataStore.geminiModel.first()
-        val narratorTag = storyNarrator.id
         val inferredBackendFromLocal = if (llmProvider == LlmProvider.LOCAL) {
             BackendUrlRules.backendFromMistypedOllamaUrl(localOllamaUrl)
         } else {
@@ -532,7 +544,6 @@ class StoryRepository(
                 track = track,
                 trackKey = trackKey,
                 previousScripts = previousScripts,
-                narratorTag = narratorTag,
                 storyLength = storyLength,
                 storyNarrator = storyNarrator,
                 ttsVoice = ttsVoice,
@@ -609,7 +620,6 @@ class StoryRepository(
         track: TrackInfo,
         trackKey: String,
         previousScripts: List<String>,
-        narratorTag: String,
         storyLength: StoryLength,
         storyNarrator: StoryNarrator,
         ttsVoice: TtsVoice,
@@ -735,7 +745,7 @@ class StoryRepository(
                         "Backend OK: audio=${!response.audioUrl.isNullOrBlank()} " +
                             "quota=${response.quota?.remaining}/${response.quota?.limit}",
                     )
-                    persistStory(trackKey, track, response, narratorTag)
+                    persistStory(trackKey, track, response, storyNarrator)
                     StoryAttemptResult.Success(response)
                 }
             }
@@ -1191,7 +1201,7 @@ class StoryRepository(
         trackKey: String,
         track: TrackInfo,
         response: StoryResponse,
-        angle: String,
+        storyNarrator: StoryNarrator,
     ) {
         storyDao.insert(
             CachedStory(
@@ -1215,7 +1225,9 @@ class StoryRepository(
             artist = track.artist,
             title = track.title,
             script = response.script,
-            angle = angle,
+            angle = null,
+            storyNarrator = storyNarrator.id,
+            seedScope = response.seedScope,
         )
         insertHistoryEntryIfNew(entry)
         scopePushSyncHistory(entry)

@@ -443,11 +443,10 @@ export async function recordUserStory(
     artist: input.artist,
     title: input.title,
     script: input.script,
-    angle: input.seed.scope,
     playedAt: Date.now(),
     seedFact: input.seed.fact,
     seedScope: input.seed.scope,
-    storyNarrator: input.storyNarrator && input.storyNarrator !== 'auto' ? input.storyNarrator : undefined,
+    storyNarrator: input.storyNarrator ?? undefined,
     interestRating: input.seed.interestRating,
   });
   clearPendingTrackSeed(installId, input.artist, input.title);

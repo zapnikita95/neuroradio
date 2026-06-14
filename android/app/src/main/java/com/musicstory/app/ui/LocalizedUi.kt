@@ -1,5 +1,6 @@
 package com.musicstory.app.ui
 
+import com.musicstory.app.data.local.StoryHistoryEntry
 import com.musicstory.app.domain.EdgeVoicePreset
 import com.musicstory.app.domain.GeminiModel
 import com.musicstory.app.domain.GroqModel
@@ -26,10 +27,43 @@ fun StoryNarrator.uiLabel(lang: ResolvedAppLanguage): String =
         StoryNarrator.NIGHT_DJ -> "Night DJ"
     } else labelRu
 
+fun isFactSeedScope(value: String): Boolean =
+    value.trim().lowercase() in setOf("track", "artist", "album")
+
+/** History persona label — never treat seed scope as narrator. */
+fun resolveHistoryPersonaLabel(entry: StoryHistoryEntry, lang: ResolvedAppLanguage): String? {
+    entry.storyNarrator?.takeIf { it.isNotBlank() }?.let { id ->
+        return StoryNarrator.fromId(id).uiLabel(lang)
+    }
+    val angle = entry.angle?.trim().orEmpty()
+    if (angle.isNotEmpty() && !isFactSeedScope(angle)) {
+        return formatHistoryNarratorAngle(angle, lang)
+    }
+    return null
+}
+
+fun resolveHistorySeedScopeLabel(entry: StoryHistoryEntry, lang: ResolvedAppLanguage): String? {
+    val scope = entry.seedScope?.trim().orEmpty().ifBlank {
+        entry.angle?.trim().orEmpty().takeIf { isFactSeedScope(it) }.orEmpty()
+    }
+    if (scope.isEmpty()) return null
+    return formatHistorySeedScope(scope, lang)
+}
+
+fun formatHistorySeedScope(scope: String, lang: ResolvedAppLanguage): String =
+    when (scope.trim().lowercase()) {
+        "track" -> if (lang == ResolvedAppLanguage.EN) "Track" else "Трек"
+        "artist" -> if (lang == ResolvedAppLanguage.EN) "Artist" else "Артист"
+        "album" -> if (lang == ResolvedAppLanguage.EN) "Album" else "Альбом"
+        else -> scope.replaceFirstChar { ch ->
+            if (ch.isLowerCase()) ch.titlecase(java.util.Locale.getDefault()) else ch.toString()
+        }
+    }
+
 /** History `angle` may be narrator id (new) or legacy Russian label. */
 fun formatHistoryNarratorAngle(angle: String, lang: ResolvedAppLanguage): String {
     val trimmed = angle.trim()
-    if (trimmed.isEmpty()) return trimmed
+    if (trimmed.isEmpty() || isFactSeedScope(trimmed)) return trimmed
     StoryNarrator.entries.firstOrNull { it.id == trimmed }?.let { return it.uiLabel(lang) }
     StoryNarrator.entries.firstOrNull { it.labelRu.equals(trimmed, ignoreCase = true) }
         ?.let { return it.uiLabel(lang) }

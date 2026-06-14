@@ -53,7 +53,8 @@ import com.musicstory.app.data.local.StoryHistoryEntry
 import com.musicstory.app.domain.AppLanguage
 import com.musicstory.app.domain.ResolvedAppLanguage
 import com.musicstory.app.domain.resolveAppLanguage
-import com.musicstory.app.ui.formatHistoryNarratorAngle
+import com.musicstory.app.ui.resolveHistoryPersonaLabel
+import com.musicstory.app.ui.resolveHistorySeedScopeLabel
 import com.musicstory.app.ui.components.GlassCard
 import com.musicstory.app.ui.components.MusicStoryBackground
 import com.musicstory.app.ui.components.SecondaryStoryButton
@@ -240,12 +241,33 @@ private fun StoryHistoryItem(
                     text = formatter.format(Date(entry.playedAt)),
                     style = MaterialTheme.typography.bodySmall,
                 )
-                entry.angle?.takeIf { it.isNotBlank() }?.let { angle ->
-                    Text(
-                        text = formatHistoryNarratorAngle(angle, resolvedLang),
-                        style = MaterialTheme.typography.labelMedium,
-                        color = GoldBright.copy(alpha = 0.85f),
-                    )
+                val personaLabel = resolveHistoryPersonaLabel(entry, resolvedLang)
+                val scopeLabel = resolveHistorySeedScopeLabel(entry, resolvedLang)
+                if (personaLabel != null || scopeLabel != null) {
+                    Row(
+                        modifier = Modifier.padding(top = 2.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        personaLabel?.let { label ->
+                            Text(
+                                text = label,
+                                style = MaterialTheme.typography.labelMedium,
+                                color = GoldBright.copy(alpha = 0.85f),
+                            )
+                        }
+                        scopeLabel?.let { label ->
+                            Text(
+                                text = label,
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(999.dp))
+                                    .background(MutedLavender.copy(alpha = 0.14f))
+                                    .padding(horizontal = 8.dp, vertical = 2.dp),
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MutedLavender,
+                            )
+                        }
+                    }
                 }
                 Spacer(modifier = Modifier.height(8.dp))
                 Text(

@@ -3,6 +3,7 @@ package com.musicstory.app.data.remote
 import android.content.Context
 import com.musicstory.app.data.local.ScrobbleEntry
 import com.musicstory.app.data.local.StoryHistoryEntry
+import com.musicstory.app.data.local.parseStoryHistoryJson
 import com.musicstory.app.data.remote.BillingEntitlementResponse
 import com.musicstory.app.util.DeviceFingerprint
 import kotlinx.coroutines.Dispatchers
@@ -41,18 +42,7 @@ class AccountAuthManager(
         return buildList {
             for (i in 0 until arr.length()) {
                 val item = arr.optJSONObject(i) ?: continue
-                add(
-                    StoryHistoryEntry(
-                        serverId = item.optString("id").ifBlank { null },
-                        trackKey = item.optString("trackKey"),
-                        artist = item.optString("artist"),
-                        title = item.optString("title"),
-                        script = item.optString("script"),
-                        angle = item.optString("angle").ifBlank { null },
-                        playedAt = item.optLong("playedAt", System.currentTimeMillis()),
-                        vote = item.optString("vote").ifBlank { null },
-                    ),
-                )
+                add(parseStoryHistoryJson(item))
             }
         }
     }

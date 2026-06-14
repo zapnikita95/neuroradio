@@ -1,6 +1,8 @@
 package com.musicstory.app.data.remote
 
 import com.musicstory.app.data.local.StoryHistoryEntry
+import com.musicstory.app.data.local.parseStoryHistoryJson
+import com.musicstory.app.data.local.toSyncJson
 import java.util.UUID
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -189,18 +191,7 @@ class AccountSyncManager(
                     buildList {
                         for (i in 0 until arr.length()) {
                             val item = arr.optJSONObject(i) ?: continue
-                            add(
-                                StoryHistoryEntry(
-                                    serverId = item.optString("id").ifBlank { null },
-                                    trackKey = item.optString("trackKey"),
-                                    artist = item.optString("artist"),
-                                    title = item.optString("title"),
-                                    script = item.optString("script"),
-                                    angle = item.optString("angle").ifBlank { null },
-                                    playedAt = item.optLong("playedAt", System.currentTimeMillis()),
-                                    vote = item.optString("vote").ifBlank { null },
-                                ),
-                            )
+                            add(parseStoryHistoryJson(item))
                         }
                     }
                 }
@@ -297,15 +288,7 @@ class AccountSyncManager(
         withContext(Dispatchers.IO) {
             val token = authManager.getAccessToken(baseUrl) ?: return@withContext
             val syncId = entry.serverId?.takeIf { it.isNotBlank() } ?: UUID.randomUUID().toString()
-            val body = JSONObject()
-                .put("id", syncId)
-                .put("trackKey", entry.trackKey)
-                .put("artist", entry.artist)
-                .put("title", entry.title)
-                .put("script", entry.script)
-                .put("angle", entry.angle)
-                .put("playedAt", entry.playedAt)
-            entry.vote?.let { body.put("vote", it) }
+            val body = entry.copy(serverId = syncId).toSyncJson()
 
             fun postOnce(): Int {
                 val req = Request.Builder()

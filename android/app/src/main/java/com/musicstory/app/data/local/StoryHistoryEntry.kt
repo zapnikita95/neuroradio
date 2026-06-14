@@ -16,7 +16,12 @@ data class StoryHistoryEntry(
     val artist: String,
     val title: String,
     val script: String,
+    /** Legacy narrator label/id; prefer [storyNarrator]. */
     val angle: String? = null,
+    /** Narrator persona id (`radio_host`, …). */
+    val storyNarrator: String? = null,
+    /** Seed fact scope: `track`, `artist`, `album`. */
+    val seedScope: String? = null,
     val playedAt: Long = System.currentTimeMillis(),
     /** "like" or "dislike" after user feedback. */
     val vote: String? = null,

@@ -42,6 +42,16 @@ interface StoryHistoryDao {
     @Query("UPDATE story_history SET serverId = :serverId WHERE id = :localId")
     suspend fun updateServerId(localId: Long, serverId: String)
 
+    @Query(
+        """
+        UPDATE story_history
+        SET storyNarrator = COALESCE(:storyNarrator, storyNarrator),
+            seedScope = COALESCE(:seedScope, seedScope)
+        WHERE id = :localId
+        """,
+    )
+    suspend fun updatePersonaMeta(localId: Long, storyNarrator: String?, seedScope: String?)
+
     @Query("SELECT * FROM story_history ORDER BY playedAt DESC")
     fun observeAll(): Flow<List<StoryHistoryEntry>>
 
