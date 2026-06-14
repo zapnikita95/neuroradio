@@ -1,6 +1,7 @@
 import {
   buildArtistPhrasePhoneticRu,
   lookupArtistPronunciation,
+  replaceWholePhrase,
 } from './artist-pronunciation.js';
 import { normalizeGenreTermsForTts } from './tts-genre-pronounce.js';
 import { fixWikiTranslationArtifacts } from './wiki-translate-quality.js';
@@ -372,7 +373,24 @@ function unmaskTtsMarkup(text: string, slots: string[]): string {
   );
 }
 
-/** Replace longest known Latin phrases first (case-insensitive). */
+/** Single-token FR/DE keys that are common English/Russian words — skip in phrase dict. */
+const SKIP_PHRASE_DICT_HOMOGRAPHS = new Set([
+  'she', 'he', 'me', 'we', 'us', 'or', 'so', 'in', 'on', 'at', 'as', 'it', 'is', 'am', 'an',
+  'de', 'le', 'la', 'du', 'ne', 'se', 'ce', 'je', 'tu', 'il', 'on', 'ou', 'au', 'en', 'un',
+  'les', 'des', 'mes', 'tes', 'ses', 'mon', 'ton', 'son', 'par', 'sur', 'que', 'qui', 'pas',
+  'der', 'die', 'das', 'und', 'ist', 'ich', 'du', 'er', 'sie', 'es', 'wir', 'ihr', 'man',
+  'mit', 'von', 'aus', 'bei', 'vor', 'nach', 'war', 'hat', 'bin', 'gut', 'tag', 'tod', 'nie',
+  'ev', // artist abbrev; whole-word only but still homograph-prone in EN quotes
+]);
+
+function shouldApplyPhraseDictKey(key: string): boolean {
+  const k = key.trim().toLowerCase();
+  if (k.length < 2) return false;
+  if (!k.includes(' ') && SKIP_PHRASE_DICT_HOMOGRAPHS.has(k)) return false;
+  return true;
+}
+
+/** Replace longest known Latin phrases first (case-insensitive, whole-word). */
 function applyPhraseDictionaryLogged(
   text: string,
   extra: Record<string, string> = {},
@@ -383,14 +401,14 @@ function applyPhraseDictionaryLogged(
   const keys = Object.keys(dict).sort((a, b) => b.length - a.length);
   let result = text;
   for (const key of keys) {
-    const re = new RegExp(key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi');
-    result = result.replace(re, (match) => {
-      const to = dict[key]!;
-      if (match !== to) {
-        replacements.push({ from: match, to, source });
-      }
-      return to;
-    });
+    const isArtistExtra = Object.prototype.hasOwnProperty.call(extra, key);
+    if (!isArtistExtra && !shouldApplyPhraseDictKey(key)) continue;
+    const to = dict[key]!;
+    const before = result;
+    result = replaceWholePhrase(result, key, to);
+    if (result !== before) {
+      replacements.push({ from: key, to, source });
+    }
   }
   return result;
 }

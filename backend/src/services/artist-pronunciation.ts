@@ -53,24 +53,56 @@ export function buildArtistPhrasePhoneticEn(): Record<string, string> {
   return out;
 }
 
-function replaceLongestFirst(text: string, dict: Record<string, string>): string {
-  const keys = Object.keys(dict).sort((a, b) => b.length - a.length);
-  let result = text;
-  for (const key of keys) {
-    if (key.length < 2) continue;
-    result = replaceWholePhrase(result, key, dict[key]!);
-  }
-  return result;
-}
-
 function escapeRegExp(s: string): string {
   return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
-function replaceWholePhrase(text: string, phrase: string, replacement: string): string {
+/** Whole-word / phrase match — avoids «ev» inside «Never», «she» inside «wishes». */
+export function replaceWholePhrase(text: string, phrase: string, replacement: string): string {
   if (!phrase.trim()) return text;
   const re = new RegExp(`(?<![\\p{L}\\p{N}'’-])${escapeRegExp(phrase.trim())}(?![\\p{L}\\p{N}'’-])`, 'giu');
   return text.replace(re, replacement);
+}
+
+/**
+ * Ambiguous EN keys: also common English words or idioms — only replace via artist/title metadata,
+ * not global narration scan.
+ */
+const EN_SKIP_GLOBAL_PRONUNCIATION_KEYS = new Set([
+  'pink',
+  'korn',
+  'grimes',
+  'yeat',
+  'david',
+  'mot',
+  'death grips',
+  'bbno',
+  'eminem',
+  'gorillaz',
+  'maneskin',
+  'linkin park',
+  'travis scott',
+  'd4vd',
+]);
+
+function shouldApplyGlobalEnPronunciationKey(key: string): boolean {
+  const k = normalizeArtistKey(key);
+  if (!k || EN_SKIP_GLOBAL_PRONUNCIATION_KEYS.has(k)) return false;
+  if (/\d/.test(k) || /[$!]/.test(k)) return true;
+  if (k.length <= 3) return true;
+  if (k.includes(' ')) return true;
+  if (k.length >= 9) return true;
+  return false;
+}
+
+function replaceLongestFirst(text: string, dict: Record<string, string>): string {
+  const keys = Object.keys(dict).sort((a, b) => b.length - a.length);
+  let result = text;
+  for (const key of keys) {
+    if (key.length < 2 || !shouldApplyGlobalEnPronunciationKey(key)) continue;
+    result = replaceWholePhrase(result, key, dict[key]!);
+  }
+  return result;
 }
 
 /** Yandex/Edge: stylized artist tokens → Cyrillic respelling (mgk → эм-джей-кей, maroon 5 → марун файв). */
@@ -101,6 +133,9 @@ export function applyEnglishArtistPronunciation(
     const entry = lookupArtistPronunciation(seed);
     if (!entry) continue;
     result = replaceWholePhrase(result, seed, entry.en);
+    for (const alias of entry.aliases ?? []) {
+      result = replaceWholePhrase(result, alias, entry.en);
+    }
   }
   return replaceLongestFirst(result, dict);
 }
