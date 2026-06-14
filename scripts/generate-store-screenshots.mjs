@@ -2,6 +2,7 @@
  * Маркетинговые скрины для Google Play и App Store.
  * node scripts/generate-store-screenshots.mjs
  * node scripts/generate-store-screenshots.mjs --from-play   # пересборка из *-play.jpg
+ * node scripts/generate-store-screenshots.mjs --locale en  # EN Play Store (ENG1.jpg… на рабочем столе)
  */
 import fs from 'node:fs';
 import path from 'node:path';
@@ -11,12 +12,15 @@ import sharp from 'sharp';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, '..');
 const FROM_PLAY = process.argv.includes('--from-play');
+const LOCALE = process.argv.includes('--locale')
+  ? process.argv[process.argv.indexOf('--locale') + 1] ?? 'ru'
+  : 'ru';
 
 const DESKTOP = process.env.USERPROFILE
   ? path.join(process.env.USERPROFILE, 'OneDrive', 'Desktop')
   : path.join(process.env.HOME || '', 'Desktop');
 
-const SLIDES = [
+const SLIDES_RU = [
   {
     file: 'скрин1.jpg',
     play: {
@@ -96,6 +100,90 @@ const SLIDES = [
     },
   },
 ];
+
+/** English Play Store — source: Desktop/ENG1.jpg … ENG6.jpg */
+const SLIDES_EN = [
+  {
+    file: 'ENG1.jpg',
+    play: {
+      headline: 'AI radio host',
+      headlineAccent: 'in your player',
+      subtitle: 'Spotify, Yandex Music — no app switching',
+    },
+    ios: {
+      headline: 'AI radio host',
+      headlineAccent: 'with your music',
+      subtitle: 'Apple Music, Spotify — story for each track',
+    },
+  },
+  {
+    file: 'ENG2.jpg',
+    play: {
+      headline: 'Live stories',
+      headlineAccent: 'about every track',
+      subtitle: 'Facts and emotion — voiced while the song plays',
+    },
+    ios: {
+      headline: 'Live stories',
+      headlineAccent: 'on the air',
+      subtitle: 'A short story between tracks',
+    },
+  },
+  {
+    file: 'ENG3.jpg',
+    play: {
+      headline: 'Story',
+      headlineAccent: 'archive',
+      subtitle: 'Read past broadcasts and rate with 👍 or 👎',
+    },
+    ios: {
+      headline: 'Story',
+      headlineAccent: 'archive',
+      subtitle: 'Every story saved in History',
+    },
+  },
+  {
+    file: 'ENG4.jpg',
+    play: {
+      headline: 'Everything',
+      headlineAccent: 'you listened to',
+      subtitle: 'Listening diary — see which tracks had a story',
+    },
+    ios: {
+      headline: 'Listening',
+      headlineAccent: 'diary',
+      subtitle: 'Each track tagged when a story played',
+    },
+  },
+  {
+    file: 'ENG5.jpg',
+    play: {
+      headline: '6 narrator',
+      headlineAccent: 'personas',
+      subtitle: 'Radio host, DJ, expert, superfan — pick your mood',
+    },
+    ios: {
+      headline: '6 narrator',
+      headlineAccent: 'personas',
+      subtitle: 'From night DJ to superfan',
+    },
+  },
+  {
+    file: 'ENG6.jpg',
+    play: {
+      headline: 'Voice',
+      headlineAccent: 'your way',
+      subtitle: 'Dozens of voices — or auto by genre and era',
+    },
+    ios: {
+      headline: 'Your host',
+      headlineAccent: 'voice',
+      subtitle: 'Male and female — or matched automatically',
+    },
+  },
+];
+
+const SLIDES = LOCALE === 'en' ? SLIDES_EN : SLIDES_RU;
 
 const BG = '#06050c';
 const ACCENT = '#8b3dff';
@@ -323,8 +411,14 @@ async function resolveSource(slide, index, playOut) {
 }
 
 async function main() {
-  const playOut = path.join(ROOT, 'play-store', 'screenshots');
-  const iosOut = path.join(ROOT, 'app-store', 'screenshots');
+  const playOut =
+    LOCALE === 'en'
+      ? path.join(ROOT, 'play-store', 'screenshots-en')
+      : path.join(ROOT, 'play-store', 'screenshots');
+  const iosOut =
+    LOCALE === 'en'
+      ? path.join(ROOT, 'app-store', 'screenshots-en')
+      : path.join(ROOT, 'app-store', 'screenshots');
   fs.mkdirSync(playOut, { recursive: true });
   fs.mkdirSync(iosOut, { recursive: true });
 
@@ -340,7 +434,10 @@ async function main() {
     const num = String(i + 1).padStart(2, '0');
 
     const playBuf = await composeSlide(src, slide.play, PLAY_SPEC);
-    const playPath = path.join(playOut, `${num}-${slide.file.replace(/\.jpg$/i, '')}-play.jpg`);
+    const playPath = path.join(
+      playOut,
+      `${num}-${slide.file.replace(/\.jpg$/i, '')}-play.jpg`,
+    );
     fs.writeFileSync(playPath, playBuf);
     console.log('Play →', path.relative(ROOT, playPath));
 
@@ -358,7 +455,7 @@ async function main() {
     console.error('Нет исходников. Положи скрин1.jpg… на рабочий стол или запусти с --from-play');
     process.exit(1);
   }
-  console.log(`\nГотово: ${n} слайдов × 2 платформы (phoneTop фиксирован — без скачков)`);
+  console.log(`\nГотово (${LOCALE}): ${n} слайдов × 2 платформы`);
 }
 
 main().catch((e) => {

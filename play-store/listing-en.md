@@ -99,19 +99,21 @@ node scripts/generate-play-store-assets.mjs
 
 ## Screenshots (English listing)
 
-Use screenshots with **English UI** (device language English or in-app language → English):
+Folder **`play-store/screenshots-en/`** — 6 frames 1080×1920 with English headlines (from `ENG1.jpg` … `ENG6.jpg` on Desktop):
 
-1. Neural host in your player  
-2. Live stories about every track  
-3. Story archive and ratings  
-4. Listening diary  
-5. 6 narrator personas  
-6. Voice picker  
+| # | File | Headline | Subtitle |
+|---|------|----------|----------|
+| 1 | `01-ENG1-play.jpg` | AI radio host **in your player** | Spotify, Yandex Music — no app switching |
+| 2 | `02-ENG2-play.jpg` | Live stories **about every track** | Facts and emotion — voiced while the song plays |
+| 3 | `03-ENG3-play.jpg` | Story **archive** | Read past broadcasts and rate with 👍 or 👎 |
+| 4 | `04-ENG4-play.jpg` | Everything **you listened to** | Listening diary — see which tracks had a story |
+| 5 | `05-ENG5-play.jpg` | 6 narrator **personas** | Radio host, DJ, expert, superfan — pick your mood |
+| 6 | `06-ENG6-play.jpg` | Voice **your way** | Dozens of voices — or auto by genre and era |
 
-Rebuild marketing frames (add `--locale en` when supported, or swap headline copy in `scripts/generate-store-screenshots.mjs`):
+Regenerate after new phone captures:
 
 ```bash
-node scripts/generate-store-screenshots.mjs
+node scripts/generate-store-screenshots.mjs --locale en
 ```
 
 ## Data safety
