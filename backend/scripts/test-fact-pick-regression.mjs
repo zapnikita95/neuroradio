@@ -527,6 +527,17 @@ assert(!isEligibleHotFact(GENERIC_VIDEO, { artist: 'Shakira', title: 'Waka Waka'
 assert(isEligibleHotFact(STRONG_VIDEO, { artist: 'Shakira', title: 'Waka Waka' }), 'strong video stays hot');
 assert(isRejectedPickSeed(GENERIC_VIDEO, 'Waka Waka', 'ru', [], 'Shakira'), 'generic video rejected at pick');
 
+const BOBBY_BIO =
+  'Walden Robert Cassotto, known by the stage name Bobby Darin, was an American singer, songwriter, and actor who performed pop, swing, folk, rock and roll and country music.';
+assert(
+  rejectSeedForTrackStory(BOBBY_BIO, 'Bobby Darin', 'Dream Lover'),
+  'Bobby Darin encyclopedia bio rejected for Dream Lover',
+);
+assert(
+  isRejectedPickSeed(BOBBY_BIO, 'Dream Lover', 'ru', [], 'Bobby Darin'),
+  'Bobby Darin bio rejected at pick',
+);
+
 // --- 6. Optional live: real Last.fm + aggregator ---
 if (LIVE) {
   if (!process.env.LASTFM_API_KEY?.trim()) {

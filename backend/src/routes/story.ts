@@ -16,6 +16,7 @@ import { fetchFastTrackWikiFacts } from '../services/wikipedia-facts.js';
 import { explainReferenceFactSelection, factsTooSimilar, isRejectedStorySeed, type SelectedReferenceFact } from '../services/fact-picker.js';
 import { formatFactPickLog, logFactCandidatePools } from '../services/fact-interest-log.js';
 import { interestScore, isWikiBiographyLead, isCatalogMetadataSeed, isEncyclopediaDefinitionSeed } from '../services/reference-fact-quality.js';
+import { isArtistCareerBioWithoutTrack } from '../services/fact-track-anchor.js';
 import { interestRating10 } from '../services/fact-interest-log.js';
 import {
   buildFactPickContext,
@@ -481,6 +482,13 @@ router.post('/full', extractClientSecrets, validateStoryFullBody, storyFullRateL
     if (bankFact && isEncyclopediaDefinitionSeed(bankFact.fact)) {
       console.log(
         `[facts] bank seed trivial definition for "${metadata.artist}" — "${metadata.title}", fetching fresh facts`,
+      );
+      bankFact = null;
+    }
+
+    if (bankFact && isArtistCareerBioWithoutTrack(bankFact.fact, metadata.title)) {
+      console.log(
+        `[facts] bank seed artist bio without track for "${metadata.artist}" — "${metadata.title}", fetching fresh facts`,
       );
       bankFact = null;
     }

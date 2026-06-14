@@ -6,6 +6,7 @@ import {
   findIncompleteEnding,
   findLlmGarbage,
   findWateryContent,
+  findUngroundedClaims,
   anchorsReferenceFact,
   referenceFactsAreAnchorable,
   sanitizeScriptForTts,
@@ -158,6 +159,11 @@ export function finalizeAfterQualityLoop<T extends { script: string }>(
   });
   if (garbage) {
     logRejectedScript('last script rejected as llm garbage', sanitized, garbage);
+    return null;
+  }
+  const ungrounded = findUngroundedClaims(sanitized, referenceFacts);
+  if (ungrounded) {
+    logRejectedScript('last script rejected (ungrounded claim)', sanitized, ungrounded);
     return null;
   }
   if (referenceFacts.length === 0) {

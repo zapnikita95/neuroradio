@@ -1038,8 +1038,36 @@ const UNGROUNDED_CLAIM_CHECKS: Array<{ claim: RegExp; factHint: RegExp }> = [
     factHint: /world|мир|breath|one take|improvis|дыхан/i,
   },
   {
-    claim: /визитной\s+карточкой\s+артиста/i,
-    factHint: /signature|calling card|визитн|card|breakthrough/i,
+    claim: /визитной\s+карточк/i,
+    factHint: /signature|calling card|визитн|card|breakthrough|calling|хит|hit|chart|billboard|top\s+\d|#2|signature song/i,
+  },
+  {
+    claim: /(?:за|в)\s+одн[ую]\s+ноч|одной\s+ночью|за\s+ночь/i,
+    factHint: /one night|overnight|за\s+ноч|одной\s+ноч|insomnia|бессон|не\s+спал|couldn't sleep|could not sleep/i,
+  },
+  {
+    claim: /бессон|не\s+мог\s+уснут/i,
+    factHint: /insomnia|бессон|couldn't sleep|could not sleep|sleepless|не\s+спал/i,
+  },
+  {
+    claim: /портативн\w*\s+магнитофон/i,
+    factHint: /portable|tape recorder|магнитофон|recorder|demo tape|кассет/i,
+  },
+  {
+    claim: /(?:среди|посреди)\s+ночи/i,
+    factHint: /middle of the night|midnight|среди\s+ноч|посреди\s+ноч|at night|ночью/i,
+  },
+  {
+    claim: /(?:утром|на\s+утро)\s+прин(?:ё|е)с/i,
+    factHint: /next morning|brought.*studio|утром|studio.*morning|прин[ёе]с.*студи/i,
+  },
+  {
+    claim: /записал\w*\s+демо/i,
+    factHint: /demo|демо|tape|магнитофон|recorder|home record/i,
+  },
+  {
+    claim: /(?:не\s+)?(?:в\s+)?результате\s+долг(?:их|ие)\s+сесс/i,
+    factHint: /session|сесс|studio|weeks|months|recorded|запис/i,
   },
   {
     claim: /лёгкий\s+поп-?звук\s+с\s+неожиданно\s+глубокой/i,

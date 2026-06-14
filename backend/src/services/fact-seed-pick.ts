@@ -17,15 +17,12 @@ import {
 } from './reference-fact-quality.js';
 import { WEAK_TRIVIA_PATTERNS } from './story-fact-hunt.js';
 import { isMetadataOnlyFallbackFact } from './metadata-facts.js';
-import { isTruncatedMarketingSnippet, isUnspeakableWebSeed } from './web-snippet-accept.js';
+import { isTruncatedMarketingSnippet, isUnspeakableWebSeed, isArtistIdentityBioSnippet } from './web-snippet-accept.js';
 import {
   factMentionsTitle,
   hasTrackContextSignal,
-  isAmbiguousCommonWordTitle,
   isMisattributedBandTrackFact,
 } from './fact-relevance.js';
-import { isArtistIdentityBioSnippet } from './web-snippet-accept.js';
-import { artistHasSearchAliases } from './artist-search-aliases.js';
 import { hasAnchoredTrackContext, isTrackTitleAnchoredSeed, rejectSeedForTrackStory } from './fact-track-anchor.js';
 import { factFitsStoryLanguage } from './fact-language-fit.js';
 import type { StoryLanguageId } from './story-language.js';
@@ -53,11 +50,7 @@ export function isRejectedPickSeed(
     title.trim() &&
     isArtistIdentityBioSnippet(fact) &&
     !factMentionsTitle(fact, title) &&
-    !hasAnchoredTrackContext(fact, title) &&
-    (isAmbiguousCommonWordTitle(title) ||
-      artistHasSearchAliases(artist) ||
-      trackPool.some((t) => factMentionsTitle(t, title) && adjustedInterestScore(t) >= 8) ||
-      trackPool.some((t) => hasAnchoredTrackContext(t, title) && adjustedInterestScore(t) >= 8))
+    !hasAnchoredTrackContext(fact, title)
   ) {
     return true;
   }
