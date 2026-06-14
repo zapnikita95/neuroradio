@@ -53,30 +53,30 @@ Live music stories voiced by an AI host while your track plays
 ## Full description (max 4000 characters)
 
 ```
-Broadcast AI is a neural radio host for Android. While you listen in Spotify, Yandex Music, and other players, the app detects the current track, finds interesting facts from open sources, and tells a short story in a natural voice between songs.
+Broadcast AI is an AI-powered radio host for Android. While you listen to music in Spotify, Yandex Music, and other players, the app recognizes the current track, finds interesting facts from open sources, and tells a short story in a natural voice between songs.
 
 How it works
-• The app sees what is playing via system media notifications (MediaSession).
-• Our service collects facts about the track and artist and ranks them by interest.
-• AI writes a coherent script in your chosen narrator style — in English or Russian.
-• Premium voices (ElevenLabs) or free Edge TTS speak the story — like a real broadcast.
+• The app sees what is playing now through system media notifications (MediaSession).
+• The service collects facts about the track and artist and ranks them by how interesting they are.
+• AI writes a coherent script in English in the style you choose.
+• ElevenLabs or Microsoft Edge voice reads the story aloud — like a real broadcast.
 
 6 narrator personas
-Radio host, night DJ, genre expert, era contemporary, superfan, backstage insider — each with its own tone, pace, and delivery.
+Radio host, night DJ, genre expert, era contemporary, superfan, backstage insider — each with its own character, pace, and delivery.
 
-For you if
-• You love music and want context around the tracks you play.
-• You listen in the car, on a walk, or at home — hands free, stories on autopilot.
-• You want “smart radio” on top of your own playlist, not pre-recorded shows.
+Who it's for
+• Music lovers who want context around the tracks they play.
+• Listeners in the car, on a walk, or at home — hands free, stories flow on their own.
+• Anyone who wants “smart radio” on top of their own playlist, without canned scripts.
 
 Plans
-• Basic — limited stories per day, Edge TTS voiceover.
-• Extended — more broadcasts, premium voices, smarter AI — subscribe in Google Play or at efir-ai.ru.
+• Basic — limited number of stories per day.
+• Extended — more broadcasts, priority voiceover, subscribe via Google Play or at efir-ai.ru.
 
 Important
-• Media notification access is required to detect the current track.
-• Story generation and voiceover use the Broadcast AI server — internet required.
-• This app does not replace your music player — it works on top of apps you already use.
+• Media notification access is required (to detect the current track).
+• Voiceover and story generation use the Broadcast AI server — an internet connection is required.
+• The app does not replace your music player: it works on top of apps you already have installed.
 
 Support: hello@efir-ai.ru
 Website: https://www.efir-ai.ru
