@@ -31,7 +31,7 @@ export function resolveWebsiteDir(baseDir: string): string | null {
  * чтобы работали /health, /v1/* и /audio/*.
  */
 export function serveWebsite(dir: string): express.RequestHandler {
-  return express.static(dir, {
+  const staticHandler = express.static(dir, {
     index: 'index.html',
     extensions: ['html'],
     dotfiles: 'ignore',
@@ -49,4 +49,12 @@ export function serveWebsite(dir: string): express.RequestHandler {
       }
     },
   });
+
+  return (req, res, next) => {
+    if (req.method === 'GET' && (req.path === '/privacy' || req.path === '/privacy/')) {
+      res.sendFile(path.join(dir, 'privacy.html'));
+      return;
+    }
+    staticHandler(req, res, next);
+  };
 }
