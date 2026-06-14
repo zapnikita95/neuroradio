@@ -34,14 +34,14 @@
     <string name="onboarding_title">Доступ к уведомлениям</string>
     <string name="onboarding_welcome_headline">Нейроведущий для Spotify и Яндекс Музыки</string>
     <string name="onboarding_welcome_subtitle">Истории голосом, пока играет ваш трек — без смены плеера.</string>
-    <string name="onboarding_apk_faq_title">Установка из APK? Сначала снимите ограничение</string>
-    <string name="onboarding_apk_faq_body">Если скачали приложение с сайта, а не из магазина, Android может заблокировать доступ к уведомлениям и показать «Доступ для приложения запрещён».\n\nСделайте один раз:\n1. Настройки → Приложения → Эфир AI\n2. ⋮ (три точки справа сверху) → «Разрешить ограниченные настройки»\n3. Потом: Особые права → Доступ к уведомлениям → включите «Эфир AI — мониторинг медиа»\n\nНа Xiaomi, Samsung, Honor путь может чуть отличаться, но порядок тот же: сначала снять ограничение в карточке приложения, потом выдать доступ к уведомлениям.</string>
+    <string name="onboarding_access_help_title">Не получается включить доступ?</string>
+    <string name="onboarding_access_help_body">Если Android пишет «Доступ для приложения запрещён», на Xiaomi, Samsung или Honor иногда нужно сначала разрешить особые настройки:\n\n1. Настройки → Приложения → Эфир AI\n2. ⋮ → «Разрешить ограниченные настройки»\n3. Особые права → Доступ к уведомлениям → включите «Эфир AI — мониторинг медиа»\n\nЕсли ставили из Google Play — обычно достаточно шагов ниже.</string>
     <string name="onboarding_open_app_settings">Открыть карточку приложения</string>
     <string name="onboarding_description">Эфир AI читает метаданные треков из Spotify и Яндекс Музыки через специальный доступ к уведомлениям. Без него приложение не видит, что сейчас играет.</string>
-    <string name="onboarding_steps">1. Если ставили APK — сначала выполните шаги в блоке выше.\n2. Нажмите «Открыть доступ к уведомлениям» ниже.\n3. Включите «Эфир AI — мониторинг медиа».\n4. Вернитесь сюда и нажмите «Проверить и войти».</string>
+    <string name="onboarding_steps">1. Нажмите «Открыть доступ к уведомлениям» ниже.\n2. Включите «Эфир AI — мониторинг медиа».\n3. Вернитесь сюда и нажмите «Проверить и войти».</string>
     <string name="onboarding_open_settings">Открыть доступ к уведомлениям</string>
     <string name="onboarding_check_access">Проверить и войти</string>
-    <string name="onboarding_not_granted_yet">Сначала включите «Эфир AI — мониторинг медиа». Если ставили APK — проверьте, что в карточке приложения включено «Разрешить ограниченные настройки».</string>
+    <string name="onboarding_not_granted_yet">Сначала включите «Эфир AI — мониторинг медиа» в настройках Android. Если система блокирует доступ — раскройте подсказку выше.</string>
 
     <string name="home_tour_welcome_title">Вас приветствует Эфир AI</string>
     <string name="home_tour_welcome_body">Первую неделю — полный доступ: Yandex SpeechKit (или ElevenLabs на английском), лучшие модели, офлайн-сохранение фактов. Потом — базовый тариф с Edge TTS и обычными моделями; расширенный — по подписке. Истории озвучиваются голосом выбранного амплуа — каждый эфир уникален.</string>
@@ -154,8 +154,7 @@
     <string name="settings_language_system">Как на устройстве</string>
     <string name="settings_language_ru">Русский</string>
     <string name="settings_language_en">English</string>
-    <string name="settings_elevenlabs_voice">Голос ElevenLabs</string>
-    <string name="settings_elevenlabs_hint">На английском языке расширенный тариф озвучивает истории через ElevenLabs.</string>
+    <string name="settings_premium_voice_intro">Самые реалистичные нейросетевые голоса</string>
     <string name="settings_playback_mode_hint">Включено — истории запускаются сами при смене трека. Выключено — только вручную кнопкой «Рассказать».</string>
     <string name="settings_speak_track_names">Названия треков в озвучке</string>
     <string name="settings_speak_track_names_hint">Включено — в голосе звучат название и исполнитель латиницей. Выключено — только английские имя и трек заменяются на «эта песня»; русские названия не трогаются. Остальные имена в тексте — по-русски.</string>

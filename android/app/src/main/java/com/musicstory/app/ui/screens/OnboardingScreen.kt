@@ -114,7 +114,7 @@ fun OnboardingScreen(
                         painter = painterResource(R.drawable.logo_efir_ai),
                         contentDescription = null,
                         modifier = Modifier.fillMaxSize(),
-                        contentScale = ContentScale.Crop,
+                        contentScale = ContentScale.Fit,
                     )
                 }
 
@@ -153,7 +153,7 @@ fun OnboardingScreen(
 
                 Spacer(modifier = Modifier.height(16.dp))
 
-                OnboardingApkFaqCard(
+                OnboardingAccessHelpCard(
                     onOpenAppSettings = {
                         hintMessage = null
                         context.startActivity(
@@ -247,7 +247,7 @@ fun OnboardingScreen(
 }
 
 @Composable
-private fun OnboardingApkFaqCard(
+private fun OnboardingAccessHelpCard(
     onOpenAppSettings: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -266,7 +266,7 @@ private fun OnboardingApkFaqCard(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Text(
-                text = context.getString(R.string.onboarding_apk_faq_title),
+                text = context.getString(R.string.onboarding_access_help_title),
                 style = MaterialTheme.typography.titleSmall,
                 fontWeight = FontWeight.SemiBold,
                 color = GoldBright,
@@ -288,7 +288,7 @@ private fun OnboardingApkFaqCard(
             Column {
                 Spacer(modifier = Modifier.height(12.dp))
                 Text(
-                    text = context.getString(R.string.onboarding_apk_faq_body),
+                    text = context.getString(R.string.onboarding_access_help_body),
                     style = MaterialTheme.typography.bodySmall,
                     color = CreamText,
                     textAlign = TextAlign.Start,
