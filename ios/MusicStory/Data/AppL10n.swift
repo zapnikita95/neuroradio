@@ -58,10 +58,10 @@ struct AppL10n {
     var playingStory: String { en ? "Playing story" : "Воспроизводим историю" }
     var autoMonitoring: String { en ? "Auto · monitoring" : "Авто · мониторинг" }
     var manualModeStatus: String { en ? "Manual mode" : "Ручной режим" }
-    var tellStory: String { en ? "Tell story" : "Рассказать историю" }
+    var tellStory: String { en ? "Tell the story" : "Рассказать историю" }
     var generatingStory: String { en ? "Generating story…" : "Генерируем историю…" }
     var storyPlaying: String { en ? "Story playing…" : "История играет…" }
-    var stopStory: String { en ? "Stop story" : "Остановить историю" }
+    var stopStory: String { en ? "Stop the story" : "Остановить историю" }
 
     func tracksUntil(_ count: Int) -> String {
         let n = max(0, count)

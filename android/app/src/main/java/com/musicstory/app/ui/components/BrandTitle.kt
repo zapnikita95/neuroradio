@@ -21,8 +21,15 @@ fun BrandTitle(
     fontSize: TextUnit = MaterialTheme.typography.headlineMedium.fontSize,
     lineHeight: TextUnit = MaterialTheme.typography.headlineMedium.lineHeight,
 ) {
+    val prefix = stringResource(R.string.brand_title_prefix)
+    val accent = stringResource(R.string.brand_title_accent)
+    val compact = (prefix.length + accent.length) > 9
+    val effectiveSize = if (compact) fontSize * 0.78f else fontSize
+    val effectiveLineHeight = if (compact) lineHeight * 0.78f else lineHeight
     Text(
         modifier = modifier,
+        maxLines = 1,
+        softWrap = false,
         text = buildAnnotatedString {
             withStyle(
                 SpanStyle(
@@ -45,8 +52,8 @@ fun BrandTitle(
             }
         },
         style = MaterialTheme.typography.headlineMedium.copy(
-            fontSize = fontSize,
-            lineHeight = lineHeight,
+            fontSize = effectiveSize,
+            lineHeight = effectiveLineHeight,
         ),
     )
 }

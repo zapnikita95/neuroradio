@@ -48,15 +48,20 @@ struct BrandTitle: View {
     var fontSize: CGFloat = 22
     var lang: ResolvedAppLanguage = .RU
 
+    private var compact: Bool { lang == .en }
+    private var effectiveSize: CGFloat { compact ? fontSize * 0.78 : fontSize }
+
     var body: some View {
         HStack(spacing: 0) {
             Text(lang == .en ? "Broadcast " : "Эфир ")
-                .font(.system(size: fontSize, weight: .semibold, design: .serif))
+                .font(.system(size: effectiveSize, weight: .semibold, design: .serif))
                 .foregroundStyle(AppTheme.creamText)
             Text("AI")
-                .font(.system(size: fontSize, weight: .bold, design: .default))
+                .font(.system(size: effectiveSize, weight: .bold, design: .default))
                 .foregroundStyle(AppTheme.accentViolet)
         }
+        .lineLimit(1)
+        .minimumScaleFactor(0.85)
     }
 }
 
