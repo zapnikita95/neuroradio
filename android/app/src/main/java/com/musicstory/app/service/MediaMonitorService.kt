@@ -41,6 +41,8 @@ class MediaMonitorService : Service() {
     private var lastTrackMatchKey: String? = null
     private var dwellTrack: TrackInfo? = null
     private var dwellStartedAtMs: Long = 0L
+    /** True once the current dwell session already wrote a scrobble row. */
+    private var dwellScrobbled: Boolean = false
 
     override fun onCreate() {
         super.onCreate()
@@ -97,6 +99,7 @@ class MediaMonitorService : Service() {
                             listenCountJob?.cancel()
                             val finished = dwellTrack
                             if (finished != null &&
+                                !dwellScrobbled &&
                                 System.currentTimeMillis() - dwellStartedAtMs >= MIN_SCROBBLE_LISTEN_MS
                             ) {
                                 serviceScope.launch { scrobbleIfNeeded(app, finished) }
@@ -106,6 +109,7 @@ class MediaMonitorService : Service() {
                         if (titleChanged || firstTrack) {
                             dwellTrack = track
                             dwellStartedAtMs = System.currentTimeMillis()
+                            dwellScrobbled = false
                             scheduleTrackCounted(app, track)
                             serviceScope.launch { app.offlinePackRepository.onTrackHeard(track) }
                         }
@@ -151,7 +155,7 @@ class MediaMonitorService : Service() {
             if (userSec > 0) {
                 delay(userSec * 1000L)
                 if (!stillOnTrack()) return@launch
-                scrobbleIfNeeded(app, track)
+                scrobbleIfNeeded(app, track, markDwellScrobbled = true)
             }
 
             val remaining = (storyDwellSec - userSec).coerceAtLeast(0)
@@ -161,15 +165,20 @@ class MediaMonitorService : Service() {
             }
 
             if (userSec == 0) {
-                scrobbleIfNeeded(app, track)
+                scrobbleIfNeeded(app, track, markDwellScrobbled = true)
             }
             app.storyOrchestrator.onTrackChanged(track)
         }
     }
 
-    private suspend fun scrobbleIfNeeded(app: MusicStoryApp, track: TrackInfo) {
+    private suspend fun scrobbleIfNeeded(
+        app: MusicStoryApp,
+        track: TrackInfo,
+        markDwellScrobbled: Boolean = false,
+    ) {
         if (!app.scrobbleRepository.wasRecentlyScrobbled(track)) {
             app.scrobbleRepository.scrobbleTrack(track)
+            if (markDwellScrobbled) dwellScrobbled = true
         }
     }
 

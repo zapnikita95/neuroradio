@@ -171,6 +171,7 @@ class MusicStoryApp : Application() {
         prefetchAccountHistory()
         appScope.launch {
             storyRepository.dedupeStoryHistory()
+            scrobbleRepository.dedupeListeningHistory()
         }
         appScope.launch {
             val purgeMarker = settingsDataStore.offlineCachePurgeVersion.first()
@@ -209,8 +210,10 @@ class MusicStoryApp : Application() {
                 scrobbleRepository.mergeScrobbleEntries(login.scrobbles)
             }
             storyRepository.dedupeStoryHistory()
+            scrobbleRepository.dedupeListeningHistory()
             syncAccountDataWithServer(backendUrl)
             storyRepository.dedupeStoryHistory()
+            scrobbleRepository.dedupeListeningHistory()
         }
     }
 

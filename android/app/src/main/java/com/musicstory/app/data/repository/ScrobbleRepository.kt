@@ -99,6 +99,47 @@ class ScrobbleRepository(
         genreCache.clear()
     }
 
+    /**
+     * Remove duplicate rows from the old double-scrobble bug (count on dwell + again on track switch).
+     * Keeps the row with [ScrobbleEntry.storyTriggered] or the earliest timestamp in each cluster.
+     */
+    suspend fun dedupeListeningHistory() {
+        val entries = scrobbleDao.getRecent(limit = 2_000)
+        if (entries.size < 2) return
+
+        val toDelete = mutableSetOf<Long>()
+        val processed = mutableSetOf<Long>()
+        val byTrack = entries.groupBy { trackKey(it.artist, it.title) }
+
+        for (group in byTrack.values) {
+            val sorted = group.sortedByDescending { it.scrobbledAt }
+            for (entry in sorted) {
+                if (entry.id in processed) continue
+                val cluster = sorted.filter { other ->
+                    other.id !in processed &&
+                        kotlin.math.abs(entry.scrobbledAt - other.scrobbledAt) <= DUPLICATE_LISTEN_WINDOW_MS
+                }
+                if (cluster.size <= 1) {
+                    processed.add(entry.id)
+                    continue
+                }
+                val keep = cluster.sortedWith(
+                    compareByDescending<ScrobbleEntry> { it.storyTriggered }
+                        .thenBy { it.scrobbledAt },
+                ).first()
+                cluster.filter { it.id != keep.id }.forEach { duplicate ->
+                    toDelete.add(duplicate.id)
+                    processed.add(duplicate.id)
+                }
+                processed.add(keep.id)
+            }
+        }
+
+        if (toDelete.isNotEmpty()) {
+            scrobbleDao.deleteByIds(toDelete.toList())
+        }
+    }
+
     suspend fun mergeScrobbleEntries(remote: List<ScrobbleEntry>) {
         for (entry in remote) {
             insertScrobbleIfNew(entry)
@@ -168,4 +209,9 @@ class ScrobbleRepository(
 
     private fun trackKey(artist: String, title: String): String =
         "${artist.lowercase()}|${title.lowercase()}"
+
+    private companion object {
+        /** Same track replayed within this window is treated as one listen for dedupe. */
+        const val DUPLICATE_LISTEN_WINDOW_MS = 20 * 60 * 1000L
+    }
 }

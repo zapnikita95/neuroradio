@@ -87,6 +87,7 @@ private suspend fun persistAccountLogin(
             app.scrobbleRepository.mergeScrobbleEntries(login.scrobbles)
         }
         app.storyRepository.dedupeStoryHistory()
+        app.scrobbleRepository.dedupeListeningHistory()
     }.onFailure { err ->
         StoryLog.e("Account login: cloud merge failed (login kept)", err)
     }
@@ -101,6 +102,7 @@ private fun scheduleAccountLoginSync(app: MusicStoryApp) {
             withTimeout(LOGIN_BACKGROUND_SYNC_TIMEOUT_MS) {
                 app.syncAccountDataWithServer(url)
                 app.storyRepository.dedupeStoryHistory()
+        app.scrobbleRepository.dedupeListeningHistory()
             }
         }.onFailure { err ->
             StoryLog.e("Account login: background sync failed (login kept)", err)

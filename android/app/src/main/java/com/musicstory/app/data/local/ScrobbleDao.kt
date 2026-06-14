@@ -86,4 +86,7 @@ interface ScrobbleDao {
 
     @Query("DELETE FROM scrobble_entries")
     suspend fun deleteAll()
+
+    @Query("DELETE FROM scrobble_entries WHERE id IN (:ids)")
+    suspend fun deleteByIds(ids: List<Long>)
 }
