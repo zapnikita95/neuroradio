@@ -63,6 +63,11 @@ export function hasPaidStoryTier(installId: string): boolean {
   return tier === 'trial' || tier === 'premium' || tier === 'unlimited';
 }
 
+/** Trial, premium, or unlimited — premium voice / ElevenLabs / SpeechKit on server. */
+export function hasPremiumLikeEntitlement(installId: string): boolean {
+  return hasPaidStoryTier(installId);
+}
+
 export function isElevenLabsEnabled(): boolean {
   const flag = process.env.ELEVENLABS_ENABLED?.trim().toLowerCase();
   return flag === 'true' || flag === '1' || flag === 'on';

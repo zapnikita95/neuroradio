@@ -10,6 +10,7 @@ import {
   resolveEffectiveTtsProvider,
 } from '../dist/services/tts-router.js';
 import { resolveUserTier } from '../dist/services/entitlements.js';
+import { setDevTierOverride } from '../dist/services/dev-tier-store.js';
 import { enhanceMixedLanguageText } from '../dist/services/tts-en-normalize.js';
 import { polishScriptForSpeechDelivery } from '../dist/services/tts-speech-polish.js';
 import { buildAzureSsml, preparePlainSpeechText } from '../dist/services/tts-azure-ssml.js';
@@ -355,6 +356,34 @@ test('premium tier without entitlement throws', () => {
       }),
     PremiumTtsAccessError,
   );
+});
+
+test('trial tier with premium voice does not throw (EN → paid TTS path)', () => {
+  const prev = process.env.ALLOW_DEV_TIER_SWITCH;
+  process.env.ALLOW_DEV_TIER_SWITCH = 'true';
+  const installId = 'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee';
+  setDevTierOverride(installId, 'trial');
+  try {
+    assert.doesNotThrow(() =>
+      resolveEffectiveTtsProvider({
+        voiceTier: 'premium',
+        ttsProvider: 'auto',
+        installId,
+        storyLanguage: 'en',
+      }),
+    );
+    const provider = resolveEffectiveTtsProvider({
+      voiceTier: 'premium',
+      ttsProvider: 'auto',
+      installId,
+      storyLanguage: 'en',
+    });
+    assert.notEqual(provider, 'edge', `trial EN should not fall back to free edge, got ${provider}`);
+  } finally {
+    setDevTierOverride(installId, null);
+    if (prev === undefined) delete process.env.ALLOW_DEV_TIER_SWITCH;
+    else process.env.ALLOW_DEV_TIER_SWITCH = prev;
+  }
 });
 
 test('free tier resolves to edge TTS', () => {

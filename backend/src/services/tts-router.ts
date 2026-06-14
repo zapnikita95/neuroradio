@@ -8,7 +8,7 @@ import {
   canUseServerSpeechKit,
   SpeechKitSubscriptionRequiredError,
 } from './tts-access.js';
-import { hasPremiumEntitlement, isElevenLabsEnabled } from './entitlements.js';
+import { hasPaidStoryTier, isElevenLabsEnabled } from './entitlements.js';
 import { hasElevenLabsCredentials, synthesizeSpeechElevenLabs } from './elevenlabs-tts.js';
 import { resolveElevenLabsVoiceId, resolveElevenLabsVoiceSetting } from './elevenlabs-voices.js';
 import type { StoryLanguageId } from './story-language.js';
@@ -117,10 +117,10 @@ export function resolveEffectiveTtsProvider(
 
   const serverSpeechKit = canUseServerSpeechKit(request.installId, request.userTtsCredentials);
 
-  const requirePremium = () => {
-    if (!hasPremiumEntitlement(request.installId)) {
+  const requirePaidVoiceTier = () => {
+    if (!hasPaidStoryTier(request.installId)) {
       throw new PremiumTtsAccessError(
-        'Премиум-голос доступен по подписке 199 ₽/мес. Оформите premium_voice_monthly.',
+        'Премиум-голос доступен на пробном периоде или по подписке 199 ₽/мес.',
       );
     }
   };
@@ -137,7 +137,7 @@ export function resolveEffectiveTtsProvider(
   }
 
   if (ttsProvider === 'sber') {
-    requirePremium();
+    requirePaidVoiceTier();
     if (canUseSaluteSpeechProduction()) return 'sber';
     if (!serverSpeechKit) throw new SpeechKitSubscriptionRequiredError();
     console.warn('[tts-router] sber requested but not configured — fallback to Yandex');
@@ -145,7 +145,7 @@ export function resolveEffectiveTtsProvider(
   }
 
   if (ttsProvider === 'azure') {
-    requirePremium();
+    requirePaidVoiceTier();
     if (canUseAzureSpeechProduction()) return 'azure';
     if (canUseSaluteSpeechProduction()) return 'sber';
     if (!serverSpeechKit) throw new SpeechKitSubscriptionRequiredError();
@@ -153,7 +153,7 @@ export function resolveEffectiveTtsProvider(
   }
 
   if (ttsProvider === 'elevenlabs') {
-    requirePremium();
+    requirePaidVoiceTier();
     if (canUseElevenLabs()) return 'elevenlabs';
     if (canUseSaluteSpeechProduction()) return 'sber';
     if (canUseAzureSpeechProduction()) return 'azure';
@@ -162,7 +162,7 @@ export function resolveEffectiveTtsProvider(
   }
 
   if (request.voiceTier === 'premium') {
-    requirePremium();
+    requirePaidVoiceTier();
     if (request.storyLanguage === 'en' && canUseElevenLabs()) {
       return 'elevenlabs';
     }
@@ -170,7 +170,7 @@ export function resolveEffectiveTtsProvider(
   }
 
   if (request.storyLanguage === 'en') {
-    if (hasPremiumEntitlement(request.installId) && canUseElevenLabs()) {
+    if (hasPaidStoryTier(request.installId) && canUseElevenLabs()) {
       return 'elevenlabs';
     }
     return 'edge';
