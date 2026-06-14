@@ -131,13 +131,6 @@ fun AccountLoginScreen(
             ) {
                 BrandTitle()
                 Spacer(modifier = Modifier.height(12.dp))
-                Text(
-                    text = context.getString(R.string.account_login_subtitle),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MutedLavender,
-                    textAlign = TextAlign.Center,
-                    modifier = Modifier.padding(bottom = 12.dp),
-                )
                 VinylDisc(size = 88.dp, isSpinning = true)
                 Spacer(modifier = Modifier.height(16.dp))
                 GlassCard(accentBorder = true, modifier = Modifier.fillMaxWidth()) {
@@ -187,13 +180,6 @@ fun AccountLoginScreen(
                     text = context.getString(R.string.account_login_skip),
                     onClick = onSkip,
                     modifier = Modifier.fillMaxWidth(),
-                )
-                Spacer(modifier = Modifier.height(12.dp))
-                Text(
-                    text = context.getString(R.string.account_login_trial_hint),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MutedLavender,
-                    textAlign = TextAlign.Center,
                 )
             }
         }

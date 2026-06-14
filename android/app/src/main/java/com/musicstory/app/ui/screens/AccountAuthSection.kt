@@ -295,7 +295,6 @@ fun AccountStatusSection(
                     app = app,
                     scope = scope,
                     showSkip = false,
-                    compact = true,
                     onSkip = {},
                     onLoggedIn = {
                         scope.launch {
@@ -351,7 +350,6 @@ fun AccountStatusSection(
                     app = app,
                     scope = scope,
                     showSkip = false,
-                    compact = true,
                     onSkip = {},
                     onLoggedIn = {
                         scope.launch {
@@ -429,7 +427,6 @@ fun AccountEmailLoginContent(
     onSkip: () -> Unit,
     onLoggedIn: () -> Unit,
     modifier: Modifier = Modifier,
-    compact: Boolean = false,
 ) {
     val context = LocalContext.current
     var email by remember { mutableStateOf("") }
@@ -471,15 +468,6 @@ fun AccountEmailLoginContent(
     )
 
     Column(modifier = modifier) {
-        if (!compact) {
-            Text(
-                text = context.getString(R.string.account_login_subtitle),
-                style = MaterialTheme.typography.bodyLarge,
-                color = MutedLavender,
-            )
-            Spacer(modifier = Modifier.height(16.dp))
-        }
-
         AuthPrivacyConsentRow(
             checked = agreePrivacy,
             onCheckedChange = { agreePrivacy = it },

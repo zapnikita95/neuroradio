@@ -311,11 +311,9 @@
     <string name="settings_auth_telegram_hint">Tap Telegram — button appears in app, then Accept or Decline.</string>
     <string name="settings_auth_telegram_not_configured">Telegram not configured on server (TELEGRAM_WIDGET_BASE_URL)</string>
     <string name="account_login_title">Sign in</string>
-    <string name="account_login_subtitle">Your first week includes full access on this device. Sign in to sync history and settings across phones — or continue without an account.</string>
     <string name="account_login_skip">Continue without signing in</string>
-    <string name="account_login_trial_hint">The trial week works without sign-in, but history stays on this phone only.</string>
     <string name="account_login_help_title">Why sign in?</string>
-    <string name="account_login_help_body">Signed-in history syncs across devices. Likes, dislikes, and persona prefs are remembered. Sign-in is optional — the first full-access week starts without registration.</string>
+    <string name="account_login_help_body">Story history and settings sync across devices. Likes, dislikes, and narrator preferences are saved. Signing in is optional.</string>
     <string name="account_login_help_ok">Got it</string>
     <string name="nav_account">Account</string>
     <string name="billing_tab">Billing</string>

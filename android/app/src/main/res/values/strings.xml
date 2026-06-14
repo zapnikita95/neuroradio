@@ -326,11 +326,9 @@
     <string name="settings_auth_telegram_hint">Нажмите Telegram — в приложении появится кнопка, затем «Принять» или «Отклонить».</string>
     <string name="settings_auth_telegram_not_configured">Telegram не настроен на сервере (TELEGRAM_WIDGET_BASE_URL)</string>
     <string name="account_login_title">Вход в аккаунт</string>
-    <string name="account_login_subtitle">Первая неделя — полный доступ на этом устройстве (вход или «Пропустить»). Войдите, чтобы сохранять историю и настройки на других телефонах.</string>
     <string name="account_login_skip">Продолжить без входа</string>
-    <string name="account_login_trial_hint">Без входа пробная неделя тоже доступна, но история останется только на этом устройстве.</string>
     <string name="account_login_help_title">Зачем входить?</string>
-    <string name="account_login_help_body">При авторизации сохраняется история рассказов — её можно открыть на других устройствах. Запоминаются ваши лайки, дизлайки и предпочтения по амплуа. Вход не обязателен: первая неделя полного доступа начинается и без регистрации.</string>
+    <string name="account_login_help_body">История рассказов и настройки синхронизируются между устройствами. Сохраняются лайки, дизлайки и предпочтения по амплуа. Вход не обязателен.</string>
     <string name="account_login_help_ok">Понятно</string>
     <string name="nav_account">Аккаунт</string>
     <string name="billing_tab">Оплата</string>
