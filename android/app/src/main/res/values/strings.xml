@@ -14,6 +14,8 @@
     <string name="fact_hint_action_tell">Рассказать</string>
 
     <string name="home_title">Эфир AI</string>
+    <string name="brand_title_prefix">Эфир </string>
+    <string name="brand_title_accent">AI</string>
     <string name="settings_title">Настройки</string>
     <string name="history_title">История</string>
     <string name="history_tab_stories">Рассказы</string>

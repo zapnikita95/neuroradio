@@ -40,7 +40,7 @@ struct OnboardingView: View {
 
     private var headerSlot: some View {
         VStack(spacing: 10) {
-            BrandTitle(fontSize: step == 0 ? 28 : 24)
+            BrandTitle(fontSize: step == 0 ? 28 : 24, lang: settings.resolvedLanguage)
 
             if step == 0 {
                 Text("Нейро-ведущий для Spotify и Apple Music")

@@ -132,7 +132,7 @@ extension AppStrings {
 
     static func offlinePackReadyHint(_ lang: ResolvedAppLanguage) -> String {
         lang == .en
-            ? "When a pack track plays, Efir tells the saved story offline."
+            ? "When a pack track plays, Broadcast AI tells the saved story offline."
             : OfflinePack.readyHint
     }
 

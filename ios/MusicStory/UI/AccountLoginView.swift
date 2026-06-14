@@ -371,13 +371,14 @@ struct TelegramPaperPlane: Shape {
 
 struct AccountLoginView: View {
     @Environment(\.dismiss) private var dismiss
+    @EnvironmentObject private var settings: SettingsStore
 
     var body: some View {
         MusicStoryBackground {
             VStack(spacing: 0) {
                 ScrollView {
                     VStack(spacing: 20) {
-                        BrandTitle(fontSize: 18)
+                        BrandTitle(fontSize: 18, lang: settings.resolvedLanguage)
                         Text("Вход в аккаунт")
                             .font(.title.bold())
                             .foregroundStyle(AppTheme.creamText)

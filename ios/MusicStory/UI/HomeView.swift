@@ -107,7 +107,7 @@ struct HomeView: View {
 
     private var topBar: some View {
         HStack {
-            BrandTitle()
+            BrandTitle(lang: lang)
             Spacer()
             Button { showAccount = true } label: {
                 Image(systemName: "person.crop.circle")

@@ -51,7 +51,7 @@ async function icon512() {
   console.log('icon-512.png');
 }
 
-async function featureGraphic() {
+async function featureGraphic(locale = 'ru') {
   const w = 1024;
   const h = 500;
   const svg = `<svg width="${w}" height="${h}" xmlns="http://www.w3.org/2000/svg">
@@ -67,20 +67,28 @@ async function featureGraphic() {
   </svg>`;
   const bg = await sharp(Buffer.from(svg)).png().toBuffer();
   const logo = await roundLogoPng(await sharp(ICON).png().toBuffer(), 220);
+  const en = locale === 'en';
+  const titlePrefix = en ? 'Broadcast' : 'Эфир';
+  const titlePrefixX = en ? 0 : 0;
+  const titleAiX = en ? 248 : 130;
+  const tagline = en
+    ? 'Neural radio host for your music'
+    : 'Нейро-радиоведущий о вашей музыке';
   const titleSvg = Buffer.from(`<svg width="700" height="120" xmlns="http://www.w3.org/2000/svg">
-    <text x="0" y="52" font-family="Arial, Helvetica, sans-serif" font-weight="700" font-size="48" fill="#f3eefb">Эфир</text>
-    <text x="130" y="52" font-family="Arial, Helvetica, sans-serif" font-weight="700" font-size="48" fill="#ff5da2">AI</text>
-    <text x="0" y="100" font-family="Arial, Helvetica, sans-serif" font-weight="500" font-size="28" fill="#a99fc4">Нейро-радиоведущий о вашей музыке</text>
+    <text x="${titlePrefixX}" y="52" font-family="Arial, Helvetica, sans-serif" font-weight="700" font-size="48" fill="#f3eefb">${titlePrefix}</text>
+    <text x="${titleAiX}" y="52" font-family="Arial, Helvetica, sans-serif" font-weight="700" font-size="48" fill="#ff5da2">AI</text>
+    <text x="0" y="100" font-family="Arial, Helvetica, sans-serif" font-weight="500" font-size="28" fill="#a99fc4">${tagline}</text>
   </svg>`);
   const title = await sharp(titleSvg).png().toBuffer();
+  const outName = en ? 'feature-graphic-en-1024x500.png' : 'feature-graphic-1024x500.png';
   await sharp(bg)
     .composite([
       { input: logo, left: 80, top: Math.round((h - 220) / 2) },
       { input: title, left: 340, top: Math.round((h - 120) / 2) },
     ])
     .png()
-    .toFile(path.join(OUT, 'feature-graphic-1024x500.png'));
-  console.log('feature-graphic-1024x500.png');
+    .toFile(path.join(OUT, outName));
+  console.log(outName);
 }
 
 async function promoPhone() {
@@ -97,6 +105,7 @@ async function promoPhone() {
 }
 
 await icon512();
-await featureGraphic();
+await featureGraphic('ru');
+await featureGraphic('en');
 await promoPhone();
 console.log('Готово → play-store/graphics/');

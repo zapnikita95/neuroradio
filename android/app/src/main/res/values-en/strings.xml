@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">Efir AI</string>
-    <string name="notification_listener_label">Efir AI — media monitoring</string>
+    <string name="app_name">Broadcast AI</string>
+    <string name="notification_listener_label">Broadcast AI — media monitoring</string>
     <string name="channel_monitor_name">Music monitoring</string>
     <string name="channel_monitor_description">Background tracking for Spotify and Yandex Music</string>
     <string name="channel_fact_hint_name">Fact hints</string>
@@ -11,7 +11,9 @@
     <string name="fact_hint_notification_title">%1$s</string>
     <string name="fact_hint_notification_body">There is an interesting fact about %1$s. Want to hear it?</string>
     <string name="fact_hint_action_tell">Tell story</string>
-    <string name="home_title">Efir AI</string>
+    <string name="home_title">Broadcast AI</string>
+    <string name="brand_title_prefix">Broadcast </string>
+    <string name="brand_title_accent">AI</string>
     <string name="settings_title">Settings</string>
     <string name="history_title">History</string>
     <string name="history_tab_stories">Stories</string>
@@ -31,19 +33,19 @@
     <string name="onboarding_apk_faq_body">If you installed from the website, not the store, Android may block notification access.
 
 Once:
-1. Settings → Apps → Efir AI
+1. Settings → Apps → Broadcast AI
 2. ⋮ → «Allow restricted settings»
-3. Special access → Notification access → enable «Efir AI — media monitoring»</string>
+3. Special access → Notification access → enable «Broadcast AI — media monitoring»</string>
     <string name="onboarding_open_app_settings">Open app info</string>
-    <string name="onboarding_description">Efir AI reads track metadata from Spotify and Yandex Music via notification access. Without it the app cannot see what is playing.</string>
+    <string name="onboarding_description">Broadcast AI reads track metadata from Spotify and Yandex Music via notification access. Without it the app cannot see what is playing.</string>
     <string name="onboarding_steps">1. If you used APK — follow the block above first.
 2. Tap «Open notification access» below.
-3. Enable «Efir AI — media monitoring».
+3. Enable «Broadcast AI — media monitoring».
 4. Return here and tap «Check and continue».</string>
     <string name="onboarding_open_settings">Open notification access</string>
     <string name="onboarding_check_access">Check and continue</string>
-    <string name="onboarding_not_granted_yet">Enable «Efir AI — media monitoring» first. For APK installs, allow restricted settings in app info.</string>
-    <string name="home_tour_welcome_title">Welcome to Efir AI</string>
+    <string name="onboarding_not_granted_yet">Enable «Broadcast AI — media monitoring» first. For APK installs, allow restricted settings in app info.</string>
+    <string name="home_tour_welcome_title">Welcome to Broadcast AI</string>
     <string name="home_tour_welcome_body">First week — full access: Yandex SpeechKit (or ElevenLabs in English), best models, offline facts. Then — Basic with Edge TTS; Extended by subscription. Stories are voiced in your chosen persona — every broadcast is unique.</string>
     <string name="home_tour_track_title">Now playing</string>
     <string name="home_tour_track_body">When you play a track in Spotify or Yandex Music, it shows here — title, artist, and source.</string>
@@ -162,7 +164,7 @@ Once:
     <string name="settings_offline_pack_progress">Collected %1$d of %2$d</string>
     <string name="settings_offline_pack_generating">Preparing stories and facts… %1$d of %2$d</string>
     <string name="settings_offline_pack_ready">Ready! %1$d stories on device — listen offline.</string>
-    <string name="settings_offline_pack_ready_hint">When a pack track plays, Efir tells the saved story offline.</string>
+    <string name="settings_offline_pack_ready_hint">When a pack track plays, Broadcast AI tells the saved story offline.</string>
     <string name="channel_offline_pack_name">Offline pack</string>
     <string name="channel_offline_pack_description">Track collection and story preparation progress</string>
     <string name="offline_pack_collecting_title">Collecting tracks for offline pack</string>

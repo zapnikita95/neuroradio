@@ -46,10 +46,11 @@ struct MusicStoryBackground<Content: View>: View {
 
 struct BrandTitle: View {
     var fontSize: CGFloat = 22
+    var lang: ResolvedAppLanguage = .RU
 
     var body: some View {
         HStack(spacing: 0) {
-            Text("Эфир ")
+            Text(lang == .en ? "Broadcast " : "Эфир ")
                 .font(.system(size: fontSize, weight: .semibold, design: .serif))
                 .foregroundStyle(AppTheme.creamText)
             Text("AI")

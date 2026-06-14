@@ -10,6 +10,8 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.TextUnit
+import androidx.compose.ui.res.stringResource
+import com.musicstory.app.R
 import com.musicstory.app.ui.theme.AccentViolet
 import com.musicstory.app.ui.theme.CreamText
 
@@ -29,7 +31,7 @@ fun BrandTitle(
                     color = CreamText,
                 ),
             ) {
-                append("Эфир ")
+                append(stringResource(R.string.brand_title_prefix))
             }
             withStyle(
                 SpanStyle(
@@ -39,7 +41,7 @@ fun BrandTitle(
                     letterSpacing = MaterialTheme.typography.labelLarge.letterSpacing,
                 ),
             ) {
-                append("AI")
+                append(stringResource(R.string.brand_title_accent))
             }
         },
         style = MaterialTheme.typography.headlineMedium.copy(
