@@ -47,6 +47,7 @@ import androidx.lifecycle.LifecycleEventObserver
 import com.musicstory.app.MusicStoryApp
 import com.musicstory.app.R
 import com.musicstory.app.service.MediaNotificationListener
+import com.musicstory.app.ui.components.BrandTitle
 import com.musicstory.app.ui.components.GlassCard
 import com.musicstory.app.ui.components.MusicStoryBackground
 import com.musicstory.app.ui.components.PrimaryStoryButton
@@ -119,11 +120,35 @@ fun OnboardingScreen(
 
                 Spacer(modifier = Modifier.height(20.dp))
 
+                BrandTitle()
+
+                Spacer(modifier = Modifier.height(12.dp))
+
                 Text(
-                    text = context.getString(R.string.onboarding_title),
-                    style = MaterialTheme.typography.headlineMedium,
+                    text = context.getString(R.string.onboarding_welcome_headline),
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold,
                     textAlign = TextAlign.Center,
                     color = CreamText,
+                )
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                Text(
+                    text = context.getString(R.string.onboarding_welcome_subtitle),
+                    style = MaterialTheme.typography.bodyMedium,
+                    textAlign = TextAlign.Center,
+                    color = MutedLavender,
+                )
+
+                Spacer(modifier = Modifier.height(20.dp))
+
+                Text(
+                    text = context.getString(R.string.onboarding_title),
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.SemiBold,
+                    textAlign = TextAlign.Center,
+                    color = GoldBright,
                 )
 
                 Spacer(modifier = Modifier.height(16.dp))

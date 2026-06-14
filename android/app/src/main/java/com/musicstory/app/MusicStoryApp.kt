@@ -30,6 +30,7 @@ import androidx.work.WorkManager
 import com.musicstory.app.domain.WelcomeTrialGate
 import com.musicstory.app.worker.AuthRefreshWorker
 import com.musicstory.app.util.StoryLog
+import com.musicstory.app.util.LocaleHelper
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -157,6 +158,14 @@ class MusicStoryApp : Application() {
             scope = appScope,
         )
         scheduleBackgroundAuthRefresh()
+        appScope.launch {
+            runCatching {
+                LocaleHelper.persistLanguageForBoot(
+                    this@MusicStoryApp,
+                    settingsDataStore.appLanguage.first(),
+                )
+            }
+        }
         prefetchBackendAuth()
         WelcomeTrialGate.ensureDeviceWelcomeTrial(this)
         prefetchAccountHistory()

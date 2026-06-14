@@ -63,6 +63,38 @@ struct AppL10n {
     var storyPlaying: String { en ? "Story playing…" : "История играет…" }
     var stopStory: String { en ? "Stop the story" : "Остановить историю" }
 
+    // MARK: - Onboarding
+
+    var onboardingWelcomeHeadline: String {
+        en ? "AI radio host for Spotify and Apple Music" : "Нейроведущий для Spotify и Apple Music"
+    }
+    var onboardingWelcomeSubtitle: String {
+        en
+            ? "Voice stories about the track that is playing — without leaving your music app."
+            : "На iPhone — Spotify, Apple Music и ShazamKit. Истории голосом, пока играет ваш трек."
+    }
+    var onboardingNotificationsTitle: String { en ? "Notifications" : "Уведомления" }
+    var onboardingNotificationsSubtitle: String {
+        en ? "Tell the story button in track alerts" : "Кнопка «Рассказать историю» на push"
+    }
+    var onboardingSpotifyTitle: String { "Spotify" }
+    var onboardingSpotifySubtitle: String {
+        en ? "Optional — for automatic mode" : "Опционально — для авто-режима"
+    }
+    var onboardingAccountTitle: String { en ? "Account" : "Аккаунт" }
+    var onboardingAccountSubtitle: String {
+        en ? "Telegram or email — history in the cloud" : "Telegram или email — история в облаке"
+    }
+    var onboardingAllowNotifications: String { en ? "Allow notifications" : "Разрешить уведомления" }
+    var onboardingSpotifyHint: String {
+        en
+            ? "Start a track in Spotify, then confirm access — the app will return on its own."
+            : "В Spotify включите трек, затем подтвердите доступ — приложение вернётся само."
+    }
+    var onboardingSpotifyConnected: String { en ? "Spotify connected" : "Spotify подключён" }
+    var onboardingSkip: String { en ? "Skip" : "Пропустить" }
+    var onboardingStartWithoutLogin: String { en ? "Continue without signing in" : "Начать без входа" }
+
     func tracksUntil(_ count: Int) -> String {
         let n = max(0, count)
         guard en else { return UserFacingError.tracksUntilLabel(n) }

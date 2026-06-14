@@ -32,6 +32,8 @@
     <string name="nav_settings">Настройки</string>
 
     <string name="onboarding_title">Доступ к уведомлениям</string>
+    <string name="onboarding_welcome_headline">Нейроведущий для Spotify и Яндекс Музыки</string>
+    <string name="onboarding_welcome_subtitle">Истории голосом, пока играет ваш трек — без смены плеера.</string>
     <string name="onboarding_apk_faq_title">Установка из APK? Сначала снимите ограничение</string>
     <string name="onboarding_apk_faq_body">Если скачали приложение с сайта, а не из магазина, Android может заблокировать доступ к уведомлениям и показать «Доступ для приложения запрещён».\n\nСделайте один раз:\n1. Настройки → Приложения → Эфир AI\n2. ⋮ (три точки справа сверху) → «Разрешить ограниченные настройки»\n3. Потом: Особые права → Доступ к уведомлениям → включите «Эфир AI — мониторинг медиа»\n\nНа Xiaomi, Samsung, Honor путь может чуть отличаться, но порядок тот же: сначала снять ограничение в карточке приложения, потом выдать доступ к уведомлениям.</string>
     <string name="onboarding_open_app_settings">Открыть карточку приложения</string>

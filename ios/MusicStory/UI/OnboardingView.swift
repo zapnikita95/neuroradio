@@ -6,6 +6,8 @@ struct OnboardingView: View {
 
     @State private var step = 0
 
+    private var l10n: AppL10n { AppL10n(lang: settings.resolvedLanguage) }
+
     var body: some View {
         MusicStoryBackground {
             GeometryReader { geo in
@@ -43,12 +45,12 @@ struct OnboardingView: View {
             BrandTitle(fontSize: step == 0 ? 28 : 24, lang: settings.resolvedLanguage)
 
             if step == 0 {
-                Text("Нейро-ведущий для Spotify и Apple Music")
+                Text(l10n.onboardingWelcomeHeadline)
                     .font(.title3.weight(.semibold))
                     .foregroundStyle(AppTheme.creamText)
                     .multilineTextAlignment(.center)
 
-                Text("На iPhone — Spotify, Apple Music и ShazamKit. Истории голосом, пока играет ваш трек.")
+                Text(l10n.onboardingWelcomeSubtitle)
                     .font(.subheadline)
                     .multilineTextAlignment(.center)
                     .foregroundStyle(AppTheme.mutedLavender)
@@ -72,20 +74,20 @@ struct OnboardingView: View {
                 onboardingRow(
                     targetStep: 0,
                     done: step > 0,
-                    title: "Уведомления",
-                    subtitle: "Кнопка «Рассказать историю» на push"
+                    title: l10n.onboardingNotificationsTitle,
+                    subtitle: l10n.onboardingNotificationsSubtitle
                 )
                 onboardingRow(
                     targetStep: 1,
                     done: step > 1,
-                    title: "Spotify",
-                    subtitle: "Опционально — для авто-режима"
+                    title: l10n.onboardingSpotifyTitle,
+                    subtitle: l10n.onboardingSpotifySubtitle
                 )
                 onboardingRow(
                     targetStep: 2,
                     done: step > 2,
-                    title: "Аккаунт",
-                    subtitle: "Telegram или email — история в облаке"
+                    title: l10n.onboardingAccountTitle,
+                    subtitle: l10n.onboardingAccountSubtitle
                 )
             }
         }
@@ -95,7 +97,7 @@ struct OnboardingView: View {
     private var bottomActions: some View {
         switch step {
         case 0:
-            PrimaryStoryButton(title: "Разрешить уведомления") {
+            PrimaryStoryButton(title: l10n.onboardingAllowNotifications) {
                 Task {
                     _ = await NotificationService.shared.requestAuthorization()
                     step = 1
@@ -103,7 +105,7 @@ struct OnboardingView: View {
             }
         case 1:
             VStack(spacing: 10) {
-                Text("В Spotify включите трек, затем подтвердите доступ — приложение вернётся само.")
+                Text(l10n.onboardingSpotifyHint)
                     .font(.caption)
                     .foregroundStyle(AppTheme.mutedLavender)
                     .multilineTextAlignment(.center)
@@ -116,7 +118,11 @@ struct OnboardingView: View {
                         .multilineTextAlignment(.center)
                 }
 
-                PrimaryStoryButton(title: nowPlaying.spotify.isConnected ? "Spotify подключён" : "Подключить Spotify") {
+                PrimaryStoryButton(
+                    title: nowPlaying.spotify.isConnected
+                        ? l10n.onboardingSpotifyConnected
+                        : l10n.connectSpotify
+                ) {
                     if nowPlaying.spotify.isConnected {
                         step = 2
                     } else {
@@ -129,7 +135,7 @@ struct OnboardingView: View {
                     ProgressView().tint(AppTheme.accentViolet)
                 }
 
-                Button("Пропустить") { step = 2 }
+                Button(l10n.onboardingSkip) { step = 2 }
                     .foregroundStyle(AppTheme.mutedLavender)
             }
             .onChange(of: nowPlaying.spotify.isConnected) { _, connected in
@@ -139,7 +145,7 @@ struct OnboardingView: View {
             AccountAuthPanel(
                 onSuccess: { settings.onboardingComplete = true },
                 onSkip: { settings.onboardingComplete = true },
-                skipTitle: "Начать без входа"
+                skipTitle: l10n.onboardingStartWithoutLogin
             )
         }
     }
