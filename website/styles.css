@@ -252,12 +252,28 @@ main { max-width: 100%; overflow-x: clip; }
 /* ---------- personas ---------- */
 .section-personas { max-width: 100%; padding-left: 0; padding-right: 0; overflow-x: clip; }
 .section-personas .section-head { padding: 0 16px; }
-.persona-rail-wrap { position: relative; max-width: min(var(--maxw), 100%); margin: 0 auto; overflow: hidden; }
-.persona-rail { display: flex; gap: 22px; overflow-x: auto; scroll-snap-type: x mandatory; padding: 10px clamp(16px, 4vw, 32px) 28px; scrollbar-width: none; cursor: grab; user-select: none; -webkit-user-select: none; }
+.persona-rail-wrap {
+  position: relative; max-width: min(var(--maxw), 100%); margin: 0 auto; overflow: hidden;
+  --persona-pad: clamp(16px, 4vw, 32px);
+  --persona-card-w: min(86vw, 380px);
+  padding-inline: clamp(40px, 4.5vw, 52px);
+}
+@media (min-width: 1180px) {
+  .persona-rail-wrap {
+    --persona-card-w: min(380px, calc((100% - 2 * var(--persona-pad) - 44px) / 3));
+  }
+}
+.persona-rail {
+  display: flex; gap: 22px; overflow-x: auto; scroll-snap-type: x mandatory;
+  padding: 10px var(--persona-pad) 28px;
+  padding-inline-end: max(var(--persona-pad), calc(100% - var(--persona-card-w) - var(--persona-pad)));
+  scroll-padding-inline: var(--persona-pad);
+  scrollbar-width: none; cursor: grab; user-select: none; -webkit-user-select: none;
+}
 .persona-rail.is-dragging { cursor: grabbing; scroll-snap-type: none; scroll-behavior: auto; }
 .persona-rail.is-dragging .persona-card { pointer-events: none; }
 .persona-rail::-webkit-scrollbar { display: none; }
-.persona-card { scroll-snap-align: center; flex: 0 0 min(86vw, 380px); border-radius: var(--r-lg); overflow: hidden; position: relative;
+.persona-card { scroll-snap-align: center; flex: 0 0 var(--persona-card-w); border-radius: var(--r-lg); overflow: hidden; position: relative;
   border: 1px solid var(--line-strong); background: var(--panel-solid); min-height: 520px; display: flex; flex-direction: column;
   transition: transform .4s var(--ease), box-shadow .4s; }
 .persona-card:hover { transform: translateY(-6px); box-shadow: 0 40px 80px -40px rgba(0,0,0,.8), var(--glow); }
@@ -635,6 +651,7 @@ main { max-width: 100%; overflow-x: clip; }
   .plan-price .amount { font-size: clamp(36px, 12vw, 52px); }
   .btn-lg { white-space: normal; text-align: center; }
   .rail-btn { display: none; }
+  .persona-rail-wrap { padding-inline: 0; }
 }
 
 /* ---------- legal / docs pages ---------- */
