@@ -239,11 +239,7 @@ class MediaControllerManager(
 
     private fun hasValidMetadata(controller: MediaController): Boolean {
         val metadata = controller.metadata ?: return false
-        val artist = metadata.getString(android.media.MediaMetadata.METADATA_KEY_ARTIST)
-            ?: metadata.getString(android.media.MediaMetadata.METADATA_KEY_ALBUM_ARTIST)
-            ?: ""
-        val title = metadata.getString(android.media.MediaMetadata.METADATA_KEY_TITLE) ?: ""
-        return artist.isNotBlank() && title.isNotBlank() && artist != title
+        return MediaTrackParser.fromMediaMetadata(metadata, controller.packageName)?.isValid() == true
     }
 
     private fun isPlaying(controller: MediaController): Boolean {
@@ -265,26 +261,15 @@ class MediaControllerManager(
         }
 
         _activePackage.value = controller.packageName
-        val metadata = controller.metadata
-        val artist = metadata?.getString(android.media.MediaMetadata.METADATA_KEY_ARTIST)
-            ?: metadata?.getString(android.media.MediaMetadata.METADATA_KEY_ALBUM_ARTIST)
-            ?: ""
-        val title = metadata?.getString(android.media.MediaMetadata.METADATA_KEY_TITLE) ?: ""
-        val album = metadata?.getString(android.media.MediaMetadata.METADATA_KEY_ALBUM)
-        val duration = metadata?.getLong(android.media.MediaMetadata.METADATA_KEY_DURATION) ?: 0L
+        val parsed = controller.metadata?.let {
+            MediaTrackParser.fromMediaMetadata(it, controller.packageName)
+        }
 
-        if (artist.isNotBlank() && title.isNotBlank()) {
-            val next = TrackInfo(
-                artist = artist,
-                title = title,
-                album = album,
-                packageName = controller.packageName,
-                durationMs = duration,
-            )
-            if (_nowPlaying.value?.displayKey != next.displayKey) {
+        if (parsed != null && parsed.isValid()) {
+            if (_nowPlaying.value?.displayKey != parsed.displayKey) {
                 sessionTrackUpdatedAtMs = System.currentTimeMillis()
             }
-            _nowPlaying.value = next
+            _nowPlaying.value = parsed
         }
 
         val state = controller.playbackState?.state

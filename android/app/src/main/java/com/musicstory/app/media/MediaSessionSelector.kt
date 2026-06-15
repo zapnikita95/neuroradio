@@ -2,7 +2,7 @@ package com.musicstory.app.media
 
 object MediaSessionSelector {
 
-    /** Music apps we track — Yandex first; Spotify last (empty ghost sessions). */
+    /** Known music apps — higher priority when several sessions are active. */
     val PREFERRED_PACKAGES = listOf(
         "ru.yandex.music",
         "com.yandex.music",
@@ -11,13 +11,27 @@ object MediaSessionSelector {
         "com.spotify.music",
     )
 
-    /** Video / non-music — never bind or parse notifications. */
+    /** Video / streaming — never bind or parse notifications. */
     val BLOCKED_PACKAGES = setOf(
         "com.google.android.youtube",
         "com.google.android.apps.youtube",
         "com.google.android.youtube.tv",
         "com.vanced.android.youtube",
         "app.revanced.android.youtube",
+        "com.netflix.mediaclient",
+        "com.netflix.ninja",
+        "tv.twitch.android.app",
+        "org.videolan.vlc",
+        "org.videolan.vlc.betav7neon",
+        "com.mxtech.videoplayer.ad",
+        "com.mxtech.videoplayer.pro",
+        "com.amazon.avod.thirdpartyclient",
+        "com.disney.disneyplus",
+        "com.wbd.stream",
+        "ru.rutube.app",
+        "com.vk.vkvideo",
+        "com.google.android.videos",
+        "com.google.android.apps.tv",
     )
 
     private val PREFERRED_PREFIXES = listOf(
@@ -25,16 +39,27 @@ object MediaSessionSelector {
         "com.yandex.music",
     )
 
+    private val BLOCKED_PREFIXES = listOf(
+        "com.google.android.youtube",
+    )
+
+    /** Any non-blocked media app (NewPipe, local players, etc.) — not only Spotify/Yandex. */
     fun isAllowedMusicPackage(packageName: String?): Boolean {
         if (packageName.isNullOrBlank()) return false
-        return !isBlockedPackage(packageName) && isPreferredPackage(packageName)
+        if (packageName == "com.musicstory.app") return false
+        return !isBlockedPackage(packageName)
     }
 
     fun isBlockedPackage(packageName: String?): Boolean {
         if (packageName.isNullOrBlank()) return false
         if (BLOCKED_PACKAGES.contains(packageName)) return true
-        return packageName.startsWith("com.google.android.youtube") &&
-            !packageName.contains("youtube.music")
+        if (BLOCKED_PREFIXES.any { prefix ->
+                packageName.startsWith(prefix) && !packageName.contains("youtube.music")
+            }
+        ) {
+            return true
+        }
+        return false
     }
 
     fun isPreferredPackage(packageName: String?): Boolean {
@@ -47,12 +72,22 @@ object MediaSessionSelector {
     fun priority(packageName: String?): Int {
         if (packageName.isNullOrBlank()) return Int.MAX_VALUE
         val index = PREFERRED_PACKAGES.indexOf(packageName)
-        return if (index >= 0) index else Int.MAX_VALUE - 1
+        return when {
+            index >= 0 -> index
+            isAllowedMusicPackage(packageName) -> PREFERRED_PACKAGES.size
+            else -> Int.MAX_VALUE
+        }
     }
 
     fun selectBestPackage(candidates: Collection<String>): String? {
         return candidates
-            .filter { isPreferredPackage(it) }
+            .filter { isAllowedMusicPackage(it) }
             .minByOrNull { priority(it) }
+    }
+
+    fun shouldParseNotification(packageName: String, extras: android.os.Bundle): Boolean {
+        if (!isAllowedMusicPackage(packageName)) return false
+        if (isPreferredPackage(packageName)) return true
+        return MediaTrackParser.looksLikeMediaNotification(extras)
     }
 }

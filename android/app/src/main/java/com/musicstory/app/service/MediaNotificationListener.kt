@@ -6,6 +6,7 @@ import android.service.notification.StatusBarNotification
 import com.musicstory.app.MusicStoryApp
 import com.musicstory.app.data.model.TrackInfo
 import com.musicstory.app.media.MediaSessionSelector
+import com.musicstory.app.media.MediaTrackParser
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -38,26 +39,25 @@ class MediaNotificationListener : NotificationListenerService() {
     override fun onNotificationPosted(sbn: StatusBarNotification?) {
         sbn ?: return
         if (MediaSessionSelector.isBlockedPackage(sbn.packageName)) return
-        if (MediaSessionSelector.isPreferredPackage(sbn.packageName)) {
-            parseNotificationTrack(sbn)?.let { track ->
-                if (notificationTrack.value?.displayKey != track.displayKey) {
-                    lastNotificationUpdateMs = System.currentTimeMillis()
-                }
-                notificationTrack.value = track
-                (application as? MusicStoryApp)?.mediaControllerManager?.syncEffectiveNowPlaying()
+        val extras = sbn.notification.extras
+        if (!MediaSessionSelector.shouldParseNotification(sbn.packageName, extras)) return
+        parseNotificationTrack(sbn)?.let { track ->
+            if (notificationTrack.value?.displayKey != track.displayKey) {
+                lastNotificationUpdateMs = System.currentTimeMillis()
             }
-            val app = application as? MusicStoryApp
-            app?.monitorLifecycle?.tryWakeFromMusicApp(sbn.packageName)
-            refreshSessionsDebounced()
+            notificationTrack.value = track
+            (application as? MusicStoryApp)?.mediaControllerManager?.syncEffectiveNowPlaying()
         }
+        val app = application as? MusicStoryApp
+        app?.monitorLifecycle?.tryWakeFromMusicApp(sbn.packageName)
+        refreshSessionsDebounced()
     }
 
     override fun onNotificationRemoved(sbn: StatusBarNotification?) {
         sbn ?: return
         if (MediaSessionSelector.isBlockedPackage(sbn.packageName)) return
-        if (MediaSessionSelector.isPreferredPackage(sbn.packageName)) {
-            refreshSessionsDebounced()
-        }
+        if (!MediaSessionSelector.isAllowedMusicPackage(sbn.packageName)) return
+        refreshSessionsDebounced()
     }
 
     private fun refreshSessionsDebounced() {
@@ -76,23 +76,8 @@ class MediaNotificationListener : NotificationListenerService() {
     }
 
     private fun parseNotificationTrack(sbn: StatusBarNotification): TrackInfo? {
-        val extras = sbn.notification.extras
-        val title = extras.getCharSequence(android.app.Notification.EXTRA_TITLE)?.toString()
-        val text = extras.getCharSequence(android.app.Notification.EXTRA_TEXT)?.toString()
-        val subText = extras.getCharSequence(android.app.Notification.EXTRA_SUB_TEXT)?.toString()
-
-        val trackTitle = title?.takeIf { it.isNotBlank() } ?: return null
-        val artist = text?.takeIf { it.isNotBlank() }
-            ?: subText?.takeIf { it.isNotBlank() }
-            ?: return null
-
-        if (artist == trackTitle) return null
-
-        return TrackInfo(
-            artist = artist,
-            title = trackTitle,
-            packageName = sbn.packageName,
-        )
+        return MediaTrackParser.fromNotificationExtras(sbn.notification.extras, sbn.packageName)
+            ?.takeIf { it.isValid() }
     }
 
     companion object {

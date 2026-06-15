@@ -8,6 +8,7 @@ fun Context.streamingSourceLabel(packageName: String?): String? {
     return when {
         packageName.contains("spotify", ignoreCase = true) -> getString(R.string.source_spotify)
         packageName.contains("yandex", ignoreCase = true) -> getString(R.string.source_yandex_music)
+        packageName.contains("newpipe", ignoreCase = true) -> "NewPipe"
         else -> packageName.substringAfterLast('.').takeIf { it.isNotBlank() }
     }
 }
