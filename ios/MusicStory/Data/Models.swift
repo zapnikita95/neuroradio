@@ -50,6 +50,8 @@ struct StoryResponse: Decodable, Sendable {
     let seedScope: String?
     let seedInterestScore: Int?
     let seedInterestRating: Int?
+    let ttsTranscript: String?
+    let ttsProvider: String?
 
     enum CodingKeys: String, CodingKey {
         case artist
@@ -69,6 +71,8 @@ struct StoryResponse: Decodable, Sendable {
         case seedScope = "seed_scope"
         case seedInterestScore = "seed_interest_score"
         case seedInterestRating = "seed_interest_rating"
+        case ttsTranscript = "tts_transcript"
+        case ttsProvider = "tts_provider"
     }
 
     init(
@@ -88,7 +92,9 @@ struct StoryResponse: Decodable, Sendable {
         seedFact: String? = nil,
         seedScope: String? = nil,
         seedInterestScore: Int? = nil,
-        seedInterestRating: Int? = nil
+        seedInterestRating: Int? = nil,
+        ttsTranscript: String? = nil,
+        ttsProvider: String? = nil
     ) {
         self.artist = artist
         self.title = title
@@ -107,6 +113,8 @@ struct StoryResponse: Decodable, Sendable {
         self.seedScope = seedScope
         self.seedInterestScore = seedInterestScore
         self.seedInterestRating = seedInterestRating
+        self.ttsTranscript = ttsTranscript
+        self.ttsProvider = ttsProvider
     }
 
     init(from decoder: Decoder) throws {
@@ -128,6 +136,17 @@ struct StoryResponse: Decodable, Sendable {
         seedScope = try container.decodeIfPresent(String.self, forKey: .seedScope)
         seedInterestScore = try container.decodeIfPresent(Int.self, forKey: .seedInterestScore)
         seedInterestRating = try container.decodeIfPresent(Int.self, forKey: .seedInterestRating)
+        ttsTranscript = try container.decodeIfPresent(String.self, forKey: .ttsTranscript)
+        ttsProvider = try container.decodeIfPresent(String.self, forKey: .ttsProvider)
+    }
+
+    var displayTranscript: String {
+        let raw = (ttsTranscript?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false)
+            ? ttsTranscript!
+            : script
+        return raw
+            .replacingOccurrences(of: "й+утй+уб", with: "YouTube", options: .caseInsensitive)
+            .replacingOccurrences(of: "ют+уб", with: "YouTube", options: .caseInsensitive)
     }
 }
 

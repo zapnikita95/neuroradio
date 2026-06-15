@@ -17,10 +17,10 @@ struct HomeView: View {
         let voice: String
         if lang == .en && settings.hasPremiumTtsAccess {
             voice = "ElevenLabs"
-        } else if settings.effectiveServerTtsProvider == .edge {
-            voice = settings.edgeVoicePreset.uiLabel(lang)
-        } else {
+        } else if settings.hasPremiumTtsAccess {
             voice = settings.ttsVoice.uiLabel(lang)
+        } else {
+            voice = settings.edgeVoicePreset.uiLabel(lang)
         }
         return "\(narrator) · \(voice)"
     }
@@ -73,9 +73,19 @@ struct HomeView: View {
                     }
                 }
 
-                actionButtons
-                    .padding(.horizontal, 20)
-                    .padding(.bottom, 28)
+                VStack(spacing: 14) {
+                    if orchestrator.uiState.generationPreview.isActive,
+                       !orchestrator.uiState.generationPreview.words.isEmpty {
+                        StoryGenerationPreview(
+                            preview: orchestrator.uiState.generationPreview,
+                            spokenLabel: copy.storySpokenTranscript
+                        )
+                    }
+
+                    actionButtons
+                }
+                .padding(.horizontal, 20)
+                .padding(.bottom, 28)
             }
 
             if let feedback = orchestrator.uiState.pendingFeedback,
@@ -246,6 +256,41 @@ struct HomeView: View {
                 return copy.autoMonitoring
             case .manual:
                 return copy.manualModeStatus
+            }
+        }
+    }
+}
+
+private struct StoryGenerationPreview: View {
+    let preview: GenerationPreviewState
+    let spokenLabel: String
+
+    var body: some View {
+        let words = preview.words
+        let visibleCount = min(preview.visibleWordCount, words.count)
+        let visibleText = words.prefix(visibleCount).joined(separator: " ")
+        Group {
+            if !visibleText.isEmpty {
+                VStack(spacing: 8) {
+                    if preview.isSpokenTranscript {
+                        Text(spokenLabel)
+                            .font(.caption)
+                            .foregroundStyle(AppTheme.mutedLavender)
+                            .frame(maxWidth: .infinity)
+                    }
+                    ScrollView {
+                        Text(visibleText)
+                            .font(.body)
+                            .foregroundStyle(AppTheme.creamText)
+                            .multilineTextAlignment(.center)
+                            .frame(maxWidth: .infinity)
+                    }
+                    .frame(maxHeight: 220)
+                }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 12)
+                .background(AppTheme.surfaceGlass)
+                .clipShape(RoundedRectangle(cornerRadius: 18))
             }
         }
     }

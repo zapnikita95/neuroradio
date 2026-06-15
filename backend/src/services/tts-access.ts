@@ -37,6 +37,7 @@ export function resolveStoryTtsProvider(
   }
 
   if (canUseServerSpeechKit(installId, userTtsCredentials)) {
+    if (normalized === 'edge') return 'auto';
     return normalized ?? 'auto';
   }
 

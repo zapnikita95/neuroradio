@@ -21,6 +21,13 @@ struct PendingStoryFeedback: Equatable {
     let trackKey: String
 }
 
+struct GenerationPreviewState: Equatable {
+    var words: [String] = []
+    var visibleWordCount: Int = 0
+    var isActive: Bool = false
+    var isSpokenTranscript: Bool = false
+}
+
 struct OrchestratorUiState {
     var mode: OrchestratorMode = .auto
     var state: OrchestratorState = .idle
@@ -29,6 +36,7 @@ struct OrchestratorUiState {
     var tracksUntilNext: Int?
     var isMonitoringActive = false
     var pendingFeedback: PendingStoryFeedback?
+    var generationPreview = GenerationPreviewState()
 }
 
 @MainActor
@@ -45,6 +53,7 @@ final class StoryOrchestrator: ObservableObject {
 
     private var playbackSession = 0
     private var isStoryRunning = false
+    private var previewTask: Task<Void, Never>?
     /// Ручной запрос истории из настроек — не сбрасывать UI в onTrackChanged.
     private var explicitManualStoryRequest = false
 
@@ -188,6 +197,7 @@ final class StoryOrchestrator: ObservableObject {
     }
 
     func stopStory() {
+        cancelGenerationPreview()
         playbackSession += 1
         isStoryRunning = false
         uiState.pendingFeedback = nil
@@ -319,6 +329,14 @@ final class StoryOrchestrator: ObservableObject {
             }
 
             uiState.state = .preparingPlayback
+
+            let displayText = response.displayTranscript
+            startGenerationPreview(
+                script: displayText,
+                session: session,
+                isSpokenTranscript: response.ttsTranscript?.isEmpty == false
+            )
+
             var musicPaused = false
             if nowPlaying.canControlPlayback(for: track.source) {
                 nowPlaying.pauseMusic()
@@ -347,6 +365,7 @@ final class StoryOrchestrator: ObservableObject {
                             self.nowPlaying.resumeMusic()
                         }
                         self.isStoryRunning = false
+                        self.cancelGenerationPreview()
                         await self.storyRepository.recordStoryPlaybackComplete(response)
                         let trackKey = track.displayKey
                         let script = response.script
@@ -381,6 +400,7 @@ final class StoryOrchestrator: ObservableObject {
             schedulePlaybackWatchdog(session: session, musicPaused: musicPaused)
 
         case .failure(let error):
+            cancelGenerationPreview()
             isStoryRunning = false
             uiState.errorMessage = error.localizedDescription
             uiState.state = .error
@@ -401,5 +421,79 @@ final class StoryOrchestrator: ObservableObject {
             uiState.errorMessage = copy.playbackRetry
             uiState.state = .error
         }
+    }
+
+    private func cancelGenerationPreview() {
+        previewTask?.cancel()
+        previewTask = nil
+        uiState.generationPreview = GenerationPreviewState()
+    }
+
+    private func startGenerationPreview(script: String, session: Int, isSpokenTranscript: Bool) {
+        let words = script
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .split { $0.isWhitespace }
+            .map(String.init)
+        guard !words.isEmpty else { return }
+
+        previewTask?.cancel()
+        previewTask = Task {
+            let estimatedMs = max(12_000, words.count * 420)
+            let waitStart = Date()
+
+            uiState.generationPreview = GenerationPreviewState(
+                words: words,
+                visibleWordCount: 0,
+                isActive: true,
+                isSpokenTranscript: isSpokenTranscript
+            )
+
+            var lastCount = 0
+            while session == playbackSession {
+                let playerState = storyPlayer.state
+                let progress = storyPlayer.playbackProgress
+                let elapsedMs = Int(Date().timeIntervalSince(waitStart) * 1000)
+
+                let count: Int
+                switch playerState {
+                case .completed:
+                    count = words.count
+                case .playing, .paused:
+                    count = Self.visibleWordsFromPlayback(
+                        wordCount: words.count,
+                        progress: progress,
+                        elapsedMs: elapsedMs,
+                        estimatedDurationMs: estimatedMs
+                    )
+                default:
+                    count = 0
+                }
+
+                if count != lastCount {
+                    lastCount = count
+                    uiState.generationPreview.visibleWordCount = count
+                }
+
+                if playerState == .completed { break }
+                try? await Task.sleep(nanoseconds: 40_000_000)
+            }
+
+            guard session == playbackSession else { return }
+            uiState.generationPreview.visibleWordCount = words.count
+            uiState.generationPreview.isActive = true
+        }
+    }
+
+    private static func visibleWordsFromPlayback(
+        wordCount: Int,
+        progress: Double,
+        elapsedMs: Int,
+        estimatedDurationMs: Int
+    ) -> Int {
+        if progress > 0.01 {
+            return min(wordCount, max(1, Int((Double(wordCount) * progress).rounded(.up))))
+        }
+        let fraction = min(1, Double(elapsedMs) / Double(max(estimatedDurationMs, 1)))
+        return min(wordCount, max(0, Int((Double(wordCount) * fraction).rounded(.up))))
     }
 }

@@ -368,4 +368,12 @@ final class SettingsStore: ObservableObject {
     var effectiveServerTtsProvider: ServerTtsProvider {
         hasPremiumTtsAccess ? serverTtsProvider : .edge
     }
+
+    /// Что уходит в `tts_provider` на BFF — premium не должен слать Edge по ошибке.
+    var storyTtsProviderRequest: String {
+        guard hasPremiumTtsAccess else { return "edge" }
+        if resolvedLanguage == .en { return "auto" }
+        if serverTtsProvider == .edge { return "auto" }
+        return serverTtsProvider.rawValue
+    }
 }

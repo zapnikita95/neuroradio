@@ -218,7 +218,7 @@ enum ServerTtsProvider: String, CaseIterable, Identifiable {
     }
 
     static func fromId(_ id: String?) -> ServerTtsProvider {
-        guard let id, let value = ServerTtsProvider(rawValue: id) else { return .edge }
+        guard let id, let value = ServerTtsProvider(rawValue: id) else { return .yandex }
         return value
     }
 }

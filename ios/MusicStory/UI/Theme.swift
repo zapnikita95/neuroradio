@@ -265,23 +265,38 @@ struct VinylDisc: View {
     var spinning: Bool
     var tonearmOnDisc = false
 
-    private let discSize: CGFloat = 172
-    private let frameSize: CGFloat = 200
+    @State private var armProgress: CGFloat = 1
+
+    private let discSize: CGFloat = 160
+    private var frameSize: CGFloat { discSize * 1.22 }
 
     var body: some View {
         ZStack {
             spinningDiscLayer
-            tonearmLayer
+                .frame(width: discSize, height: discSize)
+
+            Canvas { context, size in
+                drawTonearm(in: &context, size: size, progress: armProgress)
+            }
+            .frame(width: frameSize, height: frameSize)
         }
         .frame(width: frameSize, height: frameSize)
+        .onAppear {
+            armProgress = tonearmOnDisc ? 1 : 0
+        }
+        .onChange(of: tonearmOnDisc) { _, onDisc in
+            withAnimation(.easeInOut(duration: 0.65)) {
+                armProgress = onDisc ? 1 : 0
+            }
+        }
     }
 
     @ViewBuilder
     private var spinningDiscLayer: some View {
         if spinning {
-            TimelineView(.animation(minimumInterval: 1.0 / 30.0)) { context in
+            TimelineView(.animation(minimumInterval: 1.0 / 30.0)) { timeline in
                 discBody
-                    .rotationEffect(discRotation(at: context.date))
+                    .rotationEffect(discRotation(at: timeline.date))
             }
         } else {
             discBody
@@ -293,70 +308,111 @@ struct VinylDisc: View {
             Circle()
                 .fill(
                     RadialGradient(
-                        colors: [Color.black, Color(red: 0.1, green: 0.08, blue: 0.12)],
+                        colors: [Color(red: 0.14, green: 0.12, blue: 0.16), Color.black],
                         center: .center,
                         startRadius: 8,
-                        endRadius: 90
+                        endRadius: discSize * 0.48
                     )
                 )
                 .frame(width: discSize, height: discSize)
                 .overlay(
                     Circle()
-                        .stroke(AppTheme.accentViolet.opacity(0.35), lineWidth: 2)
+                        .stroke(AppTheme.accentViolet.opacity(0.28), lineWidth: 1.5)
                 )
+
+            ForEach(0..<3, id: \.self) { ring in
+                Circle()
+                    .stroke(Color.white.opacity(0.07), lineWidth: 1)
+                    .frame(width: discSize * (0.78 - CGFloat(ring) * 0.16))
+            }
 
             Circle()
                 .fill(
                     RadialGradient(
-                        colors: [AppTheme.accentPink, AppTheme.accentViolet],
+                        colors: [AppTheme.accentPink, AppTheme.accentViolet, AppTheme.goldWarm.opacity(0.9)],
                         center: .center,
                         startRadius: 2,
-                        endRadius: 22
+                        endRadius: discSize * 0.11
                     )
                 )
-                .frame(width: 44, height: 44)
+                .frame(width: discSize * 0.36, height: discSize * 0.36)
 
-            ForEach(0..<3, id: \.self) { ring in
-                Circle()
-                    .stroke(Color.white.opacity(0.04), lineWidth: 1)
-                    .frame(width: discSize * (0.55 + CGFloat(ring) * 0.15))
-            }
+            Circle()
+                .fill(Color.black)
+                .frame(width: discSize * 0.1, height: discSize * 0.1)
         }
     }
 
-    private var tonearmLayer: some View {
-        ZStack(alignment: .topTrailing) {
-            Circle()
-                .fill(AppTheme.surfaceElevated)
-                .frame(width: 14, height: 14)
-                .overlay(Circle().stroke(AppTheme.accentViolet.opacity(0.5), lineWidth: 1))
-                .padding(.top, 6)
-                .padding(.trailing, 10)
+    private func drawTonearm(in context: inout GraphicsContext, size: CGSize, progress: CGFloat) {
+        let discRadius = discSize / 2
+        let discCenter = CGPoint(x: size.width / 2, y: size.height / 2)
+        let grooveRadius = discRadius * 0.68
+        let grooveAngle = 38.0 * Double.pi / 180.0
+        let contactOnDisc = CGPoint(
+            x: discCenter.x + grooveRadius * CGFloat(cos(grooveAngle)),
+            y: discCenter.y + grooveRadius * CGFloat(sin(grooveAngle))
+        )
+        let pivot = CGPoint(
+            x: discCenter.x + discRadius * 0.92,
+            y: discCenter.y - discRadius * 0.82
+        )
+        let dx = contactOnDisc.x - pivot.x
+        let dy = contactOnDisc.y - pivot.y
+        let armLength = hypot(dx, dy)
+        let onDiscAngle = atan2(dy, dx)
+        let swingRad = 25.0 * Double.pi / 180.0
+        let offDiscAngle = onDiscAngle - CGFloat(swingRad)
+        let armAngle = offDiscAngle + CGFloat(swingRad) * progress
+        let tip = CGPoint(
+            x: pivot.x + armLength * cos(armAngle),
+            y: pivot.y + armLength * sin(armAngle)
+        )
 
-            RoundedRectangle(cornerRadius: 2)
-                .fill(
-                    LinearGradient(
-                        colors: [AppTheme.creamText.opacity(0.95), AppTheme.mutedLavender.opacity(0.8)],
-                        startPoint: .top,
-                        endPoint: .bottom
-                    )
-                )
-                .frame(width: 4, height: 64)
-                .overlay(alignment: .bottom) {
-                    Circle()
-                        .fill(AppTheme.accentPink)
-                        .frame(width: 9, height: 9)
-                        .offset(y: 4)
-                }
-                .offset(x: -4, y: 16)
-                .rotationEffect(.degrees(tonearmOnDisc ? 18 : -34), anchor: .topTrailing)
-                .animation(.easeInOut(duration: 0.45), value: tonearmOnDisc)
-        }
-        .frame(width: frameSize, height: frameSize, alignment: .topTrailing)
+        let pivotRadius = discSize * 0.028
+        let armWidth = max(2.5, discSize * 0.018)
+        let stylusOuter = discSize * 0.034
+        let stylusInner = discSize * 0.012
+
+        var pivotCircle = Path(ellipseIn: CGRect(
+            x: pivot.x - pivotRadius,
+            y: pivot.y - pivotRadius,
+            width: pivotRadius * 2,
+            height: pivotRadius * 2
+        ))
+        context.fill(pivotCircle, with: .color(AppTheme.goldWarm.opacity(0.85)))
+
+        var armPath = Path()
+        armPath.move(to: pivot)
+        armPath.addLine(to: tip)
+        context.stroke(
+            armPath,
+            with: .linearGradient(
+                Gradient(colors: [AppTheme.creamText.opacity(0.95), AppTheme.mutedLavender.opacity(0.85)]),
+                startPoint: pivot,
+                endPoint: tip
+            ),
+            style: StrokeStyle(lineWidth: armWidth, lineCap: .round)
+        )
+
+        var stylusOuterPath = Path(ellipseIn: CGRect(
+            x: tip.x - stylusOuter,
+            y: tip.y - stylusOuter,
+            width: stylusOuter * 2,
+            height: stylusOuter * 2
+        ))
+        context.fill(stylusOuterPath, with: .color(.black))
+
+        var stylusInnerPath = Path(ellipseIn: CGRect(
+            x: tip.x - stylusInner,
+            y: tip.y - stylusInner,
+            width: stylusInner * 2,
+            height: stylusInner * 2
+        ))
+        context.fill(stylusInnerPath, with: .color(AppTheme.accentPink.opacity(0.85)))
     }
 
     private func discRotation(at date: Date) -> Angle {
-        let period = 4.0
+        let period = 3.2
         let progress = date.timeIntervalSinceReferenceDate.truncatingRemainder(dividingBy: period) / period
         return .degrees(progress * 360)
     }

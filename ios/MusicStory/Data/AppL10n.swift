@@ -61,6 +61,7 @@ struct AppL10n {
     var tellStory: String { en ? "Tell the story" : "Рассказать историю" }
     var generatingStory: String { en ? "Generating story…" : "Генерируем историю…" }
     var storyPlaying: String { en ? "Story playing…" : "История играет…" }
+    var storySpokenTranscript: String { en ? "As voiced" : "Как озвучено" }
     var stopStory: String { en ? "Stop the story" : "Остановить историю" }
 
     // MARK: - Onboarding

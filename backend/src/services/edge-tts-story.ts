@@ -104,7 +104,7 @@ export async function synthesizeSpeechEdge(
       );
     }
   } else {
-    const ruText = prepareEdgeRuText(source, speakNames);
+    const ruText = prepareEdgeRuText(source, speakNamesExplicit || speakNames);
     bufs.push(await synthEdgeSegment(ruText, preset.ruVoice, rate, pitch));
   }
 
