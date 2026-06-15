@@ -111,12 +111,18 @@ final class NowPlayingCoordinator: ObservableObject {
                 otherAudioWatcher.recordManualSuccess(track)
             }
             return track
+        } catch ShazamError.cancelled {
+            throw ShazamError.cancelled
         } catch {
             if !autoTriggered {
                 otherAudioWatcher.recordManualFailure()
             }
             throw error
         }
+    }
+
+    func stopShazamListening() {
+        shazam.stopListening()
     }
 
     private func merge(

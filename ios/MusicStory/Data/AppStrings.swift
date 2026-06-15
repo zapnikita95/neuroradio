@@ -115,6 +115,7 @@ enum AppStrings {
             "Музыка остановилась — Shazam выключается. Два промаха подряд — ждём нового воспроизведения."
         static let listeningAirPods = "Слушаю в AirPods…"
         static let recognizeButton = "Распознать через Shazam"
+        static let stopButton = "Остановить Shazam"
         static let listeningHint = "Слушаю… поднесите к колонке"
         static let homeIdleSubtitle =
             "Spotify и Apple Music — сами. Другой плеер — круглая кнопка Shazam справа."

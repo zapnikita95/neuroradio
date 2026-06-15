@@ -38,8 +38,7 @@ struct ShazamFloatingButton: View {
             }
         }
         .buttonStyle(.plain)
-        .accessibilityLabel(AppStrings.Shazam.recognizeButton)
-        .disabled(isListening)
+        .accessibilityLabel(isListening ? AppStrings.Shazam.stopButton : AppStrings.Shazam.recognizeButton)
         .onChange(of: isListening) { _, listening in
             pulse = listening
         }

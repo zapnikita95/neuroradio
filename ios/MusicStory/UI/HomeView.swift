@@ -181,7 +181,7 @@ struct HomeView: View {
     private var shazamFloatingControl: some View {
         ShazamFloatingButton(
             isListening: nowPlaying.shazam.isListening,
-            action: { Task { await recognizeWithShazam() } }
+            action: { Task { await toggleShazam() } }
         )
         .padding(.top, 56)
         .padding(.trailing, 14)
@@ -234,10 +234,16 @@ struct HomeView: View {
         return AppStrings.shazamHomeIdle(lang)
     }
 
-    private func recognizeWithShazam() async {
+    private func toggleShazam() async {
+        if nowPlaying.shazam.isListening {
+            nowPlaying.stopShazamListening()
+            return
+        }
         orchestrator.clearError()
         do {
             _ = try await nowPlaying.recognizeWithShazam()
+        } catch ShazamError.cancelled {
+            return
         } catch {
             orchestrator.showError(error.localizedDescription)
         }

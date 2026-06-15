@@ -5,6 +5,7 @@ enum ShazamError: LocalizedError {
     case microphonePermissionDenied
     case noMatch
     case engineFailure
+    case cancelled
 
     var errorDescription: String? {
         switch self {
@@ -14,6 +15,8 @@ enum ShazamError: LocalizedError {
             return AppStrings.Shazam.noMatch
         case .engineFailure:
             return AppStrings.Shazam.engineFailure
+        case .cancelled:
+            return nil
         }
     }
 }
@@ -25,9 +28,12 @@ final class ShazamTrackRecognizer: ObservableObject {
     @Published private(set) var usesHeadphonesRoute = false
 
     private var activeSession: SHManagedSession?
+    private var cancelRequested = false
 
     func recognizeOnce(timeout: TimeInterval = 12) async throws -> TrackInfo {
-        stopListening()
+        activeSession?.cancel()
+        activeSession = nil
+        cancelRequested = false
 
         guard await requestMicrophonePermission() else {
             throw ShazamError.microphonePermissionDenied
@@ -38,8 +44,10 @@ final class ShazamTrackRecognizer: ObservableObject {
             isListening = false
             activeSession = nil
             usesHeadphonesRoute = false
+            cancelRequested = false
         }
 
+        try Task.checkCancellation()
         try configureAudioSessionForShazam()
         usesHeadphonesRoute = isHeadphoneRouteActive()
 
@@ -48,19 +56,22 @@ final class ShazamTrackRecognizer: ObservableObject {
         await session.prepare()
 
         var track = try await withThrowingTaskGroup(of: TrackInfo.self) { group in
-            group.addTask {
+            group.addTask { @MainActor in
                 switch await session.result() {
                 case .match(let match):
+                    if self.cancelRequested || Task.isCancelled {
+                        throw ShazamError.cancelled
+                    }
                     return try await Self.track(from: match)
                 case .noMatch:
-                    throw ShazamError.noMatch
+                    throw self.cancelRequested || Task.isCancelled ? ShazamError.cancelled : ShazamError.noMatch
                 case .error(_, _):
-                    throw ShazamError.engineFailure
+                    throw self.cancelRequested || Task.isCancelled ? ShazamError.cancelled : ShazamError.engineFailure
                 }
             }
-            group.addTask {
+            group.addTask { @MainActor in
                 try await Task.sleep(nanoseconds: UInt64(timeout * 1_000_000_000))
-                throw ShazamError.noMatch
+                throw self.cancelRequested || Task.isCancelled ? ShazamError.cancelled : ShazamError.noMatch
             }
 
             guard let track = try await group.next() else {
@@ -68,6 +79,10 @@ final class ShazamTrackRecognizer: ObservableObject {
             }
             group.cancelAll()
             return track
+        }
+
+        if cancelRequested || Task.isCancelled {
+            throw ShazamError.cancelled
         }
 
         let durationMs = await TrackDurationResolver.resolveDurationMs(
@@ -89,7 +104,9 @@ final class ShazamTrackRecognizer: ObservableObject {
     }
 
     func stopListening() {
-        activeSession = nil
+        guard isListening else { return }
+        cancelRequested = true
+        activeSession?.cancel()
         isListening = false
     }
 
