@@ -47,10 +47,19 @@ struct AuthConfig: Sendable {
 
 struct AccountLoginResult: Sendable {
     let profile: AccountProfile?
+    let history: [CloudStoryHistoryEntry]
+    let scrobbles: [CloudScrobbleEntry]
     let error: String?
 
-    init(profile: AccountProfile? = nil, error: String? = nil) {
+    init(
+        profile: AccountProfile? = nil,
+        history: [CloudStoryHistoryEntry] = [],
+        scrobbles: [CloudScrobbleEntry] = [],
+        error: String? = nil
+    ) {
         self.profile = profile
+        self.history = history
+        self.scrobbles = scrobbles
         self.error = error
     }
 }
@@ -106,12 +115,7 @@ final class AccountAuthManager {
             if let err = data["error"] as? String, !err.isEmpty {
                 return AccountLoginResult(error: err)
             }
-            let profile = parseProfile(data["profile"] as? [String: Any] ?? data)
-            settings.saveAccountProfile(profile)
-            if let plan = profile.plan, !plan.isEmpty {
-                settings.serverTier = plan
-            }
-            return AccountLoginResult(profile: profile)
+            return parseLoginResponse(data)
         } catch let error as BackendError {
             return AccountLoginResult(error: error.errorDescription ?? UserFacingError.message(for: error))
         } catch {
@@ -155,12 +159,7 @@ final class AccountAuthManager {
             if let err = data["error"] as? String, !err.isEmpty {
                 return AccountLoginResult(error: err)
             }
-            let profile = parseProfile(data["profile"] as? [String: Any] ?? data)
-            settings.saveAccountProfile(profile)
-            if let plan = profile.plan, !plan.isEmpty {
-                settings.serverTier = plan
-            }
-            return AccountLoginResult(profile: profile)
+            return parseLoginResponse(data)
         } catch let error as TelegramOAuthError {
             return AccountLoginResult(error: error.localizedDescription)
         } catch {
@@ -179,12 +178,7 @@ final class AccountAuthManager {
             if let err = data["error"] as? String, !err.isEmpty {
                 return AccountLoginResult(error: err)
             }
-            let profile = parseProfile(data["profile"] as? [String: Any] ?? data)
-            settings.saveAccountProfile(profile)
-            if let plan = profile.plan, !plan.isEmpty {
-                settings.serverTier = plan
-            }
-            return AccountLoginResult(profile: profile)
+            return parseLoginResponse(data)
         } catch {
             return AccountLoginResult(error: error.localizedDescription)
         }
@@ -193,12 +187,7 @@ final class AccountAuthManager {
     func fetchProfile() async -> AccountLoginResult {
         do {
             let data = try await backend.authorizedJSON(path: "v1/account/profile", method: "GET", body: nil)
-            let profile = parseProfile(data)
-            settings.saveAccountProfile(profile)
-            if let plan = profile.plan, !plan.isEmpty {
-                settings.serverTier = plan
-            }
-            return AccountLoginResult(profile: profile)
+            return parseLoginResponse(data)
         } catch {
             return AccountLoginResult(error: error.localizedDescription)
         }
@@ -235,17 +224,26 @@ final class AccountAuthManager {
             if let err = data["error"] as? String, !err.isEmpty {
                 return AccountLoginResult(error: err)
             }
-            let profile = parseProfile(data["profile"] as? [String: Any] ?? data)
-            settings.saveAccountProfile(profile)
-            if let plan = profile.plan, !plan.isEmpty {
-                settings.serverTier = plan
-            }
-            return AccountLoginResult(profile: profile)
+            return parseLoginResponse(data)
         } catch let error as BackendError {
             return AccountLoginResult(error: error.errorDescription ?? UserFacingError.message(for: error))
         } catch {
             return AccountLoginResult(error: UserFacingError.message(for: error))
         }
+    }
+
+    private func parseLoginResponse(_ data: [String: Any]) -> AccountLoginResult {
+        let profileJson = data["profile"] as? [String: Any] ?? data
+        let profile = parseProfile(profileJson)
+        settings.saveAccountProfile(profile)
+        if let plan = profile.plan, !plan.isEmpty {
+            settings.serverTier = plan
+        }
+        return AccountLoginResult(
+            profile: profile,
+            history: CloudHistoryMapper.parseStoryHistory(data),
+            scrobbles: CloudHistoryMapper.parseScrobbles(data)
+        )
     }
 
     private static func int64(_ value: Any?) -> Int64? {

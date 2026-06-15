@@ -56,6 +56,9 @@
 		B1000044 /* AppLanguage.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1000044 /* AppLanguage.swift */; };
 		B1000045 /* LocalizedUi.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1000045 /* LocalizedUi.swift */; };
 		B1000046 /* AppL10n.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1000046 /* AppL10n.swift */; };
+		B1000047 /* CloudHistoryMapper.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1000047 /* CloudHistoryMapper.swift */; };
+		B1000048 /* AccountSyncManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1000048 /* AccountSyncManager.swift */; };
+		B1000049 /* AccountCloudSync.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1000049 /* AccountCloudSync.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -136,6 +139,9 @@
 		F1000044 /* AppLanguage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppLanguage.swift; sourceTree = "<group>"; };
 		F1000045 /* LocalizedUi.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalizedUi.swift; sourceTree = "<group>"; };
 		F1000046 /* AppL10n.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppL10n.swift; sourceTree = "<group>"; };
+		F1000047 /* CloudHistoryMapper.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CloudHistoryMapper.swift; sourceTree = "<group>"; };
+		F1000048 /* AccountSyncManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AccountSyncManager.swift; sourceTree = "<group>"; };
+		F1000049 /* AccountCloudSync.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AccountCloudSync.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -253,6 +259,9 @@
 				F1000024 /* AppStrings.swift */,
 				F1000044 /* AppLanguage.swift */,
 				F1000046 /* AppL10n.swift */,
+				F1000047 /* CloudHistoryMapper.swift */,
+				F1000048 /* AccountSyncManager.swift */,
+				F1000049 /* AccountCloudSync.swift */,
 				F1000021 /* TierAccess.swift */,
 			);
 			path = Data;
@@ -449,6 +458,9 @@
 				B1000044 /* AppLanguage.swift in Sources */,
 				B1000045 /* LocalizedUi.swift in Sources */,
 				B1000046 /* AppL10n.swift in Sources */,
+				B1000047 /* CloudHistoryMapper.swift in Sources */,
+				B1000048 /* AccountSyncManager.swift in Sources */,
+				B1000049 /* AccountCloudSync.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

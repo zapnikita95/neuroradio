@@ -171,6 +171,9 @@ struct AccountView: View {
         settings.backendURL = BackendURL.normalize(settings.backendURL)
         let result = await AccountAuthManager.shared.fetchProfile()
         profile = result.profile ?? settings.accountProfile
+        if result.profile?.isLoggedIn == true {
+            AccountCloudSync.mergeCloudPayload(result)
+        }
         if let err = result.error, !(profile?.isLoggedIn ?? settings.accountProfile?.isLoggedIn ?? false) {
             loadError = err
         }

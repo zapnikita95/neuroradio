@@ -218,6 +218,7 @@ struct AccountAuthPanel: View {
                 message = err
             }
         } else {
+            await AccountCloudSync.finishAccountLogin(result)
             await StoryRepository.shared.refreshQuota()
             onSuccess()
         }
@@ -232,6 +233,7 @@ struct AccountAuthPanel: View {
                 message = err
             }
         } else {
+            await AccountCloudSync.finishAccountLogin(result)
             await StoryRepository.shared.refreshQuota()
             onSuccess()
         }
@@ -284,6 +286,7 @@ struct AccountAuthPanel: View {
             message = err
         } else {
             message = "Вход выполнен"
+            await AccountCloudSync.finishAccountLogin(result)
             await StoryRepository.shared.refreshQuota()
             showEmailSheet = false
             onSuccess()

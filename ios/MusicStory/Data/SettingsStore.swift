@@ -51,6 +51,7 @@ final class SettingsStore: ObservableObject {
         static let shazamAutoDetectEnabled = "shazam_auto_detect_enabled"
         static let playbackCachePurgeVersion = "playback_cache_purge_version"
         static let appLanguage = "app_language"
+        static let syncCode = "sync_code"
     }
 
     /// Сброс битого OGG-кэша при обновлении (AVPlayer на iOS не играет OGG).
@@ -238,6 +239,14 @@ final class SettingsStore: ObservableObject {
 
     func saveAccountProfile(_ profile: AccountProfile) {
         accountProfile = profile
+    }
+
+    var syncCode: String {
+        defaults.string(forKey: Keys.syncCode) ?? ""
+    }
+
+    func setSyncCode(_ code: String) {
+        defaults.set(code, forKey: Keys.syncCode)
     }
 
     func clearAccountProfile() {
