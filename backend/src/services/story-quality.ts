@@ -1037,10 +1037,7 @@ const UNGROUNDED_CLAIM_CHECKS: Array<{ claim: RegExp; factHint: RegExp }> = [
     claim: /два\s+мира\s+столкнулись|на\s+одном\s+дыхании/i,
     factHint: /world|мир|breath|one take|improvis|дыхан/i,
   },
-  {
-    claim: /визитной\s+карточк/i,
-    factHint: /signature|calling card|визитн|card|breakthrough|calling|хит|hit|chart|billboard|top\s+\d|#2|signature song/i,
-  },
+  // «визитной карточкой» — устойчивая фан-речь из voiceover-no-names.ts, не факт-галлюцинация.
   {
     claim: /(?:за|в)\s+одн[ую]\s+ноч|одной\s+ночью|за\s+ночь/i,
     factHint: /one night|overnight|за\s+ноч|одной\s+ноч|insomnia|бессон|не\s+спал|couldn't sleep|could not sleep/i,

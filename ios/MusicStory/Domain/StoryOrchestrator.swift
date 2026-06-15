@@ -45,6 +45,8 @@ final class StoryOrchestrator: ObservableObject {
 
     private var playbackSession = 0
     private var isStoryRunning = false
+    /// Ручной запрос истории из настроек — не сбрасывать UI в onTrackChanged.
+    private var explicitManualStoryRequest = false
 
     init(nowPlaying: NowPlayingCoordinator, storyPlayer: StoryPlayer) {
         self.nowPlaying = nowPlaying
@@ -53,6 +55,11 @@ final class StoryOrchestrator: ObservableObject {
         nowPlaying.onTrackChanged = { [weak self] track in
             Task { @MainActor in
                 await self?.onTrackChanged(track)
+            }
+        }
+        nowPlaying.onTrackHeard = { [weak self] track in
+            Task { @MainActor in
+                self?.recordTrackHeard(track)
             }
         }
     }
@@ -77,12 +84,13 @@ final class StoryOrchestrator: ObservableObject {
     func onTrackChanged(_ track: TrackInfo) async {
         guard track.isValid() else { return }
         uiState.currentTrack = track
+        if explicitManualStoryRequest {
+            return
+        }
         if uiState.pendingFeedback?.trackKey != track.displayKey {
             uiState.pendingFeedback = nil
         }
         OfflinePackStore.shared.onTrackHeard(track)
-
-        guard !historyStore.wasRecentlyScrobbled(track.displayKey) else { return }
 
         let triggerSettings = settings.triggerSettings
         let shouldTrigger = uiState.mode == .auto &&
@@ -93,12 +101,13 @@ final class StoryOrchestrator: ObservableObject {
                 trackGenre: nil
             )
 
-        historyStore.logScrobble(track, storyTriggered: shouldTrigger)
         uiState.tracksUntilNext = triggerEngine.tracksUntilNext(settings: triggerSettings)
 
         if shouldTrigger {
             await playStory(for: track, manual: false)
-        } else if !isStoryRunning {
+        } else if !isStoryRunning,
+                  uiState.state != .fetchingStory,
+                  uiState.state != .preparingPlayback {
             uiState.state = .listening
             if settings.manualMode && settings.factNotificationsEnabled {
                 let hasHot = await storyRepository.hasHotFactForTrack(
@@ -114,8 +123,23 @@ final class StoryOrchestrator: ObservableObject {
         }
     }
 
+    /// Listening history — Shazam, Spotify, Apple Music, manual input.
+    func recordTrackHeard(_ track: TrackInfo) {
+        guard track.isValid() else { return }
+        guard !historyStore.wasRecentlyScrobbled(track.displayKey) else { return }
+        historyStore.logScrobble(track, storyTriggered: false)
+    }
+
+    private func markStoryTriggered(for track: TrackInfo) {
+        historyStore.markLatestScrobbleStoryTriggered(trackKey: track.displayKey)
+    }
+
     func requestManualStory() async {
+        if isStoryRunning { stopStory() }
+
         if var track = nowPlaying.currentTrack, track.isValid() {
+            uiState.state = .fetchingStory
+            uiState.errorMessage = nil
             await playStory(for: track, manual: true)
             return
         }
@@ -132,9 +156,29 @@ final class StoryOrchestrator: ObservableObject {
     }
 
     func requestManualStory(artist: String, title: String) async {
+        if isStoryRunning { stopStory() }
+
         let track = TrackInfo(artist: artist, title: title, source: .manual)
+        guard track.isValid() else {
+            let copy = AppStrings.l10n(settings.resolvedLanguage)
+            uiState.errorMessage = copy.manualTrackRequired
+            uiState.state = .error
+            return
+        }
+
+        explicitManualStoryRequest = true
+        defer { explicitManualStoryRequest = false }
+
+        uiState.state = .fetchingStory
+        uiState.errorMessage = nil
+        uiState.currentTrack = track
         nowPlaying.setManualTrack(track)
         await playStory(for: track, manual: true)
+    }
+
+    /// Запуск из настроек — Task живёт в orchestrator, не в SettingsView.
+    func beginManualStoryFromSettings(artist: String, title: String) {
+        Task { await requestManualStory(artist: artist, title: title) }
     }
 
     func requestStoryFromNotification(artist: String, title: String) async {
@@ -237,7 +281,11 @@ final class StoryOrchestrator: ObservableObject {
     }
 
     private func playStory(for track: TrackInfo, manual: Bool) async {
-        guard !isStoryRunning else { return }
+        if isStoryRunning {
+            guard manual else { return }
+            stopStory()
+            try? await Task.sleep(nanoseconds: 150_000_000)
+        }
         isStoryRunning = true
         playbackSession += 1
         let session = playbackSession
@@ -256,6 +304,7 @@ final class StoryOrchestrator: ObservableObject {
 
         switch result {
         case .success(let response):
+            markStoryTriggered(for: track)
             if !manual {
                 let elapsed = Date().timeIntervalSince(fetchStarted)
                 let remaining = max(0, 8.0 - elapsed)

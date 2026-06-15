@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 struct SettingsView: View {
     @Environment(\.dismiss) private var dismiss
@@ -11,6 +12,8 @@ struct SettingsView: View {
     @State private var spotifyClientId: String = ""
     @State private var manualArtist: String = ""
     @State private var manualTitle: String = ""
+
+    @State private var manualStoryLoading = false
 
     private var lang: ResolvedAppLanguage { settings.resolvedLanguage }
     private var copy: AppL10n { AppStrings.l10n(lang) }
@@ -158,7 +161,9 @@ struct SettingsView: View {
                 }
 
                 SettingsSubheading(title: copy.emotion)
-                ForEach(TtsEmotion.allCases) { emotion in
+                ForEach(TtsEmotion.allCases.filter { emotion in
+                    emotion != .evil || settings.ttsVoice.supportsEvil
+                }) { emotion in
                     SettingsPreferenceRow(
                         label: emotion.uiLabel(lang),
                         subtitle: emotion.uiDescription(lang),
@@ -366,10 +371,21 @@ struct SettingsView: View {
                 .foregroundStyle(AppTheme.creamText)
             TextField(copy.titleField, text: $manualTitle)
                 .foregroundStyle(AppTheme.creamText)
-            PrimaryStoryButton(title: copy.storyForTrack) {
-                Task {
-                    await orchestrator.requestManualStory(artist: manualArtist, title: manualTitle)
+            PrimaryStoryButton(
+                title: copy.storyForTrack,
+                loading: manualStoryLoading
+            ) {
+                UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                let artist = manualArtist.trimmingCharacters(in: .whitespacesAndNewlines)
+                let title = manualTitle.trimmingCharacters(in: .whitespacesAndNewlines)
+                guard !artist.isEmpty, !title.isEmpty else {
+                    orchestrator.showError(copy.manualTrackRequired)
+                    return
                 }
+                manualStoryLoading = true
+                dismiss()
+                orchestrator.beginManualStoryFromSettings(artist: artist, title: title)
+                manualStoryLoading = false
             }
         }
     }
