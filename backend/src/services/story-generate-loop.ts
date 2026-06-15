@@ -5,6 +5,8 @@ import {
   findHardScriptViolation,
   findIncompleteEnding,
   findLlmGarbage,
+  findNewsSeedBleedIntoRecordingStory,
+  findOffSeedInvention,
   findWateryContent,
   findUngroundedClaims,
   anchorsReferenceFact,
@@ -164,6 +166,16 @@ export function finalizeAfterQualityLoop<T extends { script: string }>(
   const ungrounded = findUngroundedClaims(sanitized, referenceFacts);
   if (ungrounded) {
     logRejectedScript('last script rejected (ungrounded claim)', sanitized, ungrounded);
+    return null;
+  }
+  const newsBleed = findNewsSeedBleedIntoRecordingStory(sanitized, input.title, referenceFacts);
+  if (newsBleed) {
+    logRejectedScript('last script rejected (news seed bleed)', sanitized, newsBleed);
+    return null;
+  }
+  const offSeed = findOffSeedInvention(sanitized, referenceFacts);
+  if (offSeed) {
+    logRejectedScript('last script rejected (off-seed invention)', sanitized, offSeed);
     return null;
   }
   if (referenceFacts.length === 0) {

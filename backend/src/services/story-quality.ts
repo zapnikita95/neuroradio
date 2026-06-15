@@ -873,6 +873,14 @@ export function validateStoryScript(
     if (trackMisattribution) {
       return { ok: false, reason: trackMisattribution };
     }
+    const newsBleed = findNewsSeedBleedIntoRecordingStory(trimmed, title, referenceFacts);
+    if (newsBleed) {
+      return { ok: false, reason: newsBleed };
+    }
+    const offSeed = findOffSeedInvention(trimmed, referenceFacts);
+    if (offSeed) {
+      return { ok: false, reason: offSeed };
+    }
     const fictionIssue = skipPersonaCliches ? null : findGenericFiction(trimmed);
     if (fictionIssue) {
       return { ok: false, reason: fictionIssue };
@@ -1149,6 +1157,7 @@ const LLM_GARBAGE_PATTERNS: RegExp[] = [
   /—\s*в\s+треке\s*[.!?]?$/i,
   /\+\s*б\s+\+\s*б/i,
   /\+[а-яё]/i,
+  /\bвоукал/i,
 ];
 
 export interface LlmGarbageOptions {
@@ -1220,6 +1229,36 @@ export function findArtistSeedTrackMisattribution(
   );
   if (titleNearAward.test(script)) {
     return 'artist milestone misattributed to track';
+  }
+  return null;
+}
+
+const NEWS_POLITICS_SEED_RE =
+  /teachers?\s*union|забастовк\w*|учител\w*\s+забастовк|chicago\s+public\s+schools/i;
+const RECORDING_STUDIO_SCRIPT_RE =
+  /(?:запис\w*|студи|гитар|van\s+halen|рифф|thriller|beat\s*it|дубль|\bsolo\b|сolo|вокал|музыкант\w*\s+не\s+мог\w*\s+репетир)/i;
+
+/** Script invents detail absent from seed (e.g. teachers strike hallucinated for Beat It). */
+export function findOffSeedInvention(script: string, referenceFacts: string[] = []): string | null {
+  if (referenceFacts.length === 0) return null;
+  const seed = referenceFacts.join(' ');
+  if (NEWS_POLITICS_SEED_RE.test(script) && !NEWS_POLITICS_SEED_RE.test(seed)) {
+    return 'invented detail not in seed: teachers strike';
+  }
+  return null;
+}
+
+/** News/politics seed without track anchor woven into a recording-session story. */
+export function findNewsSeedBleedIntoRecordingStory(
+  script: string,
+  title: string,
+  referenceFacts: string[],
+): string | null {
+  const primary = referenceFacts[0]?.trim() ?? '';
+  if (!primary || factMentionsTitle(primary, title)) return null;
+  if (!NEWS_POLITICS_SEED_RE.test(primary)) return null;
+  if (RECORDING_STUDIO_SCRIPT_RE.test(script)) {
+    return 'news/politics seed incorrectly woven into track recording story';
   }
   return null;
 }

@@ -169,4 +169,49 @@ if (hasEnglishLeak(REDBONE_SCRIPT, 'Graham Blvd', 'Come and Get Your Love', { re
   ok('Billboard + Cash Box proper nouns allowed');
 }
 
+const { fixVocalLanguage } = await import('../dist/services/story-english-normalize.js');
+const { findNewsSeedBleedIntoRecordingStory, findOffSeedInvention, sanitizeScriptForTts } =
+  await import('../dist/services/story-quality.js');
+
+if (fixVocalLanguage('а воукалз записывал он сам') !== 'а вокал записывал он сам') {
+  fail(`voocalz fix got: ${fixVocalLanguage('а воукалз записывал он сам')}`);
+} else {
+  ok('воукалз → вокал');
+}
+
+const CHICAGO_TEACHERS_SEED =
+  'In September 2012, the Chicago Teachers Union launched a strike that shut down Chicago Public Schools for seven days.';
+const BEAT_IT_BAD_SCRIPT =
+  'Эта песня вышла в 1983 году. В ней звучит гитара Эдди Ван Хэлина, а воукалз записывал он сам, пока в соседнем помещении проходила забастовка учителей.';
+
+const bleed = findNewsSeedBleedIntoRecordingStory(
+  BEAT_IT_BAD_SCRIPT,
+  'Beat It',
+  [CHICAGO_TEACHERS_SEED],
+);
+if (!bleed) {
+  fail('Chicago Teachers seed woven into Beat It recording must be rejected');
+} else {
+  ok(`Chicago Teachers bleed rejected (${bleed})`);
+}
+
+const hallucinated = findOffSeedInvention(
+  'Гитарист записал solo, пока рядом шла забастовка учителей.',
+  ['Beat It Michael Jackson Eddie Van Halen recorded guitar solo in one take for Thriller.'],
+);
+if (!hallucinated) {
+  fail('teachers strike hallucination without seed must be rejected');
+} else {
+  ok(`teachers strike hallucination rejected (${hallucinated})`);
+}
+
+const sanitizedBeatIt = sanitizeScriptForTts(BEAT_IT_BAD_SCRIPT, 'Michael Jackson', 'Beat It', [
+  CHICAGO_TEACHERS_SEED,
+]);
+if (/\bвоукал/i.test(sanitizedBeatIt)) {
+  fail(`sanitized script still has воукал: ${sanitizedBeatIt}`);
+} else {
+  ok('sanitize replaces воукалz with вокал');
+}
+
 process.exit(failed > 0 ? 1 : 0);

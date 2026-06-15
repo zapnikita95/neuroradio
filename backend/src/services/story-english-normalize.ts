@@ -101,6 +101,8 @@ export const GENERIC_ENGLISH_REPLACEMENTS: Array<[RegExp, string]> = [
   [/\bperformance\b/gi, 'выступление'],
   [/\bperformances\b/gi, 'выступления'],
   [/\bvocal delivery\b/gi, 'подача'],
+  [/\bvocals\b/gi, 'вокал'],
+  [/\bvocal\b/gi, 'вокал'],
   [/\bdelivery\b/gi, 'подача'],
   [/\bflow\b/gi, 'флоу'],
   [/\bflo\b/gi, 'флоу'],
@@ -341,14 +343,23 @@ export function buildAllowedLatinTokens(
   return allowed;
 }
 
+/** Russian has no plural «вокалы»; LLM writes «воукалz/воукалз» from English vocals. */
+export function fixVocalLanguage(text: string): string {
+  return text
+    .replace(/воукал(?:z|з|s|ы|ов|ам|ами)?/gi, 'вокал')
+    .replace(/вокал(?:ы|ов|ам|ами)/gi, 'вокал');
+}
+
 /** LLM often mistranslates vocal «delivery» as shipping «доставка». */
 export function fixMusicalMistranslations(text: string): string {
-  return text
-    .replace(/\bдоставок\b/gi, 'подач')
-    .replace(/\bдоставкой\b/gi, 'подачей')
-    .replace(/\bдоставку\b/gi, 'подачу')
-    .replace(/\bдоставки\b/gi, 'подачи')
-    .replace(/\bдоставка\b/gi, 'подача');
+  return fixVocalLanguage(
+    text
+      .replace(/\bдоставок\b/gi, 'подач')
+      .replace(/\bдоставкой\b/gi, 'подачей')
+      .replace(/\bдоставку\b/gi, 'подачу')
+      .replace(/\bдоставки\b/gi, 'подачи')
+      .replace(/\bдоставка\b/gi, 'подача'),
+  );
 }
 
 /** Replace generic English; leave proper nouns intact. */
@@ -394,6 +405,7 @@ export function prepareStoryScriptLanguage(
   text = replaceGenericEnglish(text, namePhrases);
   text = restoreProperNamesCorruptedByGenreTranslation(text, namePhrases);
   text = fixMusicalMistranslations(text);
+  text = fixVocalLanguage(text);
   const allowedLatin = buildAllowedLatinTokens(
     ctx.artist,
     ctx.title,

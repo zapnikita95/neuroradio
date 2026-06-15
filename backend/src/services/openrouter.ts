@@ -10,8 +10,11 @@ import {
   findArtistSeedTrackMisattribution,
   findHardScriptViolation,
   findLlmGarbage,
+  findNewsSeedBleedIntoRecordingStory,
+  findOffSeedInvention,
   findUngroundedClaims,
   findPersonaCliche,
+  findWateryContent,
   hasConcreteFact,
   anchorsReferenceFact,
   referenceFactsAreAnchorable,
@@ -380,6 +383,12 @@ export async function generateStoryScript(
         referenceFacts,
       }) &&
       !findUngroundedClaims(sanitized, referenceFacts) &&
+      !findOffSeedInvention(sanitized, referenceFacts) &&
+      !findNewsSeedBleedIntoRecordingStory(sanitized, input.title, referenceFacts) &&
+      !findWateryContent(sanitized, input.artist, input.title, referenceFacts, {
+        skipPersonaCliches: true,
+        speakTrackNamesInVoiceover: input.speakTrackNamesInVoiceover,
+      }) &&
       !findArtistSeedTrackMisattribution(sanitized, input.title, referenceFacts) &&
       !referenceFacts.some((f) => isArtistLateLifeHealthFactWithoutTrack(f, input.title)) &&
       !findHardScriptViolation(sanitized) &&
