@@ -125,7 +125,11 @@ final class BackendClient {
     private static let storyResourceTimeout: TimeInterval = 600
     private static let apiRequestTimeout: TimeInterval = 90
     private static let apiResourceTimeout: TimeInterval = 180
+    private static let authRequestTimeout: TimeInterval = 35
     private static let probeTimeout: TimeInterval = 12
+
+    private var lastReachableBackendProbeAt: Date?
+    private static let backendProbeTTL: TimeInterval = 45
 
     private init() {
         let apiConfig = URLSessionConfiguration.default
@@ -179,6 +183,7 @@ final class BackendClient {
             do {
                 _ = try await getAccessToken(forceRefresh: false)
                 backendLog.info("login ready base=\(base, privacy: .public)")
+                lastReachableBackendProbeAt = Date()
                 return LoginPrepResult(ready: true, error: nil)
             } catch let error as BackendError {
                 backendLog.error("login failed base=\(base, privacy: .public) err=\(error.localizedDescription, privacy: .public)")
@@ -196,6 +201,10 @@ final class BackendClient {
     }
 
     func selectReachableBackend(preferred: String? = nil) async {
+        if let lastReachableBackendProbeAt,
+           Date().timeIntervalSince(lastReachableBackendProbeAt) < Self.backendProbeTTL {
+            return
+        }
         for base in BackendURL.candidateBases(preferred: preferred ?? settings.backendURL) {
             guard let url = BackendURL.url(base: base, path: "health") else { continue }
             do {
@@ -207,6 +216,7 @@ final class BackendClient {
                 if settings.backendURL != base {
                     settings.backendURL = base
                 }
+                lastReachableBackendProbeAt = Date()
                 backendLog.info("backend selected base=\(base, privacy: .public)")
                 return
             } catch {
@@ -362,7 +372,13 @@ final class BackendClient {
 
     func authorizedJSON(path: String, method: String, body: Data?) async throws -> [String: Any] {
         await selectReachableBackend()
-        let (data, response) = try await dataFromAPI(path: path, method: method, body: body, authorized: true)
+        let (data, response) = try await dataFromAPI(
+            path: path,
+            method: method,
+            body: body,
+            authorized: true,
+            requestTimeout: Self.authRequestTimeout
+        )
         if let http = response as? HTTPURLResponse, !(200...299).contains(http.statusCode) {
             throw BackendError.serverError(http.statusCode, Self.parseErrorMessage(from: data))
         }
@@ -400,7 +416,8 @@ final class BackendClient {
         path: String,
         method: String,
         body: Data?,
-        authorized: Bool
+        authorized: Bool,
+        requestTimeout: TimeInterval? = nil
     ) async throws -> (Data, URLResponse) {
         var lastError: Error?
         for base in BackendURL.candidateBases(preferred: settings.backendURL) {
@@ -409,6 +426,9 @@ final class BackendClient {
             request.httpMethod = method
             request.setValue("application/json", forHTTPHeaderField: "Content-Type")
             request.httpBody = body
+            if let requestTimeout {
+                request.timeoutInterval = requestTimeout
+            }
 
             if authorized, let token = try await getAccessToken(forceRefresh: false) {
                 request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
@@ -422,11 +442,13 @@ final class BackendClient {
                         retry.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
                         let (retryData, retryResponse) = try await session(for: path).data(for: retry)
                         settings.backendURL = base
+                        lastReachableBackendProbeAt = Date()
                         return (retryData, retryResponse)
                     }
                     throw BackendError.unauthorized
                 }
                 settings.backendURL = base
+                lastReachableBackendProbeAt = Date()
                 return (data, response)
             } catch let error as BackendError {
                 throw error

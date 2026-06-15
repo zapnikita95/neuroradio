@@ -257,6 +257,17 @@ final class StoryHistoryStore {
         return ((try? context.fetch(descriptor))?.isEmpty == false)
     }
 
+    func markLatestScrobbleStoryTriggered(trackKey: String) {
+        var descriptor = FetchDescriptor<ScrobbleEntry>(
+            predicate: #Predicate { $0.trackKey == trackKey },
+            sortBy: [SortDescriptor(\.scrobbledAt, order: .reverse)]
+        )
+        descriptor.fetchLimit = 1
+        guard let entry = try? context.fetch(descriptor).first else { return }
+        entry.storyTriggered = true
+        try? context.save()
+    }
+
     func allRecentHistory(limit: Int = 500) -> [StoryHistoryEntry] {
         var descriptor = FetchDescriptor<StoryHistoryEntry>(
             sortBy: [SortDescriptor(\.createdAt, order: .reverse)]

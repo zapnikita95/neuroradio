@@ -17,6 +17,7 @@ final class NowPlayingCoordinator: ObservableObject {
     private let volumeFader = SystemVolumeFader()
     private let otherAudioWatcher = OtherAudioShazamWatcher()
     var onTrackChanged: ((TrackInfo) -> Void)?
+    var onTrackHeard: ((TrackInfo) -> Void)?
 
     func prepareSpotify(settings: SettingsStore) {
         spotify.configure(
@@ -162,5 +163,6 @@ final class NowPlayingCoordinator: ObservableObject {
         guard key != lastPublishedKey else { return }
         lastPublishedKey = key
         onTrackChanged?(track)
+        onTrackHeard?(track)
     }
 }

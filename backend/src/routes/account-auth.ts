@@ -76,14 +76,13 @@ router.post('/email/verify', async (req: Request, res: Response) => {
     res.status(400).json({ error: result.error });
     return;
   }
-  const cloud = await pullAccountCloudData(req.installId!);
   const profile = await getAccountProfileLoaded(req.installId!);
   res.json({
     ok: true,
     accountId: result.accountId,
     profile,
-    history: cloud?.history ?? [],
-    scrobbles: cloud?.scrobbles ?? [],
+    history: [],
+    scrobbles: [],
   });
 });
 
@@ -112,14 +111,13 @@ router.post('/apple', async (req: Request, res: Response) => {
     res.status(400).json({ error: result.error });
     return;
   }
-  const cloud = await pullAccountCloudData(req.installId!);
   const profile = await getAccountProfileLoaded(req.installId!);
   res.json({
     ok: true,
     accountId: result.accountId,
     profile,
-    history: cloud?.history ?? [],
-    scrobbles: cloud?.scrobbles ?? [],
+    history: [],
+    scrobbles: [],
   });
 });
 
@@ -169,14 +167,13 @@ router.post('/telegram/oauth', async (req: Request, res: Response) => {
     res.status(400).json({ error: result.error });
     return;
   }
-  const cloud = await pullAccountCloudData(req.installId!);
   const profile = await getAccountProfileLoaded(req.installId!);
   res.json({
     ok: true,
     accountId: result.accountId,
     profile,
-    history: cloud?.history ?? [],
-    scrobbles: cloud?.scrobbles ?? [],
+    history: [],
+    scrobbles: [],
   });
 });
 
@@ -206,14 +203,13 @@ router.post('/telegram', async (req: Request, res: Response) => {
     res.status(400).json({ error: result.error });
     return;
   }
-  const cloud = await pullAccountCloudData(req.installId!);
   const profile = await getAccountProfileLoaded(req.installId!);
   res.json({
     ok: true,
     accountId: result.accountId,
     profile,
-    history: cloud?.history ?? [],
-    scrobbles: cloud?.scrobbles ?? [],
+    history: [],
+    scrobbles: [],
   });
 });
 

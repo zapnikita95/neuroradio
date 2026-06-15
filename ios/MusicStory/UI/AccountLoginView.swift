@@ -218,8 +218,8 @@ struct AccountAuthPanel: View {
                 message = err
             }
         } else {
-            await AccountCloudSync.finishAccountLogin(result)
-            await StoryRepository.shared.refreshQuota()
+            AccountCloudSync.finishAccountLogin(result)
+            Task { await StoryRepository.shared.refreshQuota() }
             onSuccess()
         }
     }
@@ -233,8 +233,8 @@ struct AccountAuthPanel: View {
                 message = err
             }
         } else {
-            await AccountCloudSync.finishAccountLogin(result)
-            await StoryRepository.shared.refreshQuota()
+            AccountCloudSync.finishAccountLogin(result)
+            Task { await StoryRepository.shared.refreshQuota() }
             onSuccess()
         }
     }
@@ -281,15 +281,32 @@ struct AccountAuthPanel: View {
         }
         loading = true
         defer { loading = false }
-        let result = await AccountAuthManager.shared.verifyEmailLogin(email: email, code: trimmedCode)
+        let result = await withLoginTimeout {
+            await AccountAuthManager.shared.verifyEmailLogin(email: email, code: trimmedCode)
+        }
         if let err = result.error {
             message = err
         } else {
-            message = "Вход выполнен"
-            await AccountCloudSync.finishAccountLogin(result)
-            await StoryRepository.shared.refreshQuota()
+            focusedField = nil
             showEmailSheet = false
             onSuccess()
+            AccountCloudSync.finishAccountLogin(result)
+            Task { await StoryRepository.shared.refreshQuota() }
+        }
+    }
+
+    private func withLoginTimeout(
+        _ operation: @escaping () async -> AccountLoginResult
+    ) async -> AccountLoginResult {
+        await withTaskGroup(of: AccountLoginResult.self) { group in
+            group.addTask { await operation() }
+            group.addTask {
+                try? await Task.sleep(nanoseconds: 40_000_000_000)
+                return AccountLoginResult(error: "Сервер не отвечает. Проверьте интернет и попробуйте ещё раз.")
+            }
+            let first = await group.next() ?? AccountLoginResult(error: "Не удалось выполнить вход")
+            group.cancelAll()
+            return first
         }
     }
 

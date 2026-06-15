@@ -66,7 +66,9 @@ struct AppL10n {
     // MARK: - Onboarding
 
     var onboardingWelcomeHeadline: String {
-        en ? "AI radio host for Spotify and Apple Music" : "Нейроведущий для Spotify и Apple Music"
+        en
+            ? "AI radio host for Spotify\nand Apple Music"
+            : "Нейроведущий для Spotify\nи Apple Music"
     }
     var onboardingWelcomeSubtitle: String {
         en
@@ -114,6 +116,9 @@ struct AppL10n {
             : "Нет сохранённой озвучки. Послушайте трек онлайн с расширенным тарифом."
     }
     var invalidTrack: String { en ? "Invalid track metadata" : "Некорректные метаданные трека" }
+    var manualTrackRequired: String {
+        en ? "Enter artist and title" : "Укажите исполнителя и название"
+    }
     var offlineNoInternet: String {
         en
             ? "No internet. This story is not saved on the phone yet — listen online once with Extended plan."

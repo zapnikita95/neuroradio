@@ -8,10 +8,12 @@ enum AccountCloudSync {
         applyCloudPayload(login)
     }
 
-    static func finishAccountLogin(_ login: AccountLoginResult) async {
+    static func finishAccountLogin(_ login: AccountLoginResult) {
         guard login.profile?.isLoggedIn == true else { return }
-        applyCloudPayload(login)
-        await scheduleBackgroundSync()
+        Task { @MainActor in
+            applyCloudPayload(login)
+            await scheduleBackgroundSync()
+        }
     }
 
     static func prefetchAccountHistoryIfLoggedIn() async {

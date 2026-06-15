@@ -184,6 +184,13 @@ enum TtsVoice: String, CaseIterable, Identifiable {
         }
     }
 
+    var supportsEvil: Bool {
+        switch self {
+        case .jane, .omazh, .zahar: return true
+        case .auto, .alena, .filipp, .ermil, .marina, .dasha: return false
+        }
+    }
+
     static func fromId(_ id: String?) -> TtsVoice {
         guard let id, let value = TtsVoice(rawValue: id) else { return .auto }
         return value
@@ -318,7 +325,7 @@ enum UserFacingError {
         return "Авто · через \(n) \(word)"
     }
 
-    private static func looksTechnical(_ text: String) -> Bool {
+    static func looksTechnical(_ text: String) -> Bool {
         let lower = text.lowercased()
         return lower.contains("com.apple.") ||
             lower.contains("avfaudio") ||

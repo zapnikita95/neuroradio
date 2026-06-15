@@ -14,27 +14,23 @@ struct OnboardingView: View {
                 VStack(spacing: 0) {
                     headerSlot
                         .padding(.horizontal, 24)
-                        .padding(.top, step == 0 ? 12 : 8)
-
-                    Spacer(minLength: step == 0 ? 28 : 6)
-                        .layoutPriority(step == 0 ? 4 : 2)
+                        .padding(.top, step == 0 ? 8 : 8)
 
                     vinylSlot
                         .padding(.horizontal, 24)
-                        .padding(.vertical, step == 0 ? 12 : 6)
-
-                    Spacer(minLength: step == 0 ? 36 : 12)
-                        .layoutPriority(step == 0 ? 4 : 2)
+                        .padding(.top, step == 0 ? 6 : 6)
+                        .padding(.bottom, step == 0 ? 4 : 6)
 
                     checklistSlot
                         .padding(.horizontal, 24)
+                        .padding(.top, step == 0 ? 6 : 0)
 
-                    Spacer(minLength: step == 0 ? 8 : 10)
-                        .layoutPriority(step == 0 ? 0 : 1)
+                    Spacer(minLength: 0)
 
                     bottomActions
                         .padding(.horizontal, 24)
-                        .padding(.bottom, max(12, geo.safeAreaInsets.bottom > 0 ? 4 : 12))
+                        .padding(.top, 10)
+                        .padding(.bottom, max(12, geo.safeAreaInsets.bottom + 4))
                 }
             }
         }
@@ -49,6 +45,9 @@ struct OnboardingView: View {
                     .font(.title3.weight(.semibold))
                     .foregroundStyle(AppTheme.creamText)
                     .multilineTextAlignment(.center)
+                    .lineLimit(2)
+                    .minimumScaleFactor(0.9)
+                    .fixedSize(horizontal: false, vertical: true)
 
                 Text(l10n.onboardingWelcomeSubtitle)
                     .font(.subheadline)
@@ -63,8 +62,8 @@ struct OnboardingView: View {
 
     private var vinylSlot: some View {
         VinylDisc(spinning: true)
-            .scaleEffect(step == 0 ? 1.02 : 0.86)
-            .frame(height: step == 0 ? 248 : 168)
+            .scaleEffect(step == 0 ? 0.92 : 0.86)
+            .frame(height: step == 0 ? 168 : 168)
             .frame(maxWidth: .infinity)
     }
 

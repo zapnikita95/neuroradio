@@ -46,7 +46,7 @@ struct MusicStoryBackground<Content: View>: View {
 
 struct BrandTitle: View {
     var fontSize: CGFloat = 22
-    var lang: ResolvedAppLanguage = .RU
+    var lang: ResolvedAppLanguage = .ru
 
     private var compact: Bool { lang == .en }
     private var effectiveSize: CGFloat { compact ? fontSize * 0.78 : fontSize }
@@ -348,7 +348,7 @@ struct VinylDisc: View {
                         .frame(width: 9, height: 9)
                         .offset(y: 4)
                 }
-                .offset(x: -18, y: 16)
+                .offset(x: -4, y: 16)
                 .rotationEffect(.degrees(tonearmOnDisc ? 18 : -34), anchor: .topTrailing)
                 .animation(.easeInOut(duration: 0.45), value: tonearmOnDisc)
         }
