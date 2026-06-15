@@ -1717,7 +1717,7 @@ router.post('/full', extractClientSecrets, validateStoryFullBody, storyFullRateL
             })}`
           : `yandexVoice=${voiceId}`;
       console.log(
-        `[tts] queue install=${installId.slice(0, 8)} ${voiceLog} style=${delivery.styleId} speed=${delivery.speed} emotion=${delivery.emotion} tier=${effectiveVoiceTier} userTier=${userTier} provider=${effectiveTtsProvider} userBilling=${hasUserTtsCredentials(userTtsCredentials) ? userTtsCredentials?.provider : 'server'} words=${story.word_count}`,
+        `[tts] queue install=${installId.slice(0, 8)} ${voiceLog} style=${delivery.styleId} speed=${delivery.speed} emotion=${delivery.emotion} tier=${effectiveVoiceTier} userTier=${userTier} provider=${effectiveTtsProvider} userBilling=${hasUserTtsCredentials(userTtsCredentials) ? userTtsCredentials?.provider : 'server'} speak_track_names=${(req.body as StoryFullBody).speak_track_names_in_voiceover === true} words=${story.word_count}`,
       );
       const mobileWav = requiresMobileWavPlayback(body);
       const audio = await synthesizeStoryAudio({

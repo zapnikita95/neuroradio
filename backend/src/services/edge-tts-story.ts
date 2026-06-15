@@ -7,6 +7,7 @@ import { prepareYandexTtsText } from './tts-markup.js';
 import { mergeLatinTitleOtArtist } from './tts-yandex-ssml.js';
 import { splitMixedLanguageForEdge } from './tts-mixed-segments.js';
 import { prepareEdgeRussianSegment } from './tts-edge-normalize.js';
+import { scriptContainsLatinTrackCitation } from './tts-generic-script.js';
 import { AUDIO_DIR, type SynthesisResult } from './yandex-tts.js';
 
 function formatRatePercent(speed: number, offsetPct = 0): string {
@@ -69,7 +70,10 @@ export async function synthesizeSpeechEdge(
   const speed = options.speed ?? 1.15;
   const rate = formatRatePercent(speed, preset.rateOffsetPct);
   const pitch = preset.pitch;
-  const speakNames = options.speakTrackNamesInVoiceover === true;
+  const speakNamesExplicit = options.speakTrackNamesInVoiceover === true;
+  const speakNames =
+    speakNamesExplicit ||
+    (Boolean(artist && title) && scriptContainsLatinTrackCitation(script, artist, title));
 
   let source = script.trim();
 

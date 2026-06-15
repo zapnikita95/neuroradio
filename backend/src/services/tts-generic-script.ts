@@ -33,6 +33,22 @@ export function shouldStripLatinTrackNames(text: string): boolean {
   return /[A-Za-zÀ-ÿ]/.test(trimmed);
 }
 
+/** Скрипт уже содержит латинское название/артиста — не вырезать в Edge/Yandex mixed path. */
+export function scriptContainsLatinTrackCitation(
+  script: string,
+  artist: string,
+  title: string,
+): boolean {
+  const norm = script.toLowerCase();
+  const phrases = [...phraseVariants(title), ...phraseVariants(artist)];
+  for (const phrase of phrases) {
+    const p = phrase.trim();
+    if (p.length < 4 || !shouldStripLatinTrackNames(p)) continue;
+    if (norm.includes(p.toLowerCase())) return true;
+  }
+  return false;
+}
+
 /** Фразы artist/title для маски при транслитерации (озвучка с названиями). */
 export function latinTrackProtectPhrases(artist: string, title: string): string[] {
   const out: string[] = [];
@@ -172,17 +188,14 @@ function stripLatinArtistAfterOt(text: string, artist: string): string {
   return result;
 }
 
-function rewriteLead(script: string, title: string, artist: string): string {
-  const stripTitle = shouldStripLatinTrackNames(title);
-  const stripArtist = shouldStripLatinTrackNames(artist);
-
-  const leadRe = new RegExp(
-    `^${escapeRe(title)}\\s+от\\s+${escapeRe(artist)}(\\s*[—–-]\\s*|\\s+)`,
-    'i',
-  );
-  const m = script.match(leadRe);
-
-  if (m) {
+function rewriteLeadFromMatch(
+  script: string,
+  m: RegExpMatchArray,
+  title: string,
+  artist: string,
+  stripTitle: boolean,
+  stripArtist: boolean,
+): string {
     const rest = script.slice(m[0].length).trim();
     const dashLead = /[—–-]\s*$/.test(m[0]) || /^[—–-]/.test(rest);
 
@@ -215,24 +228,47 @@ function rewriteLead(script: string, title: string, artist: string): string {
       `В эфире классика, которая ${rest.replace(/^вышел\b/i, 'вышла').replace(/^неожиданно возглавил/i, 'неожиданно возглавила')}`,
     ];
     return templates[v]!;
+}
+
+function rewriteLead(script: string, title: string, artist: string): string {
+  const stripTitle = shouldStripLatinTrackNames(title);
+  const stripArtist = shouldStripLatinTrackNames(artist);
+
+  for (const titleVariant of phraseVariants(title)) {
+    for (const artistVariant of phraseVariants(artist)) {
+      for (const sep of ['\\s+от\\s+', '\\s+by\\s+'] as const) {
+        const leadRe = new RegExp(
+          `^${escapeRe(titleVariant)}${sep}${escapeRe(artistVariant)}(\\s*[—–-]\\s*|\\s+)`,
+          'i',
+        );
+        const m = script.match(leadRe);
+        if (m) {
+          return rewriteLeadFromMatch(script, m, titleVariant, artist, stripTitle, stripArtist);
+        }
+      }
+    }
   }
 
   if (!stripTitle) return script;
 
-  const titleOnlyRe = new RegExp(`^${escapeRe(title)}(\\s*[—–-]\\s*|\\s+)`, 'i');
-  const tm = script.match(titleOnlyRe);
-  if (!tm) return script;
+  for (const titleVariant of phraseVariants(title)) {
+    const titleOnlyRe = new RegExp(`^${escapeRe(titleVariant)}(\\s*[—–-]\\s*|\\s+)`, 'i');
+    const tm = script.match(titleOnlyRe);
+    if (!tm) continue;
 
-  const rest = script.slice(tm[0].length).trim().replace(/^[—–-]\s*/, '');
-  const v = pickVariant(title, 5);
-  const templates = [
-    `Эта песня ${rest}`,
-    `Этот трек ${rest}`,
-    `В треке ${rest}`,
-    `У этой песни ${rest}`,
-    `Сейчас в эфире ${rest}`,
-  ];
-  return templates[v]!;
+    const rest = script.slice(tm[0].length).trim().replace(/^[—–-]\s*/, '');
+    const v = pickVariant(titleVariant, 5);
+    const templates = [
+      `Эта песня ${rest}`,
+      `Этот трек ${rest}`,
+      `В треке ${rest}`,
+      `У этой песни ${rest}`,
+      `Сейчас в эфире ${rest}`,
+    ];
+    return templates[v]!;
+  }
+
+  return script;
 }
 
 function cleanupAfterGenericize(text: string, artist: string): string {
