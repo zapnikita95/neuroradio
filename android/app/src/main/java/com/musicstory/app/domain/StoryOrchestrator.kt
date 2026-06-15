@@ -767,7 +767,6 @@ class StoryOrchestrator(
 
                     withContext(Dispatchers.Main.immediate) {
                         mediaControllerManager.fadeOutAndPause(fadeSeconds)
-                        mediaControllerManager.restoreStreamVolumeForStoryPlayback()
                     }
                     musicPausedForStory.set(true)
                     if (!manual) {
@@ -1060,6 +1059,7 @@ class StoryOrchestrator(
             _hintMessage.value = null
             _state.value = OrchestratorState.ERROR
             if (musicPausedForStory.get()) {
+                mediaControllerManager.restoreSystemMusicVolumeIfNeeded()
                 mediaControllerManager.resumeMusic()
             }
             publishUiState()
@@ -1161,7 +1161,6 @@ class StoryOrchestrator(
             val ttsSpeed = settingsDataStore.ttsSpeed.first().androidRate
             withContext(Dispatchers.Main.immediate) {
                 mediaControllerManager.fadeOutAndPause(fadeSeconds)
-                mediaControllerManager.restoreStreamVolumeForStoryPlayback()
             }
 
             val audioUrl = storyRepository.resolvePlaybackUrl(

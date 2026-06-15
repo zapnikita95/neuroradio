@@ -115,7 +115,7 @@ class MediaControllerManager(
         activeController?.transportControls?.pause()
     }
 
-  suspend fun fadeOutAndPause(seconds: Float) {
+    suspend fun fadeOutAndPause(seconds: Float) {
         val controls = activeController?.transportControls
         if (controls == null) {
             return
@@ -132,7 +132,6 @@ class MediaControllerManager(
         if (seconds <= 0.2f) {
             audioManager.setStreamVolume(AudioManager.STREAM_MUSIC, targetVolume, 0)
             controls.pause()
-            restoreStreamVolumeForStoryPlayback()
             return
         }
         val steps = (seconds * 12f).toInt().coerceIn(8, 20)
@@ -144,15 +143,15 @@ class MediaControllerManager(
             delay(stepDelayMs)
         }
         controls.pause()
-        restoreStreamVolumeForStoryPlayback()
     }
 
     /**
-     * ExoPlayer uses STREAM_MUSIC — after ducking to 0 the story was inaudible.
-     * Music stays paused; restore system stream level for narration only.
+     * ExoPlayer uses STREAM_MUSIC — call when story audio actually starts, not after fade.
+     * Keeps stream at 0 between fade and first story frame so music cannot blip loud again.
      */
     fun restoreStreamVolumeForStoryPlayback() {
         val original = fadedStreamOriginalVolume ?: return
+        activeController?.transportControls?.pause()
         val max = audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC)
         val level = original.coerceIn(1, max)
         audioManager.setStreamVolume(AudioManager.STREAM_MUSIC, level, 0)
