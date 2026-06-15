@@ -51,15 +51,6 @@ struct HomeView: View {
                             .padding(.top, 16)
                             .padding(.horizontal, 24)
 
-                        if orchestrator.uiState.state == .fetchingStory {
-                            HStack(spacing: 10) {
-                                ProgressView().tint(AppTheme.accentViolet)
-                                Text(copy.preparingStory)
-                                    .foregroundStyle(AppTheme.mutedLavender)
-                            }
-                            .padding(.top, 12)
-                        }
-
                         if let error = orchestrator.uiState.errorMessage {
                             Text(error)
                                 .font(.subheadline)
@@ -172,9 +163,11 @@ struct HomeView: View {
             Text(personaVoiceLabel)
                 .font(.caption.weight(.semibold))
                 .foregroundStyle(AppTheme.mutedLavender)
-            Text(statusText)
-                .font(.subheadline)
-                .foregroundStyle(AppTheme.creamText)
+            if !statusText.isEmpty {
+                Text(statusText)
+                    .font(.subheadline)
+                    .foregroundStyle(AppTheme.creamText)
+            }
         }
     }
 
@@ -253,7 +246,8 @@ struct HomeView: View {
 
     private var statusText: String {
         switch orchestrator.uiState.state {
-        case .fetchingStory: return copy.preparingStory
+        case .fetchingStory:
+            return ""
         case .preparingPlayback, .playingStory: return copy.playingStory
         default:
             switch orchestrator.uiState.mode {
@@ -273,6 +267,8 @@ private struct StoryGenerationPreview: View {
     let preview: GenerationPreviewState
     let spokenLabel: String
 
+    private let bottomAnchorId = "story-transcript-bottom"
+
     var body: some View {
         let words = preview.words
         let visibleCount = min(preview.visibleWordCount, words.count)
@@ -286,19 +282,43 @@ private struct StoryGenerationPreview: View {
                             .foregroundStyle(AppTheme.mutedLavender)
                             .frame(maxWidth: .infinity)
                     }
-                    ScrollView {
-                        Text(visibleText)
-                            .font(.body)
-                            .foregroundStyle(AppTheme.creamText)
-                            .multilineTextAlignment(.center)
-                            .frame(maxWidth: .infinity)
+                    ScrollViewReader { proxy in
+                        ScrollView {
+                            VStack(spacing: 0) {
+                                Text(visibleText)
+                                    .font(.body)
+                                    .foregroundStyle(AppTheme.creamText)
+                                    .multilineTextAlignment(.center)
+                                    .frame(maxWidth: .infinity)
+                                Color.clear
+                                    .frame(height: 1)
+                                    .id(bottomAnchorId)
+                            }
+                        }
+                        .frame(maxHeight: 220)
+                        .onChange(of: visibleCount) { _, _ in
+                            scrollToLatest(proxy)
+                        }
+                        .onChange(of: visibleText) { _, _ in
+                            scrollToLatest(proxy)
+                        }
+                        .onAppear {
+                            scrollToLatest(proxy)
+                        }
                     }
-                    .frame(maxHeight: 220)
                 }
                 .padding(.horizontal, 16)
                 .padding(.vertical, 12)
                 .background(AppTheme.surfaceGlass)
                 .clipShape(RoundedRectangle(cornerRadius: 18))
+            }
+        }
+    }
+
+    private func scrollToLatest(_ proxy: ScrollViewProxy) {
+        DispatchQueue.main.async {
+            withAnimation(.easeOut(duration: 0.2)) {
+                proxy.scrollTo(bottomAnchorId, anchor: .bottom)
             }
         }
     }
