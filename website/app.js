@@ -212,6 +212,84 @@
     }
   })();
 
+  /* ---------------- Hero now-playing: pin below header while hero visible ---------------- */
+  (function () {
+    var np = document.getElementById('heroNowPlaying');
+    var slot = document.getElementById('heroNpSlot');
+    var hero = document.getElementById('hero');
+    var header = document.getElementById('siteHeader');
+    if (!np || !slot || !hero) return;
+    if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+
+    var mq = window.matchMedia('(min-width: 981px)');
+    var GAP = 20;
+    var raf = 0;
+
+    function headerFloor() {
+      return (header ? header.getBoundingClientRect().bottom : 72) + GAP;
+    }
+
+    function clearPin() {
+      np.classList.remove('is-viewport-pinned');
+      np.style.top = np.style.left = np.style.width = '';
+      slot.style.minHeight = '';
+    }
+
+    function sync() {
+      if (!mq.matches) { clearPin(); return; }
+
+      var floor = headerFloor();
+      var heroR = hero.getBoundingClientRect();
+      var slotR = slot.getBoundingClientRect();
+      var cardH = np.offsetHeight;
+
+      if (heroR.bottom <= floor + cardH * 0.25) {
+        clearPin();
+        return;
+      }
+
+      var maxTop = heroR.bottom - cardH - GAP;
+      if (slotR.top >= floor || maxTop < floor) {
+        clearPin();
+        return;
+      }
+
+      np.classList.add('is-viewport-pinned');
+      np.style.top = floor + 'px';
+      np.style.left = slotR.left + 'px';
+      np.style.width = slotR.width + 'px';
+      slot.style.minHeight = cardH + 'px';
+    }
+
+    function requestSync() {
+      if (raf) return;
+      raf = requestAnimationFrame(function () {
+        raf = 0;
+        sync();
+      });
+    }
+
+    window.addEventListener('scroll', requestSync, { passive: true });
+    window.addEventListener('resize', requestSync);
+    window.addEventListener('load', requestSync);
+    if (document.fonts && document.fonts.ready) document.fonts.ready.then(requestSync);
+    if (mq.addEventListener) mq.addEventListener('change', requestSync);
+    else if (mq.addListener) mq.addListener(requestSync);
+    var heroVisual = document.querySelector('#hero .hero-visual.reveal');
+    if (heroVisual) {
+      heroVisual.addEventListener('transitionend', function (e) {
+        if (e.propertyName === 'transform' || e.propertyName === 'opacity') requestSync();
+      });
+    }
+    if (typeof ResizeObserver !== 'undefined') {
+      var ro = new ResizeObserver(requestSync);
+      ro.observe(slot);
+      if (header) ro.observe(header);
+      ro.observe(np);
+    }
+    requestSync();
+  })();
+
   /* ---------------- Studio (interactive demo) ---------------- */
   var studioInit = (function () {
     var scriptEl = $('#previewScript'); if (!scriptEl) return null;
