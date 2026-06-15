@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { interestRating10 } from './fact-interest-log.js';
 import { rejectSeedForTrackStory } from './fact-track-anchor.js';
-import { factMentionsArtistAsEntity, isAmbiguousCommonWordArtist } from './fact-relevance.js';
+import { factMentionsArtistAsEntity, factMentionsArtist, isAmbiguousCommonWordArtist } from './fact-relevance.js';
 import {
   adjustedInterestScore,
   interestScore,
@@ -593,6 +593,7 @@ export function pickFromBank(
       if (!factFitsStoryLanguage(fact.fact, storyLanguage)) continue;
       if (rejectSeedForTrackStory(fact.fact, artist, title, { trackPoolFacts })) continue;
       if (isRejectedPickSeed(fact.fact, title, storyLanguage, trackPoolFacts, artist)) continue;
+      if (scope === 'artist' && artist && !factMentionsArtist(fact.fact, artist)) continue;
       const live = computeLiveInterest(fact.fact);
       const effective = effectivePickScore(fact, live.score);
       if (effective < MIN_PICK_INTEREST_SCORE || live.rating < HOT_MIN_RATING) continue;

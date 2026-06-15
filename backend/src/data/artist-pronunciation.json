@@ -588,6 +588,11 @@
     "chubby checker": {
       "ru": "ч+убби ч+екер",
       "en": "Chubby Checker"
+    },
+    "van halen": {
+      "ru": "ван хал+ена",
+      "en": "Van Hay len",
+      "aliases": ["eddie van halen", "эдди ван хален", "эдди ван халена", "van halen эдди"]
     }
   }
 }

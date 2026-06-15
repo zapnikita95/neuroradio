@@ -104,6 +104,31 @@ else if (!marked.includes('Lou Bega')) fail(`Latin artist name lost: ${marked}`)
 else if (!marked.includes('ст+удии')) fail(`Cyrillic stress missing: ${marked}`);
 else ok(`TTS markup (Cyrillic stress only): ${marked}`);
 
+const BEAT_IT_SCRIPT =
+  'Beat it — Michael Jackson. Гитарист Van Halen Эдди Ван Хален записал культовый рифф за один дубль. Quincy Jones настоял на хард-роковом звучании.';
+const beatItVal = validateStoryScript(BEAT_IT_SCRIPT, '30s', 'Michael Jackson', 'Beat it', {
+  referenceFacts: [
+    'Beat It Michael Jackson Eddie Van Halen recorded guitar solo in one take for Thriller.',
+  ],
+  strictLength: false,
+  speakTrackNamesInVoiceover: true,
+});
+if (!beatItVal.ok) {
+  fail(`Beat It + Van Halen guest should pass: ${beatItVal.reason}`);
+} else {
+  ok('Beat It Van Halen guest musician accepted');
+}
+
+const beatItTts = prepareYandexTtsText(
+  'мощный гитарный рифф Эдди Ван Халена вплелся в поп-стиль.',
+  { artist: 'Michael Jackson', title: 'Beat it', sentencePauses: false },
+);
+if (!/хал\+ена/i.test(beatItTts)) {
+  fail(`Van Halen stress missing in TTS: ${beatItTts}`);
+} else {
+  ok(`Van Halen TTS stress: ${beatItTts}`);
+}
+
 const RACISM_SCRIPT =
   'Jencarlos с треком Caramba удивил: текст наполнен темой расизма и дискриминации, артист рассказывает о личном опыте.';
 const racismVal = validateStoryScript(RACISM_SCRIPT, '30s', 'Jencarlos', 'Caramba', {

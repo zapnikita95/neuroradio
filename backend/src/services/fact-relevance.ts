@@ -122,6 +122,23 @@ function isCastOrCrewMention(script: string, entity: string): boolean {
   return false;
 }
 
+/** Session guitarist / featured guest on the track — not a competing headliner (Beat It → Van Halen). */
+function isGuestOrSessionMusicianMention(script: string, entity: string): boolean {
+  const lower = script.toLowerCase();
+  const entityLower = entity.toLowerCase();
+  const idx = lower.indexOf(entityLower);
+  if (idx < 0) return false;
+  const before = script.slice(Math.max(0, idx - 96), idx);
+  const after = script.slice(idx + entity.length, idx + entity.length + 56);
+  const ctx = `${before} ${after}`;
+  return (
+    /(?:гитарист|барабанщик|бас(?:ист)?|клавишник|саксофонист|музыкант|исполнител|session|feat(?:uring|\.|ure)?|featuring|приглас(?:ил(?:и)?|ить)|записал(?:и)?|в\s+од(?:ин|ну)\s+(?:дубль|сессию|take)|solo(?:м|м)?|рифф|guest|collaborat|участ(?:ие|вовал|ник)|специально\s+для|продюсер|producer|cowriter|co-writer|на\s+гитар|гuitar|drums|bass player|played (?:the )?guitar)/i.test(
+      ctx,
+    ) ||
+    /\b(?:Van\s+Halen|Eddie|Эдди)\b/i.test(before)
+  );
+}
+
 /** Named entities that could be musical acts (Latin + Cyrillic). */
 function extractNamedEntities(fact: string): string[] {
   const entities: string[] = [];
@@ -402,6 +419,7 @@ export function storyNamesForeignArtist(
       if (isContextEntity(entity)) continue;
       if (isCriticAttribution(cleaned, entity)) continue;
       if (isCastOrCrewMention(cleaned, entity)) continue;
+      if (isGuestOrSessionMusicianMention(cleaned, entity)) continue;
       if (entityMatchesArtist(entity, artist, cleanTitle)) continue;
       if (entityAllowedAsCover(entity, coverAllowed)) continue;
       if (entityInReferenceFacts(entity, referenceFacts)) continue;
