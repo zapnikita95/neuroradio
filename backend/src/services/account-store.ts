@@ -515,11 +515,10 @@ export function getSyncStatus(installId: string): {
   };
 }
 
-export function createAccount(installId: string): { accountId: string; syncCode: string } {
-  const store = loadStore();
+function createAccountInStore(store: StoreFile, installId: string): { accountId: string; syncCode: string } {
   const normalized = installId.trim().toLowerCase();
   const existing = store.installToAccount[normalized];
-  if (existing) {
+  if (existing && store.accountsById[existing]) {
     const account = store.accountsById[existing]!;
     return { accountId: existing, syncCode: account.syncCode };
   }
@@ -541,8 +540,14 @@ export function createAccount(installId: string): { accountId: string; syncCode:
   };
   store.installToAccount[normalized] = accountId;
   store.syncCodeToAccount[syncCode] = accountId;
-  saveStore(store);
   return { accountId, syncCode };
+}
+
+export function createAccount(installId: string): { accountId: string; syncCode: string } {
+  const store = loadStore();
+  const result = createAccountInStore(store, installId);
+  saveStore(store);
+  return result;
 }
 
 export function linkAccount(installId: string, syncCodeRaw: string): {
@@ -1486,13 +1491,31 @@ export async function verifyEmailLogin(
       return { ok: false, error: 'Код выдан другому устройству' };
     }
   }
-  let accountId = store.emailToAccount[email];
+  let accountId: string | undefined = store.emailToAccount[email];
+  if (accountId && !store.accountsById[accountId]) {
+    console.warn(
+      `[email-auth] stale email→account mapping email=${email} accountId=${accountId.slice(0, 8)} — rebuilding`,
+    );
+    delete store.emailToAccount[email];
+    accountId = undefined;
+  }
   const isFirstRegistration = !accountId;
   const prevAnonymousAccountId = store.installToAccount[normalized] ?? null;
   if (!accountId) {
-    accountId = prevAnonymousAccountId ?? createAccount(installId).accountId;
+    if (prevAnonymousAccountId && store.accountsById[prevAnonymousAccountId]) {
+      accountId = prevAnonymousAccountId;
+    } else {
+      accountId = createAccountInStore(store, installId).accountId;
+    }
   }
-  const account = store.accountsById[accountId];
+  let account = store.accountsById[accountId];
+  if (!account) {
+    console.warn(
+      `[email-auth] account record missing email=${email} accountId=${accountId.slice(0, 8)} — creating`,
+    );
+    accountId = createAccountInStore(store, installId).accountId;
+    account = store.accountsById[accountId];
+  }
   if (!account) return { ok: false, error: 'Аккаунт недоступен' };
 
   account.email = email;
