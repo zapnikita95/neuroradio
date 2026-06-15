@@ -198,7 +198,9 @@ struct HomeView: View {
                 Task { await orchestrator.requestManualStory() }
             }
 
-            if orchestrator.uiState.state == .playingStory || orchestrator.uiState.state == .preparingPlayback {
+            if orchestrator.uiState.state == .fetchingStory
+                || orchestrator.uiState.state == .preparingPlayback
+                || orchestrator.uiState.state == .playingStory {
                 Button(copy.stopStory) { orchestrator.stopStory() }
                     .foregroundStyle(AppTheme.errorCoral)
             }

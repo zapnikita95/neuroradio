@@ -120,6 +120,11 @@ struct AppL10n {
     var manualTrackRequired: String {
         en ? "Enter artist and title" : "Укажите исполнителя и название"
     }
+    var storyFetchTimeout: String {
+        en
+            ? "Story generation timed out. Check your connection and try again."
+            : "История не успела сгенерироваться. Проверь интернет и попробуй ещё раз."
+    }
     var offlineNoInternet: String {
         en
             ? "No internet. This story is not saved on the phone yet — listen online once with Extended plan."

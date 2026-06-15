@@ -54,8 +54,11 @@ final class StoryOrchestrator: ObservableObject {
     private var playbackSession = 0
     private var isStoryRunning = false
     private var previewTask: Task<Void, Never>?
+    private var storyFetchTask: Task<Result<StoryResponse, Error>, Never>?
     /// Ручной запрос истории из настроек — не сбрасывать UI в onTrackChanged.
     private var explicitManualStoryRequest = false
+
+    private static let storyFetchTimeoutNs: UInt64 = 120 * 1_000_000_000
 
     init(nowPlaying: NowPlayingCoordinator, storyPlayer: StoryPlayer) {
         self.nowPlaying = nowPlaying
@@ -198,6 +201,8 @@ final class StoryOrchestrator: ObservableObject {
 
     func stopStory() {
         cancelGenerationPreview()
+        storyFetchTask?.cancel()
+        storyFetchTask = nil
         playbackSession += 1
         isStoryRunning = false
         uiState.pendingFeedback = nil
@@ -305,7 +310,7 @@ final class StoryOrchestrator: ObservableObject {
         uiState.currentTrack = track
 
         let fetchStarted = Date()
-        let result = await storyRepository.fetchStory(track: track, forceRefresh: true)
+        let result = await fetchStoryWithTimeout(for: track)
 
         guard session == playbackSession else {
             isStoryRunning = false
@@ -402,8 +407,44 @@ final class StoryOrchestrator: ObservableObject {
         case .failure(let error):
             cancelGenerationPreview()
             isStoryRunning = false
-            uiState.errorMessage = error.localizedDescription
+            if error is CancellationError || (error as? URLError)?.code == .cancelled {
+                uiState.errorMessage = nil
+                uiState.state = .listening
+                return
+            }
+            let copy = AppStrings.l10n(settings.resolvedLanguage)
+            if (error as? URLError)?.code == .timedOut {
+                uiState.errorMessage = copy.storyFetchTimeout
+            } else {
+                uiState.errorMessage = error.localizedDescription
+            }
             uiState.state = .error
+        }
+    }
+
+    private func fetchStoryWithTimeout(for track: TrackInfo) async -> Result<StoryResponse, Error> {
+        storyFetchTask?.cancel()
+        let fetchTask = Task { await storyRepository.fetchStory(track: track, forceRefresh: true) }
+        storyFetchTask = fetchTask
+
+        let timeoutTask = Task {
+            try await Task.sleep(nanoseconds: Self.storyFetchTimeoutNs)
+            fetchTask.cancel()
+        }
+
+        let repositoryResult = await fetchTask.value
+        timeoutTask.cancel()
+        storyFetchTask = nil
+
+        switch repositoryResult {
+        case .success(let response):
+            return .success(response)
+        case .failure(let error):
+            if fetchTask.isCancelled, !Task.isCancelled {
+                let copy = AppStrings.l10n(settings.resolvedLanguage)
+                return .failure(URLError(.timedOut, userInfo: [NSLocalizedDescriptionKey: copy.storyFetchTimeout]))
+            }
+            return .failure(error)
         }
     }
 

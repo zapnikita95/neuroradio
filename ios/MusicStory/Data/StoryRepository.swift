@@ -69,15 +69,29 @@ final class StoryRepository: ObservableObject {
             let response = try await backend.fetchFullStory(request: request)
             history.saveStory(response, track: track)
             dailyQuota = response.quota
-            let localPath = await maybeDownloadOfflineAudio(trackKey: track.displayKey, audioUrl: response.audioUrl)
             history.upsertCachedStory(
                 trackKey: track.displayKey,
                 response: response,
-                localAudioPath: localPath
+                localAudioPath: nil
             )
+            scheduleOfflineAudioDownload(trackKey: track.displayKey, audioUrl: response.audioUrl)
             return .success(response)
         } catch {
+            if error is CancellationError {
+                return .failure(BackendError.network(URLError(.cancelled)))
+            }
             return .failure(error)
+        }
+    }
+
+    private func scheduleOfflineAudioDownload(trackKey: String, audioUrl: String?) {
+        guard canUseOfflineReplay(), audioUrl?.isEmpty == false else { return }
+        Task(priority: .utility) { [weak self] in
+            guard let self else { return }
+            let path = await self.maybeDownloadOfflineAudio(trackKey: trackKey, audioUrl: audioUrl)
+            if let path {
+                self.history.updateLocalAudioPath(trackKey: trackKey, path: path)
+            }
         }
     }
 
