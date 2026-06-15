@@ -1,9 +1,10 @@
 import type { AccountRecord } from './account-store.js';
 
-/** Тестовые учётки (фиксированный код 000000, без письма). */
-const REVIEWER_ACCOUNTS: Record<string, { code: string; dailyStories: number }> = {
-  'googletester@test.ru': { code: '000000', dailyStories: 10 },
-  'appletester@test.ru': { code: '000000', dailyStories: 10 },
+/** Тестовые учётки App Review / Play Review (фиксированный код 000000, без письма, полный Premium). */
+const REVIEWER_ACCOUNTS: Record<string, { code: string }> = {
+  'googletester@test.ru': { code: '000000' },
+  'appletester@test.ru': { code: '000000' },
+  'appletester@test.com': { code: '000000' },
 };
 
 const REVIEWER_PREMIUM_MS = 365 * 24 * 60 * 60 * 1000;
@@ -27,12 +28,7 @@ export function isYookassaReviewerLoginCode(emailRaw: string, codeRaw: string): 
   return false;
 }
 
-export function getYookassaReviewerDailyLimit(emailRaw: string): number | null {
-  const entry = REVIEWER_ACCOUNTS[normalizeReviewerEmail(emailRaw)];
-  return entry?.dailyStories ?? null;
-}
-
-/** Premium на год, без привязанной карты — чтобы проверяющие могли пройти оплату с нуля. */
+/** Premium на год, без привязанной карты — полный доступ для App / Play Review. */
 export function provisionYookassaReviewerAccount(account: AccountRecord): void {
   const now = Date.now();
   account.plan = 'premium';

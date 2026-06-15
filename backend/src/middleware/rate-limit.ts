@@ -1,7 +1,7 @@
 import { Response } from 'express';
 import { isUnlimitedInstall, SECURITY } from '../config/security.js';
 import { getAccountProfile, getQuotaSubject } from '../services/account-store.js';
-import { getYookassaReviewerDailyLimit } from '../services/yookassa-reviewer-accounts.js';
+import { isYookassaReviewerEmail } from '../services/yookassa-reviewer-accounts.js';
 import { resolveUserTier } from '../services/entitlements.js';
 import { resolveFreeDailyLimit } from '../services/free-model-profile.js';
 import { getDevTierOverride } from '../services/dev-tier-store.js';
@@ -138,12 +138,14 @@ export function resetStoryQuotaForInstall(installId: string): void {
   buckets.delete(`story:hour:${subject}`);
 }
 
+function isReviewerInstall(installId: string): boolean {
+  const email = getAccountProfile(installId).email;
+  return Boolean(email && isYookassaReviewerEmail(email));
+}
+
 export function getDailyStoryLimit(installId: string, options: { freeOpenRouterModel?: string } = {}): number {
-  if (isUnlimitedInstall(installId) || isDevQuotaBypass(installId)) return UNLIMITED_QUOTA.limit;
-  const reviewerEmail = getAccountProfile(installId).email;
-  if (reviewerEmail) {
-    const reviewerLimit = getYookassaReviewerDailyLimit(reviewerEmail);
-    if (reviewerLimit != null) return reviewerLimit;
+  if (isUnlimitedInstall(installId) || isDevQuotaBypass(installId) || isReviewerInstall(installId)) {
+    return UNLIMITED_QUOTA.limit;
   }
   const tier = resolveUserTier(installId);
   if (tier === 'free') {
@@ -160,7 +162,7 @@ export function getDailyStoryQuota(
   installId: string,
   options: { freeOpenRouterModel?: string } = {},
 ): QuotaSnapshot {
-  if (isUnlimitedInstall(installId) || isDevQuotaBypass(installId)) {
+  if (isUnlimitedInstall(installId) || isDevQuotaBypass(installId) || isReviewerInstall(installId)) {
     return { ...UNLIMITED_QUOTA, tier: resolveUserTier(installId), resetsAt: Date.now() + DAY_MS };
   }
   const dailyLimit = getDailyStoryLimit(installId, options);
@@ -261,7 +263,7 @@ export function recordStoryGeneration(
   req: { header(name: string): string | undefined; socket: { remoteAddress?: string } },
   options: { freeOpenRouterModel?: string; skipDailyQuota?: boolean } = {},
 ): void {
-  if (isUnlimitedInstall(installId) || isDevQuotaBypass(installId) || options.skipDailyQuota) return;
+  if (isUnlimitedInstall(installId) || isDevQuotaBypass(installId) || isReviewerInstall(installId) || options.skipDailyQuota) return;
 
   const ip = clientIp(req);
   const { limits } = SECURITY;

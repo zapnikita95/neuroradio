@@ -24,9 +24,15 @@ struct AccountAuthPanel: View {
     private enum LoginStep { case email, code }
     private enum EmailField: Hashable { case email, code }
 
+    private static let reviewerEmails: Set<String> = [
+        "appletester@test.ru",
+        "appletester@test.com",
+        "googletester@test.ru",
+    ]
+
     private var isReviewerEmail: Bool {
         let trimmed = email.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
-        return trimmed == "appletester@test.ru" || trimmed == "googletester@test.ru"
+        return Self.reviewerEmails.contains(trimmed)
     }
 
     var body: some View {

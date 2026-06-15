@@ -265,8 +265,9 @@ curl -s https://ТВОЙ-BFF.up.railway.app/v1/public/tts-config
 
 | Email | Код входа | Тариф |
 |-------|-----------|-------|
-| `googletester@test.ru` | `000000` | Premium на 1 год, **10 историй/день** |
-| `appletester@test.ru` | `000000` | Premium на 1 год, **10 историй/день** |
+| `googletester@test.ru` | `000000` | Premium на 1 год, **без лимита историй** |
+| `appletester@test.ru` | `000000` | Premium на 1 год, **без лимита историй** |
+| `appletester@test.com` | `000000` | то же |
 
 Код работает в приложении и на сайте `#account`. Письмо не отправляется — можно сразу ввести `000000`. Карта не привязана.
 
