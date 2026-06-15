@@ -26,11 +26,12 @@
   --r-sm: 12px;
   --maxw: 1200px;
   --ease: cubic-bezier(.22,.61,.36,1);
+  --site-header-offset: 90px;
 }
 
 * { box-sizing: border-box; min-width: 0; }
 [hidden] { display: none !important; }
-html { scroll-behavior: smooth; scroll-padding-top: 90px; overflow-x: clip; max-width: 100%; }
+html { scroll-behavior: smooth; scroll-padding-top: var(--site-header-offset); overflow-x: clip; max-width: 100%; }
 body {
   margin: 0;
   font-family: "Manrope", system-ui, -apple-system, "Segoe UI", sans-serif;
@@ -124,9 +125,14 @@ main { max-width: 100%; overflow-x: clip; }
 }
 .nav-login, .nav-cabinet { white-space: nowrap; }
 .nav-cta { margin-left: 0; }
-.hero-visual { will-change: transform; margin-top: 0; padding-top: 12px; }
+.hero-visual { margin-top: 0; padding-top: 12px; }
 @media (min-width: 981px) {
-  #heroNowPlaying { will-change: transform; }
+  .hero-visual {
+    position: sticky;
+    top: var(--site-header-offset);
+    align-self: start;
+    z-index: 2;
+  }
 }
 .burger { display: none; flex-direction: column; gap: 5px; background: none; border: 0; cursor: pointer; padding: 8px; margin-left: auto; }
 .burger span { width: 24px; height: 2px; background: var(--text); border-radius: 2px; transition: .3s; }

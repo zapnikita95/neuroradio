@@ -212,49 +212,6 @@
     }
   })();
 
-  /* ---------------- Hero now-playing scroll drift ---------------- */
-  (function () {
-    var np = document.getElementById('heroNowPlaying');
-    var inner = document.querySelector('#hero > .hero-inner');
-    var header = document.getElementById('siteHeader');
-    if (!np || !inner) return;
-    if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
-    var mq = window.matchMedia('(min-width: 981px)');
-    var headerGap = 10;
-    function headerStopTop() { return (header ? header.getBoundingClientRect().bottom : 0) + headerGap; }
-    function onScroll() {
-      if (!mq.matches) { np.style.transform = ''; return; }
-      var stopTop = headerStopTop();
-      var elR = np.getBoundingClientRect();
-      if (elR.top >= stopTop) { np.style.transform = ''; return; }
-      var innerR = inner.getBoundingClientRect();
-      var drift = stopTop - elR.top;
-      var maxDrift = Math.max(0, innerR.bottom - elR.bottom);
-      drift = Math.min(drift, maxDrift);
-      np.style.transform = drift > 0.5 ? 'translate3d(0,' + drift + 'px,0)' : '';
-    }
-    function tick() { np.style.transform = ''; onScroll(); }
-    window.addEventListener('scroll', onScroll, { passive: true });
-    window.addEventListener('resize', tick);
-    window.addEventListener('load', tick);
-    if (document.fonts && document.fonts.ready) document.fonts.ready.then(tick);
-    if (mq.addEventListener) mq.addEventListener('change', tick);
-    else if (mq.addListener) mq.addListener(tick);
-    if (typeof ResizeObserver !== 'undefined') {
-      var ro = new ResizeObserver(tick);
-      ro.observe(inner);
-      if (header) ro.observe(header);
-      ro.observe(np);
-    }
-    var heroVisual = document.querySelector('#hero .hero-visual.reveal');
-    if (heroVisual) {
-      heroVisual.addEventListener('transitionend', function (e) {
-        if (e.propertyName === 'transform' || e.propertyName === 'opacity') tick();
-      });
-    }
-    tick();
-  })();
-
   /* ---------------- Studio (interactive demo) ---------------- */
   var studioInit = (function () {
     var scriptEl = $('#previewScript'); if (!scriptEl) return null;
