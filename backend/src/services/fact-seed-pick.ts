@@ -20,6 +20,7 @@ import { isMetadataOnlyFallbackFact } from './metadata-facts.js';
 import { isTruncatedMarketingSnippet, isUnspeakableWebSeed, isArtistIdentityBioSnippet } from './web-snippet-accept.js';
 import {
   factMentionsTitle,
+  factMentionsArtistLoose,
   hasTrackContextSignal,
   isMisattributedBandTrackFact,
 } from './fact-relevance.js';
@@ -37,7 +38,10 @@ export function isRejectedPickSeed(
   artist = '',
 ): boolean {
   if (!factFitsStoryLanguage(fact, storyLanguage)) return true;
-  if (title && artist && rejectSeedForTrackStory(fact, artist, title, { trackPoolFacts: trackPool })) {
+  if (artist.trim() && !factMentionsArtistLoose(fact, artist)) {
+    return true;
+  }
+  if (title.trim() && artist && rejectSeedForTrackStory(fact, artist, title, { trackPoolFacts: trackPool })) {
     return true;
   }
   if (isAlbumListingSeed(fact)) return true;

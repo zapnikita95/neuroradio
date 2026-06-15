@@ -2,8 +2,13 @@ import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { interestRating10 } from './fact-interest-log.js';
-import { rejectSeedForTrackStory } from './fact-track-anchor.js';
-import { factMentionsArtistAsEntity, factMentionsArtist, isAmbiguousCommonWordArtist } from './fact-relevance.js';
+import { rejectSeedForTrackStory, hasAnchoredTrackContext } from './fact-track-anchor.js';
+import {
+  factMentionsArtistAsEntity,
+  factMentionsArtistLoose,
+  factMentionsTitle,
+  isAmbiguousCommonWordArtist,
+} from './fact-relevance.js';
 import {
   adjustedInterestScore,
   interestScore,
@@ -289,6 +294,13 @@ function buildStoredFact(
 
 function isValidStoredFact(fact: StoredFact): boolean {
   if (isAmbiguousCommonWordArtist(fact.artist) && !factMentionsArtistAsEntity(fact.fact, fact.artist)) {
+    return false;
+  }
+  if (
+    fact.artist.trim() &&
+    !factMentionsArtistLoose(fact.fact, fact.artist) &&
+    !(fact.scope === 'track' && fact.title.trim() && factMentionsTitle(fact.fact, fact.title))
+  ) {
     return false;
   }
   if (
@@ -593,7 +605,15 @@ export function pickFromBank(
       if (!factFitsStoryLanguage(fact.fact, storyLanguage)) continue;
       if (rejectSeedForTrackStory(fact.fact, artist, title, { trackPoolFacts })) continue;
       if (isRejectedPickSeed(fact.fact, title, storyLanguage, trackPoolFacts, artist)) continue;
-      if (scope === 'artist' && artist && !factMentionsArtist(fact.fact, artist)) continue;
+      if (scope === 'artist' && artist && !factMentionsArtistLoose(fact.fact, artist)) continue;
+      if (
+        (scope === 'track' || scope === 'album') &&
+        title.trim() &&
+        !factMentionsTitle(fact.fact, title) &&
+        !hasAnchoredTrackContext(fact.fact, title)
+      ) {
+        continue;
+      }
       const live = computeLiveInterest(fact.fact);
       const effective = effectivePickScore(fact, live.score);
       if (effective < MIN_PICK_INTEREST_SCORE || live.rating < HOT_MIN_RATING) continue;

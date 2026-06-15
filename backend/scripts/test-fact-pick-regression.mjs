@@ -527,6 +527,45 @@ assert(!isEligibleHotFact(GENERIC_VIDEO, { artist: 'Shakira', title: 'Waka Waka'
 assert(isEligibleHotFact(STRONG_VIDEO, { artist: 'Shakira', title: 'Waka Waka' }), 'strong video stays hot');
 assert(isRejectedPickSeed(GENERIC_VIDEO, 'Waka Waka', 'ru', [], 'Shakira'), 'generic video rejected at pick');
 
+// --- 5d. Artist bank pollution: seed must mention performing artist; guests OK ---
+const { factMentionsArtistLoose } = await import('../dist/services/fact-relevance.js');
+const { lookupCuratedFact } = await import('../dist/services/curated-facts.js');
+
+const CHICAGO_TEACHERS_STRIKE =
+  'In September 2012, the Chicago Teachers Union launched a strike that shut down Chicago Public Schools for seven days over teacher evaluations and job security.';
+const BEAT_IT_CURATED = lookupCuratedFact('Michael Jackson', 'Beat it');
+
+assert(
+  !factMentionsArtistLoose(CHICAGO_TEACHERS_STRIKE, 'Michael Jackson'),
+  'Chicago Teachers strike fact must not mention Michael Jackson',
+);
+assert(
+  isRejectedPickSeed(CHICAGO_TEACHERS_STRIKE, 'Beat It', 'ru', [], 'Michael Jackson'),
+  'Chicago Teachers strike rejected as MJ seed',
+);
+assert(
+  BEAT_IT_CURATED && factMentionsArtistLoose(BEAT_IT_CURATED.fact, 'Michael Jackson'),
+  'Beat It curated fact mentions Michael Jackson',
+);
+assert(
+  BEAT_IT_CURATED && /Van Halen|van halen/i.test(BEAT_IT_CURATED.fact),
+  'Beat It curated fact may mention guest Eddie Van Halen',
+);
+assert(
+  !isRejectedPickSeed(BEAT_IT_CURATED?.fact ?? '', 'Beat it', 'ru', [], 'Michael Jackson'),
+  'Beat It curated fact passes pick gates',
+);
+
+const NIN_CURATED = lookupCuratedFact('Nine Inch Nails', 'Closer');
+assert(
+  NIN_CURATED && factMentionsArtistLoose(NIN_CURATED.fact, 'Nine Inch Nails'),
+  'NIN Closer curated mentions Nine Inch Nails / Reznor',
+);
+assert(
+  !isRejectedPickSeed(NIN_CURATED?.fact ?? '', 'Closer', 'ru', [], 'Nine Inch Nails'),
+  'NIN Closer curated passes pick gates',
+);
+
 const BOBBY_BIO =
   'Walden Robert Cassotto, known by the stage name Bobby Darin, was an American singer, songwriter, and actor who performed pop, swing, folk, rock and roll and country music.';
 assert(

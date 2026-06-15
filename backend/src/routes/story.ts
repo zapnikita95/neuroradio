@@ -493,6 +493,14 @@ router.post('/full', extractClientSecrets, validateStoryFullBody, storyFullRateL
       bankFact = null;
     }
 
+    if (bankFact && !factMentionsArtistLoose(bankFact.fact, metadata.artist)) {
+      console.warn(
+        `[facts] bank seed off-topic (no "${metadata.artist}") fact="${bankFact.fact.slice(0, 100)}" — fetching fresh facts`,
+      );
+      bankFact = null;
+      factFromCurated = false;
+    }
+
     let selectedFact: SelectedReferenceFact | null = bankFact;
     let factFromBank = Boolean(bankFact);
 
