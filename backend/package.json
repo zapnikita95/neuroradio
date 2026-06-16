@@ -29,6 +29,8 @@
     "build:catalog": "node scripts/build-popular-tracks-catalog.mjs --target=60000 --no-proxy",
     "build:catalog:20k": "node scripts/build-popular-tracks-catalog.mjs --target=20000 --no-proxy",
     "build:catalog:10k": "node scripts/build-popular-tracks-catalog.mjs --target=10000 --no-proxy",
+    "build:catalog:genre-year": "node scripts/build-genre-year-catalog.mjs --no-proxy",
+    "build:catalog:genre-year:lastfm": "node scripts/build-genre-year-catalog.mjs --lastfm-only --no-proxy",
     "seed:facts": "node scripts/bulk-seed-fact-bank.mjs --target=60000 --hot-target=20000 --concurrency=3 --resume --no-proxy --backfill-discogs",
     "seed:facts:discogs": "node scripts/bulk-seed-fact-bank.mjs --target=60000 --hot-target=20000 --concurrency=1 --resume --no-proxy --discogs-only --backfill-discogs",
     "test:facts": "npm run build && node scripts/test-fact-topic.mjs && node scripts/test-live-facts-5tracks.mjs",

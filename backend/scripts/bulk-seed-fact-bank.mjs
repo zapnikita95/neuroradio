@@ -62,6 +62,9 @@ function isHarvestableTrack(track) {
 
 function trackPriority(track) {
   const s = track.source ?? '';
+  if (s.startsWith('genre-year')) return -3;
+  if (s.startsWith('lastfm-year') || s.startsWith('lastfm-decade')) return -2;
+  if (s.startsWith('lastfm-tag')) return -1;
   if (s.startsWith('seed-ru')) return 0;
   if (s.startsWith('lastfm')) return 1;
   if (s.startsWith('seed-global')) return 2;
