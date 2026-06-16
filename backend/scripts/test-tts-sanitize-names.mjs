@@ -2,12 +2,7 @@
  * Run: npm run build && node scripts/test-tts-sanitize-names.mjs
  */
 import { sanitizeScriptForTts } from '../dist/services/story-quality.js';
-import {
-  restoreLatinNamesForVoiceover,
-  shouldStripLatinTrackNames,
-} from '../dist/services/tts-generic-script.js';
-import { prepareYandexTtsText } from '../dist/services/tts-markup.js';
-import { splitMixedLanguageForEdge } from '../dist/services/tts-mixed-segments.js';
+import { shouldStripLatinTrackNames } from '../dist/services/tts-generic-script.js';
 
 function ok(cond, msg) {
   if (!cond) {
@@ -49,32 +44,6 @@ const ruOut = sanitizeScriptForTts(ruArtist, 'Король и Шут', 'Лаге
 console.log('ruOut:', ruOut);
 ok(ruOut.includes('Лагерная Пыль'), 'cyrillic title kept');
 ok(ruOut.includes('Король и Шут'), 'cyrillic artist kept');
-
-const placeholder =
-  'Эта группа когда-то записала хит с гитарным риффом. Этот трек стал визитной карточкой альбома.';
-const restored = restoreLatinNamesForVoiceover(placeholder, 'The Offspring', 'Self Esteem');
-console.log('restored:', restored);
-ok(/The Offspring/i.test(restored), 'placeholder artist → latin');
-ok(/Self Esteem/i.test(restored), 'placeholder title → latin');
-
-const sanitizedOn = sanitizeScriptForTts(placeholder, 'The Offspring', 'Self Esteem', [], {
-  speakTrackNamesInVoiceover: true,
-});
-console.log('sanitizedOn:', sanitizedOn);
-ok(/The Offspring/i.test(sanitizedOn), 'sanitize speak-on keeps latin artist');
-ok(/Self Esteem/i.test(sanitizedOn), 'sanitize speak-on keeps latin title');
-ok(!/эта группа/i.test(sanitizedOn), 'sanitize speak-on removes placeholder group');
-
-const edgeMixed = prepareYandexTtsText(placeholder, {
-  artist: 'The Offspring',
-  title: 'Self Esteem',
-  speakTrackNamesInVoiceover: true,
-  sentencePauses: false,
-});
-console.log('edgeMixed:', edgeMixed);
-ok(/The Offspring/i.test(edgeMixed), 'Edge mixed prep keeps latin artist');
-const segs = splitMixedLanguageForEdge(edgeMixed, 'The Offspring', 'Self Esteem');
-ok(segs.some((s) => s.lang === 'en' && /Offspring|Self Esteem/i.test(s.text)), 'Edge EN segment for names');
 
 if (process.exitCode) process.exit(process.exitCode);
 console.log('\nAll TTS sanitize name checks passed.');

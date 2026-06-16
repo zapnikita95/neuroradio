@@ -13,7 +13,6 @@ import { applyForeignPronunciation } from './tts-foreign-pronounce.js';
 import {
   genericizeScriptForVoiceover,
   phraseVariants,
-  restoreLatinNamesForVoiceover,
   scriptContainsLatinTrackCitation,
   shouldStripLatinTrackNames,
 } from './tts-generic-script.js';
@@ -377,6 +376,8 @@ export function sanitizeScriptForTts(
     trackArtist?: string;
     trackTitle?: string;
     storyLanguage?: StoryLanguageId;
+    /** Edge TTS: не транслитерировать латиницу в кириллицу — EN-голос Edge. */
+    skipForeignPhonetic?: boolean;
   },
 ): string {
   if (options?.storyLanguage === 'en') {
@@ -388,12 +389,6 @@ export function sanitizeScriptForTts(
   const blockArtist = options?.trackArtist ?? artist;
   const blockTitle = options?.trackTitle ?? title;
   const speakNames = options?.speakTrackNamesInVoiceover === true;
-  if (
-    speakNames &&
-    (shouldStripLatinTrackNames(blockArtist) || shouldStripLatinTrackNames(blockTitle))
-  ) {
-    result = restoreLatinNamesForVoiceover(result, blockArtist, blockTitle);
-  }
   const { text: localized } = prepareStoryScriptLanguage(result, {
     artist: blockArtist,
     title: blockTitle,
@@ -423,8 +418,8 @@ export function sanitizeScriptForTts(
     result = genericizeScriptForVoiceover(result, blockArtist, blockTitle);
   }
 
-  // Озвучка с названиями: латиница остаётся — Yandex SSML <lang en-US>, не «Зэ 2нд Ло».
-  if (!speakNames) {
+  // Yandex: кириллическая фонетика для латиницы. Edge: skipForeignPhonetic + native EN voice.
+  if (!speakNames && !options?.skipForeignPhonetic) {
     result = applyForeignPronunciation(result, '', '');
   }
 
