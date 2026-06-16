@@ -243,19 +243,17 @@
       var slotR = slot.getBoundingClientRect();
       var cardH = np.offsetHeight;
 
-      if (heroR.bottom <= floor + cardH * 0.25) {
+      if (heroR.bottom <= 0) { clearPin(); return; }
+
+      if (slotR.top >= floor) {
         clearPin();
         return;
       }
 
-      var maxTop = heroR.bottom - cardH - GAP;
-      if (slotR.top >= floor || maxTop < floor) {
-        clearPin();
-        return;
-      }
+      var top = Math.min(Math.max(floor, slotR.top), heroR.bottom - cardH - GAP);
 
       np.classList.add('is-viewport-pinned');
-      np.style.top = floor + 'px';
+      np.style.top = top + 'px';
       np.style.left = slotR.left + 'px';
       np.style.width = slotR.width + 'px';
       slot.style.minHeight = cardH + 'px';
