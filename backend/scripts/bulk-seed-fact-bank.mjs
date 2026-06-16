@@ -313,6 +313,16 @@ async function processTrack(bank, track, stats) {
   return saveFacts(bank, artist, title, facts, stats);
 }
 
+function isTopCatalogTrack(track) {
+  const s = track.source ?? '';
+  return (
+    s.startsWith('genre-top') ||
+    s.startsWith('genre-year') ||
+    s.startsWith('lastfm-year') ||
+    s.startsWith('lastfm-decade')
+  );
+}
+
 function orderTracks(tracks, doneKeys, bank, zeroFactKeys) {
   const pending = [];
   const backfill = [];
@@ -328,28 +338,36 @@ function orderTracks(tracks, doneKeys, bank, zeroFactKeys) {
     }
   }
   const byPri = (a, b) => trackPriority(a) - trackPriority(b);
+  const pendingTops = pending.filter(isTopCatalogTrack);
+  const pendingRest = pending.filter((t) => !isTopCatalogTrack(t));
 
   if (backfillDiscogs && discogsBackfill.length) {
-    console.log(`Discogs backfill: ${discogsBackfill.length} tracks without album facts`);
+    console.log(`Discogs backfill: ${discogsBackfill.length} tracks without album facts (after tops)`);
   }
+  console.log(
+    `Queue priority: tops=${pendingTops.length} pending=${pendingRest.length} discogs=${discogsBackfill.length} backfill=${backfill.length}`,
+  );
 
   if (retryZero) {
     const retry = tracks.filter((t) => {
       const key = trackKey(t.artist, t.title);
       return zeroFactKeys.has(key) || (doneKeys.has(key) && !hasSubstantiveFactsInBank(bank, t.artist, t.title));
     });
-    console.log(
-      `Queue: discogs=${discogsBackfill.length} pending=${pending.length} backfill=${backfill.length} | retry-zero=${retry.length} (last)`,
-    );
     return [
+      ...pendingTops.sort(byPri),
       ...discogsBackfill.sort(byPri),
-      ...pending.sort(byPri),
+      ...pendingRest.sort(byPri),
       ...backfill.sort(byPri),
       ...retry.sort(byPri),
     ];
   }
 
-  return [...discogsBackfill.sort(byPri), ...pending.sort(byPri), ...backfill.sort(byPri)];
+  return [
+    ...pendingTops.sort(byPri),
+    ...discogsBackfill.sort(byPri),
+    ...pendingRest.sort(byPri),
+    ...backfill.sort(byPri),
+  ];
 }
 
 async function runPool(tracks, bank, stats, doneKeys, zeroFactKeys) {
