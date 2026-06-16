@@ -27,6 +27,7 @@ const SEED_OUT = join(__dir, '../data/facts-bank-seed.json');
 const args = process.argv.slice(2);
 const target = parseInt(args.find((a) => a.startsWith('--target='))?.split('=')[1] ?? '60000', 10);
 const hotTarget = parseInt(args.find((a) => a.startsWith('--hot-target='))?.split('=')[1] ?? '20000', 10);
+const hotPush = args.includes('--hot-push');
 const concurrency = parseInt(
   args.find((a) => a.startsWith('--concurrency='))?.split('=')[1] ??
     (args.includes('--discogs-only') ? '1' : hotPush ? '5' : '3'),
@@ -35,7 +36,6 @@ const concurrency = parseInt(
 const trackLimit = parseInt(args.find((a) => a.startsWith('--limit='))?.split('=')[1] ?? '0', 10);
 const resume = args.includes('--resume');
 const retryZero = args.includes('--retry-zero');
-const hotPush = args.includes('--hot-push');
 const discogsOnly = args.includes('--discogs-only');
 const backfillDiscogs = !hotPush && (args.includes('--backfill-discogs') || discogsOnly);
 const backfillLastfm = !hotPush && !args.includes('--no-backfill-lastfm') && !discogsOnly;
