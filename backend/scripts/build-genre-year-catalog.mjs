@@ -19,13 +19,26 @@ const LASTFM_KEY = process.env.LASTFM_API_KEY?.trim() ?? '';
 const args = process.argv.slice(2);
 const YEAR_FROM = parseInt(args.find((a) => a.startsWith('--year-from='))?.split('=')[1] ?? '1950', 10);
 const YEAR_TO = parseInt(args.find((a) => a.startsWith('--year-to='))?.split('=')[1] ?? String(new Date().getFullYear()), 10);
+const GENRE_TOP_LIMIT = parseInt(
+  args.find((a) => a.startsWith('--genre-top-limit='))?.split('=')[1] ?? '1000',
+  10,
+);
+const YEAR_TOP_LIMIT = parseInt(
+  args.find((a) => a.startsWith('--year-top-limit='))?.split('=')[1] ?? '200',
+  10,
+);
+const DECADE_TOP_LIMIT = parseInt(
+  args.find((a) => a.startsWith('--decade-top-limit='))?.split('=')[1] ?? '500',
+  10,
+);
 const TRACKS_PER_CELL = parseInt(
-  args.find((a) => a.startsWith('--tracks-per-cell='))?.split('=')[1] ?? '12',
+  args.find((a) => a.startsWith('--tracks-per-cell='))?.split('=')[1] ?? '30',
   10,
 );
 const CONCURRENCY = parseInt(args.find((a) => a.startsWith('--concurrency='))?.split('=')[1] ?? '4', 10);
 const mergeExisting = !args.includes('--fresh');
 const skipDeezer = args.includes('--lastfm-only');
+const topsOnly = args.includes('--tops-only');
 
 /** Broad genre list — Last.fm tags + regional styles. */
 const GENRES = [
@@ -105,14 +118,30 @@ async function fetchLastFmMethod(params) {
   return fetchJson(`https://ws.audioscrobbler.com/2.0/?${q}`);
 }
 
-async function fetchLastfmTagTop(tag, limit = 100) {
-  const data = await fetchLastFmMethod({ method: 'tag.gettoptracks', tag, limit: String(limit) });
+async function fetchLastfmTagTop(tag, limit = 100, sourcePrefix = 'lastfm-tag') {
+  const data = await fetchLastFmMethod({ method: 'tag.gettoptracks', tag, limit: String(Math.min(limit, 1000)) });
   if (!data || data.error) return [];
+  const slug = tag.replace(/\s+/g, '-');
   return (data.tracks?.track ?? []).map((t) => ({
     artist: t.artist?.name ?? t.artist?.['#text'] ?? '',
     title: t.name ?? '',
-    source: `lastfm-tag-${tag.replace(/\s+/g, '-')}`,
+    source: `${sourcePrefix}-${slug}`,
   }));
+}
+
+async function fetchDeezerGenreChart(genreId, genreName, limit = 300) {
+  const data = await fetchJson(`https://api.deezer.com/chart/${genreId}/tracks?limit=${Math.min(limit, 300)}`);
+  return (data?.data ?? []).map((t) => ({
+    artist: t.artist?.name ?? '',
+    title: t.title ?? '',
+    source: `genre-top:deezer:${genreId}`,
+    genre: genreName,
+  }));
+}
+
+async function fetchDeezerAllGenres() {
+  const data = await fetchJson('https://api.deezer.com/genre');
+  return (data?.data ?? []).filter((g) => g.id > 0);
 }
 
 function scorePlaylist(title, genre, year) {
@@ -155,7 +184,7 @@ async function fetchDeezerGenreYearTracks(genre, year, limit = TRACKS_PER_CELL) 
   if (!bestPl || bestScore < 2) return [];
 
   const tracks = await fetchJson(
-    `https://api.deezer.com/playlist/${bestPl.id}/tracks?limit=${Math.min(limit + 8, 50)}`,
+    `https://api.deezer.com/playlist/${bestPl.id}/tracks?limit=${Math.min(limit + 20, 100)}`,
   );
   const out = [];
   for (const t of tracks?.data ?? []) {
@@ -206,39 +235,51 @@ async function main() {
   let addedCells = 0;
 
   if (LASTFM_KEY) {
-    console.log('Last.fm: year tags…');
-    for (let year = YEAR_FROM; year <= YEAR_TO; year += 1) {
-      for (const t of await fetchLastfmTagTop(String(year), 80)) {
-        if (addTrack(catalog, t.artist, t.title, `lastfm-year-${year}`, { year })) addedLastfm += 1;
-      }
-      await sleep(280);
-    }
-    console.log(`+ lastfm years: ${catalog.size} (+${catalog.size - before})`);
-
-    console.log('Last.fm: decades…');
-    for (const decade of DECADE_TAGS) {
-      for (const t of await fetchLastfmTagTop(decade, 120)) {
-        if (addTrack(catalog, t.artist, t.title, `lastfm-decade-${decade}`)) addedLastfm += 1;
-      }
-      await sleep(280);
-    }
-    console.log(`+ lastfm decades: ${catalog.size}`);
-
-    console.log('Last.fm: all genres (top tracks)…');
+    console.log(`Last.fm: genre tops (limit=${GENRE_TOP_LIMIT})…`);
     for (const genre of GENRES) {
-      for (const t of await fetchLastfmTagTop(genre, 50)) {
-        if (addTrack(catalog, t.artist, t.title, `lastfm-tag-${genre.replace(/\s+/g, '-')}`, { genre })) {
-          addedLastfm += 1;
-        }
+      for (const t of await fetchLastfmTagTop(genre, GENRE_TOP_LIMIT, 'genre-top:lastfm')) {
+        if (addTrack(catalog, t.artist, t.title, t.source, { genre })) addedLastfm += 1;
       }
-      await sleep(250);
+      await sleep(320);
     }
-    console.log(`+ lastfm genres: ${catalog.size} (+${addedLastfm} lastfm total)`);
+    console.log(`+ lastfm genre tops: ${catalog.size} (+${addedLastfm})`);
+
+    console.log(`Last.fm: year tags (limit=${YEAR_TOP_LIMIT})…`);
+    for (let year = YEAR_FROM; year <= YEAR_TO; year += 1) {
+      for (const t of await fetchLastfmTagTop(String(year), YEAR_TOP_LIMIT, 'lastfm-year')) {
+        if (addTrack(catalog, t.artist, t.title, t.source, { year })) addedLastfm += 1;
+      }
+      await sleep(300);
+    }
+    console.log(`+ lastfm years: ${catalog.size}`);
+
+    console.log(`Last.fm: decades (limit=${DECADE_TOP_LIMIT})…`);
+    for (const decade of DECADE_TAGS) {
+      for (const t of await fetchLastfmTagTop(decade, DECADE_TOP_LIMIT, 'lastfm-decade')) {
+        if (addTrack(catalog, t.artist, t.title, t.source)) addedLastfm += 1;
+      }
+      await sleep(300);
+    }
+    console.log(`+ lastfm decades: ${catalog.size} (+${addedLastfm} lastfm total)`);
   } else {
     console.warn('LASTFM_API_KEY missing — skipping Last.fm year/genre tags');
   }
 
   if (!skipDeezer) {
+    console.log('Deezer: genre charts (top 300 per genre)…');
+    const deezerGenres = await fetchDeezerAllGenres();
+    let deezerAdded = 0;
+    for (const g of deezerGenres) {
+      for (const t of await fetchDeezerGenreChart(g.id, g.name, 300)) {
+        if (addTrack(catalog, t.artist, t.title, t.source, { genre: t.genre })) deezerAdded += 1;
+      }
+      console.log(`+ deezer chart ${g.id} ${g.name}: catalog=${catalog.size}`);
+      await sleep(150);
+    }
+    console.log(`+ deezer genre charts: +${deezerAdded} → ${catalog.size}`);
+  }
+
+  if (!skipDeezer && !topsOnly) {
     const cells = [];
     for (let year = YEAR_FROM; year <= YEAR_TO; year += 1) {
       for (const genre of GENRES) {
@@ -278,7 +319,14 @@ async function main() {
       {
         generatedAt: new Date().toISOString(),
         count: tracks.length,
-        genreYearMeta: { yearFrom: YEAR_FROM, yearTo: YEAR_TO, genres: GENRES.length, tracksPerCell: TRACKS_PER_CELL },
+        genreYearMeta: {
+          yearFrom: YEAR_FROM,
+          yearTo: YEAR_TO,
+          genres: GENRES.length,
+          genreTopLimit: GENRE_TOP_LIMIT,
+          tracksPerCell: TRACKS_PER_CELL,
+          topsOnly,
+        },
         tracks,
       },
       null,
