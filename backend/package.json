@@ -38,6 +38,7 @@
     "verify:batch": "npm run build && node scripts/verify-story-batch.mjs",
     "audit:bulk": "npm run build && node scripts/audit-bulk-coverage.mjs",
     "seed:facts:retry-zero": "node scripts/bulk-seed-fact-bank.mjs --target=60000 --hot-target=20000 --concurrency=3 --resume --retry-zero --no-proxy --backfill-discogs",
+    "seed:status": "node scripts/bulk-seed-status.mjs",
     "harvest:charts": "npm run build && node scripts/weekly-chart-harvest.mjs",
     "harvest:charts:dry": "npm run build && node scripts/weekly-chart-harvest.mjs --dry-run",
     "harvest:charts:status": "npm run build && node scripts/chart-harvest-status.mjs",
