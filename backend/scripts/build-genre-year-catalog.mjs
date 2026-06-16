@@ -293,6 +293,34 @@ async function main() {
     );
 
     let cellAdded = 0;
+    let cellsDone = 0;
+    const flushCatalog = () => {
+      const tracks = [...catalog.values()];
+      writeFileSync(
+        OUT,
+        JSON.stringify(
+          {
+            generatedAt: new Date().toISOString(),
+            count: tracks.length,
+            genreYearMeta: {
+              yearFrom: YEAR_FROM,
+              yearTo: YEAR_TO,
+              genres: GENRES.length,
+              genreTopLimit: GENRE_TOP_LIMIT,
+              tracksPerCell: TRACKS_PER_CELL,
+              topsOnly,
+              matrixOnly,
+              matrixProgress: `${cellsDone}/${cells.length}`,
+            },
+            tracks,
+          },
+          null,
+          0,
+        ),
+      );
+      console.log(`[checkpoint] catalog=${tracks.length} matrix=${cellsDone}/${cells.length}`);
+    };
+
     await poolMap(cells, CONCURRENCY, async ({ genre, year }) => {
       try {
         const tracks = await fetchDeezerGenreYearTracks(genre, year, TRACKS_PER_CELL);
@@ -307,6 +335,8 @@ async function main() {
       } catch {
         // skip cell
       }
+      cellsDone += 1;
+      if (cellsDone % 500 === 0) flushCatalog();
       await sleep(60);
     });
     console.log(`+ deezer genre×year: ${cellAdded} tracks from ${addedCells} non-empty cells → catalog=${catalog.size}`);

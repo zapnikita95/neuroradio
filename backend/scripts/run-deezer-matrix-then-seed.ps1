@@ -31,14 +31,8 @@ Stop-BulkSeed
 Push-Location $Backend
 try {
     Log 'Building Deezer genre×year matrix (merge into catalog)…'
-    $matrixArgs = @(
-        'scripts/build-genre-year-catalog.mjs',
-        '--matrix-only',
-        '--tracks-per-cell=30',
-        '--concurrency=5',
-        '--no-proxy'
-    )
-    & node @matrixArgs 2>&1 | Tee-Object -FilePath $PipelineLog -Append
+    $env:NODE_OPTIONS = ''
+    & node scripts/build-genre-year-catalog.mjs --matrix-only --tracks-per-cell=30 --concurrency=4 --no-proxy *>> $PipelineLog
     if ($LASTEXITCODE -ne 0) {
         Log "MATRIX FAILED exit=$LASTEXITCODE"
         exit $LASTEXITCODE
