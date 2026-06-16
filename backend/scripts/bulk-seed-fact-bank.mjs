@@ -28,15 +28,17 @@ const args = process.argv.slice(2);
 const target = parseInt(args.find((a) => a.startsWith('--target='))?.split('=')[1] ?? '60000', 10);
 const hotTarget = parseInt(args.find((a) => a.startsWith('--hot-target='))?.split('=')[1] ?? '20000', 10);
 const concurrency = parseInt(
-  args.find((a) => a.startsWith('--concurrency='))?.split('=')[1] ?? (args.includes('--discogs-only') ? '1' : '3'),
+  args.find((a) => a.startsWith('--concurrency='))?.split('=')[1] ??
+    (args.includes('--discogs-only') ? '1' : hotPush ? '5' : '3'),
   10,
 );
 const trackLimit = parseInt(args.find((a) => a.startsWith('--limit='))?.split('=')[1] ?? '0', 10);
 const resume = args.includes('--resume');
 const retryZero = args.includes('--retry-zero');
+const hotPush = args.includes('--hot-push');
 const discogsOnly = args.includes('--discogs-only');
-const backfillDiscogs = args.includes('--backfill-discogs') || discogsOnly;
-const backfillLastfm = !args.includes('--no-backfill-lastfm') && !discogsOnly;
+const backfillDiscogs = !hotPush && (args.includes('--backfill-discogs') || discogsOnly);
+const backfillLastfm = !hotPush && !args.includes('--no-backfill-lastfm') && !discogsOnly;
 
 const JUNK_ARTIST =
   /^(karaoke version|ameritz|party allstars|the latin party allstars|the latin party)$/i;
@@ -462,15 +464,24 @@ async function main() {
   console.log(`Checkpoint: hot-seed rebuilt from bank (${Object.keys(buildHotSeed(bank).byTrack).length} track keys)`);
 
   const ordered = orderTracks(tracks, doneKeys, bank, zeroFactKeys);
-  const backfillCount = ordered.filter((t) => doneKeys.has(trackKey(t.artist, t.title))).length;
+  let queue = ordered;
+  if (hotPush) {
+    queue = tracks
+      .filter((t) => !doneKeys.has(trackKey(t.artist, t.title)) && isTopCatalogTrack(t))
+      .sort((a, b) => trackPriority(a) - trackPriority(b));
+    console.log(
+      `HOT-PUSH: ${queue.length} top-catalog tracks only (skip discogs/backfill/obscure until hot≥${hotTarget})`,
+    );
+  }
+  const backfillCount = queue.filter((t) => doneKeys.has(trackKey(t.artist, t.title))).length;
   console.log(
-    `Targets: facts=${target} hot=${hotTarget} | mode=${discogsOnly ? 'discogs-only' : 'full'} concurrency=${concurrency}`,
+    `Targets: facts=${target} hot=${hotTarget} | mode=${hotPush ? 'hot-push' : discogsOnly ? 'discogs-only' : 'full'} concurrency=${concurrency}`,
   );
   console.log(
-    `Catalog: ${tracks.length} harvestable / ${(catalog.tracks ?? []).length} total | queue: ${ordered.length} (${backfillCount} backfill) | bank hot=${countHotInBank(bank)}`,
+    `Catalog: ${tracks.length} harvestable / ${(catalog.tracks ?? []).length} total | queue: ${queue.length} (${backfillCount} backfill) | bank hot=${countHotInBank(bank)}`,
   );
 
-  await runPool(ordered, bank, stats, doneKeys, zeroFactKeys);
+  await runPool(queue, bank, stats, doneKeys, zeroFactKeys);
 
   saveCheckpoint(bank, stats, doneKeys, zeroFactKeys);
   writeFileSync(

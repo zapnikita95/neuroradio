@@ -56,7 +56,7 @@ try {
         -ArgumentList $seedArgs `
         -WorkingDirectory $Backend `
         -RedirectStandardOutput $BulkLog `
-        -RedirectStandardError $BulkLog `
+        -RedirectStandardError (Join-Path $LogDir 'bulk-seed.err.log') `
         -PassThru `
         -WindowStyle Hidden
     $p.Id | Set-Content -Path (Join-Path $LogDir 'bulk-seed.pid') -Encoding ascii

@@ -50,7 +50,7 @@ try {
         -ArgumentList $nodeArgs `
         -WorkingDirectory $Backend `
         -RedirectStandardOutput $LogFile `
-        -RedirectStandardError $LogFile `
+        -RedirectStandardError (Join-Path $LogDir 'bulk-seed.err.log') `
         -PassThru `
         -WindowStyle Hidden
     $proc.Id | Set-Content -Path $PidFile -Encoding ascii
