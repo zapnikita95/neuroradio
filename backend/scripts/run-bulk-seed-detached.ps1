@@ -46,36 +46,17 @@ try {
         '--no-proxy',
         '--backfill-discogs'
     )
-    $psi = New-Object System.Diagnostics.ProcessStartInfo
-    $psi.FileName = 'node'
-    $psi.Arguments = ($nodeArgs -join ' ')
-    $psi.WorkingDirectory = $Backend
-    $psi.UseShellExecute = $false
-    $psi.RedirectStandardOutput = $true
-    $psi.RedirectStandardError = $true
-    $psi.CreateNoWindow = $true
-    $proc = [System.Diagnostics.Process]::Start($psi)
+    $proc = Start-Process -FilePath 'node' `
+        -ArgumentList $nodeArgs `
+        -WorkingDirectory $Backend `
+        -RedirectStandardOutput $LogFile `
+        -RedirectStandardError $LogFile `
+        -PassThru `
+        -WindowStyle Hidden
     $proc.Id | Set-Content -Path $PidFile -Encoding ascii
     Write-Host "bulk-seed started PID $($proc.Id)"
-    Write-Host "Log (async): $LogFile"
+    Write-Host "Log: $LogFile"
     Write-Host "Tail: Get-Content '$LogFile' -Wait -Tail 30"
-
-    # Фоновый drain лога
-    Start-Job -ScriptBlock {
-        param($p, $log)
-        $out = $p.StandardOutput
-        $err = $p.StandardError
-        $sw = [System.IO.StreamWriter]::new($log, $true, [System.Text.Encoding]::UTF8)
-        try {
-            while (-not $p.HasExited) {
-                while ($out.Peek() -ge 0) { $sw.WriteLine($out.ReadLine()) }
-                while ($err.Peek() -ge 0) { $sw.WriteLine($err.ReadLine()) }
-                Start-Sleep -Milliseconds 500
-            }
-            while (-not $out.EndOfStream) { $sw.WriteLine($out.ReadLine()) }
-            while (-not $err.EndOfStream) { $sw.WriteLine($err.ReadLine()) }
-        } finally { $sw.Close() }
-    } -ArgumentList $proc, $LogFile | Out-Null
 } finally {
     Pop-Location
 }

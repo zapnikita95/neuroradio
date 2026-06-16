@@ -39,6 +39,7 @@ const CONCURRENCY = parseInt(args.find((a) => a.startsWith('--concurrency='))?.s
 const mergeExisting = !args.includes('--fresh');
 const skipDeezer = args.includes('--lastfm-only');
 const topsOnly = args.includes('--tops-only');
+const matrixOnly = args.includes('--matrix-only');
 
 /** Broad genre list — Last.fm tags + regional styles. */
 const GENRES = [
@@ -234,7 +235,7 @@ async function main() {
   let addedLastfm = 0;
   let addedCells = 0;
 
-  if (LASTFM_KEY) {
+  if (LASTFM_KEY && !matrixOnly) {
     console.log(`Last.fm: genre tops (limit=${GENRE_TOP_LIMIT})…`);
     for (const genre of GENRES) {
       for (const t of await fetchLastfmTagTop(genre, GENRE_TOP_LIMIT, 'genre-top:lastfm')) {
@@ -265,7 +266,7 @@ async function main() {
     console.warn('LASTFM_API_KEY missing — skipping Last.fm year/genre tags');
   }
 
-  if (!skipDeezer) {
+  if (!skipDeezer && !matrixOnly) {
     console.log('Deezer: genre charts (top 300 per genre)…');
     const deezerGenres = await fetchDeezerAllGenres();
     let deezerAdded = 0;
@@ -279,7 +280,7 @@ async function main() {
     console.log(`+ deezer genre charts: +${deezerAdded} → ${catalog.size}`);
   }
 
-  if (!skipDeezer && !topsOnly) {
+  if (!skipDeezer && (!topsOnly || matrixOnly)) {
     const cells = [];
     for (let year = YEAR_FROM; year <= YEAR_TO; year += 1) {
       for (const genre of GENRES) {

@@ -32,6 +32,8 @@
     "build:catalog:genre-year": "node scripts/build-genre-year-catalog.mjs --no-proxy",
     "build:catalog:genre-year:lastfm": "node scripts/build-genre-year-catalog.mjs --lastfm-only --no-proxy",
     "build:catalog:genre-tops": "node scripts/build-genre-year-catalog.mjs --tops-only --genre-top-limit=1000 --no-proxy",
+    "build:catalog:genre-matrix": "node scripts/build-genre-year-catalog.mjs --matrix-only --tracks-per-cell=30 --concurrency=5 --no-proxy",
+    "pipeline:matrix-seed": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/run-deezer-matrix-then-seed.ps1",
     "seed:facts": "node scripts/bulk-seed-fact-bank.mjs --target=60000 --hot-target=20000 --concurrency=3 --resume --no-proxy --backfill-discogs",
     "seed:facts:discogs": "node scripts/bulk-seed-fact-bank.mjs --target=60000 --hot-target=20000 --concurrency=1 --resume --no-proxy --discogs-only --backfill-discogs",
     "test:facts": "npm run build && node scripts/test-fact-topic.mjs && node scripts/test-live-facts-5tracks.mjs",
