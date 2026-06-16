@@ -38,8 +38,18 @@ function prepareEdgeRuText(script: string, speakTrackNamesInVoiceover = false): 
   return prepareEdgeRussianSegment(marked);
 }
 
-function prepareEdgeMixedText(script: string, artist: string, title: string): string {
-  const marked = prepareYandexTtsText(script, { artist, title, sentencePauses: false });
+function prepareEdgeMixedText(
+  script: string,
+  artist: string,
+  title: string,
+  speakTrackNamesInVoiceover = true,
+): string {
+  const marked = prepareYandexTtsText(script, {
+    artist,
+    title,
+    sentencePauses: false,
+    speakTrackNamesInVoiceover,
+  });
   const merged = mergeLatinTitleOtArtist(
     marked.replace(/<\[[^\]]+\]>/g, ' ').replace(/\s+/g, ' ').trim(),
   );
@@ -80,7 +90,7 @@ export async function synthesizeSpeechEdge(
   const bufs: Buffer[] = [];
 
   if (speakNames && artist && title) {
-    const mixed = prepareEdgeMixedText(source, artist, title);
+    const mixed = prepareEdgeMixedText(source, artist, title, speakNamesExplicit);
     const segments = splitMixedLanguageForEdge(mixed, artist, title).map((seg) =>
       seg.lang === 'ru'
         ? { ...seg, text: prepareEdgeRussianSegment(seg.text.replace(/\+/g, '')) }
@@ -119,6 +129,8 @@ export async function synthesizeSpeechEdge(
     fileName,
     filePath,
     audioUrl: `/audio/${fileName}`,
-    ttsTranscript: speakNames ? prepareEdgeMixedText(source, artist, title) : prepareEdgeRuText(source, false),
+    ttsTranscript: speakNames
+      ? prepareEdgeMixedText(source, artist, title, speakNamesExplicit)
+      : prepareEdgeRuText(source, false),
   };
 }

@@ -12,6 +12,9 @@ import { prepareStoryScriptLanguage } from './story-english-normalize.js';
 import { applyForeignPronunciation } from './tts-foreign-pronounce.js';
 import {
   genericizeScriptForVoiceover,
+  phraseVariants,
+  restoreLatinNamesForVoiceover,
+  scriptContainsLatinTrackCitation,
   shouldStripLatinTrackNames,
 } from './tts-generic-script.js';
 import { isTruncatedMarketingSnippet, isSpeakableReferenceFact } from './web-snippet-accept.js';
@@ -20,7 +23,6 @@ import { fixSoloArtistPronounsRu } from './artist-grammar.js';
 import { fixTtsGrammarIssues } from './tts-grammar-fixes.js';
 import { isVoiceoverWithoutTrackNames, scriptLeaksVoiceoverNames } from './voiceover-no-names.js';
 import { primaryArtistName } from './artist-primary.js';
-import { phraseVariants } from './tts-generic-script.js';
 import { resolveStoryNarrator, type StoryNarratorId } from './story-narrator.js';
 
 export { DEFAULT_STORY_LENGTH, getStoryLengthPreset };
@@ -386,6 +388,12 @@ export function sanitizeScriptForTts(
   const blockArtist = options?.trackArtist ?? artist;
   const blockTitle = options?.trackTitle ?? title;
   const speakNames = options?.speakTrackNamesInVoiceover === true;
+  if (
+    speakNames &&
+    (shouldStripLatinTrackNames(blockArtist) || shouldStripLatinTrackNames(blockTitle))
+  ) {
+    result = restoreLatinNamesForVoiceover(result, blockArtist, blockTitle);
+  }
   const { text: localized } = prepareStoryScriptLanguage(result, {
     artist: blockArtist,
     title: blockTitle,
@@ -808,6 +816,17 @@ export function validateStoryScript(
     !storyMentionsPerformingArtist(trimmed, artist, title)
   ) {
     return { ok: false, reason: 'story does not mention the performing artist' };
+  }
+
+  if (
+    !noTrackNames &&
+    (shouldStripLatinTrackNames(artist) || shouldStripLatinTrackNames(title)) &&
+    !scriptContainsLatinTrackCitation(trimmed, artist, title)
+  ) {
+    return {
+      ok: false,
+      reason: 'voiceover names mode requires Latin artist or track name in script',
+    };
   }
 
   if (!noTrackNames && artist.trim() && title.trim()) {

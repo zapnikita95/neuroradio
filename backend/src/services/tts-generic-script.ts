@@ -1,6 +1,7 @@
 /** Убираем латинские названия трека/артиста из озвучки — русские замены. Кириллица остаётся. */
 
 import { resolveArtistGrammarRu } from './artist-grammar.js';
+import { primaryArtistName } from './artist-primary.js';
 
 function escapeRe(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -357,4 +358,71 @@ export function genericizeScriptForVoiceover(
     .replace(/\bMTV\b/gi, 'МТВ');
 
   return cleanupAfterGenericize(result, artist);
+}
+
+function replaceFirstVoiceoverPlaceholder(
+  text: string,
+  substitutes: string[],
+  replacement: string,
+): string {
+  const rep = replacement.trim();
+  if (!rep) return text;
+  for (const sub of substitutes) {
+    const re = new RegExp(
+      `(^|[\\s,.!?«"—-])(${escapeRe(sub)})(?=[\\s,.!?»"—-]|$)`,
+      'iu',
+    );
+    if (re.test(text)) {
+      return text.replace(re, `$1${rep}`);
+    }
+  }
+  return text;
+}
+
+/**
+ * Режим «названия в озвучке»: если LLM оставил «эта группа» / «этот трек»,
+ * подставляем латинские artist/title из метаданных перед Edge/Yandex mixed path.
+ */
+export function restoreLatinNamesForVoiceover(
+  script: string,
+  artist: string,
+  title: string,
+): string {
+  const trimmed = script.trim();
+  if (!trimmed) return trimmed;
+
+  const stripTitle = shouldStripLatinTrackNames(title);
+  const stripArtist = shouldStripLatinTrackNames(artist);
+  if (!stripTitle && !stripArtist) return trimmed;
+  if (scriptContainsLatinTrackCitation(trimmed, artist, title)) return trimmed;
+
+  const primary = primaryArtistName(artist).trim();
+  let result = trimmed;
+
+  if (stripArtist) {
+    result = replaceFirstVoiceoverPlaceholder(
+      result,
+      artistSubstitutesForVoiceover(artist),
+      primary,
+    );
+  }
+  if (stripTitle) {
+    result = replaceFirstVoiceoverPlaceholder(result, TRACK_SUBSTITUTES, title.trim());
+  }
+
+  if (scriptContainsLatinTrackCitation(result, artist, title)) {
+    return result.replace(/\s{2,}/g, ' ').trim();
+  }
+
+  const sep =
+    stripTitle && stripArtist && /[A-Za-z]/.test(title) && /[A-Za-z]/.test(primary)
+      ? ' by '
+      : ' — ';
+  const opener =
+    stripTitle && stripArtist
+      ? `${title.trim()}${sep}${primary}. `
+      : stripTitle
+        ? `${title.trim()}. `
+        : `${primary}. `;
+  return `${opener}${result}`.replace(/\s{2,}/g, ' ').trim();
 }

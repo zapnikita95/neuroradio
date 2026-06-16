@@ -1745,7 +1745,7 @@ router.post('/full', extractClientSecrets, validateStoryFullBody, storyFullRateL
         artist: metadata.artist,
         title: metadata.title,
         edgeVoicePreset: (req.body as StoryFullBody).edge_voice_preset,
-        speakTrackNamesInVoiceover: (req.body as StoryFullBody).speak_track_names_in_voiceover,
+        speakTrackNamesInVoiceover: (req.body as StoryFullBody).speak_track_names_in_voiceover === true,
         storyLanguage: storyLanguage ?? 'ru',
         elevenLabsVoice: bodyFull.elevenlabs_voice ?? ttsVoice,
         logContext: {
