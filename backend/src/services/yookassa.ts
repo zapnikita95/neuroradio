@@ -18,7 +18,7 @@ export const SUBSCRIPTION_PLANS_USD: Record<
   SubscriptionPlan,
   { amountUsd: number; months: number; labelEn: string; productId: string }
 > = {
-  month: { amountUsd: 3.99, months: 1, labelEn: 'Extended · month', productId: 'efir_premium_month_usd' },
+  month: { amountUsd: 3.99, months: 1, labelEn: 'Extended · month', productId: 'premium_month_usd' },
   quarter: { amountUsd: 9.99, months: 3, labelEn: 'Extended · quarter', productId: 'efir_premium_quarter_usd' },
   year: { amountUsd: 39.99, months: 12, labelEn: 'Extended · year', productId: 'efir_premium_year_usd' },
 };

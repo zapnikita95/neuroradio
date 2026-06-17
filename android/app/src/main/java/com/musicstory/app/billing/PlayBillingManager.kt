@@ -19,7 +19,7 @@ import kotlin.coroutines.resume
 
 /** Google Play product IDs for international (USD) subscriptions. */
 object PlayBillingProducts {
-    const val MONTH = "efir_premium_month_usd"
+    const val MONTH = "premium_month_usd"
     const val QUARTER = "efir_premium_quarter_usd"
     const val YEAR = "efir_premium_year_usd"
 

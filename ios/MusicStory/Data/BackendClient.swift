@@ -312,6 +312,18 @@ final class BackendClient {
         try validateHTTP(response)
     }
 
+    func createYooKassaPayment(email: String, plan: String) async throws -> PaymentCreateResponse {
+        let body = try JSONEncoder().encode(PaymentCreateRequest(email: email, plan: plan))
+        let (data, response) = try await dataFromAPI(
+            path: "v1/public/payment/create",
+            method: "POST",
+            body: body,
+            authorized: false
+        )
+        try validateHTTP(response)
+        return try decode(PaymentCreateResponse.self, from: data)
+    }
+
     func verifyAppStorePurchase(receiptData: String) async throws -> IapVerifyResponse {
         let body = try JSONEncoder().encode(AppStoreVerifyRequest(receiptData: receiptData))
         let (data, response) = try await dataFromAPI(

@@ -1,5 +1,42 @@
 # App Store Review — заметки для повторной отправки
 
+## Guideline 2.1(b) — In-App Purchases (обязательно перед ревью)
+
+Apple отклоняет, если IAP **не отправлены на ревью** или кнопка «Оформить подписку» падает с ошибкой.
+
+### App Store Connect (вручную)
+
+1. **Agreements, Tax, and Banking** → **Paid Apps Agreement** — статус **Active** (без этого IAP не работают).
+2. **Monetization → Subscriptions** → группа **Extended** → три auto-renewable с ID:
+   - `premium_month_usd`
+   - `efir_premium_quarter_usd`
+   - `efir_premium_year_usd`
+3. У **каждой** подписки: локализация, цена, **Review screenshot** (скрин экрана «Subscription» в приложении).
+4. Статус каждого IAP → **Submit for Review** (вместе с новым билдом).
+5. **Users and Access → Integrations → In-App Purchase** — скопировать **Shared Secret** → Railway `APP_STORE_SHARED_SECRET=...` (fallback verifyReceipt).
+
+### Проверка в Sandbox
+
+1. App Store Connect → **Sandbox** → тестовый Apple ID.
+2. На устройстве: Настройки → App Store → Sandbox Account.
+3. В приложении: профиль → вкладка **Subscription** → «Оформить подписку» — должен открыться sheet Apple Pay, без красной ошибки.
+
+### Текст ответа Apple (англ.)
+
+```
+In-App Purchase subscriptions are configured and submitted for review:
+- premium_month_usd
+- efir_premium_quarter_usd
+- efir_premium_year_usd
+
+Each product includes the required App Review screenshot (Subscription tab in the app).
+Paid Apps Agreement is active.
+
+To test: Profile → Subscription tab → tap "Оформить подписку" / subscribe.
+Sandbox purchase is verified via StoreKit 2 on device (no login required for IAP sheet).
+For full premium without purchase, use demo account appletester@test.ru + OTP 000000.
+```
+
 ## iPhone only
 
 Приложение **не для iPad** (`TARGETED_DEVICE_FAMILY = 1`). В App Store Connect убедитесь, что в разделе Pricing and Availability / Device Availability iPad **не** отмечен, либо после загрузки билда 97+ iPad исчезнет из списка устройств.

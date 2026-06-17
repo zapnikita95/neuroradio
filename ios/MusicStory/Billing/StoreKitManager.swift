@@ -2,7 +2,7 @@ import Foundation
 import StoreKit
 
 enum PlayProductIds {
-    static let month = "efir_premium_month_usd"
+    static let month = "premium_month_usd"
     static let quarter = "efir_premium_quarter_usd"
     static let year = "efir_premium_year_usd"
     static let all = [month, quarter, year]
@@ -38,11 +38,20 @@ final class StoreKitManager: ObservableObject {
     func loadProducts() async {
         isLoading = true
         defer { isLoading = false }
+        lastError = nil
         do {
             products = try await Product.products(for: PlayProductIds.all)
+            if products.isEmpty {
+                lastError = "Subscriptions are not available in the App Store yet"
+            }
         } catch {
             lastError = error.localizedDescription
         }
+    }
+
+    func displayPrice(forPlan plan: String) -> String? {
+        let productId = PlayProductIds.id(forPlan: plan)
+        return products.first(where: { $0.id == productId })?.displayPrice
     }
 
     func purchase(plan: String) async -> Bool {
@@ -84,16 +93,47 @@ final class StoreKitManager: ObservableObject {
     }
 
     private func verifyOnServer(transaction: Transaction) async -> Bool {
-        guard let receiptURL = Bundle.main.appStoreReceiptURL,
-              let receiptData = try? Data(contentsOf: receiptURL) else {
-            lastError = "App Store receipt unavailable"
-            return false
-        }
-        let base64 = receiptData.base64EncodedString()
         do {
-            let resp = try await BackendClient.shared.verifyAppStorePurchase(receiptData: base64)
-            return resp.ok == true
+            let expiresMs: Int64? = transaction.expirationDate.map {
+                Int64($0.timeIntervalSince1970 * 1000)
+            }
+            let environment: String
+            switch transaction.environment {
+            case .sandbox:
+                environment = "Sandbox"
+            case .production:
+                environment = "Production"
+            default:
+                environment = "Production"
+            }
+
+            let resp = try await BackendClient.shared.verifyApplePurchase(
+                signedTransactionInfo: "",
+                transactionId: String(transaction.id),
+                productId: transaction.productID,
+                originalTransactionId: String(transaction.originalID),
+                expiresDateMs: expiresMs,
+                bundleId: Bundle.main.bundleIdentifier ?? "",
+                environment: environment
+            )
+            let activated = resp.premium == true || resp.tier == "premium"
+            if !activated {
+                lastError = "Subscription was not activated on the server"
+            }
+            return activated
         } catch {
+            if let receiptURL = Bundle.main.appStoreReceiptURL,
+               let receiptData = try? Data(contentsOf: receiptURL) {
+                do {
+                    let resp = try await BackendClient.shared.verifyAppStorePurchase(
+                        receiptData: receiptData.base64EncodedString()
+                    )
+                    return resp.ok == true
+                } catch {
+                    lastError = error.localizedDescription
+                    return false
+                }
+            }
             lastError = error.localizedDescription
             return false
         }

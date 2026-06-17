@@ -10,7 +10,7 @@
 
 Product IDs (одинаковые в Play Console и App Store Connect):
 
-- `efir_premium_month_usd`
+- `premium_month_usd`
 - `efir_premium_quarter_usd`
 - `efir_premium_year_usd`
 

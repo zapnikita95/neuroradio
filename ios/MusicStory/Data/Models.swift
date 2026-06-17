@@ -228,6 +228,17 @@ struct IapVerifyResponse: Decodable, Sendable {
     let error: String?
 }
 
+struct PaymentCreateRequest: Encodable, Sendable {
+    let email: String
+    let plan: String
+}
+
+struct PaymentCreateResponse: Decodable, Sendable {
+    let ok: Bool?
+    let confirmationUrl: String?
+    let error: String?
+}
+
 struct StoryFeedbackRequest: Encodable, Sendable {
     let artist: String
     let title: String

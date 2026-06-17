@@ -1,9 +1,10 @@
 const EXPECTED_BUNDLE_IDS = new Set(['com.efirai.appname', 'com.efirai.myapp']);
 
+/** Must match App Store Connect + ios/MusicStory/Billing/StoreKitManager.swift */
 export const APPLE_IAP_PRODUCT_IDS = [
-  'premium_voice_monthly',
-  'premium_voice_quarterly',
-  'premium_voice_yearly',
+  'premium_month_usd',
+  'efir_premium_quarter_usd',
+  'efir_premium_year_usd',
 ] as const;
 
 export type AppleIapProductId = (typeof APPLE_IAP_PRODUCT_IDS)[number];

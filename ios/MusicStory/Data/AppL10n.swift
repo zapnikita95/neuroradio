@@ -135,6 +135,83 @@ struct AppL10n {
 
     var historyTitle: String { en ? "History" : "История" }
     var listen: String { en ? "Listen" : "Слушать" }
+
+    // MARK: - Account
+
+    var accountTab: String { en ? "Account" : "Аккаунт" }
+    var subscriptionTab: String { en ? "Subscription" : "Подписка" }
+    var accountSignInHint: String {
+        en ? "Sign in to sync history across devices." : "Войдите — история сохранится в облаке."
+    }
+    var accountSignIn: String { en ? "Sign in" : "Войти" }
+    var accountSignOut: String { en ? "Sign out" : "Выйти" }
+    var accountRefreshProfile: String { en ? "Refresh profile" : "Обновить профиль" }
+    func accountPlanLabel(_ plan: String) -> String {
+        en ? "Plan: \(plan)" : "Тариф: \(plan)"
+    }
+
+    // MARK: - Billing
+
+    var billingTitle: String { en ? "Extended" : "Расширенный" }
+    var billingIntro: String {
+        en
+            ? "For daily listeners: more stories, smarter model, premium voices."
+            : "Для тех, кто слушает много: больше историй, умнее модель, больше голосов."
+    }
+    var billingPitch: String {
+        en
+            ? "DeepSeek V3 finds sharper facts and cleaner scripts. Premium voices via Yandex SpeechKit. History syncs across phones with the same email."
+            : "DeepSeek V3 лучше находит факты про трек и артиста, аккуратнее формулирует текст. Yandex SpeechKit — расширенный набор голосов. История синхронизируется между телефонами, если войти тем же email."
+    }
+    var billingPlansHeading: String { en ? "Choose billing period" : "Выберите период" }
+    var billingSubscribe: String { en ? "Subscribe" : "Оформить подписку" }
+    var billingProcessing: String { "…" }
+    var billingSuccess: String { en ? "Subscription activated" : "Подписка активирована" }
+    var billingEmailRequired: String {
+        en ? "Enter email to activate subscription" : "Укажите email для активации подписки"
+    }
+    var billingPaymentFailed: String {
+        en ? "Could not create payment" : "Не удалось создать платёж"
+    }
+    var billingAppStoreHint: String {
+        en
+            ? "Payment via App Store. Manage in Settings → Apple ID → Subscriptions."
+            : "Оплата через App Store. Управление — Настройки → Apple ID → Подписки."
+    }
+    var billingYookassaHint: String {
+        en
+            ? "Payment in rubles via YooKassa in the browser. Sign in with the same email after payment."
+            : "Оплата в рублях через ЮKassa в браузере. После оплаты войдите тем же email в приложении."
+    }
+    var billingYookassaOpened: String {
+        en
+            ? "Complete payment in the browser, then sign in with the same email."
+            : "Откройте браузер для оплаты. После оплаты войдите тем же email."
+    }
+    var billingAppStoreLegal: String {
+        en
+            ? "Payment will be charged to your Apple ID account. Subscription renews automatically unless canceled at least 24 hours before the end of the period. Manage in Settings → Apple ID → Subscriptions."
+            : "Оплата списывается с Apple ID. Подписка продлевается автоматически, если не отменить её минимум за 24 часа до конца периода. Управление — Настройки → Apple ID → Подписки."
+    }
+    var billingEmailField: String { en ? "Email" : "Email" }
+    var billingPremiumFeature1: String {
+        en ? "Up to 25 stories per day" : "До 25 историй в день"
+    }
+    var billingPremiumFeature2: String {
+        en ? "DeepSeek V3 for stories" : "DeepSeek V3 для историй"
+    }
+    var billingPremiumFeature3: String {
+        en
+            ? "Premium Yandex SpeechKit voices"
+            : "Yandex SpeechKit — расширенный набор голосов"
+    }
+    var billingPremiumFeature4: String {
+        en ? "Sync across devices" : "Синхронизация между устройствами"
+    }
+    var billingPlanMonth: String { en ? "Month" : "Месяц" }
+    var billingPlanQuarter: String { en ? "Quarter" : "Квартал" }
+    var billingPlanYear: String { en ? "Year" : "Год" }
+    var billingBestValue: String { en ? "Best value" : "Выгоднее всего" }
 }
 
 extension StoryRepository {
