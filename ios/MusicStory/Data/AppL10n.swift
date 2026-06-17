@@ -160,7 +160,7 @@ struct AppL10n {
     }
     var billingPitch: String {
         en
-            ? "DeepSeek V3 finds sharper facts and cleaner scripts. Premium voices via Yandex SpeechKit. History syncs across phones with the same email."
+            ? "DeepSeek V3 finds sharper facts and cleaner scripts. ElevenLabs for premium voices. History syncs across phones with the same email."
             : "DeepSeek V3 лучше находит факты про трек и артиста, аккуратнее формулирует текст. Yandex SpeechKit — расширенный набор голосов. История синхронизируется между телефонами, если войти тем же email."
     }
     var billingPlansHeading: String { en ? "Choose billing period" : "Выберите период" }
@@ -201,9 +201,7 @@ struct AppL10n {
         en ? "DeepSeek V3 for stories" : "DeepSeek V3 для историй"
     }
     var billingPremiumFeature3: String {
-        en
-            ? "Premium Yandex SpeechKit voices"
-            : "Yandex SpeechKit — расширенный набор голосов"
+        en ? "ElevenLabs premium voices" : "Yandex SpeechKit — расширенный набор голосов"
     }
     var billingPremiumFeature4: String {
         en ? "Sync across devices" : "Синхронизация между устройствами"
