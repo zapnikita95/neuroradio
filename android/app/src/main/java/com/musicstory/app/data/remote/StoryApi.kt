@@ -93,6 +93,7 @@ data class StoryFeedbackRequest(
 data class PaymentCreateRequest(
     val email: String,
     val plan: String,
+    val locale: String? = null,
 )
 
 data class PaymentCreateResponse(
@@ -105,6 +106,7 @@ data class PaymentCreateResponse(
 data class GooglePlayVerifyRequest(
     val productId: String,
     val purchaseToken: String,
+    val appLanguage: String? = null,
 )
 
 data class IapVerifyResponse(

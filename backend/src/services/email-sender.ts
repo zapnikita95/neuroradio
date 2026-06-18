@@ -1,6 +1,6 @@
 import { getSiteApkUrl, getSiteExtensionUrl } from './github-downloads.js';
 import { getAccountPageUrl, getAppStoreUrl, getGooglePlayUrl } from './store-links.js';
-import { buildPaymentSuccessEmail } from './welcome-email-template.js';
+import { buildWelcomeEmail, type WelcomeEmailLang } from './welcome-email-template.js';
 
 const RESEND_API = 'https://api.resend.com/emails';
 
@@ -110,10 +110,12 @@ function receiptAdminEmail(): string {
   );
 }
 
-export async function sendPaymentSuccessEmail(options: {
+export async function sendWelcomeEmail(options: {
   to: string;
+  lang: WelcomeEmailLang;
   plan: string;
-  amountRub: number;
+  amount: number;
+  currency: 'RUB' | 'USD';
   premiumUntilIso: string;
 }): Promise<void> {
   const apiKey = process.env.RESEND_API_KEY?.trim();
@@ -126,10 +128,12 @@ export async function sendPaymentSuccessEmail(options: {
     process.env.PUBLIC_SITE_URL?.trim() ||
     process.env.TELEGRAM_WIDGET_BASE_URL?.trim() ||
     'https://www.efir-ai.ru';
-  const { html, text } = buildPaymentSuccessEmail({
+  const { subject, html, text } = buildWelcomeEmail({
+    lang: options.lang,
     email: options.to,
     plan: options.plan,
-    amountRub: options.amountRub,
+    amount: options.amount,
+    currency: options.currency,
     premiumUntilIso: options.premiumUntilIso,
     links: {
       siteUrl: siteUrl.replace(/\/$/, ''),
@@ -150,7 +154,7 @@ export async function sendPaymentSuccessEmail(options: {
     body: JSON.stringify({
       from,
       to: [options.to],
-      subject: 'Эфир AI — подписка активна, скачайте приложение',
+      subject,
       html,
       text,
     }),
@@ -160,6 +164,23 @@ export async function sendPaymentSuccessEmail(options: {
     const detail = await res.text().catch(() => '');
     throw new Error(`Resend HTTP ${res.status}${detail ? `: ${detail.slice(0, 200)}` : ''}`);
   }
+}
+
+/** @deprecated use sendWelcomeEmail */
+export async function sendPaymentSuccessEmail(options: {
+  to: string;
+  plan: string;
+  amountRub: number;
+  premiumUntilIso: string;
+}): Promise<void> {
+  await sendWelcomeEmail({
+    to: options.to,
+    lang: 'ru',
+    plan: options.plan,
+    amount: options.amountRub,
+    currency: 'RUB',
+    premiumUntilIso: options.premiumUntilIso,
+  });
 }
 
 /** Письмо админу: нужно отправить чек пользователю. */

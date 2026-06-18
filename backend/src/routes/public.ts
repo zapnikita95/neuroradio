@@ -171,7 +171,9 @@ router.post('/payment/create', async (req: Request, res: Response) => {
   }
 
   try {
-    const created = await createYooKassaPayment({ email, plan });
+    const localeRaw = typeof req.body?.locale === 'string' ? req.body.locale.trim().toLowerCase() : '';
+    const locale = localeRaw === 'en' ? 'en' : localeRaw === 'ru' ? 'ru' : undefined;
+    const created = await createYooKassaPayment({ email, plan, locale });
     if (isEmailConfigured()) {
       void sendPaymentLinkEmail({
         to: email,
@@ -332,7 +334,9 @@ router.post('/subscribe', async (req: Request, res: Response) => {
 
   if (isYooKassaConfigured() && plan) {
     try {
-      const created = await createYooKassaPayment({ email, plan });
+      const localeRaw = typeof req.body?.locale === 'string' ? req.body.locale.trim().toLowerCase() : '';
+      const locale = localeRaw === 'en' ? 'en' : localeRaw === 'ru' ? 'ru' : undefined;
+      const created = await createYooKassaPayment({ email, plan, locale });
       if (isEmailConfigured()) {
         await sendPaymentLinkEmail({
           to: email,

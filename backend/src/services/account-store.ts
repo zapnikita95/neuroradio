@@ -179,6 +179,8 @@ export interface AccountRecord {
   nextPaymentAt?: number | null;
   autoRenew?: boolean;
   lastRecurringAttemptAt?: number | null;
+  /** Dedup keys for post-purchase welcome emails (paymentId / transactionId). */
+  welcomeEmailKeys?: string[];
   /** AES-GCM blob for per-install transport key (never plain). */
   secretsTransportEnc?: string | null;
   /** User-supplied API keys — always encrypted blobs, never plain. */
@@ -1058,6 +1060,29 @@ function getAccountByEmail(emailRaw: string): AccountRecord | null {
 
 export function getAccountByEmailForBilling(emailRaw: string): AccountRecord | null {
   return getAccountByEmail(emailRaw);
+}
+
+export function shouldSendWelcomeEmail(emailRaw: string, purchaseKey: string): boolean {
+  const account = getAccountByEmailForBilling(emailRaw);
+  if (!account) return true;
+  const key = purchaseKey.trim();
+  if (!key) return false;
+  return !(account.welcomeEmailKeys ?? []).includes(key);
+}
+
+export function markWelcomeEmailSent(emailRaw: string, purchaseKey: string): void {
+  const email = normalizeEmail(emailRaw);
+  const key = purchaseKey.trim();
+  if (!key) return;
+  const store = loadStore();
+  const accountId = store.emailToAccount?.[email];
+  if (!accountId) return;
+  const account = store.accountsById[accountId];
+  if (!account) return;
+  const keys = account.welcomeEmailKeys ?? [];
+  if (keys.includes(key)) return;
+  account.welcomeEmailKeys = [...keys, key].slice(-40);
+  saveStore(store);
 }
 
 function verifyWebCabinetCode(

@@ -381,6 +381,9 @@ final class BackendClient {
         if let expiresDateMs {
             payload["expiresDateMs"] = expiresDateMs
         }
+        let storedLang = UserDefaults.standard.string(forKey: "app_language") ?? "system"
+        let appLang = AppLanguage.fromId(storedLang)
+        payload["appLanguage"] = resolveAppLanguage(appLang).apiCode
         let body = try JSONSerialization.data(withJSONObject: payload)
         let (data, response) = try await dataFromAPI(
             path: "v1/billing/apple/verify",

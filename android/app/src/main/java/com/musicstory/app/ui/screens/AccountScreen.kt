@@ -53,6 +53,7 @@ import com.musicstory.app.ui.components.PrimaryStoryButton
 import com.musicstory.app.ui.components.SecondaryStoryButton
 import com.musicstory.app.domain.ResolvedAppLanguage
 import com.musicstory.app.domain.resolveAppLanguage
+import com.musicstory.app.domain.toApiCode
 import com.musicstory.app.ui.components.billingPlansForEnglishUi
 import com.musicstory.app.util.LocaleHelper
 import com.musicstory.app.ui.theme.CreamText
@@ -437,10 +438,12 @@ private suspend fun payWithGooglePlay(
             setError(context.getString(R.string.billing_payment_failed))
             return
         }
+        val appLang = resolveAppLanguage(LocaleHelper.readStoredLanguage(context)).toApiCode()
         val resp = app.apiClient.verifyGooglePlayPurchase(
             backendUrl,
             purchase.productId,
             purchase.purchaseToken,
+            appLanguage = appLang,
         )
         if (resp.ok == true) {
             onSuccess()
@@ -480,7 +483,8 @@ private suspend fun pay(
     setLoading(true)
     setError(null)
     try {
-        val resp = app.apiClient.createPayment(backendUrl, email, plan)
+        val appLang = resolveAppLanguage(LocaleHelper.readStoredLanguage(context)).toApiCode()
+        val resp = app.apiClient.createPayment(backendUrl, email, plan, locale = appLang)
         val url = resp.confirmationUrl
         if (url.isNullOrBlank()) {
             setError(context.getString(R.string.billing_payment_failed))

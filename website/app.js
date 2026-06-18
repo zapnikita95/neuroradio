@@ -486,7 +486,12 @@
       var payBtn = $('#payBtn'); var prevText = payBtn.innerHTML;
       payBtn.disabled = true; payBtn.innerHTML = window.EfirI18n.getLang() === 'en' ? 'Creating payment…' : 'Создаём платёж…';
 
-      var payload = { email: emailInput.value.trim(), plan: selectedPlanKey, amount: amountEl.textContent };
+      var payload = {
+        email: emailInput.value.trim(),
+        plan: selectedPlanKey,
+        amount: amountEl.textContent,
+        locale: (window.EfirI18n && window.EfirI18n.getLang() === 'en') ? 'en' : 'ru',
+      };
       var url = (API_BASE || '') + '/v1/public/payment/create';
       fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
         .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, body: j }; }); })

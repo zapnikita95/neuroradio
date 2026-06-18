@@ -7,9 +7,9 @@ import {
 } from './account-store.js';
 import {
   isEmailConfigured,
-  sendPaymentSuccessEmail,
   sendReceiptRequestEmail,
 } from './email-sender.js';
+import { notifyWelcomeEmailAfterPurchase, resolveWelcomeLang } from './welcome-email-notify.js';
 
 export async function applyYooKassaPaymentSucceeded(options: {
   paymentId: string;
@@ -73,13 +73,15 @@ export async function applyYooKassaPaymentSucceeded(options: {
   const premiumUntilIso = new Date(entitlement.premiumUntil).toISOString();
 
   if (isEmailConfigured()) {
-    void sendPaymentSuccessEmail({
-      to: email,
-      plan: planMeta.labelRu,
-      amountRub: planMeta.amountRub,
-      premiumUntilIso,
-    }).catch((err) => {
-      console.warn('[yookassa/billing] user success email failed:', err instanceof Error ? err.message : err);
+    const locale = payment?.metadata?.locale;
+    void notifyWelcomeEmailAfterPurchase({
+      email,
+      purchaseKey: options.paymentId,
+      plan,
+      premiumUntilMs: entitlement.premiumUntil,
+      billingProvider: 'yookassa',
+      explicitLang: locale,
+      lang: resolveWelcomeLang({ explicit: locale, billingProvider: 'yookassa' }),
     });
     void sendReceiptRequestEmail({
       userEmail: email,

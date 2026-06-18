@@ -74,6 +74,7 @@ export async function createYooKassaPayment(options: {
   email: string;
   plan: SubscriptionPlan;
   returnUrl?: string;
+  locale?: 'en' | 'ru';
 }): Promise<{ paymentId: string; confirmationUrl: string; amountRub: number; planLabel: string }> {
   if (!isYooKassaConfigured()) {
     throw new Error('YOOKASSA_NOT_CONFIGURED');
@@ -95,6 +96,7 @@ export async function createYooKassaPayment(options: {
     returnUrl,
     savePaymentMethod,
     idempotenceKey,
+    locale: options.locale,
   });
 
   if (!res.ok && savePaymentMethod) {
@@ -156,7 +158,7 @@ export type YooKassaWebhookEvent = {
   object?: {
     id?: string;
     status?: string;
-    metadata?: { email?: string; plan?: string; recurring?: string | boolean };
+    metadata?: { email?: string; plan?: string; recurring?: string | boolean; locale?: string };
   };
 };
 
@@ -165,7 +167,7 @@ export type YooKassaPaymentDetails = {
   status: string;
   paymentMethodId: string | null;
   paymentMethodSaved: boolean;
-  metadata?: { email?: string; plan?: string; recurring?: string | boolean };
+  metadata?: { email?: string; plan?: string; recurring?: string | boolean; locale?: string };
 };
 
 export async function fetchYooKassaPayment(paymentId: string): Promise<YooKassaPaymentDetails | null> {
@@ -182,7 +184,7 @@ export async function fetchYooKassaPayment(paymentId: string): Promise<YooKassaP
     id?: string;
     status?: string;
     payment_method?: { id?: string; saved?: boolean };
-    metadata?: { email?: string; plan?: string; recurring?: string | boolean };
+    metadata?: { email?: string; plan?: string; recurring?: string | boolean; locale?: string };
   };
   const id = data.id?.trim();
   if (!id) return null;
@@ -261,6 +263,7 @@ async function postYooKassaRedirectPayment(options: {
   returnUrl: string;
   savePaymentMethod: boolean;
   idempotenceKey: string;
+  locale?: 'en' | 'ru';
 }): Promise<Response> {
   const body: Record<string, unknown> = {
     amount: { value: options.planMeta.amountRub.toFixed(2), currency: 'RUB' },
@@ -274,6 +277,7 @@ async function postYooKassaRedirectPayment(options: {
       plan: options.plan,
       service: 'efir-ai',
       recurring: 'false',
+      ...(options.locale ? { locale: options.locale } : {}),
     },
   };
   if (options.savePaymentMethod) {

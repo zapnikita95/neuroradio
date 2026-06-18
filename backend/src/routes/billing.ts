@@ -33,7 +33,7 @@ import {
   resolveLanguageSwitchPolicy,
   type AppLanguageCode,
 } from '../services/subscription-market.js';
-import { SUBSCRIPTION_PLANS_USD } from '../services/yookassa.js';
+import { SUBSCRIPTION_PLANS_USD, type SubscriptionPlan } from '../services/yookassa.js';
 import {
   isGooglePlayBillingConfigured,
   verifyGooglePlaySubscription,
@@ -44,6 +44,7 @@ import {
   verifyAppStoreReceipt,
 } from '../services/app-store-billing.js';
 import { verifyApplePurchaseInput } from '../services/apple-iap.js';
+import { notifyWelcomeEmailForInstall } from '../services/welcome-email-notify.js';
 
 const router = Router();
 
@@ -183,6 +184,14 @@ router.post('/verify/google-play', async (req: Request, res: Response) => {
       premiumUntil: verified.expiryTimeMs ?? undefined,
     });
     resetStoryQuotaForInstall(installId);
+    void notifyWelcomeEmailForInstall({
+      installId,
+      purchaseKey: purchaseToken,
+      plan: verified.plan,
+      premiumUntilMs: entitlement.premiumUntil,
+      billingProvider: 'google_play',
+      explicitLang: req.body?.appLanguage,
+    });
     res.json({
       ok: true,
       tier: resolveUserTier(installId),
@@ -232,6 +241,14 @@ router.post('/verify/app-store', async (req: Request, res: Response) => {
       premiumUntil: verified.expiryTimeMs ?? undefined,
     });
     resetStoryQuotaForInstall(installId);
+    void notifyWelcomeEmailForInstall({
+      installId,
+      purchaseKey: purchaseKey,
+      plan: verified.plan,
+      premiumUntilMs: entitlement.premiumUntil,
+      billingProvider: 'app_store',
+      explicitLang: req.body?.appLanguage,
+    });
     res.json({
       ok: true,
       tier: resolveUserTier(installId),
@@ -283,6 +300,11 @@ router.post('/apple/verify', (req: Request, res: Response) => {
   }
 
   const purchaseKey = verified.transactionId ?? verified.productId;
+  const plan: SubscriptionPlan = verified.productId.includes('year')
+    ? 'year'
+    : verified.productId.includes('quarter')
+      ? 'quarter'
+      : 'month';
   const entitlement = grantPremiumSubscription(installId, {
     months: verified.months,
     productId: verified.productId,
@@ -290,8 +312,18 @@ router.post('/apple/verify', (req: Request, res: Response) => {
     subscriptionMarket: 'intl',
     billingProvider: 'app_store',
     premiumUntil: verified.premiumUntilMs,
+    subscriptionPlan: plan,
   });
   resetStoryQuotaForInstall(installId);
+
+  void notifyWelcomeEmailForInstall({
+    installId,
+    purchaseKey,
+    plan,
+    premiumUntilMs: entitlement.premiumUntil,
+    billingProvider: 'app_store',
+    explicitLang: req.body?.appLanguage,
+  });
 
   res.json({
     ok: true,

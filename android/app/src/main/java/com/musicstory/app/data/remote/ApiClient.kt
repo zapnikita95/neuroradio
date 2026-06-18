@@ -160,16 +160,18 @@ class ApiClient(
         baseUrl: String,
         productId: String,
         purchaseToken: String,
+        appLanguage: String? = null,
     ): IapVerifyResponse {
+        val request = GooglePlayVerifyRequest(
+            productId = productId,
+            purchaseToken = purchaseToken,
+            appLanguage = appLanguage,
+        )
         return try {
-            getApi(baseUrl).verifyGooglePlay(
-                GooglePlayVerifyRequest(productId = productId, purchaseToken = purchaseToken),
-            )
+            getApi(baseUrl).verifyGooglePlay(request)
         } catch (first: Exception) {
             authManager.invalidateToken()
-            getApi(baseUrl).verifyGooglePlay(
-                GooglePlayVerifyRequest(productId = productId, purchaseToken = purchaseToken),
-            )
+            getApi(baseUrl).verifyGooglePlay(request)
         }
     }
 
@@ -182,9 +184,14 @@ class ApiClient(
         }
     }
 
-    suspend fun createPayment(baseUrl: String, email: String, plan: String): PaymentCreateResponse {
+    suspend fun createPayment(
+        baseUrl: String,
+        email: String,
+        plan: String,
+        locale: String? = null,
+    ): PaymentCreateResponse {
         return try {
-            getApi(baseUrl).createPayment(PaymentCreateRequest(email = email, plan = plan))
+            getApi(baseUrl).createPayment(PaymentCreateRequest(email = email, plan = plan, locale = locale))
         } catch (e: retrofit2.HttpException) {
             val body = e.response()?.errorBody()?.string().orEmpty()
             val parsed = runCatching {
