@@ -39,12 +39,13 @@ try {
     npm run build 2>&1 | Tee-Object -FilePath $LogFile -Append | Out-Null
     $nodeArgs = @(
         'scripts/bulk-seed-fact-bank.mjs',
+        '--hot-push',
         '--target=60000',
         '--hot-target=20000',
-        '--concurrency=3',
+        '--concurrency=5',
         '--resume',
         '--no-proxy',
-        '--backfill-discogs'
+        '--no-backfill-lastfm'
     )
     $proc = Start-Process -FilePath 'node' `
         -ArgumentList $nodeArgs `

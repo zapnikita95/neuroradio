@@ -29,7 +29,7 @@ export async function fetchProdHealth() {
 
 export async function postProdStoryFull(
   token,
-  { artist, title, voiceId = 'filipp', storyLength = '30s', llmProvider = 'openrouter', openRouterApiKey, narrator },
+  { artist, title, voiceId = 'filipp', storyLength = '30s', llmProvider = 'openrouter', openRouterApiKey, narrator, speakTrackNamesInVoiceover },
 ) {
   const body = {
     artist,
