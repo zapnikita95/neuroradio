@@ -63,6 +63,8 @@ const GLOBAL_SEED_TRACKS = [
   ['Lady Gaga', 'Bad Romance'], ['Bruno Mars', 'Uptown Funk'],
   ['Adele', 'Rolling in the Deep'], ['Justin Bieber', 'Baby'],
   ['PSY', 'Gangnam Style'], ['Daft Punk', 'Get Lucky'],
+  ['Sting', 'Shape of My Heart'], ['Sting', 'Fields of Gold'], ['Sting', 'Englishman In New York'],
+  ['Sting', 'Desert Rose'], ['The Police', 'Every Breath You Take'], ['The Police', 'Roxanne'],
 ];
 
 /** Deezer genre chart ids (each returns up to 300 tracks). */

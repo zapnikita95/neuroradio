@@ -46,6 +46,19 @@ const JUNK_TITLE =
   /originally recorded|in the style of|\(karaoke|\(radio edit\)|\(instrumental\)/i;
 const JUNK_FACT = /\b(?:in the style of|karaoke version)\b/i;
 
+/** Major hits — always first in hot-push queue. */
+const PRIORITY_HOT_TRACKS = [
+  ['Sting', 'Shape of My Heart'],
+  ['Sting', 'Fields of Gold'],
+  ['Sting', 'Englishman In New York'],
+  ['Sting', 'Desert Rose'],
+  ['Sting', 'Fragile'],
+  ['Sting', 'Russians'],
+  ['The Police', 'Every Breath You Take'],
+  ['The Police', 'Roxanne'],
+  ['The Police', 'Message in a Bottle'],
+];
+
 function trackKey(artist, title) {
   return `${artist.trim().toLowerCase()}|${title.trim().toLowerCase()}`;
 }
@@ -64,11 +77,13 @@ function isHarvestableTrack(track) {
 
 function trackPriority(track) {
   const s = track.source ?? '';
+  if (s.startsWith('seed-global:priority')) return -6;
   if (s.startsWith('genre-top')) return -5;
   if (s.startsWith('lastfm-global-chart') || s.startsWith('deezer-chart-0')) return -5;
   if (s.startsWith('genre-year')) return -4;
   if (s.startsWith('deezer-chart-')) return -4;
   if (s.startsWith('seed-global')) return -4;
+  if (s.startsWith('itunes-chart-')) return -4;
   if (s.startsWith('lastfm-year') || s.startsWith('lastfm-decade')) return -3;
   if (s.startsWith('lastfm-tag')) return -3;
   if (s.startsWith('lastfm-geo-')) return -2;
@@ -77,6 +92,23 @@ function trackPriority(track) {
   if (s.includes('deezer') || s.includes('itunes')) return 3;
   if (s === 'cover-classics') return 8;
   return 5;
+}
+
+function countTrackHotInBank(bank, artist, title) {
+  const tk = trackKey(artist, title);
+  return (bank.byTrack[tk] ?? []).filter((f) => f.isHot && !f.isMetadata).length;
+}
+
+function buildPriorityHotQueue(bank, doneKeys) {
+  return PRIORITY_HOT_TRACKS.map(([artist, title]) => ({
+    artist,
+    title,
+    source: 'seed-global:priority',
+  })).filter(({ artist, title }) => {
+    const key = trackKey(artist, title);
+    if (!doneKeys.has(key)) return true;
+    return countTrackHotInBank(bank, artist, title) < 1;
+  });
 }
 
 function hasSubstantiveInPool(pool) {
@@ -328,6 +360,7 @@ function isTopCatalogTrack(track) {
     s.startsWith('lastfm-tag') ||
     s.startsWith('lastfm-global-chart') ||
     s.startsWith('deezer-chart-') ||
+    s.startsWith('itunes-chart-') ||
     s.startsWith('seed-global')
   );
 }
@@ -482,12 +515,20 @@ async function main() {
   const ordered = orderTracks(tracks, doneKeys, bank, zeroFactKeys);
   let queue = ordered;
   if (hotPush) {
-    queue = tracks
-      .filter((t) => !doneKeys.has(trackKey(t.artist, t.title)) && isTopCatalogTrack(t))
-      .sort(compareHotPushTracks);
+    const priority = buildPriorityHotQueue(bank, doneKeys);
+    const priKeys = new Set(priority.map((t) => trackKey(t.artist, t.title)));
+    queue = [
+      ...priority,
+      ...tracks
+        .filter((t) => !priKeys.has(trackKey(t.artist, t.title)) && !doneKeys.has(trackKey(t.artist, t.title)) && isTopCatalogTrack(t))
+        .sort(compareHotPushTracks),
+    ];
     console.log(
-      `HOT-PUSH: ${queue.length} top-catalog tracks (genre/chart/tag/year; skip playlists/obscure until hot≥${hotTarget})`,
+      `HOT-PUSH: ${priority.length} priority hits + ${queue.length - priority.length} top-catalog (genre/chart/tag/year until hot≥${hotTarget})`,
     );
+    if (priority.length) {
+      console.log(`  priority: ${priority.map((t) => `${t.artist} — ${t.title}`).join('; ')}`);
+    }
   }
   const backfillCount = queue.filter((t) => doneKeys.has(trackKey(t.artist, t.title))).length;
   console.log(
