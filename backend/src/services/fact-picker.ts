@@ -14,6 +14,7 @@ import {
   isBoringFact,
   isCollectorFact,
   isWeakChartSeed,
+  isEncyclopediaDefinitionSeed,
   MIN_PICK_INTEREST_SCORE,
 } from './reference-fact-quality.js';
 import type { StoryNarratorId } from './story-narrator.js';
@@ -281,6 +282,36 @@ export function pickReferenceFact(
     }
   }
 
+  return null;
+}
+
+/** After duplicate-reject: pick next-best bundle fact, ignoring recent-topic similarity (only excluded fingerprints). */
+export function pickFallbackSeedFromBundle(
+  bundle: ReferenceFactBundle,
+  artist: string,
+  title: string,
+  excludedFingerprints: Set<string>,
+  narrator: StoryNarratorId = 'auto',
+  storyLanguage: StoryLanguageId = 'ru',
+): SelectedReferenceFact | null {
+  const pools = splitBundleByScope(bundle, artist, title);
+  const trackPoolForReject = [...pools.track, ...pools.album];
+  const candidates = [...pools.track, ...pools.album, ...pools.artist].sort(
+    (a, b) => adjustedInterestScore(b, narrator) - adjustedInterestScore(a, narrator),
+  );
+  for (const fact of candidates) {
+    if (excludedFingerprints.has(factFingerprint(fact))) continue;
+    if (isRejectedSeed(fact, title, storyLanguage, trackPoolForReject, artist)) continue;
+    if (isEncyclopediaDefinitionSeed(fact)) continue;
+    if (isGenericConcertVenueSeed(fact)) continue;
+    if (adjustedInterestScore(fact, narrator) < MIN_PICK_INTEREST_SCORE) continue;
+    const scope: FactScope = pools.track.includes(fact)
+      ? 'track'
+      : pools.album.includes(fact)
+        ? 'album'
+        : 'artist';
+    return wrapSelected(fact, scope, narrator);
+  }
   return null;
 }
 

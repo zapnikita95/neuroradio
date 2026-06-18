@@ -16,6 +16,22 @@
         "addedAt": 1781126629632
       }
     ],
+    "sting|shape of my heart": [
+      {
+        "id": "b2c3d4e5-f6a7-8901-bcde-f12345678901",
+        "artist": "Sting",
+        "title": "Shape Of My Heart",
+        "scope": "track",
+        "fact": "«Shape of My Heart» Sting написал вместе с гитаристом Домиником Миллером — редкое для него соавторство; в тексте песни карточный игрок сравнивает судьбу с партией в блекджек, а узнаваемый акустический рифф звучит в финале «Леона» (1994), где композиция заменила тему Eric Serra.",
+        "interestScore": 42,
+        "interestRating": 10,
+        "source": "api",
+        "isHot": true,
+        "harvestSource": "curated",
+        "timesUsed": 0,
+        "addedAt": 1781126629632
+      }
+    ],
     "кино|звезда по имени солнце": [
       {
         "id": "a346529f-0c0b-4b52-be7e-10252de325cf",
@@ -372,6 +388,22 @@
         "source": "api",
         "isHot": true,
         "harvestSource": "wiki",
+        "timesUsed": 0,
+        "addedAt": 1781126357408
+      }
+    ],
+    "sting": [
+      {
+        "id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+        "artist": "Sting",
+        "title": "Shape Of My Heart",
+        "scope": "artist",
+        "fact": "После распада The Police Sting в 1985 начал сольную карьеру, совмещая rock, jazz и reggae; к 1993 году на альбоме Ten Summoner's Tales он показал аранжировочную зрелость — там же родился «Shape of My Heart» с соавтором Домиником Миллером.",
+        "interestScore": 22,
+        "interestRating": 9,
+        "source": "api",
+        "isHot": true,
+        "harvestSource": "curated",
         "timesUsed": 0,
         "addedAt": 1781126357408
       }

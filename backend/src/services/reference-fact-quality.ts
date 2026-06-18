@@ -140,7 +140,7 @@ export function isEncyclopediaDefinitionSeed(fact: string): boolean {
   const t = fact.trim();
   if (highImpactBonus(t) >= 6) return false;
   if (
-    /\b(?:inspired by|sampled from|written as|wrote (?:it|this|the song)|intended as|protest song|viral on|went viral|banned from|scandal|originally wrote)\b/i.test(
+    /\b(?:inspired by|sampled from|written as|wrote (?:it|this|the song)|intended as|protest song|viral on|went viral|banned from|scandal|originally wrote|co-written|co written)\b/i.test(
       t,
     )
   ) {
@@ -229,7 +229,6 @@ export const COLLECTOR_FACT_PATTERNS: RegExp[] = [
   /\b(?:tiktok|spotify|youtube|apple\s+music|streaming)\b/i,
   /\b(?:billion|million)\b.*\b(?:streams?|plays|views?)\b/i,
   /\b(?:streams?|plays)\b.*\b(?:billion|million|spotify)\b/i,
-  /\bco[- ]?writ(?:ten|er)\b/i,
   /\b(?:bush\s+doof|music\s+video|official\s+video)\b/i,
   /\b(?:limited\s+edition|vinyl|pressing|bootleg|b[- ]?side|cassette|7[- ]?inch)\b/i,
   /\b(?:debut\s+single|lead\s+single)\b.*\b(?:since|first|only)\b/i,
@@ -379,6 +378,10 @@ export function interestScore(fact: string): number {
   if (/\b(?:first new (?:song|music|single)|announced (?:a )?new ep|new lead singer)\b/i.test(trimmed)) {
     score += 14;
   }
+  if (/\bco[- ]?written\b/i.test(trimmed)) score += 18;
+  if (/соавторил\w*/i.test(trimmed)) score += 14;
+  if (/\b(?:card(?:sharp|player|game)?|blackjack|poker|playing cards)\b/i.test(trimmed)) score += 10;
+  if (/\b(?:Leon|L[eé]on: The Professional|Eric Serra)\b/i.test(trimmed)) score += 12;
   if (/\b(?:deathtronica|electronicore|metalcore|hardcore|scream\s+vocals?)\b/i.test(trimmed)) score += 20;
   if (isArtistFormationBioSeed(trimmed)) score -= 12;
   if (BACKSTORY_FACT_PATTERNS.some((pattern) => pattern.test(fact))) score += 12;
@@ -434,12 +437,12 @@ export function interestScore(fact: string): number {
   if (/\b(?:widely considered|grunge anthem|ultimate grunge|song'?s success|omnipresence|grew tired of it|removed it from their live)\b/i.test(fact)) {
     score += 14;
   }
-  if (
-    /\b(?:opening track|(?:first|second|third|fourth|lead|debut) single)\b/i.test(fact) &&
+  if (/\b(?:opening track|(?:first|second|third|fourth|lead|debut) single)\b/i.test(fact) &&
     /\b(?:album|released|debut|studio album|from their|from the)\b/i.test(fact)
   ) {
     score += 14;
   }
+  if (/\b(?:втор\w*|перв\w*|трет\w*|четв[её]рт\w*|пят\w*)\s+сингл/i.test(trimmed)) score += 12;
   if (/\b(?:deodorant|Hanna was referring|inspired the title|wrote the song in)\b/i.test(fact)) score += 10;
   if (
     /\b(?:MP3|MPEG|Fraunhofer|Brandenburg)\b/i.test(trimmed) &&

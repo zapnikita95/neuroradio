@@ -577,6 +577,31 @@ assert(
   'Bobby Darin bio rejected at pick',
 );
 
+const STING_WIKI_DEF =
+  '"Shape of My Heart" is a song by British musician Sting, released in August 1993 by A&M Records as the fifth single from his fourth solo album, Ten Summoner\'s Tales.';
+const STING_COWRITTEN =
+  'It was co-written by Dominic Miller, Sting\'s guitarist, which makes it one of the few songs on Ten Summoner\'s Tales that Sting did not write alone.';
+const STING_SETLIST =
+  '«Shape of My Heart» впервые прозвучала на живом выступлении Sting 02-06-2026 (Howard Stern Radio Program, New York, United States).';
+assert(isEncyclopediaDefinitionSeed(STING_WIKI_DEF), 'Sting wiki one-liner is encyclopedia definition');
+assert(
+  !isEncyclopediaDefinitionSeed(STING_COWRITTEN),
+  'Sting co-written genius fact is not encyclopedia definition',
+);
+const stingPick = pickReferenceFact(
+  { trackFacts: [STING_WIKI_DEF, STING_SETLIST, STING_COWRITTEN], artistFacts: [] },
+  [],
+  0,
+  'Sting',
+  'Shape Of My Heart',
+);
+assert(
+  stingPick?.fact.includes('co-written') || stingPick?.fact.includes('Dominic Miller'),
+  `Sting pick prefers co-written over wiki definition (got: ${stingPick?.fact?.slice(0, 90) ?? 'null'})`,
+);
+const STING_CURATED = lookupCuratedFact('Sting', 'Shape Of My Heart');
+assert(STING_CURATED?.fact.includes('Миллер'), 'Sting Shape Of My Heart curated fact present');
+
 // --- 6. Optional live: real Last.fm + aggregator ---
 if (LIVE) {
   if (!process.env.LASTFM_API_KEY?.trim()) {

@@ -60,7 +60,7 @@ const EUROPEAN_ROCK_MAJOR = [
   'a-ha', 'robbie williams', 'placebo', 'muse', 'the killers',
   'the cardigans', 'cardigans', 't a t u', 'tatu',
   'arctic monkeys', 'the strokes', 'linkin park', 'green day', 'blink-182',
-  'savage garden',
+  'savage garden', 'sting', 'the police', 'teddy swims', 'phil collins', 'genesis',
 ];
 
 const KPOP_PATTERN =

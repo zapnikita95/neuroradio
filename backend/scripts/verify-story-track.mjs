@@ -101,17 +101,27 @@ if (!prodOnly) {
   console.log('--- LOCAL SEED ---');
   const { fetchAggregatedFactContext } = await import('../dist/services/fact-aggregator.js');
   const { pickReferenceFact, isRejectedStorySeed } = await import('../dist/services/fact-picker.js');
+  const { lookupCuratedFact } = await import('../dist/services/curated-facts.js');
+  const { interestScore } = await import('../dist/services/reference-fact-quality.js');
   const { isWeakSelectedFact, pickSalvageSnippetSeed } = await import(
     '../dist/services/search-snippet-salvage.js'
   );
   const { validateStoryScript } = await import('../dist/services/story-quality.js');
 
+  const curated = lookupCuratedFact(artist, title);
   const ctx = await fetchAggregatedFactContext(artist, title, 'US');
   const pick = pickReferenceFact(ctx.bundle, [], 0, artist, title);
   const salvage = pickSalvageSnippetSeed(ctx.rawSnippets, artist, title, 'ru');
-    const chosen = pick && !isRejectedStorySeed(pick.fact, artist, title, ctx.bundle.trackFacts)
-      ? pick
-      : salvage;
+  let chosen =
+    pick && !isRejectedStorySeed(pick.fact, artist, title, ctx.bundle.trackFacts) ? pick : salvage;
+  if (!chosen && curated) {
+    chosen = {
+      fact: curated.fact,
+      scope: curated.scope,
+      interestScore: interestScore(curated.fact),
+    };
+    console.log('curated:', curated.fact.slice(0, 180));
+  }
 
   console.log('rules pick:', pick?.fact?.slice(0, 180) ?? '(none)');
   console.log('salvage:', salvage?.fact?.slice(0, 180) ?? '(none)');

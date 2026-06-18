@@ -91,6 +91,13 @@ export function isRejectedPickSeed(
   }
   if (isTruncatedMarketingSnippet(fact)) return true;
   if (isUnspeakableWebSeed(fact)) return true;
+  if (
+    title.trim() &&
+    /впервые прозвучала на живом выступлении/i.test(fact) &&
+    trackPool.some((t) => /\bco[- ]?written\b/i.test(t) && adjustedInterestScore(t) >= 12)
+  ) {
+    return true;
+  }
   return false;
 }
 

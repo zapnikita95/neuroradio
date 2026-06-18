@@ -33,6 +33,7 @@ import {
 } from './fact-topic.js';
 import type { StoryLanguageId } from './story-language.js';
 import { getAccountUsedSeedsForArtistAsync } from './account-store.js';
+import { isCatalogMajorArtist } from './artist-notability.js';
 
 const PENDING_SEED_TTL_MS = 3 * 60_000;
 const pendingTrackSeeds = new Map<string, { fact: string; at: number }>();
@@ -472,7 +473,7 @@ export function prefetchArtistFactsToBank(
   title: string,
   bundle: ReferenceFactBundle,
 ): void {
-  if (!shouldPrefetchArtistFacts(installId, artist)) return;
+  if (!shouldPrefetchArtistFacts(installId, artist) && !isCatalogMajorArtist(artist)) return;
   ingestBundleToBank(artist, title, bundle);
   const pools = splitBundleByScope(bundle, artist, title);
   for (const scope of ['artist'] as const) {

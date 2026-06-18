@@ -275,6 +275,7 @@ export function isTrackTitleAnchoredSeed(fact: string, title: string): boolean {
 function isStrongTrackPoolAnchor(fact: string, title: string): boolean {
   const trimmed = fact.trim();
   if (trimmed.length < 35 || !factMentionsTitle(trimmed, title)) return false;
+  if (/впервые прозвучала на живом выступлении/i.test(trimmed)) return false;
   if (isCatalogMetadataSeed(trimmed) || isAlbumListingSeed(trimmed)) return false;
   if (isMetadataOnlyFallbackFact(trimmed)) return false;
   if (isEncyclopediaDefinitionSeed(trimmed) || isArtistDisambiguationListSeed(trimmed)) {

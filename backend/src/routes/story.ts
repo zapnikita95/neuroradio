@@ -13,9 +13,9 @@ import {
 } from '../services/fact-aggregator.js';
 import { fetchDeepWebSearchSnippets, fetchArtistIdentityWebSnippets } from '../services/web-search-facts.js';
 import { fetchFastTrackWikiFacts } from '../services/wikipedia-facts.js';
-import { explainReferenceFactSelection, factsTooSimilar, isRejectedStorySeed, type SelectedReferenceFact } from '../services/fact-picker.js';
+import { explainReferenceFactSelection, factsTooSimilar, isRejectedStorySeed, pickFallbackSeedFromBundle, type SelectedReferenceFact } from '../services/fact-picker.js';
 import { formatFactPickLog, logFactCandidatePools } from '../services/fact-interest-log.js';
-import { interestScore, isWikiBiographyLead, isCatalogMetadataSeed, isEncyclopediaDefinitionSeed } from '../services/reference-fact-quality.js';
+import { interestScore, isWikiBiographyLead, isCatalogMetadataSeed, isEncyclopediaDefinitionSeed, isGenericConcertVenueSeed } from '../services/reference-fact-quality.js';
 import { isArtistCareerBioWithoutTrack } from '../services/fact-track-anchor.js';
 import { interestRating10 } from '../services/fact-interest-log.js';
 import {
@@ -1071,7 +1071,7 @@ router.post('/full', extractClientSecrets, validateStoryFullBody, storyFullRateL
           }
         }
         if (!selectedFact) {
-          if (isCatalogMajorArtist(metadata.artist)) {
+          if (artistTier === 'major' || isCatalogMajorArtist(metadata.artist)) {
             const factModels =
               ownLlmKey && openrouterModelFact.includes('/')
                 ? [openrouterModelFact]
@@ -1232,7 +1232,7 @@ router.post('/full', extractClientSecrets, validateStoryFullBody, storyFullRateL
         }
       }
 
-      if ((!alt || factsTooSimilar(alt.fact, rejectSimilarTo)) && isCatalogMajorArtist(metadata.artist)) {
+      if ((!alt || factsTooSimilar(alt.fact, rejectSimilarTo)) && (artistTier === 'major' || isCatalogMajorArtist(metadata.artist))) {
         const factModels =
           ownLlmKey && openrouterModelFact.includes('/')
             ? [openrouterModelFact]
@@ -1262,9 +1262,29 @@ router.post('/full', extractClientSecrets, validateStoryFullBody, storyFullRateL
         }
         console.log(`[facts] switched to alternate seed: "${alt.fact.slice(0, 90)}"`);
       } else {
+        const bundleFallback = pickFallbackSeedFromBundle(
+          factBundle,
+          metadata.artist,
+          metadata.title,
+          usedFingerprints,
+          storyNarrator,
+          storyLang,
+        );
+        if (bundleFallback) {
+          selectedFact = bundleFallback;
+          factFromBank = false;
+          factHuntLlm = false;
+          factFromSalvage = false;
+          storyReferenceFacts = [selectedFact.fact];
+          if (coverCtx.isCover && coverCtx.coverNoteRu) {
+            storyReferenceFacts = [coverCtx.coverNoteRu, ...storyReferenceFacts];
+          }
+          console.log(`[facts] bundle fallback after duplicate reject: "${bundleFallback.fact.slice(0, 90)}"`);
+        } else {
         console.warn(
           `[facts] no alternate seed after duplicate reject for "${metadata.artist}" — "${metadata.title}"`,
         );
+        }
       }
     }
 
@@ -1360,7 +1380,14 @@ router.post('/full', extractClientSecrets, validateStoryFullBody, storyFullRateL
           );
         }
         const strongBundleFacts = [...factBundle.trackFacts, ...factBundle.artistFacts]
-          .filter((f) => interestScore(f) >= 6 && !isWeakSnippetSeed(f))
+          .filter(
+            (f) =>
+              interestScore(f) >= 6 &&
+              !isWeakSnippetSeed(f) &&
+              !isEncyclopediaDefinitionSeed(f) &&
+              !isGenericConcertVenueSeed(f) &&
+              !isCatalogMetadataSeed(f),
+          )
           .sort((a, b) => interestScore(b) - interestScore(a));
         const realRefFacts = storyReferenceFacts.filter(
           (f) => !isMetadataOnlyFallbackFact(f) && !isWeakSnippetSeed(f),
