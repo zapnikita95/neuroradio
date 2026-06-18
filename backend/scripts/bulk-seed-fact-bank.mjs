@@ -65,12 +65,15 @@ function isHarvestableTrack(track) {
 function trackPriority(track) {
   const s = track.source ?? '';
   if (s.startsWith('genre-top')) return -5;
+  if (s.startsWith('lastfm-global-chart') || s.startsWith('deezer-chart-0')) return -5;
   if (s.startsWith('genre-year')) return -4;
+  if (s.startsWith('deezer-chart-')) return -4;
+  if (s.startsWith('seed-global')) return -4;
   if (s.startsWith('lastfm-year') || s.startsWith('lastfm-decade')) return -3;
-  if (s.startsWith('lastfm-tag')) return -2;
+  if (s.startsWith('lastfm-tag')) return -3;
+  if (s.startsWith('lastfm-geo-')) return -2;
   if (s.startsWith('seed-ru')) return 0;
   if (s.startsWith('lastfm')) return 1;
-  if (s.startsWith('seed-global')) return 2;
   if (s.includes('deezer') || s.includes('itunes')) return 3;
   if (s === 'cover-classics') return 8;
   return 5;
@@ -321,8 +324,20 @@ function isTopCatalogTrack(track) {
     s.startsWith('genre-top') ||
     s.startsWith('genre-year') ||
     s.startsWith('lastfm-year') ||
-    s.startsWith('lastfm-decade')
+    s.startsWith('lastfm-decade') ||
+    s.startsWith('lastfm-tag') ||
+    s.startsWith('lastfm-global-chart') ||
+    s.startsWith('deezer-chart-') ||
+    s.startsWith('seed-global')
   );
+}
+
+function compareHotPushTracks(a, b) {
+  const pri = trackPriority(a) - trackPriority(b);
+  if (pri !== 0) return pri;
+  const yearA = parseInt(a.source?.match(/:(\d{4})(?:$|:)/)?.[1] ?? a.year ?? '0', 10);
+  const yearB = parseInt(b.source?.match(/:(\d{4})(?:$|:)/)?.[1] ?? b.year ?? '0', 10);
+  return yearB - yearA;
 }
 
 function orderTracks(tracks, doneKeys, bank, zeroFactKeys) {
@@ -339,7 +354,7 @@ function orderTracks(tracks, doneKeys, bank, zeroFactKeys) {
       backfill.push(t);
     }
   }
-  const byPri = (a, b) => trackPriority(a) - trackPriority(b);
+  const byPri = compareHotPushTracks;
   const pendingTops = pending.filter(isTopCatalogTrack);
   const pendingRest = pending.filter((t) => !isTopCatalogTrack(t));
 
@@ -374,12 +389,13 @@ function orderTracks(tracks, doneKeys, bank, zeroFactKeys) {
 
 async function runPool(tracks, bank, stats, doneKeys, zeroFactKeys) {
   let idx = 0;
+  function shouldContinue() {
+    const hotLeft = countHotInBank(bank) < hotTarget;
+    if (hotPush) return hotLeft;
+    return stats.total < target && hotLeft;
+  }
   async function worker() {
-    while (
-      idx < tracks.length &&
-      stats.total < target &&
-      countHotInBank(bank) < hotTarget
-    ) {
+    while (idx < tracks.length && shouldContinue()) {
       const i = idx++;
       const track = tracks[i];
       const key = trackKey(track.artist, track.title);
@@ -468,9 +484,9 @@ async function main() {
   if (hotPush) {
     queue = tracks
       .filter((t) => !doneKeys.has(trackKey(t.artist, t.title)) && isTopCatalogTrack(t))
-      .sort((a, b) => trackPriority(a) - trackPriority(b));
+      .sort(compareHotPushTracks);
     console.log(
-      `HOT-PUSH: ${queue.length} top-catalog tracks only (skip discogs/backfill/obscure until hot≥${hotTarget})`,
+      `HOT-PUSH: ${queue.length} top-catalog tracks (genre/chart/tag/year; skip playlists/obscure until hot≥${hotTarget})`,
     );
   }
   const backfillCount = queue.filter((t) => doneKeys.has(trackKey(t.artist, t.title))).length;

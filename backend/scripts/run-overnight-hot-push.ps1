@@ -35,7 +35,7 @@ try {
     $hotArgs = @(
         'scripts/bulk-seed-fact-bank.mjs',
         '--hot-push',
-        '--target=60000',
+        '--target=120000',
         '--hot-target=20000',
         '--concurrency=5',
         '--resume',
