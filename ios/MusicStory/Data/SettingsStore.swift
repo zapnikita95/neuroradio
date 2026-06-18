@@ -251,6 +251,7 @@ final class SettingsStore: ObservableObject {
 
     func clearAccountProfile() {
         accountProfile = nil
+        setSyncCode("")
     }
 
     private func persistAccountProfile() {

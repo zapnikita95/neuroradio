@@ -190,7 +190,13 @@ export async function pgInsertUsedSeed(
   return (res.rowCount ?? 0) > 0;
 }
 
-export async function pgDeleteUsedSeedByFingerprint(
+export async function pgDeleteAllDataForAccount(accountId: string): Promise<void> {
+  if (!hasPostgres()) return;
+  const pool = getPool();
+  await pool.query(`DELETE FROM story_history WHERE account_id = $1`, [accountId]);
+  await pool.query(`DELETE FROM used_seeds WHERE account_id = $1`, [accountId]);
+}
+
   installId: string,
   accountId: string | null,
   artist: string,

@@ -149,6 +149,17 @@ struct AppL10n {
     func accountPlanLabel(_ plan: String) -> String {
         en ? "Plan: \(plan)" : "Тариф: \(plan)"
     }
+    var accountDelete: String { en ? "Delete account" : "Удалить аккаунт" }
+    var accountDeleteTitle: String { en ? "Delete account?" : "Удалить аккаунт?" }
+    var accountDeleteBody: String {
+        en
+            ? "Your cloud history and profile will be permanently deleted. This cannot be undone. Active App Store subscriptions must be canceled in Settings → Apple ID → Subscriptions."
+            : "Облачная история и профиль будут удалены безвозвратно. Активную подписку App Store отмените в Настройки → Apple ID → Подписки."
+    }
+    var accountDeleteConfirm: String { en ? "Delete permanently" : "Удалить навсегда" }
+    var accountDeleteCancel: String { en ? "Cancel" : "Отмена" }
+    var accountDeleteSuccess: String { en ? "Account deleted" : "Аккаунт удалён" }
+    var accountDeleteFailed: String { en ? "Could not delete account" : "Не удалось удалить аккаунт" }
 
     // MARK: - Billing
 
@@ -161,7 +172,7 @@ struct AppL10n {
     var billingPitch: String {
         en
             ? "DeepSeek V3 finds sharper facts and cleaner scripts. ElevenLabs for premium voices. History syncs across phones with the same email."
-            : "DeepSeek V3 лучше находит факты про трек и артиста, аккуратнее формулирует текст. Yandex SpeechKit — расширенный набор голосов. История синхронизируется между телефонами, если войти тем же email."
+            : "DeepSeek V3 лучше находит факты и формулирует текст. ElevenLabs — премиум-голоса. История синхронизируется между устройствами с одним email."
     }
     var billingPlansHeading: String { en ? "Choose billing period" : "Выберите период" }
     var billingSubscribe: String { en ? "Subscribe" : "Оформить подписку" }
@@ -201,7 +212,7 @@ struct AppL10n {
         en ? "DeepSeek V3 for stories" : "DeepSeek V3 для историй"
     }
     var billingPremiumFeature3: String {
-        en ? "ElevenLabs premium voices" : "Yandex SpeechKit — расширенный набор голосов"
+        en ? "ElevenLabs premium voices" : "ElevenLabs — премиум-голоса"
     }
     var billingPremiumFeature4: String {
         en ? "Sync across devices" : "Синхронизация между устройствами"

@@ -2,6 +2,7 @@ import { Router, Request, Response } from 'express';
 import { requireAppAuth } from '../middleware/app-auth.js';
 import {
   claimDeviceWelcomeTrial,
+  deleteAccountForInstall,
   getAccountProfileLoaded,
   getSyncStatus,
   linkAppleAccount,
@@ -211,6 +212,16 @@ router.post('/telegram', async (req: Request, res: Response) => {
     history: [],
     scrobbles: [],
   });
+});
+
+router.delete('/account', async (req: Request, res: Response) => {
+  const result = await deleteAccountForInstall(req.installId!);
+  if (!result.ok) {
+    const status = result.code === 'NOT_LOGGED_IN' ? 401 : 400;
+    res.status(status).json({ ok: false, error: result.error, code: result.code });
+    return;
+  }
+  res.json({ ok: true, message: 'Account deleted' });
 });
 
 export default router;

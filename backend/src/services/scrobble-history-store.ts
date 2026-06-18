@@ -93,6 +93,10 @@ export async function pgReassignScrobbleHistoryForInstall(
   return res.rowCount ?? 0;
 }
 
+export async function pgDeleteAllScrobblesForAccount(accountId: string): Promise<void> {
+  await getPool().query(`DELETE FROM scrobble_history WHERE account_id = $1`, [accountId]);
+}
+
 export async function pgMergeScrobbleHistoryAccounts(
   fromAccountId: string,
   toAccountId: string,

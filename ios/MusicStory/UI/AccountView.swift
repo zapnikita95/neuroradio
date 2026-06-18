@@ -17,7 +17,6 @@ private struct BillingPlanOption: Identifiable {
 
 struct AccountView: View {
     @Environment(\.dismiss) private var dismiss
-    @Environment(\.openURL) private var openURL
     @EnvironmentObject private var settings: SettingsStore
     @StateObject private var storeKit = StoreKitManager.shared
 
@@ -28,14 +27,15 @@ struct AccountView: View {
     @State private var selectedTab: AccountScreenTab = .account
     @State private var selectedPlan = "quarter"
     @State private var isPurchasing = false
+    @State private var isDeletingAccount = false
+    @State private var showDeleteConfirm = false
     @State private var billingMessage: String?
     @State private var billingError: String?
-    @State private var billingEmail = ""
+    @State private var accountMessage: String?
 
     private var copy: AppL10n { AppStrings.l10n(settings.resolvedLanguage) }
-    private var useAppStore: Bool { settings.resolvedLanguage == .en }
 
-    private var usdPlans: [BillingPlanOption] {
+    private var plans: [BillingPlanOption] {
         let monthPrice = storeKit.displayPrice(forPlan: "month") ?? "$3.99"
         let quarterPrice = storeKit.displayPrice(forPlan: "quarter") ?? "$9.99"
         let yearPrice = storeKit.displayPrice(forPlan: "year") ?? "$39.99"
@@ -46,36 +46,26 @@ struct AccountView: View {
                 price: monthPrice,
                 oldPrice: nil,
                 badge: nil,
-                perMonthHint: useAppStore ? "\(monthPrice) / mo" : nil
+                perMonthHint: "\(monthPrice) / mo"
             ),
             BillingPlanOption(
                 id: "quarter",
                 title: copy.billingPlanQuarter,
                 price: quarterPrice,
-                oldPrice: useAppStore ? "$11.97" : "597 ₽",
+                oldPrice: "$11.97",
                 badge: nil,
-                perMonthHint: useAppStore ? "≈ $3.33 / mo" : "≈ 166 ₽ в месяц"
+                perMonthHint: "≈ $3.33 / mo"
             ),
             BillingPlanOption(
                 id: "year",
                 title: copy.billingPlanYear,
                 price: yearPrice,
-                oldPrice: useAppStore ? "$47.88" : "2388 ₽",
+                oldPrice: "$47.88",
                 badge: copy.billingBestValue,
-                perMonthHint: useAppStore ? "≈ $3.33 / mo" : "≈ 167 ₽ в месяц"
+                perMonthHint: "≈ $3.33 / mo"
             ),
         ]
     }
-
-    private var rubPlans: [BillingPlanOption] {
-        [
-            BillingPlanOption(id: "month", title: copy.billingPlanMonth, price: "199 ₽", oldPrice: nil, badge: nil, perMonthHint: "199 ₽ в месяц"),
-            BillingPlanOption(id: "quarter", title: copy.billingPlanQuarter, price: "499 ₽", oldPrice: "597 ₽", badge: nil, perMonthHint: "≈ 166 ₽ в месяц"),
-            BillingPlanOption(id: "year", title: copy.billingPlanYear, price: "1999 ₽", oldPrice: "2388 ₽", badge: copy.billingBestValue, perMonthHint: "≈ 167 ₽ в месяц"),
-        ]
-    }
-
-    private var plans: [BillingPlanOption] { useAppStore ? usdPlans : rubPlans }
 
     var body: some View {
         MusicStoryBackground {
@@ -115,17 +105,21 @@ struct AccountView: View {
         .navigationDestination(isPresented: $showLogin) {
             AccountLoginView()
         }
-        .task {
-            billingEmail = settings.accountProfile?.email ?? ""
-            await loadProfile()
-            if useAppStore {
-                await storeKit.loadProducts()
+        .confirmationDialog(
+            copy.accountDeleteTitle,
+            isPresented: $showDeleteConfirm,
+            titleVisibility: .visible
+        ) {
+            Button(copy.accountDeleteConfirm, role: .destructive) {
+                Task { await deleteAccount() }
             }
+            Button(copy.accountDeleteCancel, role: .cancel) {}
+        } message: {
+            Text(copy.accountDeleteBody)
         }
-        .onChange(of: settings.resolvedLanguage) { _, lang in
-            if lang == .en {
-                Task { await storeKit.loadProducts() }
-            }
+        .task {
+            await loadProfile()
+            await storeKit.loadProducts()
         }
     }
 
@@ -165,13 +159,33 @@ struct AccountView: View {
                     settings.clearAccountProfile()
                     profile = nil
                     loadError = nil
-                    billingEmail = ""
+                    accountMessage = nil
                 }
                 Button(copy.accountRefreshProfile) {
                     Task { await loadProfile() }
                 }
                 .font(.caption)
                 .foregroundStyle(AppTheme.mutedLavender)
+
+                Button {
+                    showDeleteConfirm = true
+                } label: {
+                    Text(copy.accountDelete)
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(AppTheme.errorCoral)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 12)
+                }
+                .disabled(isDeletingAccount)
+
+                if isDeletingAccount {
+                    ProgressView().tint(AppTheme.accentViolet)
+                }
+                if let accountMessage {
+                    Text(accountMessage)
+                        .font(.footnote)
+                        .foregroundStyle(AppTheme.mutedLavender)
+                }
             } else {
                 PrimaryStoryButton(title: copy.accountSignIn) {
                     showLogin = true
@@ -216,22 +230,6 @@ struct AccountView: View {
                 }
             }
 
-            if !useAppStore {
-                VStack(alignment: .leading, spacing: 8) {
-                    Text(copy.billingEmailField)
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(AppTheme.mutedLavender)
-                    TextField(copy.billingEmailField, text: $billingEmail)
-                        .textInputAutocapitalization(.never)
-                        .keyboardType(.emailAddress)
-                        .autocorrectionDisabled()
-                        .padding(12)
-                        .background(AppTheme.surfaceElevated.opacity(0.9))
-                        .clipShape(RoundedRectangle(cornerRadius: 12))
-                        .foregroundStyle(AppTheme.creamText)
-                }
-            }
-
             PrimaryStoryButton(
                 title: isPurchasing ? copy.billingProcessing : copy.billingSubscribe,
                 loading: isPurchasing
@@ -248,21 +246,19 @@ struct AccountView: View {
                 Text(billingError)
                     .font(.footnote)
                     .foregroundStyle(AppTheme.errorCoral)
-            } else if useAppStore, let err = storeKit.lastError {
+            } else if let err = storeKit.lastError {
                 Text(err)
                     .font(.footnote)
                     .foregroundStyle(AppTheme.errorCoral)
             }
 
-            Text(useAppStore ? copy.billingAppStoreHint : copy.billingYookassaHint)
+            Text(copy.billingAppStoreHint)
                 .font(.caption)
                 .foregroundStyle(AppTheme.mutedLavender)
 
-            if useAppStore {
-                Text(copy.billingAppStoreLegal)
-                    .font(.caption2)
-                    .foregroundStyle(AppTheme.mutedLavender)
-            }
+            Text(copy.billingAppStoreLegal)
+                .font(.caption2)
+                .foregroundStyle(AppTheme.mutedLavender)
         }
     }
 
@@ -286,9 +282,6 @@ struct AccountView: View {
         settings.backendURL = BackendURL.normalize(settings.backendURL)
         let result = await AccountAuthManager.shared.fetchProfile()
         profile = result.profile ?? settings.accountProfile
-        if let email = profile?.email ?? settings.accountProfile?.email, !email.isEmpty {
-            billingEmail = email
-        }
         if result.profile?.isLoggedIn == true {
             AccountCloudSync.mergeCloudPayload(result)
         }
@@ -304,34 +297,32 @@ struct AccountView: View {
         isPurchasing = true
         defer { isPurchasing = false }
 
-        if useAppStore {
-            let ok = await storeKit.purchase(plan: selectedPlan)
-            if ok {
-                billingMessage = copy.billingSuccess
-                await StoryRepository.shared.refreshQuota()
-                await loadProfile()
-            } else if storeKit.lastError != nil {
-                billingError = storeKit.lastError
-            }
-            return
+        let ok = await storeKit.purchase(plan: selectedPlan)
+        if ok {
+            billingMessage = copy.billingSuccess
+            await StoryRepository.shared.refreshQuota()
+            await loadProfile()
+        } else if storeKit.lastError != nil {
+            billingError = storeKit.lastError
         }
+    }
 
-        let email = billingEmail.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard email.contains("@"), email.count <= 254 else {
-            billingError = copy.billingEmailRequired
-            return
-        }
+    private func deleteAccount() async {
+        isDeletingAccount = true
+        accountMessage = nil
+        defer { isDeletingAccount = false }
 
         do {
-            let resp = try await BackendClient.shared.createYooKassaPayment(email: email, plan: selectedPlan)
-            guard resp.ok == true, let urlString = resp.confirmationUrl, let url = URL(string: urlString) else {
-                billingError = resp.error ?? copy.billingPaymentFailed
-                return
-            }
-            openURL(url)
-            billingMessage = copy.billingYookassaOpened
+            try await BackendClient.shared.deleteAccount()
+            settings.clearAccountProfile()
+            profile = nil
+            loadError = nil
+            accountMessage = copy.accountDeleteSuccess
+            await StoryRepository.shared.refreshQuota()
         } catch {
-            billingError = error.localizedDescription
+            accountMessage = error.localizedDescription.isEmpty
+                ? copy.accountDeleteFailed
+                : error.localizedDescription
         }
     }
 }

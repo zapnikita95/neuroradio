@@ -18,6 +18,7 @@ import {
   pgDeleteUsedSeedByFingerprint,
   pgListStoryHistory,
   pgUpdateStoryHistoryVote,
+  pgDeleteAllDataForAccount,
 } from './story-history-store.js';
 import { isEmailConfigured } from './email-sender.js';
 import { encryptUserSecret } from './user-secrets-crypto.js';
@@ -1819,4 +1820,74 @@ export function getAccountListenStat(installId: string, artist: string): ListenS
   if (!accountId) return null;
   const key = artist.trim().toLowerCase();
   return store.accountsById[accountId]?.listenStats?.find((s) => s.artistKey === key) ?? null;
+}
+
+/** Permanently delete the logged-in account and cloud data (App Store Guideline 5.1.1(v)). */
+export async function deleteAccountForInstall(
+  installId: string,
+): Promise<{ ok: true } | { ok: false; error: string; code?: string }> {
+  await ensureAccountStoreLoaded();
+  const normalized = installId.trim().toLowerCase();
+  const store = loadStore();
+  const accountId = store.installToAccount[normalized];
+  if (!accountId) {
+    return { ok: false, error: 'Not signed in', code: 'NOT_LOGGED_IN' };
+  }
+  const account = store.accountsById[accountId];
+  if (!account) {
+    delete store.installToAccount[normalized];
+    saveStore(store);
+    return { ok: true };
+  }
+
+  const hasIdentity =
+    Boolean(account.email?.trim()) ||
+    Boolean(account.appleSub?.trim()) ||
+    (account.telegramId ?? 0) > 0;
+  if (!hasIdentity) {
+    return { ok: false, error: 'No account to delete', code: 'NO_IDENTITY' };
+  }
+
+  store.emailToAccount = store.emailToAccount ?? {};
+  store.appleToAccount = store.appleToAccount ?? {};
+  store.telegramToAccount = store.telegramToAccount ?? {};
+  store.pendingWebCabinetCodes = store.pendingWebCabinetCodes ?? {};
+
+  if (account.email?.trim()) {
+    const email = normalizeEmail(account.email);
+    delete store.emailToAccount[email];
+    delete store.pendingWebCabinetCodes[email];
+    const pending = store.pendingEmailCodes ?? {};
+    for (const [key, row] of Object.entries(pending)) {
+      if (row.email === email) delete pending[key];
+    }
+    store.pendingEmailCodes = pending;
+    if (hasPostgres()) {
+      await pgDeletePendingEmailCode(email);
+    }
+  }
+  if (account.appleSub?.trim()) {
+    delete store.appleToAccount[account.appleSub.trim()];
+  }
+  if (account.telegramId) {
+    delete store.telegramToAccount[String(account.telegramId)];
+  }
+  delete store.syncCodeToAccount[account.syncCode];
+
+  for (const id of [...account.installIds]) {
+    if (store.installToAccount[id] === accountId) {
+      delete store.installToAccount[id];
+    }
+  }
+
+  delete store.accountsById[accountId];
+
+  if (hasPostgres()) {
+    await pgDeleteAllDataForAccount(accountId);
+    const { pgDeleteAllScrobblesForAccount } = await import('./scrobble-history-store.js');
+    await pgDeleteAllScrobblesForAccount(accountId);
+  }
+
+  saveStore(store);
+  return { ok: true };
 }

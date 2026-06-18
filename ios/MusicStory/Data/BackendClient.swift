@@ -324,6 +324,16 @@ final class BackendClient {
         return try decode(PaymentCreateResponse.self, from: data)
     }
 
+    func deleteAccount() async throws {
+        let (_, response) = try await dataFromAPI(
+            path: "v1/auth/account",
+            method: "DELETE",
+            body: nil,
+            authorized: true
+        )
+        try validateHTTP(response)
+    }
+
     func verifyAppStorePurchase(receiptData: String) async throws -> IapVerifyResponse {
         let body = try JSONEncoder().encode(AppStoreVerifyRequest(receiptData: receiptData))
         let (data, response) = try await dataFromAPI(
