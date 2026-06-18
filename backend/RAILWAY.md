@@ -247,6 +247,8 @@ curl -s https://ТВОЙ-BFF.up.railway.app/v1/public/tts-config
 | `RECEIPT_ADMIN_EMAIL` | `zap.nikita95@gmail.com` — запрос чека после оплаты |
 | `BILLING_ADMIN_SECRET` | Секрет для `POST /v1/billing/admin/receipt` |
 | `PUBLIC_BFF_URL` | `https://www.efir-ai.ru` (BFF/music-story) |
+| `APP_STORE_URL` | Ссылка на приложение в App Store (когда появится). Письмо после оплаты + кнопки на сайте. |
+| `GOOGLE_PLAY_URL` | Ссылка на приложение в Google Play. Письмо после оплаты + кнопки на сайте. |
 | `DATABASE_URL` | `${{Postgres.DATABASE_URL}}` — **обязательно**, иначе premium сбросится при редеплое |
 
 **Webhook в ЮKassa:** `https://ТВОЙ-BFF.up.railway.app/v1/public/yookassa/webhook`  

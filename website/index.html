@@ -311,6 +311,19 @@
           <p class="dl-fine"><a href="docs/extension.html">Как установить расширение →</a></p>
         </article>
       </div>
+      <div class="store-links-panel reveal" id="storeLinksPanel" hidden>
+        <p class="store-links-lead">Также в официальных магазинах:</p>
+        <div class="store-links-row">
+          <a href="#" id="dlAppStore" class="btn btn-store btn-store--apple" target="_blank" rel="noopener noreferrer" hidden>
+            <span class="store-btn-title">App Store</span>
+            <span class="store-btn-sub">для iPhone и iPad</span>
+          </a>
+          <a href="#" id="dlGooglePlay" class="btn btn-store btn-store--play" target="_blank" rel="noopener noreferrer" hidden>
+            <span class="store-btn-title">Google Play</span>
+            <span class="store-btn-sub">для Android</span>
+          </a>
+        </div>
+      </div>
     </section>
 
     <!-- ============ PERSONAS ============ -->
@@ -810,6 +823,38 @@
           <button type="submit" class="btn btn-primary btn-block btn-lg" id="loginModalSubmit" hidden>Войти в кабинет</button>
           <p class="login-modal-msg" id="loginModalMsg" hidden></p>
         </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ PAYMENT SUCCESS (return from YooKassa) ============ -->
+  <div class="modal-backdrop" id="paymentSuccessBackdrop" hidden>
+    <div class="modal modal-payment-success" role="dialog" aria-modal="true" aria-labelledby="paymentSuccessTitle">
+      <button class="modal-close" id="paymentSuccessClose" aria-label="Закрыть">×</button>
+      <div class="payment-success-body">
+        <div class="success-mark"><span class="site-ic ic-check" aria-hidden="true"></span></div>
+        <h3 id="paymentSuccessTitle">Оплата прошла — подписка активна</h3>
+        <p id="paymentSuccessLead">
+          Мы отправили письмо с инструкцией на ваш email. Скачайте приложение и войдите с тем же адресом — расширенный доступ включится автоматически.
+        </p>
+        <div class="success-downloads" id="paymentSuccessDownloads">
+          <a href="#" id="paySuccessAppStore" class="btn btn-store btn-store--apple btn-block" target="_blank" rel="noopener noreferrer" hidden>
+            <span class="store-btn-title">Скачать в App Store</span>
+            <span class="store-btn-sub">iPhone и iPad</span>
+          </a>
+          <a href="#" id="paySuccessGooglePlay" class="btn btn-store btn-store--play btn-block" target="_blank" rel="noopener noreferrer" hidden>
+            <span class="store-btn-title">Скачать в Google Play</span>
+            <span class="store-btn-sub">Android</span>
+          </a>
+          <a href="/efir-ai.apk" id="paySuccessApk" class="btn btn-primary btn-block" rel="noopener" download="efir-ai.apk">
+            <span class="btn-ic site-ic ic-download" aria-hidden="true"></span> Скачать APK для Android
+          </a>
+          <a href="/efir-extension.zip" id="paySuccessExt" class="btn btn-ghost btn-block" rel="noopener" download="efir-extension.zip">
+            <span class="btn-ic site-ic ic-puzzle" aria-hidden="true"></span> Скачать расширение
+          </a>
+        </div>
+        <a href="account/" class="btn btn-primary btn-block btn-lg" id="paymentSuccessAccount">Открыть личный кабинет</a>
+        <button class="btn btn-ghost btn-block btn-text" id="paymentSuccessDismiss">Продолжить на сайте</button>
       </div>
     </div>
   </div>

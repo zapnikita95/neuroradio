@@ -58,6 +58,27 @@
           <p class="cabinet-loading">Загружаем данные подписки…</p>
         </div>
 
+        <div class="cabinet-downloads" id="cabinetDownloads" hidden>
+          <h2 class="cabinet-downloads-title">Скачайте приложение</h2>
+          <p class="cabinet-downloads-lead">Войдите в приложении с <strong id="cabinetDownloadEmail">…</strong> — подписка уже активна.</p>
+          <div class="cabinet-downloads-grid">
+            <a href="#" id="cabinetAppStore" class="btn btn-store btn-store--apple btn-block" target="_blank" rel="noopener noreferrer" hidden>
+              <span class="store-btn-title">App Store</span>
+              <span class="store-btn-sub">iPhone и iPad</span>
+            </a>
+            <a href="#" id="cabinetGooglePlay" class="btn btn-store btn-store--play btn-block" target="_blank" rel="noopener noreferrer" hidden>
+              <span class="store-btn-title">Google Play</span>
+              <span class="store-btn-sub">Android</span>
+            </a>
+            <a href="/efir-ai.apk" id="cabinetApk" class="btn btn-primary btn-block" rel="noopener" download="efir-ai.apk">
+              <span class="btn-ic site-ic ic-download" aria-hidden="true"></span> Скачать APK
+            </a>
+            <a href="/efir-extension.zip" id="cabinetExt" class="btn btn-ghost btn-block" rel="noopener" download="efir-extension.zip">
+              <span class="btn-ic site-ic ic-puzzle" aria-hidden="true"></span> Расширение для браузера
+            </a>
+          </div>
+        </div>
+
         <div class="cabinet-actions">
           <button type="button" class="btn btn-ghost btn-block cabinet-cancel" id="cabinetCancelBtn">
             Отменить подписку

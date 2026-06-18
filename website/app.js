@@ -515,10 +515,13 @@
 
   /* ---------------- Download links ---------------- */
   (function () {
-    var apkEls = ['#dlApk', '#successApk', '#heroApk'].map(function (id) { return $(id); }).filter(Boolean);
-    var extEls = ['#dlExt', '#successExt', '#heroExt'].map(function (id) { return $(id); }).filter(Boolean);
+    var apkEls = ['#dlApk', '#successApk', '#heroApk', '#paySuccessApk', '#cabinetApk'].map(function (id) { return $(id); }).filter(Boolean);
+    var extEls = ['#dlExt', '#successExt', '#heroExt', '#paySuccessExt', '#cabinetExt'].map(function (id) { return $(id); }).filter(Boolean);
     var apkVer = $('#apkVersion');
     var extVer = $('#extVersion');
+    var storePanel = $('#storeLinksPanel');
+    var appStoreEls = ['#dlAppStore', '#paySuccessAppStore', '#cabinetAppStore'].map(function (id) { return $(id); }).filter(Boolean);
+    var playEls = ['#dlGooglePlay', '#paySuccessGooglePlay', '#cabinetGooglePlay'].map(function (id) { return $(id); }).filter(Boolean);
 
     function pickAssets(rel) {
       var assets = rel.assets || [];
@@ -532,6 +535,29 @@
     }
 
     var lastLinks = null;
+
+    function applyStoreLinks(links) {
+      var hasStore = false;
+      appStoreEls.forEach(function (el) {
+        if (links.appStoreUrl) {
+          el.href = links.appStoreUrl;
+          el.hidden = false;
+          hasStore = true;
+        } else {
+          el.hidden = true;
+        }
+      });
+      playEls.forEach(function (el) {
+        if (links.googlePlayUrl) {
+          el.href = links.googlePlayUrl;
+          el.hidden = false;
+          hasStore = true;
+        } else {
+          el.hidden = true;
+        }
+      });
+      if (storePanel) storePanel.hidden = !hasStore;
+    }
 
     function applyLinks(links) {
       lastLinks = links;
@@ -554,6 +580,7 @@
       });
       if (apkVer) apkVer.textContent = links.apkUrl ? tagLabel : tagLabel + (en ? ' (pending build)' : ' (ожидает сборку)');
       if (extVer) extVer.textContent = links.tag ? tagLabel : (en ? 'latest on site' : 'актуальная на сайте');
+      applyStoreLinks(links);
     }
 
     function fetchGhMobileLatest() {
@@ -598,8 +625,14 @@
           return r.json();
         })
         .then(function (d) {
-          if (!d.apkUrl && !d.extensionUrl) throw new Error('empty bff');
-          return { apkUrl: d.apkUrl, extensionUrl: d.extensionUrl, tag: d.tag };
+          if (!d.apkUrl && !d.extensionUrl && !d.appStoreUrl && !d.googlePlayUrl) throw new Error('empty bff');
+          return {
+            apkUrl: d.apkUrl,
+            extensionUrl: d.extensionUrl,
+            appStoreUrl: d.appStoreUrl || null,
+            googlePlayUrl: d.googlePlayUrl || null,
+            tag: d.tag,
+          };
         });
     }
 
@@ -613,6 +646,58 @@
     window.EfirRefreshDownloadLabels = function () {
       if (lastLinks) applyLinks(lastLinks);
     };
+
+    window.EfirApplyDownloadLinks = applyLinks;
+  })();
+
+  /* ---------------- Payment success (YooKassa return) ---------------- */
+  (function () {
+    var backdrop = $('#paymentSuccessBackdrop');
+    if (!backdrop) return;
+
+    var closeBtn = $('#paymentSuccessClose');
+    var dismissBtn = $('#paymentSuccessDismiss');
+
+    function closePaymentSuccess() {
+      backdrop.hidden = true;
+      document.body.style.overflow = '';
+      if (window.history && window.history.replaceState) {
+        window.history.replaceState({}, '', window.location.pathname + window.location.hash);
+      }
+    }
+
+    function openPaymentSuccess() {
+      var en = window.EfirI18n && window.EfirI18n.getLang() === 'en';
+      var title = $('#paymentSuccessTitle');
+      var lead = $('#paymentSuccessLead');
+      if (title) {
+        title.textContent = en
+          ? 'Payment complete — subscription active'
+          : 'Оплата прошла — подписка активна';
+      }
+      if (lead) {
+        lead.textContent = en
+          ? 'We sent a welcome email with instructions. Download the app and sign in with the same email — premium unlocks automatically.'
+          : 'Мы отправили письмо с инструкцией на ваш email. Скачайте приложение и войдите с тем же адресом — расширенный доступ включится автоматически.';
+      }
+      backdrop.hidden = false;
+      document.body.style.overflow = 'hidden';
+    }
+
+    if (closeBtn) closeBtn.addEventListener('click', closePaymentSuccess);
+    if (dismissBtn) dismissBtn.addEventListener('click', closePaymentSuccess);
+    backdrop.addEventListener('click', function (e) {
+      if (e.target === backdrop) closePaymentSuccess();
+    });
+    document.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape' && !backdrop.hidden) closePaymentSuccess();
+    });
+
+    if (window.location.search.indexOf('payment=success') !== -1) {
+      openPaymentSuccess();
+    }
+
+    window.EfirOpenPaymentSuccess = openPaymentSuccess;
   })();
 
 })();

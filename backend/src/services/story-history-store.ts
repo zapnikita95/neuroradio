@@ -197,12 +197,14 @@ export async function pgDeleteAllDataForAccount(accountId: string): Promise<void
   await pool.query(`DELETE FROM used_seeds WHERE account_id = $1`, [accountId]);
 }
 
+export async function pgDeleteUsedSeedByFingerprint(
   installId: string,
   accountId: string | null,
   artist: string,
   title: string,
   fingerprint: string,
 ): Promise<void> {
+  if (!hasPostgres()) return;
   const normalized = installId.trim().toLowerCase();
   if (accountId) {
     await getPool().query(

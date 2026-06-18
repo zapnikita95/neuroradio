@@ -1,3 +1,7 @@
+import { getSiteApkUrl, getSiteExtensionUrl } from './github-downloads.js';
+import { getAccountPageUrl, getAppStoreUrl, getGooglePlayUrl } from './store-links.js';
+import { buildPaymentSuccessEmail } from './welcome-email-template.js';
+
 const RESEND_API = 'https://api.resend.com/emails';
 
 export function isEmailConfigured(): boolean {
@@ -118,6 +122,25 @@ export async function sendPaymentSuccessEmail(options: {
     throw new Error('Resend not configured (RESEND_API_KEY, RESEND_FROM)');
   }
 
+  const siteUrl =
+    process.env.PUBLIC_SITE_URL?.trim() ||
+    process.env.TELEGRAM_WIDGET_BASE_URL?.trim() ||
+    'https://www.efir-ai.ru';
+  const { html, text } = buildPaymentSuccessEmail({
+    email: options.to,
+    plan: options.plan,
+    amountRub: options.amountRub,
+    premiumUntilIso: options.premiumUntilIso,
+    links: {
+      siteUrl: siteUrl.replace(/\/$/, ''),
+      accountUrl: getAccountPageUrl(),
+      appStoreUrl: getAppStoreUrl(),
+      googlePlayUrl: getGooglePlayUrl(),
+      apkUrl: getSiteApkUrl(),
+      extensionUrl: getSiteExtensionUrl(),
+    },
+  });
+
   const res = await fetch(RESEND_API, {
     method: 'POST',
     headers: {
@@ -127,15 +150,9 @@ export async function sendPaymentSuccessEmail(options: {
     body: JSON.stringify({
       from,
       to: [options.to],
-      subject: `Эфир AI — оплата прошла, подписка активна`,
-      text:
-        `Спасибо за оплату!\n\n` +
-        `Тариф: ${options.plan}\n` +
-        `Сумма: ${options.amountRub} ₽\n` +
-        `Расширенный доступ до: ${options.premiumUntilIso}\n\n` +
-        `Войдите в приложение с этим email — лимиты и модель DeepSeek V3 включатся автоматически.\n\n` +
-        `Кассовый чек придёт отдельным письмом в ближайшее время.\n\n` +
-        `Вопросы: hello@efir-ai.ru`,
+      subject: 'Эфир AI — подписка активна, скачайте приложение',
+      html,
+      text,
     }),
   });
 

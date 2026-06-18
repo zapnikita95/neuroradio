@@ -1,3 +1,5 @@
+import { getAccountPageUrl, getAppStoreUrl, getGooglePlayUrl } from './store-links.js';
+
 const SITE_APK_PATH = '/efir-ai.apk';
 const SITE_EXTENSION_PATH = '/efir-extension.zip';
 
@@ -26,6 +28,9 @@ export type PublicDownloadLinks = {
   tag: string | null;
   apkUrl: string | null;
   extensionUrl: string | null;
+  appStoreUrl: string | null;
+  googlePlayUrl: string | null;
+  accountUrl: string;
   publishedAt: string | null;
 };
 
@@ -48,15 +53,24 @@ function pickAssets(release: GhRelease): { apk: string | null; ext: string | nul
   return { apk, ext };
 }
 
+function withStoreLinks(data: Omit<PublicDownloadLinks, 'appStoreUrl' | 'googlePlayUrl' | 'accountUrl'>): PublicDownloadLinks {
+  return {
+    ...data,
+    appStoreUrl: getAppStoreUrl(),
+    googlePlayUrl: getGooglePlayUrl(),
+    accountUrl: getAccountPageUrl(),
+  };
+}
+
 function releaseToLinks(release: GhRelease): PublicDownloadLinks {
   const picked = pickAssets(release);
-  return {
+  return withStoreLinks({
     repo: GH_REPO,
     tag: release.tag_name ?? null,
     apkUrl: picked.apk,
     extensionUrl: picked.ext,
     publishedAt: release.published_at ?? null,
-  };
+  });
 }
 
 async function fetchJson(url: string): Promise<unknown> {
@@ -71,13 +85,13 @@ async function fetchJson(url: string): Promise<unknown> {
 }
 
 async function resolveFromGitHub(): Promise<PublicDownloadLinks> {
-  const empty: PublicDownloadLinks = {
+  const empty = withStoreLinks({
     repo: GH_REPO,
     tag: null,
     apkUrl: null,
     extensionUrl: null,
     publishedAt: null,
-  };
+  });
 
   // Always prefer the dedicated mobile-latest tag (not GitHub "latest" which may differ).
   try {

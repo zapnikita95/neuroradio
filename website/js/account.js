@@ -106,6 +106,11 @@
       if (options.unlinkBtn) options.unlinkBtn.hidden = !canManage;
       if (options.actionHint) options.actionHint.hidden = !canManage;
     }
+
+    if (options.downloadsEl) {
+      options.downloadsEl.hidden = !active;
+      if (options.downloadEmailEl && st.email) options.downloadEmailEl.textContent = st.email;
+    }
   }
 
   function doLogout() {
@@ -317,6 +322,8 @@
     var actionHint = $('#cabinetActionHint');
     var msgEl = $('#cabinetMsg');
     var emailEl = $('#cabinetUserEmail');
+    var downloadsEl = $('#cabinetDownloads');
+    var downloadEmailEl = $('#cabinetDownloadEmail');
 
     function showMsg(text, isErr) {
       if (!msgEl) return;
@@ -333,7 +340,33 @@
         cancelBtn: cancelBtn,
         unlinkBtn: unlinkBtn,
         actionHint: actionHint,
+        downloadsEl: downloadsEl,
+        downloadEmailEl: downloadEmailEl,
       });
+    }
+
+    function loadCabinetDownloads() {
+      if (!API_BASE) return;
+      fetch(API_BASE + '/v1/public/downloads', { headers: { Accept: 'application/json' } })
+        .then(function (r) { return r.ok ? r.json() : null; })
+        .then(function (links) {
+          if (!links) return;
+          var apk = $('#cabinetApk');
+          var ext = $('#cabinetExt');
+          var appStore = $('#cabinetAppStore');
+          var play = $('#cabinetGooglePlay');
+          if (apk && links.apkUrl) apk.href = links.apkUrl;
+          if (ext && links.extensionUrl) ext.href = links.extensionUrl;
+          if (appStore && links.appStoreUrl) {
+            appStore.href = links.appStoreUrl;
+            appStore.hidden = false;
+          }
+          if (play && links.googlePlayUrl) {
+            play.href = links.googlePlayUrl;
+            play.hidden = false;
+          }
+        })
+        .catch(function () {});
     }
 
     function runCabinetAction(btn, path, confirmText, okFallback) {
@@ -355,6 +388,7 @@
 
     if (emailEl) emailEl.textContent = session.email;
     if (session.status) applyStatus(session.status);
+    loadCabinetDownloads();
 
     fetchStatus(session.email, session.code)
       .then(function (res) {

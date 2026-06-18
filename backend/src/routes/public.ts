@@ -35,11 +35,16 @@ router.get('/downloads', async (_req: Request, res: Response) => {
     res.json(links);
   } catch (err) {
     console.warn('[public/downloads]', err instanceof Error ? err.message : err);
+    const { getPublicStoreLinks } = await import('../services/store-links.js');
+    const store = getPublicStoreLinks();
     res.status(503).json({
       repo: 'zapnikita95/neuroradio',
       tag: null,
       apkUrl: getSiteApkUrl(),
       extensionUrl: null,
+      appStoreUrl: store.appStoreUrl,
+      googlePlayUrl: store.googlePlayUrl,
+      accountUrl: store.accountUrl,
       publishedAt: null,
       error: 'releases_unavailable',
     });
