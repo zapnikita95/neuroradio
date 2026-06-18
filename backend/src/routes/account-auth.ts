@@ -214,14 +214,26 @@ router.post('/telegram', async (req: Request, res: Response) => {
   });
 });
 
-router.delete('/account', async (req: Request, res: Response) => {
-  const result = await deleteAccountForInstall(req.installId!);
-  if (!result.ok) {
-    const status = result.code === 'NOT_LOGGED_IN' ? 401 : 400;
-    res.status(status).json({ ok: false, error: result.error, code: result.code });
-    return;
+router.delete('/account', deleteAccountHandler);
+
+export async function deleteAccountHandler(req: Request, res: Response): Promise<void> {
+  try {
+    const installId = req.installId?.trim();
+    if (!installId) {
+      res.status(401).json({ ok: false, error: 'Unauthorized', code: 'NOT_LOGGED_IN' });
+      return;
+    }
+    const result = await deleteAccountForInstall(installId);
+    if (!result.ok) {
+      const status = result.code === 'NOT_LOGGED_IN' ? 401 : 400;
+      res.status(status).json({ ok: false, error: result.error, code: result.code });
+      return;
+    }
+    res.json({ ok: true, message: 'Account deleted' });
+  } catch (err) {
+    console.error('[account/delete]', err instanceof Error ? err.message : err);
+    res.status(500).json({ ok: false, error: 'Could not delete account', code: 'DELETE_FAILED' });
   }
-  res.json({ ok: true, message: 'Account deleted' });
-});
+}
 
 export default router;

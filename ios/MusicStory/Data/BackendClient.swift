@@ -326,7 +326,7 @@ final class BackendClient {
 
     func deleteAccount() async throws {
         let (_, response) = try await dataFromAPI(
-            path: "v1/auth/account",
+            path: "v1/account/account",
             method: "DELETE",
             body: nil,
             authorized: true

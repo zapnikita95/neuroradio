@@ -1888,7 +1888,14 @@ export async function deleteAccountForInstall(
     }
     store.pendingEmailCodes = pending;
     if (hasPostgres()) {
-      await pgDeletePendingEmailCode(email);
+      try {
+        await pgDeletePendingEmailCode(email);
+      } catch (err) {
+        console.warn(
+          `[account/delete] pending email code cleanup failed email=${email}:`,
+          err instanceof Error ? err.message : err,
+        );
+      }
     }
   }
   if (account.appleSub?.trim()) {
@@ -1908,9 +1915,16 @@ export async function deleteAccountForInstall(
   delete store.accountsById[accountId];
 
   if (hasPostgres()) {
-    await pgDeleteAllDataForAccount(accountId);
-    const { pgDeleteAllScrobblesForAccount } = await import('./scrobble-history-store.js');
-    await pgDeleteAllScrobblesForAccount(accountId);
+    try {
+      await pgDeleteAllDataForAccount(accountId);
+      const { pgDeleteAllScrobblesForAccount } = await import('./scrobble-history-store.js');
+      await pgDeleteAllScrobblesForAccount(accountId);
+    } catch (err) {
+      console.warn(
+        `[account/delete] postgres cleanup failed accountId=${accountId}:`,
+        err instanceof Error ? err.message : err,
+      );
+    }
   }
 
   saveStore(store);

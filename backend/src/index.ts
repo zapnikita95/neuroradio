@@ -9,7 +9,8 @@ import llmProbeRouter from './routes/llm-probe.js';
 import authRouter from './routes/auth.js';
 import syncRouter from './routes/sync.js';
 import billingRouter from './routes/billing.js';
-import accountAuthRouter from './routes/account-auth.js';
+import accountAuthRouter, { deleteAccountHandler } from './routes/account-auth.js';
+import { requireAppAuth } from './middleware/app-auth.js';
 import { isAppAuthEnabled } from './services/jwt.js';
 import { AUDIO_DIR } from './services/yandex-tts.js';
 import { hasGroqApiKey } from './services/groq.js';
@@ -173,6 +174,8 @@ app.get('/health', (_req, res) => {
 });
 
 app.use('/v1/auth', authRouter);
+/** Legacy/wrong client path — same handler as DELETE /v1/account/account */
+app.delete('/v1/auth/account', requireAppAuth, deleteAccountHandler);
 app.use('/v1/sync', syncRouter);
 app.use('/v1/billing', billingRouter);
 app.use('/v1/account', accountAuthRouter);
