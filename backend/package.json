@@ -44,6 +44,7 @@
     "test:fact-pick": "npm run build && node scripts/test-fact-pick-regression.mjs",
     "test:similar-tracks": "npm run build && node scripts/test-similar-tracks-regression.mjs",
     "verify:track": "npm run build && node scripts/verify-story-track.mjs",
+    "verify:multi-pick": "npm run build && node scripts/verify-multi-pick.mjs --rounds 5",
     "verify:batch": "npm run build && node scripts/verify-story-batch.mjs",
     "audit:bulk": "npm run build && node scripts/audit-bulk-coverage.mjs",
     "seed:facts:retry-zero": "node scripts/bulk-seed-fact-bank.mjs --target=60000 --hot-target=20000 --concurrency=3 --resume --retry-zero --no-proxy --backfill-discogs",

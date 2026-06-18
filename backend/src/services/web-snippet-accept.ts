@@ -15,6 +15,7 @@ import {
   isCitationBibliographySeed,
   isGenericConcertVenueSeed,
   isGenericMusicVideoSeed,
+  isArtistFormationBioSeed,
 } from './reference-fact-quality.js';
 import { isTrackTitleAnchoredSeed } from './fact-track-anchor.js';
 
@@ -175,8 +176,20 @@ export function isSpeakableReferenceFact(
   if (title && isTrackTitleAnchoredSeed(trimmed, title)) {
     return interestScore(trimmed) >= 6;
   }
-  if (isBoringFact(trimmed) && !isBackstoryFact(trimmed)) return false;
-  return interestScore(trimmed) >= 6 || isBackstoryFact(trimmed);
+  if (
+    isBoringFact(trimmed) &&
+    !isBackstoryFact(trimmed) &&
+    !isArtistIdentityBioSnippet(trimmed) &&
+    !isArtistFormationBioSeed(trimmed)
+  ) {
+    return false;
+  }
+  return (
+    interestScore(trimmed) >= 6 ||
+    isBackstoryFact(trimmed) ||
+    isArtistIdentityBioSnippet(trimmed) ||
+    isArtistFormationBioSeed(trimmed)
+  );
 }
 
 export function isLowQualityWebSnippet(snippet: string): boolean {
@@ -199,7 +212,8 @@ export function isArtistIdentityBioSnippet(snippet: string): boolean {
     /(?:сольный проект|известн(?:ый|ого|ая|ой|ым)\s+как|вокалист(?:а|ом)?|создател\w*\s+групп|участник\s+групп|русск\w*\s+рэп|russian rap|musician biography|rapper biography|stage name|псевдоним)/i.test(
       trimmed,
     ) ||
-    (/(?:артист|исполнитель|музыкант|rapper|musician)/i.test(trimmed) &&
+    /\bknown (?:professionally as|by (?:his|her|their) moniker)\b/i.test(trimmed) ||
+    (/(?:артист|исполнитель|музыкант|rapper|musician|singer[- ]?songwriter|recording artist|lead singer)/i.test(trimmed) &&
       /(?:родился|род\.|born|project of|member of|ex-)/i.test(trimmed))
   );
 }

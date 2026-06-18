@@ -16,8 +16,9 @@ import {
   isEncyclopediaDefinitionSeed,
   MIN_PICK_INTEREST_SCORE,
   isMetadataHarvestFact,
+  isArtistFormationBioSeed,
 } from './reference-fact-quality.js';
-import { isSpeakableReferenceFact } from './web-snippet-accept.js';
+import { isSpeakableReferenceFact, isArtistIdentityBioSnippet } from './web-snippet-accept.js';
 import { factsTooSimilar, type FactScope } from './fact-picker.js';
 import {
   classifyFactTopic,
@@ -572,7 +573,8 @@ export function applyFactFeedbackPenalty(
 }
 
 function effectivePickScore(fact: StoredFact, liveScore: number): number {
-  return Math.max(0, liveScore - (fact.feedbackDislikes ?? 0) * 4);
+  const base = Math.max(liveScore, fact.interestScore ?? 0);
+  return Math.max(0, base - (fact.feedbackDislikes ?? 0) * 4);
 }
 
 export function pickFromBank(
@@ -588,10 +590,16 @@ export function pickFromBank(
 ): StoredFact | null {
   const { track, artist: artistFacts } = listBankFacts(artist, title);
   const trackScopeStreak = (options.recentScopes ?? []).slice(0, 2).filter((s) => s === 'track').length;
-  const minScoreForScope = (scope: FactScope): number =>
-    scope !== 'track' && trackScopeStreak >= 2
-      ? Math.max(6, MIN_PICK_INTEREST_SCORE - 6)
-      : MIN_PICK_INTEREST_SCORE;
+  const rotatingFromTrack = (options.recentScopes ?? [])[0] === 'track';
+  const minScoreForScope = (scope: FactScope): number => {
+    if (scope === 'track') return MIN_PICK_INTEREST_SCORE;
+    if (trackScopeStreak >= 2 || rotatingFromTrack) {
+      return Math.max(6, MIN_PICK_INTEREST_SCORE - 6);
+    }
+    return MIN_PICK_INTEREST_SCORE;
+  };
+  const minRatingForScope = (scope: FactScope): number =>
+    scope === 'artist' && rotatingFromTrack ? 5 : HOT_MIN_RATING;
   const pools: Record<FactScope, StoredFact[]> = {
     track: track.filter((f) => f.scope === 'track'),
     album: track.filter((f) => f.scope === 'album'),
@@ -608,11 +616,23 @@ export function pickFromBank(
     for (const fact of pools[scope] ?? []) {
       if (usedFingerprints.has(factFingerprint(fact.fact))) continue;
       if (fact.topicKey && fact.topicKey !== 'misc' && blockedTopics.has(fact.topicKey)) continue;
-      if (factsTooSimilar(fact.fact, rejectSimilarTo)) continue;
+      if (factsTooSimilar(fact.fact, rejectSimilarTo, { pickScope: scope, recentScopes: options.recentScopes })) continue;
       if (!factFitsStoryLanguage(fact.fact, storyLanguage)) continue;
-      if (rejectSeedForTrackStory(fact.fact, artist, title, { trackPoolFacts })) continue;
-      if (isRejectedPickSeed(fact.fact, title, storyLanguage, trackPoolFacts, artist)) continue;
-      if (scope === 'artist' && artist && !factMentionsArtistLoose(fact.fact, artist)) continue;
+      if (
+        scope !== 'artist' &&
+        scope !== 'album' &&
+        rejectSeedForTrackStory(fact.fact, artist, title, { trackPoolFacts })
+      ) {
+        continue;
+      }
+      if (isRejectedPickSeed(fact.fact, title, storyLanguage, trackPoolFacts, artist, scope)) continue;
+      if (
+        scope === 'track' &&
+        artist &&
+        !factMentionsArtistLoose(fact.fact, artist)
+      ) {
+        continue;
+      }
       if (
         (scope === 'track' || scope === 'album') &&
         title.trim() &&
@@ -623,8 +643,14 @@ export function pickFromBank(
       }
       const live = computeLiveInterest(fact.fact);
       const effective = effectivePickScore(fact, live.score);
-      if (effective < minScoreForScope(scope) || live.rating < HOT_MIN_RATING) continue;
-      if (!isSpeakableReferenceFact(fact.fact, artist, title)) continue;
+      const profileBio =
+        scope === 'artist' &&
+        (isArtistIdentityBioSnippet(fact.fact) ||
+          isArtistFormationBioSeed(fact.fact) ||
+          /\b(?:frontman|lead singer|co[- ]?founder|started (?:his|her|their) solo career|until its break-up)\b/i.test(fact.fact));
+      if (!profileBio && effective < minScoreForScope(scope)) continue;
+      if (!profileBio && live.rating < minRatingForScope(scope)) continue;
+      if (!profileBio && !isSpeakableReferenceFact(fact.fact, artist, title)) continue;
       if (isAmbiguousCommonWordArtist(artist) && !factMentionsArtistAsEntity(fact.fact, artist)) continue;
       scopeCandidates.push({
         ...fact,

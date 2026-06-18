@@ -14,6 +14,7 @@ import {
   isCollectorFact,
   isWeakChartSeed,
   MIN_PICK_INTEREST_SCORE,
+  isBackstoryFact,
 } from './reference-fact-quality.js';
 import { WEAK_TRIVIA_PATTERNS } from './story-fact-hunt.js';
 import { isMetadataOnlyFallbackFact } from './metadata-facts.js';
@@ -28,6 +29,7 @@ import { hasAnchoredTrackContext, isTrackTitleAnchoredSeed, rejectSeedForTrackSt
 import { factFitsStoryLanguage } from './fact-language-fit.js';
 import type { StoryLanguageId } from './story-language.js';
 import { interestRating10 } from './fact-interest-log.js';
+import type { RankedFactScope } from './fact-ranking.js';
 
 /** Shared reject gates for live pick + bank pick + push hot — одна логика с pickReferenceFact. */
 export function isRejectedPickSeed(
@@ -36,12 +38,22 @@ export function isRejectedPickSeed(
   storyLanguage: StoryLanguageId = 'ru',
   trackPool: string[] = [],
   artist = '',
+  pickScope?: RankedFactScope,
 ): boolean {
+  const artistScope = pickScope === 'artist';
+  const albumScope = pickScope === 'album';
+  const nonTrackScope = artistScope || albumScope;
+
   if (!factFitsStoryLanguage(fact, storyLanguage)) return true;
-  if (artist.trim() && !factMentionsArtistLoose(fact, artist)) {
+  if (!nonTrackScope && artist.trim() && !factMentionsArtistLoose(fact, artist)) {
     return true;
   }
-  if (title.trim() && artist && rejectSeedForTrackStory(fact, artist, title, { trackPoolFacts: trackPool })) {
+  if (
+    !nonTrackScope &&
+    title.trim() &&
+    artist &&
+    rejectSeedForTrackStory(fact, artist, title, { trackPoolFacts: trackPool })
+  ) {
     return true;
   }
   if (isAlbumListingSeed(fact)) return true;
@@ -51,6 +63,7 @@ export function isRejectedPickSeed(
   if (isArtistDisambiguationListSeed(fact)) return true;
   if (isDiscogsLinerNotesSeed(fact)) return true;
   if (
+    !artistScope &&
     title.trim() &&
     isArtistIdentityBioSnippet(fact) &&
     !factMentionsTitle(fact, title) &&
@@ -61,6 +74,7 @@ export function isRejectedPickSeed(
   if (isGenericConcertVenueSeed(fact)) return true;
   if (isGenericMusicVideoSeed(fact)) return true;
   if (
+    !artistScope &&
     title.trim() &&
     isArtistFormationBioSeed(fact) &&
     trackPool.some((t) => factMentionsTitle(t, title) && adjustedInterestScore(t) >= 6)
@@ -68,6 +82,7 @@ export function isRejectedPickSeed(
     return true;
   }
   if (
+    !nonTrackScope &&
     title.trim() &&
     !factMentionsTitle(fact, title) &&
     !hasTrackContextSignal(fact) &&
@@ -76,13 +91,24 @@ export function isRejectedPickSeed(
     return true;
   }
   if (isMetadataOnlyFallbackFact(fact)) return true;
-  if (title && isMisattributedBandTrackFact(fact, title)) return true;
+  if (!artistScope && title && isMisattributedBandTrackFact(fact, title)) return true;
   if (WEAK_TRIVIA_PATTERNS.some((p) => p.test(fact))) return true;
   if (isWeakChartSeed(fact)) return true;
-  if (isBoringFact(fact) && !(title && isTrackTitleAnchoredSeed(fact, title) && !isEncyclopediaDefinitionSeed(fact))) {
+  const allowArtistBio =
+    artistScope &&
+    (isArtistIdentityBioSnippet(fact) ||
+      isArtistFormationBioSeed(fact) ||
+      isBackstoryFact(fact) ||
+      /\b(?:frontman|lead singer|co[- ]?founder|started (?:his|her|their) solo career|until its break-up)\b/i.test(fact));
+  if (
+    !allowArtistBio &&
+    isBoringFact(fact) &&
+    !(title && isTrackTitleAnchoredSeed(fact, title) && !isEncyclopediaDefinitionSeed(fact))
+  ) {
     return true;
   }
   if (
+    !allowArtistBio &&
     isCollectorFact(fact) &&
     !(title && factMentionsTitle(fact, title)) &&
     !/\b(?:inspired by|intended to|anti-war|protest song|meaning|metaphor)\b/i.test(fact)

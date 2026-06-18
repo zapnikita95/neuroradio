@@ -473,7 +473,13 @@ router.post('/full', extractClientSecrets, validateStoryFullBody, storyFullRateL
       bankFact = null;
     }
 
-    if (bankFact && factsTooSimilar(bankFact.fact, rejectSimilarTo)) {
+    if (
+      bankFact &&
+      factsTooSimilar(bankFact.fact, rejectSimilarTo, {
+        pickScope: bankFact.scope,
+        recentScopes: factPickCtx.recentScopes,
+      })
+    ) {
       console.log(
         `[facts] bank seed repeats recent topic for "${artist}" — "${title}", fetching fresh facts`,
       );

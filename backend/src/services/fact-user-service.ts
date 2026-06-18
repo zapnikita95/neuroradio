@@ -377,7 +377,13 @@ export async function pickBankFactForUser(
       storyLanguage,
       { recentScopes },
     );
-    if (fromBank && !factsTooSimilar(fromBank.fact, rejectSimilarTo)) {
+    if (
+      fromBank &&
+      !factsTooSimilar(fromBank.fact, rejectSimilarTo, {
+        pickScope: fromBank.scope,
+        recentScopes,
+      })
+    ) {
       return storedFactToSelected(fromBank);
     }
   }
@@ -430,7 +436,13 @@ export async function pickFactForUser(
       storyLanguage,
       { recentScopes },
     );
-    if (fromBank && !factsTooSimilar(fromBank.fact, rejectSimilarTo)) {
+    if (
+      fromBank &&
+      !factsTooSimilar(fromBank.fact, rejectSimilarTo, {
+        pickScope: fromBank.scope,
+        recentScopes,
+      })
+    ) {
       return storedFactToSelected(fromBank);
     }
     if (!fromBank) break;
@@ -443,7 +455,12 @@ export async function pickFactForUser(
     recentScopes,
     storyLanguage,
   });
-  if (picked && factsTooSimilar(picked.fact, rejectSimilarTo)) return null;
+  if (
+    picked &&
+    factsTooSimilar(picked.fact, rejectSimilarTo, { pickScope: picked.scope, recentScopes })
+  ) {
+    return null;
+  }
   return picked;
 }
 

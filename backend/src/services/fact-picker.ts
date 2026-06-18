@@ -110,8 +110,18 @@ export function factOverlapsPrevious(fact: string, previousScripts: string[], st
 }
 
 /** Same track/artist — reject duplicate topic or near-duplicate text across sources. */
-export function factsTooSimilar(candidate: string, recentFacts: string[]): boolean {
+export function factsTooSimilar(
+  candidate: string,
+  recentFacts: string[],
+  options?: { pickScope?: FactScope; recentScopes?: FactScope[] },
+): boolean {
   if (!candidate.trim() || recentFacts.length === 0) return false;
+  const rotatingScope =
+    options?.pickScope &&
+    options.recentScopes &&
+    options.recentScopes.length >= 1 &&
+    options.pickScope !== options.recentScopes[0];
+  if (rotatingScope) return false;
   for (const recent of recentFacts) {
     if (factsShareTopicOrOverlap(candidate, recent)) return true;
     if (factOverlapsPrevious(candidate, [recent], true)) return true;
@@ -139,8 +149,9 @@ function isRejectedSeed(
   storyLanguage: StoryLanguageId = 'ru',
   trackPool: string[] = [],
   artist = '',
+  pickScope?: FactScope,
 ): boolean {
-  return isRejectedPickSeed(fact, title, storyLanguage, trackPool, artist);
+  return isRejectedPickSeed(fact, title, storyLanguage, trackPool, artist, pickScope);
 }
 
 function sortByInterest(facts: string[], narrator: StoryNarratorId = 'auto'): string[] {
@@ -164,14 +175,16 @@ function pickBestByInterest(
   storyLanguage: StoryLanguageId = 'ru',
   trackPool: string[] = [],
   artist = '',
+  pickScope?: FactScope,
+  recentScopes: FactScope[] = [],
 ): string | null {
   for (const fact of sortByInterest(facts, narrator)) {
-    if (isRejectedSeed(fact, title, storyLanguage, trackPool, artist)) continue;
+    if (isRejectedSeed(fact, title, storyLanguage, trackPool, artist, pickScope)) continue;
     if (adjustedInterestScore(fact, narrator) < minScore) continue;
     if (isUsedFact(fact, usedFingerprints)) continue;
     const topic = classifyFactTopic(fact);
     if (topic !== 'misc' && blockedTopics.has(topic)) continue;
-    if (factsTooSimilar(fact, previousScripts)) continue;
+    if (factsTooSimilar(fact, previousScripts, { pickScope, recentScopes })) continue;
     if (factOverlapsPrevious(fact, previousScripts)) continue;
     return fact;
   }
@@ -218,8 +231,14 @@ export function pickReferenceFact(
   const scopeOrder = resolveScopeOrder(storyIndex, options.recentScopes ?? []);
   const trackPoolForReject = [...pools.track, ...pools.album];
   const trackScopeStreak = (options.recentScopes ?? []).slice(0, 2).filter((s) => s === 'track').length;
-  const minGoodForScope = (scope: FactScope): number =>
-    scope !== 'track' && trackScopeStreak >= 2 ? MIN_PICK_INTEREST_SCORE - 6 : MIN_GOOD_SCOPE_INTEREST;
+  const minGoodForScope = (scope: FactScope): number => {
+    if (scope === 'track') return MIN_GOOD_SCOPE_INTEREST;
+    const rotatingFromTrack = (options.recentScopes ?? [])[0] === 'track';
+    if (trackScopeStreak >= 2 || rotatingFromTrack) {
+      return Math.max(6, MIN_PICK_INTEREST_SCORE - 6);
+    }
+    return MIN_GOOD_SCOPE_INTEREST;
+  };
 
   for (const scope of scopeOrder) {
     const pool = pools[scope];
@@ -236,6 +255,8 @@ export function pickReferenceFact(
       storyLanguage,
       trackPoolForReject,
       artist,
+      scope,
+      options.recentScopes ?? [],
     );
     if (picked && adjustedInterestScore(picked, narrator) >= minScore) {
       return wrapSelected(picked, scope, narrator);
@@ -275,13 +296,15 @@ export function pickReferenceFact(
     if (isUsedFact(fact, usedFingerprints)) continue;
     const topic = classifyFactTopic(fact);
     if (topic !== 'misc' && blockedTopics.has(topic)) continue;
-    if (factsTooSimilar(fact, previousScripts)) continue;
+    const scope: FactScope = pools.track.includes(fact)
+      ? 'track'
+      : pools.album.includes(fact)
+        ? 'album'
+        : 'artist';
+    if (factsTooSimilar(fact, previousScripts, { pickScope: scope, recentScopes: options.recentScopes ?? [] })) {
+      continue;
+    }
     if (!factOverlapsPrevious(fact, previousScripts)) {
-      const scope: FactScope = pools.track.includes(fact)
-        ? 'track'
-        : pools.album.includes(fact)
-          ? 'album'
-          : 'artist';
       return wrapSelected(fact, scope, narrator);
     }
   }
