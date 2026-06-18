@@ -44,6 +44,7 @@ const { BFF_URL, fetchProdToken, postProdStoryFull, TEST_INSTALL_ID } = await im
 
 const args = process.argv.slice(2);
 const prod = args.includes('--prod');
+const skipLocal = args.includes('--skip-local') || args.includes('--prod-only');
 const narrators = ['night_dj', 'radio_host', 'storyteller'];
 const STORIES_PER_TRACK = 3;
 
@@ -145,30 +146,33 @@ for (let ti = 0; ti < tracks.length; ti += 1) {
     const t0 = Date.now();
     let script = '';
     let elapsedMs = 0;
-    let source = 'local-openrouter';
 
-    try {
-      const story = await generateLocalStory({
-        artist,
-        title,
-        voiceId: 'filipp',
-        storyLength: '30s',
-        storyNarrator: narrator,
-        previousScripts,
-        referenceFacts: [fact.fact],
-        selectedReferenceFact: {
-          fact: fact.fact,
-          scope: fact.scope ?? 'track',
-          scopeLabelRu: fact.scope === 'artist' ? 'артист' : fact.scope === 'album' ? 'альбом' : 'трек',
-        },
-        artistTier: 'major',
-        storyLanguage: 'ru',
-      });
-      elapsedMs = Date.now() - t0;
-      script = story.script;
-    } catch (e) {
-      elapsedMs = Date.now() - t0;
-      console.warn(`  LOCAL FAIL (${elapsedMs}ms):`, e.message);
+    if (!skipLocal) {
+      try {
+        const story = await generateLocalStory({
+          artist,
+          title,
+          voiceId: 'filipp',
+          storyLength: '30s',
+          storyNarrator: narrator,
+          previousScripts,
+          referenceFacts: [fact.fact],
+          selectedReferenceFact: {
+            fact: fact.fact,
+            scope: fact.scope ?? 'track',
+            scopeLabelRu: fact.scope === 'artist' ? 'артист' : fact.scope === 'album' ? 'альбом' : 'трек',
+          },
+          artistTier: 'major',
+          storyLanguage: 'ru',
+        });
+        elapsedMs = Date.now() - t0;
+        script = story.script;
+      } catch (e) {
+        elapsedMs = Date.now() - t0;
+        console.warn(`  LOCAL FAIL (${elapsedMs}ms):`, e.message);
+      }
+    } else {
+      console.log('  LOCAL skipped (--skip-local)');
     }
 
     const anchored = script ? anchorsReferenceFact(script, [fact.fact], artist, title) : false;
@@ -199,7 +203,7 @@ for (let ti = 0; ti < tracks.length; ti += 1) {
       script,
     };
 
-    if (token && si === 0) {
+    if (token) {
       const pt0 = Date.now();
       const prodRes = await postProdStoryFull(token, {
         artist,
@@ -214,6 +218,7 @@ for (let ti = 0; ti < tracks.length; ti += 1) {
       row.prodScope = prodRes.scope ?? '';
       if (prodRes.ok) {
         const pAnchored = anchorsReferenceFact(prodRes.script, [prodRes.seed || fact.fact], artist, title);
+        row.prodAnchored = pAnchored;
         console.log(`  PROD ${prodRes.elapsedMs}ms | scope=${prodRes.scope} | anchored=${pAnchored}`);
         console.log(`  PROD SEED: ${(prodRes.seed || '').slice(0, 180)}`);
         console.log(`  PROD SCRIPT: ${(prodRes.script || '').slice(0, 220)}…`);
@@ -232,6 +237,14 @@ const summary = {
   at: new Date().toISOString(),
   tracks: tracks.length,
   stories: results.length,
+  prodStories: results.filter((r) => r.prodOk).length,
+  prodAvgMs: Math.round(
+    results.filter((r) => r.prodOk).reduce((s, r) => s + (r.prodMs ?? 0), 0) /
+      Math.max(1, results.filter((r) => r.prodOk).length),
+  ),
+  prodAnchoredPct: Math.round(
+    (results.filter((r) => r.prodAnchored).length / Math.max(1, results.filter((r) => r.prodOk).length)) * 100,
+  ),
   localAvgMs: Math.round(results.reduce((s, r) => s + (r.localMs ?? 0), 0) / Math.max(1, results.length)),
   anchoredPct: Math.round((results.filter((r) => r.anchored).length / Math.max(1, results.length)) * 100),
   qualityOkPct: Math.round((results.filter((r) => r.qualityOk).length / Math.max(1, results.length)) * 100),
@@ -246,6 +259,7 @@ const summary = {
 
 writeFileSync(OUT, JSON.stringify(summary, null, 2), 'utf8');
 console.log('\n=== SUMMARY ===');
-console.log(`stories: ${summary.stories} | local avg: ${summary.localAvgMs}ms | anchored: ${summary.anchoredPct}% | quality ok: ${summary.qualityOkPct}%`);
+console.log(`stories: ${summary.stories} | prod ok: ${summary.prodStories} avg ${summary.prodAvgMs}ms anchored ${summary.prodAnchoredPct}%`);
+console.log(`local avg: ${summary.localAvgMs}ms | local anchored: ${summary.anchoredPct}% | quality ok: ${summary.qualityOkPct}%`);
 console.log(`distinct seeds/track:`, summary.distinctSeedsPerTrack);
 console.log(`saved: ${OUT}\n`);

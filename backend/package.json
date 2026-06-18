@@ -37,6 +37,7 @@
     "seed:hot-push": "node scripts/bulk-seed-fact-bank.mjs --hot-push --target=60000 --hot-target=20000 --concurrency=5 --resume --no-proxy --no-backfill-lastfm",
     "pipeline:overnight": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/run-overnight-hot-push.ps1",
     "test:bank-stories": "npm run build && node scripts/test-bank-facts-10tracks.mjs --prod",
+    "test:bank-stories:prod": "npm run build && node scripts/test-bank-facts-10tracks.mjs --prod --skip-local",
     "seed:facts": "node scripts/bulk-seed-fact-bank.mjs --target=60000 --hot-target=20000 --concurrency=3 --resume --no-proxy --backfill-discogs",
     "seed:facts:discogs": "node scripts/bulk-seed-fact-bank.mjs --target=60000 --hot-target=20000 --concurrency=1 --resume --no-proxy --discogs-only --backfill-discogs",
     "test:facts": "npm run build && node scripts/test-fact-topic.mjs && node scripts/test-live-facts-5tracks.mjs",
