@@ -6,7 +6,9 @@ import { isMetadataOnlyFallbackFact } from './metadata-facts.js';
 import {
   interestScore,
   isAlbumListingSeed,
+  isBoringFact,
   isCatalogMetadataSeed,
+  isEncyclopediaDefinitionSeed,
   isWikiBiographyLead,
 } from './reference-fact-quality.js';
 import { acceptSearchGroundedSnippet, acceptIndieEmergingSnippet, isLyricsPageSeed, isPlaylistJunkSnippet, isSpeakableReferenceFact, isUnspeakableWebSeed } from './web-snippet-accept.js';
@@ -21,7 +23,8 @@ export function isWeakSnippetSeed(fact: string, score = interestScore(fact), tit
   if (isAlbumListingSeed(trimmed)) return true;
   if (isCatalogMetadataSeed(trimmed)) return true;
   if (isLyricsPageSeed(trimmed)) return true;
-  if (title && isTrackTitleAnchoredSeed(trimmed, title)) return false;
+  if (isEncyclopediaDefinitionSeed(trimmed)) return true;
+  if (title && isTrackTitleAnchoredSeed(trimmed, title) && !isEncyclopediaDefinitionSeed(trimmed)) return false;
   if (score < 6) return true;
   if (isWikiBiographyLead(trimmed)) return true;
   return isUnspeakableWebSeed(trimmed) || !isSpeakableReferenceFact(trimmed, '', title);
@@ -36,8 +39,9 @@ export function isWeakSelectedFact(
   const trimmed = selected.fact.trim();
   if (isCatalogMetadataSeed(trimmed)) return true;
   if (isLyricsPageSeed(trimmed)) return true;
+  if (isEncyclopediaDefinitionSeed(trimmed)) return true;
   const score = Math.max(selected.interestScore ?? 0, interestScore(trimmed));
-  if (title && isTrackTitleAnchoredSeed(trimmed, title) && score >= 10) return false;
+  if (title && isTrackTitleAnchoredSeed(trimmed, title) && score >= 10 && !isBoringFact(trimmed)) return false;
   if (score < 6) return true;
   if (isWikiBiographyLead(trimmed)) return true;
   return isUnspeakableWebSeed(trimmed) || !isSpeakableReferenceFact(trimmed, artist, title);

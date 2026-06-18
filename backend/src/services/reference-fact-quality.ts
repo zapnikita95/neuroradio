@@ -135,11 +135,25 @@ export function isArtistDisambiguationListSeed(fact: string): boolean {
 }
 
 /** Dictionary/literary page bleed — «cliché» the word, not mgk track. */
+/** Also Wikipedia one-liners: «"Sorry" is a song by…» — not a story hook. */
 export function isEncyclopediaDefinitionSeed(fact: string): boolean {
   const t = fact.trim();
+  if (highImpactBonus(t) >= 6) return false;
+  if (
+    /\b(?:inspired by|sampled from|written as|wrote (?:it|this|the song)|intended as|protest song|viral on|went viral|banned from|scandal|originally wrote)\b/i.test(
+      t,
+    )
+  ) {
+    return false;
+  }
   if (
     /\b(?:song|single|track)\s+originally\s+(?:performed|recorded|released)\s+by\b/i.test(t) ||
-    /\bis\s+(?:an?\s+)?(?:pop|rock|hip[- ]?hop|r[\s&]b|dance|electronic|country|folk|jazz|soul|metal|indie)\s+(?:song|single|track)\s+originally\b/i.test(t)
+    /\bis\s+(?:an?\s+)?(?:pop|rock|hip[- ]?hop|r[\s&]b|dance|electronic|country|folk|jazz|soul|metal|indie)\s+(?:song|single|track)\s+originally\b/i.test(t) ||
+    /\bis\s+(?:an?\s+)?(?:song|single|track)\s+(?:by|recorded\s+by)\b/i.test(t) ||
+    /\bis\s+(?:an?\s+)?(?:song|single|track)\s+from\b/i.test(t) ||
+    /^"[^"]{1,90}"\s+is\s+(?:an?\s+)?(?:song|single|track)\b/i.test(t) ||
+    /^"[^"]{1,90}"\s+is\s+(?:an?\s+)?(?:pop|rock|hip[- ]?hop|r[\s&]b|dance|electronic|country|folk|jazz|soul|metal|indie)\b/i.test(t) ||
+    /^«[^»]{1,90}»\s+(?:—|-)\s+(?:песня|сингл|трек)\b/i.test(t)
   ) {
     return true;
   }

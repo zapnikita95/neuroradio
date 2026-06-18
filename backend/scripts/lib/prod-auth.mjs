@@ -71,6 +71,9 @@ export async function postProdStoryFull(
       status: storyRes.status,
       elapsedMs,
       error: parsed.error ?? parsed.message ?? `HTTP ${storyRes.status}`,
+      code: parsed.code ?? null,
+      message: parsed.message ?? null,
+      source: parsed.source ?? null,
       body: parsed,
     };
   }
@@ -86,4 +89,53 @@ export async function postProdStoryFull(
     audioUrl: parsed.audioUrl ?? parsed.audio_url ?? '',
     body: parsed,
   };
+}
+
+export async function postProdStoryComplete(token, {
+  artist,
+  title,
+  script,
+  seedFact,
+  seedScope = 'track',
+  seedInterestScore = 10,
+  seedInterestRating = 8,
+  narrator = 'auto',
+}) {
+  const res = await fetch(`${BFF_URL}/v1/story/complete`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({
+      artist,
+      title,
+      script,
+      seed_fact: seedFact,
+      seed_scope: seedScope,
+      seed_interest_score: seedInterestScore,
+      seed_interest_rating: seedInterestRating,
+      story_narrator: narrator,
+    }),
+    signal: AbortSignal.timeout(30_000),
+  });
+  const text = await res.text();
+  let parsed;
+  try {
+    parsed = JSON.parse(text);
+  } catch {
+    return { ok: false, status: res.status, error: 'not JSON', raw: text.slice(0, 300) };
+  }
+  return {
+    ok: res.ok,
+    status: res.status,
+    error: res.ok ? null : parsed.error ?? parsed.message ?? `HTTP ${res.status}`,
+    body: parsed,
+  };
+}
+
+export function testInstallId(suffix) {
+  const n = Number(String(suffix).replace(/\D/g, '') || 0);
+  const hex = n.toString(16).padStart(12, '0').slice(-12);
+  return `00000000-0000-4000-8000-${hex}`;
 }

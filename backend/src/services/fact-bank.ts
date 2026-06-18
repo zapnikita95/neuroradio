@@ -584,6 +584,7 @@ export function pickFromBank(
   rejectSimilarTo: string[] = [],
   blockedTopics: Set<FactTopicKey> = new Set(),
   storyLanguage: StoryLanguageId = 'ru',
+  options: { markUsed?: boolean } = {},
 ): StoredFact | null {
   const { track, artist: artistFacts } = listBankFacts(artist, title);
   const pools: Record<FactScope, StoredFact[]> = {
@@ -631,7 +632,9 @@ export function pickFromBank(
     (a, b) => adjustedInterestScore(b.fact, 'auto') - adjustedInterestScore(a.fact, 'auto'),
   );
   const picked = unused[startOffset % unused.length]!;
-  markFactUsed(picked.id, artist, title);
+  if (options.markUsed !== false) {
+    markFactUsed(picked.id, artist, title);
+  }
   return picked;
 }
 

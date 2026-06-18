@@ -79,7 +79,9 @@ export function isRejectedPickSeed(
   if (title && isMisattributedBandTrackFact(fact, title)) return true;
   if (WEAK_TRIVIA_PATTERNS.some((p) => p.test(fact))) return true;
   if (isWeakChartSeed(fact)) return true;
-  if (isBoringFact(fact) && !(title && isTrackTitleAnchoredSeed(fact, title))) return true;
+  if (isBoringFact(fact) && !(title && isTrackTitleAnchoredSeed(fact, title) && !isEncyclopediaDefinitionSeed(fact))) {
+    return true;
+  }
   if (
     isCollectorFact(fact) &&
     !(title && factMentionsTitle(fact, title)) &&

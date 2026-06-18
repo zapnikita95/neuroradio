@@ -40,11 +40,13 @@ const { generateStoryScript } = await import('../dist/services/groq.js');
 const { resolveOpenRouterModelOrder } = await import('../dist/services/openrouter-models.js');
 const { generateStoryScript: generateOpenRouterStory } = await import('../dist/services/openrouter.js');
 const { anchorsReferenceFact, validateStoryScript } = await import('../dist/services/story-quality.js');
-const { BFF_URL, fetchProdToken, postProdStoryFull, TEST_INSTALL_ID } = await import('./lib/prod-auth.mjs');
+const { BFF_URL, fetchProdToken, postProdStoryFull, postProdStoryComplete, testInstallId } = await import('./lib/prod-auth.mjs');
 
 const args = process.argv.slice(2);
 const prod = args.includes('--prod');
 const skipLocal = args.includes('--skip-local') || args.includes('--prod-only');
+const maxTracksArg = args.find((a) => a.startsWith('--tracks='));
+const MAX_TRACKS = maxTracksArg ? Number(maxTracksArg.split('=')[1]) : 10;
 const narrators = ['night_dj', 'radio_host', 'storyteller'];
 const STORIES_PER_TRACK = 3;
 
@@ -68,15 +70,15 @@ function pickTopTracks(bank, limit = 10) {
 
 function pickDistinctFacts(artist, title, count = 3) {
   const used = new Set();
-  const rejectSimilar = [];
   const picks = [];
-  for (let offset = 0; offset < 20 && picks.length < count; offset += 1) {
-    const hit = pickFromBank(artist, title, used, ['track', 'album', 'artist'], offset, rejectSimilar, new Set(), 'ru');
+  for (let offset = 0; offset < 30 && picks.length < count; offset += 1) {
+    const hit = pickFromBank(artist, title, used, ['track', 'album', 'artist'], offset, [], new Set(), 'ru', {
+      markUsed: false,
+    });
     if (!hit) continue;
     const fp = factFingerprint(hit.fact);
     if (used.has(fp)) continue;
     used.add(fp);
-    rejectSimilar.push(hit.fact);
     picks.push(hit);
   }
   return picks;
@@ -94,18 +96,45 @@ function seedWordsInScript(seed, script) {
 }
 
 const bank = JSON.parse(readFileSync(BANK_PATH, 'utf8'));
-const tracks = pickTopTracks(bank, 10);
+const tracks = pickTopTracks(bank, MAX_TRACKS);
 console.log(`\n=== BANK FACT STORY TEST (${tracks.length} tracks × ${STORIES_PER_TRACK} stories) ===\n`);
 
 const results = [];
-let token = null;
+let prodToken = null;
 if (prod) {
   try {
-    token = await fetchProdToken(TEST_INSTALL_ID);
+    prodToken = await fetchProdToken(testInstallId('prod-smoke'));
     console.log('prod:', BFF_URL, '\n');
   } catch (e) {
     console.warn('prod unavailable:', e.message, '— local only\n');
   }
+}
+
+async function callProdWithRetry(artist, title, narrator, storyKey, attempts = 3) {
+  const installId = testInstallId(storyKey);
+  let last = null;
+  for (let a = 0; a < attempts; a += 1) {
+    const token = await fetchProdToken(installId);
+    const prodRes = await postProdStoryFull(token, {
+      artist,
+      title,
+      narrator,
+      openRouterApiKey: process.env.OPEN_ROUTER_API_KEY?.trim(),
+    });
+    last = { ...prodRes, installId, token };
+    if (prodRes.ok) return last;
+    const retryable =
+      prodRes.status === 503 ||
+      prodRes.status === 429 ||
+      prodRes.code === 'story_in_progress' ||
+      prodRes.code === 'STORY_QUALITY_FAILED';
+    console.warn(
+      `  PROD FAIL (${prodRes.elapsedMs}ms) code=${prodRes.code ?? prodRes.status} ${prodRes.message ?? prodRes.error}`,
+    );
+    if (!retryable || a === attempts - 1) break;
+    await new Promise((r) => setTimeout(r, 4000 * (a + 1)));
+  }
+  return last;
 }
 
 async function generateLocalStory(input) {
@@ -203,16 +232,13 @@ for (let ti = 0; ti < tracks.length; ti += 1) {
       script,
     };
 
-    if (token) {
-      const pt0 = Date.now();
-      const prodRes = await postProdStoryFull(token, {
-        artist,
-        title,
-        narrator,
-        openRouterApiKey: process.env.OPEN_ROUTER_API_KEY?.trim(),
-      });
+    if (prodToken !== null) {
+      const storyKey = ti * 10 + si + 1;
+      const prodRes = await callProdWithRetry(artist, title, narrator, storyKey);
       row.prodMs = prodRes.elapsedMs;
       row.prodOk = prodRes.ok;
+      row.prodCode = prodRes.code ?? null;
+      row.prodError = prodRes.ok ? null : (prodRes.message ?? prodRes.error ?? null);
       row.prodSeed = prodRes.seed ?? '';
       row.prodScript = prodRes.script ?? '';
       row.prodScope = prodRes.scope ?? '';
@@ -222,10 +248,16 @@ for (let ti = 0; ti < tracks.length; ti += 1) {
         console.log(`  PROD ${prodRes.elapsedMs}ms | scope=${prodRes.scope} | anchored=${pAnchored}`);
         console.log(`  PROD SEED: ${(prodRes.seed || '').slice(0, 180)}`);
         console.log(`  PROD SCRIPT: ${(prodRes.script || '').slice(0, 220)}…`);
-      } else {
-        console.warn(`  PROD FAIL: ${prodRes.error}`);
+        await postProdStoryComplete(prodRes.token, {
+          artist,
+          title,
+          script: prodRes.script,
+          seedFact: prodRes.seed || fact.fact,
+          seedScope: prodRes.scope || fact.scope || 'track',
+          narrator,
+        });
       }
-      await new Promise((r) => setTimeout(r, 8000));
+      await new Promise((r) => setTimeout(r, 3000));
     }
 
     results.push(row);
@@ -248,6 +280,12 @@ const summary = {
   localAvgMs: Math.round(results.reduce((s, r) => s + (r.localMs ?? 0), 0) / Math.max(1, results.length)),
   anchoredPct: Math.round((results.filter((r) => r.anchored).length / Math.max(1, results.length)) * 100),
   qualityOkPct: Math.round((results.filter((r) => r.qualityOk).length / Math.max(1, results.length)) * 100),
+  prodFailCodes: Object.fromEntries(
+    [...new Set(results.filter((r) => !r.prodOk).map((r) => r.prodCode ?? 'unknown'))].map((c) => [
+      c,
+      results.filter((r) => !r.prodOk && (r.prodCode ?? 'unknown') === c).length,
+    ]),
+  ),
   distinctSeedsPerTrack: Object.fromEntries(
     tracks.map((t) => {
       const seeds = results.filter((r) => r.artist === t.artist && r.title === t.title).map((r) => r.seed.slice(0, 80));
@@ -261,5 +299,5 @@ writeFileSync(OUT, JSON.stringify(summary, null, 2), 'utf8');
 console.log('\n=== SUMMARY ===');
 console.log(`stories: ${summary.stories} | prod ok: ${summary.prodStories} avg ${summary.prodAvgMs}ms anchored ${summary.prodAnchoredPct}%`);
 console.log(`local avg: ${summary.localAvgMs}ms | local anchored: ${summary.anchoredPct}% | quality ok: ${summary.qualityOkPct}%`);
-console.log(`distinct seeds/track:`, summary.distinctSeedsPerTrack);
+console.log(`prod fail codes:`, summary.prodFailCodes);
 console.log(`saved: ${OUT}\n`);
