@@ -189,6 +189,12 @@ struct AppL10n {
             ? "Payment via App Store. Manage in Settings → Apple ID → Subscriptions."
             : "Оплата через App Store. Управление — Настройки → Apple ID → Подписки."
     }
+    var billingCrossPlatformHint: String {
+        en
+            ? "Already subscribed on efir-ai.ru or the Android app? Sign in with the same email — your access activates automatically."
+            : "Уже оформили подписку на сайте или в Android? Войдите с тем же email — доступ активируется."
+    }
+    var billingCrossPlatformSignIn: String { en ? "Sign in" : "Войти" }
     var billingYookassaHint: String {
         en
             ? "Payment in rubles via YooKassa in the browser. Sign in with the same email after payment."

@@ -216,6 +216,19 @@ struct AccountView: View {
                 }
             }
 
+            GlassCard {
+                VStack(alignment: .leading, spacing: 10) {
+                    Text(copy.billingCrossPlatformHint)
+                        .font(.footnote)
+                        .foregroundStyle(AppTheme.mutedLavender)
+                    if !isLoggedIn {
+                        SecondaryStoryButton(title: copy.billingCrossPlatformSignIn) {
+                            showLogin = true
+                        }
+                    }
+                }
+            }
+
             Text(copy.billingPlansHeading)
                 .font(.subheadline.weight(.semibold))
                 .foregroundStyle(AppTheme.creamText)
