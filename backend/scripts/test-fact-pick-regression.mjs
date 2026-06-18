@@ -602,6 +602,52 @@ assert(
 const STING_CURATED = lookupCuratedFact('Sting', 'Shape Of My Heart');
 assert(STING_CURATED?.fact.includes('Миллер'), 'Sting Shape Of My Heart curated fact present');
 
+const { resolveScopeOrder } = await import('../dist/services/fact-picker.js');
+const { pickFromBank, ingestHarvestFacts } = await import('../dist/services/fact-bank.js');
+const { factFingerprint } = await import('../dist/services/fact-bank.js');
+assert(
+  resolveScopeOrder(1, ['track', 'track']).join(',') === 'artist,album,track',
+  'two track scopes rotate to artist first',
+);
+assert(
+  resolveScopeOrder(0, []).join(',') === 'track,album,artist',
+  'first story prefers track scope',
+);
+
+const TRACK_HIGH =
+  "It was co-written by Dominic Miller, Sting's guitarist, which makes it one of the few songs on Ten Summoner's Tales that Sting did not write alone.";
+const ARTIST_RESERVE =
+  'После распада The Police Sting начал сольную карьеру; к 1993 году на альбоме Ten Summoner\'s Tales он записал «Shape of My Heart» вместе с Домиником Миллером.';
+ingestHarvestFacts('Sting', 'Shape Of My Heart', [
+  { fact: TRACK_HIGH, scope: 'track', minScore: 6 },
+  { fact: ARTIST_RESERVE, scope: 'artist', minScore: 3 },
+]);
+const bankPickTrackFirst = pickFromBank(
+  'Sting',
+  'Shape Of My Heart',
+  new Set(),
+  ['track', 'album', 'artist'],
+);
+assert(bankPickTrackFirst?.scope === 'track', 'bank default order prefers track');
+const trackUsed = new Set([factFingerprint(TRACK_HIGH)]);
+const repeatPick = pickReferenceFact(
+  {
+    trackFacts: [TRACK_HIGH],
+    artistFacts: [ARTIST_RESERVE],
+  },
+  [],
+  1,
+  'Sting',
+  'Shape Of My Heart',
+  trackUsed,
+  'auto',
+  { recentScopes: ['track', 'track'] },
+);
+assert(
+  repeatPick?.scope === 'artist',
+  `repeat track scopes prefer artist when track used (got ${repeatPick?.scope ?? 'null'})`,
+);
+
 // --- 6. Optional live: real Last.fm + aggregator ---
 if (LIVE) {
   if (!process.env.LASTFM_API_KEY?.trim()) {

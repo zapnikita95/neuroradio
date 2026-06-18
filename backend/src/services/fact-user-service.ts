@@ -12,20 +12,20 @@ import {
   resolveAccountId,
   type SyncHistoryEntry,
 } from './account-store.js';
-import {
-  factFingerprint,
-  ingestFacts,
-  listBankFacts,
-  pickFromBank,
-  type StoredFact,
-  trackKey,
-} from './fact-bank.js';
+import { factFingerprint, ingestFacts, ingestHarvestFacts, listBankFacts, pickFromBank, type StoredFact, trackKey } from './fact-bank.js';
 import type { CoverFactContext } from './cover-resolve.js';
 import { splitBundleByScope, rankScopedFacts } from './fact-ranking.js';
 import { computeLiveInterest } from './fact-seed-pick.js';
-import { MIN_PICK_INTEREST_SCORE } from './reference-fact-quality.js';
+import {
+  MIN_PICK_INTEREST_SCORE,
+  isArtistFormationBioSeed,
+  isBackstoryFact,
+  isBoringFact,
+  isEncyclopediaDefinitionSeed,
+} from './reference-fact-quality.js';
 import { factMentionsArtistAsEntity, isAmbiguousCommonWordArtist } from './fact-relevance.js';
 import type { FactScope, ReferenceFactBundle } from './fact-picker.js';
+import { resolveScopeOrder } from './fact-picker.js';
 import {
   classifyFactTopic,
   topicKeySet,
@@ -33,6 +33,7 @@ import {
 } from './fact-topic.js';
 import type { StoryLanguageId } from './story-language.js';
 import { getAccountUsedSeedsForArtistAsync } from './account-store.js';
+import type { ArtistTier } from './artist-notability.js';
 import { isCatalogMajorArtist } from './artist-notability.js';
 
 const PENDING_SEED_TTL_MS = 3 * 60_000;
@@ -94,6 +95,29 @@ export async function getRecentSeedScopesForArtist(
   if (history) {
     for (const h of history) {
       if (h.artist.trim().toLowerCase() !== artistNorm) continue;
+      const scope = h.seedScope as FactScope | undefined;
+      if (scope === 'track' || scope === 'album' || scope === 'artist') {
+        scopes.push(scope);
+      }
+      if (scopes.length >= limit) break;
+    }
+  }
+  return scopes;
+}
+
+/** Scopes of recent seeds for this exact track — drives track→artist rotation on repeats. */
+export async function getRecentSeedScopesForTrack(
+  installId: string,
+  artist: string,
+  title: string,
+  limit = 4,
+): Promise<FactScope[]> {
+  const scopes: FactScope[] = [];
+  const tk = trackKey(artist, title);
+  const history = await pullHistoryAsync(installId, 0);
+  if (history) {
+    for (const h of history) {
+      if (h.trackKey !== tk) continue;
       const scope = h.seedScope as FactScope | undefined;
       if (scope === 'track' || scope === 'album' || scope === 'artist') {
         scopes.push(scope);
@@ -172,12 +196,13 @@ export async function buildFactPickContext(
   title: string,
   options: { album?: string; storyNarrator?: StoryNarratorId; storyLanguage?: StoryLanguageId } = {},
 ): Promise<FactPickContext> {
-  const [used, recentTrack, recentArtist, blockedTopics, recentScopes, narratorTopic] =
+  const [used, recentTrack, recentArtist, blockedTopics, trackScopes, artistScopes, narratorTopic] =
     await Promise.all([
       getUsedFingerprints(installId, artist, title),
       getRecentSeedFactsForTrack(installId, artist, title),
       getRecentSeedFactsForArtist(installId, artist),
       getBlockedTopicsForUser(installId, artist, options.album),
+      getRecentSeedScopesForTrack(installId, artist, title),
       getRecentSeedScopesForArtist(installId, artist),
       options.storyNarrator
         ? getNarratorSwitchBlockedTopic(installId, artist, title, options.storyNarrator)
@@ -190,6 +215,7 @@ export async function buildFactPickContext(
   }
   const rejectSimilarTo = [...new Set([...recentTrack, ...recentArtist])];
   const storyLanguage = options.storyLanguage ?? 'ru';
+  const recentScopes = trackScopes.length >= 1 ? trackScopes : artistScopes;
   return { usedFingerprints: used, rejectSimilarTo, blockedTopics, recentScopes, storyLanguage };
 }
 
@@ -328,11 +354,13 @@ export async function pickBankFactForUser(
   title: string,
   cover?: CoverFactContext,
   pickCtx?: FactPickContext,
+  storyIndex = 0,
 ): Promise<SelectedReferenceFact | null> {
   ensureAccount(installId);
   const ctx =
     pickCtx ?? (await buildFactPickContext(installId, artist, title));
-  const { usedFingerprints: used, rejectSimilarTo, blockedTopics, storyLanguage } = ctx;
+  const { usedFingerprints: used, rejectSimilarTo, blockedTopics, recentScopes, storyLanguage } = ctx;
+  const scopeOrder = resolveScopeOrder(storyIndex, recentScopes);
   const keys: Array<[string, string]> = [[artist, title]];
   if (cover?.isCover) {
     keys.push([cover.factArtist, cover.factTitle]);
@@ -342,11 +370,12 @@ export async function pickBankFactForUser(
       a,
       t,
       used,
-      ['track', 'album', 'artist'],
+      scopeOrder,
       0,
       rejectSimilarTo,
       blockedTopics,
       storyLanguage,
+      { recentScopes },
     );
     if (fromBank && !factsTooSimilar(fromBank.fact, rejectSimilarTo)) {
       return storedFactToSelected(fromBank);
@@ -387,17 +416,19 @@ export async function pickFactForUser(
     pickCtx ??
     (await buildFactPickContext(installId, artist, title, { storyNarrator: narrator }));
   const { usedFingerprints: used, rejectSimilarTo, blockedTopics, recentScopes, storyLanguage } = ctx;
+  const scopeOrder = resolveScopeOrder(storyIndex, recentScopes);
 
   for (let offset = 0; offset < 8; offset += 1) {
     const fromBank = pickFromBank(
       artist,
       title,
       used,
-      ['track', 'album', 'artist'],
+      scopeOrder,
       offset,
       rejectSimilarTo,
       blockedTopics,
       storyLanguage,
+      { recentScopes },
     );
     if (fromBank && !factsTooSimilar(fromBank.fact, rejectSimilarTo)) {
       return storedFactToSelected(fromBank);
@@ -467,21 +498,54 @@ export function shouldPrefetchArtistFacts(installId: string, artist: string): bo
   return repeatArtistProbability(installId, artist) >= 0.35;
 }
 
+export function reserveArtistFactsInBank(
+  artist: string,
+  title: string,
+  bundle: ReferenceFactBundle,
+  tier: ArtistTier = 'indie',
+): number {
+  if (tier !== 'major' && !isCatalogMajorArtist(artist)) return 0;
+  const pools = splitBundleByScope(bundle, artist, title);
+  const artistFacts = pools.artist.filter((fact) => {
+    const trimmed = fact.trim();
+    if (trimmed.length < 35) return false;
+    if (isArtistFormationBioSeed(trimmed)) return false;
+    if (isEncyclopediaDefinitionSeed(trimmed)) return false;
+    if (isBoringFact(trimmed) && !isBackstoryFact(trimmed)) return false;
+    return true;
+  });
+  if (artistFacts.length === 0) return 0;
+  const saved = ingestHarvestFacts(
+    artist,
+    title,
+    artistFacts.slice(0, 8).map((fact) => ({
+      fact,
+      scope: 'artist' as const,
+      source: 'api' as const,
+      minScore: 3,
+    })),
+  );
+  if (saved > 0) {
+    console.log(
+      `[fact-reserve] artist pool +${saved} artist="${artist}" title="${title}" tier=${tier}`,
+    );
+  }
+  return saved;
+}
+
 export function prefetchArtistFactsToBank(
   installId: string,
   artist: string,
   title: string,
   bundle: ReferenceFactBundle,
+  tier: ArtistTier = 'indie',
 ): void {
-  if (!shouldPrefetchArtistFacts(installId, artist) && !isCatalogMajorArtist(artist)) return;
-  ingestBundleToBank(artist, title, bundle);
-  const pools = splitBundleByScope(bundle, artist, title);
-  for (const scope of ['artist'] as const) {
-    for (const fact of pools[scope].slice(0, 6)) {
-      ingestFacts(artist, title, [{ fact, scope: 'artist', source: 'api' }]);
-    }
+  if (!shouldPrefetchArtistFacts(installId, artist) && tier !== 'major' && !isCatalogMajorArtist(artist)) {
+    return;
   }
+  ingestBundleToBank(artist, title, bundle);
+  reserveArtistFactsInBank(artist, title, bundle, tier);
   console.log(
-    `[fact-prefetch] install=${installId.slice(0, 8)} artist="${artist}" prob=${repeatArtistProbability(installId, artist).toFixed(2)}`,
+    `[fact-prefetch] install=${installId.slice(0, 8)} artist="${artist}" prob=${repeatArtistProbability(installId, artist).toFixed(2)} tier=${tier}`,
   );
 }

@@ -451,7 +451,14 @@ router.post('/full', extractClientSecrets, validateStoryFullBody, storyFullRateL
         );
       }
     } else {
-      bankFact = await pickBankFactForUser(installId, artist, title, coverCtx, factPickCtx);
+      bankFact = await pickBankFactForUser(
+        installId,
+        artist,
+        title,
+        coverCtx,
+        factPickCtx,
+        previousScripts.length,
+      );
     }
 
     if (bankFact && usedFingerprints.has(factFingerprint(bankFact.fact))) {
@@ -653,7 +660,19 @@ router.post('/full', extractClientSecrets, validateStoryFullBody, storyFullRateL
       if (coverCtx.isCover) {
         ingestBundleToBank(artist, title, factBundle);
       }
-      prefetchArtistFactsToBank(installId, factArtist, factTitle, factBundle);
+      const artistTierPrefetch = resolveArtistTier(
+        metadata.artist,
+        metadata.title,
+        metadata,
+        factBundle,
+      );
+      prefetchArtistFactsToBank(
+        installId,
+        factArtist,
+        factTitle,
+        factBundle,
+        artistTierPrefetch,
+      );
 
       selectedFact = await pickFactForUser(
         installId,

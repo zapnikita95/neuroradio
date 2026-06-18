@@ -584,9 +584,14 @@ export function pickFromBank(
   rejectSimilarTo: string[] = [],
   blockedTopics: Set<FactTopicKey> = new Set(),
   storyLanguage: StoryLanguageId = 'ru',
-  options: { markUsed?: boolean } = {},
+  options: { markUsed?: boolean; recentScopes?: FactScope[] } = {},
 ): StoredFact | null {
   const { track, artist: artistFacts } = listBankFacts(artist, title);
+  const trackScopeStreak = (options.recentScopes ?? []).slice(0, 2).filter((s) => s === 'track').length;
+  const minScoreForScope = (scope: FactScope): number =>
+    scope !== 'track' && trackScopeStreak >= 2
+      ? Math.max(6, MIN_PICK_INTEREST_SCORE - 6)
+      : MIN_PICK_INTEREST_SCORE;
   const pools: Record<FactScope, StoredFact[]> = {
     track: track.filter((f) => f.scope === 'track'),
     album: track.filter((f) => f.scope === 'album'),
@@ -599,6 +604,7 @@ export function pickFromBank(
 
   const unused: StoredFact[] = [];
   for (const scope of preferScope) {
+    const scopeCandidates: StoredFact[] = [];
     for (const fact of pools[scope] ?? []) {
       if (usedFingerprints.has(factFingerprint(fact.fact))) continue;
       if (fact.topicKey && fact.topicKey !== 'misc' && blockedTopics.has(fact.topicKey)) continue;
@@ -617,20 +623,21 @@ export function pickFromBank(
       }
       const live = computeLiveInterest(fact.fact);
       const effective = effectivePickScore(fact, live.score);
-      if (effective < MIN_PICK_INTEREST_SCORE || live.rating < HOT_MIN_RATING) continue;
+      if (effective < minScoreForScope(scope) || live.rating < HOT_MIN_RATING) continue;
       if (!isSpeakableReferenceFact(fact.fact, artist, title)) continue;
       if (isAmbiguousCommonWordArtist(artist) && !factMentionsArtistAsEntity(fact.fact, artist)) continue;
-      unused.push({
+      scopeCandidates.push({
         ...fact,
         interestScore: effective,
         interestRating: live.rating,
       });
     }
+    scopeCandidates.sort(
+      (a, b) => adjustedInterestScore(b.fact, 'auto') - adjustedInterestScore(a.fact, 'auto'),
+    );
+    unused.push(...scopeCandidates);
   }
   if (unused.length === 0) return null;
-  unused.sort(
-    (a, b) => adjustedInterestScore(b.fact, 'auto') - adjustedInterestScore(a.fact, 'auto'),
-  );
   const picked = unused[startOffset % unused.length]!;
   if (options.markUsed !== false) {
     markFactUsed(picked.id, artist, title);

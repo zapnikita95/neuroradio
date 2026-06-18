@@ -380,6 +380,7 @@ export function interestScore(fact: string): number {
   }
   if (/\bco[- ]?written\b/i.test(trimmed)) score += 18;
   if (/соавторил\w*/i.test(trimmed)) score += 14;
+  if (/После распада/i.test(trimmed) && /\b(?:Police|Sting|сольн)/i.test(trimmed)) score += 16;
   if (/\b(?:card(?:sharp|player|game)?|blackjack|poker|playing cards)\b/i.test(trimmed)) score += 10;
   if (/\b(?:Leon|L[eé]on: The Professional|Eric Serra)\b/i.test(trimmed)) score += 12;
   if (/\b(?:deathtronica|electronicore|metalcore|hardcore|scream\s+vocals?)\b/i.test(trimmed)) score += 20;

@@ -217,15 +217,19 @@ export function pickReferenceFact(
   const storyLanguage = options.storyLanguage ?? 'ru';
   const scopeOrder = resolveScopeOrder(storyIndex, options.recentScopes ?? []);
   const trackPoolForReject = [...pools.track, ...pools.album];
+  const trackScopeStreak = (options.recentScopes ?? []).slice(0, 2).filter((s) => s === 'track').length;
+  const minGoodForScope = (scope: FactScope): number =>
+    scope !== 'track' && trackScopeStreak >= 2 ? MIN_PICK_INTEREST_SCORE - 6 : MIN_GOOD_SCOPE_INTEREST;
 
   for (const scope of scopeOrder) {
     const pool = pools[scope];
     if (pool.length === 0) continue;
+    const minScore = minGoodForScope(scope);
     const picked = pickBestByInterest(
       pool,
       previousScripts,
       usedFingerprints,
-      MIN_PICK_INTEREST_SCORE,
+      minScore,
       title,
       narrator,
       blockedTopics,
@@ -233,7 +237,7 @@ export function pickReferenceFact(
       trackPoolForReject,
       artist,
     );
-    if (picked && adjustedInterestScore(picked, narrator) >= MIN_GOOD_SCOPE_INTEREST) {
+    if (picked && adjustedInterestScore(picked, narrator) >= minScore) {
       return wrapSelected(picked, scope, narrator);
     }
   }
