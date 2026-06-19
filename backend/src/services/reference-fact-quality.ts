@@ -298,6 +298,10 @@ const BACKSTAGE_DRAMA_PATTERNS: RegExp[] = [
   /(?:скандал|конфликт|запрет|отказ|суд|плагиат|ссор|ультиматум|почти не|отверг)/i,
 ];
 
+export function isBackstageDramaSeed(fact: string): boolean {
+  return BACKSTAGE_DRAMA_PATTERNS.some((p) => p.test(fact.trim()));
+}
+
 const EXPERT_MECHANISM_PATTERNS: RegExp[] = [
   /\b(?:genre|subgenre|produc|arrang|synthes|sample|tempo|harmon|chord|instrument|structure|suite|operatic)\b/i,
   /(?:жанр|аранж|продакш|синтез|семпл|ритм|гармон|структур|без припева)/i,

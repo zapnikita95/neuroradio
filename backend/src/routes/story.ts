@@ -13,10 +13,11 @@ import {
 } from '../services/fact-aggregator.js';
 import { fetchDeepWebSearchSnippets, fetchArtistIdentityWebSnippets } from '../services/web-search-facts.js';
 import { fetchFastTrackWikiFacts } from '../services/wikipedia-facts.js';
-import { explainReferenceFactSelection, factsTooSimilar, isRejectedStorySeed, pickFallbackSeedFromBundle, type SelectedReferenceFact } from '../services/fact-picker.js';
+import { explainReferenceFactSelection, factsTooSimilar, isRejectedStorySeed, isStrongBundleFallbackFact, pickFallbackSeedFromBundle, type SelectedReferenceFact } from '../services/fact-picker.js';
 import { formatFactPickLog, logFactCandidatePools } from '../services/fact-interest-log.js';
 import { interestScore, isWikiBiographyLead, isCatalogMetadataSeed, isEncyclopediaDefinitionSeed, isGenericConcertVenueSeed } from '../services/reference-fact-quality.js';
-import { isArtistCareerBioWithoutTrack } from '../services/fact-track-anchor.js';
+import { isArtistCareerBioWithoutTrack, hasAnchoredTrackContext } from '../services/fact-track-anchor.js';
+import { factMentionsTitle } from '../services/fact-relevance.js';
 import { interestRating10 } from '../services/fact-interest-log.js';
 import {
   buildFactPickContext,
@@ -845,6 +846,7 @@ router.post('/full', extractClientSecrets, validateStoryFullBody, storyFullRateL
         metadata.title,
         factBundle.trackFacts,
         storyLang,
+        selectedFact.scope,
       )
     ) {
       console.warn(
@@ -1405,15 +1407,41 @@ router.post('/full', extractClientSecrets, validateStoryFullBody, storyFullRateL
           );
         }
         const strongBundleFacts = [...factBundle.trackFacts, ...factBundle.artistFacts]
-          .filter(
-            (f) =>
-              interestScore(f) >= 6 &&
-              !isWeakSnippetSeed(f) &&
-              !isEncyclopediaDefinitionSeed(f) &&
-              !isGenericConcertVenueSeed(f) &&
-              !isCatalogMetadataSeed(f),
-          )
-          .sort((a, b) => interestScore(b) - interestScore(a));
+          .filter((f) => {
+            if (interestScore(f) < 6) return false;
+            if (isWeakSnippetSeed(f)) return false;
+            if (isGenericConcertVenueSeed(f)) return false;
+            if (isCatalogMetadataSeed(f)) return false;
+            if (
+              isEncyclopediaDefinitionSeed(f) &&
+              !(
+                factMentionsTitle(f, metadata.title) ||
+                hasAnchoredTrackContext(f, metadata.title)
+              )
+            ) {
+              return false;
+            }
+            return isStrongBundleFallbackFact(
+              f,
+              metadata.artist,
+              metadata.title,
+              storyNarrator,
+            );
+          })
+          .sort((a, b) => {
+            const aTrack =
+              factBundle.trackFacts.includes(a) &&
+              (factMentionsTitle(a, metadata.title) || hasAnchoredTrackContext(a, metadata.title))
+                ? 1
+                : 0;
+            const bTrack =
+              factBundle.trackFacts.includes(b) &&
+              (factMentionsTitle(b, metadata.title) || hasAnchoredTrackContext(b, metadata.title))
+                ? 1
+                : 0;
+            if (aTrack !== bTrack) return bTrack - aTrack;
+            return interestScore(b) - interestScore(a);
+          });
         const realRefFacts = storyReferenceFacts.filter(
           (f) => !isMetadataOnlyFallbackFact(f) && !isWeakSnippetSeed(f),
         );

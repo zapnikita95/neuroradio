@@ -757,6 +757,7 @@ export function validateStoryScript(
     minWordsOverride?: number;
     previousScripts?: string[];
     speakTrackNamesInVoiceover?: boolean;
+    storyNarrator?: StoryNarratorId;
   } = {},
 ): { ok: true } | { ok: false; reason: string } {
   const limits = getStoryLengthPreset(lengthId);
@@ -825,7 +826,7 @@ export function validateStoryScript(
   }
 
   if (!noTrackNames && artist.trim() && title.trim()) {
-    const nameRep = findExcessiveNameRepetition(trimmed, artist, title);
+    const nameRep = findExcessiveNameRepetition(trimmed, artist, title, options.storyNarrator);
     if (nameRep) {
       return { ok: false, reason: nameRep };
     }
@@ -899,7 +900,9 @@ export function validateStoryScript(
     if (fictionIssue) {
       return { ok: false, reason: fictionIssue };
     }
-    const ungrounded = findUngroundedClaims(trimmed, referenceFacts);
+    const ungrounded = findUngroundedClaims(trimmed, referenceFacts, {
+      storyNarrator: options.storyNarrator,
+    });
     if (ungrounded) {
       return { ok: false, reason: ungrounded };
     }
@@ -1114,12 +1117,33 @@ const UNGROUNDED_CLAIM_CHECKS: Array<{ claim: RegExp; factHint: RegExp }> = [
   },
 ];
 
-export function findUngroundedClaims(script: string, referenceFacts: string[] = []): string | null {
+export function findUngroundedClaims(
+  script: string,
+  referenceFacts: string[] = [],
+  options: { storyNarrator?: StoryNarratorId } = {},
+): string | null {
   const factsText = referenceFacts.join(' ');
+  const fanPersona =
+    options.storyNarrator === 'fan' || options.storyNarrator === 'contemporary';
+  const nightDjPersona = options.storyNarrator === 'night_dj';
+  const seedHasReleaseContext =
+    /\b(?:single|released|capitol|records|album|chart|april|2018|synth|guitar|pop punk)\b/i.test(
+      factsText,
+    );
+  const seedHasProductionHints =
+    /\b(?:synth|guitar|vocal|drum|бит|гитар|синтез|вокал|produc|recorded|studio)\b/i.test(
+      factsText,
+    );
   for (const { claim, factHint } of UNGROUNDED_CLAIM_CHECKS) {
-    if (claim.test(script) && (referenceFacts.length === 0 || !factHint.test(factsText))) {
-      return `ungrounded claim: ${claim.source}`;
+    if (!claim.test(script)) continue;
+    if (referenceFacts.length === 0 || factHint.test(factsText)) continue;
+    if (fanPersona && seedHasReleaseContext) {
+      if (/(?:мурашк|гитарн\w*\s+риф|электронн\w*\s+бит)/i.test(claim.source)) continue;
     }
+    if (nightDjPersona && !seedHasProductionHints) {
+      if (/(?:синтезатор|шёпот|шепот|электроник)/i.test(claim.source)) continue;
+    }
+    return `ungrounded claim: ${claim.source}`;
   }
   return null;
 }
@@ -1258,6 +1282,11 @@ export function findOffSeedInvention(script: string, referenceFacts: string[] = 
   const seed = referenceFacts.join(' ');
   if (NEWS_POLITICS_SEED_RE.test(script) && !NEWS_POLITICS_SEED_RE.test(seed)) {
     return 'invented detail not in seed: teachers strike';
+  }
+  const collectorInvention =
+    /\b(?:7-inch|7 inch|B-side has studio banter|limited edition.*vinyl|rewriting the chorus three times|studio banter about this exact moment)\b/i;
+  if (collectorInvention.test(script) && !collectorInvention.test(seed) && !/\bvinyl|7-inch|B-side|banter|press\b/i.test(seed)) {
+    return 'invented collector detail not in seed';
   }
   return null;
 }
@@ -1437,6 +1466,7 @@ export function findExcessiveNameRepetition(
   script: string,
   artist: string,
   title: string,
+  storyNarrator?: StoryNarratorId,
 ): string | null {
   const primary = primaryArtistName(artist);
   const artistCount = countPhraseMentions(script, primary);
@@ -1444,8 +1474,9 @@ export function findExcessiveNameRepetition(
     return `excessive name repetition: artist "${primary}" ${artistCount}× (max 2)`;
   }
   const titleCount = countPhraseMentions(script, title);
-  if (titleCount > 1) {
-    return `excessive name repetition: track "${title}" ${titleCount}× (max 1)`;
+  const titleMax = storyNarrator === 'fan' || storyNarrator === 'contemporary' ? 2 : 1;
+  if (titleCount > titleMax) {
+    return `excessive name repetition: track "${title}" ${titleCount}× (max ${titleMax})`;
   }
   return null;
 }
@@ -1455,12 +1486,12 @@ export function findWateryContent(
   artist = '',
   title = '',
   referenceFacts: string[] = [],
-  options: { skipPersonaCliches?: boolean; speakTrackNamesInVoiceover?: boolean } = {},
+  options: { skipPersonaCliches?: boolean; speakTrackNamesInVoiceover?: boolean; storyNarrator?: StoryNarratorId } = {},
 ): string | null {
   const skipPersona = options.skipPersonaCliches ?? false;
   const noTrackNames = isVoiceoverWithoutTrackNames(options.speakTrackNamesInVoiceover);
   if (options.speakTrackNamesInVoiceover === true && artist.trim() && title.trim()) {
-    const nameRep = findExcessiveNameRepetition(script, artist, title);
+    const nameRep = findExcessiveNameRepetition(script, artist, title, options.storyNarrator);
     if (nameRep) return nameRep;
   }
   if (!skipPersona) {

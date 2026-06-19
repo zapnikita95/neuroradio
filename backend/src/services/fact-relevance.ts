@@ -962,8 +962,6 @@ function entityOnlyInParentheses(fact: string, entity: string): boolean {
 
 /** Другая песня того же артиста в кавычках — не семя для запрошенного трека. */
 export function factMentionsOtherTrackTitle(fact: string, title: string): boolean {
-  if (factMentionsTitle(fact, title)) return false;
-
   const titleNorm = normalize(title.replace(/\s*\([^)]*\)\s*/g, ' '));
   const factNorm = normalize(fact);
 

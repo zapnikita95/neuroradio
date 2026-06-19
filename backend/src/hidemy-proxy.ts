@@ -20,8 +20,17 @@ export async function ensureHidemyProxy(): Promise<void> {
   if (!process.env.NO_PROXY?.trim()) {
     process.env.NO_PROXY = '127.0.0.1,localhost,::1';
   }
-  if (process.env.HTTPS_PROXY?.trim() || process.env.HTTP_PROXY?.trim()) {
+  const outbound =
+    process.env.OUTBOUND_PROXY?.trim() ||
+    process.env.ELEVENLABS_PROXY?.trim() ||
+    process.env.HTTPS_PROXY?.trim() ||
+    process.env.HTTP_PROXY?.trim();
+  if (outbound) {
+    process.env.HTTP_PROXY = outbound;
+    process.env.HTTPS_PROXY = outbound;
     process.env.NODE_USE_ENV_PROXY = '1';
+    const safe = outbound.replace(/\/\/([^:@/]+):([^@/]+)@/, '//$1:***@');
+    console.log(`[proxy] outbound → ${safe}`);
     return;
   }
   const alive = await new Promise<boolean>((resolve) => {

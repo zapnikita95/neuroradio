@@ -11,6 +11,7 @@ import {
   isGenericConcertVenueSeed,
   isGenericMusicVideoSeed,
   isBackstoryFact,
+  isBackstageDramaSeed,
   isBoringFact,
   isCollectorFact,
   isWeakChartSeed,
@@ -31,7 +32,7 @@ import {
   isMisattributedBandTrackFact,
   isNonMusicTitleCollisionFact,
 } from './fact-relevance.js';
-import { rejectSeedForTrackStory, isTrackTitleAnchoredSeed } from './fact-track-anchor.js';
+import { rejectSeedForTrackStory, isTrackTitleAnchoredSeed, hasAnchoredTrackContext } from './fact-track-anchor.js';
 import { factFitsStoryLanguage } from './fact-language-fit.js';
 import type { StoryLanguageId } from './story-language.js';
 import { isRejectedPickSeed } from './fact-seed-pick.js';
@@ -328,15 +329,21 @@ export function pickFallbackSeedFromBundle(
   );
   for (const fact of candidates) {
     if (excludedFingerprints.has(factFingerprint(fact))) continue;
-    if (isRejectedSeed(fact, title, storyLanguage, trackPoolForReject, artist)) continue;
-    if (isEncyclopediaDefinitionSeed(fact)) continue;
-    if (isGenericConcertVenueSeed(fact)) continue;
-    if (adjustedInterestScore(fact, narrator) < MIN_PICK_INTEREST_SCORE) continue;
     const scope: FactScope = pools.track.includes(fact)
       ? 'track'
       : pools.album.includes(fact)
         ? 'album'
         : 'artist';
+    if (isRejectedSeed(fact, title, storyLanguage, trackPoolForReject, artist, scope)) continue;
+    if (
+      isEncyclopediaDefinitionSeed(fact) &&
+      !(title.trim() && isTrackTitleAnchoredSeed(fact, title) && interestScore(fact) >= 10)
+    ) {
+      continue;
+    }
+    if (!isStrongBundleFallbackFact(fact, artist, title, narrator)) continue;
+    if (isGenericConcertVenueSeed(fact)) continue;
+    if (adjustedInterestScore(fact, narrator) < MIN_PICK_INTEREST_SCORE) continue;
     return wrapSelected(fact, scope, narrator);
   }
   return null;
@@ -380,8 +387,38 @@ export function isRejectedStorySeed(
   title: string,
   trackPool: string[] = [],
   storyLanguage: StoryLanguageId = 'ru',
+  pickScope?: FactScope,
 ): boolean {
-  return isRejectedSeed(fact, title, storyLanguage, trackPool, artist);
+  return isRejectedSeed(fact, title, storyLanguage, trackPool, artist, pickScope);
+}
+
+/** Fallback bundle fact for story LLM when no seed picked — must match requested track. */
+export function isStrongBundleFallbackFact(
+  fact: string,
+  artist: string,
+  title: string,
+  narrator: StoryNarratorId = 'auto',
+): boolean {
+  if (!title.trim()) return true;
+  if (factMentionsOtherTrackTitle(fact, title)) return false;
+  if (narrator === 'backstage') {
+    const trackAnchored =
+      factMentionsTitle(fact, title) || hasAnchoredTrackContext(fact, title);
+    if (
+      /\b(?:Monterey|Woodstock|Altamont|Isle of Wight|headlined)\b/i.test(fact) &&
+      !trackAnchored
+    ) {
+      return false;
+    }
+    if (
+      !trackAnchored &&
+      !isBackstoryFact(fact) &&
+      !isBackstageDramaSeed(fact)
+    ) {
+      return false;
+    }
+  }
+  return true;
 }
 
 export { isAlbumScopeFact, factMentionsOtherTrackTitle };

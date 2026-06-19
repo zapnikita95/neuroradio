@@ -2,7 +2,7 @@
  * English narration for ElevenLabs: base language en, DE/FR spans for foreign artist/track names.
  * ElevenLabs is used only when storyLanguage === 'en' — no Russian segments.
  */
-import { applyEnglishArtistPronunciation } from './artist-pronunciation.js';
+import { applyEnglishArtistPronunciation, lookupArtistPronunciation } from './artist-pronunciation.js';
 import { stripYandexMarkup } from './tts-azure-ssml.js';
 import { sanitizeScriptForTts } from './story-quality.js';
 import { runTtsQualityPass } from './tts-quality-pass.js';
@@ -23,6 +23,35 @@ const FR_LATIN_HINT: Record<string, string> = {
   papaoutai: 'Papa-oo-tie',
   zaz: 'Zahz',
 };
+
+/** Common English track titles that must not be read as German/French. */
+const ENGLISH_TRACK_TITLE_WORDS = new Set([
+  'war',
+  'love',
+  'home',
+  'hero',
+  'faith',
+  'believe',
+  'peace',
+  'fire',
+  'gold',
+  'star',
+  'angel',
+  'dream',
+  'life',
+  'time',
+  'light',
+  'dark',
+  'free',
+  'lost',
+  'run',
+  'stay',
+  'fall',
+  'rise',
+  'one',
+  'two',
+  'three',
+]);
 
 function normalizeKey(phrase: string): string {
   return phrase.trim().toLowerCase().replace(/\s+/g, ' ').replace(/[?!.,…]+$/g, '');
@@ -94,9 +123,17 @@ function buildForeignPhrasesInText(text: string, artist: string, title: string):
 
   const artistLang = edgeForeignLang(artist, artist, title);
   const titleLang = edgeForeignLang(title, artist, title);
+  const titleKey = normalizeKey(title);
+  const titleStaysEn =
+    ENGLISH_TRACK_TITLE_WORDS.has(titleKey) ||
+    (titleKey.split(' ').length === 1 && titleKey.length <= 4);
 
-  if (artistLang === 'de' || artistLang === 'fr') add(artist, artistLang);
-  if (titleLang === 'de' || titleLang === 'fr') add(title, titleLang);
+  if (lookupArtistPronunciation(artist)) {
+    // Respelling applied in English segment — avoid DE/FR split mispronouncing YUNGBLUD etc.
+  } else if (artistLang === 'de' || artistLang === 'fr') {
+    add(artist, artistLang);
+  }
+  if (!titleStaysEn && (titleLang === 'de' || titleLang === 'fr')) add(title, titleLang);
   if (artist && title) {
     const combinedLang =
       artistLang === 'de' || artistLang === 'fr'

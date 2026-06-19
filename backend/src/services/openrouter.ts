@@ -243,6 +243,7 @@ export async function generateStoryScript(
         );
         qOpts.previousScripts = previousScripts;
         qOpts.speakTrackNamesInVoiceover = input.speakTrackNamesInVoiceover;
+        qOpts.storyNarrator = narratorId;
 
         const quality = validateGeneratedStory(
           story.script,

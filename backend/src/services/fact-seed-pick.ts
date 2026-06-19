@@ -23,6 +23,7 @@ import {
   factMentionsTitle,
   factMentionsArtistLoose,
   hasTrackContextSignal,
+  factMentionsOtherTrackTitle,
   isMisattributedBandTrackFact,
 } from './fact-relevance.js';
 import { hasAnchoredTrackContext, isTrackTitleAnchoredSeed, rejectSeedForTrackStory } from './fact-track-anchor.js';
@@ -44,8 +45,15 @@ export function isRejectedPickSeed(
   const albumScope = pickScope === 'album';
   const nonTrackScope = artistScope || albumScope;
 
+  if (title.trim() && factMentionsOtherTrackTitle(fact, title)) return true;
   if (!factFitsStoryLanguage(fact, storyLanguage)) return true;
-  if (!nonTrackScope && artist.trim() && !factMentionsArtistLoose(fact, artist)) {
+  if (
+    !nonTrackScope &&
+    artist.trim() &&
+    !factMentionsArtistLoose(fact, artist) &&
+    !hasAnchoredTrackContext(fact, title) &&
+    !hasTrackContextSignal(fact)
+  ) {
     return true;
   }
   if (
@@ -59,7 +67,16 @@ export function isRejectedPickSeed(
   if (isAlbumListingSeed(fact)) return true;
   if (isCatalogMetadataSeed(fact)) return true;
   if (isCitationBibliographySeed(fact)) return true;
-  if (isEncyclopediaDefinitionSeed(fact)) return true;
+  if (
+    isEncyclopediaDefinitionSeed(fact) &&
+    !(
+      title.trim() &&
+      isTrackTitleAnchoredSeed(fact, title) &&
+      interestScore(fact) >= 10
+    )
+  ) {
+    return true;
+  }
   if (isArtistDisambiguationListSeed(fact)) return true;
   if (isDiscogsLinerNotesSeed(fact)) return true;
   if (
@@ -103,7 +120,11 @@ export function isRejectedPickSeed(
   if (
     !allowArtistBio &&
     isBoringFact(fact) &&
-    !(title && isTrackTitleAnchoredSeed(fact, title) && !isEncyclopediaDefinitionSeed(fact))
+    !(
+      title &&
+      isTrackTitleAnchoredSeed(fact, title) &&
+      (interestScore(fact) >= 10 || !isEncyclopediaDefinitionSeed(fact))
+    )
   ) {
     return true;
   }

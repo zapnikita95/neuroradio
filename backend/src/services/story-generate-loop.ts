@@ -1,5 +1,6 @@
 import type { StoryLengthId } from './story-length.js';
 import type { StoryLanguageId } from './story-language.js';
+import type { StoryNarratorId } from './story-narrator.js';
 import {
   countWords,
   findHardScriptViolation,
@@ -38,6 +39,7 @@ export interface StoryQualityAttemptOptions {
   minWordsOverride?: number;
   previousScripts?: string[];
   speakTrackNamesInVoiceover?: boolean;
+  storyNarrator?: StoryNarratorId;
 }
 
 /** Production story checks — no word-count gate; length is a prompt/TTS concern. */
