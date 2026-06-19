@@ -254,6 +254,27 @@ curl -s https://ТВОЙ-BFF.up.railway.app/v1/public/tts-config
 **Webhook в ЮKassa:** `https://ТВОЙ-BFF.up.railway.app/v1/public/yookassa/webhook`  
 Событие: `payment.succeeded`.
 
+### App Store (iOS USD подписки)
+
+| Variable | Значение |
+|----------|----------|
+| `APP_STORE_SHARED_SECRET` | Общий ключ приложения в Connect (legacy receipt verify) — **уже есть** |
+| `APPLE_KEY_ID` | Connect → Integrations → **In-App Purchase** → Key ID (не путать с EAS Submit API key) |
+| `APPLE_ISSUER_ID` | Issuer ID на той же странице Integrations |
+| `APPLE_IAP_PRIVATE_KEY` | Содержимое `.p8` (In-App Purchase key), одной строкой с `\n` или multiline |
+| `APPLE_BUNDLE_ID` | `com.efirai.myapp` (опционально, дефолт в коде) |
+| `ALLOWED_IOS_TEAM_ID` | Team ID — уже есть |
+
+**Webhook App Store Server Notifications (Эфир AI → App Information):**
+
+```
+https://www.efir-ai.ru/v1/public/app-store/notifications
+```
+
+Production и Sandbox — один URL.
+
+Без `APPLE_*` ключей работает только verify при покупке (доверие JWS с устройства + `APP_STORE_SHARED_SECRET` для receipt). С ключами — проверка через Apple Server API + renew/refund по webhook.
+
 ### Как работает в приложении
 
 1. **Аккаунт → Подписка** → email (для активации и чека) → месяц / квартал / год

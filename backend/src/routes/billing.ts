@@ -5,6 +5,7 @@ import {
   grantPremiumSubscription,
   grantTrialSubscription,
   cancelAutoRenewByInstall,
+  linkAppleOriginalTransaction,
 } from '../services/account-store.js';
 import {
   hasPremiumEntitlement,
@@ -43,7 +44,17 @@ import {
   isAppStoreBillingConfigured,
   verifyAppStoreReceipt,
 } from '../services/app-store-billing.js';
+import {
+  isAppStoreServerApiConfigured,
+  resolveVerifiedTransaction,
+} from '../services/app-store-server-api.js';
 import { verifyApplePurchaseInput } from '../services/apple-iap.js';
+import type { ParsedAppleTransaction } from '../services/app-store-server-api.js';
+import {
+  grantApplePremiumForInstall,
+  afterApplePurchaseGranted,
+  parsedToGrantOptions,
+} from '../services/apple-iap-billing.js';
 import { notifyWelcomeEmailForInstall } from '../services/welcome-email-notify.js';
 
 const router = Router();
@@ -123,7 +134,9 @@ router.get('/status', (req: Request, res: Response) => {
     ),
     inAppBilling: {
       googlePlayConfigured: isGooglePlayBillingConfigured(),
-      appStoreConfigured: isAppStoreBillingConfigured(),
+      appStoreConfigured:
+        isAppStoreBillingConfigured() || isAppStoreServerApiConfigured(),
+      appStoreServerApiConfigured: isAppStoreServerApiConfigured(),
     },
     hint: tierQuotaHintRu(tier),
     premiumVoiceHint: premiumUpsellHintRu(tier),
@@ -240,6 +253,9 @@ router.post('/verify/app-store', async (req: Request, res: Response) => {
       subscriptionPlan: verified.plan,
       premiumUntil: verified.expiryTimeMs ?? undefined,
     });
+    if (verified.originalTransactionId) {
+      linkAppleOriginalTransaction(installId, verified.originalTransactionId);
+    }
     resetStoryQuotaForInstall(installId);
     void notifyWelcomeEmailForInstall({
       installId,
@@ -263,76 +279,92 @@ router.post('/verify/app-store', async (req: Request, res: Response) => {
   }
 });
 
-/** StoreKit 2 JWS verify (iOS fallback when receipt file is unavailable). */
-router.post('/apple/verify', (req: Request, res: Response) => {
+/** StoreKit 2 — server-verified when APPLE_* API keys set; else device JWS fields. */
+router.post('/apple/verify', async (req: Request, res: Response) => {
   const installId = req.installId ?? '';
   if (!installId) {
     res.status(400).json({ error: 'Missing install id' });
     return;
   }
 
-  const verified = verifyApplePurchaseInput({
-    signedTransactionInfo:
-      typeof req.body?.signedTransactionInfo === 'string'
-        ? req.body.signedTransactionInfo
-        : undefined,
-    transactionId:
-      typeof req.body?.transactionId === 'string' ? req.body.transactionId : undefined,
-    productId: typeof req.body?.productId === 'string' ? req.body.productId : undefined,
-    originalTransactionId:
-      typeof req.body?.originalTransactionId === 'string'
-        ? req.body.originalTransactionId
-        : undefined,
-    expiresDateMs:
-      typeof req.body?.expiresDateMs === 'number' ? req.body.expiresDateMs : undefined,
-    bundleId: typeof req.body?.bundleId === 'string' ? req.body.bundleId : undefined,
-    environment:
-      typeof req.body?.environment === 'string' ? req.body.environment : undefined,
-  });
-
-  if (!verified.ok || !verified.productId) {
-    res.status(400).json({
-      ok: false,
-      error: verified.error ?? 'Invalid Apple purchase',
-      code: verified.code ?? 'APPLE_VERIFY_FAILED',
+  if (!isAppStoreBillingConfigured() && !isAppStoreServerApiConfigured()) {
+    res.status(503).json({
+      error: 'App Store billing not configured on server',
+      code: 'APP_STORE_NOT_CONFIGURED',
     });
     return;
   }
 
-  const purchaseKey = verified.transactionId ?? verified.productId;
-  const plan: SubscriptionPlan = verified.productId.includes('year')
-    ? 'year'
-    : verified.productId.includes('quarter')
-      ? 'quarter'
-      : 'month';
-  const entitlement = grantPremiumSubscription(installId, {
-    months: verified.months,
-    productId: verified.productId,
-    purchaseToken: purchaseKey,
-    subscriptionMarket: 'intl',
-    billingProvider: 'app_store',
-    premiumUntil: verified.premiumUntilMs,
-    subscriptionPlan: plan,
-  });
-  resetStoryQuotaForInstall(installId);
+  try {
+    let tx: ParsedAppleTransaction;
+    if (isAppStoreServerApiConfigured()) {
+      tx = await resolveVerifiedTransaction({
+        signedTransactionInfo:
+          typeof req.body?.signedTransactionInfo === 'string'
+            ? req.body.signedTransactionInfo
+            : undefined,
+        transactionId:
+          typeof req.body?.transactionId === 'string' ? req.body.transactionId : undefined,
+        environment:
+          typeof req.body?.environment === 'string' ? req.body.environment : undefined,
+      });
+    } else {
+      const verified = verifyApplePurchaseInput({
+        signedTransactionInfo:
+          typeof req.body?.signedTransactionInfo === 'string'
+            ? req.body.signedTransactionInfo
+            : undefined,
+        transactionId:
+          typeof req.body?.transactionId === 'string' ? req.body.transactionId : undefined,
+        productId: typeof req.body?.productId === 'string' ? req.body.productId : undefined,
+        originalTransactionId:
+          typeof req.body?.originalTransactionId === 'string'
+            ? req.body.originalTransactionId
+            : undefined,
+        expiresDateMs:
+          typeof req.body?.expiresDateMs === 'number' ? req.body.expiresDateMs : undefined,
+        bundleId: typeof req.body?.bundleId === 'string' ? req.body.bundleId : undefined,
+        environment:
+          typeof req.body?.environment === 'string' ? req.body.environment : undefined,
+      });
+      if (!verified.ok || !verified.productId || !verified.transactionId) {
+        res.status(400).json({
+          ok: false,
+          error: verified.error ?? 'Invalid Apple purchase',
+          code: verified.code ?? 'APPLE_VERIFY_FAILED',
+        });
+        return;
+      }
+      tx = {
+        productId: verified.productId,
+        transactionId: verified.transactionId,
+        originalTransactionId:
+          typeof req.body?.originalTransactionId === 'string'
+            ? req.body.originalTransactionId
+            : verified.transactionId,
+        expiresDateMs: verified.premiumUntilMs ?? null,
+        environment: typeof req.body?.environment === 'string' ? req.body.environment : null,
+        revoked: false,
+      };
+    }
 
-  void notifyWelcomeEmailForInstall({
-    installId,
-    purchaseKey,
-    plan,
-    premiumUntilMs: entitlement.premiumUntil,
-    billingProvider: 'app_store',
-    explicitLang: req.body?.appLanguage,
-  });
+    const { entitlement } = grantApplePremiumForInstall(installId, tx);
+    const opts = parsedToGrantOptions(tx);
+    await afterApplePurchaseGranted(installId, tx, opts);
 
-  res.json({
-    ok: true,
-    tier: resolveUserTier(installId),
-    premium: true,
-    entitlement,
-    subscriptionMarket: 'intl',
-    hint: 'International subscription active. You can switch to Russian UI — limits stay the same.',
-  });
+    res.json({
+      ok: true,
+      tier: resolveUserTier(installId),
+      premium: true,
+      entitlement,
+      subscriptionMarket: 'intl',
+      hint: 'International subscription active. You can switch to Russian UI — limits stay the same.',
+    });
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error('[billing/apple/verify]', msg);
+    res.status(400).json({ ok: false, error: msg, code: 'APPLE_VERIFY_FAILED' });
+  }
 });
 
 /** Отвязать карту и отключить автопродление (данные привязки удаляются у нас). */

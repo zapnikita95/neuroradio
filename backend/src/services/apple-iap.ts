@@ -69,6 +69,17 @@ function isKnownProductId(productId: string): boolean {
   return APPLE_IAP_PRODUCT_IDS.includes(productId as AppleIapProductId);
 }
 
+export function isKnownAppleProductId(productId: string): boolean {
+  return isKnownProductId(productId);
+}
+
+export function planForAppleProductId(productId: string): 'month' | 'quarter' | 'year' {
+  const id = productId.toLowerCase();
+  if (id.includes('year')) return 'year';
+  if (id.includes('quarter')) return 'quarter';
+  return 'month';
+}
+
 /**
  * Validates an App Store purchase payload from StoreKit 2 on device.
  * Signature chain verification can be added later via App Store Server API.

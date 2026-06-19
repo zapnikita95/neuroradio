@@ -195,6 +195,8 @@ interface StoreFile {
   syncCodeToAccount: Record<string, string>;
   emailToAccount?: Record<string, string>;
   appleToAccount?: Record<string, string>;
+  /** App Store original_transaction_id → accountId (renewals / webhooks). */
+  appleOriginalTxnToAccount?: Record<string, string>;
   telegramToAccount?: Record<string, string>;
   pendingEmailCodes?: Record<string, PendingEmailCode>;
   pendingWebCabinetCodes?: Record<string, PendingWebCabinetCode>;
@@ -859,6 +861,104 @@ export function grantPremiumSubscription(
   if (!account) return getEntitlementForInstall(installId);
 
   applyPremium(account);
+  saveStore(store);
+  return entitlementFromAccount(account);
+}
+
+export function linkAppleOriginalTransaction(
+  installId: string,
+  originalTransactionId: string,
+): void {
+  const orig = originalTransactionId.trim();
+  if (!orig) return;
+  const store = loadStore();
+  const normalized = installId.trim().toLowerCase();
+  const accountId = store.installToAccount[normalized];
+  if (!accountId) return;
+  store.appleOriginalTxnToAccount = store.appleOriginalTxnToAccount ?? {};
+  store.appleOriginalTxnToAccount[orig] = accountId;
+  saveStore(store);
+}
+
+export function getAccountIdByAppleOriginalTransaction(
+  originalTransactionId: string,
+): string | null {
+  const orig = originalTransactionId.trim();
+  if (!orig) return null;
+  const store = loadStore();
+  return store.appleOriginalTxnToAccount?.[orig] ?? null;
+}
+
+export function applyAppleSubscriptionUpdate(options: {
+  installId: string;
+  originalTransactionId: string;
+  productId?: string;
+  months?: number;
+  premiumUntilMs?: number;
+  subscriptionPlan?: 'month' | 'quarter' | 'year';
+  purchaseToken?: string;
+  revoke?: boolean;
+}): AccountEntitlement {
+  const store = loadStore();
+  store.appleOriginalTxnToAccount = store.appleOriginalTxnToAccount ?? {};
+  const orig = options.originalTransactionId.trim();
+  let accountId = store.appleOriginalTxnToAccount[orig] ?? null;
+
+  if (!accountId && options.installId.trim()) {
+    const normalized = options.installId.trim().toLowerCase();
+    accountId = store.installToAccount[normalized] ?? null;
+    if (accountId) {
+      store.appleOriginalTxnToAccount[orig] = accountId;
+    }
+  }
+
+  if (!accountId) {
+    if (options.installId.trim() && !options.revoke) {
+      return grantPremiumSubscription(options.installId, {
+        months: options.months,
+        productId: options.productId,
+        purchaseToken: options.purchaseToken,
+        subscriptionMarket: 'intl',
+        billingProvider: 'app_store',
+        premiumUntil: options.premiumUntilMs,
+        subscriptionPlan: options.subscriptionPlan,
+      });
+    }
+    throw new Error('APPLE_ACCOUNT_NOT_LINKED');
+  }
+
+  const account = store.accountsById[accountId];
+  if (!account) throw new Error('APPLE_ACCOUNT_NOT_FOUND');
+
+  if (options.revoke) {
+    account.premiumUntil = Math.min(account.premiumUntil ?? 0, Date.now());
+    if ((account.premiumUntil ?? 0) <= Date.now()) {
+      account.plan = 'free';
+    }
+    account.autoRenew = false;
+    saveStore(store);
+    return entitlementFromAccount(account);
+  }
+
+  const months = Math.max(1, options.months ?? 1);
+  const base = Math.max(Date.now(), account.premiumUntil ?? 0);
+  account.plan = 'premium';
+  account.premiumUntil =
+    options.premiumUntilMs != null && options.premiumUntilMs > base
+      ? options.premiumUntilMs
+      : base + months * PREMIUM_MS_MONTH;
+  if (options.productId) account.premiumProductId = options.productId;
+  if (options.subscriptionPlan) account.subscriptionPlan = options.subscriptionPlan;
+  account.subscriptionMarket = 'intl';
+  account.billingProvider = 'app_store';
+  account.autoRenew = true;
+  if (options.purchaseToken) {
+    account.purchaseTokenHash = crypto
+      .createHash('sha256')
+      .update(options.purchaseToken)
+      .digest('hex');
+  }
+  store.appleOriginalTxnToAccount[orig] = accountId;
   saveStore(store);
   return entitlementFromAccount(account);
 }
@@ -1900,6 +2000,10 @@ export async function deleteAccountForInstall(
   }
   if (account.appleSub?.trim()) {
     delete store.appleToAccount[account.appleSub.trim()];
+  }
+  store.appleOriginalTxnToAccount = store.appleOriginalTxnToAccount ?? {};
+  for (const [orig, aid] of Object.entries(store.appleOriginalTxnToAccount)) {
+    if (aid === accountId) delete store.appleOriginalTxnToAccount[orig];
   }
   if (account.telegramId) {
     delete store.telegramToAccount[String(account.telegramId)];

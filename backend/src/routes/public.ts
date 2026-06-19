@@ -25,6 +25,7 @@ import {
   unlinkCardViaWebCabinet,
 } from '../services/account-store.js';
 import { getChartHarvestStatus } from '../services/weekly-chart-harvest.js';
+import { handleAppStoreServerNotification } from '../services/apple-iap-billing.js';
 
 const router = Router();
 
@@ -236,6 +237,28 @@ router.post('/yookassa/webhook', async (req: Request, res: Response) => {
 
 router.get('/yookassa/webhook', (_req, res: Response) => {
   res.json({ ok: true, message: 'YooKassa webhook endpoint active' });
+});
+
+/** App Store Server Notifications V2 — renewals, refunds (no app auth). */
+router.post('/app-store/notifications', (req: Request, res: Response) => {
+  const signedPayload =
+    typeof req.body?.signedPayload === 'string' ? req.body.signedPayload.trim() : '';
+  if (!signedPayload) {
+    res.status(400).json({ ok: false, error: 'signedPayload required' });
+    return;
+  }
+  try {
+    const result = handleAppStoreServerNotification(signedPayload);
+    res.json({ ok: true, ...result });
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error('[app-store/notifications]', msg);
+    res.status(400).json({ ok: false, error: msg });
+  }
+});
+
+router.get('/app-store/notifications', (_req, res: Response) => {
+  res.json({ ok: true, message: 'App Store Server Notifications endpoint active' });
 });
 
 /** Код на email для личного кабинета на сайте (отвязка карты ЮKassa). */
