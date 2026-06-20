@@ -14,4 +14,14 @@ const q = validateStoryScript(queenStory, undefined, 'Queen', 'I Want To Break F
 console.log('validate template closing=', q);
 if (q.ok || !/template closing|hard reject/i.test(q.reason)) failed++;
 
+const staleRadio =
+  'В студии сомневались, но сингл всё равно вышел в ротацию. Такой факт в эфир не выкинешь — слушатели сразу цепляются.';
+const staleQ = validateStoryScript(staleRadio, undefined, 'Queen', 'Bohemian Rhapsody', {
+  referenceFacts: ['Bohemian Rhapsody was recorded by Queen.'],
+  skipPersonaCliches: true,
+  speakTrackNamesInVoiceover: true,
+});
+console.log('validate stale radio closing=', staleQ);
+if (staleQ.ok || !/stale radio closing/i.test(staleQ.reason)) failed++;
+
 process.exit(failed > 0 ? 1 : 0);

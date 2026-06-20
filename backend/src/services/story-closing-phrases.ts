@@ -28,12 +28,16 @@ const CLOSING_POOLS: Record<Exclude<StoryNarratorId, 'auto'>, string[]> = {
     'С этой предысторией механика трека читается на слух.',
   ],
   radio_host: [
-    'Такой факт в эфир не выкинешь — слушатели сразу цепляются.',
     'Именно поэтому этот сингл годами не сходил с ротации.',
-    'С этим контекстом понятно, почему линия поддержки не молчала.',
+    'С таким фактом ведущий не рискует — аудитория дослушивает до конца.',
+    'На линии поддержки такие истории разбирают дольше обычного.',
     'Такие детали и объясняют, почему его ставили снова и снова.',
     'Именно из-за этого трек помнят дольше, чем один сезон.',
     'После такой детали понятно, за что его не вырезали из эфира.',
+    'В эфире такие повороты не откладывают — слишком много реакции в студии.',
+    'Суфлёр на таком факте не экономит слов — история сама тянет эфир.',
+    'Редко какой факт так держит внимание — этот как раз из таких.',
+    'С этим контекстом понятно, почему линия поддержки не молчала.',
   ],
   backstage: [
     'На прослушивании такие детали сразу отличают хит от проходного сингла.',
@@ -78,7 +82,22 @@ const CLOSING_OVERUSE_MARKERS: RegExp[] = [
   /не\s+как\s+филлер/i,
   /а\s+как\s+событие/i,
   /отделяют\s+хит\s+от/i,
+  /в\s+эфир\s+не\s+выкинешь/i,
+  /слушател(?:и|ей)\s+сразу\s+цепл/i,
+  /такой\s+факт\s+в\s+эфир/i,
 ];
+
+/** Дословные штампы финала — никогда не подсказывать модели и отклонять в quality gate. */
+export const STALE_CLOSING_CLICHE_PATTERNS: RegExp[] = [
+  /в\s+эфир\s+не\s+выкинешь/i,
+  /слушател(?:и|ей)\s+сразу\s+цепл/i,
+  /такой\s+факт\s+в\s+эфир\s+не/i,
+];
+
+export function isStaleClosingCliche(script: string): boolean {
+  const tail = script.trim().slice(-220);
+  return STALE_CLOSING_CLICHE_PATTERNS.some((p) => p.test(tail));
+}
 
 function closingPhraseOverused(phrase: string, previousScripts: string[]): boolean {
   if (previousScripts.some((s) => scriptSimilarity(s, phrase) > 0.42)) return true;
@@ -95,7 +114,11 @@ export function pickClosingPhraseHint(
 ): string {
   const key = narratorId === 'auto' ? 'contemporary' : narratorId;
   const basePool = CLOSING_POOLS[key];
-  let pool = basePool.filter((phrase) => !closingPhraseOverused(phrase, previousScripts));
+  let pool = basePool.filter(
+    (phrase) =>
+      !closingPhraseOverused(phrase, previousScripts) &&
+      !STALE_CLOSING_CLICHE_PATTERNS.some((p) => p.test(phrase)),
+  );
   if (pool.length === 0) pool = basePool;
   const idx =
     hashSeed(`${key}|${artist.trim().toLowerCase()}|${title.trim().toLowerCase()}|${previousScripts.length}`) %
@@ -121,6 +144,7 @@ export function buildClosingPhrasePromptBlock(
 - Вариант для этого трека: «${hint}»
 - Другие уместные финалы для твоего амплуа (чередуй; ЗАПРЕЩЕНО: «мурашки», «ощущение эпохи», «вступление», «джингл», «первые секунды/ноты» — если уже были в прошлых рассказах):
 ${alts}
+- Мысль «факт слишком сильный для эфира / слушатели не отворачиваются» — ОК, но каждый раз НОВЫМИ словами. ЗАПРЕЩЕНО дословно и почти дословно: «Такой факт в эфир не выкинешь — слушатели сразу цепляются» и любые вариации с «не выкинешь» + «цепляются».
 - ЗАПРЕЩЁН шаблон «ради чего … оставался после смены / задерживался после монтажа» и любые вариации с микшёром, монтажёром, звукорежиссёром.
 - ЗАПРЕЩЕНО: «После такой истории трек звучит не как filler/филлер», «не как filler, а как событие», «отделяют хит от filler» — шаблон из старых выпусков; финал каждый раз новый.
 - ЗАПРЕЩЕНО заканчивать реакцией на «вступление», «начало», «первые секунды» — если в семени нет intro/opening.

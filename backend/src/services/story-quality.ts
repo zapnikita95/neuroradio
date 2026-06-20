@@ -23,6 +23,7 @@ import { fixTtsGrammarIssues } from './tts-grammar-fixes.js';
 import { isVoiceoverWithoutTrackNames, scriptLeaksVoiceoverNames } from './voiceover-no-names.js';
 import { primaryArtistName } from './artist-primary.js';
 import { resolveStoryNarrator, type StoryNarratorId } from './story-narrator.js';
+import { isStaleClosingCliche } from './story-closing-phrases.js';
 
 export { DEFAULT_STORY_LENGTH, getStoryLengthPreset };
 export type { StoryLengthId, StoryLengthPreset };
@@ -789,6 +790,13 @@ export function validateStoryScript(
   const templateClosing = /После такой истории\s+трек\s+звучит|звучит\s+не\s+как\s+(?:filler|филлер)|отделяют\s+хит\s+от\s+(?:filler|филлер)/i;
   if (templateClosing.test(trimmed)) {
     return { ok: false, reason: 'template closing phrase — write a fresh reaction to the seed fact' };
+  }
+  if (isStaleClosingCliche(trimmed)) {
+    return {
+      ok: false,
+      reason:
+        'stale radio closing cliché — keep the idea (strong fact for air) but rephrase in fresh words',
+    };
   }
   if (
     previousScripts.some((prev) => templateClosing.test(prev)) &&
