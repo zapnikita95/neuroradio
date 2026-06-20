@@ -51,6 +51,7 @@
     "seed:status": "node scripts/bulk-seed-status.mjs",
     "bank:refresh-scores": "npm run build && node scripts/refresh-bank-scores.mjs",
     "test:bulk-narrative": "npm run build && node scripts/test-bulk-narrative-gate.mjs",
+    "audit:reject-resim": "npm run build && node scripts/audit-reject-resim.mjs",
     "harvest:charts": "npm run build && node scripts/weekly-chart-harvest.mjs",
     "harvest:charts:dry": "npm run build && node scripts/weekly-chart-harvest.mjs --dry-run",
     "harvest:charts:status": "npm run build && node scripts/chart-harvest-status.mjs",
