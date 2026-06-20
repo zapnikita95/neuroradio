@@ -48,6 +48,18 @@
     <priority>0.3</priority>
   </url>
   <url>
+    <loc>https://www.efir-ai.ru/docs/privacy-en.html</loc>
+    <lastmod>2026-06-20</lastmod>
+    <changefreq>yearly</changefreq>
+    <priority>0.3</priority>
+  </url>
+  <url>
+    <loc>https://www.efir-ai.ru/docs/terms-en.html</loc>
+    <lastmod>2026-06-20</lastmod>
+    <changefreq>yearly</changefreq>
+    <priority>0.3</priority>
+  </url>
+  <url>
     <loc>https://www.efir-ai.ru/docs/terms.html</loc>
     <lastmod>2026-06-07</lastmod>
     <changefreq>yearly</changefreq>

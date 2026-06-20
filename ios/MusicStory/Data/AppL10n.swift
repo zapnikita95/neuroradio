@@ -248,8 +248,8 @@ struct AppL10n {
     var billingTermsOfUse: String { en ? "Terms of Use (EULA)" : "Пользовательское соглашение (EULA)" }
     var billingLegalLinksHint: String {
         en
-            ? "Privacy Policy and Terms of Use (EULA):"
-            : "Политика конфиденциальности и пользовательское соглашение (EULA):"
+            ? "Before subscribing, review our:"
+            : "Перед оформлением подписки ознакомьтесь с:"
     }
     var settingsSubscriptionSection: String { en ? "Subscription" : "Подписка" }
     var settingsSubscriptionSummary: String {

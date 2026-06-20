@@ -256,6 +256,8 @@ struct AccountView: View {
                 }
             }
 
+            subscriptionPurchaseLegalBlock
+
             PrimaryStoryButton(
                 title: isPurchasing ? copy.billingProcessing : copy.billingSubscribe,
                 loading: isPurchasing
@@ -294,44 +296,45 @@ struct AccountView: View {
             Text(copy.billingAppStoreHint)
                 .font(.caption)
                 .foregroundStyle(AppTheme.mutedLavender)
-
-            Text(copy.billingAppStoreLegal)
-                .font(.caption2)
-                .foregroundStyle(AppTheme.mutedLavender)
-
-            subscriptionLegalLinks
         }
     }
 
-    private var subscriptionLegalLinks: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text(copy.billingLegalLinksHint)
-                .font(.caption)
-                .foregroundStyle(AppTheme.mutedLavender)
+    private var subscriptionPurchaseLegalBlock: some View {
+        GlassCard {
+            VStack(alignment: .leading, spacing: 10) {
+                Text(copy.billingAppStoreLegal)
+                    .font(.caption2)
+                    .foregroundStyle(AppTheme.mutedLavender)
 
-            HStack(spacing: 16) {
-                Button {
-                    openURL(AppLegalURLs.privacyPolicy)
-                } label: {
-                    Text(copy.billingPrivacyPolicy)
-                        .font(.caption.weight(.semibold))
-                        .underline()
-                        .foregroundStyle(AppTheme.accentViolet)
-                }
-                .buttonStyle(.plain)
+                Text(copy.billingLegalLinksHint)
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(AppTheme.creamText)
 
-                Button {
-                    openURL(AppLegalURLs.termsOfUse)
-                } label: {
-                    Text(copy.billingTermsOfUse)
-                        .font(.caption.weight(.semibold))
-                        .underline()
-                        .foregroundStyle(AppTheme.accentViolet)
+                HStack(spacing: 16) {
+                    subscriptionLegalLink(
+                        title: copy.billingPrivacyPolicy,
+                        url: AppLegalURLs.privacyPolicy(for: settings.resolvedLanguage)
+                    )
+                    subscriptionLegalLink(
+                        title: copy.billingTermsOfUse,
+                        url: AppLegalURLs.termsOfUse(for: settings.resolvedLanguage)
+                    )
                 }
-                .buttonStyle(.plain)
             }
         }
-        .padding(.top, 4)
+    }
+
+    private func subscriptionLegalLink(title: String, url: URL) -> some View {
+        Button {
+            openURL(url)
+        } label: {
+            Text(title)
+                .font(.caption.weight(.semibold))
+                .underline()
+                .foregroundStyle(AppTheme.accentViolet)
+                .multilineTextAlignment(.leading)
+        }
+        .buttonStyle(.plain)
     }
 
     private func billingFeatureRow(_ text: String) -> some View {

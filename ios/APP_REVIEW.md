@@ -4,8 +4,8 @@
 
 В приложении (вкладка **Subscription** / **Подписка**) должны быть **кликабельные** ссылки:
 
-- Privacy Policy: https://www.efir-ai.ru/docs/privacy.html
-- Terms of Use (EULA): https://www.efir-ai.ru/docs/terms.html
+- Privacy Policy: https://www.efir-ai.ru/docs/privacy.html (RU) / https://www.efir-ai.ru/docs/privacy-en.html (EN)
+- Terms of Use (EULA): https://www.efir-ai.ru/docs/terms.html (RU) / https://www.efir-ai.ru/docs/terms-en.html (EN)
 
 На каждом плане: название (Extended · Month / Quarter / Year), длина периода, цена.
 

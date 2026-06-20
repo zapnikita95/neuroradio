@@ -33,8 +33,18 @@ private func friendlyNetworkMessage(_ error: Error) -> String {
 }
 
 enum AppLegalURLs {
-    static let privacyPolicy = URL(string: "https://www.efir-ai.ru/docs/privacy.html")!
-    static let termsOfUse = URL(string: "https://www.efir-ai.ru/docs/terms.html")!
+    static let privacyPolicyRU = URL(string: "https://www.efir-ai.ru/docs/privacy.html")!
+    static let privacyPolicyEN = URL(string: "https://www.efir-ai.ru/docs/privacy-en.html")!
+    static let termsOfUseRU = URL(string: "https://www.efir-ai.ru/docs/terms.html")!
+    static let termsOfUseEN = URL(string: "https://www.efir-ai.ru/docs/terms-en.html")!
+
+    static func privacyPolicy(for lang: ResolvedAppLanguage) -> URL {
+        lang == .en ? privacyPolicyEN : privacyPolicyRU
+    }
+
+    static func termsOfUse(for lang: ResolvedAppLanguage) -> URL {
+        lang == .en ? termsOfUseEN : termsOfUseRU
+    }
 }
 
 enum BackendURL {
