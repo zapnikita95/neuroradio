@@ -1,5 +1,33 @@
 # App Store Review — заметки для повторной отправки
 
+## Guideline 3.1.2(c) — подписки: Privacy + EULA
+
+В приложении (вкладка **Subscription** / **Подписка**) должны быть **кликабельные** ссылки:
+
+- Privacy Policy: https://www.efir-ai.ru/docs/privacy.html
+- Terms of Use (EULA): https://www.efir-ai.ru/docs/terms.html
+
+На каждом плане: название (Extended · Month / Quarter / Year), длина периода, цена.
+
+### App Store Connect (метаданные, вручную)
+
+1. **App Information → Privacy Policy URL**: `https://www.efir-ai.ru/docs/privacy.html`
+2. **Description** (или custom EULA): добавить строку  
+   `Terms of Use (EULA): https://www.efir-ai.ru/docs/terms.html`
+3. Либо загрузить custom EULA в поле **EULA** в ASC.
+
+### Текст ответа Apple (англ.)
+
+```
+Guideline 3.1.2(c): The Subscription screen now includes functional links to our Privacy Policy
+(https://www.efir-ai.ru/docs/privacy.html) and Terms of Use (EULA)
+(https://www.efir-ai.ru/docs/terms.html). Each auto-renewable plan shows the product title
+(Extended · Month / Quarter / Year), subscription length, and price before purchase.
+
+App Store metadata: Privacy Policy URL is set in App Store Connect; Terms of Use (EULA) link
+is included in the app description.
+```
+
 ## Guideline 2.1(b) — In-App Purchases (обязательно перед ревью)
 
 Apple отклоняет, если IAP **не отправлены на ревью** или кнопка «Оформить подписку» падает с ошибкой.
@@ -25,15 +53,22 @@ Apple отклоняет, если IAP **не отправлены на ревь
 
 ```
 In-App Purchase subscriptions are configured and submitted for review:
-- premium_month_usd
-- efir_premium_quarter_usd
-- efir_premium_year_usd
+- premium_month_usd (Extended · Month)
+- efir_premium_quarter_usd (Extended · Quarter)
+- efir_premium_year_usd (Extended · Year)
 
 Each product includes the required App Review screenshot (Subscription tab in the app).
 Paid Apps Agreement is active.
 
-To test: Profile → Subscription tab → tap "Оформить подписку" / subscribe.
-Sandbox purchase is verified via StoreKit 2 on device (no login required for IAP sheet).
+How to find subscriptions in the app (no login required):
+1. Open the app and complete or skip onboarding.
+2. On the main screen, tap the profile icon (person circle) in the top-right corner.
+   Alternatively: tap the gear icon → Settings → "View plans and subscribe".
+3. The Subscription tab opens by default (segment "Subscription" / "Подписка").
+4. Choose Month, Quarter, or Year, then tap "Subscribe" / "Оформить подписку".
+5. The App Store purchase sheet appears (sandbox IAP).
+
+Sandbox purchase is verified via StoreKit 2 on device.
 For full premium without purchase, use demo account appletester@test.ru + OTP 000000.
 ```
 

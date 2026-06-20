@@ -49,11 +49,6 @@ final class StoreKitManager: ObservableObject {
         }
     }
 
-    func displayPrice(forPlan plan: String) -> String? {
-        let productId = PlayProductIds.id(forPlan: plan)
-        return products.first(where: { $0.id == productId })?.displayPrice
-    }
-
     func purchase(plan: String) async -> Bool {
         let productId = PlayProductIds.id(forPlan: plan)
         if products.isEmpty { await loadProducts() }
@@ -77,6 +72,31 @@ final class StoreKitManager: ObservableObject {
             @unknown default:
                 return false
             }
+        } catch {
+            lastError = error.localizedDescription
+            return false
+        }
+    }
+
+    func displayPrice(forPlan plan: String) -> String? {
+        let productId = PlayProductIds.id(forPlan: plan)
+        return products.first(where: { $0.id == productId })?.displayPrice
+    }
+
+    func restorePurchases() async -> Bool {
+        lastError = nil
+        do {
+            try await AppStore.sync()
+            var restored = false
+            for await result in Transaction.currentEntitlements {
+                if case .verified(let transaction) = result {
+                    if PlayProductIds.all.contains(transaction.productID),
+                       await verifyOnServer(transaction: transaction) {
+                        restored = true
+                    }
+                }
+            }
+            return restored
         } catch {
             lastError = error.localizedDescription
             return false

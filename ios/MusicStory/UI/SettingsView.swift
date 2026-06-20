@@ -14,6 +14,7 @@ struct SettingsView: View {
     @State private var manualTitle: String = ""
 
     @State private var manualStoryLoading = false
+    @State private var showSubscription = false
 
     private var lang: ResolvedAppLanguage { settings.resolvedLanguage }
     private var copy: AppL10n { AppStrings.l10n(lang) }
@@ -42,6 +43,7 @@ struct SettingsView: View {
         MusicStoryBackground {
             ScrollView {
                 VStack(alignment: .leading, spacing: 16) {
+                    subscriptionSection
                     languageSection
                     generalSection
                     modeSection
@@ -79,6 +81,23 @@ struct SettingsView: View {
         .task {
             await StoryRepository.shared.refreshQuota()
             _ = await AccountAuthManager.shared.fetchProfile()
+        }
+        .navigationDestination(isPresented: $showSubscription) {
+            AccountView(initialTab: .subscription)
+        }
+    }
+
+    private var subscriptionSection: some View {
+        SettingsSection(
+            title: copy.settingsSubscriptionSection,
+            summary: copy.settingsSubscriptionSummary
+        ) {
+            Text(copy.billingIntro)
+                .font(.footnote)
+                .foregroundStyle(AppTheme.mutedLavender)
+            PrimaryStoryButton(title: copy.settingsOpenSubscription) {
+                showSubscription = true
+            }
         }
     }
 

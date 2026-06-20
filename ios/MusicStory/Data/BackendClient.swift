@@ -32,6 +32,11 @@ private func friendlyNetworkMessage(_ error: Error) -> String {
     return error.localizedDescription
 }
 
+enum AppLegalURLs {
+    static let privacyPolicy = URL(string: "https://www.efir-ai.ru/docs/privacy.html")!
+    static let termsOfUse = URL(string: "https://www.efir-ai.ru/docs/terms.html")!
+}
+
 enum BackendURL {
     /// Прод BFF (LE E7, *.up.railway.app).
     static let production = "https://music-story-production.up.railway.app"

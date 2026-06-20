@@ -1,7 +1,7 @@
 import SwiftUI
 import StoreKit
 
-private enum AccountScreenTab: Hashable {
+enum AccountScreenTab: Hashable {
     case account
     case subscription
 }
@@ -9,6 +9,7 @@ private enum AccountScreenTab: Hashable {
 private struct BillingPlanOption: Identifiable {
     let id: String
     let title: String
+    let duration: String
     let price: String
     let oldPrice: String?
     let badge: String?
@@ -16,7 +17,10 @@ private struct BillingPlanOption: Identifiable {
 }
 
 struct AccountView: View {
+    var initialTab: AccountScreenTab = .subscription
+
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.openURL) private var openURL
     @EnvironmentObject private var settings: SettingsStore
     @StateObject private var storeKit = StoreKitManager.shared
 
@@ -24,9 +28,10 @@ struct AccountView: View {
     @State private var profile: AccountProfile?
     @State private var loadError: String?
     @State private var showLogin = false
-    @State private var selectedTab: AccountScreenTab = .account
+    @State private var selectedTab: AccountScreenTab
     @State private var selectedPlan = "quarter"
     @State private var isPurchasing = false
+    @State private var isRestoring = false
     @State private var isDeletingAccount = false
     @State private var showDeleteConfirm = false
     @State private var billingMessage: String?
@@ -34,6 +39,11 @@ struct AccountView: View {
     @State private var accountMessage: String?
 
     private var copy: AppL10n { AppStrings.l10n(settings.resolvedLanguage) }
+
+    init(initialTab: AccountScreenTab = .subscription) {
+        self.initialTab = initialTab
+        _selectedTab = State(initialValue: initialTab)
+    }
 
     private var plans: [BillingPlanOption] {
         let monthPrice = storeKit.displayPrice(forPlan: "month") ?? "$3.99"
@@ -43,6 +53,7 @@ struct AccountView: View {
             BillingPlanOption(
                 id: "month",
                 title: copy.billingPlanMonth,
+                duration: copy.billingPlanMonthDuration,
                 price: monthPrice,
                 oldPrice: nil,
                 badge: nil,
@@ -51,6 +62,7 @@ struct AccountView: View {
             BillingPlanOption(
                 id: "quarter",
                 title: copy.billingPlanQuarter,
+                duration: copy.billingPlanQuarterDuration,
                 price: quarterPrice,
                 oldPrice: "$11.97",
                 badge: nil,
@@ -59,6 +71,7 @@ struct AccountView: View {
             BillingPlanOption(
                 id: "year",
                 title: copy.billingPlanYear,
+                duration: copy.billingPlanYearDuration,
                 price: yearPrice,
                 oldPrice: "$47.88",
                 badge: copy.billingBestValue,
@@ -250,6 +263,19 @@ struct AccountView: View {
                 Task { await purchase() }
             }
 
+            Button {
+                Task { await restorePurchases() }
+            } label: {
+                Text(copy.billingRestorePurchases)
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(AppTheme.accentViolet)
+            }
+            .disabled(isRestoring || isPurchasing)
+
+            if isRestoring {
+                ProgressView().tint(AppTheme.accentViolet)
+            }
+
             if let billingMessage {
                 Text(billingMessage)
                     .font(.footnote)
@@ -272,7 +298,40 @@ struct AccountView: View {
             Text(copy.billingAppStoreLegal)
                 .font(.caption2)
                 .foregroundStyle(AppTheme.mutedLavender)
+
+            subscriptionLegalLinks
         }
+    }
+
+    private var subscriptionLegalLinks: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(copy.billingLegalLinksHint)
+                .font(.caption)
+                .foregroundStyle(AppTheme.mutedLavender)
+
+            HStack(spacing: 16) {
+                Button {
+                    openURL(AppLegalURLs.privacyPolicy)
+                } label: {
+                    Text(copy.billingPrivacyPolicy)
+                        .font(.caption.weight(.semibold))
+                        .underline()
+                        .foregroundStyle(AppTheme.accentViolet)
+                }
+                .buttonStyle(.plain)
+
+                Button {
+                    openURL(AppLegalURLs.termsOfUse)
+                } label: {
+                    Text(copy.billingTermsOfUse)
+                        .font(.caption.weight(.semibold))
+                        .underline()
+                        .foregroundStyle(AppTheme.accentViolet)
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .padding(.top, 4)
     }
 
     private func billingFeatureRow(_ text: String) -> some View {
@@ -320,6 +379,22 @@ struct AccountView: View {
         }
     }
 
+    private func restorePurchases() async {
+        billingError = nil
+        billingMessage = nil
+        isRestoring = true
+        defer { isRestoring = false }
+
+        let ok = await storeKit.restorePurchases()
+        if ok {
+            billingMessage = copy.billingRestoreSuccess
+            await StoryRepository.shared.refreshQuota()
+            await loadProfile()
+        } else {
+            billingError = storeKit.lastError ?? copy.billingRestoreNone
+        }
+    }
+
     private func deleteAccount() async {
         isDeletingAccount = true
         accountMessage = nil
@@ -357,6 +432,9 @@ private struct BillingPlanCard: View {
                     Text(plan.title)
                         .font(.headline)
                         .foregroundStyle(AppTheme.creamText)
+                    Text(plan.duration)
+                        .font(.caption)
+                        .foregroundStyle(AppTheme.mutedLavender)
                     if let hint = plan.perMonthHint {
                         Text(hint)
                             .font(.caption)

@@ -177,6 +177,13 @@ struct AppL10n {
     }
     var billingPlansHeading: String { en ? "Choose billing period" : "Выберите период" }
     var billingSubscribe: String { en ? "Subscribe" : "Оформить подписку" }
+    var billingRestorePurchases: String { en ? "Restore Purchases" : "Восстановить покупки" }
+    var billingRestoreNone: String {
+        en ? "No active subscription found for this Apple ID" : "Активная подписка для этого Apple ID не найдена"
+    }
+    var billingRestoreSuccess: String {
+        en ? "Subscription restored" : "Подписка восстановлена"
+    }
     var billingProcessing: String { "…" }
     var billingSuccess: String { en ? "Subscription activated" : "Подписка активирована" }
     var billingEmailRequired: String {
@@ -224,10 +231,33 @@ struct AppL10n {
     var billingPremiumFeature4: String {
         en ? "Sync across devices" : "Синхронизация между устройствами"
     }
-    var billingPlanMonth: String { en ? "Month" : "Месяц" }
-    var billingPlanQuarter: String { en ? "Quarter" : "Квартал" }
-    var billingPlanYear: String { en ? "Year" : "Год" }
+    var billingPlanMonth: String { en ? "Extended · Month" : "Расширенный · Месяц" }
+    var billingPlanQuarter: String { en ? "Extended · Quarter" : "Расширенный · Квартал" }
+    var billingPlanYear: String { en ? "Extended Year USD" : "Расширенный · Год" }
+    var billingPlanMonthDuration: String {
+        en ? "1 month, auto-renewing" : "1 месяц, автопродление"
+    }
+    var billingPlanQuarterDuration: String {
+        en ? "3 months, auto-renewing" : "3 месяца, автопродление"
+    }
+    var billingPlanYearDuration: String {
+        en ? "1 year, auto-renewing" : "1 год, автопродление"
+    }
     var billingBestValue: String { en ? "Best value" : "Выгоднее всего" }
+    var billingPrivacyPolicy: String { en ? "Privacy Policy" : "Политика конфиденциальности" }
+    var billingTermsOfUse: String { en ? "Terms of Use (EULA)" : "Пользовательское соглашение (EULA)" }
+    var billingLegalLinksHint: String {
+        en
+            ? "Privacy Policy and Terms of Use (EULA):"
+            : "Политика конфиденциальности и пользовательское соглашение (EULA):"
+    }
+    var settingsSubscriptionSection: String { en ? "Subscription" : "Подписка" }
+    var settingsSubscriptionSummary: String {
+        en ? "Extended plan — App Store" : "Тариф «Расширенный» — App Store"
+    }
+    var settingsOpenSubscription: String {
+        en ? "View plans and subscribe" : "Тарифы и оформление подписки"
+    }
 }
 
 extension StoryRepository {
