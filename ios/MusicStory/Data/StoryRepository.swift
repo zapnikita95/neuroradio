@@ -55,12 +55,13 @@ final class StoryRepository: ObservableObject {
             previousScripts: previousScripts,
             storyLength: settings.storyLength.rawValue,
             storyNarrator: settings.storyNarrator.rawValue,
-            ttsVoice: settings.ttsVoice.rawValue,
+            ttsVoice: settings.storyTtsVoiceRequest,
             ttsSpeed: settings.ttsSpeedPreset.yandexSpeed,
             ttsEmotion: settings.ttsEmotion.rawValue,
             clientPlatform: "ios",
             ttsProvider: settings.storyTtsProviderRequest,
-            edgeVoicePreset: settings.edgeVoicePreset.rawValue,
+            edgeVoicePreset: settings.storyEdgeVoicePresetRequest,
+            elevenLabsVoice: settings.storyElevenLabsVoiceRequest,
             speakTrackNamesInVoiceover: settings.speakTrackNamesInVoiceover,
             lang: lang.apiCode
         )

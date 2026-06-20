@@ -115,7 +115,12 @@ extension TtsVoice {
 
 extension ServerTtsProvider {
     func uiLabel(_ lang: ResolvedAppLanguage) -> String {
-        labelRu
+        guard lang == .en else { return labelRu }
+        switch self {
+        case .edge: return "Microsoft Edge"
+        case .yandex: return "Yandex SpeechKit"
+        case .elevenlabs: return "ElevenLabs"
+        }
     }
 
     func uiDescription(_ lang: ResolvedAppLanguage) -> String {
@@ -123,6 +128,7 @@ extension ServerTtsProvider {
         switch self {
         case .edge: return "Neural Edge voices"
         case .yandex: return "Professional SpeechKit voiceover"
+        case .elevenlabs: return "Premium neural voices for English stories"
         }
     }
 }
@@ -131,22 +137,22 @@ extension EdgeVoicePreset {
     func uiLabel(_ lang: ResolvedAppLanguage) -> String {
         guard lang == .en else { return labelRu }
         switch self {
-        case .dmitryCalm: return "Dmitry — calm"
-        case .svetlanaCalm: return "Svetlana — calm"
-        case .dmitryLively: return "Dmitry — lively"
-        case .svetlanaLively: return "Svetlana — lively"
-        case .daria: return "Daria — soft"
+        case .dmitryCalm: return "Eric"
+        case .svetlanaCalm: return "Anna"
+        case .dmitryLively: return "Chris"
+        case .svetlanaLively: return "Aria"
+        case .daria: return "Michelle"
         }
     }
 
     func uiDescription(_ lang: ResolvedAppLanguage) -> String {
         guard lang == .en else { return descriptionRu }
         switch self {
-        case .dmitryCalm: return "Steady male Microsoft Edge voice"
-        case .svetlanaCalm: return "Neutral female Microsoft Edge voice"
-        case .dmitryLively: return "Energetic male delivery, radio-like"
-        case .svetlanaLively: return "Expressive female voice"
-        case .daria: return "Soft female Microsoft Edge tone"
+        case .dmitryCalm: return "Male · calm, steady delivery"
+        case .svetlanaCalm: return "Female · calm, neutral tone"
+        case .dmitryLively: return "Male · lively, radio-like"
+        case .svetlanaLively: return "Female · expressive, energetic"
+        case .daria: return "Female · soft, gentle tone"
         }
     }
 }

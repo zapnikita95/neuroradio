@@ -180,7 +180,9 @@ fun HomeScreen(
         effectiveTier,
     ) {
         val voicePart = when {
-            resolvedLang == ResolvedAppLanguage.EN && TierAccess.isPremiumLike(effectiveTier) ->
+            resolvedLang == ResolvedAppLanguage.EN &&
+                TierAccess.isPremiumLike(effectiveTier) &&
+                serverTtsProvider == ServerTtsProvider.ELEVENLABS ->
                 elevenLabsVoice.label(resolvedLang)
             !TierAccess.isPremiumLike(effectiveTier) || serverTtsProvider == ServerTtsProvider.EDGE ->
                 edgeVoicePreset.uiLabel(resolvedLang)

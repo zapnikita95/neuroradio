@@ -672,10 +672,12 @@ class StoryRepository(
                         previousScripts = previousScripts,
                         storyLength = storyLength.id,
                         storyNarrator = storyNarrator.id,
-                        ttsVoice = if (resolvedLang == ResolvedAppLanguage.EN) {
-                            elevenLabsVoice.id
-                        } else {
-                            ttsVoice.id
+                        ttsVoice = when {
+                            resolvedLang == ResolvedAppLanguage.EN &&
+                                TierAccess.isPremiumLike(serverTier) &&
+                                serverTtsProvider == ServerTtsProvider.ELEVENLABS ->
+                                elevenLabsVoice.id
+                            else -> ttsVoice.id
                         },
                         storyLanguage = resolvedLang.toApiCode(),
                         ttsSpeed = ttsSpeed.yandexSpeed,
@@ -696,7 +698,7 @@ class StoryRepository(
                             UserTtsBilling.SBER -> "sber"
                             UserTtsBilling.SERVER -> when {
                                 !TierAccess.isPremiumLike(serverTier) -> "edge"
-                                resolvedLang == ResolvedAppLanguage.EN -> "auto"
+                                serverTtsProvider == ServerTtsProvider.ELEVENLABS -> "elevenlabs"
                                 serverTtsProvider == ServerTtsProvider.YANDEX -> "yandex"
                                 else -> "edge"
                             }
@@ -710,7 +712,8 @@ class StoryRepository(
                         saluteAuthKey = saluteAuthKey.takeIf { userTtsBilling == UserTtsBilling.SBER && it.isNotBlank() },
                         edgeVoicePreset = edgeVoicePreset.id.takeIf {
                             userTtsBilling == UserTtsBilling.SERVER &&
-                                (!TierAccess.isPremiumLike(serverTier) || serverTtsProvider == ServerTtsProvider.EDGE)
+                                (!TierAccess.isPremiumLike(serverTier) ||
+                                    serverTtsProvider == ServerTtsProvider.EDGE)
                         },
                         speakTrackNamesInVoiceover = speakTrackNamesInVoiceover,
                         clientPlatform = "android",

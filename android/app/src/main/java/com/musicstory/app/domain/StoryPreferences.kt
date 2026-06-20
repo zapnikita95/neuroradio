@@ -88,6 +88,11 @@ enum class ServerTtsProvider(val id: String, val labelRu: String, val descriptio
         labelRu = "Yandex SpeechKit",
         descriptionRu = "Профессиональная озвучка с расширенным набором голосов",
     ),
+    ELEVENLABS(
+        id = "elevenlabs",
+        labelRu = "ElevenLabs",
+        descriptionRu = "Премиум нейросетевые голоса для английских историй",
+    ),
     ;
 
     companion object {

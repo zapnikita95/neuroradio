@@ -42,6 +42,7 @@ final class SettingsStore: ObservableObject {
         static let storyNarrator = "story_narrator"
         static let ttsVoice = "tts_voice"
         static let edgeVoicePreset = "edge_voice_preset"
+        static let elevenLabsVoice = "elevenlabs_voice"
         static let storyLength = "story_length"
         static let accountProfile = "account_profile_json"
         static let offlineAudioCacheEnabled = "offline_audio_cache_enabled"
@@ -131,6 +132,10 @@ final class SettingsStore: ObservableObject {
         didSet { defaults.set(edgeVoicePreset.rawValue, forKey: Keys.edgeVoicePreset) }
     }
 
+    @Published var elevenLabsVoice: ElevenLabsVoice {
+        didSet { defaults.set(elevenLabsVoice.rawValue, forKey: Keys.elevenLabsVoice) }
+    }
+
     @Published var storyLength: StoryLength {
         didSet { defaults.set(storyLength.rawValue, forKey: Keys.storyLength) }
     }
@@ -208,6 +213,7 @@ final class SettingsStore: ObservableObject {
         storyNarrator = StoryNarrator.fromId(defaults.string(forKey: Keys.storyNarrator))
         ttsVoice = TtsVoice.fromId(defaults.string(forKey: Keys.ttsVoice))
         edgeVoicePreset = EdgeVoicePreset.fromId(defaults.string(forKey: Keys.edgeVoicePreset))
+        elevenLabsVoice = ElevenLabsVoice.fromId(defaults.string(forKey: Keys.elevenLabsVoice))
         storyLength = StoryLength.fromId(defaults.string(forKey: Keys.storyLength))
         serverTtsProvider = ServerTtsProvider.fromId(defaults.string(forKey: Keys.serverTtsProvider))
         serverTier = defaults.string(forKey: Keys.serverTier)
@@ -370,11 +376,30 @@ final class SettingsStore: ObservableObject {
         hasPremiumTtsAccess ? serverTtsProvider : .edge
     }
 
-    /// Что уходит в `tts_provider` на BFF — premium не должен слать Edge по ошибке.
+    /// Что уходит в `tts_provider` на BFF.
     var storyTtsProviderRequest: String {
         guard hasPremiumTtsAccess else { return "edge" }
-        if resolvedLanguage == .en { return "auto" }
-        if serverTtsProvider == .edge { return "auto" }
-        return serverTtsProvider.rawValue
+        switch serverTtsProvider {
+        case .edge: return "edge"
+        case .yandex: return "yandex"
+        case .elevenlabs: return "elevenlabs"
+        }
+    }
+
+    var storyTtsVoiceRequest: String {
+        if resolvedLanguage == .en, hasPremiumTtsAccess, serverTtsProvider == .elevenlabs {
+            return elevenLabsVoice.rawValue
+        }
+        return ttsVoice.rawValue
+    }
+
+    var storyEdgeVoicePresetRequest: String? {
+        guard hasPremiumTtsAccess else { return edgeVoicePreset.rawValue }
+        return serverTtsProvider == .edge ? edgeVoicePreset.rawValue : nil
+    }
+
+    var storyElevenLabsVoiceRequest: String? {
+        guard resolvedLanguage == .en, hasPremiumTtsAccess, serverTtsProvider == .elevenlabs else { return nil }
+        return elevenLabsVoice.rawValue
     }
 }

@@ -588,21 +588,27 @@ fun SettingsScreen(
     val isFreeServerTier = TierAccess.isFreeServerTier(effectiveTier)
     val effectiveServerTtsProvider = if (isFreeServerTier) ServerTtsProvider.EDGE else serverTtsProviderUi
     val resolvedDraftLang = resolveAppLanguage(appLanguageUi)
-    val showElevenLabsVoices = resolvedDraftLang == ResolvedAppLanguage.EN && isPaidServerTier
-    val serverUsesEdge = userTtsBillingUi == UserTtsBilling.SERVER &&
-        effectiveServerTtsProvider == ServerTtsProvider.EDGE && !showElevenLabsVoices
+    val serverTtsProviderOptions = remember(resolvedDraftLang, isPaidServerTier) {
+        if (!isPaidServerTier) emptyList()
+        else when (resolvedDraftLang) {
+            ResolvedAppLanguage.EN ->
+                listOf(ServerTtsProvider.EDGE, ServerTtsProvider.ELEVENLABS, ServerTtsProvider.YANDEX)
+            else -> ServerTtsProvider.entries.filter { it != ServerTtsProvider.ELEVENLABS }
+        }
+    }
     val showServerTtsProviderChoice =
-        userTtsBillingUi == UserTtsBilling.SERVER && isPaidServerTier && !showElevenLabsVoices
-    val showEdgeVoices = serverUsesEdge
-    val showYandexVoices = !showElevenLabsVoices && (
+        userTtsBillingUi == UserTtsBilling.SERVER && isPaidServerTier
+    val showEdgeVoices = userTtsBillingUi == UserTtsBilling.SERVER &&
+        effectiveServerTtsProvider == ServerTtsProvider.EDGE
+    val showElevenLabsVoices = userTtsBillingUi == UserTtsBilling.SERVER &&
+        effectiveServerTtsProvider == ServerTtsProvider.ELEVENLABS &&
+        resolvedDraftLang == ResolvedAppLanguage.EN
+    val showYandexVoices =
         (userTtsBillingUi == UserTtsBilling.YANDEX) ||
             (userTtsBillingUi == UserTtsBilling.SERVER && isPaidServerTier &&
                 effectiveServerTtsProvider == ServerTtsProvider.YANDEX)
-        )
-    val userTtsBillingOptions = remember(showElevenLabsVoices) {
-        UserTtsBilling.entries.filter {
-            it != UserTtsBilling.SBER && !(showElevenLabsVoices && it == UserTtsBilling.YANDEX)
-        }
+    val userTtsBillingOptions = remember {
+        UserTtsBilling.entries.filter { it != UserTtsBilling.SBER }
     }
 
     suspend fun applySettingsDraft(): Boolean {
@@ -1110,7 +1116,7 @@ fun SettingsScreen(
                         showElevenLabsVoices ->
                             "${elevenLabsVoiceUi.label(resolvedDraftLang)} · " +
                                 "${ttsSpeedUi.uiLabel(resolvedDraftLang)} · ${storyLengthUi.uiLabel(resolvedDraftLang)}"
-                        serverUsesEdge ->
+                        showEdgeVoices ->
                             "${ServerTtsProvider.EDGE.uiLabel(resolvedDraftLang)} · " +
                                 "${edgeVoicePresetUi.uiLabel(resolvedDraftLang)} · " +
                                 "${ttsSpeedUi.uiLabel(resolvedDraftLang)} · ${storyLengthUi.uiLabel(resolvedDraftLang)}"
@@ -1146,7 +1152,7 @@ fun SettingsScreen(
                             style = MaterialTheme.typography.labelMedium,
                             color = MutedLavender,
                         )
-                        ServerTtsProvider.entries.forEach { provider ->
+                        serverTtsProviderOptions.forEach { provider ->
                             PreferenceRadioRow(
                                 label = provider.uiLabel(resolvedDraftLang),
                                 selected = serverTtsProviderUi == provider,

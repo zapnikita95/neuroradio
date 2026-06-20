@@ -22,10 +22,18 @@ struct SettingsView: View {
         settings.effectiveServerTtsProvider == .edge
     }
 
+    private var usesElevenLabsVoices: Bool {
+        settings.resolvedLanguage == .en && settings.effectiveServerTtsProvider == .elevenlabs
+    }
+
     private var voiceSectionSummary: String {
-        let voicePart = usesEdgeVoices
-            ? settings.edgeVoicePreset.uiLabel(lang)
-            : settings.ttsVoice.uiLabel(lang)
+        let voicePart: String = if usesElevenLabsVoices {
+            settings.elevenLabsVoice.uiLabel(lang)
+        } else if usesEdgeVoices {
+            settings.edgeVoicePreset.uiLabel(lang)
+        } else {
+            settings.ttsVoice.uiLabel(lang)
+        }
         let engine = settings.effectiveServerTtsProvider.uiLabel(lang)
         return "\(engine) · \(voicePart) · \(settings.ttsSpeedPreset.uiLabel(lang)) · \(settings.storyLength.uiLabel(lang))"
     }
@@ -126,7 +134,7 @@ struct SettingsView: View {
         ) {
             if settings.hasPremiumTtsAccess {
                 SettingsSubheading(title: copy.ttsEngine)
-                ForEach(ServerTtsProvider.allCases) { provider in
+                ForEach(ServerTtsProvider.options(for: lang, premium: true)) { provider in
                     SettingsPreferenceRow(
                         label: provider.uiLabel(lang),
                         subtitle: provider.uiDescription(lang),
@@ -146,6 +154,17 @@ struct SettingsView: View {
                         selected: settings.edgeVoicePreset == preset
                     ) {
                         settings.edgeVoicePreset = preset
+                    }
+                }
+            } else if usesElevenLabsVoices {
+                SettingsSubheading(title: copy.premiumVoiceIntro)
+                ForEach(ElevenLabsVoice.allCases) { voice in
+                    SettingsPreferenceRow(
+                        label: voice.uiLabel(lang),
+                        subtitle: voice.uiDescription(lang),
+                        selected: settings.elevenLabsVoice == voice
+                    ) {
+                        settings.elevenLabsVoice = voice
                     }
                 }
             } else {

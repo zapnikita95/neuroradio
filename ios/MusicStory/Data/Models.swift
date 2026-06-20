@@ -12,6 +12,7 @@ struct StoryRequest: Encodable, Sendable {
     let clientPlatform: String
     let ttsProvider: String?
     let edgeVoicePreset: String?
+    let elevenLabsVoice: String?
     let speakTrackNamesInVoiceover: Bool
     let lang: String?
 
@@ -27,8 +28,27 @@ struct StoryRequest: Encodable, Sendable {
         case clientPlatform = "client_platform"
         case ttsProvider = "tts_provider"
         case edgeVoicePreset = "edge_voice_preset"
+        case elevenLabsVoice = "elevenlabs_voice"
         case speakTrackNamesInVoiceover = "speak_track_names_in_voiceover"
         case lang
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(artist, forKey: .artist)
+        try container.encode(title, forKey: .title)
+        try container.encode(previousScripts, forKey: .previousScripts)
+        try container.encode(storyLength, forKey: .storyLength)
+        try container.encode(storyNarrator, forKey: .storyNarrator)
+        try container.encode(ttsVoice, forKey: .ttsVoice)
+        try container.encode(ttsSpeed, forKey: .ttsSpeed)
+        try container.encode(ttsEmotion, forKey: .ttsEmotion)
+        try container.encode(clientPlatform, forKey: .clientPlatform)
+        try container.encodeIfPresent(ttsProvider, forKey: .ttsProvider)
+        try container.encodeIfPresent(edgeVoicePreset, forKey: .edgeVoicePreset)
+        try container.encodeIfPresent(elevenLabsVoice, forKey: .elevenLabsVoice)
+        try container.encode(speakTrackNamesInVoiceover, forKey: .speakTrackNamesInVoiceover)
+        try container.encodeIfPresent(lang, forKey: .lang)
     }
 }
 

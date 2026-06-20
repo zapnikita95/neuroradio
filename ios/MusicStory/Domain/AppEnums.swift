@@ -200,6 +200,7 @@ enum TtsVoice: String, CaseIterable, Identifiable {
 enum ServerTtsProvider: String, CaseIterable, Identifiable {
     case edge
     case yandex
+    case elevenlabs
 
     var id: String { rawValue }
 
@@ -207,6 +208,7 @@ enum ServerTtsProvider: String, CaseIterable, Identifiable {
         switch self {
         case .edge: return "Microsoft Edge"
         case .yandex: return "Yandex SpeechKit"
+        case .elevenlabs: return "ElevenLabs"
         }
     }
 
@@ -214,12 +216,23 @@ enum ServerTtsProvider: String, CaseIterable, Identifiable {
         switch self {
         case .edge: return "Нейросетевые голоса Edge"
         case .yandex: return "Профессиональная озвучка SpeechKit"
+        case .elevenlabs: return "Премиум нейросетевые голоса для английских историй"
         }
     }
 
     static func fromId(_ id: String?) -> ServerTtsProvider {
-        guard let id, let value = ServerTtsProvider(rawValue: id) else { return .yandex }
+        guard let id, let value = ServerTtsProvider(rawValue: id) else { return .edge }
         return value
+    }
+
+    static func options(for lang: ResolvedAppLanguage, premium: Bool) -> [ServerTtsProvider] {
+        guard premium else { return [] }
+        switch lang {
+        case .en:
+            return [.edge, .elevenlabs, .yandex]
+        case .ru, .system:
+            return [.edge, .yandex]
+        }
     }
 }
 
@@ -254,6 +267,93 @@ enum EdgeVoicePreset: String, CaseIterable, Identifiable {
 
     static func fromId(_ id: String?) -> EdgeVoicePreset {
         guard let id, let value = EdgeVoicePreset(rawValue: id) else { return .svetlanaCalm }
+        return value
+    }
+}
+
+enum ElevenLabsVoice: String, CaseIterable, Identifiable {
+    case auto
+    case rachel
+    case adam
+    case antoni
+    case bella
+    case elli
+    case josh
+    case sam
+    case emily
+    case charlie
+    case matilda
+
+    var id: String { rawValue }
+
+    func uiLabel(_ lang: ResolvedAppLanguage) -> String {
+        guard lang == .en else { return labelRu }
+        switch self {
+        case .auto: return "Auto"
+        case .rachel: return "Rachel"
+        case .adam: return "Adam"
+        case .antoni: return "Antoni"
+        case .bella: return "Bella"
+        case .elli: return "Elli"
+        case .josh: return "Josh"
+        case .sam: return "Sam"
+        case .emily: return "Emily"
+        case .charlie: return "Charlie"
+        case .matilda: return "Matilda"
+        }
+    }
+
+    func uiDescription(_ lang: ResolvedAppLanguage) -> String {
+        guard lang == .en else { return descriptionRu }
+        switch self {
+        case .auto: return "Matched to narrator persona"
+        case .rachel: return "Calm, clear female"
+        case .adam: return "Deep, confident male"
+        case .antoni: return "Warm, rounded male"
+        case .bella: return "Soft, gentle female"
+        case .elli: return "Young, upbeat female"
+        case .josh: return "Crisp narrative male"
+        case .sam: return "Raspy, characterful male"
+        case .emily: return "Calm, mature female"
+        case .charlie: return "Casual conversational male"
+        case .matilda: return "Expressive, warm female"
+        }
+    }
+
+    var labelRu: String {
+        switch self {
+        case .auto: return "Авто"
+        case .rachel: return "Рейчел"
+        case .adam: return "Адам"
+        case .antoni: return "Антони"
+        case .bella: return "Белла"
+        case .elli: return "Элли"
+        case .josh: return "Джош"
+        case .sam: return "Сэм"
+        case .emily: return "Эмили"
+        case .charlie: return "Чарли"
+        case .matilda: return "Матильда"
+        }
+    }
+
+    var descriptionRu: String {
+        switch self {
+        case .auto: return "Голос подбирается по амплуа"
+        case .rachel: return "Спокойный женский"
+        case .adam: return "Глубокий мужской"
+        case .antoni: return "Тёплый мужской"
+        case .bella: return "Мягкий женский"
+        case .elli: return "Молодой женский"
+        case .josh: return "Чёткий повествователь"
+        case .sam: return "Хриплый мужской"
+        case .emily: return "Спокойная зрелая"
+        case .charlie: return "Разговорный мужской"
+        case .matilda: return "Выразительная женский"
+        }
+    }
+
+    static func fromId(_ id: String?) -> ElevenLabsVoice {
+        guard let id, let value = ElevenLabsVoice(rawValue: id) else { return .auto }
         return value
     }
 }

@@ -25,6 +25,7 @@ struct AppL10n {
     var voiceSection: String { en ? "Voiceover" : "Озвучка" }
     var ttsEngine: String { en ? "Voice engine" : "Движок озвучки" }
     var edgeVoice: String { en ? "Microsoft Edge voice" : "Голос Microsoft Edge" }
+    var premiumVoiceIntro: String { en ? "The most realistic AI voices" : "Самые реалистичные нейросетевые голоса" }
     var voice: String { en ? "Voice" : "Голос" }
     var emotion: String { en ? "Intonation" : "Интонация" }
     var speechSpeed: String { en ? "Speech speed" : "Скорость речи" }

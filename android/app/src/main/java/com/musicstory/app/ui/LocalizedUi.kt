@@ -121,20 +121,20 @@ fun TtsVoice.uiDescription(lang: ResolvedAppLanguage): String =
 
 fun EdgeVoicePreset.uiLabel(lang: ResolvedAppLanguage): String =
     if (lang == ResolvedAppLanguage.EN) when (this) {
-        EdgeVoicePreset.DMITRY_CALM -> "Dmitry — calm"
-        EdgeVoicePreset.SVETLANA_CALM -> "Svetlana — calm"
-        EdgeVoicePreset.DMITRY_LIVELY -> "Dmitry — lively"
-        EdgeVoicePreset.SVETLANA_LIVELY -> "Svetlana — lively"
-        EdgeVoicePreset.DARIA -> "Daria — soft"
+        EdgeVoicePreset.DMITRY_CALM -> "Eric"
+        EdgeVoicePreset.SVETLANA_CALM -> "Anna"
+        EdgeVoicePreset.DMITRY_LIVELY -> "Chris"
+        EdgeVoicePreset.SVETLANA_LIVELY -> "Aria"
+        EdgeVoicePreset.DARIA -> "Michelle"
     } else labelRu
 
 fun EdgeVoicePreset.uiDescription(lang: ResolvedAppLanguage): String =
     if (lang == ResolvedAppLanguage.EN) when (this) {
-        EdgeVoicePreset.DMITRY_CALM -> "Male · steady Microsoft Edge voice"
-        EdgeVoicePreset.SVETLANA_CALM -> "Female · neutral Microsoft Edge voice"
-        EdgeVoicePreset.DMITRY_LIVELY -> "Male · energetic, radio-like delivery"
-        EdgeVoicePreset.SVETLANA_LIVELY -> "Female · expressive Microsoft Edge voice"
-        EdgeVoicePreset.DARIA -> "Female · soft Microsoft Edge tone"
+        EdgeVoicePreset.DMITRY_CALM -> "Male · calm, steady delivery"
+        EdgeVoicePreset.SVETLANA_CALM -> "Female · calm, neutral tone"
+        EdgeVoicePreset.DMITRY_LIVELY -> "Male · lively, radio-like"
+        EdgeVoicePreset.SVETLANA_LIVELY -> "Female · expressive, energetic"
+        EdgeVoicePreset.DARIA -> "Female · soft, gentle tone"
     } else descriptionRu
 
 fun StoryLength.uiLabel(lang: ResolvedAppLanguage): String =
@@ -171,6 +171,7 @@ fun ServerTtsProvider.uiLabel(lang: ResolvedAppLanguage): String =
     if (lang == ResolvedAppLanguage.EN) when (this) {
         ServerTtsProvider.EDGE -> "Microsoft Edge"
         ServerTtsProvider.YANDEX -> "Yandex SpeechKit"
+        ServerTtsProvider.ELEVENLABS -> "ElevenLabs"
     } else labelRu
 
 fun LlmProvider.uiLabel(lang: ResolvedAppLanguage): String =
