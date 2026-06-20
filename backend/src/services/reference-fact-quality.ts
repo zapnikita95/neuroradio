@@ -364,6 +364,9 @@ export function interestScore(fact: string): number {
   if (isGenericMusicVideoSeed(trimmed)) return -25;
   if (isLyricsPageSeed(trimmed)) score -= 50;
   if (isArtistIdentityBioSnippet(trimmed)) score += 16;
+  if (/«[\p{L}\p{N}\s'().-]+»/u.test(trimmed) && /(?:написал|родился|группа|альбом|Sanremo|Eurovision|стил|prod|сингл)/iu.test(trimmed)) {
+    score += 14;
+  }
   if (isTruncatedMarketingSnippet(trimmed)) score -= 40;
   if (isUnspeakableWebSeed(trimmed)) score -= 50;
   if (isCollectorFact(fact)) score += 8;
@@ -432,6 +435,28 @@ export function interestScore(fact: string): number {
   if (/(?:origin|originally|meaning|metaphor|hidden|disguised|ironic|paradox|заклинан|смысл|метафор|ирони|парадокс)/i.test(fact)) score += 6;
   if (/\binspired by the music of\b/i.test(fact)) score += 14;
   if (/\b(?:anti-war|protest song|political protest)\b/i.test(fact)) score += 14;
+  if (/\bwrote (?:this song|the song) about (?:his|her|their)\b/i.test(fact)) score += 24;
+  if (/\bcomposed primarily by\b.*\bas an ode to\b/i.test(fact)) score += 20;
+  if (/^["'][\p{L}\p{N}\s'-]+["']\s+is a song by the (?:rock )?band\b/iu.test(quoteNorm)) score -= 28;
+  if (/\bstarted writing (?:his|her|their|my|)?\s*(?:deeply personal )?(?:songs|music) at age \d+/i.test(fact)) {
+    score += 18;
+  }
+  if (
+    /\b(?:band|group)\b/i.test(fact) &&
+    /\b(?:blues|rock|metal|pop-punk|dream-pop|post-punk)\b/i.test(fact) &&
+    /\bfrom [A-Za-z]/i.test(fact)
+  ) {
+    score += 16;
+  }
+  // Taxman и подобные: налоги как смысл песни, не «энциклопедия».
+  if (
+    /\b(?:95\s*%|95\s*percent|top rate|tax rate|income tax|super[- ]?tax|one for you)\b/i.test(fact) &&
+    /\b(?:wrote|written|inspired|response|complain|protest|harrison|beatles|revolver|taxman|song)\b/i.test(
+      fact,
+    )
+  ) {
+    score += 24;
+  }
   if (/\b(?:intended to reflect|refrain.*intended|chorus.*intended)\b/i.test(fact)) score += 12;
   if (/The song(?:'|')s title comes from/i.test(quoteNorm)) score += 16;
   if (/\b(?:new musical elements|vocal counterpoint|incorporates a lot of new)\b/i.test(fact)) score += 14;

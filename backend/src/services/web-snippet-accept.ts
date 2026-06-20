@@ -112,6 +112,27 @@ export function isWrongEntityDisambiguation(snippet: string, artist: string): bo
   ) {
     return true;
   }
+  if (
+    (artistKey === 'voodoo' || artistKey === 'vodoo' || artistKey === 'voodo') &&
+    /\b(?:haiti|haitian|religion|spiritual|festival|100[,.\s]?000|vodou|voudou)\b/i.test(trimmed) &&
+    !/\b(?:song|single|track|album|artist|band|released|recorded|chart|music video)\b/i.test(trimmed)
+  ) {
+    return true;
+  }
+  if (
+    artistKey === 'helmut' &&
+    /\b(?:german|politician|actor|football|soccer|president|minister|born in \d{4})\b/i.test(trimmed) &&
+    !/\b(?:band|musician|singer|rapper|dj|producer|song|album|track|released)\b/i.test(trimmed)
+  ) {
+    return true;
+  }
+  if (
+    /\bachille lauro\b/i.test(artistKey) &&
+    /\b(?:denver|colorado)\b/i.test(trimmed) &&
+    !/\b(?:italian|sanremo|eurovision|pop-punk|rapper|singer)\b/i.test(trimmed)
+  ) {
+    return true;
+  }
   return false;
 }
 
@@ -174,21 +195,24 @@ export function isSpeakableReferenceFact(
   if (isWebListicleJunk(trimmed)) return false;
   if (artist && isPlaylistJunkSnippet(trimmed, artist, title)) return false;
   if (title && isTrackTitleAnchoredSeed(trimmed, title)) {
-    return interestScore(trimmed) >= 6;
+    return interestScore(trimmed) >= 6 || (trimmed.length >= 55 && /«[^»]+»/.test(trimmed));
   }
   if (
     isBoringFact(trimmed) &&
     !isBackstoryFact(trimmed) &&
     !isArtistIdentityBioSnippet(trimmed) &&
-    !isArtistFormationBioSeed(trimmed)
+    !isArtistFormationBioSeed(trimmed) &&
+    !isArtistBackstoryNarrative(trimmed)
   ) {
     return false;
   }
+  if (/«[^»]{2,60}»/.test(trimmed) && trimmed.length >= 55) return true;
   return (
     interestScore(trimmed) >= 6 ||
     isBackstoryFact(trimmed) ||
     isArtistIdentityBioSnippet(trimmed) ||
-    isArtistFormationBioSeed(trimmed)
+    isArtistFormationBioSeed(trimmed) ||
+    isArtistBackstoryNarrative(trimmed)
   );
 }
 
@@ -201,6 +225,29 @@ export function isLowQualityWebSnippet(snippet: string): boolean {
   if (/©\w{2,}\b|©Reddit/i.test(trimmed)) return true;
   if (/other album details for\s*$/i.test(trimmed)) return true;
   return false;
+}
+
+/** Press/label bio line — «сольный проект X, известный как…» (GALAGA / indie rap). */
+export function isArtistBackstoryNarrative(snippet: string): boolean {
+  const trimmed = decodeHtmlEntities(snippet).trim();
+  if (trimmed.length < 30) return false;
+  return (
+    /\bstarted writing (?:his|her|their|my|)?\s*(?:deeply personal )?(?:songs|music) at age \d+/i.test(
+      trimmed,
+    ) ||
+    /\bborn in [A-Za-zÀ-ÿ][^.]{0,80}(?:father|mother|parents|German|Spanish|Italian|Japanese)/i.test(
+      trimmed,
+    ) ||
+    (/\b(?:band|group|artist)\b/i.test(trimmed) &&
+      /\bfrom (?:Geneva|Barcelona|Oxford|Minneapolis|Los Angeles|Denver|Italy|Spain|Switzerland)\b/i.test(
+        trimmed,
+      )) ||
+    /\b(?:jumps in to produce|produced (?:by|their)|Gojira)\b/i.test(trimmed) ||
+    /\bwrote (?:this song|the song) about (?:his|her|their)\b/i.test(trimmed) ||
+    /\bcomposed primarily by\b.*\bas an ode to\b/i.test(trimmed) ||
+    /\b(?:Eurovision|Sanremo|represented San Marino)\b/i.test(trimmed) ||
+    /\b(?:pop-punk|dream-pop|post-punk|metalcore|blues\s*\/\s*rock)\b/i.test(trimmed)
+  );
 }
 
 /** Press/label bio line — «сольный проект X, известный как…» (GALAGA / indie rap). */

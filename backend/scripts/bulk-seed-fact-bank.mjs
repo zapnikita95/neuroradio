@@ -16,6 +16,7 @@ import { harvestAllFacts, fetchDiscogsFacts } from '../dist/services/fact-source
 import { interestScore } from '../dist/services/reference-fact-quality.js';
 import { interestRating10 } from '../dist/services/fact-interest-log.js';
 import { isBoringFact, isMetadataHarvestFact } from '../dist/services/reference-fact-quality.js';
+import { isArtistBackstoryNarrative } from '../dist/services/web-snippet-accept.js';
 import { BANK_PATH, refreshBankInterestScores } from '../dist/services/fact-bank.js';
 import { classifyFactTopic, poolHasTopicDuplicate } from '../dist/services/fact-topic.js';
 import { isParserTrustedHarvestSource } from '../dist/services/fact-sources/types.js';
@@ -309,13 +310,21 @@ function saveCheckpoint(bank, stats, doneKeys, zeroFactKeys) {
   );
 }
 
+function isSongMeaningNarrative(trimmed) {
+  return (
+    isArtistBackstoryNarrative(trimmed) ||
+    (/\b(?:95\s*%|supertax|tax rate|one for you|income tax)\b/i.test(trimmed) &&
+      /\b(?:wrote|written|harrison|beatles|taxman|song|protest)\b/i.test(trimmed))
+  );
+}
+
 function shouldRejectFact(trimmed, item) {
   if (JUNK_FACT.test(trimmed)) return 'junk';
   if (isParserTrustedHarvestSource(item.source)) return null;
   if (item.scope === 'artist' && item.source === 'wiki' && trimmed.length >= 80) {
     return interestScore(trimmed) < 2 ? 'wiki_low_score' : null;
   }
-  if (isBoringFact(trimmed)) return 'boring';
+  if (isBoringFact(trimmed) && !isSongMeaningNarrative(trimmed)) return 'boring';
   return null;
 }
 

@@ -24,7 +24,7 @@ function artistTokens(artist: string): string[] {
 
 /** Слова-существительные/приветствия, совпадающие с именем артиста — не путать с группой. */
 const AMBIGUOUS_COMMON_WORD_ARTISTS = new Set(
-  ['привет', 'плохо', 'любовь', 'скорpioн', 'hello', 'bad', 'good', 'love', 'pain'].map(
+  ['привет', 'плохо', 'любовь', 'скорпион', 'hello', 'bad', 'good', 'love', 'pain', 'voodoo'].map(
     normalize,
   ),
 );
@@ -42,7 +42,7 @@ export function factMentionsArtistAsEntity(fact: string, artist: string): boolea
       fact,
     ) ||
     new RegExp(`[«"']${escaped}[«"']`, 'i').test(fact) ||
-    new RegExp(`\\b${escaped}\\s+(?:band|group|artist|коллектив|duo)\\b`, 'i').test(fact)
+    new RegExp(`\\b${escaped}\\s+(?:band|group|artist|коллектив|duo|are|is|were|was)\\b`, 'i').test(fact)
   );
 }
 
@@ -832,6 +832,8 @@ const AMBIGUOUS_COMMON_WORD_TITLES = new Set(
     'yours',
     'ours',
     'theirs',
+    'voodoo',
+    'hunters',
   ].map(normalize),
 );
 
@@ -843,6 +845,7 @@ const NON_MUSIC_TITLE_COLLISION_PATTERNS: RegExp[] = [
   /\b(?:is one of the four seasons|is the warmest season|is the hottest season)\b/i,
   /\b(?:зимн|летн|весенн|осенн)(?:ий|яя|ее|ем|ей)\s+(?:период|сезон|отпуск)\b/i,
   /\b(?:сам(?:ый|ая|ое)\s+)?(?:жарк(?:ий|ая|ое)|тёпл(?:ый|ая|ое)|тепл(?:ый|ая|ое)|холодн(?:ый|ая|ое))\s+сезон\b/i,
+  /\b(?:haiti|haitian|vodou|voudou|religion|spiritual practice|festival.*\bfans?\b|\b100[,.\s]?000\s+fans?\b)\b/i,
 ];
 
 export function isAmbiguousCommonWordTitle(title: string): boolean {

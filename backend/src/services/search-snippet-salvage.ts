@@ -40,6 +40,7 @@ export function isWeakSelectedFact(
   if (isCatalogMetadataSeed(trimmed)) return true;
   if (isLyricsPageSeed(trimmed)) return true;
   if (isEncyclopediaDefinitionSeed(trimmed)) return true;
+  if (/^["'][\p{L}\p{N}\s'-]+["']\s+is a song by the (?:rock )?band\b/iu.test(trimmed)) return true;
   const score = Math.max(selected.interestScore ?? 0, interestScore(trimmed));
   if (title && isTrackTitleAnchoredSeed(trimmed, title) && score >= 10 && !isBoringFact(trimmed)) return false;
   if (score < 6) return true;

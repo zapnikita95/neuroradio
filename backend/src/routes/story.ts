@@ -1939,7 +1939,7 @@ router.post('/full', extractClientSecrets, validateStoryFullBody, storyFullRateL
         error: 'Story generation unavailable',
         code: 'NO_REFERENCE_FACTS',
         message:
-          'Извините, по такому треку или группе рассказать историю не получилось — проверенных фактов не нашли.',
+          'Не удалось собрать факт — проверенных данных по этому треку не нашли. Попробуй другой трек или нажми «Рассказать историю» ещё раз.',
         source: 'facts',
       });
       return;

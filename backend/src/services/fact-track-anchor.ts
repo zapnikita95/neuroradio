@@ -20,6 +20,7 @@ import {
   isCatalogMetadataSeed,
   isEncyclopediaDefinitionSeed,
 } from './reference-fact-quality.js';
+import { isArtistBackstoryNarrative } from './web-snippet-accept.js';
 import { isMetadataOnlyFallbackFact } from './metadata-facts.js';
 
 function normalize(text: string): string {
@@ -181,6 +182,7 @@ export function isPlaceNameTitleCollision(fact: string, title: string, artist: s
 /** Duo/formation/solo-transition — not a fact about this specific track. */
 export function isArtistCareerBioWithoutTrack(fact: string, title: string): boolean {
   if (factMentionsTitle(fact, title)) return false;
+  if (isArtistBackstoryNarrative(fact)) return false;
   return ARTIST_CAREER_BIO_PATTERNS.some((p) => p.test(fact));
 }
 
@@ -327,6 +329,8 @@ export function rejectSeedForTrackStory(
   if (isTitleTokenForeignArtistFact(trimmed, artist, title)) return true;
 
   if (factMentionsTitle(trimmed, title)) return false;
+
+  if (isArtistBackstoryNarrative(trimmed) && factMentionsArtist(trimmed, artist)) return false;
 
   const trackPool = options.trackPoolFacts ?? [];
   const hasStrongTrackFact = trackPool.some((f) => isStrongTrackPoolAnchor(f, title));

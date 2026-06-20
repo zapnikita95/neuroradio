@@ -18,7 +18,7 @@ import {
 } from './reference-fact-quality.js';
 import { WEAK_TRIVIA_PATTERNS } from './story-fact-hunt.js';
 import { isMetadataOnlyFallbackFact } from './metadata-facts.js';
-import { isTruncatedMarketingSnippet, isUnspeakableWebSeed, isArtistIdentityBioSnippet } from './web-snippet-accept.js';
+import { isTruncatedMarketingSnippet, isUnspeakableWebSeed, isArtistIdentityBioSnippet, isArtistBackstoryNarrative } from './web-snippet-accept.js';
 import {
   factMentionsTitle,
   factMentionsArtistLoose,
@@ -85,6 +85,7 @@ export function isRejectedPickSeed(
     !artistScope &&
     title.trim() &&
     isArtistIdentityBioSnippet(fact) &&
+    !isArtistBackstoryNarrative(fact) &&
     !factMentionsTitle(fact, title) &&
     !hasAnchoredTrackContext(fact, title)
   ) {
@@ -118,6 +119,7 @@ export function isRejectedPickSeed(
     (isArtistIdentityBioSnippet(fact) ||
       isArtistFormationBioSeed(fact) ||
       isBackstoryFact(fact) ||
+      isArtistBackstoryNarrative(fact) ||
       /\b(?:frontman|lead singer|co[- ]?founder|started (?:his|her|their) solo career|until its break-up)\b/i.test(fact));
   if (
     !allowArtistBio &&

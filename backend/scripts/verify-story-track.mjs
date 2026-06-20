@@ -112,19 +112,34 @@ if (!prodOnly) {
   const ctx = await fetchAggregatedFactContext(artist, title, 'US');
   const pick = pickReferenceFact(ctx.bundle, [], 0, artist, title);
   const salvage = pickSalvageSnippetSeed(ctx.rawSnippets, artist, title, 'ru');
-  let chosen =
-    pick && !isRejectedStorySeed(pick.fact, artist, title, ctx.bundle.trackFacts) ? pick : salvage;
-  if (!chosen && curated) {
-    chosen = {
-      fact: curated.fact,
-      scope: curated.scope,
-      interestScore: interestScore(curated.fact),
-    };
-    console.log('curated:', curated.fact.slice(0, 180));
+
+  // Как story.ts: curated первым, если ещё не «использован» (verify без bank history).
+  let chosen = null;
+  let seedOrigin = 'pick';
+  if (curated) {
+    const curatedScore = Math.max(interestScore(curated.fact), 12);
+    if (!isRejectedStorySeed(curated.fact, artist, title, ctx.bundle.trackFacts)) {
+      chosen = {
+        fact: curated.fact,
+        scope: curated.scope,
+        interestScore: curatedScore,
+      };
+      seedOrigin = 'curated';
+      console.log('curated (prod path):', curated.fact.slice(0, 180));
+    }
+  }
+  if (!chosen) {
+    chosen =
+      pick && !isRejectedStorySeed(pick.fact, artist, title, ctx.bundle.trackFacts) ? pick : salvage;
+    seedOrigin = pick ? 'pick' : salvage ? 'salvage' : 'none';
   }
 
   console.log('rules pick:', pick?.fact?.slice(0, 180) ?? '(none)');
   console.log('salvage:', salvage?.fact?.slice(0, 180) ?? '(none)');
+  if (chosen) {
+    const score = chosen.interestScore ?? interestScore(chosen.fact);
+    console.log(`chosen origin=${seedOrigin} interestScore=${score}`);
+  }
 
   if (!chosen) {
     fail('no local seed (rules + salvage both null)');
@@ -139,6 +154,12 @@ if (!prodOnly) {
       fail('chosen seed isWeakSelectedFact');
     } else {
       ok('not weak seed');
+    }
+    const chosenScore = chosen.interestScore ?? interestScore(chosen.fact);
+    if (chosenScore < 8) {
+      fail(`interestScore too low (${chosenScore}) — boring seed`);
+    } else {
+      ok(`interestScore=${chosenScore} (not boring)`);
     }
     for (const p of badSeedRes) {
       if (p.test(chosen.fact)) fail(`bad seed pattern: ${p}`);

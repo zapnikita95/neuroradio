@@ -149,6 +149,14 @@ assert(
   `Summer pick is Spotify fact, not season trivia (got: ${summerPick?.fact?.slice(0, 80)})`,
 );
 
+// --- 2c. Taxman: UK supertax IS the song story — never a title collision ---
+const TAXMAN_TAX_FACT =
+  'George Harrison wrote "Taxman" after learning the UK top rate of income tax could take 95% of the Beatles\' earnings — the "one for you, nineteen for me" line refers to that rate.';
+assert(
+  !isNonMusicTitleCollisionFact(TAXMAN_TAX_FACT, 'Taxman', 'The Beatles'),
+  'Taxman 95% UK tax fact is track meaning, not encyclopedia collision',
+);
+
 // --- 3. Dedup: narrative + duration are not the same topic duplicate ---
 assert(
   !poolHasTopicDuplicate(HYPA_NARRATIVE, [DURATION_CATALOG]),
