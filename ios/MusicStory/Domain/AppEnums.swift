@@ -230,7 +230,7 @@ enum ServerTtsProvider: String, CaseIterable, Identifiable {
         switch lang {
         case .en:
             return [.edge, .elevenlabs, .yandex]
-        case .ru, .system:
+        case .ru:
             return [.edge, .yandex]
         }
     }
