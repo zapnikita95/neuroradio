@@ -31,6 +31,7 @@ import { factFitsStoryLanguage } from './fact-language-fit.js';
 import type { StoryLanguageId } from './story-language.js';
 import { interestRating10 } from './fact-interest-log.js';
 import type { RankedFactScope } from './fact-ranking.js';
+import { isUnverifiedQuoteAttributionSeed } from './fact-quote-attribution.js';
 
 /** Shared reject gates for live pick + bank pick + push hot — одна логика с pickReferenceFact. */
 export function isRejectedPickSeed(
@@ -40,6 +41,7 @@ export function isRejectedPickSeed(
   trackPool: string[] = [],
   artist = '',
   pickScope?: RankedFactScope,
+  attributionCorpus: string[] = [],
 ): boolean {
   const artistScope = pickScope === 'artist';
   const albumScope = pickScope === 'album';
@@ -142,6 +144,13 @@ export function isRejectedPickSeed(
     title.trim() &&
     /впервые прозвучала на живом выступлении/i.test(fact) &&
     trackPool.some((t) => /\bco[- ]?written\b/i.test(t) && adjustedInterestScore(t) >= 12)
+  ) {
+    return true;
+  }
+  if (
+    attributionCorpus.length > 0 &&
+    artist.trim() &&
+    isUnverifiedQuoteAttributionSeed(fact, artist, attributionCorpus)
   ) {
     return true;
   }

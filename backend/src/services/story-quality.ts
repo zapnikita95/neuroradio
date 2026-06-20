@@ -24,6 +24,7 @@ import { isVoiceoverWithoutTrackNames, scriptLeaksVoiceoverNames } from './voice
 import { primaryArtistName } from './artist-primary.js';
 import { resolveStoryNarrator, type StoryNarratorId } from './story-narrator.js';
 import { isStaleClosingCliche } from './story-closing-phrases.js';
+import { findQuoteSpeakerDrift } from './fact-quote-attribution.js';
 
 export { DEFAULT_STORY_LENGTH, getStoryLengthPreset };
 export type { StoryLengthId, StoryLengthPreset };
@@ -797,6 +798,10 @@ export function validateStoryScript(
       reason:
         'stale radio closing cliché — keep the idea (strong fact for air) but rephrase in fresh words',
     };
+  }
+  const quoteDrift = findQuoteSpeakerDrift(trimmed, referenceFacts[0] ?? '');
+  if (quoteDrift) {
+    return { ok: false, reason: quoteDrift };
   }
   if (
     previousScripts.some((prev) => templateClosing.test(prev)) &&

@@ -18,6 +18,7 @@ import { formatFactPickLog, logFactCandidatePools } from '../services/fact-inter
 import { interestScore, isWikiBiographyLead, isCatalogMetadataSeed, isEncyclopediaDefinitionSeed, isGenericConcertVenueSeed } from '../services/reference-fact-quality.js';
 import { isArtistCareerBioWithoutTrack, hasAnchoredTrackContext } from '../services/fact-track-anchor.js';
 import { factMentionsTitle } from '../services/fact-relevance.js';
+import { isUnverifiedQuoteAttributionSeed } from '../services/fact-quote-attribution.js';
 import { interestRating10 } from '../services/fact-interest-log.js';
 import {
   buildFactPickContext,
@@ -1406,12 +1407,22 @@ router.post('/full', extractClientSecrets, validateStoryFullBody, storyFullRateL
             `[story-pipeline] weak seed rejected score=${selectedFact.interestScore} fact="${selectedFact.fact.slice(0, 100)}"`,
           );
         }
+        const quoteAttributionCorpus = [
+          ...factBundle.trackFacts,
+          ...factBundle.artistFacts,
+          ...factCtx.rawSnippets,
+        ];
         const strongBundleFacts = [...factBundle.trackFacts, ...factBundle.artistFacts]
           .filter((f) => {
             if (interestScore(f) < 6) return false;
             if (isWeakSnippetSeed(f)) return false;
             if (isGenericConcertVenueSeed(f)) return false;
             if (isCatalogMetadataSeed(f)) return false;
+            if (
+              isUnverifiedQuoteAttributionSeed(f, metadata.artist, quoteAttributionCorpus)
+            ) {
+              return false;
+            }
             if (
               isEncyclopediaDefinitionSeed(f) &&
               !(

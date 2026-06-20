@@ -95,7 +95,7 @@ function isNonActEntity(name: string): boolean {
   return false;
 }
 
-function isCriticAttribution(fact: string, entity: string): boolean {
+export function isCriticAttribution(fact: string, entity: string): boolean {
   const idx = fact.indexOf(entity);
   if (idx < 0) return false;
   const after = fact.slice(idx + entity.length, idx + entity.length + 80);

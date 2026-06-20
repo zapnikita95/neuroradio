@@ -151,8 +151,17 @@ function isRejectedSeed(
   trackPool: string[] = [],
   artist = '',
   pickScope?: FactScope,
+  attributionCorpus: string[] = [],
 ): boolean {
-  return isRejectedPickSeed(fact, title, storyLanguage, trackPool, artist, pickScope);
+  return isRejectedPickSeed(
+    fact,
+    title,
+    storyLanguage,
+    trackPool,
+    artist,
+    pickScope,
+    attributionCorpus,
+  );
 }
 
 function sortByInterest(facts: string[], narrator: StoryNarratorId = 'auto'): string[] {
@@ -179,8 +188,21 @@ function pickBestByInterest(
   pickScope?: FactScope,
   recentScopes: FactScope[] = [],
 ): string | null {
+  const attributionCorpus = [...new Set([...facts, ...trackPool])];
   for (const fact of sortByInterest(facts, narrator)) {
-    if (isRejectedSeed(fact, title, storyLanguage, trackPool, artist, pickScope)) continue;
+    if (
+      isRejectedSeed(
+        fact,
+        title,
+        storyLanguage,
+        trackPool,
+        artist,
+        pickScope,
+        attributionCorpus,
+      )
+    ) {
+      continue;
+    }
     if (adjustedInterestScore(fact, narrator) < minScore) continue;
     if (isUsedFact(fact, usedFingerprints)) continue;
     const topic = classifyFactTopic(fact);
@@ -241,6 +263,8 @@ export function pickReferenceFact(
     return MIN_GOOD_SCOPE_INTEREST;
   };
 
+  const attributionCorpus = [...pools.track, ...pools.album, ...pools.artist];
+
   for (const scope of scopeOrder) {
     const pool = pools[scope];
     if (pool.length === 0) continue;
@@ -276,7 +300,18 @@ export function pickReferenceFact(
     trackPoolForReject,
     artist,
   );
-  if (globalBest && !isRejectedSeed(globalBest, title, storyLanguage, trackPoolForReject, artist)) {
+  if (
+    globalBest &&
+    !isRejectedSeed(
+      globalBest,
+      title,
+      storyLanguage,
+      trackPoolForReject,
+      artist,
+      undefined,
+      attributionCorpus,
+    )
+  ) {
     if (!isCatalogMetadataSeed(globalBest) && !isCitationBibliographySeed(globalBest)) {
       const scope: FactScope = pools.track.includes(globalBest)
         ? 'track'
@@ -292,7 +327,19 @@ export function pickReferenceFact(
     if (isMetadataOnlyFallbackFact(fact)) continue;
     if (isMisattributedBandTrackFact(fact, title)) continue;
     if (isBoringFact(fact) && !(title && (isTrackTitleAnchoredSeed(fact, title) || factMentionsTitle(fact, title)))) continue;
-    if (isRejectedSeed(fact, title, storyLanguage, trackPoolForReject, artist)) continue;
+    if (
+      isRejectedSeed(
+        fact,
+        title,
+        storyLanguage,
+        trackPoolForReject,
+        artist,
+        undefined,
+        attributionCorpus,
+      )
+    ) {
+      continue;
+    }
     if (adjustedInterestScore(fact, narrator) < 6) continue;
     if (isUsedFact(fact, usedFingerprints)) continue;
     const topic = classifyFactTopic(fact);
@@ -324,6 +371,7 @@ export function pickFallbackSeedFromBundle(
 ): SelectedReferenceFact | null {
   const pools = splitBundleByScope(bundle, artist, title);
   const trackPoolForReject = [...pools.track, ...pools.album];
+  const attributionCorpus = [...pools.track, ...pools.album, ...pools.artist];
   const candidates = [...pools.track, ...pools.album, ...pools.artist].sort(
     (a, b) => adjustedInterestScore(b, narrator) - adjustedInterestScore(a, narrator),
   );
@@ -334,7 +382,19 @@ export function pickFallbackSeedFromBundle(
       : pools.album.includes(fact)
         ? 'album'
         : 'artist';
-    if (isRejectedSeed(fact, title, storyLanguage, trackPoolForReject, artist, scope)) continue;
+    if (
+      isRejectedSeed(
+        fact,
+        title,
+        storyLanguage,
+        trackPoolForReject,
+        artist,
+        scope,
+        attributionCorpus,
+      )
+    ) {
+      continue;
+    }
     if (
       isEncyclopediaDefinitionSeed(fact) &&
       !(title.trim() && isTrackTitleAnchoredSeed(fact, title) && interestScore(fact) >= 10)
