@@ -2,6 +2,7 @@
 
 import { mergeLatinCollaborationPhrases } from './tts-grammar-fixes.js';
 import { normalizeGenreTermsForTts } from './tts-genre-pronounce.js';
+import { applyTitleNumeralsInText, titleNumeralsForTts } from './tts-title-numerals.js';
 
 const CURLY_APOSTROPHE = /[\u2018\u2019\u02BC\u0060]/g;
 
@@ -75,7 +76,10 @@ function normalizeTechAcronymsForRussianTts(text: string): string {
 
 /** English loanwords in Russian narration → Cyrillic phonetic (TTS only). */
 function normalizeLoanwordsForRussianTts(text: string): string {
-  return text.replace(/\bfiller\b/gi, 'ф+иллер');
+  return text
+    .replace(/\bfiller\b/gi, 'ф+иллер')
+    .replace(/\blo[\u2010\u2011\u2012\u2013\u2014-]fi\b/gi, 'л+оу ф+ай')
+    .replace(/\blofi\b/gi, 'л+оу ф+ай');
 }
 
 /** Mixed RU/EN tokens that Yandex misreads inside `<lang en-US>` or after apostrophe splits. */
@@ -110,6 +114,14 @@ export function normalizeYandexSpeechTokens(text: string, artist = '', title = '
   result = normalizeTechAcronymsForRussianTts(result);
 
   result = normalizeLoanwordsForRussianTts(result);
+
+  if (titleNorm) {
+    const spoken = titleNumeralsForTts(titleNorm, artistNorm);
+    if (spoken && spoken.toLowerCase() !== titleNorm.toLowerCase()) {
+      result = result.replace(new RegExp(escapeRegExp(titleNorm), 'gi'), spoken);
+    }
+  }
+  result = applyTitleNumeralsInText(result, artist, title);
 
   return result;
 }

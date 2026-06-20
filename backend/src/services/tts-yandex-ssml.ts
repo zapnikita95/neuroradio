@@ -129,7 +129,13 @@ function trimBreaksAroundLangTags(text: string): string {
     .replace(/(<\/lang>)(\s*)([вскуо])(\s+)(?=[а-яёА-ЯЁ])/g, '$1 $3$4');
 }
 
+import { titleNumeralsForTts } from './tts-title-numerals.js';
+
 const LATIN_SSML_PRONUNCIATION: Record<string, string> = {
+  'lo-fi': 'lo fi',
+  'lo‑fi': 'lo fi',
+  lofi: 'lo fi',
+  'pop-punk': 'pop punk',
   moonwalk: 'moon walk',
   xscape: 'X scape',
   onerepublic: 'One Republic',
@@ -156,8 +162,14 @@ function splitCamelCaseLatin(span: string): string {
   return span;
 }
 
-function latinSpanForSsml(span: string): string {
-  return stripLatinApostrophesForTts(splitCamelCaseLatin(span.trim()));
+function latinSpanForSsml(span: string, artist = '', title = ''): string {
+  const trimmed = span.trim();
+  const titleSpoken =
+    title && trimmed.toLowerCase() === title.trim().toLowerCase()
+      ? titleNumeralsForTts(title, artist)
+      : null;
+  const mapped = titleSpoken ?? splitCamelCaseLatin(trimmed);
+  return stripLatinApostrophesForTts(mapped);
 }
 
 /** Last.fm. → SSML lang «Last.fm» + sentence «.» outside — not two lang tags. */
@@ -205,7 +217,8 @@ export function wrapMixedLanguageBody(text: string): string {
       out += escapeRussianChunkBeforeLatin(prepared.slice(last, match.index));
     }
     const lang = detectLangCode(match[0]);
-    const cyrillicAccent = lang === 'es-ES' || lang === 'it-IT' ? cyrillicForShortAccentLatin(match[0]) : null;
+    // ES/DE/IT/EN — только SSML lang; короткую кириллицу оставляем для IT односложных акцентов.
+    const cyrillicAccent = lang === 'it-IT' ? cyrillicForShortAccentLatin(match[0]) : null;
     if (cyrillicAccent) {
       out += escapeSsml(cyrillicAccent);
     } else {

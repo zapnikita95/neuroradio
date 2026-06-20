@@ -4,6 +4,7 @@
  */
 import assert from 'node:assert/strict';
 import { prepareYandexTtsText } from '../dist/services/tts-markup.js';
+import { normalizeYandexSpeechTokens } from '../dist/services/tts-yandex-normalize.js';
 import { resolveVoiceDelivery } from '../dist/services/tts-voice-profiles.js';
 import {
   PremiumTtsAccessError,
@@ -116,6 +117,20 @@ test('prepareYandexTtsText reads filler as ф+иллер (no en-US lang wrap)', 
   const ssml = buildYandexSsml(out);
   assert.doesNotMatch(ssml, /<lang[^>]*>filler/i);
   assert.doesNotMatch(ssml, /\bfiller\b/i);
+});
+
+test('normalizeYandexSpeechTokens reads pop-punk as two words поп панк', () => {
+  assert.match(normalizeYandexSpeechTokens('главный pop-punk хит.'), /поп панк/i);
+  assert.match(normalizeYandexSpeechTokens('стиль поп-панк.'), /поп панк/i);
+  assert.doesNotMatch(normalizeYandexSpeechTokens('pop-punk хит.'), /поппанк/i);
+});
+
+test('normalizeYandexSpeechTokens reads LO-FI as л+оу ф+ай', () => {
+  const out = normalizeYandexSpeechTokens('Вокруг LO-FI продакшна.');
+  assert.match(out, /л(\+)?оу ф(\+)?ай/i);
+  assert.doesNotMatch(out, /\bLO-FI\b/i);
+  const ssml = buildYandexSsml(out);
+  assert.doesNotMatch(ssml, /<lang[^>]*>lo[\s-]?fi/i);
 });
 
 test('SSML keeps Last.fm as one English lang span', () => {
