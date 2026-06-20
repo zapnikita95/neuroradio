@@ -21,6 +21,7 @@ import { isParserTrustedHarvestSource } from '../dist/services/fact-sources/type
 
 const __dir = dirname(fileURLToPath(import.meta.url));
 const CATALOG = join(__dir, '../src/data/popular-tracks-catalog.json');
+const PRIORITY_ARTISTS_PATH = join(__dir, '../src/data/priority-fact-artists.json');
 const PROGRESS = join(__dir, '../data/bulk-seed-progress.json');
 const SEED_OUT = join(__dir, '../data/facts-bank-seed.json');
 
@@ -64,7 +65,33 @@ function trackKey(artist, title) {
 }
 
 function artistKey(artist) {
-  return artist.trim().toLowerCase();
+  return artist
+    .trim()
+    .toLowerCase()
+    .replace(/\./g, '')
+    .replace(/\s+/g, ' ');
+}
+
+const { priorityArtistSet, priorityArtistOrder } = loadPriorityArtists();
+
+function loadPriorityArtists() {
+  if (!existsSync(PRIORITY_ARTISTS_PATH)) {
+    return { priorityArtistSet: new Set(), priorityArtistOrder: new Map() };
+  }
+  const data = JSON.parse(readFileSync(PRIORITY_ARTISTS_PATH, 'utf8'));
+  const order = new Map();
+  const set = new Set();
+  for (const [i, name] of (data.artists ?? []).entries()) {
+    const k = artistKey(name);
+    if (!k || set.has(k)) continue;
+    set.add(k);
+    order.set(k, i);
+  }
+  return { priorityArtistSet: set, priorityArtistOrder: order };
+}
+
+function isPriorityArtist(artist) {
+  return priorityArtistSet.has(artistKey(artist));
 }
 
 function isHarvestableTrack(track) {
@@ -77,6 +104,7 @@ function isHarvestableTrack(track) {
 
 function trackPriority(track) {
   const s = track.source ?? '';
+  if (s.startsWith('seed-global:priority-artist') || s.includes(':priority-retry')) return -7;
   if (s.startsWith('seed-global:priority')) return -6;
   if (s.startsWith('genre-top')) return -5;
   if (s.startsWith('lastfm-global-chart') || s.startsWith('deezer-chart-0')) return -5;
@@ -109,6 +137,59 @@ function buildPriorityHotQueue(bank, doneKeys) {
     if (!doneKeys.has(key)) return true;
     return countTrackHotInBank(bank, artist, title) < 1;
   });
+}
+
+function trackNeedsHotPushHarvest(bank, track, doneKeys) {
+  const { artist, title } = track;
+  const key = trackKey(artist, title);
+  if (!doneKeys.has(key)) return true;
+  if (!hasSubstantiveFactsInBank(bank, artist, title)) return true;
+  return countTrackHotInBank(bank, artist, title) < 1;
+}
+
+/** All catalog tracks for fact-rich classics — any source, including playlists. */
+function buildPriorityArtistQueue(allTracks, bank, doneKeys) {
+  const out = [];
+  for (const t of allTracks) {
+    if (!isPriorityArtist(t.artist)) continue;
+    if (!trackNeedsHotPushHarvest(bank, t, doneKeys)) continue;
+    const key = trackKey(t.artist, t.title);
+    out.push({
+      ...t,
+      source: doneKeys.has(key)
+        ? `${t.source ?? 'catalog'}:priority-retry`
+        : `seed-global:priority-artist:${t.source ?? 'catalog'}`,
+    });
+  }
+  return out.sort((a, b) => {
+    const ia = priorityArtistOrder.get(artistKey(a.artist)) ?? 9999;
+    const ib = priorityArtistOrder.get(artistKey(b.artist)) ?? 9999;
+    if (ia !== ib) return ia - ib;
+    return compareHotPushTracks(a, b);
+  });
+}
+
+function buildArtistsWithSubstantiveFacts(bank) {
+  const set = new Set();
+  for (const [k, pool] of Object.entries(bank.byArtist ?? {})) {
+    if (hasSubstantiveInPool(pool)) set.add(k);
+  }
+  for (const [tk, pool] of Object.entries(bank.byTrack ?? {})) {
+    if (hasSubstantiveInPool(pool)) set.add(tk.split('|')[0]);
+  }
+  return set;
+}
+
+function compareHotPushTracksWithBank(a, b, artistsWithFacts) {
+  const gapA =
+    (isPriorityArtist(a.artist) ? -4 : 0) + (artistsWithFacts.has(artistKey(a.artist)) ? 0 : -2);
+  const gapB =
+    (isPriorityArtist(b.artist) ? -4 : 0) + (artistsWithFacts.has(artistKey(b.artist)) ? 0 : -2);
+  const pri = trackPriority(a) + gapA - (trackPriority(b) + gapB);
+  if (pri !== 0) return pri;
+  const yearA = parseInt(a.source?.match(/:(\d{4})(?:$|:)/)?.[1] ?? a.year ?? '0', 10);
+  const yearB = parseInt(b.source?.match(/:(\d{4})(?:$|:)/)?.[1] ?? b.year ?? '0', 10);
+  return yearB - yearA;
 }
 
 function hasSubstantiveInPool(pool) {
@@ -515,19 +596,30 @@ async function main() {
   const ordered = orderTracks(tracks, doneKeys, bank, zeroFactKeys);
   let queue = ordered;
   if (hotPush) {
-    const priority = buildPriorityHotQueue(bank, doneKeys);
-    const priKeys = new Set(priority.map((t) => trackKey(t.artist, t.title)));
-    queue = [
-      ...priority,
-      ...tracks
-        .filter((t) => !priKeys.has(trackKey(t.artist, t.title)) && !doneKeys.has(trackKey(t.artist, t.title)) && isTopCatalogTrack(t))
-        .sort(compareHotPushTracks),
-    ];
-    console.log(
-      `HOT-PUSH: ${priority.length} priority hits + ${queue.length - priority.length} top-catalog (genre/chart/tag/year until hot≥${hotTarget})`,
+    const priorityHits = buildPriorityHotQueue(bank, doneKeys);
+    const priorityArtists = buildPriorityArtistQueue(tracks, bank, doneKeys);
+    const priKeys = new Set(
+      [...priorityHits, ...priorityArtists].map((t) => trackKey(t.artist, t.title)),
     );
-    if (priority.length) {
-      console.log(`  priority: ${priority.map((t) => `${t.artist} — ${t.title}`).join('; ')}`);
+    const artistsWithFacts = buildArtistsWithSubstantiveFacts(bank);
+    const rest = tracks
+      .filter((t) => {
+        const key = trackKey(t.artist, t.title);
+        if (priKeys.has(key)) return false;
+        if (!trackNeedsHotPushHarvest(bank, t, doneKeys)) return false;
+        return isTopCatalogTrack(t) || isPriorityArtist(t.artist);
+      })
+      .sort((a, b) => compareHotPushTracksWithBank(a, b, artistsWithFacts));
+    queue = [...priorityHits, ...priorityArtists, ...rest];
+    console.log(
+      `HOT-PUSH: ${priorityHits.length} priority hits + ${priorityArtists.length} classic-artist tracks + ${rest.length} top-catalog (hot≥${hotTarget})`,
+    );
+    if (priorityHits.length) {
+      console.log(`  hits: ${priorityHits.map((t) => `${t.artist} — ${t.title}`).join('; ')}`);
+    }
+    if (priorityArtists.length) {
+      const sample = priorityArtists.slice(0, 8).map((t) => `${t.artist} — ${t.title}`);
+      console.log(`  classics (${priorityArtists.length} tracks): ${sample.join('; ')}…`);
     }
   }
   const backfillCount = queue.filter((t) => doneKeys.has(trackKey(t.artist, t.title))).length;
