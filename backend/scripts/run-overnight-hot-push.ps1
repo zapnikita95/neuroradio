@@ -39,7 +39,6 @@ try {
         '--hot-target=20000',
         '--concurrency=5',
         '--resume',
-        '--no-proxy',
         '--no-backfill-lastfm'
     )
     Log $HotLog "start hot-push: $($hotArgs -join ' ')"

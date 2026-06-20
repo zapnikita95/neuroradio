@@ -44,7 +44,6 @@ try {
         '--hot-target=20000',
         '--concurrency=5',
         '--resume',
-        '--no-proxy',
         '--no-backfill-lastfm'
     )
     $proc = Start-Process -FilePath 'node' `

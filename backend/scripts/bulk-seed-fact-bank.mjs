@@ -1,13 +1,14 @@
 /**
  * Bulk harvest facts into facts-bank.json / facts-bank-seed.json.
  * Checkpoint every 10 tracks (bank + hot-seed + progress).
- * Run: node scripts/bulk-seed-fact-bank.mjs [--target=8000] [--concurrency=2] [--resume] [--retry-zero] [--no-proxy]
+ * Run: node scripts/bulk-seed-fact-bank.mjs [--target=8000] [--concurrency=2] [--resume] [--retry-zero] [--no-proxy] [--skip-vpn-check]
  */
 import './setup-hidemy-proxy.mjs';
 import '../dist/load-env.js';
 process.env.HARVEST_RATE_LIMIT = 'true';
 process.env.BULK_HARVEST = 'true';
 import crypto from 'node:crypto';
+import net from 'node:net';
 import { mkdirSync, readFileSync, writeFileSync, existsSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -38,6 +39,8 @@ const trackLimit = parseInt(args.find((a) => a.startsWith('--limit='))?.split('=
 const resume = args.includes('--resume');
 const retryZero = args.includes('--retry-zero');
 const discogsOnly = args.includes('--discogs-only');
+const skipVpnCheck = args.includes('--skip-vpn-check');
+const noProxy = args.includes('--no-proxy');
 const backfillDiscogs = !hotPush && (args.includes('--backfill-discogs') || discogsOnly);
 const backfillLastfm = !hotPush && !args.includes('--no-backfill-lastfm') && !discogsOnly;
 
@@ -551,7 +554,71 @@ async function runPool(tracks, bank, stats, doneKeys, zeroFactKeys) {
   await Promise.all(Array.from({ length: concurrency }, () => worker()));
 }
 
+function proxyPortAlive(port = 1301) {
+  return new Promise((resolve) => {
+    const s = net.connect({ host: '127.0.0.1', port });
+    s.once('connect', () => {
+      s.end();
+      resolve(true);
+    });
+    s.once('error', () => resolve(false));
+    setTimeout(() => {
+      s.destroy();
+      resolve(false);
+    }, 800);
+  });
+}
+
+async function lastfmReachable() {
+  const key = process.env.LASTFM_API_KEY?.trim();
+  if (!key) return true;
+  try {
+    const url =
+      `https://ws.audioscrobbler.com/2.0/?method=track.getInfo&api_key=${encodeURIComponent(key)}` +
+      `&artist=The%20Beatles&track=Yesterday&format=json`;
+    const r = await fetch(url, { signal: AbortSignal.timeout(12000) });
+    return r.ok;
+  } catch {
+    return false;
+  }
+}
+
+/** Last.fm blocked in RU without hidemy — refuse to chew queue on discogs-only sludge. */
+async function assertHarvestNetwork() {
+  if (skipVpnCheck) {
+    console.warn('[vpn] --skip-vpn-check: старт без проверки VPN/Last.fm');
+    return;
+  }
+  if (noProxy) {
+    console.warn(
+      '[vpn] --no-proxy: hidemy 127.0.0.1:1301 не используется; нужен системный VPN или Last.fm не ответит',
+    );
+  }
+  const proxyUp = await proxyPortAlive();
+  if (hotPush && !noProxy && !proxyUp) {
+    console.error('\n=== hot-push: hidemy VPN выключен (127.0.0.1:1301) ===');
+    console.error('Last.fm и wiki без VPN в РФ не работают — процесс не стартует.');
+    console.error('Включи hidemy.name → npm run seed:hot-push (или run-overnight-hot-push.ps1)');
+    console.error('Принудительно без VPN: --skip-vpn-check\n');
+    process.exit(1);
+  }
+  const lastfmOk = await lastfmReachable();
+  const viaProxy = Boolean(process.env.HTTPS_PROXY?.trim() || process.env.HTTP_PROXY?.trim());
+  if (lastfmOk) {
+    console.log(
+      `[vpn] Last.fm OK${proxyUp ? ' (hidemy 1301 up' + (viaProxy ? ', proxy active)' : ')') : viaProxy ? ' (via proxy)' : ''}`,
+    );
+    return;
+  }
+  console.error('\n=== Last.fm недоступен — harvest бессмысленен ===');
+  console.error(`hidemy proxy 127.0.0.1:1301: ${proxyUp ? 'UP но Last.fm всё равно fail' : 'DOWN (VPN выключен?)'}`);
+  console.error('Включи hidemy.name и перезапусти hot-push (без --no-proxy).');
+  console.error('Принудительно: --skip-vpn-check (только discogs, без Last.fm).\n');
+  process.exit(1);
+}
+
 async function main() {
+  await assertHarvestNetwork();
   refreshBankInterestScores();
   const catalog = JSON.parse(readFileSync(CATALOG, 'utf8'));
   let tracks = (catalog.tracks ?? []).filter(isHarvestableTrack);
