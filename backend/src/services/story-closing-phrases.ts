@@ -1,83 +1,178 @@
 import type { StoryNarratorId } from './story-narrator.js';
+import type { StoryLanguageId } from './story-language.js';
 import { scriptSimilarity } from './story-quality.js';
 
-/** Short closing reactions per persona — tied to facts/charts, not generic «вступление». */
-const CLOSING_POOLS: Record<Exclude<StoryNarratorId, 'auto'>, string[]> = {
+type PersonaKey = Exclude<StoryNarratorId, 'auto'>;
+
+/** RU closing reactions — Cyrillic only (TTS reads Latin aloud). */
+const CLOSING_POOLS_RU: Record<PersonaKey, string[]> = {
   fan: [
-    'После этого факта трек для меня звучит иначе — не просто фон.',
-    'Именно такая деталь и заставляет переслушать весь альбом.',
-    'Когда узнаёшь это — мелодия уже не кажется случайной.',
-    'Теперь понятно, почему этот сингл не сходил с ротации.',
-    'Такие детали и делают песню личной, а не просто хитом.',
-    'С этим контекстом текст читается совсем по-другому.',
-    'Вот почему я до сих пор не выкидываю этот трек из плейлиста.',
-    'Теперь каждый припев ощущается не случайностью, а выбором.',
-    'С такой предысторией сложно слушать равнодушно.',
-    'Именно за это я и цепляюсь к каталогу снова и снова.',
+    'Факт, достойный отдельного подкаста!',
+    'Такой факт просто не оставит равнодушным!',
+    'Это реально незабываемая деталь!',
+    'Вот из-за таких историй я и обожаю их творчество.',
+    'История, которую мы — фанаты — часто вспоминаем.',
+    'Обожаю, когда за песней стоит живая история.',
+    'От таких деталей только сильнее тянет слушать их снова.',
+    'Честно — факт огонь, такое не забываешь.',
+    'Именно за такое я и уважаю этих ребят.',
+    'Только истинный фанат может знать такие детали.',
   ],
   contemporary: [
-    'С этим контекстом трек звучит как документ эпохи, а не просто хит.',
-    'После такой детали понимаешь, почему его не выкинули из плейлистов.',
-    'Именно из-за этого он и остался в памяти, а не только в чартах.',
-    'Теперь ясно, почему о нём говорили не только фанаты.',
-    'Такая предыстория объясняет, откуда взялась вся эта энергия.',
-    'С этой историей трек перестаёт быть просто фоном.',
-    'Мы тогда и не знали половины — а песня уже работала.',
-    'Вот почему его помнят дольше одного сезона на плейлистах.',
-    'С этой деталью понятно, откуда взялось чувство срочности в записи.',
-    'Такие вещи и отличают хит, который пережил эпоху.',
+    'Мы с друзьями ещё не раз вспоминали эту историю!',
+    'Вот ради таких историй и тянет переслушивать знакомые песни.',
+    'Честно, от таких деталей музыка оживает по-новому.',
+    'Такие штуки и делают песню больше, чем просто фоновой музыкой.',
+    'Кому ни расскажешь такое — все удивляются!',
+    'Не думал, что за знакомой мелодией может столько всего стоять.',
+    'Вот почему эта композиция так хорошо запомнилась.',
+    'После такой истории трек мне сразу запомнился.',
+    'Такой факт — и песня уже другая, хотя мелодия та же.',
+    'Обожаю, когда любимая песня на самом деле ещё глубже, чем кажется.',
   ],
   expert: [
-    'Эта деталь объясняет, почему трек до сих пор цитируют в разборах.',
-    'Именно такой факт и отличает хит от однодневного сингла.',
-    'С таким контекстом видно, за что его брали в учебные подборки.',
-    'После этого понятна вся конструкция — не только припев.',
-    'Такие факты и держат трек в каноне жанра.',
-    'С этой предысторией механика трека читается на слух.',
-    'Вот за что этот номер до сих пор разбирают по слоям.',
-    'Именно эта деталь держит трек в разговоре о жанре.',
-    'С таким семенем видно, почему аранжировка не случайна.',
-    'После этого факта трек перестаёт быть просто «ещё одним синглом».',
+    'Вот такую деталь и имеют в виду, когда говорят про закулисье хита.',
+    'Такой факт хорошо объясняет, почему этот трек любят поднимать в разборах группы.',
+    'Именно такие штуки потом разбирают на подкастах.',
+    'Тут видна усердная работа, а не просто везение.',
+    'Это не байки фанатов — это то, что реально меняет взгляд на запись.',
+    'Запомни эту деталь — в любом разборе она всплывёт снова.',
+    'Редко когда одна строка из интервью так много объясняет.',
+    'Вот за что этот трек до сих пор цитируют в музыкальной прессе.',
+    'Для серьёзного разбора это почти обязательный пункт.',
+    'Такой факт — сильный аргумент, почему трек не однодневка.',
   ],
   radio_host: [
-    'Именно поэтому этот сингл годами не сходил с ротации.',
-    'С таким фактом ведущий не рискует — аудитория дослушивает до конца.',
-    'На линии поддержки такие истории разбирают дольше обычного.',
-    'Такие детали и объясняют, почему его ставили снова и снова.',
-    'Именно из-за этого трек помнят дольше, чем один сезон.',
-    'После такой детали понятно, за что его не вырезали из эфира.',
-    'В эфире такие повороты не откладывают — слишком много реакции в студии.',
-    'Суфлёр на таком факте не экономит слов — история сама тянет эфир.',
-    'Редко какой факт так держит внимание — этот как раз из таких.',
-    'С этим контекстом понятно, почему линия поддержки не молчала.',
-    'Такой поворот в выпуске не вырезают — слишком много откликов.',
-    'Именно за такие детали слушатели и возвращаются к эфиру.',
+    'Такое нарочно не придумаешь!',
+    'Не переключайтесь!',
+    'Этот трек — наш любимчик на станции!',
+    'Вот это да! А теперь вернёмся к прослушиванию.',
+    'Вот как-то так, друзья! Отличного прослушивания!',
+    'У нас в эфире только ваши любимые треки, не переключайтесь!',
+    'В чартах или нет, этот трек запомнится надолго!',
+    'Ну и ну, не терпится послушать дальше!',
+    'Факт не оставит равнодушным, как и сама композиция!',
+    'А на этом у нас всё, вернёмся к прослушиванию!',
   ],
   backstage: [
-    'На прослушивании такие детали сразу отличают хит от проходного сингла.',
-    'Именно этот момент все потом обсуждали за кулисами.',
-    'С такой предысторией было ясно: в ротацию пойдёт не случайно.',
-    'Такой факт объясняет, почему трек не вырезали при монтаже.',
-    'После этого контекста вся запись звучит иначе.',
-    'Именно из-за этого его и оставили на пластинке.',
-    'Вот что потом годами обсуждали на коридорных разговорах.',
-    'С такой деталью было понятно: это не демо на один день.',
-    'Именно этот эпизод и отделял запись от «ещё одного дубля».',
-    'После такого контекста вся сессия читается по-другому.',
+    'Но только давайте это будет наш с вами секрет!',
+    'Все свои знают об этом, теперь и вы знаете!',
+    'Именно это потом обсуждают за закрытыми дверями.',
+    'Только факты — без софитов и вымысла.',
+    'Да это знает каждый, кто в теме!',
+    'Вот за такие истории этот бизнес и любят изнутри.',
+    'Не каждый день случается что-то настолько показательное.',
+    'Мне шепнули это по секрету, вы смотрите, не проболтайтесь!',
+    'Это вовсе не слух: это факт из первых рук!',
+    'Да.... В интервью такого не расскажут!',
   ],
   night_dj: [
-    'Ночью такая деталь звучит особенно — тихо, но в точку.',
-    'С этим контекстом трек становится разговором один на один.',
-    'Именно поэтому его не переключали даже в три часа ночи.',
-    'После этого факта песня звучит как исповедь, а не фон.',
-    'С такой предысторией её доводят до конца, не переключая.',
-    'В три ночи такие истории работают лучше любой болтовни.',
-    'Ночной эфир любит такие факты — без крика, но с весом.',
-    'С этой деталью трек держит тишину в студии до последней ноты.',
-    'Именно поэтому ночью его не сворачивают на середине.',
-    'Такая предыстория в ночи звучит честнее, чем днём.',
+    'Ночью такие истории звучат особенно честно.',
+    'Тихий эфир для таких фактов — самое место.',
+    'Не переключайтесь — послушайте до конца.',
+    'Посреди ночи такой факт попадает прямо в душу.',
+    'Зная это, ночью получаешь особенный опыт прослушивания.',
+    'Ночью каждая такая деталь на вес золота.',
+    'Именно ночью начинаешь слышать гораздо больше.',
+    'Ночью музыка с таким фактом открывается по-новому.',
+    'Давайте же насладимся этой композицией.',
+    'Спокойной ночи и хорошей музыки!',
   ],
 };
+
+/** EN closing reactions — English only, same persona vibe as RU pools. */
+const CLOSING_POOLS_EN: Record<PersonaKey, string[]> = {
+  fan: [
+    'A fact worthy of its own podcast episode!',
+    'A detail like that will not leave anyone cold!',
+    'That is a truly unforgettable detail!',
+    'Stories like this are why I love their music.',
+    'A story we fans keep coming back to.',
+    'I love when there is a real story behind a song.',
+    'Details like that make me want to listen again.',
+    'Honestly — killer fact, you do not forget that.',
+    'That is exactly why I respect these artists.',
+    'Only a true fan would know a detail like that.',
+  ],
+  contemporary: [
+    'My friends and I have brought this story up more than once!',
+    'Stories like this make you want to replay old favorites.',
+    'Honestly, details like that bring the music back to life.',
+    'Stuff like this makes a song more than just background music.',
+    'Tell anyone this — they are shocked!',
+    'Did not think so much could hide behind a familiar melody.',
+    'That is why this track stuck with me.',
+    'After a story like that, the track hits different.',
+    'Same melody — whole new song once you know the fact.',
+    'I love when a favorite track runs even deeper than it seems.',
+  ],
+  expert: [
+    'This is the kind of detail people mean when they talk hit backstage.',
+    'A fact like that explains why this track keeps coming up in deep dives.',
+    'This is exactly what gets unpacked on podcasts.',
+    'That is real work on display — not just luck.',
+    'Not fan fiction — this genuinely reframes the record.',
+    'Remember this detail — it will show up in every breakdown.',
+    'Rare when one interview line explains so much.',
+    'This is why music press still quotes this track.',
+    'For a serious breakdown, this is basically required reading.',
+    'A strong argument this is not a one-week wonder.',
+  ],
+  radio_host: [
+    'You could not make this up!',
+    'Do not touch that dial!',
+    'This track is a station favorite!',
+    'Wow! Now back to the music.',
+    'That is a wrap, folks — happy listening!',
+    'Only your favorites on our air — stay tuned!',
+    'Chart or no chart, this one stays with you.',
+    'Man, cannot wait to hear what comes next!',
+    'The fact hits as hard as the song itself!',
+    'That is all from us — back to the music!',
+  ],
+  backstage: [
+    'But let us keep this our little secret!',
+    'Insiders have known this — now you do too!',
+    'This is what gets talked about behind closed doors.',
+    'Just the facts — no spotlights, no fiction.',
+    'Everyone in the know has heard this one.',
+    'Stories like this are why people love this business from the inside.',
+    'Does not happen every day — something that telling.',
+    'Someone whispered this to me — do not go blabbing!',
+    'Not rumor — first-hand fact.',
+    'Yeah.... You will not hear this in a press interview!',
+  ],
+  night_dj: [
+    'Stories like this land differently at night.',
+    'Quiet night radio for facts like this — perfect fit.',
+    'Do not go anywhere — listen to the end.',
+    'In the dead of night, a fact like that goes straight to the soul.',
+    'Knowing this, night listening hits different.',
+    'At night, every detail like that is gold.',
+    'Night is when you start hearing so much more.',
+    'At night, music with a fact like that opens up anew.',
+    'Let us savor this track.',
+    'Good night and good music!',
+  ],
+};
+
+function closingPoolsFor(lang: StoryLanguageId): Record<PersonaKey, string[]> {
+  return lang === 'en' ? CLOSING_POOLS_EN : CLOSING_POOLS_RU;
+}
+
+function assertClosingPoolAlphabets(): void {
+  for (const phrase of Object.values(CLOSING_POOLS_RU).flat()) {
+    if (/[a-zA-Z]/.test(phrase)) {
+      throw new Error(`RU closing phrase must be Cyrillic only: ${phrase}`);
+    }
+  }
+  for (const phrase of Object.values(CLOSING_POOLS_EN).flat()) {
+    if (/[а-яёА-ЯЁ]/.test(phrase)) {
+      throw new Error(`EN closing phrase must be English only: ${phrase}`);
+    }
+  }
+}
+assertClosingPoolAlphabets();
 
 function hashSeed(input: string): number {
   let h = 0;
@@ -109,7 +204,96 @@ const CLOSING_OVERUSE_MARKERS: RegExp[] = [
   /такой\s+факт\s+в\s+эфир/i,
   /не\s+нуждается\s+в\s+лишних\s+словах/i,
   /с\s+такой\s+историей\s+за\s+спиной/i,
+  /не\s+просто\s+фон/i,
+  /с\s+этим\s+контекстом/i,
+  /выкидыва/i,
+  /плейлист/i,
+  /каждый\s+припев/i,
+  /цепляюсь\s+к\s+каталог/i,
+  /документ\s+эпох/i,
+  /суфл[её]р/i,
+  /копа(?:ю|л)\s+бэкстейдж/i,
+  /разбор\s+дискограф/i,
+  /половин[аы]\s+альбом/i,
+  /удачн(?:ый|ого)\s+релиз/i,
+  /за\s+датами/i,
+  /после\s+(?:этого|такого)\b/i,
+  /без\s+(?:этой|такой)\s+истории/i,
+  /на\s+месте\s+автор/i,
+  /ещё\s+один\s+сингл/i,
+  /[«""]/,
+  /\bканон\b/i,
+  /звучит\s+как\s+решен/i,
 ];
+
+/** RU: типичная лatin-вставка модели → кириллица для TTS. */
+const CLOSING_LATIN_TO_RU: Record<string, string> = {
+  filler: 'филлер',
+  event: 'событие',
+  track: 'трек',
+  hit: 'хит',
+};
+
+const BAD_CLOSING_TAIL =
+  /звучит\s+не\s+как\s+(?:filler|филлер)|После такой истории\s+трек\s+звучит|отделяют\s+хит\s+от/i;
+
+function sanitizeClosingPhrase(phrase: string, lang: StoryLanguageId): string {
+  let s = phrase.replace(/[«""„"']/g, ' ').replace(/\s{2,}/g, ' ').trim();
+  if (!s) return '';
+
+  if (lang === 'en') {
+    s = s.replace(/[а-яёА-ЯЁ]+/g, ' ').replace(/\s{2,}/g, ' ').trim();
+    return s;
+  }
+
+  for (const [latin, ru] of Object.entries(CLOSING_LATIN_TO_RU)) {
+    s = s.replace(new RegExp(`\\b${latin}\\b`, 'gi'), ru);
+  }
+  s = s.replace(/\b[a-zA-Z]+\b/g, (word) => CLOSING_LATIN_TO_RU[word.toLowerCase()] ?? '');
+  return s.replace(/\s{2,}/g, ' ').replace(/^[,;:\-—]+/, '').trim();
+}
+
+/** Авто-правка финала: кавычки/латиница/штамп — без reject, пользователь не ждёт лишних retry. */
+export function sanitizeClosingTail(script: string, lang: StoryLanguageId = 'ru'): string {
+  const trimmed = script.trim();
+  if (!trimmed) return trimmed;
+
+  const sentences = trimmed.split(/(?<=[.!?…])\s+/).filter(Boolean);
+  if (sentences.length <= 1) {
+    const only = sanitizeClosingPhrase(trimmed, lang);
+    if (!only || closingHasWrongAlphabet(only, lang) || closingHasQuotes(only)) return trimmed;
+    if (isStaleClosingCliche(only) || BAD_CLOSING_TAIL.test(only)) return trimmed;
+    return only;
+  }
+
+  const closingRaw = sentences.pop()!;
+  const body = sentences.join(' ').trim();
+  let closing = sanitizeClosingPhrase(closingRaw, lang);
+
+  if (
+    !closing ||
+    closingHasWrongAlphabet(closing, lang) ||
+    closingHasQuotes(closing) ||
+    isStaleClosingCliche(`${body} ${closing}`) ||
+    BAD_CLOSING_TAIL.test(`${body} ${closing}`)
+  ) {
+    return body;
+  }
+
+  return `${body} ${closing}`.replace(/\s{2,}/g, ' ').trim();
+}
+
+/** Финал с кавычками — TTS их озвучивает вслух. */
+export function closingHasQuotes(text: string): boolean {
+  return /[«""„"]/.test(text.trim().slice(-220));
+}
+
+/** RU финал с латиницей или EN финал с кириллицей — TTS ломается. */
+export function closingHasWrongAlphabet(text: string, lang: StoryLanguageId = 'ru'): boolean {
+  const tail = text.trim().slice(-220);
+  if (lang === 'en') return /[а-яёА-ЯЁ]/.test(tail);
+  return /[a-zA-Z]/.test(tail);
+}
 
 /** Дословные штампы финала — никогда не подсказывать модели и отклонять в quality gate. */
 export const STALE_CLOSING_CLICHE_PATTERNS: RegExp[] = [
@@ -119,6 +303,18 @@ export const STALE_CLOSING_CLICHE_PATTERNS: RegExp[] = [
   /не\s+нуждается\s+в\s+лишних\s+словах/i,
   /с\s+такой\s+историей\s+за\s+спиной/i,
   /лучше\s+любого\s+джингла/i,
+  /не\s+просто\s+фон/i,
+  /с\s+этим\s+контекстом/i,
+  /выкидыва/i,
+  /каждый\s+припев/i,
+  /цепляюсь\s+к\s+каталог/i,
+  /копа(?:ю|л)\s+бэкстейдж/i,
+  /разбор\s+дискограф/i,
+  /после\s+(?:этого|такого)\b/i,
+  /без\s+(?:этой|такой)\s+истории/i,
+  /[«""]/,
+  /\bканон\b/i,
+  /звучит\s+как\s+решен/i,
 ];
 
 export function isStaleClosingCliche(script: string): boolean {
@@ -127,8 +323,10 @@ export function isStaleClosingCliche(script: string): boolean {
 }
 
 /** All closing phrase templates by persona (for docs / review). */
-export function listClosingPhrasePools(): Record<Exclude<StoryNarratorId, 'auto'>, string[]> {
-  return CLOSING_POOLS;
+export function listClosingPhrasePools(
+  lang: StoryLanguageId = 'ru',
+): Record<PersonaKey, string[]> {
+  return closingPoolsFor(lang);
 }
 
 function closingPhraseOverused(phrase: string, previousScripts: string[]): boolean {
@@ -143,19 +341,53 @@ export function pickClosingPhraseHint(
   artist: string,
   title: string,
   previousScripts: string[] = [],
+  storyLanguage: StoryLanguageId = 'ru',
 ): string {
   const key = narratorId === 'auto' ? 'contemporary' : narratorId;
-  const basePool = CLOSING_POOLS[key];
+  const basePool = closingPoolsFor(storyLanguage)[key];
   let pool = basePool.filter(
     (phrase) =>
       !closingPhraseOverused(phrase, previousScripts) &&
-      !STALE_CLOSING_CLICHE_PATTERNS.some((p) => p.test(phrase)),
+      !STALE_CLOSING_CLICHE_PATTERNS.some((p) => p.test(phrase)) &&
+      !closingHasWrongAlphabet(phrase, storyLanguage),
   );
   if (pool.length === 0) pool = basePool;
   const idx =
-    hashSeed(`${key}|${artist.trim().toLowerCase()}|${title.trim().toLowerCase()}|${previousScripts.length}`) %
+    hashSeed(`${key}|${storyLanguage}|${artist.trim().toLowerCase()}|${title.trim().toLowerCase()}|${previousScripts.length}`) %
     pool.length;
   return pool[idx] ?? pool[0]!;
+}
+
+function buildRuClosingPromptBlock(
+  key: PersonaKey,
+  hint: string,
+  alts: string,
+  personaBan: string,
+): string {
+  return `ФИНАЛЬНАЯ РЕПЛИКА (одна короткая фраза в конце — своими словами, как живой человек в амплуа; НЕ копируй шаблон дословно):
+- Вариант для этого трека: ${hint}
+- Другие уместные финалы (чередуй):
+${alts}
+- Финал = самодостаточная реакция на факт из семени. Не после этого / без этой истории — фраза должна звучать нормально сразу после любого факта.
+- Только кириллица в финале — без латиницы и без кавычек (синтез речи их озвучивает вслух).
+- ЗАПРЕЩЕНО дословно и близко: в эфир не выкинешь — слушатели цепляются, за спиной не нуждается в лишних словах, не просто фон, с этим контекстом, каждый припев, выкидываю из плейлиста, цепляюсь к каталогу, после этого, без этой истории, канон, трек звучит как решение.
+- ЗАПРЕЩЕНО заканчивать реакцией на вступление / первые секунды, если этого нет в семени.${personaBan}`;
+}
+
+function buildEnClosingPromptBlock(
+  key: PersonaKey,
+  hint: string,
+  alts: string,
+  personaBan: string,
+): string {
+  return `CLOSING LINE (one short phrase at the end — your own words in persona voice; do NOT copy templates verbatim):
+- Suggested for this track: ${hint}
+- Other closings (rotate):
+${alts}
+- Closing = self-contained reaction to the seed fact. No after this / without this story — must work after any fact.
+- English only in the closing — no Cyrillic, no quotation marks (TTS reads quotes aloud).
+- FORBIDDEN verbatim or near: on air you cannot skip it, listeners hook instantly, no filler/event clichés, after this, without this story.
+- Do NOT react to intro / first seconds unless the seed mentions them.${personaBan}`;
 }
 
 export function buildClosingPhrasePromptBlock(
@@ -163,22 +395,54 @@ export function buildClosingPhrasePromptBlock(
   artist: string,
   title: string,
   previousScripts: string[] = [],
+  storyLanguage: StoryLanguageId = 'ru',
 ): string {
-  const hint = pickClosingPhraseHint(narratorId, artist, title, previousScripts);
+  const hint = pickClosingPhraseHint(narratorId, artist, title, previousScripts, storyLanguage);
   const key = narratorId === 'auto' ? 'contemporary' : narratorId;
-  const alts = CLOSING_POOLS[key]
+  const alts = closingPoolsFor(storyLanguage)[key]
     .filter((line) => line !== hint && !closingPhraseOverused(line, previousScripts))
     .slice(0, 5)
     .map((line) => `• ${line}`)
     .join('\n');
 
-  return `ФИНАЛЬНАЯ РЕПЛИКА (одна короткая фраза в конце — адаптируй, НЕ копируй дословно шаблон):
-- Вариант для этого трека: «${hint}»
-- Другие уместные финалы для твоего амплуа (чередуй; ЗАПРЕЩЕНО: «мурашки», «ощущение эпохи», «вступление», «джингл», «первые секунды/ноты» — если уже были в прошлых рассказах):
-${alts}
-- Мысль «сильный факт / трек говорит сам» — ОК, но каждый раз НОВЫМИ словами. ЗАПРЕЩЕНО дословно: «Такой факт в эфир не выкинешь — слушатели сразу цепляются», «С такой историей за спиной трек не нуждается в лишних словах», «лучше любого jingle/джингла».
-- ЗАПРЕЩЁН шаблон «ради чего … оставался после смены / задерживался после монтажа» и любые вариации с микшёром, монтажёром, звукорежиссёром.
-- ЗАПРЕЩЕНО: «После такой истории трек звучит не как filler/филлер», «не как filler, а как событие», «отделяют хит от filler» — шаблон из старых выпусков; финал каждый раз новый.
-- ЗАПРЕЩЕНО заканчивать реакцией на «вступление», «начало», «первые секунды» — если в семени нет intro/opening.
-- Финал = реакция на КОНКРЕТНЫЙ факт из семени (имя, событие, платформа, скандал, чарт). Без воды и без пафосных штампов.`;
+  if (storyLanguage === 'en') {
+    const personaBan =
+      key === 'fan'
+        ? `
+- SUPERFAN: warm exclamation, love for the artist. Self-contained — works with any fact.`
+        : key === 'radio_host'
+          ? `
+- RADIO HOST: live on-air vibe — stay tuned, back to the music, wow. No fake call-ins or chart fiction.`
+          : key === 'night_dj'
+            ? `
+- NIGHT DJ: quiet, intimate, late-night delivery. No after this clichés.`
+            : key === 'backstage'
+              ? `
+- BACKSTAGE: industry insider whisper, gossip tone, no invented context.`
+              : '';
+    return buildEnClosingPromptBlock(key, hint, alts, personaBan);
+  }
+
+  const personaBan =
+    key === 'fan'
+      ? `
+- СУПЕРФАН: короткая тёплая реакция-восклицание, любовь к группе/исполнителю. Финал САМОДОСТАТОЧЕН — ложится на любой факт.`
+      : key === 'contemporary'
+        ? `
+- СОВРЕМЕННИК: тёплая реакция своими словами, без привязки к конкретному году или эпохе.`
+        : key === 'expert'
+          ? `
+- ЭКСПЕРТ: как подкастер или журналист, простым языком. Без канона, без трек звучит как решение.`
+          : key === 'radio_host'
+            ? `
+- РАДИО: живой эфир — коротко, по-дружески: не переключайтесь, вернёмся к прослушиванию, вот это да.`
+            : key === 'backstage'
+              ? `
+- БЭКСТЕЙДЖ: инсайдер индустрии, байки изнутри, без выдуманного контекста.`
+              : key === 'night_dj'
+                ? `
+- НОЧНОЙ ДИДЖЕЙ: тихо, интимно, без исповеди, без после этого.`
+                : '';
+
+  return buildRuClosingPromptBlock(key, hint, alts, personaBan);
 }

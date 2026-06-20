@@ -807,18 +807,23 @@ class StoryRepository(
                     code == "YANDEX_TTS_FAILED" ||
                     code == "YANDEX_TTS_SPEED" ||
                     parsedBody?.contains("не получилось") == true ||
+                    parsedBody?.contains("не удалось собрать") == true ||
                     parsedBody?.contains("кавер") == true ||
                     parsedBody?.contains("Yandex", ignoreCase = true) == true ||
                     parsedBody?.contains("озвуч", ignoreCase = true) == true
                 ) {
                     return StoryAttemptResult.Failed(
                         reason = parsedBody
-                            ?: "Извините, по такому треку или группе рассказать историю не получилось.",
+                            ?: "Не удалось собрать факт — проверенных данных по треку нет",
                     )
                 }
                 if (e.code() == 503) {
-                    val reason = sanitizeBackendError(parsedBody, llmProvider)
-                        ?: explainError(e, llmProvider)
+                    val reason = when (code) {
+                        "NO_REFERENCE_FACTS" -> parsedBody
+                            ?: "Не удалось собрать факт — проверенных данных по треку нет"
+                        else -> sanitizeBackendError(parsedBody, llmProvider)
+                            ?: explainError(e, llmProvider)
+                    }
                     StoryLog.w("Backend LLM unavailable: $reason")
                     return StoryAttemptResult.Failed(
                         reason = reason,
@@ -950,18 +955,29 @@ class StoryRepository(
             429 -> "Лимит сервера Music Story (не Gemini)"
             499 -> "Отменено"
             503 -> "${llmProvider.labelRu} на сервере недоступен"
+            504 -> "Сервер долго отвечает — подожди и попробуй ещё раз"
             else -> "HTTP ${e.code()}"
         }
         is IOException -> {
             if (e.message?.contains("cancel", ignoreCase = true) == true) {
                 "Отменено"
-            } else if (e.message?.contains("timeout", ignoreCase = true) == true) {
+            } else if (
+                e.message?.contains("timeout", ignoreCase = true) == true ||
+                e.message?.contains("timed out", ignoreCase = true) == true
+            ) {
                 "Сервер долго отвечает — подожди и попробуй ещё раз"
+            } else if (
+                e.message?.contains("Unable to resolve", ignoreCase = true) == true ||
+                e.message?.contains("Failed to connect", ignoreCase = true) == true ||
+                e.message?.contains("Network is unreachable", ignoreCase = true) == true ||
+                e.message?.contains("ECONNREFUSED", ignoreCase = true) == true
+            ) {
+                "Не удалось связаться с сервером — проверь интернет или VPN"
             } else {
-                "Нет связи с сервером — проверь интернет"
+                "Сервер долго отвечает — подожди и попробуй ещё раз"
             }
         }
-        else -> e.message?.take(80) ?: e.javaClass.simpleName
+        else -> e.message?.take(120) ?: e.javaClass.simpleName
     }
 
     private fun parseServerRateLimit(e: HttpException): ServerRateLimitParser.Parsed {
@@ -1314,7 +1330,7 @@ class StoryRepository(
             "GEMINI_NOT_CONFIGURED",
             "LOCAL_OLLAMA_NOT_CONFIGURED",
         )
-        private const val BACKEND_TIMEOUT_MS = 300_000L
+        private const val BACKEND_TIMEOUT_MS = 480_000L
         /** Local Ollama: research + up to 8 narrator attempts on 35b model. */
         private const val BACKEND_LOCAL_TIMEOUT_MS = 1_200_000L
         private const val METADATA_TIMEOUT_MS = 15_000L

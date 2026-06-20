@@ -1,3 +1,4 @@
+import { sanitizeClosingTail } from '../dist/services/story-closing-phrases.js';
 import { validateStoryScript } from '../dist/services/story-quality.js';
 
 const queenStory =
@@ -6,22 +7,32 @@ const seed =
   '"I Want to Break Free" is a song performed by Queen, which was written by bassist John Deacon.';
 
 let failed = 0;
+
+const sanitizedQueen = sanitizeClosingTail(queenStory, 'ru');
+console.log('sanitize filler closing=', sanitizedQueen);
+if (/filler|филлер|событие/i.test(sanitizedQueen.slice(-80))) {
+  console.error('FAIL: bad filler closing should be stripped');
+  failed++;
+}
+
+const staleRadio =
+  'В студии сомневались, но сингл всё равно вышел в ротацию. Такой факт в эфир не выкинешь — слушатели сразу цепляются.';
+const sanitizedStale = sanitizeClosingTail(staleRadio, 'ru');
+console.log('sanitize stale radio closing=', sanitizedStale);
+if (/в эфир не выкинешь/i.test(sanitizedStale)) {
+  console.error('FAIL: stale radio closing should be stripped');
+  failed++;
+}
+
 const q = validateStoryScript(queenStory, undefined, 'Queen', 'I Want To Break Free', {
   referenceFacts: [seed],
   skipPersonaCliches: true,
   speakTrackNamesInVoiceover: true,
 });
-console.log('validate template closing=', q);
-if (q.ok || !/template closing|hard reject/i.test(q.reason)) failed++;
-
-const staleRadio =
-  'В студии сомневались, но сингл всё равно вышел в ротацию. Такой факт в эфир не выкинешь — слушатели сразу цепляются.';
-const staleQ = validateStoryScript(staleRadio, undefined, 'Queen', 'Bohemian Rhapsody', {
-  referenceFacts: ['Bohemian Rhapsody was recorded by Queen.'],
-  skipPersonaCliches: true,
-  speakTrackNamesInVoiceover: true,
-});
-console.log('validate stale radio closing=', staleQ);
-if (staleQ.ok || !/stale radio closing/i.test(staleQ.reason)) failed++;
+console.log('validate after auto-sanitize path=', q);
+if (/template closing|filler|филлер/i.test(q.reason ?? '')) {
+  console.error('FAIL: should auto-fix closing, not reject for filler template');
+  failed++;
+}
 
 process.exit(failed > 0 ? 1 : 0);

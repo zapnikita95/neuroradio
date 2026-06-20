@@ -366,9 +366,24 @@ class StoryOrchestrator(
         factHintNotifier.onPlaybackTrackChanged(track)
 
         _hintMessage.value = null
+        _errorMessage.value = null
         _pendingFeedback.value?.takeIf { it.trackKey != track.displayKey }?.let {
             _pendingFeedback.value = null
         }
+
+        if (!manualStoryInFlight) {
+            val incoming = trackTitleKey(track)
+            val inFlight = inFlightTrackKey
+            if (
+                inFlight != null &&
+                inFlight != incoming &&
+                (backendFetchInFlight || generationInFlight || activeStoryJob?.isActive == true)
+            ) {
+                storyRepository.cancelActiveStoryFetch("track changed")
+                cancelInFlightGenerationImmediate("track changed")
+            }
+        }
+
         mediaControllerManager.restoreSystemMusicVolumeIfNeeded()
 
         triggerEngine.restoreTracksSinceLastStory(settingsDataStore.tracksSinceLastStory.first())
@@ -942,16 +957,19 @@ class StoryOrchestrator(
         reason == "stopped by user" ||
             reason?.contains("stopped by user", ignoreCase = true) == true
 
+    private fun shouldAllowHttpCancel(reason: String): Boolean =
+        reason == "stopped by user" || reason == "track skipped" || reason == "track changed"
+
     private fun cancelInFlightGenerationImmediate(reason: String) {
         if (!shouldAbortInFlightStory(reason)) {
             StoryLog.i("Keep in-flight story ($reason) — manual request active")
             return
         }
-        if (backendFetchInFlight && reason != "stopped by user") {
+        if (backendFetchInFlight && !shouldAllowHttpCancel(reason)) {
             StoryLog.i("Story generation cancel suppressed during HTTP: $reason")
             return
         }
-        if (reason == "track skipped" || reason == "stopped by user") {
+        if (shouldAllowHttpCancel(reason)) {
             storyRepository.cancelActiveStoryFetch(reason)
         }
         val wasActive = generationInFlight ||
@@ -980,11 +998,11 @@ class StoryOrchestrator(
             StoryLog.i("Keep in-flight story ($reason) — manual request active")
             return
         }
-        if (backendFetchInFlight && reason != "stopped by user") {
+        if (backendFetchInFlight && !shouldAllowHttpCancel(reason)) {
             StoryLog.i("Story generation cancel suppressed during HTTP: $reason")
             return
         }
-        if (reason == "track skipped" || reason == "stopped by user") {
+        if (shouldAllowHttpCancel(reason)) {
             storyRepository.cancelActiveStoryFetch(reason)
         }
         val wasActive = generationInFlight ||
@@ -1338,9 +1356,9 @@ class StoryOrchestrator(
     }
 
     companion object {
-        private const val PLAYBACK_START_TIMEOUT_MS = 55_000L
-        /** Metadata + backend /v1/story/full (facts + LLM + Yandex TTS). */
-        private const val STORY_FETCH_TIMEOUT_MS = 300_000L
+        private const val PLAYBACK_START_TIMEOUT_MS = 180_000L
+        /** Metadata + backend /v1/story/full (facts + LLM + TTS). */
+        private const val STORY_FETCH_TIMEOUT_MS = 480_000L
         /** Local Ollama on PC BFF — 35b model + research. */
         private const val LOCAL_STORY_FETCH_TIMEOUT_MS = 1_200_000L
         private const val PREVIEW_REVEAL_MAX_MS = 7_000L

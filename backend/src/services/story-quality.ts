@@ -23,7 +23,7 @@ import { fixTtsGrammarIssues } from './tts-grammar-fixes.js';
 import { isVoiceoverWithoutTrackNames, scriptLeaksVoiceoverNames } from './voiceover-no-names.js';
 import { primaryArtistName } from './artist-primary.js';
 import { resolveStoryNarrator, type StoryNarratorId } from './story-narrator.js';
-import { isStaleClosingCliche } from './story-closing-phrases.js';
+import { isStaleClosingCliche, sanitizeClosingTail } from './story-closing-phrases.js';
 import { findQuoteSpeakerDrift } from './fact-quote-attribution.js';
 
 export { DEFAULT_STORY_LENGTH, getStoryLengthPreset };
@@ -384,9 +384,10 @@ export function sanitizeScriptForTts(
 ): string {
   if (options?.storyLanguage === 'en') {
     let result = script.trim().replace(/\s{2,}/g, ' ').replace(/\s+([,.!?])/g, '$1').trim();
+    result = sanitizeClosingTail(result, 'en');
     return stripBannedFluff(result);
   }
-  let result = stripLlmStressLeakage(script.trim());
+  let result = stripLlmStressLeakage(sanitizeClosingTail(script.trim(), 'ru'));
   const allowed = allowedDigitSequences(artist, title, referenceFacts);
   const blockArtist = options?.trackArtist ?? artist;
   const blockTitle = options?.trackTitle ?? title;
@@ -776,7 +777,8 @@ export function validateStoryScript(
   const referenceFacts = options.referenceFacts ?? [];
   const previousScripts = options.previousScripts ?? [];
   const noTrackNames = isVoiceoverWithoutTrackNames(options.speakTrackNamesInVoiceover);
-  const trimmed = stripLlmStressLeakage(script.trim());
+  const storyLang = options.storyLanguage ?? 'ru';
+  let trimmed = stripLlmStressLeakage(sanitizeClosingTail(script.trim(), storyLang));
   if (!trimmed) return { ok: false, reason: 'empty script' };
 
   if (noTrackNames) {

@@ -17,6 +17,7 @@ import { buildStylePromptBlock } from './style-corpus.js';
 import { eraContextForPrompt, resolveTrackLocale } from './track-locale.js';
 import type { StoryPersona } from './prompts.js';
 import { buildVoiceoverNamesEconomyPromptBlockEn } from './voiceover-no-names.js';
+import { buildClosingPhrasePromptBlock } from './story-closing-phrases.js';
 
 function buildLengthStructurePlanEn(length: StoryLengthPreset): string {
   switch (length.id) {
@@ -267,6 +268,7 @@ export function buildEnglishStoryUserPrompt(params: {
   }
 
   lines.push('');
+  lines.push(buildClosingPhrasePromptBlock(narratorId, params.artist, params.title, prev, 'en'));
   lines.push(`Voice (voiceId): ${params.voiceId}`);
   lines.push('Reply in JSON.');
   return lines.join('\n');

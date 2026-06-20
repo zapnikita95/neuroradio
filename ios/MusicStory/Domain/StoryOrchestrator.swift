@@ -58,7 +58,7 @@ final class StoryOrchestrator: ObservableObject {
     /// Ручной запрос истории из настроек — не сбрасывать UI в onTrackChanged.
     private var explicitManualStoryRequest = false
 
-    private static let storyFetchTimeoutNs: UInt64 = 120 * 1_000_000_000
+    private static let storyFetchTimeoutNs: UInt64 = 480 * 1_000_000_000
 
     init(nowPlaying: NowPlayingCoordinator, storyPlayer: StoryPlayer) {
         self.nowPlaying = nowPlaying
@@ -96,6 +96,7 @@ final class StoryOrchestrator: ObservableObject {
     func onTrackChanged(_ track: TrackInfo) async {
         guard track.isValid() else { return }
         uiState.currentTrack = track
+        uiState.errorMessage = nil
         if explicitManualStoryRequest {
             return
         }

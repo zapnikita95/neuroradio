@@ -371,9 +371,12 @@
     <string name="android_tts_error_message">Could not voice on device — install a voice in TTS settings or switch back to Yandex</string>
     <string name="error_story_playback_failed">Could not play the story</string>
     <string name="error_story_timeout_local">Local model timed out (20 min limit). Check logs: Music story\logs\local-bff.log</string>
-    <string name="error_story_timeout_server">Server did not respond in 5 minutes. The story may still be preparing.</string>
+    <string name="error_story_timeout_server">Server did not respond in 8 minutes. The story may still be preparing.</string>
     <string name="error_story_request_cancelled">Request cancelled. Tap «Tell the story» again.</string>
     <string name="error_story_fetch_failed">Could not fetch the story</string>
+    <string name="error_story_no_facts">Could not find a verified fact for this track</string>
+    <string name="error_story_server_timeout">Server is taking too long — wait and try again</string>
+    <string name="error_story_connection">Could not reach the server — check internet or VPN</string>
     <string name="error_story_tell_failed">Could not tell the story</string>
     <string name="settings_llm_check_local">Set PC server URL and Ollama, then «Save and test»</string>
     <string name="settings_llm_check_api_key">Paste an API key first, then tap «Save and test»</string>

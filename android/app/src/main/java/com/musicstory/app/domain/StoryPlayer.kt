@@ -367,7 +367,7 @@ class StoryPlayer(context: Context) {
     }
 
     companion object {
-        private const val EXO_START_TIMEOUT_MS = 45_000L
+        private const val EXO_START_TIMEOUT_MS = 180_000L
         /** One retry only if audio never started — avoids triple restart mid-playback. */
         private const val MAX_EXO_URL_RETRIES = 1
 

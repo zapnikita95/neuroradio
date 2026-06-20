@@ -66,7 +66,7 @@ class ApiClient(
     /** Story generation can take 2+ minutes (facts + LLM + TTS queue on server). */
     private val storyOkHttpClient: OkHttpClient = OkHttpClient.Builder()
         .connectTimeout(30, TimeUnit.SECONDS)
-        .readTimeout(4, TimeUnit.MINUTES)
+        .readTimeout(8, TimeUnit.MINUTES)
         .writeTimeout(30, TimeUnit.SECONDS)
         .addInterceptor(storyCancelInterceptor)
         .addInterceptor(loggingInterceptor)

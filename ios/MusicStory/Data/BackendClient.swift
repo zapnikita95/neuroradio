@@ -136,8 +136,8 @@ final class BackendClient {
     private let settings = SettingsStore.shared
     private let tokenRefreshSkewMs: Int64 = 7 * 24 * 60 * 60 * 1000
 
-    private static let storyRequestTimeout: TimeInterval = 120
-    private static let storyResourceTimeout: TimeInterval = 180
+    private static let storyRequestTimeout: TimeInterval = 480
+    private static let storyResourceTimeout: TimeInterval = 540
     private static let apiRequestTimeout: TimeInterval = 90
     private static let apiResourceTimeout: TimeInterval = 180
     private static let authRequestTimeout: TimeInterval = 35

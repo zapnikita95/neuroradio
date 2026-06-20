@@ -504,7 +504,7 @@ export function buildStoryUserPrompt(params: {
   }
 
   lines.push('');
-  lines.push(buildClosingPhrasePromptBlock(narratorId, params.artist, params.title, prev));
+  lines.push(buildClosingPhrasePromptBlock(narratorId, params.artist, params.title, prev, 'ru'));
   lines.push('');
   lines.push(`Голос (voiceId): ${params.voiceId}`);
   const voiceHint = voiceStoryPromptHint(params.voiceId);
