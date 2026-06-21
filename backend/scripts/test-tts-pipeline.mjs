@@ -25,6 +25,7 @@ import {
 import { resolveEdgeTtsDeliveryForPreset } from '../dist/services/edge-tts-en.js';
 import { normalizeYearsForRussianTts, normalizeDecadesForRussianTts } from '../dist/services/tts-russian-years.js';
 import { sanitizeScriptForTts } from '../dist/services/story-quality.js';
+import { sanitizeClosingTail } from '../dist/services/story-closing-phrases.js';
 import { normalizeEdgeRussianOrthography } from '../dist/services/tts-edge-normalize.js';
 
 let passed = 0;
@@ -323,6 +324,14 @@ test('decades spoken: классикой 80-х → восьмидесятых', 
   const spoken = normalizeDecadesForRussianTts('классикой 80-х вроде');
   assert.match(spoken, /классикой восьмидесятых/i);
   assert.doesNotMatch(spoken, /80/i);
+});
+
+test('closing tail keeps Tous les Mêmes (not ê)', () => {
+  const script =
+    'Marga Bult — певица. Среди её работ можно выделить Tous les Mêmes.';
+  const out = sanitizeClosingTail(script, 'ru');
+  assert.match(out, /Tous les Mêmes/i);
+  assert.doesNotMatch(out, />ê\./i);
 });
 
 test('Yandex TTS: режиссёр Marc Klasfeld и MTV без en-US SSML', () => {

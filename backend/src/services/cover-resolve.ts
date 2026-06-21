@@ -1,5 +1,9 @@
 /** Resolve cover/karaoke titles to original artist + clean title for fact lookup. */
 
+import { readFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
 const ORIGINAL_ARTIST_IN_TITLE_RE =
   /\((?:[^)]*\b(?:originally\s+(?:recorded|performed|written|sung)\s+by|originally\s+by|as\s+(?:made\s+)?famous\s+by|in\s+the\s+style\s+of|tribute\s+to)\s+([^)]+?))\)/i;
 
@@ -40,6 +44,53 @@ export function isExplicitCoverTitle(title: string): boolean {
   return ORIGINAL_ARTIST_IN_TITLE_RE.test(title);
 }
 
+interface KnownCoverOriginal {
+  title: string;
+  originalArtist: string;
+}
+
+let knownCoverByTitle: Map<string, KnownCoverOriginal> | null = null;
+
+/** Accent-insensitive title key for known-cover lookup. */
+export function normalizeCoverTitleKey(title: string): string {
+  return title
+    .normalize('NFD')
+    .replace(/\p{M}/gu, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .toLowerCase();
+}
+
+function loadKnownCoverOriginals(): Map<string, KnownCoverOriginal> {
+  if (knownCoverByTitle) return knownCoverByTitle;
+  const dir = dirname(fileURLToPath(import.meta.url));
+  let rows: KnownCoverOriginal[] = [];
+  try {
+    rows = JSON.parse(
+      readFileSync(join(dir, '../data/known-cover-originals.json'), 'utf8'),
+    ) as KnownCoverOriginal[];
+  } catch {
+    rows = [];
+  }
+  knownCoverByTitle = new Map();
+  for (const row of rows) {
+    const key = normalizeCoverTitleKey(row.title);
+    if (key) knownCoverByTitle.set(key, row);
+  }
+  return knownCoverByTitle;
+}
+
+function lookupKnownOriginal(title: string): KnownCoverOriginal | null {
+  return loadKnownCoverOriginals().get(normalizeCoverTitleKey(title)) ?? null;
+}
+
+function artistsDiffer(a: string, b: string): boolean {
+  const na = a.trim().toLowerCase();
+  const nb = b.trim().toLowerCase();
+  if (!na || !nb) return false;
+  return na !== nb && !na.includes(nb) && !nb.includes(na);
+}
+
 /** Map performer + long cover title → original act for wiki/MB fact fetch. */
 export function resolveCoverForFacts(artist: string, title: string): CoverFactContext {
   const performerArtist = artist.trim();
@@ -67,6 +118,20 @@ export function resolveCoverForFacts(artist: string, title: string): CoverFactCo
       factTitle: cleanTitle || performerTitle,
       isCover: true,
       coverNoteRu: `Это кавер-версия трека ${cleanTitle}.`,
+    };
+  }
+
+  const known = lookupKnownOriginal(cleanTitle || performerTitle);
+  if (known && artistsDiffer(performerArtist, known.originalArtist)) {
+    const factTitle = known.title.trim() || cleanTitle || performerTitle;
+    return {
+      performerArtist,
+      performerTitle,
+      factArtist: known.originalArtist.trim(),
+      factTitle,
+      isCover: true,
+      originalArtist: known.originalArtist.trim(),
+      coverNoteRu: `Сейчас играет кавер (${performerArtist}); рассказываем про оригинал — ${known.originalArtist.trim()}, трек «${factTitle}».`,
     };
   }
 

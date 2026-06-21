@@ -240,6 +240,19 @@ const CLOSING_LATIN_TO_RU: Record<string, string> = {
 
 const CLOSING_TAGLINE_MAX_WORDS = 16;
 
+/** Last sentence still names tracks/artists — not a persona tagline; keep Latin titles intact. */
+const STORY_BODY_CLOSING_RE =
+  /(?:выделить|назван|запис|выпуст|альбом|трек|песн|композиц|исполн|известн|участ|представл|работ|групп|сингл|кавer|cover|Eurovision|Billboard|Grammy|чарт|релиз|дебют|клип|верси)/iu;
+
+function isStoryBodyClosing(sentence: string): boolean {
+  return STORY_BODY_CLOSING_RE.test(sentence.trim());
+}
+
+function shouldSanitizeAsClosingTagline(sentence: string): boolean {
+  if (isStoryBodyClosing(sentence)) return false;
+  return sentence.split(/\s+/).filter(Boolean).length <= CLOSING_TAGLINE_MAX_WORDS;
+}
+
 const BAD_CLOSING_TAIL =
   /звучит\s+не\s+как\s+(?:filler|филлер)|После такой истории\s+трек\s+звучит|отделяют\s+хит\s+от/i;
 
@@ -255,6 +268,7 @@ function sanitizeClosingPhrase(phrase: string, lang: StoryLanguageId): string {
   for (const [latin, ru] of Object.entries(CLOSING_LATIN_TO_RU)) {
     s = s.replace(new RegExp(`\\b${latin}\\b`, 'gi'), ru);
   }
+  // ASCII-only: do not strip ê/é/… inside French titles (Mêmes → «M» + «êmes»).
   s = s.replace(/\b[a-zA-Z]+\b/g, (word) => CLOSING_LATIN_TO_RU[word.toLowerCase()] ?? '');
   return s.replace(/\s{2,}/g, ' ').replace(/^[,;:\-—]+/, '').trim();
 }
@@ -268,7 +282,7 @@ export function sanitizeClosingTail(script: string, lang: StoryLanguageId = 'ru'
   if (sentences.length <= 1) {
     const wordCount = trimmed.split(/\s+/).filter(Boolean).length;
     // One-sentence story body — not a short closing tagline; keep Latin names (directors, MTV, films).
-    if (wordCount > CLOSING_TAGLINE_MAX_WORDS) return trimmed;
+    if (wordCount > CLOSING_TAGLINE_MAX_WORDS || isStoryBodyClosing(trimmed)) return trimmed;
     const only = sanitizeClosingPhrase(trimmed, lang);
     if (!only || closingHasWrongAlphabet(only, lang) || closingHasQuotes(only)) return trimmed;
     if (isStaleClosingCliche(only) || BAD_CLOSING_TAIL.test(only)) return trimmed;
@@ -277,6 +291,9 @@ export function sanitizeClosingTail(script: string, lang: StoryLanguageId = 'ru'
 
   const closingRaw = sentences.pop()!;
   const body = sentences.join(' ').trim();
+  if (!shouldSanitizeAsClosingTagline(closingRaw)) {
+    return trimmed;
+  }
   let closing = sanitizeClosingPhrase(closingRaw, lang);
 
   if (
