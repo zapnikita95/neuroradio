@@ -31,16 +31,16 @@ const CLOSING_POOLS_RU: Record<PersonaKey, string[]> = {
     'Обожаю, когда любимая песня на самом деле ещё глубже, чем кажется.',
   ],
   expert: [
-    'Вот такую деталь и имеют в виду, когда говорят про закулисье хита.',
-    'Такой факт хорошо объясняет, почему этот трек любят поднимать в разборах группы.',
-    'Именно такие штуки потом разбирают на подкастах.',
-    'Тут видна усердная работа, а не просто везение.',
+    'Такой факт можно встретить в любом серьёзном разборе этой композиции.',
+    'В любом серьёзном разборе этой композиции такая деталь всплывает почти всегда.',
+    'Открой серьёзный разбор этой композиции — там наверняка найдёшь похожий факт.',
+    'Эту деталь редко пропускают, когда разбирают эту композицию всерьёз.',
+    'В разборе этой композиции такие факты — не редкость.',
+    'Любой серьёзный разбор этой композиции опирается на подобные детали.',
+    'Такие факты и делают разбор этой композиции по-настоящему интересным.',
+    'Без такой детали разбор этой композиции выглядел бы неполным.',
+    'В музыкальной прессе при разборе этой композиции такое всплывает часто.',
     'Это не байки фанатов — это то, что реально меняет взгляд на запись.',
-    'Запомни эту деталь — в любом разборе она всплывёт снова.',
-    'Редко когда одна строка из интервью так много объясняет.',
-    'Вот за что этот трек до сих пор цитируют в музыкальной прессе.',
-    'Для серьёзного разбора это почти обязательный пункт.',
-    'Такой факт — сильный аргумент, почему трек не однодневка.',
   ],
   radio_host: [
     'Такое нарочно не придумаешь!',
@@ -107,16 +107,16 @@ const CLOSING_POOLS_EN: Record<PersonaKey, string[]> = {
     'I love when a favorite track runs even deeper than it seems.',
   ],
   expert: [
-    'This is the kind of detail people mean when they talk hit backstage.',
-    'A fact like that explains why this track keeps coming up in deep dives.',
-    'This is exactly what gets unpacked on podcasts.',
-    'That is real work on display — not just luck.',
+    'A fact like this shows up in any serious breakdown of this track.',
+    'In any serious breakdown of this track, a detail like this almost always appears.',
+    'Open a serious breakdown of this track — you will likely find a similar fact.',
+    'People rarely skip this detail when they break down this track properly.',
+    'Facts like this are common when this composition gets a serious breakdown.',
+    'Any serious breakdown of this track leans on details like this.',
+    'Details like this are what make a breakdown of this track worth hearing.',
+    'Without a detail like this, a breakdown of this track would feel incomplete.',
+    'Music press often surfaces this when breaking down this composition.',
     'Not fan fiction — this genuinely reframes the record.',
-    'Remember this detail — it will show up in every breakdown.',
-    'Rare when one interview line explains so much.',
-    'This is why music press still quotes this track.',
-    'For a serious breakdown, this is basically required reading.',
-    'A strong argument this is not a one-week wonder.',
   ],
   radio_host: [
     'You could not make this up!',
@@ -224,6 +224,9 @@ const CLOSING_OVERUSE_MARKERS: RegExp[] = [
   /[«""]/,
   /\bканон\b/i,
   /звучит\s+как\s+решен/i,
+  /для\s+серь[её]зного\s+разбора\s+это\s+почти\s+обязательный/i,
+  /именно\s+такие\s+эксперименты\s+с\s+жанрами/i,
+  /потом\s+разбирают\s+на\s+подкастах/i,
 ];
 
 /** RU: типичная лatin-вставка модели → кириллица для TTS. */
@@ -315,6 +318,9 @@ export const STALE_CLOSING_CLICHE_PATTERNS: RegExp[] = [
   /[«""]/,
   /\bканон\b/i,
   /звучит\s+как\s+решен/i,
+  /для\s+серь[её]зного\s+разбора\s+это\s+почти\s+обязательный/i,
+  /именно\s+такие\s+эксперименты\s+с\s+жанрами/i,
+  /потом\s+разбирают\s+на\s+подкастах/i,
 ];
 
 export function isStaleClosingCliche(script: string): boolean {
@@ -432,7 +438,7 @@ export function buildClosingPhrasePromptBlock(
 - СОВРЕМЕННИК: тёплая реакция своими словами, без привязки к конкретному году или эпохе.`
         : key === 'expert'
           ? `
-- ЭКСПЕРТ: как подкастер или журналист, простым языком. Без канона, без трек звучит как решение.`
+- ЭКСПЕРТ: финал — серьёзный разбор этой композиции (можно встретить такой факт). Простой язык. Без канона, без обязательный пункт, без разбирают на подкастах.`
           : key === 'radio_host'
             ? `
 - РАДИО: живой эфир — коротко, по-дружески: не переключайтесь, вернёмся к прослушиванию, вот это да.`

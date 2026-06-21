@@ -10,7 +10,6 @@ const MUST_MATCH = {
   инженеры: 'инжен+еры',
   инженером: 'инжен+ером',
   звукорежиссёры: 'звукорежисс+ёры',
-  версии: 'верс+ии',
   атлас: 'атл+ас',
   микрофон: 'микроф+он',
   мониторов: 'монит+оров',
@@ -48,6 +47,24 @@ console.log('\n=== Story sample ===');
 const sample =
   'Я стоял у мониторов, звукорежиссёры краснели от свиста в колонках, инженер потом говорил, что микрофон еле остыл.';
 console.log(prepareYandexTtsText(sample, {}));
+
+console.log('\n=== versiya stress (в+ерсии, not vers+ii) ===');
+const versiyaSamples = {
+  'даже в студийной версии': 'в+ерсии',
+  'оригинальной версии Jeff Buckley': 'в+ерсии',
+  'клубную версию': 'в+ерсию',
+  'несколько версий': 'в+ерсий',
+  'в акустической версии': 'в+ерсии',
+  'две версии трека': 'верс+ии',
+};
+for (const [input, needle] of Object.entries(versiyaSamples)) {
+  const got = applyRussianStressSafe(input);
+  if (!got.includes(needle)) {
+    fail(`versiya "${input}": expected "${needle}" in "${got}"`);
+  } else {
+    ok(`${input} → …${needle}…`);
+  }
+}
 
 console.log('\n=== nu metal pronunciation ===');
 const nuSamples = {

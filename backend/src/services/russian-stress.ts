@@ -31,8 +31,6 @@ export const RUSSIAN_STRESS: Record<string, string> = {
   барабан: 'бараб+ан',
   батарея: 'батар+ея',
   батарее: 'батар+ее',
-  версии: 'верс+ии',
-  версию: 'в+ерсию',
   флоу: 'фл+оу',
   дубль: 'д+убль',
   дубля: 'д+убля',
@@ -242,6 +240,34 @@ export function normalizeNuMetalPronunciation(text: string): string {
   return result;
 }
 
+/**
+ * версия / версии / версию — ударение на «е» (в+ерсии), не «верс+ии».
+ * Исключение: мн. ч. им. (две версии) — vers+ii на последнем слоге.
+ */
+export function normalizeVersiyaStress(text: string): string {
+  if (!/верси/i.test(text)) return text;
+
+  let result = text.replace(
+    /(?<![\p{L}\p{N}_+])(?:\d+|две|три|четыре|пять|шесть|семь|восемь|девять|десять|несколько|многие|разные|другие|ранние|новые|старые|акустические|концертные|альтернативные|живые)\s+версии(?![\p{L}\p{N}_])/giu,
+    (match) => match.replace(/версии/i, 'верс+ии'),
+  );
+
+  const forms: Array<[RegExp, string]> = [
+    [/(?<![\p{L}\p{N}_+])версиями(?![\p{L}\p{N}_])/giu, 'в+ерсиями'],
+    [/(?<![\p{L}\p{N}_+])версиях(?![\p{L}\p{N}_])/giu, 'в+ерсиях'],
+    [/(?<![\p{L}\p{N}_+])версиям(?![\p{L}\p{N}_])/giu, 'в+ерсиям'],
+    [/(?<![\p{L}\p{N}_+])версией(?![\p{L}\p{N}_])/giu, 'в+ерсией'],
+    [/(?<![\p{L}\p{N}_+])версий(?![\p{L}\p{N}_])/giu, 'в+ерсий'],
+    [/(?<![\p{L}\p{N}_+])версию(?![\p{L}\p{N}_])/giu, 'в+ерсию'],
+    [/(?<![\p{L}\p{N}_+])версии(?![\p{L}\p{N}_])/giu, 'в+ерсии'],
+    [/(?<![\p{L}\p{N}_+])версия(?![\p{L}\p{N}_])/giu, 'в+ерсия'],
+  ];
+  for (const [pattern, replacement] of forms) {
+    result = result.replace(pattern, replacement);
+  }
+  return result;
+}
+
 /** pop / поп-музык* — ударение на «у»: попм+узыку, попм+узыка (Yandex часто читает на «и»). */
 export function normalizePopMusicStress(text: string): string {
   return text
@@ -296,8 +322,10 @@ const LATIN_SLOT_END = '\uE015';
 
 /** Латиница не трогается ударениями и ё-нормализацией — иначе Hollywood → Hollywуd. */
 export function applyRussianStressSafe(text: string): string {
-  const prepped = normalizeGenreRockStress(
-    normalizePopMusicStress(normalizeNuMetalPronunciation(text)),
+  const prepped = normalizeVersiyaStress(
+    normalizeGenreRockStress(
+      normalizePopMusicStress(normalizeNuMetalPronunciation(text)),
+    ),
   );
   const slots: string[] = [];
   const masked = prepped.replace(LATIN_RUN_RE, (match) => {
