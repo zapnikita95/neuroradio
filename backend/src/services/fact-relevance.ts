@@ -1076,6 +1076,9 @@ export function factAppliesToRequest(
         hasTrackContextSignal(trimmed) ||
         hasRussianTrackContextSignal(trimmed) ||
         /^[«"']/.test(trimmed) ||
+        /\b(?:first teased|teased during|confirmed as a track|track title|Clancy World Tour|Tyler stated)\b/i.test(
+          trimmed,
+        ) ||
         (isAmbiguousCommonWordTitle(title) &&
           /\b(?:spotify|stream|chart|single|song|track|released|billboard|most[- ]streamed)\b/i.test(trimmed));
       if (!titleOnlyOk) return false;

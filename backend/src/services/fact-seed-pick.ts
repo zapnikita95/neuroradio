@@ -10,6 +10,7 @@ import {
   isEncyclopediaDefinitionSeed,
   isGenericConcertVenueSeed,
   isGenericMusicVideoSeed,
+  isSetlistLiveDebutSeed,
   isBoringFact,
   isCollectorFact,
   isWeakChartSeed,
@@ -52,7 +53,9 @@ export function isRejectedPickSeed(
   if (
     !nonTrackScope &&
     artist.trim() &&
+    title.trim() &&
     !factMentionsArtistLoose(fact, artist) &&
+    !factMentionsTitle(fact, title) &&
     !hasAnchoredTrackContext(fact, title) &&
     !hasTrackContextSignal(fact)
   ) {
@@ -92,6 +95,12 @@ export function isRejectedPickSeed(
     return true;
   }
   if (isGenericConcertVenueSeed(fact)) return true;
+  if (
+    isSetlistLiveDebutSeed(fact) &&
+    trackPool.some((t) => !isSetlistLiveDebutSeed(t) && adjustedInterestScore(t) >= 8)
+  ) {
+    return true;
+  }
   if (isGenericMusicVideoSeed(fact)) return true;
   if (
     !artistScope &&

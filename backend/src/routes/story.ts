@@ -15,7 +15,7 @@ import { fetchDeepWebSearchSnippets, fetchArtistIdentityWebSnippets } from '../s
 import { fetchFastTrackWikiFacts } from '../services/wikipedia-facts.js';
 import { explainReferenceFactSelection, factsTooSimilar, isRejectedStorySeed, isStrongBundleFallbackFact, pickFallbackSeedFromBundle, type SelectedReferenceFact } from '../services/fact-picker.js';
 import { formatFactPickLog, logFactCandidatePools } from '../services/fact-interest-log.js';
-import { interestScore, isWikiBiographyLead, isCatalogMetadataSeed, isEncyclopediaDefinitionSeed, isGenericConcertVenueSeed } from '../services/reference-fact-quality.js';
+import { interestScore, isWikiBiographyLead, isCatalogMetadataSeed, isEncyclopediaDefinitionSeed, isGenericConcertVenueSeed, isSetlistLiveDebutSeed } from '../services/reference-fact-quality.js';
 import { isArtistCareerBioWithoutTrack, hasAnchoredTrackContext } from '../services/fact-track-anchor.js';
 import { factMentionsTitle } from '../services/fact-relevance.js';
 import { isUnverifiedQuoteAttributionSeed } from '../services/fact-quote-attribution.js';
@@ -46,7 +46,7 @@ import {
   shouldRunLlmFactHunt,
   explainFactHuntDecision,
 } from '../services/story-llm-fact-hunt.js';
-import { pickSalvageSnippetSeed, pickRelaxedSnippetSeed, isWeakSelectedFact, isWeakSnippetSeed } from '../services/search-snippet-salvage.js';
+import { pickSalvageSnippetSeed, pickRelaxedSnippetSeed, isWeakSelectedFact, isWeakSnippetSeed, enrichFactBundleWithRawSnippets } from '../services/search-snippet-salvage.js';
 import { hasActionableSnippets } from '../services/web-snippet-accept.js';
 import { factMentionsArtistLoose } from '../services/fact-relevance.js';
 import { hasLlmKeyForProvider, resolveLlmProvider, resolveEffectiveStoryLlmProvider, clientKeyForProvider, type ClientLlmKeys, type ClientLocalOllama } from '../services/llm-provider.js';
@@ -662,6 +662,15 @@ router.post('/full', extractClientSecrets, validateStoryFullBody, storyFullRateL
         factBundle = { ...factBundle, artistFacts: metaFacts };
         artistFactCount = metaFacts.length;
         console.log(`[facts] metadata-only seeds (${metaFacts.length}) for "${metadata.artist}"`);
+      }
+
+      const beforeMerge = factBundle.trackFacts.length;
+      factBundle = enrichFactBundleWithRawSnippets(factBundle, factCtx.rawSnippets);
+      trackFactCount = factBundle.trackFacts.length;
+      if (trackFactCount > beforeMerge) {
+        console.log(
+          `[facts] merged raw snippets into track pool +${trackFactCount - beforeMerge} for "${metadata.artist}" — "${metadata.title}"`,
+        );
       }
 
       ingestBundleToBank(factArtist, factTitle, factBundle);
@@ -1309,9 +1318,104 @@ router.post('/full', extractClientSecrets, validateStoryFullBody, storyFullRateL
           }
           console.log(`[facts] bundle fallback after duplicate reject: "${bundleFallback.fact.slice(0, 90)}"`);
         } else {
-        console.warn(
-          `[facts] no alternate seed after duplicate reject for "${metadata.artist}" — "${metadata.title}"`,
-        );
+          const rawExtras = factCtx.rawSnippets
+            .map((s) => s.trim())
+            .filter(
+              (s) =>
+                s.length >= 35 &&
+                s.length <= 480 &&
+                !factsTooSimilar(s, rejectSimilarTo) &&
+                factFingerprint(s) !== rejectedFp &&
+                !isSetlistLiveDebutSeed(s),
+            )
+            .slice(0, 8);
+          if (rawExtras.length > 0) {
+            factBundle = {
+              trackFacts: [...new Set([...factBundle.trackFacts, ...rawExtras])],
+              artistFacts: factBundle.artistFacts,
+            };
+            trackFactCount = factBundle.trackFacts.length;
+            ingestBundleToBank(factArtist, factTitle, factBundle);
+            console.log(
+              `[facts] raw snippet pool +${rawExtras.length} after duplicate reject "${metadata.title}"`,
+            );
+          }
+
+          const snippetSeed =
+            pickSalvageSnippetSeed(factCtx.rawSnippets, metadata.artist, metadata.title, storyLang) ??
+            pickRelaxedSnippetSeed(factCtx.rawSnippets, metadata.artist, metadata.title, storyLang);
+          if (snippetSeed && !factsTooSimilar(snippetSeed.fact, rejectSimilarTo)) {
+            selectedFact = snippetSeed;
+            factFromBank = false;
+            factHuntLlm = false;
+            factFromSalvage = true;
+            storyReferenceFacts = [snippetSeed.fact];
+            if (coverCtx.isCover && coverCtx.coverNoteRu) {
+              storyReferenceFacts = [coverCtx.coverNoteRu, ...storyReferenceFacts];
+            }
+            console.log(`[facts] snippet salvage after duplicate reject: "${snippetSeed.fact.slice(0, 90)}"`);
+          }
+
+          if (!selectedFact && factCtx.rawSnippets.length >= 2) {
+            const factModels =
+              ownLlmKey && openrouterModelFact.includes('/')
+                ? [openrouterModelFact]
+                : resolveOpenRouterFactModelsForTier(userTier, openrouterModelRequested);
+            const hunted = await huntReferenceFactWithLlm({
+              artist: metadata.artist,
+              title: metadata.title,
+              year: metadata.year,
+              genre: metadata.genre,
+              rawSnippets: factCtx.rawSnippets,
+              preferredProvider: llmProvider,
+              openRouterModel: openrouterModelFact,
+              openRouterModels: factModels,
+            });
+            if (hunted && !factsTooSimilar(hunted.fact, rejectSimilarTo)) {
+              selectedFact = hunted;
+              factFromBank = false;
+              factHuntLlm = true;
+              factFromSalvage = false;
+              storyReferenceFacts = [hunted.fact];
+              ingestFacts(metadata.artist, metadata.title, [
+                { fact: hunted.fact, scope: hunted.scope, source: 'llm' },
+              ]);
+              if (coverCtx.isCover && coverCtx.coverNoteRu) {
+                storyReferenceFacts = [coverCtx.coverNoteRu, ...storyReferenceFacts];
+              }
+              console.log(`[facts] llm-hunt after duplicate reject: "${hunted.fact.slice(0, 90)}"`);
+            }
+          }
+
+          if (!selectedFact) {
+            const retryFallback = pickFallbackSeedFromBundle(
+              factBundle,
+              metadata.artist,
+              metadata.title,
+              usedFingerprints,
+              storyNarrator,
+              storyLang,
+            );
+            if (retryFallback) {
+              selectedFact = retryFallback;
+              factFromBank = false;
+              factHuntLlm = false;
+              factFromSalvage = false;
+              storyReferenceFacts = [retryFallback.fact];
+              if (coverCtx.isCover && coverCtx.coverNoteRu) {
+                storyReferenceFacts = [coverCtx.coverNoteRu, ...storyReferenceFacts];
+              }
+              console.log(
+                `[facts] bundle fallback after duplicate reject: "${retryFallback.fact.slice(0, 90)}"`,
+              );
+            }
+          }
+
+          if (!selectedFact) {
+            console.warn(
+              `[facts] no alternate seed after duplicate reject for "${metadata.artist}" — "${metadata.title}"`,
+            );
+          }
         }
       }
     }

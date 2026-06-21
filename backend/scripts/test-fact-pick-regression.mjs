@@ -291,6 +291,7 @@ assert(
 const {
   isCitationBibliographySeed,
   isGenericConcertVenueSeed,
+  isSetlistLiveDebutSeed,
   isCatalogMetadataSeed,
   interestScore: scoreFact,
 } = await import('../dist/services/reference-fact-quality.js');
@@ -606,6 +607,28 @@ const stingPick = pickReferenceFact(
 assert(
   stingPick?.fact.includes('co-written') || stingPick?.fact.includes('Dominic Miller'),
   `Sting pick prefers co-written over wiki definition (got: ${stingPick?.fact?.slice(0, 90) ?? 'null'})`,
+);
+assert(isSetlistLiveDebutSeed(STING_SETLIST), 'setlist live debut detected');
+assert(isGenericConcertVenueSeed(STING_SETLIST), 'setlist live debut is generic venue seed');
+
+const RAWFEAR_SETLIST =
+  '«RAWFEAR» впервые прозвучала на живом выступлении twenty one pilots 03-04-2026 (American Legion Mall, Indianapolis, United States).';
+const RAWFEAR_TEASE =
+  'The name "RAWFEAR" was first teased during the Clancy World Tour, before being confirmed as a track title.';
+const rawfearPick = pickReferenceFact(
+  { trackFacts: [RAWFEAR_SETLIST, RAWFEAR_TEASE], artistFacts: [] },
+  [],
+  0,
+  'twenty one pilots',
+  'RAWFEAR',
+);
+assert(
+  rawfearPick?.fact.includes('teased') || rawfearPick?.fact.includes('Clancy'),
+  `RAWFEAR pick prefers tease over setlist debut (got: ${rawfearPick?.fact?.slice(0, 90) ?? 'null'})`,
+);
+assert(
+  isRejectedPickSeed(RAWFEAR_SETLIST, 'RAWFEAR', 'ru', [RAWFEAR_TEASE], 'twenty one pilots'),
+  'setlist live debut rejected when tease fact in pool',
 );
 const STING_CURATED = lookupCuratedFact('Sting', 'Shape Of My Heart');
 assert(STING_CURATED?.fact.includes('Миллер'), 'Sting Shape Of My Heart curated fact present');

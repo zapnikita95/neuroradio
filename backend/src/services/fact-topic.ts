@@ -66,7 +66,7 @@ const TOPIC_RULES: TopicRule[] = [
   },
   {
     topic: 'live_performance',
-    pattern: /\b(?:setlist|live debut|first performed live|концерт|выступлен|tour\b|toured)\b/i,
+    pattern: /\b(?:setlist|live debut|first performed live|концерт|выступлен|tour\b|toured|впервые прозвучала на живом выступлении|живом выступлении)\b/i,
   },
   {
     topic: 'lyrics_backstory',

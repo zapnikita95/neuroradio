@@ -10,6 +10,7 @@ import {
   isCitationBibliographySeed,
   isGenericConcertVenueSeed,
   isGenericMusicVideoSeed,
+  isSetlistLiveDebutSeed,
   isBackstoryFact,
   isBackstageDramaSeed,
   isBoringFact,
@@ -403,6 +404,7 @@ export function pickFallbackSeedFromBundle(
     }
     if (!isStrongBundleFallbackFact(fact, artist, title, narrator)) continue;
     if (isGenericConcertVenueSeed(fact)) continue;
+    if (isSetlistLiveDebutSeed(fact)) continue;
     if (adjustedInterestScore(fact, narrator) < MIN_PICK_INTEREST_SCORE) continue;
     return wrapSelected(fact, scope, narrator);
   }

@@ -1,4 +1,4 @@
-import type { SelectedReferenceFact } from './fact-picker.js';
+import type { ReferenceFactBundle, SelectedReferenceFact } from './fact-picker.js';
 import { factMentionsArtist, factMentionsTitle, factNamesForeignEntity, hasTrackContextSignal } from './fact-relevance.js';
 import { isTrackTitleAnchoredSeed } from './fact-track-anchor.js';
 import { interestRating10 } from './fact-interest-log.js';
@@ -9,6 +9,7 @@ import {
   isBoringFact,
   isCatalogMetadataSeed,
   isEncyclopediaDefinitionSeed,
+  isSetlistLiveDebutSeed,
   isWikiBiographyLead,
 } from './reference-fact-quality.js';
 import { acceptSearchGroundedSnippet, acceptIndieEmergingSnippet, isLyricsPageSeed, isPlaylistJunkSnippet, isSpeakableReferenceFact, isUnspeakableWebSeed } from './web-snippet-accept.js';
@@ -22,6 +23,7 @@ export function isWeakSnippetSeed(fact: string, score = interestScore(fact), tit
   const trimmed = fact.trim();
   if (isAlbumListingSeed(trimmed)) return true;
   if (isCatalogMetadataSeed(trimmed)) return true;
+  if (isSetlistLiveDebutSeed(trimmed)) return true;
   if (isLyricsPageSeed(trimmed)) return true;
   if (isEncyclopediaDefinitionSeed(trimmed)) return true;
   if (title && isTrackTitleAnchoredSeed(trimmed, title) && !isEncyclopediaDefinitionSeed(trimmed)) return false;
@@ -38,6 +40,7 @@ export function isWeakSelectedFact(
   if (!selected) return true;
   const trimmed = selected.fact.trim();
   if (isCatalogMetadataSeed(trimmed)) return true;
+  if (isSetlistLiveDebutSeed(trimmed)) return true;
   if (isLyricsPageSeed(trimmed)) return true;
   if (isEncyclopediaDefinitionSeed(trimmed)) return true;
   if (/^["'][\p{L}\p{N}\s'-]+["']\s+is a song by the (?:rock )?band\b/iu.test(trimmed)) return true;
@@ -69,7 +72,8 @@ export function pickSalvageSnippetSeed(
       const boost = (s: string) =>
         (factMentionsArtist(s, artist) ? 25 : 0) +
         (factMentionsTitle(s, title) ? 15 : 0) +
-        (hasTrackContextSignal(s) ? 10 : 0);
+        (hasTrackContextSignal(s) ? 10 : 0) +
+        (isSetlistLiveDebutSeed(s) ? -40 : 0);
       return interestScore(b) + boost(b) - (interestScore(a) + boost(a));
     });
 
@@ -104,7 +108,8 @@ export function pickRelaxedSnippetSeed(
       const boost = (s: string) =>
         (factMentionsArtist(s, artist) ? 25 : 0) +
         (factMentionsTitle(s, title) ? 15 : 0) +
-        (hasTrackContextSignal(s) ? 10 : 0);
+        (hasTrackContextSignal(s) ? 10 : 0) +
+        (isSetlistLiveDebutSeed(s) ? -40 : 0);
       return interestScore(b) + boost(b) - (interestScore(a) + boost(a));
     });
 
@@ -120,6 +125,20 @@ export function pickRelaxedSnippetSeed(
     scopeLabelRu: scope === 'track' ? 'трек' : 'группа/артист',
     interestScore: score,
     interestRating: interestRating10(best),
+  };
+}
+
+export function enrichFactBundleWithRawSnippets(
+  bundle: ReferenceFactBundle,
+  rawSnippets: string[],
+): ReferenceFactBundle {
+  const extras = rawSnippets
+    .map((s) => s.trim())
+    .filter((s) => s.length >= 35 && s.length <= 480 && !isSetlistLiveDebutSeed(s));
+  if (extras.length === 0) return bundle;
+  return {
+    trackFacts: [...new Set([...bundle.trackFacts, ...extras])],
+    artistFacts: bundle.artistFacts,
   };
 }
 

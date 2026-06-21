@@ -30,7 +30,6 @@ const DEDICATED_CATALOG_SEED_PATTERNS: RegExp[] = [
   /Discogs датирован \d{4}/i,
   /выходил на лейбле/i,
   /трек «[^»]+» идёт \d+:\d+/i,
-  /впервые прозвучала на живом выступлении/i,
   /(?:electronicore|deathtronica|metalcore|post-punk|shoegaze)\s+band\s+from/i,
   /(?:piece|member)\s+.*\s+band\s+from/i,
   /\bas the (?:first|second|third|fourth|fifth|lead|debut) single from\b/i,
@@ -70,10 +69,20 @@ export function isCitationBibliographySeed(fact: string): boolean {
   return false;
 }
 
+/** Setlist.fm «впервые на живом выступлении DD-MM-YYYY (Venue)» — каталог, не история. */
+export function isSetlistLiveDebutSeed(fact: string): boolean {
+  const t = decodeHtmlEntities(fact).trim();
+  return (
+    /впервые прозвучала на живом выступлении/i.test(t) ||
+    /\b(?:live debut|first performed live)\b/i.test(t)
+  );
+}
+
 /** «Выступили в зале X» без драмы — не история про трек. */
 export function isGenericConcertVenueSeed(fact: string): boolean {
   const t = decodeHtmlEntities(fact).trim();
   if (isCitationBibliographySeed(t)) return true;
+  if (isSetlistLiveDebutSeed(t)) return true;
   if (!/\b(?:live at|performed at|concert at|live in|concert in)\b/i.test(t)) return false;
   if (/\b(?:banned|protest|scandal|controvers|riot|arrest|police|historic|milestone|withheld|refused)\b/i.test(t)) {
     return false;
@@ -386,6 +395,10 @@ export function interestScore(fact: string): number {
     score += 14;
   }
   if (/\bco[- ]?written\b/i.test(trimmed)) score += 18;
+  if (/\b(?:first teased|teased during|Clancy World Tour|Tyler stated|listening events)\b/i.test(trimmed)) {
+    score += 18;
+  }
+  if (/\b(?:can't escape|endless cycle|running away)\b/i.test(trimmed)) score += 12;
   if (/соавторил\w*/i.test(trimmed)) score += 14;
   if (/После распада/i.test(trimmed) && /\b(?:Police|Sting|сольн)/i.test(trimmed)) score += 16;
   if (/\b(?:card(?:sharp|player|game)?|blackjack|poker|playing cards)\b/i.test(trimmed)) score += 10;

@@ -258,6 +258,9 @@ export function isTitleTokenForeignArtistFact(fact: string, artist: string, titl
   if (!title.trim() || !artist.trim()) return false;
   const trimmed = fact.trim();
   if (!factMentionsTitle(trimmed, title)) return false;
+  if (/\b(?:first teased|teased during|confirmed as a track|track title|listening events)\b/i.test(trimmed)) {
+    return false;
+  }
   if (factMentionsArtist(trimmed, artist)) return false;
   if (factNamesForeignEntity(trimmed, artist, title, '', 'strict')) return true;
   if (/\b(?:Claypool|Les Claypool|Primus)\b/i.test(trimmed)) return true;
