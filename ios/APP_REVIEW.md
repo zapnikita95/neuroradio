@@ -1,4 +1,17 @@
-# App Store Review — заметки для повторной отправки
+# App Store Review — MVP без IAP (iOS)
+
+Версия **1.5.105 (150+)** — без In-App Purchase в приложении. Расширенный тариф только через efir-ai.ru; в приложении вход с тем же email.
+
+В App Store Connect для этой версии **не отправлять** auto-renewable IAP с билдом (или снять из submission).
+
+## Notes for Review (англ.)
+
+```
+This build does not offer In-App Purchases. Premium access is purchased on our website (efir-ai.ru).
+Users who already subscribed on the website or Android can sign in with the same email to activate access.
+Profile icon → Sign in. Demo: appletester@test.ru, OTP 000000.
+App UI is Russian-only for this MVP release.
+```
 
 ## Guideline 3.1.2(c) — подписки: Privacy + EULA
 

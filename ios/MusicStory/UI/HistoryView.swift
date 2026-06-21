@@ -16,8 +16,8 @@ struct HistoryView: View {
         MusicStoryBackground {
             VStack(spacing: 0) {
                 Picker("", selection: $tab) {
-                    Text(settings.resolvedLanguage == .en ? "Stories" : "Истории").tag(0)
-                    Text(settings.resolvedLanguage == .en ? "Listening" : "Прослушивания").tag(1)
+                    Text("Истории").tag(0)
+                    Text("Прослушивания").tag(1)
                 }
                 .pickerStyle(.segmented)
                 .padding()
@@ -47,7 +47,7 @@ struct HistoryView: View {
     private var storyList: some View {
         List {
             if stories.isEmpty {
-                Text(settings.resolvedLanguage == .en ? "No saved stories yet" : "Пока нет сохранённых историй")
+                Text("Пока нет сохранённых историй")
                     .foregroundStyle(AppTheme.mutedLavender)
                     .listRowBackground(Color.clear)
             } else {
@@ -63,9 +63,7 @@ struct HistoryView: View {
                             }
                         }
                         if let vote = entry.vote {
-                            Text(vote == "like"
-                                ? (settings.resolvedLanguage == .en ? "You liked 👍" : "Ты поставил 👍")
-                                : (settings.resolvedLanguage == .en ? "You disliked 👎" : "Ты поставил 👎"))
+                            Text(vote == "like" ? "Ты поставил 👍" : "Ты поставил 👎")
                                 .font(.caption2)
                                 .foregroundStyle(AppTheme.liveGreen)
                         }
@@ -91,7 +89,7 @@ struct HistoryView: View {
     private var scrobbleList: some View {
         List {
             if scrobbles.isEmpty {
-                Text(settings.resolvedLanguage == .en ? "No entries yet" : "Пока нет записей")
+                Text("Пока нет записей")
                     .foregroundStyle(AppTheme.mutedLavender)
                     .listRowBackground(Color.clear)
             } else {

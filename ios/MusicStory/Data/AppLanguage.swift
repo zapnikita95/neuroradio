@@ -28,15 +28,5 @@ enum ResolvedAppLanguage {
 }
 
 func resolveAppLanguage(_ stored: AppLanguage, device: Locale = .current) -> ResolvedAppLanguage {
-    switch stored {
-    case .system:
-        if device.language.languageCode?.identifier == "ru" {
-            return .ru
-        }
-        return .en
-    case .ru:
-        return .ru
-    case .en:
-        return .en
-    }
+    .ru
 }

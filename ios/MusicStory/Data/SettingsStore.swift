@@ -178,7 +178,7 @@ final class SettingsStore: ObservableObject {
     }
 
     var resolvedLanguage: ResolvedAppLanguage {
-        resolveAppLanguage(appLanguage)
+        .ru
     }
 
     private init() {
@@ -222,7 +222,7 @@ final class SettingsStore: ObservableObject {
         offlinePackSessionId = Int64(defaults.object(forKey: Keys.offlinePackSessionId) as? Int ?? 0)
         factNotificationsEnabled = defaults.object(forKey: Keys.factNotificationsEnabled) as? Bool ?? true
         shazamAutoDetectEnabled = defaults.object(forKey: Keys.shazamAutoDetectEnabled) as? Bool ?? true
-        appLanguage = AppLanguage.fromId(defaults.string(forKey: Keys.appLanguage))
+        appLanguage = .ru
         accountProfile = loadAccountProfile()
     }
 
@@ -387,7 +387,7 @@ final class SettingsStore: ObservableObject {
     }
 
     var storyTtsVoiceRequest: String {
-        if resolvedLanguage == .en, hasPremiumTtsAccess, serverTtsProvider == .elevenlabs {
+        if hasPremiumTtsAccess, serverTtsProvider == .elevenlabs {
             return elevenLabsVoice.rawValue
         }
         return ttsVoice.rawValue
@@ -399,7 +399,7 @@ final class SettingsStore: ObservableObject {
     }
 
     var storyElevenLabsVoiceRequest: String? {
-        guard resolvedLanguage == .en, hasPremiumTtsAccess, serverTtsProvider == .elevenlabs else { return nil }
+        guard hasPremiumTtsAccess, serverTtsProvider == .elevenlabs else { return nil }
         return elevenLabsVoice.rawValue
     }
 }

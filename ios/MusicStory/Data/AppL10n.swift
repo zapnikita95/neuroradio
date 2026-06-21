@@ -153,9 +153,7 @@ struct AppL10n {
     var accountDelete: String { en ? "Delete account" : "Удалить аккаунт" }
     var accountDeleteTitle: String { en ? "Delete account?" : "Удалить аккаунт?" }
     var accountDeleteBody: String {
-        en
-            ? "Your cloud history and profile will be permanently deleted. This cannot be undone. Active App Store subscriptions must be canceled in Settings → Apple ID → Subscriptions."
-            : "Облачная история и профиль будут удалены безвозвратно. Активную подписку App Store отмените в Настройки → Apple ID → Подписки."
+        "Облачная история и профиль будут удалены безвозвратно. Подписку на сайте отмените в личном кабинете efir-ai.ru."
     }
     var accountDeleteConfirm: String { en ? "Delete permanently" : "Удалить навсегда" }
     var accountDeleteCancel: String { en ? "Cancel" : "Отмена" }
@@ -198,9 +196,10 @@ struct AppL10n {
             : "Оплата через App Store. Управление — Настройки → Apple ID → Подписки."
     }
     var billingCrossPlatformHint: String {
-        en
-            ? "Already subscribed on efir-ai.ru or the Android app? Sign in with the same email — your access activates automatically."
-            : "Уже оформили подписку на сайте или в Android? Войдите с тем же email — доступ активируется."
+        "Уже оформили подписку на efir-ai.ru или в Android? Войдите с тем же email — доступ активируется автоматически."
+    }
+    var billingMvpExternalOnly: String {
+        "Оплата в приложении iOS временно недоступна. Расширенный тариф оформляется на сайте efir-ai.ru."
     }
     var billingCrossPlatformSignIn: String { en ? "Sign in" : "Войти" }
     var billingYookassaHint: String {

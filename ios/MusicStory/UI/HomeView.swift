@@ -15,9 +15,7 @@ struct HomeView: View {
     private var personaVoiceLabel: String {
         let narrator = settings.storyNarrator.uiLabel(lang)
         let voice: String
-        if lang == .en && settings.hasPremiumTtsAccess {
-            voice = "ElevenLabs"
-        } else if settings.hasPremiumTtsAccess {
+        if settings.hasPremiumTtsAccess {
             voice = settings.ttsVoice.uiLabel(lang)
         } else {
             voice = settings.edgeVoicePreset.uiLabel(lang)

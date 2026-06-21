@@ -14,7 +14,6 @@ struct SettingsView: View {
     @State private var manualTitle: String = ""
 
     @State private var manualStoryLoading = false
-    @State private var showSubscription = false
 
     private var lang: ResolvedAppLanguage { settings.resolvedLanguage }
     private var copy: AppL10n { AppStrings.l10n(lang) }
@@ -24,7 +23,7 @@ struct SettingsView: View {
     }
 
     private var usesElevenLabsVoices: Bool {
-        settings.resolvedLanguage == .en && settings.effectiveServerTtsProvider == .elevenlabs
+        settings.effectiveServerTtsProvider == .elevenlabs
     }
 
     private var voiceSectionSummary: String {
@@ -43,8 +42,6 @@ struct SettingsView: View {
         MusicStoryBackground {
             ScrollView {
                 VStack(alignment: .leading, spacing: 16) {
-                    subscriptionSection
-                    languageSection
                     generalSection
                     modeSection
                     triggerSection
@@ -81,51 +78,6 @@ struct SettingsView: View {
         .task {
             await StoryRepository.shared.refreshQuota()
             _ = await AccountAuthManager.shared.fetchProfile()
-        }
-        .navigationDestination(isPresented: $showSubscription) {
-            AccountView(initialTab: .subscription)
-        }
-    }
-
-    private var subscriptionSection: some View {
-        SettingsSection(
-            title: copy.settingsSubscriptionSection,
-            summary: copy.settingsSubscriptionSummary
-        ) {
-            Text(copy.billingIntro)
-                .font(.footnote)
-                .foregroundStyle(AppTheme.mutedLavender)
-            PrimaryStoryButton(title: copy.settingsOpenSubscription) {
-                showSubscription = true
-            }
-        }
-    }
-
-    private var languageSection: some View {
-        SettingsSection(
-            title: copy.languageSection,
-            summary: languageSummary
-        ) {
-            languageRow(.system, copy.languageSystem)
-            languageRow(.ru, copy.languageRu)
-            languageRow(.en, copy.languageEn)
-        }
-    }
-
-    private var languageSummary: String {
-        switch settings.appLanguage {
-        case .system: return copy.languageSystem
-        case .ru: return copy.languageRu
-        case .en: return copy.languageEn
-        }
-    }
-
-    private func languageRow(_ value: AppLanguage, _ label: String) -> some View {
-        SettingsPreferenceRow(
-            label: label,
-            selected: settings.appLanguage == value
-        ) {
-            settings.appLanguage = value
         }
     }
 
