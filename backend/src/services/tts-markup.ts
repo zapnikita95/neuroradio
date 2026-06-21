@@ -8,6 +8,7 @@ import { applyRussianStressSafe, RUSSIAN_STRESS } from './russian-stress.js';
 import { runTtsQualityPass } from './tts-quality-pass.js';
 import {
   applyForeignPronunciation,
+  applyYandexPersonaTransliteration,
   preserveMusicProperNames,
 } from './tts-foreign-pronounce.js';
 import { applyStylizedArtistTokensRu } from './artist-pronunciation.js';
@@ -15,7 +16,7 @@ import { enhanceMixedLanguageText } from './tts-en-normalize.js';
 import {
   normalizeYandexSpeechTokens,
 } from './tts-yandex-normalize.js';
-import { normalizeYearsForRussianTts } from './tts-russian-years.js';
+import { normalizeDecadesForRussianTts, normalizeYearsForRussianTts } from './tts-russian-years.js';
 import type { TtsPauseProfile } from './tts-voice-profiles.js';
 
 /** @deprecated use RUSSIAN_STRESS from russian-stress.ts */
@@ -139,6 +140,8 @@ export function prepareYandexTtsText(
     speakTrackNamesInVoiceover: options.speakTrackNamesInVoiceover,
     trackArtist: options.artist ?? '',
     trackTitle: options.title ?? '',
+    // Latin stays for Yandex SSML <lang> — ES/DE/IT via native xml:lang, not RU translit.
+    skipForeignPhonetic: !options.websitePreview,
   });
   const quality = runTtsQualityPass(text, {
     artist: options.artist ?? '',
@@ -147,11 +150,15 @@ export function prepareYandexTtsText(
   text = quality.text;
 
   text = normalizeYearsForRussianTts(text);
+  text = normalizeDecadesForRussianTts(text);
   // Кавычки: только текст внутри, без «в кавычках …» — не занимает эфир.
   text = stripGuillemetsForPreview(text);
   text = normalizeYandexSpeechTokens(text, artist, title);
   text = applyStylizedArtistTokensRu(text, options.artist ?? artist, options.title ?? title);
   text = applyRussianStressSafe(text);
+  text = options.websitePreview
+    ? text
+    : applyYandexPersonaTransliteration(text);
 
   if (options.sentencePauses !== false) {
     text = addSentencePauses(text, pauseProfile);

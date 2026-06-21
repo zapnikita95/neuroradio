@@ -23,7 +23,8 @@ import {
   splitMixedLanguageForEdge,
 } from '../dist/services/tts-mixed-segments.js';
 import { resolveEdgeTtsDeliveryForPreset } from '../dist/services/edge-tts-en.js';
-import { normalizeYearsForRussianTts } from '../dist/services/tts-russian-years.js';
+import { normalizeYearsForRussianTts, normalizeDecadesForRussianTts } from '../dist/services/tts-russian-years.js';
+import { sanitizeScriptForTts } from '../dist/services/story-quality.js';
 import { normalizeEdgeRussianOrthography } from '../dist/services/tts-edge-normalize.js';
 
 let passed = 0;
@@ -306,6 +307,40 @@ test('National Film Registry stays English in SSML', () => {
 test('stress marks хаоса correctly', () => {
   const out = prepareYandexTtsText('родился из хаоса импровизации.', { artist: 'MJ', title: 'Test' });
   assert.match(out, /х\+аоса/i);
+});
+
+test('sanitize keeps 80-х (no «80 тогда» orphan)', () => {
+  const out = sanitizeScriptForTts(
+    'классикой 80-х вроде Sixteen Candles',
+    'Friday Night At The Movies',
+    'Canción del Mariachi',
+  );
+  assert.match(out, /80-х/i);
+  assert.doesNotMatch(out, /80\s+тогда/i);
+});
+
+test('decades spoken: классикой 80-х → восьмидесятых', () => {
+  const spoken = normalizeDecadesForRussianTts('классикой 80-х вроде');
+  assert.match(spoken, /классикой восьмидесятых/i);
+  assert.doesNotMatch(spoken, /80/i);
+});
+
+test('Yandex TTS: режиссёр Marc Klasfeld и MTV без en-US SSML', () => {
+  const script =
+    'Режиссёр Marc Klasfeld признался MTV, что клип вдохновлён фильмами Джона Хьюза и классикой 80-х вроде Sixteen Candles.';
+  const out = prepareYandexTtsText(script, {
+    artist: 'Friday Night At The Movies',
+    title: 'Canción del Mariachi',
+    speakTrackNamesInVoiceover: false,
+  });
+  const ssml = buildYandexSsml(out);
+  assert.match(out, /Марк Кл\+?асфелд/i);
+  assert.match(out, /МТВ/i);
+  assert.match(out, /восьмидесятых/i);
+  assert.doesNotMatch(out, /Marc Klasfeld/i);
+  assert.doesNotMatch(out, /\bMTV\b/i);
+  assert.doesNotMatch(ssml, /xml:lang="en-US">Marc/i);
+  assert.doesNotMatch(ssml, /xml:lang="en-US">MTV/i);
 });
 
 test('stress marks Deacon surname as д+икон', () => {

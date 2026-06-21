@@ -235,7 +235,10 @@ const CLOSING_LATIN_TO_RU: Record<string, string> = {
   event: 'событие',
   track: 'трек',
   hit: 'хит',
+  mtv: 'МТВ',
 };
+
+const CLOSING_TAGLINE_MAX_WORDS = 16;
 
 const BAD_CLOSING_TAIL =
   /звучит\s+не\s+как\s+(?:filler|филлер)|После такой истории\s+трек\s+звучит|отделяют\s+хит\s+от/i;
@@ -263,6 +266,9 @@ export function sanitizeClosingTail(script: string, lang: StoryLanguageId = 'ru'
 
   const sentences = trimmed.split(/(?<=[.!?…])\s+/).filter(Boolean);
   if (sentences.length <= 1) {
+    const wordCount = trimmed.split(/\s+/).filter(Boolean).length;
+    // One-sentence story body — not a short closing tagline; keep Latin names (directors, MTV, films).
+    if (wordCount > CLOSING_TAGLINE_MAX_WORDS) return trimmed;
     const only = sanitizeClosingPhrase(trimmed, lang);
     if (!only || closingHasWrongAlphabet(only, lang) || closingHasQuotes(only)) return trimmed;
     if (isStaleClosingCliche(only) || BAD_CLOSING_TAIL.test(only)) return trimmed;

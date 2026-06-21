@@ -84,6 +84,55 @@ const IN_BEGINNING_YEAR =
 const SEASON_GEN_YEAR =
   /(^|[\s,.«"—-])((?:лета|летом|зимой|зимы|весной|весны|осенью|осени))\s+((?:19|20)\d{2})(\s+года(?=[\s,.!?»"—-]|$))?/gu;
 
+const DECADE_GENITIVE: Record<number, string> = {
+  20: 'двадцатых',
+  30: 'тридцатых',
+  40: 'сороковых',
+  50: 'пятидесятых',
+  60: 'шестидесятых',
+  70: 'семидесятых',
+  80: 'восьмидесятых',
+  90: 'девяностых',
+};
+
+function decadeGenitiveSpoken(twoDigit: number, century: '19' | '20' | null): string {
+  if (century === '20' && twoDigit === 0) return 'двухтысячных';
+  if (century === '20' && twoDigit === 10) return 'десятых';
+  if (century === '20' && twoDigit === 20) return 'двадцатых';
+  if (century === '19' || century === null) {
+    return DECADE_GENITIVE[twoDigit] ?? `${twoDigit}-х`;
+  }
+  return DECADE_GENITIVE[twoDigit] ?? `${twoDigit}-х`;
+}
+
+function decadePrepositionalSpoken(twoDigit: number, century: '19' | '20' | null): string {
+  return decadeGenitiveSpoken(twoDigit, century);
+}
+
+const DECADE_ORDINAL_TTS =
+  /(^|[\s,.«"—-])((?:19|20)?(\d{2}))\s*[-–—]?\s*х(?=[\s,.!?»"—-]|$)/giu;
+
+/** «классикой 80-х» → «классикой восьмидесятых» (TTS only; display keeps «80-х»). */
+export function normalizeDecadesForRussianTts(text: string): string {
+  return text.replace(
+    DECADE_ORDINAL_TTS,
+    (match, lead: string, full: string, twoDigitStr: string, offset: number, whole: string) => {
+      const two = parseInt(twoDigitStr, 10);
+      const century: '19' | '20' | null = /^19/.test(full) ? '19' : /^20/.test(full) ? '20' : null;
+      const before = whole.slice(Math.max(0, offset - 48), offset);
+      const genitiveCtx =
+        /(?:классик(?:ой|и)|стил(?:ем|я)|эстетик(?:ой|и)|дух(?:ом|а)|наслед(?:и(?:ем|я))|эпох(?:ой|и)|хит(?:ами|ов)?|классик\w*)\s*$/iu.test(
+          before,
+        );
+      const prepCtx = /(?:^|[\s,.«"—-])(?:в|во)\s+$/iu.test(before);
+      const spoken = genitiveCtx || prepCtx
+        ? decadePrepositionalSpoken(two, century)
+        : decadeGenitiveSpoken(two, century);
+      return `${lead}${spoken}`;
+    },
+  );
+}
+
 /** «В 2021 году» → «В двадцать первом году»; «в начале 2010 года» → «в начале две тысячи десятого года». */
 export function normalizeYearsForRussianTts(text: string): string {
   let result = text.replace(

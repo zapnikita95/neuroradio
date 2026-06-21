@@ -69,6 +69,7 @@ function normalizeVinylSideLabels(text: string): string {
 /** Latin tech acronyms in Russian narration → Cyrillic phonetic (TTS only; UI script unchanged). */
 function normalizeTechAcronymsForRussianTts(text: string): string {
   return text
+    .replace(/\bMTV\b/gi, 'МТВ')
     .replace(/\bMP3-(?=[а-яёА-ЯЁ])/gi, 'эмп+э три-')
     .replace(/\bMP3\s+(?=[а-яёА-ЯЁ])/gi, 'эмп+э три ')
     .replace(/\bMP3\b/gi, 'эмп+э три');

@@ -244,8 +244,34 @@ const SPELLED_YEAR_PATTERN = new RegExp(
 
 const DIGIT_ORDINAL_SUFFIX =
   /\d+\s*[-–—]?\s*(?:й|го|м|х|е|ем|ом|ую|ая|ые|ых)(?=[\s,.!?»"—-]|$)/giu;
+/** Do not treat «-х» in «80-х» as orphan — hyphen after digit is decade ordinal, not a separator. */
 const ORPHAN_ORDINAL_SUFFIX =
-  /(?:^|[\s,.«"—-])\s*[-–—]?(?:й|го|м|х|е|ем|ом)(?=[\s,.!?»"—-]|$)/giu;
+  /(?:^|(?<!\d)[\s,.«"—-])\s*[-–—]?(?:й|го|м|х|е|ем|ом)(?=[\s,.!?»"—-]|$)/giu;
+
+const DECADE_ORDINAL_RE = /\b((?:19|20)?\d{2})\s*[-–—]?\s*х\b/giu;
+const DECADE_SLOT = '\uE014D';
+const DECADE_SLOT_END = '\uE015D';
+
+function maskDecadeOrdinals(text: string): { masked: string; decades: string[] } {
+  const decades: string[] = [];
+  const masked = text.replace(DECADE_ORDINAL_RE, (match) => {
+    const idx = decades.length;
+    decades.push(match);
+    return `${DECADE_SLOT}${idx}${DECADE_SLOT_END}`;
+  });
+  return { masked, decades };
+}
+
+function unmaskDecadeOrdinals(text: string, decades: string[]): string {
+  return text.replace(
+    new RegExp(`${DECADE_SLOT}(\\d+)${DECADE_SLOT_END}`, 'g'),
+    (_, index) => decades[Number(index)] ?? '',
+  );
+}
+
+function isDecadeOrdinalMatch(match: string): boolean {
+  return /^(?:19|20)?\d{2}\s*[-–—]?\s*х$/iu.test(match.trim());
+}
 
 export function countWords(text: string): number {
   return text.trim().split(/\s+/).filter(Boolean).length;
@@ -400,7 +426,12 @@ export function sanitizeScriptForTts(
   });
   result = stripTrackTitleGuillemets(localized, title);
 
+  const { masked: decadeMasked, decades: decadeSlots } = maskDecadeOrdinals(result);
+  result = decadeMasked;
+
   result = result.replace(DIGIT_ORDINAL_SUFFIX, (match) => {
+    DECADE_ORDINAL_RE.lastIndex = 0;
+    if (isDecadeOrdinalMatch(match)) return match;
     const digits = match.match(/\d+/)?.[0];
     return digits && shouldKeepDigit(digits, allowed) ? match : ' тогда ';
   });
@@ -412,6 +443,7 @@ export function sanitizeScriptForTts(
   result = unmaskDottedStageNames(result, stageNames);
   result = result.replace(ORPHAN_ORDINAL_SUFFIX, ' тогда ');
   ORPHAN_ORDINAL_SUFFIX.lastIndex = 0;
+  result = unmaskDecadeOrdinals(result, decadeSlots);
   result = repairOrphanDatePhrases(result, referenceFacts);
 
   if (

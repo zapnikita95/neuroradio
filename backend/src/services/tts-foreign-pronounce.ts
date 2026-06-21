@@ -51,7 +51,10 @@ const PHRASE_PRONUNCIATION_RU: Record<string, string> = {
   'snow (hey oh)': 'сн+оу хей оу',
   'national film registry': 'Нэшнл Фильм Р+еджистри',
   'vincent price': 'Винсент Прайс',
-  mtv: 'эм-ти-ви',
+  mtv: 'МТВ',
+  'marc klasfeld': 'Марк Кл+асфелд',
+  'sixteen candles': 'Сикст+ин К+андлз',
+  'the cannonball run': 'К+эннонбол Р+ан',
   mp3: 'эмп+э три',
   filler: 'ф+иллер',
   'john landis': 'Джон Ландис',
@@ -537,6 +540,45 @@ export function applyForeignPronunciation(
   const { masked: m2, slots: s2 } = maskTtsMarkup(result);
   result = ensureAllLatinTransliterated(m2);
   return unmaskTtsMarkup(result, s2);
+}
+
+/** Yandex RU voice: directors/brands → Cyrillic (no SSML en-US pauses). Track/artist Latin stays for SSML. */
+const YANDEX_PERSONA_DICT_KEYS = [
+  'the cannonball run',
+  'sixteen candles',
+  'national film registry',
+  'marc klasfeld',
+  'john landis',
+  'michael peters',
+  'vincent price',
+  'jonah weiner',
+  'john landis',
+  'mtv',
+  'mp3',
+];
+
+const YANDEX_ROLE_LATIN_RE =
+  /(Режисс(?:ё|е)р(?:ом|а|у)?|хореограф(?:у|а|ом)?|продюсер(?:у|а|ом)?|акт(?:ё|е)р(?:а|ом|у)?|актрис(?:а|ой|е|у)?|композитор(?:а|ом|у)?|оператор(?:а|ом|у)?)\s+([A-Za-zÀ-ÿ][A-Za-zÀ-ÿ0-9''.\-]*(?:\s+[A-Za-zÀ-ÿ][A-Za-zÀ-ÿ0-9''.\-]*){0,4})/giu;
+
+export function applyYandexPersonaTransliteration(text: string): string {
+  let result = text.replace(/\bMTV\b/gi, 'МТВ');
+
+  result = result.replace(YANDEX_ROLE_LATIN_RE, (full, role: string, name: string) => {
+    const trimmed = name.trim();
+    const key = trimmed.toLowerCase();
+    const fromDict = PHRASE_PRONUNCIATION_RU[key];
+    const ru = fromDict ?? latinPhraseToRussianTts(trimmed);
+    return `${role} ${ru}`;
+  });
+
+  const keys = YANDEX_PERSONA_DICT_KEYS.filter((k) => shouldApplyPhraseDictKey(k)).sort(
+    (a, b) => b.length - a.length,
+  );
+  for (const key of keys) {
+    result = replaceWholePhrase(result, key, PHRASE_PRONUNCIATION_RU[key]!);
+  }
+
+  return result;
 }
 
 /** Fix LLM truncating band names in wiki translation. */
