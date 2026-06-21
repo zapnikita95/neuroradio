@@ -604,20 +604,19 @@ async function assertHarvestNetwork() {
     );
   }
   const proxyUp = await proxyPortAlive();
-  if (hotPush && !noProxy && !proxyUp) {
-    console.error('\n=== hot-push: hidemy VPN выключен (127.0.0.1:1301) ===');
-    console.error('Last.fm и wiki без VPN в РФ не работают — процесс не стартует.');
-    console.error('Включи hidemy.name → npm run seed:hot-push (или run-overnight-hot-push.ps1)');
-    console.error('Принудительно без VPN: --skip-vpn-check\n');
-    process.exit(1);
-  }
   const lastfmOk = await lastfmReachable();
   const viaProxy = Boolean(process.env.HTTPS_PROXY?.trim() || process.env.HTTP_PROXY?.trim());
   if (lastfmOk) {
     console.log(
-      `[vpn] Last.fm OK${proxyUp ? ' (hidemy 1301 up' + (viaProxy ? ', proxy active)' : ')') : viaProxy ? ' (via proxy)' : ''}`,
+      `[vpn] Last.fm OK${proxyUp ? ' (hidemy 1301 up' + (viaProxy ? ', proxy active)' : ')') : viaProxy ? ' (via proxy)' : ' (system VPN / direct)'}`,
     );
     return;
+  }
+  if (hotPush && !noProxy && !proxyUp) {
+    console.error('\n=== hot-push: Last.fm недоступен, hidemy 127.0.0.1:1301 тоже down ===');
+    console.error('Включи VPN (hidemy или системный) → npm run seed:hot-push');
+    console.error('Принудительно: --skip-vpn-check\n');
+    process.exit(1);
   }
   console.error('\n=== Last.fm недоступен — harvest бессмысленен ===');
   console.error(`hidemy proxy 127.0.0.1:1301: ${proxyUp ? 'UP но Last.fm всё равно fail' : 'DOWN (VPN выключен?)'}`);
