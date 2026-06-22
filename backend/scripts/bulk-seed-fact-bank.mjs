@@ -173,27 +173,74 @@ function buildPriorityArtistQueue(allTracks, bank, doneKeys) {
   });
 }
 
-function buildArtistsWithSubstantiveFacts(bank) {
-  const set = new Set();
-  for (const [k, pool] of Object.entries(bank.byArtist ?? {})) {
-    if (hasSubstantiveInPool(pool)) set.add(k);
-  }
+/** Aggregate fact counts from bank — artists/albums with more facts → richer harvest. */
+function buildFactDensityIndex(bank) {
+  const artistFacts = new Map();
+  const trackFacts = new Map();
+  const trackAlbumFacts = new Map();
+
   for (const [tk, pool] of Object.entries(bank.byTrack ?? {})) {
-    if (hasSubstantiveInPool(pool)) set.add(tk.split('|')[0]);
+    const substantive = (pool ?? []).filter((f) => !f.isMetadata);
+    if (!substantive.length) continue;
+    trackFacts.set(tk, substantive.length);
+    const albumN = substantive.filter((f) => f.scope === 'album').length;
+    if (albumN) trackAlbumFacts.set(tk, albumN);
+    const ak = tk.split('|')[0];
+    artistFacts.set(ak, (artistFacts.get(ak) ?? 0) + substantive.length);
   }
-  return set;
+  for (const [ak, pool] of Object.entries(bank.byArtist ?? {})) {
+    const n = (pool ?? []).filter((f) => !f.isMetadata).length;
+    if (n) artistFacts.set(ak, (artistFacts.get(ak) ?? 0) + n);
+  }
+  return { artistFacts, trackFacts, trackAlbumFacts };
 }
 
-function compareHotPushTracksWithBank(a, b, artistsWithFacts) {
-  const gapA =
-    (isPriorityArtist(a.artist) ? -4 : 0) + (artistsWithFacts.has(artistKey(a.artist)) ? 0 : -2);
-  const gapB =
-    (isPriorityArtist(b.artist) ? -4 : 0) + (artistsWithFacts.has(artistKey(b.artist)) ? 0 : -2);
-  const pri = trackPriority(a) + gapA - (trackPriority(b) + gapB);
-  if (pri !== 0) return pri;
-  const yearA = parseInt(a.source?.match(/:(\d{4})(?:$|:)/)?.[1] ?? a.year ?? '0', 10);
-  const yearB = parseInt(b.source?.match(/:(\d{4})(?:$|:)/)?.[1] ?? b.year ?? '0', 10);
-  return yearB - yearA;
+function compareByFactDensity(a, b, density) {
+  const akA = artistKey(a.artist);
+  const akB = artistKey(b.artist);
+  const fa = density.artistFacts.get(akA) ?? 0;
+  const fb = density.artistFacts.get(akB) ?? 0;
+  if (fb !== fa) return fb - fa;
+
+  const tkA = trackKey(a.artist, a.title);
+  const tkB = trackKey(b.artist, b.title);
+  const aa = density.trackAlbumFacts.get(tkA) ?? 0;
+  const ab = density.trackAlbumFacts.get(tkB) ?? 0;
+  if (ab !== aa) return ab - aa;
+
+  const ta = density.trackFacts.get(tkA) ?? 0;
+  const tb = density.trackFacts.get(tkB) ?? 0;
+  if (tb !== ta) return tb - ta;
+
+  return compareHotPushTracks(a, b);
+}
+
+/** Pending hot-push tracks for artists already proven fact-rich in bank. */
+function buildFactRichHotQueue(allTracks, bank, doneKeys, excludeKeys = new Set()) {
+  const density = buildFactDensityIndex(bank);
+  const out = [];
+  for (const t of allTracks) {
+    const key = trackKey(t.artist, t.title);
+    if (excludeKeys.has(key)) continue;
+    if (!trackNeedsHotPushHarvest(bank, t, doneKeys)) continue;
+    const af = density.artistFacts.get(artistKey(t.artist)) ?? 0;
+    if (af < 1) continue;
+    out.push({
+      ...t,
+      source: doneKeys.has(key)
+        ? `${t.source ?? 'catalog'}:fact-rich-retry`
+        : `seed-global:fact-rich:${t.source ?? 'catalog'}`,
+    });
+  }
+  out.sort((a, b) => compareByFactDensity(a, b, density));
+  return { queue: out, density };
+}
+
+function topFactRichArtists(density, limit = 12) {
+  return [...density.artistFacts.entries()]
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, limit)
+    .map(([ak, n]) => `${ak} (${n})`);
 }
 
 function hasSubstantiveInPool(pool) {
@@ -672,29 +719,28 @@ async function main() {
   let queue = ordered;
   if (hotPush) {
     const priorityHits = buildPriorityHotQueue(bank, doneKeys);
-    const priorityArtists = buildPriorityArtistQueue(tracks, bank, doneKeys);
-    const priKeys = new Set(
-      [...priorityHits, ...priorityArtists].map((t) => trackKey(t.artist, t.title)),
-    );
-    const artistsWithFacts = buildArtistsWithSubstantiveFacts(bank);
+    const hitKeys = new Set(priorityHits.map((t) => trackKey(t.artist, t.title)));
+    const { queue: factRich, density } = buildFactRichHotQueue(tracks, bank, doneKeys, hitKeys);
+    const richKeys = new Set(factRich.map((t) => trackKey(t.artist, t.title)));
     const rest = tracks
       .filter((t) => {
         const key = trackKey(t.artist, t.title);
-        if (priKeys.has(key)) return false;
+        if (hitKeys.has(key) || richKeys.has(key)) return false;
         if (!trackNeedsHotPushHarvest(bank, t, doneKeys)) return false;
         return isTopCatalogTrack(t) || isPriorityArtist(t.artist);
       })
-      .sort((a, b) => compareHotPushTracksWithBank(a, b, artistsWithFacts));
-    queue = [...priorityHits, ...priorityArtists, ...rest];
+      .sort((a, b) => compareByFactDensity(a, b, density));
+    queue = [...priorityHits, ...factRich, ...rest];
     console.log(
-      `HOT-PUSH: ${priorityHits.length} priority hits + ${priorityArtists.length} classic-artist tracks + ${rest.length} top-catalog (hot≥${hotTarget})`,
+      `HOT-PUSH: ${priorityHits.length} hits + ${factRich.length} fact-rich + ${rest.length} tail (hot≥${hotTarget})`,
     );
     if (priorityHits.length) {
       console.log(`  hits: ${priorityHits.map((t) => `${t.artist} — ${t.title}`).join('; ')}`);
     }
-    if (priorityArtists.length) {
-      const sample = priorityArtists.slice(0, 8).map((t) => `${t.artist} — ${t.title}`);
-      console.log(`  classics (${priorityArtists.length} tracks): ${sample.join('; ')}…`);
+    if (factRich.length) {
+      const sample = factRich.slice(0, 8).map((t) => `${t.artist} — ${t.title}`);
+      console.log(`  fact-rich (${factRich.length} tracks, by bank density): ${sample.join('; ')}…`);
+      console.log(`  top artists in bank: ${topFactRichArtists(density).join(', ')}`);
     }
   }
   const backfillCount = queue.filter((t) => doneKeys.has(trackKey(t.artist, t.title))).length;
