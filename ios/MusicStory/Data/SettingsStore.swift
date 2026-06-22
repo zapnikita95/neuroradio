@@ -364,6 +364,7 @@ final class SettingsStore: ObservableObject {
     }
 
     var hasPremiumTtsAccess: Bool {
+        if IosAppStorePolicy.suppressPaidFeatures { return false }
         switch effectiveServerTier {
         case "trial", "premium", "unlimited":
             return true

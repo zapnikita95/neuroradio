@@ -10,8 +10,8 @@ enum AppStrings {
         static let refresh = "Собрать новый пакет"
         static let collectingHint = "Включите shuffle или перематывайте треки в плеере. Каждый новый трек добавляется в пакет."
         static let readyHint = "Когда играет трек из пакета, Эфир расскажет сохранённую историю офлайн."
-        static let premiumLocked = "Доступно по подписке (или укажи свой API-ключ для ручного режима)"
-        static let tierRequiredError = "Офлайн-эфир доступен на расширенном тарифе"
+        static let premiumLocked = "Сначала послушайте трек онлайн"
+        static let tierRequiredError = "Офлайн-эфир недоступен в этой версии приложения"
 
         static func progress(collected: Int, target: Int) -> String {
             "Собрано \(collected) из \(target)"

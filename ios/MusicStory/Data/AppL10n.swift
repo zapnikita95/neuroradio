@@ -114,8 +114,8 @@ struct AppL10n {
     }
     var offlineNoCache: String {
         en
-            ? "No saved audio. Listen online once with Extended plan."
-            : "Нет сохранённой озвучки. Послушайте трек онлайн с расширенным тарифом."
+            ? "No saved audio. Listen online once while connected."
+            : "Нет сохранённой озвучки. Послушайте трек онлайн при подключении к интернету."
     }
     var invalidTrack: String { en ? "Invalid track metadata" : "Некорректные метаданные трека" }
     var manualTrackRequired: String {
@@ -128,7 +128,7 @@ struct AppL10n {
     }
     var offlineNoInternet: String {
         en
-            ? "No internet. This story is not saved on the phone yet — listen online once with Extended plan."
+            ? "No internet. This story is not saved on the phone yet — listen online once while connected."
             : StoryRepository.offlineNoCacheMessageRu
     }
 
@@ -144,6 +144,9 @@ struct AppL10n {
     var accountSignInHint: String {
         en ? "Sign in to sync history across devices." : "Войдите — история сохранится в облаке."
     }
+    var accountSignedInSubtitle: String {
+        en ? "Cloud history sync is active on this device." : "История синхронизируется в облаке."
+    }
     var accountSignIn: String { en ? "Sign in" : "Войти" }
     var accountSignOut: String { en ? "Sign out" : "Выйти" }
     var accountRefreshProfile: String { en ? "Refresh profile" : "Обновить профиль" }
@@ -153,7 +156,9 @@ struct AppL10n {
     var accountDelete: String { en ? "Delete account" : "Удалить аккаунт" }
     var accountDeleteTitle: String { en ? "Delete account?" : "Удалить аккаунт?" }
     var accountDeleteBody: String {
-        "Облачная история и профиль будут удалены безвозвратно. Подписку на сайте отмените в личном кабинете efir-ai.ru."
+        en
+            ? "Your cloud history and profile will be permanently deleted."
+            : "Облачная история и профиль будут удалены безвозвратно."
     }
     var accountDeleteConfirm: String { en ? "Delete permanently" : "Удалить навсегда" }
     var accountDeleteCancel: String { en ? "Cancel" : "Отмена" }
@@ -261,7 +266,7 @@ struct AppL10n {
 
 extension StoryRepository {
     static let offlineNoCacheMessageRu =
-        "Нет интернета. Эта история ещё не сохранена на телефоне — один раз послушайте онлайн с расширенным тарифом."
+        "Нет интернета. Эта история ещё не сохранена на телефоне — один раз послушайте онлайн при подключении к сети."
 }
 
 extension AppStrings {

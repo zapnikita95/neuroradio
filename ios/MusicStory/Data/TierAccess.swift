@@ -3,6 +3,7 @@ import Network
 
 enum TierAccess {
     static func isPremiumLike(_ tier: String?) -> Bool {
+        if IosAppStorePolicy.suppressPaidFeatures { return false }
         guard let tier else { return false }
         return ["premium", "trial", "unlimited"].contains(tier.lowercased())
     }

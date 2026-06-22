@@ -68,43 +68,22 @@ struct AccountView: View {
                         Text(profile.displayName)
                             .font(.headline)
                             .foregroundStyle(AppTheme.creamText)
-                        if let plan = profile.plan {
-                            Text(copy.accountPlanLabel(plan))
-                                .foregroundStyle(AppTheme.mutedLavender)
-                        }
+                        Text(copy.accountSignedInSubtitle)
+                            .font(.footnote)
+                            .foregroundStyle(AppTheme.mutedLavender)
                     }
                 } else if let cached = settings.accountProfile, cached.isLoggedIn {
                     VStack(alignment: .leading, spacing: 8) {
                         Text(cached.displayName)
                             .font(.headline)
                             .foregroundStyle(AppTheme.creamText)
-                        if let plan = cached.plan {
-                            Text(copy.accountPlanLabel(plan))
-                                .foregroundStyle(AppTheme.mutedLavender)
-                        }
+                        Text(copy.accountSignedInSubtitle)
+                            .font(.footnote)
+                            .foregroundStyle(AppTheme.mutedLavender)
                     }
                 } else {
                     Text(loadError ?? copy.accountSignInHint)
                         .foregroundStyle(AppTheme.mutedLavender)
-                }
-            }
-
-            GlassCard(accentBorder: true) {
-                VStack(alignment: .leading, spacing: 10) {
-                    Text(copy.billingTitle)
-                        .font(.headline)
-                        .foregroundStyle(AppTheme.creamText)
-                    Text(copy.billingMvpExternalOnly)
-                        .font(.footnote)
-                        .foregroundStyle(AppTheme.mutedLavender)
-                    Text(copy.billingCrossPlatformHint)
-                        .font(.footnote)
-                        .foregroundStyle(AppTheme.mutedLavender)
-                    if !isLoggedIn {
-                        SecondaryStoryButton(title: copy.billingCrossPlatformSignIn) {
-                            showLogin = true
-                        }
-                    }
                 }
             }
 
