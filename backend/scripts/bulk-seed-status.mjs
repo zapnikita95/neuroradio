@@ -23,13 +23,16 @@ const mins = Math.round((Date.now() - st.mtimeMs) / 60000);
 const done = prog.doneKeys?.length ?? 0;
 const total = cat.tracks?.length ?? 0;
 const s = prog.stats ?? {};
+const factTarget = prog.target ?? 120000;
+const hotTargetDisplay = prog.hotTarget ?? 20000;
+const reallyFinished = Boolean(prog.finishedAt) && (s.total ?? 0) >= factTarget;
 
 console.log('=== bulk-seed status ===');
 console.log(`checkpoint: ${prog.savedAt ?? st.mtime.toISOString()} (${mins} min ago)`);
-console.log(`finished:   ${prog.finishedAt ? 'YES ' + prog.finishedAt : 'NO (stopped or running)'}`);
+console.log(`finished:   ${reallyFinished ? 'YES ' + prog.finishedAt : prog.finishedAt ? 'STOPPED (hit old hot cap?)' : 'NO (stopped or running)'}`);
 console.log(`tracks:     ${done} / ${total} (${total ? ((done / total) * 100).toFixed(1) : 0}%)`);
-console.log(`facts:      ${s.total ?? 0} / 60000 target`);
-console.log(`hot:        ${s.hot ?? 0} / 20000 target`);
+console.log(`facts:      ${s.total ?? 0} / ${factTarget} target`);
+console.log(`hot:        ${s.hot ?? 0} / ${hotTargetDisplay} milestone`);
 console.log(`zeroFacts:  ${s.zeroFacts ?? 0}`);
 console.log(`bySource:   ${JSON.stringify(s.bySource ?? {})}`);
 if (existsSync(bankPath)) {

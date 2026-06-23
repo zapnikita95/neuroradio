@@ -1,4 +1,4 @@
-# Overnight: harvest facts from ALL top-catalog tracks (+ Deezer matrix in parallel).
+# Overnight: fact-rich hot-push queue, then continues until --target facts (hot-target is milestone only).
 # Survives Cursor close. Logs: backend/logs/hot-push.log, backend/logs/deezer-matrix.log
 $ErrorActionPreference = 'Continue'
 $Backend = Split-Path $PSScriptRoot -Parent

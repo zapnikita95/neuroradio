@@ -349,6 +349,8 @@ function saveCheckpoint(bank, stats, doneKeys, zeroFactKeys) {
         doneKeys: [...doneKeys],
         zeroFactKeys: [...zeroFactKeys],
         stats,
+        target,
+        hotTarget,
         savedAt: new Date().toISOString(),
       },
       null,
@@ -563,9 +565,8 @@ function orderTracks(tracks, doneKeys, bank, zeroFactKeys) {
 async function runPool(tracks, bank, stats, doneKeys, zeroFactKeys) {
   let idx = 0;
   function shouldContinue() {
-    const hotLeft = countHotInBank(bank) < hotTarget;
-    if (hotPush) return hotLeft;
-    return stats.total < target && hotLeft;
+    // Stop only on substantive facts target — hot-target is a milestone, not a hard exit.
+    return stats.total < target;
   }
   async function worker() {
     while (idx < tracks.length && shouldContinue()) {
@@ -689,6 +690,7 @@ async function main() {
     for (const k of prog.doneKeys ?? []) doneKeys.add(k);
     for (const k of prog.zeroFactKeys ?? []) zeroFactKeys.add(k);
     Object.assign(stats, prog.stats ?? {});
+    delete prog.finishedAt;
     // Recount substantive total without metadata after bank normalization.
     normalizeBankMetadata(bank);
     const recap = summarizeBank(bank);
@@ -716,31 +718,41 @@ async function main() {
   console.log(`Checkpoint: hot-seed rebuilt from bank (${Object.keys(buildHotSeed(bank).byTrack).length} track keys)`);
 
   const ordered = orderTracks(tracks, doneKeys, bank, zeroFactKeys);
+  const density = buildFactDensityIndex(bank);
   let queue = ordered;
   if (hotPush) {
-    const priorityHits = buildPriorityHotQueue(bank, doneKeys);
-    const hitKeys = new Set(priorityHits.map((t) => trackKey(t.artist, t.title)));
-    const { queue: factRich, density } = buildFactRichHotQueue(tracks, bank, doneKeys, hitKeys);
-    const richKeys = new Set(factRich.map((t) => trackKey(t.artist, t.title)));
-    const rest = tracks
-      .filter((t) => {
-        const key = trackKey(t.artist, t.title);
-        if (hitKeys.has(key) || richKeys.has(key)) return false;
-        if (!trackNeedsHotPushHarvest(bank, t, doneKeys)) return false;
-        return isTopCatalogTrack(t) || isPriorityArtist(t.artist);
-      })
-      .sort((a, b) => compareByFactDensity(a, b, density));
-    queue = [...priorityHits, ...factRich, ...rest];
-    console.log(
-      `HOT-PUSH: ${priorityHits.length} hits + ${factRich.length} fact-rich + ${rest.length} tail (hot≥${hotTarget})`,
-    );
-    if (priorityHits.length) {
-      console.log(`  hits: ${priorityHits.map((t) => `${t.artist} — ${t.title}`).join('; ')}`);
-    }
-    if (factRich.length) {
-      const sample = factRich.slice(0, 8).map((t) => `${t.artist} — ${t.title}`);
-      console.log(`  fact-rich (${factRich.length} tracks, by bank density): ${sample.join('; ')}…`);
+    const hotMet = countHotInBank(bank) >= hotTarget;
+    if (hotMet) {
+      queue = ordered.sort((a, b) => compareByFactDensity(a, b, density));
+      console.log(
+        `HOT-PUSH: hot ${countHotInBank(bank)}/${hotTarget} done → catalog queue ${queue.length} until facts=${target}`,
+      );
       console.log(`  top artists in bank: ${topFactRichArtists(density).join(', ')}`);
+    } else {
+      const priorityHits = buildPriorityHotQueue(bank, doneKeys);
+      const hitKeys = new Set(priorityHits.map((t) => trackKey(t.artist, t.title)));
+      const { queue: factRich } = buildFactRichHotQueue(tracks, bank, doneKeys, hitKeys);
+      const richKeys = new Set(factRich.map((t) => trackKey(t.artist, t.title)));
+      const rest = tracks
+        .filter((t) => {
+          const key = trackKey(t.artist, t.title);
+          if (hitKeys.has(key) || richKeys.has(key)) return false;
+          if (!trackNeedsHotPushHarvest(bank, t, doneKeys)) return false;
+          return isTopCatalogTrack(t) || isPriorityArtist(t.artist);
+        })
+        .sort((a, b) => compareByFactDensity(a, b, density));
+      queue = [...priorityHits, ...factRich, ...rest];
+      console.log(
+        `HOT-PUSH: ${priorityHits.length} hits + ${factRich.length} fact-rich + ${rest.length} tail → hot ${hotTarget}`,
+      );
+      if (priorityHits.length) {
+        console.log(`  hits: ${priorityHits.map((t) => `${t.artist} — ${t.title}`).join('; ')}`);
+      }
+      if (factRich.length) {
+        const sample = factRich.slice(0, 8).map((t) => `${t.artist} — ${t.title}`);
+        console.log(`  fact-rich (${factRich.length} tracks): ${sample.join('; ')}…`);
+        console.log(`  top artists in bank: ${topFactRichArtists(density).join(', ')}`);
+      }
     }
   }
   const backfillCount = queue.filter((t) => doneKeys.has(trackKey(t.artist, t.title))).length;
@@ -754,19 +766,17 @@ async function main() {
   await runPool(queue, bank, stats, doneKeys, zeroFactKeys);
 
   saveCheckpoint(bank, stats, doneKeys, zeroFactKeys);
-  writeFileSync(
-    PROGRESS,
-    JSON.stringify(
-      {
-        doneKeys: [...doneKeys],
-        zeroFactKeys: [...zeroFactKeys],
-        stats,
-        finishedAt: new Date().toISOString(),
-      },
-      null,
-      2,
-    ),
-  );
+  const finishedPayload = {
+    doneKeys: [...doneKeys],
+    zeroFactKeys: [...zeroFactKeys],
+    stats,
+    target,
+    hotTarget,
+  };
+  if (stats.total >= target) {
+    finishedPayload.finishedAt = new Date().toISOString();
+  }
+  writeFileSync(PROGRESS, JSON.stringify(finishedPayload, null, 2));
 
   const hotCount =
     Object.values(bank.byTrack).flat().filter((f) => f.isHot && !f.isMetadata).length +
