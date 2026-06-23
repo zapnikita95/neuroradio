@@ -4,7 +4,9 @@ $ErrorActionPreference = 'Continue'
 $Backend = Split-Path $PSScriptRoot -Parent
 $LogDir = Join-Path $Backend 'logs'
 $HotLog = Join-Path $LogDir 'hot-push.log'
+$HotLauncherLog = Join-Path $LogDir 'hot-push-launcher.log'
 $MatrixLog = Join-Path $LogDir 'deezer-matrix.log'
+$MatrixLauncherLog = Join-Path $LogDir 'deezer-matrix-launcher.log'
 $HotPid = Join-Path $LogDir 'hot-push.pid'
 $MatrixPid = Join-Path $LogDir 'deezer-matrix.pid'
 
@@ -19,18 +21,18 @@ function Stop-ByPattern($pattern) {
     Get-CimInstance Win32_Process -ErrorAction SilentlyContinue |
         Where-Object { $_.CommandLine -and $_.CommandLine -like "*$pattern*" } |
         ForEach-Object {
-            Log $HotLog "stop PID $($_.ProcessId) ($pattern)"
+            Log $HotLauncherLog "stop PID $($_.ProcessId) ($pattern)"
             Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue
         }
 }
 
-Log $HotLog '=== overnight start ==='
+Log $HotLauncherLog '=== overnight start ==='
 Stop-ByPattern 'bulk-seed-fact-bank.mjs'
 
 Push-Location $Backend
 try {
-    Log $HotLog 'npm run build'
-    npm run build *>> $HotLog 2>&1
+    Log $HotLauncherLog 'npm run build'
+    npm run build *>> $HotLauncherLog 2>&1
 
     $hotArgs = @(
         'scripts/bulk-seed-fact-bank.mjs',
@@ -41,7 +43,7 @@ try {
         '--resume',
         '--no-backfill-lastfm'
     )
-    Log $HotLog "start hot-push: $($hotArgs -join ' ')"
+    Log $HotLauncherLog "start hot-push: $($hotArgs -join ' ')"
     $hot = Start-Process -FilePath 'node' `
         -ArgumentList $hotArgs `
         -WorkingDirectory $Backend `
@@ -50,7 +52,7 @@ try {
         -PassThru `
         -WindowStyle Hidden
     $hot.Id | Set-Content -Path $HotPid -Encoding ascii
-    Log $HotLog "hot-push PID $($hot.Id)"
+    Log $HotLauncherLog "hot-push PID $($hot.Id)"
 
     $matrixRunning = Get-CimInstance Win32_Process -ErrorAction SilentlyContinue |
         Where-Object { $_.CommandLine -like '*build-genre-year-catalog.mjs*' }
@@ -62,7 +64,7 @@ try {
             '--concurrency=4',
             '--no-proxy'
         )
-        Log $MatrixLog "start matrix: $($matrixArgs -join ' ')"
+        Log $MatrixLauncherLog "start matrix: $($matrixArgs -join ' ')"
         $mx = Start-Process -FilePath 'node' `
             -ArgumentList $matrixArgs `
             -WorkingDirectory $Backend `
@@ -71,15 +73,15 @@ try {
             -PassThru `
             -WindowStyle Hidden
         $mx.Id | Set-Content -Path $MatrixPid -Encoding ascii
-        Log $MatrixLog "matrix PID $($mx.Id)"
+        Log $MatrixLauncherLog "matrix PID $($mx.Id)"
     } else {
-        Log $MatrixLog "matrix already running PID $($matrixRunning.ProcessId -join ',')"
+        Log $MatrixLauncherLog "matrix already running PID $($matrixRunning.ProcessId -join ',')"
     }
 
-    Log $HotLog '=== overnight launched ==='
+    Log $HotLauncherLog '=== overnight launched ==='
     Write-Host "hot-push PID $($hot.Id) log=$HotLog"
     Write-Host "matrix log=$MatrixLog"
-    Write-Host "status: cd backend; npm run seed:status"
+    Write-Host ('status: Set-Location "' + $Backend + '"; npm run seed:status')
 } finally {
     Pop-Location
 }
