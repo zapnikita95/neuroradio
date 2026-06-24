@@ -319,32 +319,32 @@ const NEFFEX_SCRIPT =
   'The Friends Inside My Head (unreleased demo) — NEFFEX — трек, созданный в уникальном режиме. Этот артист выпустил 100 оригинальных песен за 100 недель и отправился в мировой тур. NEFFEX известен тем, что не останавливается — даже демо звучит как готовый хит.';
 const NEFFEX_SEED =
   'Fresh off releasing 100 original songs in 100 weeks (for the second time), NEFFEX embarks on his biggest world tour yet.';
-const neffexFixed = sanitizeScriptForTts(NEFFEX_SCRIPT, 'NEFFEX', 'The Friends Inside My Head (Demo)', [NEFFEX_SEED], {
+const neffexSan = sanitizeScriptForTts(NEFFEX_SCRIPT, 'NEFFEX', 'The Friends Inside My Head (Demo)', [NEFFEX_SEED], {
   speakTrackNamesInVoiceover: true,
 });
-if (/этот\s+артист/i.test(neffexFixed)) {
-  fail(`NEFFEX repair should drop этот артист: ${neffexFixed}`);
+if (!/этот\s+артист/i.test(neffexSan)) {
+  fail(`NEFFEX name economy must keep этот артист placeholder: ${neffexSan}`);
 } else {
-  ok('NEFFEX этот артист → pronoun repair');
+  ok('NEFFEX keeps этот артист (name economy, not replaced with NEFFEX)');
 }
-const neffexGarbage = findLlmGarbage(neffexFixed, {
+const neffexGarbage = findLlmGarbage(neffexSan, {
   allowVoiceoverPlaceholders: false,
   skipHitMemoryWhenGrounded: true,
   referenceFacts: [NEFFEX_SEED],
 });
-if (neffexGarbage) {
-  fail(`NEFFEX repaired script should pass garbage gate: ${neffexGarbage}`);
+if (neffexGarbage?.includes('этот')) {
+  fail(`NEFFEX этот артист must not be llm garbage: ${neffexGarbage}`);
 } else {
-  ok('NEFFEX repaired script passes llm garbage gate');
+  ok('NEFFEX этот артист not llm garbage');
 }
-const neffexVal = validateStoryScript(neffexFixed, '30s', 'NEFFEX', 'The Friends Inside My Head (Demo)', {
+const neffexVal = validateStoryScript(neffexSan, '30s', 'NEFFEX', 'The Friends Inside My Head (Demo)', {
   referenceFacts: [NEFFEX_SEED],
   strictLength: false,
   skipPersonaCliches: true,
   speakTrackNamesInVoiceover: true,
 });
-if (!neffexVal.ok && neffexVal.reason?.includes('этот')) {
-  fail(`NEFFEX validate after repair: ${neffexVal.reason}`);
+if (!neffexVal.ok && String(neffexVal.reason).includes('этот')) {
+  fail(`NEFFEX validate: ${neffexVal.reason}`);
 } else {
   ok(neffexVal.ok ? 'NEFFEX demo story validates' : `NEFFEX lenient (${neffexVal.reason})`);
 }

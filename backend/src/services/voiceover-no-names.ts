@@ -35,8 +35,8 @@ export function buildVoiceoverNamesEconomyPromptBlock(artist: string, title: str
       : grammar.gender === 'feminine'
         ? 'она / эта исполнительница / её альбом / у неё'
         : grammar.gender === 'masculine'
-          ? 'он / его альбом / у него'
-          : 'он / она / они / этот трек / у этой песни (без «этот артист» и «этот исполнитель»)';
+          ? 'он / этот исполнитель / его альбом / у него'
+          : 'этот артист / в треке / у этой песни (без он/она/они про одного человека)';
   const trackAlt = 'этот трек / эта песня / у этой песни / в ней';
   const duetHint = /,\s*|\s&\s|\s+and\s+/i.test(artist)
     ? '- Дуэт/коллаб в латинских именах: пиши «Artist A and Artist B», НЕ «Artist A и Artist B».\n'
@@ -114,29 +114,4 @@ export function scriptLeaksVoiceoverNames(script: string, artist: string, title:
 
 export function isVoiceoverWithoutTrackNames(speakTrackNamesInVoiceover?: boolean): boolean {
   return speakTrackNamesInVoiceover !== true;
-}
-
-/** Режим «имена в озвучке»: LLM иногда пишет «этот артист» — заменяем на местоимение, не на 3‑е «NEFFEX». */
-export function repairVoiceoverPlaceholdersWhenNamesOn(script: string, artist: string): string {
-  const grammar = resolveArtistGrammarRu(artist);
-  const pronoun =
-    grammar.kind === 'group'
-      ? 'они'
-      : grammar.gender === 'feminine'
-        ? 'она'
-        : grammar.gender === 'masculine'
-          ? 'он'
-          : primaryArtistName(artist);
-
-  const edge = '(?<![\\p{L}\\p{N}])';
-  const edgeEnd = '(?![\\p{L}\\p{N}])';
-  return script
-    .replace(new RegExp(`${edge}этот\\s+артист${edgeEnd}`, 'giu'), pronoun)
-    .replace(new RegExp(`${edge}этот\\s+исполнитель${edgeEnd}`, 'giu'), pronoun)
-    .replace(new RegExp(`${edge}эта\\s+исполнительница${edgeEnd}`, 'giu'), pronoun)
-    .replace(new RegExp(`${edge}эта\\s+артистка${edgeEnd}`, 'giu'), pronoun)
-    .replace(
-      new RegExp(`${edge}эта\\s+группа${edgeEnd}`, 'giu'),
-      grammar.kind === 'group' ? 'они' : pronoun,
-    );
 }

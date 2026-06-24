@@ -20,7 +20,7 @@ import { isTruncatedMarketingSnippet, isSpeakableReferenceFact } from './web-sni
 import { interestScore } from './reference-fact-quality.js';
 import { fixSoloArtistPronounsRu } from './artist-grammar.js';
 import { fixTtsGrammarIssues } from './tts-grammar-fixes.js';
-import { isVoiceoverWithoutTrackNames, repairVoiceoverPlaceholdersWhenNamesOn, scriptLeaksVoiceoverNames } from './voiceover-no-names.js';
+import { isVoiceoverWithoutTrackNames, scriptLeaksVoiceoverNames } from './voiceover-no-names.js';
 import { primaryArtistName } from './artist-primary.js';
 import { resolveStoryNarrator, type StoryNarratorId } from './story-narrator.js';
 import { isStaleClosingCliche, sanitizeClosingTail } from './story-closing-phrases.js';
@@ -425,10 +425,6 @@ export function sanitizeScriptForTts(
     speakTrackNamesInVoiceover: speakNames,
   });
   result = stripTrackTitleGuillemets(localized, title);
-
-  if (speakNames && blockArtist.trim()) {
-    result = repairVoiceoverPlaceholdersWhenNamesOn(result, blockArtist);
-  }
 
   const { masked: decadeMasked, decades: decadeSlots } = maskDecadeOrdinals(result);
   result = decadeMasked;
@@ -1244,13 +1240,7 @@ export function findGenericFiction(script: string): string | null {
   return persona.replace('persona cliche:', 'generic fiction:');
 }
 
-/** Обязательные замены в режиме «озвучка без имён» — не браковать (см. voiceover-no-names.ts). */
-const VOICEOVER_PLACEHOLDER_GARBAGE_PATTERNS: RegExp[] = [
-  /этот\s+артист/i,
-  /этот\s+исполнитель/i,
-  /эта\s+исполнительница/i,
-  /эта\s+артистка/i,
-];
+/** «этот артист» / «этот исполнитель» — штатная экономия имён, не llm garbage (см. voiceover-no-names.ts). */
 
 /** Штамп «хит в памяти» — бракуем только если нет якоря в seed-фактах. */
 const HIT_MEMORY_CLICHE_PATTERNS: RegExp[] = [
@@ -1289,7 +1279,7 @@ const LLM_GARBAGE_PATTERNS: RegExp[] = [
 ];
 
 export interface LlmGarbageOptions {
-  /** Режим озвучки без латинских имён — «этот исполнитель» обязателен. */
+  /** @deprecated — placeholders («этот артист») never treated as garbage */
   allowVoiceoverPlaceholders?: boolean;
   /** Не резать «хит в памяти», если текст опирается на seed-факты. */
   skipHitMemoryWhenGrounded?: boolean;
@@ -1298,9 +1288,7 @@ export interface LlmGarbageOptions {
 
 export function findLlmGarbage(script: string, options?: LlmGarbageOptions): string | null {
   const sets = [...LLM_GARBAGE_PATTERNS];
-  if (!options?.allowVoiceoverPlaceholders) {
-    sets.push(...VOICEOVER_PLACEHOLDER_GARBAGE_PATTERNS);
-  }
+  void options?.allowVoiceoverPlaceholders;
   const skipHit =
     options?.skipHitMemoryWhenGrounded &&
     (options.referenceFacts?.length ? anchorsReferenceFact(script, options.referenceFacts) : false);
