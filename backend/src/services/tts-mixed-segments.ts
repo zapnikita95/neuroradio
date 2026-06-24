@@ -1,23 +1,14 @@
 /** Split RU / EN / DE / FR for Edge TTS (and Yandex SSML lang tags). */
 
+import {
+  coalesceMixedLanguageSegments,
+  isPunctuationOnlyForMixedLang,
+  LATIN_RUN_RE,
+  type MixedLangSegment,
+} from './latin-script.js';
 import { edgeForeignLang } from './tts-foreign-lang.js';
 
-const LATIN_APOSTROPHE = "''\u2018\u2019\u02BC\u0060";
-const LATIN_INNER = `[\\p{Script=Latin}${LATIN_APOSTROPHE}.\\-&]`;
-
-/** Full Unicode Latin — é, ñ, ü stay inside one token (not split like ASCII \\b[a-z]\\b). */
-const LATIN_RUN_RE = new RegExp(
-  `\\p{Script=Latin}${LATIN_INNER}{0,}(?:\\s+(?![.!?…]\\s)\\p{Script=Latin}${LATIN_INNER}{0,})*`,
-  'gu',
-);
-
-export type MixedLangSegment = { lang: 'ru' | 'en' | 'de' | 'fr'; text: string };
-
-/** « — », «. » between two FR spans — glue to previous segment (one voice). */
-function isPunctuationOnly(text: string): boolean {
-  const t = text.trim();
-  return t.length > 0 && !/[\p{Script=Cyrillic}\p{Script=Latin}]/u.test(t);
-}
+export type { MixedLangSegment };
 
 function pushSegment(
   segments: MixedLangSegment[],
@@ -25,7 +16,7 @@ function pushSegment(
   chunk: string,
 ): void {
   if (!chunk) return;
-  if (isPunctuationOnly(chunk)) {
+  if (isPunctuationOnlyForMixedLang(chunk)) {
     const last = segments[segments.length - 1];
     if (last) {
       last.text = `${last.text}${chunk}`.replace(/\s{2,}/g, ' ').trim();
@@ -70,7 +61,7 @@ export function splitMixedLanguageForEdge(
     cursor = start + latin.length;
   }
 
-  return segments.filter((s) => s.text.length > 0);
+  return coalesceMixedLanguageSegments(segments.filter((s) => s.text.length > 0));
 }
 
 export function hasForeignSegmentsForEdge(

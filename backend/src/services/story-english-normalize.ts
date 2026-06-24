@@ -363,6 +363,30 @@ export function fixVocalLanguage(text: string): string {
     .replace(/вокал(?:ы|ов|ам|ами)/gi, 'вокал');
 }
 
+/** LLM hybrid garbage: latin tail on Cyrillic or mixed «guitarist» — fix, don't reject story. */
+const LATIN_CYRILLIC_HYBRID_FIXES: Array<[RegExp, string]> = [
+  [/\bvo+ukal[zзsы]?/gi, 'вокал'],
+  [/\bguitarist\b/gi, 'гитарист'],
+  [/\bbassist\b/gi, 'басист'],
+  [/\bdrummer\b/gi, 'барабанщик'],
+  [/\bvocalist\b/gi, 'вокалист'],
+  [/\bfrontman\b/gi, 'фронтмен'],
+  [/\bkeyboardist\b/gi, 'клавишник'],
+  [/\bbrazilian\b/gi, 'бразильский'],
+  [/\bmainstream\b/gi, 'мейнстрим'],
+  [/\bunderground\b/gi, 'андеграунд'],
+  [/\bperformance\b/gi, 'выступление'],
+  [/\bviral\b/gi, 'вирусный'],
+];
+
+export function fixLatinCyrillicHybrids(text: string): string {
+  let result = fixVocalLanguage(text);
+  for (const [pattern, replacement] of LATIN_CYRILLIC_HYBRID_FIXES) {
+    result = result.replace(pattern, replacement);
+  }
+  return result;
+}
+
 /** LLM often mistranslates vocal «delivery» as shipping «доставка». */
 export function fixMusicalMistranslations(text: string): string {
   return fixVocalLanguage(
@@ -416,6 +440,7 @@ export function prepareStoryScriptLanguage(
   }
   const namePhrases = extractProperNamePhrasesFromFacts(ctx.referenceFacts ?? []);
   text = replaceGenericEnglish(text, namePhrases);
+  text = fixLatinCyrillicHybrids(text);
   text = restoreProperNamesCorruptedByGenreTranslation(text, namePhrases);
   text = fixMusicalMistranslations(text);
   text = fixVocalLanguage(text);

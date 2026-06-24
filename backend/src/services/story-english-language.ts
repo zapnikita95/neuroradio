@@ -20,7 +20,7 @@ export function hasRussianLeak(
 
   const stripped = script
     .replace(/[«»"']/g, ' ')
-    .replace(/\b[a-z]{2,}\b/gi, ' ');
+    .replace(/\p{Script=Latin}{2,}/gu, ' ');
 
   const matches = stripped.match(/[\u0400-\u04FF]{3,}/g) ?? [];
   for (const match of matches) {

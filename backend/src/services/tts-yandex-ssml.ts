@@ -10,25 +10,12 @@ import {
   stripLatinApostrophesForTts,
 } from './tts-yandex-normalize.js';
 import { detectLatinLangCode } from './tts-foreign-lang.js';
+import { LATIN_RUN_RE } from './latin-script.js';
 
 const BREAK_SMALL = '\uE020';
 const BREAK_MEDIUM = '\uE021';
 const BREAK_SENTENCE = '\uE022';
 
-/** Latin runs incl. curly apostrophe in Don't / Don't Matter To Me. */
-const LATIN_APOSTROPHE = "''\u2018\u2019\u02BC\u0060";
-const LATIN_HYPHENS = '\\-\u2010\u2011\u2012\u2013\u2014';
-
-/** Latin token: Unicode Latin incl. é/ü/ñ; apostrophes, hyphens, dotted brands (Last.fm). */
-const LATIN_INNER = `[\\p{Script=Latin}${LATIN_APOSTROPHE}${LATIN_HYPHENS}:.&]`;
-const LATIN_TOKEN = `\\p{Script=Latin}${LATIN_INNER}{0,}`;
-
-const LATIN_RUN_RE = new RegExp(
-  `${LATIN_TOKEN}(?:\\s+(?![.!?…]\\s)${LATIN_TOKEN})*`,
-  'gu',
-);
-
-/** T-Shirt, Misfits T‐Shirt — one token; album «Alt: Title» — без рваного SSML. */
 export function normalizeLatinForSsml(text: string): string {
   return normalizeLatinApostrophes(text)
     .replace(/\bLast\s*\.\s*fm\b/gi, 'Last.fm')
@@ -188,7 +175,7 @@ export function mergeLatinTitleOtArtist(text: string): string {
   const latin = LATIN_RUN_RE.source;
   const re = new RegExp(
     `(${latin})\\s*,?\\s*от\\s+(${latin})(?=[\\s,.!?…;:—–-]|$)`,
-    'gi',
+    'giu',
   );
   return text.replace(re, (_m, title: string, artist: string) => {
     const t = title.trim();
@@ -200,7 +187,7 @@ export function mergeLatinTitleOtArtist(text: string): string {
 
 /** Пауза Yandex markup вплотную перед латиницей даёт рваный стык — убираем. */
 function stripPausesBeforeLatin(text: string): string {
-  return text.replace(/<\[(?:small|medium|large|tiny|huge|sentence)\]>\s*(?=[A-Za-zÀ-ÿ])/g, ' ');
+  return text.replace(/<\[(?:small|medium|large|tiny|huge|sentence)\]>\s*(?=\p{Script=Latin})/gu, ' ');
 }
 
 /** Оборачивает латинские фрагменты в SSML lang; русский текст и +ударения — как есть. */
@@ -210,10 +197,10 @@ export function wrapMixedLanguageBody(text: string): string {
   );
   let last = 0;
   let out = '';
-  const re = new RegExp(LATIN_RUN_RE.source, 'g');
+  LATIN_RUN_RE.lastIndex = 0;
   let match: RegExpExecArray | null;
 
-  while ((match = re.exec(prepared)) !== null) {
+  while ((match = LATIN_RUN_RE.exec(prepared)) !== null) {
     if (match.index > last) {
       out += escapeRussianChunkBeforeLatin(prepared.slice(last, match.index));
     }

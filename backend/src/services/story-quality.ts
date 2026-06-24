@@ -6,7 +6,7 @@ import {
 } from './story-length.js';
 import { COVER_CONTEXT_RE, factMentionsArtist, factMentionsTitle, hasTrackContextSignal, storyMentionsPerformingArtist, storyNamesForeignArtist } from './fact-relevance.js';
 import { hasRussianLeak } from './story-english-language.js';
-import { hasEnglishLeak } from './story-russian-language.js';
+import { repairRussianScriptLanguage } from './story-russian-language.js';
 import type { StoryLanguageId } from './story-language.js';
 import { prepareStoryScriptLanguage } from './story-english-normalize.js';
 import { applyForeignPronunciation } from './tts-foreign-pronounce.js';
@@ -813,6 +813,10 @@ export function validateStoryScript(
   let trimmed = stripLlmStressLeakage(sanitizeClosingTail(script.trim(), storyLang));
   if (!trimmed) return { ok: false, reason: 'empty script' };
 
+  if (storyLang === 'ru' && !skipEnglishCheck) {
+    trimmed = repairRussianScriptLanguage(trimmed, artist, title, referenceFacts);
+  }
+
   if (noTrackNames) {
     const leak = scriptLeaksVoiceoverNames(trimmed, artist, title);
     if (leak) return { ok: false, reason: leak };
@@ -896,15 +900,6 @@ export function validateStoryScript(
         return { ok: false, reason: persona };
       }
     }
-  }
-
-  if (
-    !skipEnglishCheck &&
-    hasEnglishLeak(trimmed, artist, title, {
-      referenceFacts,
-    })
-  ) {
-    return { ok: false, reason: 'english words in Russian narration' };
   }
 
   if (!skipRussianCheck && hasRussianLeak(trimmed, artist, title)) {

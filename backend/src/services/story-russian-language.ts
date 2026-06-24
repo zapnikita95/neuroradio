@@ -1,6 +1,8 @@
 import {
   buildAllowedLatinTokens,
   extractProperNamePhrasesFromFacts,
+  fixLatinCyrillicHybrids,
+  fixMusicalMistranslations,
   foldLatinAscii,
   replaceGenericEnglish,
 } from './story-english-normalize.js';
@@ -100,6 +102,21 @@ export function hasEnglishLeak(
     if (token.length >= 3) return true;
   }
   return false;
+}
+
+/** Auto-fix jargon/hybrids before quality/TTS — do not reject whole story for fixable glitches. */
+export function repairRussianScriptLanguage(
+  script: string,
+  artist = '',
+  title = '',
+  referenceFacts: string[] = [],
+): string {
+  let text = script.trim();
+  text = replaceGenericEnglish(text, extractProperNamePhrasesFromFacts(referenceFacts));
+  text = fixLatinCyrillicHybrids(text);
+  text = fixMusicalMistranslations(text);
+  text = text.replace(/#\s*(\d+)/g, ' номер $1 ');
+  return text.replace(/\s{2,}/g, ' ').trim();
 }
 
 export const RUSSIAN_LANGUAGE_PROMPT_BLOCK = `ЯЗЫК — ТОЛЬКО РУССКИЙ, ДЛЯ ОЗВУЧКИ:

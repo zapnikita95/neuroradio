@@ -60,16 +60,26 @@ if (!goodVal.ok) {
 
 const ENGLISH_LEAK =
   '«Dancing Queen» — единственный #1 ABBA в США, viral hit на Billboard top-5.';
-if (!hasEnglishLeak(ENGLISH_LEAK, 'ABBA', 'Dancing Queen')) {
-  fail('english leak sample should be detected');
+const repairedLeak = (await import('../dist/services/story-russian-language.js')).repairRussianScriptLanguage(
+  ENGLISH_LEAK,
+  'ABBA',
+  'Dancing Queen',
+);
+if (/viral\b/i.test(repairedLeak) || /top-5/i.test(repairedLeak) || /#\s*1/.test(repairedLeak)) {
+  fail(`repair should fix english jargon: ${repairedLeak}`);
 } else {
-  ok('english leak detected');
+  ok('english jargon repaired instead of rejecting story');
 }
-const englishVal = validateStoryScript(ENGLISH_LEAK, '30s', 'ABBA', 'Dancing Queen');
+const englishVal = validateStoryScript(repairedLeak, '30s', 'ABBA', 'Dancing Queen', {
+  strictLength: false,
+  speakTrackNamesInVoiceover: true,
+});
 if (englishVal.ok) {
-  fail('english leak script should be rejected');
+  ok('repaired english jargon script accepted');
+} else if (englishVal.reason === 'english words in Russian narration') {
+  fail('repaired script must not fail english gate');
 } else {
-  ok(`english leak rejected (${englishVal.reason})`);
+  ok(`repaired script: ${englishVal.reason}`);
 }
 
 const RUSSIAN_ABBA =
@@ -124,6 +134,14 @@ if (hasEnglishLeak(MTV_SCRIPT, 'Michael Jackson', 'Thriller')) {
   fail(`MTV script rejected for english leak: ${mtvVal.reason}`);
 } else {
   ok('MTV and track names allowed in Russian script');
+}
+
+const HYBRID = 'а воукалz записывал guitarist на сцене.';
+const hybridFixed = (await import('../dist/services/story-english-normalize.js')).fixLatinCyrillicHybrids(HYBRID);
+if (/воукал|guitarist/i.test(hybridFixed)) {
+  fail(`hybrid fix failed: ${hybridFixed}`);
+} else {
+  ok('latin-cyrillic hybrid repaired');
 }
 
 const marked = prepareYandexTtsText('Трек Lou Bega «Mambo No. 5» в студии.', {

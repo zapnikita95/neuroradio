@@ -14,6 +14,7 @@ import {
 import { splitMixedLanguageForEdge } from '../dist/services/tts-mixed-segments.js';
 import { edgeForeignLang } from '../dist/services/tts-foreign-lang.js';
 import { isFrenchLatinPhrase } from '../dist/services/fr-lang-detect.js';
+import { wrapMixedLanguageBody } from '../dist/services/tts-yandex-ssml.js';
 
 const live = process.argv.includes('--live');
 const artist = 'Stromae';
@@ -38,12 +39,20 @@ const segs = splitMixedLanguageForEdge(prepared, artist, title);
 console.log('\nsegments:');
 for (const s of segs) console.log(`  [${s.lang}] ${s.text}`);
 
-const badSplit = segs.some((s) => /\bjourn\b/i.test(s.text) && !/journée/i.test(s.text));
+const badSplit = segs.some((s) => /\bjourn\b/i.test(s.text) && !/journée/u.test(s.text));
 if (badSplit) {
   console.error('\nFAIL: journée split into journ + e');
   process.exitCode = 1;
 } else {
   console.log('\nOK: journée not split at accent');
+}
+
+const punctRu = segs.filter((s) => s.lang === 'ru' && /^[\s\p{P}]+$/u.test(s.text));
+if (punctRu.length > 0) {
+  console.error('FAIL: standalone RU punctuation segments:', punctRu);
+  process.exitCode = 1;
+} else {
+  console.log('OK: no standalone RU punctuation segments');
 }
 
 const frSegs = segs.filter((s) => s.lang === 'fr');
@@ -52,6 +61,14 @@ if (frSegs.length !== 1 || !/Mauvaise journée — Stromae/i.test(frSegs[0].text
   process.exitCode = 1;
 } else {
   console.log('OK: opener on single FR voice (no RU dash between)');
+}
+
+const yandexSsml = wrapMixedLanguageBody(`${title} — ${artist}. Родился в семье.`);
+if (!/xml:lang="fr-FR"/.test(yandexSsml) || !/Mauvaise journée/u.test(yandexSsml)) {
+  console.error('FAIL: Yandex SSML must keep French title in fr-FR lang tag:', yandexSsml.slice(0, 200));
+  process.exitCode = 1;
+} else {
+  console.log('OK: Yandex SSML uses fr-FR for French title (not RU translit)');
 }
 
 if (live) {

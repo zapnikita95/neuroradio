@@ -101,8 +101,7 @@ export const MUSIC_LATIN_ALLOWLIST = new Set([
   'viral',
 ]);
 
-const LATIN_RUN_RE =
-  /[A-Za-zÀ-ÿ][A-Za-zÀ-ÿ0-9''.\-&]{0,}(?:\s+(?![.!?…]\s)[A-Za-zÀ-ÿ][A-Za-zÀ-ÿ0-9''.\-&]{0,})*/g;
+import { LATIN_RUN_RE } from './latin-script.js';
 
 const YANDEX_MARKUP_TAG_RE = /<\[(?:small|medium|large|tiny|huge|sentence)\]>/g;
 const MARKUP_SLOT = '\uE012';

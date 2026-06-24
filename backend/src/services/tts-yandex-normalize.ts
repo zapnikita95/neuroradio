@@ -17,10 +17,9 @@ export function stripLatinApostrophesForTts(span: string): string {
   return span.replace(new RegExp(`[${LATIN_APOSTROPHE_CLASS}]`, 'g'), '');
 }
 
-const LATIN_RUN_FOR_APOSTROPHE_RE = new RegExp(
-  `[A-Za-zÀ-ÿ][A-Za-zÀ-ÿ0-9${LATIN_APOSTROPHE_CLASS}.\\-&]{0,}(?:\\s+(?![.!?…]\\s)[A-Za-zÀ-ÿ][A-Za-zÀ-ÿ0-9${LATIN_APOSTROPHE_CLASS}.\\-&]{0,})*`,
-  'g',
-);
+import { LATIN_RUN_RE } from './latin-script.js';
+
+const LATIN_RUN_FOR_APOSTROPHE_RE = LATIN_RUN_RE;
 
 export function stripApostrophesInLatinRuns(text: string): string {
   return text.replace(LATIN_RUN_FOR_APOSTROPHE_RE, (span) => stripLatinApostrophesForTts(span));
