@@ -635,6 +635,38 @@ const CONCEPT_BRIDGES: Array<{ factPattern: RegExp; scriptTokens: string[] }> = 
     factPattern: /paul\s+van\s+haver|stromae/i,
     scriptTokens: ['stromae', 'стром', 'parker', 'паркер', 'van haver'],
   },
+  {
+    factPattern: /rwand|belgian|belgium|brussels|parents?|born in|raised in|childhood/i,
+    scriptTokens: [
+      'руанд',
+      'бельг',
+      'брюсс',
+      'родил',
+      'семь',
+      'корн',
+      'происх',
+      'отец',
+      'мать',
+      'детств',
+      'вырос',
+    ],
+  },
+  {
+    factPattern: /collaborat|featur|guest|duet|together with|wrote with|co-?writ/i,
+    scriptTokens: ['коллаб', 'feat', 'дуэт', 'вместе', 'соавтор', 'приглас', 'записал'],
+  },
+  {
+    factPattern: /sampled|sampling|sample from|based on|interpolation/i,
+    scriptTokens: ['сэмпл', 'sample', 'основ', 'заимств', 'перезапис', 'фрагмент'],
+  },
+  {
+    factPattern: /france|french|ultratop|sncf|french charts?/i,
+    scriptTokens: ['франц', 'чарт', 'строчк', 'топ'],
+  },
+  {
+    factPattern: /basement|home studio|\$\d+|microphone|cheap mic/i,
+    scriptTokens: ['подвал', 'домашн', 'микрофон', 'студи', 'бюджет', 'дешёв', 'дешев'],
+  },
 ];
 
 const GENERIC_FACT_WORDS = new Set([
@@ -965,7 +997,7 @@ export function validateStoryScript(
   if (
     referenceFactsAreAnchorable(referenceFacts, artist, title) &&
     !skipFirstSentenceAnchor &&
-    !firstSentenceAnchoredToFact(trimmed, referenceFacts)
+    !openingAnchoredToFact(trimmed, referenceFacts)
   ) {
     return { ok: false, reason: 'first sentence is not anchored to seed fact' };
   }
@@ -995,11 +1027,24 @@ export function validateStoryScript(
   return { ok: true };
 }
 
-export function firstSentenceAnchoredToFact(script: string, referenceFacts: string[]): boolean {
+/** First 1–2 sentences — hooks often split anchor across two short phrases. */
+export function openingBlockForAnchor(script: string): string {
+  const sentences = script.split(/(?<=[.!?…])\s+/).map((s) => s.trim()).filter(Boolean);
+  if (sentences.length === 0) return '';
+  return sentences.slice(0, 2).join(' ').trim();
+}
+
+/** Opening anchor: same bridges as full script, but on the hook block (not just sentence 1). */
+export function openingAnchoredToFact(script: string, referenceFacts: string[]): boolean {
   if (referenceFacts.length === 0) return true;
-  const firstSentence = script.split(/(?<=[.!?…])\s+/).find(Boolean)?.trim() ?? '';
-  if (firstSentence.length < 12) return false;
-  return anchorsReferenceFact(firstSentence, referenceFacts);
+  const opening = openingBlockForAnchor(script);
+  if (opening.length < 12) return false;
+  return anchorsReferenceFact(opening, referenceFacts);
+}
+
+/** @deprecated alias — use openingAnchoredToFact */
+export function firstSentenceAnchoredToFact(script: string, referenceFacts: string[]): boolean {
+  return openingAnchoredToFact(script, referenceFacts);
 }
 
 /** @deprecated Alias for PERSONA_CLICHE_PATTERNS — kept for test imports only. */

@@ -264,4 +264,55 @@ if (/\bвоукал/i.test(sanitizedBeatIt)) {
   ok('sanitize replaces воукалz with вокал');
 }
 
+// --- Opening anchor (first 1–2 sentences, not sentence 1 only) ---
+const {
+  openingAnchoredToFact,
+  openingBlockForAnchor,
+} = await import('../dist/services/story-quality.js');
+const { qualityOptionsForProductionAttempt } = await import('../dist/services/story-generate-loop.js');
+
+const STROMAE_SEED =
+  'Paul van Haver, known as Stromae, was born in Brussels to a Rwandan father and Belgian mother.';
+const STROMAE_TWO_SENT =
+  'Родился в Брюсселе в семье с руандийскими корнями. Отец приехал из Руанды, мать была бельгийкой — так вырос Stromae.';
+if (!openingAnchoredToFact(STROMAE_TWO_SENT, [STROMAE_SEED])) {
+  fail('Stromae RU paraphrase opening should anchor via bridges + 2 sentences');
+} else {
+  ok('Stromae RU paraphrase opening anchors');
+}
+const stromaeOpening = openingBlockForAnchor(STROMAE_TWO_SENT);
+if (!stromaeOpening.includes('бельгий')) {
+  fail('openingBlock should include first two sentences');
+} else {
+  ok('openingBlock spans two sentences');
+}
+
+const GENERIC_HOOK =
+  'Эта песня — настоящая находка для фанатов. Музыка может соединить всех нас — так звучит настоящий хит.';
+const LOU_SEED_SHORT =
+  'Lou Bega adapted Perez Prado Mambo No. 5 and added verses listing women names in Munich studio.';
+const genericStrict = validateStoryScript(GENERIC_HOOK, '30s', 'Lou Bega', 'Mambo No. 5', {
+  referenceFacts: [LOU_SEED_SHORT],
+  strictLength: false,
+  skipPersonaCliches: true,
+});
+if (genericStrict.ok) {
+  fail('generic watery hook should not pass strict validation');
+} else if (
+  !String(genericStrict.reason).includes('first sentence') &&
+  !String(genericStrict.reason).includes('no concrete fact')
+) {
+  fail(`generic hook unexpected reason: ${genericStrict.reason}`);
+} else {
+  ok(`generic hook rejected (${genericStrict.reason})`);
+}
+
+const prodOpts = qualityOptionsForProductionAttempt([LOU_SEED_SHORT], 'ru');
+const prodGeneric = validateStoryScript(GENERIC_HOOK, '30s', 'Lou Bega', 'Mambo No. 5', prodOpts);
+if (!prodGeneric.ok && prodGeneric.reason?.includes('first sentence')) {
+  fail('prod options must skip opening anchor gate');
+} else {
+  ok('prod options skip opening anchor (matches OpenRouter loop)');
+}
+
 process.exit(failed > 0 ? 1 : 0);

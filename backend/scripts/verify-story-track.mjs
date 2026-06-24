@@ -224,10 +224,14 @@ if (!localOnly) {
       }
 
       const { validateStoryScript } = await import('../dist/services/story-quality.js');
-      const q = validateStoryScript(result.script, '30s', artist, title, {
-        referenceFacts: result.seed ? [result.seed] : [],
-        strictLength: false,
-      });
+      const { qualityOptionsForProductionAttempt } = await import('../dist/services/story-generate-loop.js');
+      const q = validateStoryScript(
+        result.script,
+        '30s',
+        artist,
+        title,
+        qualityOptionsForProductionAttempt(result.seed ? [result.seed] : [], 'ru'),
+      );
       if (!q.ok) {
         fail(`prod quality gate: ${q.reason}`);
       } else {
