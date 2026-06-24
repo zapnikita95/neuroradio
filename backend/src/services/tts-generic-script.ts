@@ -83,20 +83,20 @@ export function latinTrackBlocklist(artist: string, title: string): Set<string> 
     for (const variant of phraseVariants(phrase)) {
       for (const part of variant.split(/[^\p{L}\p{N}]+/u)) {
         const word = part.trim().toLowerCase();
-        if (word.length >= 2 && /[a-z]/.test(word)) blocked.add(word);
+        if (word.length >= 2 && /\p{Script=Latin}/u.test(word)) blocked.add(word);
       }
       const noArticle = variant.replace(ARTICLE_PREFIX, '').trim();
       if (noArticle.length >= 2) {
         for (const part of noArticle.split(/[^\p{L}\p{N}]+/u)) {
           const word = part.trim().toLowerCase();
-          if (word.length >= 2 && /[a-z]/.test(word)) blocked.add(word);
+          if (word.length >= 2 && /\p{Script=Latin}/u.test(word)) blocked.add(word);
         }
       }
       const paren = variant.match(/\(([^)]+)\)/);
       if (paren?.[1]?.trim() && isPrimarilyLatin(paren[1])) {
         for (const part of paren[1].split(/[^\p{L}\p{N}]+/u)) {
           const word = part.trim().toLowerCase();
-          if (word.length >= 2 && /[a-z]/.test(word)) blocked.add(word);
+          if (word.length >= 2 && /\p{Script=Latin}/u.test(word)) blocked.add(word);
         }
       }
     }

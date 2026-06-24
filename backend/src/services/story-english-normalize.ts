@@ -394,7 +394,7 @@ export function replaceGenericEnglish(
   return result.replace(/\s{2,}/g, ' ').trim();
 }
 
-const LATIN_CAP_WORD = /\b[A-Z][a-z]+(?:[''][a-z]+)?\b/g;
+const LATIN_CAP_WORD = /\b\p{Lu}\p{Script=Latin}*\b/gu;
 
 export interface StoryLanguageContext {
   artist: string;

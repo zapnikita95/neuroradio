@@ -4,6 +4,8 @@
   "phrases": {
     "stromae": "стр+оме",
     "alors on danse": "ал+ор он д+анс",
+    "mauvaise journee": "mov+ез журн+е",
+    "mauvaise journée": "mov+ез журн+е",
     "papaoutai": "пап+аут+ай",
     "formidable": "формid+абль",
     "tous les memes": "ту л+е м+ем",
@@ -251,7 +253,10 @@
     "terre": "t+ер",
     "ciel": "si+ель",
     "liberte": "lib+ерт+е",
-    "liberté": "lib+ерт+é"
+    "liberté": "lib+ерт+é",
+    "journée": "журн+е",
+    "journee": "журн+е",
+    "mauvaise": "mov+ез"
   },
   "artistKeys": [
     "stromae",

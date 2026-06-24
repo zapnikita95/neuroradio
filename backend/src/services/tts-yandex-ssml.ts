@@ -19,12 +19,13 @@ const BREAK_SENTENCE = '\uE022';
 const LATIN_APOSTROPHE = "''\u2018\u2019\u02BC\u0060";
 const LATIN_HYPHENS = '\\-\u2010\u2011\u2012\u2013\u2014';
 
-/** Latin token: words, apostrophes, hyphens, dotted brands (Last.fm, R.E.M.). */
-const LATIN_TOKEN = `[A-Za-zÀ-ÿ][A-Za-zÀ-ÿ0-9${LATIN_APOSTROPHE}${LATIN_HYPHENS}:.&]{0,}`;
+/** Latin token: Unicode Latin incl. é/ü/ñ; apostrophes, hyphens, dotted brands (Last.fm). */
+const LATIN_INNER = `[\\p{Script=Latin}${LATIN_APOSTROPHE}${LATIN_HYPHENS}:.&]`;
+const LATIN_TOKEN = `\\p{Script=Latin}${LATIN_INNER}{0,}`;
 
 const LATIN_RUN_RE = new RegExp(
   `${LATIN_TOKEN}(?:\\s+(?![.!?…]\\s)${LATIN_TOKEN})*`,
-  'g',
+  'gu',
 );
 
 /** T-Shirt, Misfits T‐Shirt — one token; album «Alt: Title» — без рваного SSML. */
@@ -42,7 +43,7 @@ export function normalizeLatinForSsml(text: string): string {
 
 export function hasLatinForSsml(text: string): boolean {
   const stripped = text.replace(/<\[(?:small|medium|large|tiny|huge|sentence)\]>/g, '');
-  return /[A-Za-zÀ-ÿ]{2,}/.test(stripped);
+  return /\p{Script=Latin}{2,}/u.test(stripped);
 }
 
 export function escapeSsml(text: string): string {

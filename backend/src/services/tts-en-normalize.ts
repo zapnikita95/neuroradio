@@ -132,7 +132,7 @@ export function collectLatinTokens(artist: string, title: string): Set<string> {
     value
       .split(/[^\p{L}\p{N}]+/u)
       .map((part) => part.trim())
-      .filter((part) => part.length >= 2 && /[a-z]/i.test(part))
+      .filter((part) => part.length >= 2 && /\p{Script=Latin}/u.test(part))
       .forEach((part) => tokens.add(part.toLowerCase()));
   };
   collect(artist);

@@ -3,19 +3,35 @@
 import { edgeForeignLang } from './tts-foreign-lang.js';
 
 const LATIN_APOSTROPHE = "''\u2018\u2019\u02BC\u0060";
+const LATIN_INNER = `[\\p{Script=Latin}${LATIN_APOSTROPHE}.\\-&]`;
 
+/** Full Unicode Latin — é, ñ, ü stay inside one token (not split like ASCII \\b[a-z]\\b). */
 const LATIN_RUN_RE = new RegExp(
-  `[A-Za-zÀ-ÿ][A-Za-zÀ-ÿ0-9${LATIN_APOSTROPHE}.\\-&]{0,}(?:\\s+(?![.!?…]\\s)[A-Za-zÀ-ÿ][A-Za-zÀ-ÿ0-9${LATIN_APOSTROPHE}.\\-&]{0,})*`,
-  'g',
+  `\\p{Script=Latin}${LATIN_INNER}{0,}(?:\\s+(?![.!?…]\\s)\\p{Script=Latin}${LATIN_INNER}{0,})*`,
+  'gu',
 );
 
 export type MixedLangSegment = { lang: 'ru' | 'en' | 'de' | 'fr'; text: string };
+
+/** « — », «. » between two FR spans — glue to previous segment (one voice). */
+function isPunctuationOnly(text: string): boolean {
+  const t = text.trim();
+  return t.length > 0 && !/[\p{Script=Cyrillic}\p{Script=Latin}]/u.test(t);
+}
 
 function pushSegment(
   segments: MixedLangSegment[],
   lang: 'ru' | 'en' | 'de' | 'fr',
   chunk: string,
 ): void {
+  if (!chunk) return;
+  if (isPunctuationOnly(chunk)) {
+    const last = segments[segments.length - 1];
+    if (last) {
+      last.text = `${last.text}${chunk}`.replace(/\s{2,}/g, ' ').trim();
+    }
+    return;
+  }
   const t = chunk.trim();
   if (!t) return;
   const last = segments[segments.length - 1];

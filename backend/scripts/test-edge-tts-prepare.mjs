@@ -93,5 +93,21 @@ console.log('sanitizeEdge:', sanitizeEdge);
 ok(/Billboard/i.test(sanitizeEdge), 'skipForeignPhonetic: latin Billboard kept for Edge EN');
 ok(/эта группа/i.test(sanitizeEdge), 'skipForeignPhonetic: placeholder kept');
 
+const stromaeScript =
+  'Mauvaise journée — Stromae. Родился в семье руандийского отца и бельгийской матери.';
+const stromaeEdge = prepareEdgeTtsText(stromaeScript, {
+  artist: 'Stromae',
+  title: 'Mauvaise journée',
+  speakTrackNamesInVoiceover: true,
+});
+const stromaeSegs = splitMixedLanguageForEdge(stromaeEdge, 'Stromae', 'Mauvaise journée');
+console.log('stromaeSegs:', stromaeSegs);
+ok(/journée/u.test(stromaeEdge), 'Stromae: journée intact as one word');
+ok(
+  stromaeSegs.filter((s) => s.lang === 'fr').length === 1 &&
+    /Mauvaise journée — Stromae/i.test(stromaeSegs.find((s) => s.lang === 'fr')?.text ?? ''),
+  'Stromae: one FR segment for title+artist',
+);
+
 if (process.exitCode) process.exit(process.exitCode);
 console.log('\nAll Edge TTS prepare checks passed.');
