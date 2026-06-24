@@ -154,7 +154,9 @@ export function prepareYandexTtsText(
   // Кавычки: только текст внутри, без «в кавычках …» — не занимает эфир.
   text = stripGuillemetsForPreview(text);
   text = normalizeYandexSpeechTokens(text, artist, title);
-  text = applyStylizedArtistTokensRu(text, options.artist ?? artist, options.title ?? title);
+  if (options.speakTrackNamesInVoiceover !== true) {
+    text = applyStylizedArtistTokensRu(text, options.artist ?? artist, options.title ?? title);
+  }
   text = applyRussianStressSafe(text);
   text = options.websitePreview
     ? text

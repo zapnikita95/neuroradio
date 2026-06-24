@@ -9,6 +9,8 @@ import {
   normalizePhraseKey,
 } from './de-lang-detect.js';
 import { isFrenchLatinPhrase, isKnownFrenchPhrase } from './fr-lang-detect.js';
+import { isSpanishLatinPhrase } from './es-lang-detect.js';
+import { isItalianLatinPhrase } from './it-lang-detect.js';
 
 export type ForeignLangCode = 'en-US' | 'de-DE' | 'it-IT' | 'es-ES' | 'fr-FR';
 export type ForeignLang = 'en' | 'de' | 'it' | 'es' | 'fr';
@@ -25,6 +27,9 @@ export function detectForeignLang(phrase: string): ForeignLang {
   if (isKnownGermanPhrase(phrase)) return 'de';
   if (isKnownFrenchPhrase(phrase)) return 'fr';
   if (isFrenchLatinPhrase(phrase)) return 'fr';
+  if (isItalianLatinPhrase(phrase)) return 'it';
+  if (isSpanishLatinPhrase(phrase)) return 'es';
+  if (isGermanLatinPhrase(phrase)) return 'de';
   return detectDeItEsEn(phrase);
 }
 
@@ -60,6 +65,18 @@ export function edgeForeignLang(latin: string, artist = '', title = ''): 'en' | 
       (title && isKnownFrenchPhrase(title))
     ) {
       return 'fr';
+    }
+    if (
+      (artist && isSpanishLatinPhrase(artist)) ||
+      (title && isSpanishLatinPhrase(title))
+    ) {
+      return 'en';
+    }
+    if (
+      (artist && isItalianLatinPhrase(artist)) ||
+      (title && isItalianLatinPhrase(title))
+    ) {
+      return 'en';
     }
     if (
       (artist && isKnownGermanPhrase(artist)) ||

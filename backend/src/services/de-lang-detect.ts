@@ -75,6 +75,7 @@ function countGermanWords(phrase: string): number {
   const tokens = normalizePhraseKey(phrase).split(/\s+/).filter(Boolean);
   let hits = 0;
   for (const t of tokens) {
+    if (/[áéíóúñ]/i.test(t)) continue;
     const bare = t.replace(/[^a-zäöüß0-9-]/gi, '');
     if (!bare) continue;
     if (WORD_KEYS.has(bare.toLowerCase()) || DE_MARKER_WORDS.has(bare.toLowerCase())) hits += 1;
@@ -87,6 +88,9 @@ function countGermanWords(phrase: string): number {
 export function isGermanLatinPhrase(phrase: string): boolean {
   const trimmed = phrase.trim();
   if (!trimmed || !/[A-Za-zÀ-ÿ]/.test(trimmed)) return false;
+
+  // Spanish ñ/á — «Maná» must not collapse to German «man».
+  if (/[áéíóúñ¿¡]/i.test(trimmed) && !/[äöüß]/i.test(trimmed)) return false;
 
   const key = normalizePhraseKey(trimmed);
   if (isKnownEnglishOnlyArtist(key)) return false;
@@ -120,13 +124,20 @@ export function detectForeignSpeechLang(latinSpan: string): ForeignSpeechLang {
   const trimmed = latinSpan.trim();
   if (!trimmed) return 'en';
 
-  if (/ñ|¿|¡|[áéíóúü](?![a-z])/i.test(trimmed) && !/[äö]/i.test(trimmed)) {
-    // Spanish accent without German umlaut — but ü exists in both; prefer German if known
-    if (!isGermanLatinPhrase(trimmed)) return 'es';
+  if (/[äöüß]/i.test(trimmed) && isGermanLatinPhrase(trimmed)) return 'de';
+
+  if (/[áéíóúñ¿¡]/i.test(trimmed) && !/[äöüß]/i.test(trimmed)) {
+    return 'es';
+  }
+
+  if (/[àèéìòù]/i.test(trimmed) && !/[äöüßñ]/i.test(trimmed)) {
+    return 'it';
   }
 
   if (
-    /\b(zitti|buoni|mambo|italiano|ciao|amore|bambino|gnocchi)\b/i.test(trimmed) ||
+    /\b(zitti|buoni|mambo|italiano|ciao|amore|bambino|gnocchi|partirò|partiro|bocelli|pavarotti)\b/i.test(
+      trimmed,
+    ) ||
     (/tti\b|gn[a-z]|gli|cci/i.test(trimmed) && !isGermanLatinPhrase(trimmed))
   ) {
     return 'it';
