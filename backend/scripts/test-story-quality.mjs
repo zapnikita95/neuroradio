@@ -1,7 +1,7 @@
 /**
  * Run: npm run build && node scripts/test-story-quality.mjs
  */
-import { validateStoryScript } from '../dist/services/story-quality.js';
+import { validateStoryScript, sanitizeScriptForTts, findLlmGarbage } from '../dist/services/story-quality.js';
 import { validateLlmSeedCandidate } from '../dist/services/story-llm-fact-hunt.js';
 import { hasEnglishLeak } from '../dist/services/story-russian-language.js';
 import { prepareYandexTtsText } from '../dist/services/tts-markup.js';
@@ -220,7 +220,7 @@ if (hasEnglishLeak(REDBONE_SCRIPT, 'Graham Blvd', 'Come and Get Your Love', { re
 }
 
 const { fixVocalLanguage } = await import('../dist/services/story-english-normalize.js');
-const { findNewsSeedBleedIntoRecordingStory, findOffSeedInvention, sanitizeScriptForTts } =
+const { findNewsSeedBleedIntoRecordingStory, findOffSeedInvention } =
   await import('../dist/services/story-quality.js');
 
 if (fixVocalLanguage('а воукалз записывал он сам') !== 'а вокал записывал он сам') {
@@ -313,6 +313,40 @@ if (!prodGeneric.ok && prodGeneric.reason?.includes('first sentence')) {
   fail('prod options must skip opening anchor gate');
 } else {
   ok('prod options skip opening anchor (matches OpenRouter loop)');
+}
+
+const NEFFEX_SCRIPT =
+  'The Friends Inside My Head (unreleased demo) — NEFFEX — трек, созданный в уникальном режиме. Этот артист выпустил 100 оригинальных песен за 100 недель и отправился в мировой тур. NEFFEX известен тем, что не останавливается — даже демо звучит как готовый хит.';
+const NEFFEX_SEED =
+  'Fresh off releasing 100 original songs in 100 weeks (for the second time), NEFFEX embarks on his biggest world tour yet.';
+const neffexFixed = sanitizeScriptForTts(NEFFEX_SCRIPT, 'NEFFEX', 'The Friends Inside My Head (Demo)', [NEFFEX_SEED], {
+  speakTrackNamesInVoiceover: true,
+});
+if (/этот\s+артист/i.test(neffexFixed)) {
+  fail(`NEFFEX repair should drop этот артист: ${neffexFixed}`);
+} else {
+  ok('NEFFEX этот артист → pronoun repair');
+}
+const neffexGarbage = findLlmGarbage(neffexFixed, {
+  allowVoiceoverPlaceholders: false,
+  skipHitMemoryWhenGrounded: true,
+  referenceFacts: [NEFFEX_SEED],
+});
+if (neffexGarbage) {
+  fail(`NEFFEX repaired script should pass garbage gate: ${neffexGarbage}`);
+} else {
+  ok('NEFFEX repaired script passes llm garbage gate');
+}
+const neffexVal = validateStoryScript(neffexFixed, '30s', 'NEFFEX', 'The Friends Inside My Head (Demo)', {
+  referenceFacts: [NEFFEX_SEED],
+  strictLength: false,
+  skipPersonaCliches: true,
+  speakTrackNamesInVoiceover: true,
+});
+if (!neffexVal.ok && neffexVal.reason?.includes('этот')) {
+  fail(`NEFFEX validate after repair: ${neffexVal.reason}`);
+} else {
+  ok(neffexVal.ok ? 'NEFFEX demo story validates' : `NEFFEX lenient (${neffexVal.reason})`);
 }
 
 process.exit(failed > 0 ? 1 : 0);

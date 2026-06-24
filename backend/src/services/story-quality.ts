@@ -20,7 +20,7 @@ import { isTruncatedMarketingSnippet, isSpeakableReferenceFact } from './web-sni
 import { interestScore } from './reference-fact-quality.js';
 import { fixSoloArtistPronounsRu } from './artist-grammar.js';
 import { fixTtsGrammarIssues } from './tts-grammar-fixes.js';
-import { isVoiceoverWithoutTrackNames, scriptLeaksVoiceoverNames } from './voiceover-no-names.js';
+import { isVoiceoverWithoutTrackNames, repairVoiceoverPlaceholdersWhenNamesOn, scriptLeaksVoiceoverNames } from './voiceover-no-names.js';
 import { primaryArtistName } from './artist-primary.js';
 import { resolveStoryNarrator, type StoryNarratorId } from './story-narrator.js';
 import { isStaleClosingCliche, sanitizeClosingTail } from './story-closing-phrases.js';
@@ -425,6 +425,10 @@ export function sanitizeScriptForTts(
     speakTrackNamesInVoiceover: speakNames,
   });
   result = stripTrackTitleGuillemets(localized, title);
+
+  if (speakNames && blockArtist.trim()) {
+    result = repairVoiceoverPlaceholdersWhenNamesOn(result, blockArtist);
+  }
 
   const { masked: decadeMasked, decades: decadeSlots } = maskDecadeOrdinals(result);
   result = decadeMasked;
