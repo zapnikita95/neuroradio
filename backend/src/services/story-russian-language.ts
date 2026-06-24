@@ -1,23 +1,52 @@
 import {
   buildAllowedLatinTokens,
+  foldLatinAscii,
   replaceGenericEnglish,
 } from './story-english-normalize.js';
-const FORBIDDEN_PHRASES: RegExp[] = [
-  /#\s*\d/,
-];
 
-const LATIN_WORD = /\b[a-z]{3,}\b/i;
+const FORBIDDEN_PHRASES: RegExp[] = [/#\s*\d/];
+
+/** Latin letters including é, ü, ñ — not ASCII-only [a-z]. */
+const LATIN_TOKEN = /\p{Script=Latin}{2,}/gu;
+const LATIN_WORD = /\p{Script=Latin}{3,}/u;
+
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function isAllowedLatinToken(token: string, allowed: ReturnType<typeof buildAllowedLatinTokens>): boolean {
+  const lower = token.toLowerCase();
+  if (allowed.has(lower)) return true;
+  if (allowed.has(foldLatinAscii(token))) return true;
+  return false;
+}
+
+/** Mask full artist/title before token scan — avoids «journée» → false «journ» leak. */
+function maskTrackMetadata(text: string, artist: string, title: string): string {
+  let result = text;
+  const phrases = [title, artist]
+    .map((p) => p.trim())
+    .filter((p) => p.length >= 2)
+    .sort((a, b) => b.length - a.length);
+  for (const phrase of phrases) {
+    result = result.replace(new RegExp(escapeRegExp(phrase), 'giu'), ' ');
+  }
+  return result;
+}
 
 /** Leave disallowed Latin for detection; mask allowed tokens and hyphen hybrids. */
 function textForEnglishLeakCheck(
   text: string,
   allowed: ReturnType<typeof buildAllowedLatinTokens>,
+  artist = '',
+  title = '',
 ): string {
   let result = text.replace(/«[^»]*»/g, ' ');
-  result = result.replace(/\b[a-z]{2,}\b/gi, (match) => {
-    return allowed.has(match.toLowerCase()) ? ' ' : match;
+  result = maskTrackMetadata(result, artist, title);
+  result = result.replace(LATIN_TOKEN, (match) => {
+    return isAllowedLatinToken(match, allowed) ? ' ' : match;
   });
-  result = result.replace(/\b[a-z]{2,}(?=-[\u0400-\u04FF])/gi, '');
+  result = result.replace(/\p{Script=Latin}{2,}(?=-[\u0400-\u04FF])/giu, '');
   return result;
 }
 
@@ -34,14 +63,15 @@ export function hasEnglishLeak(
   const allowed = buildAllowedLatinTokens(artist, title, referenceFacts, normalized, {
     blockTrackLatin: options.blockTrackLatin === true,
   });
-  const remaining = textForEnglishLeakCheck(normalized, allowed);
+  const remaining = textForEnglishLeakCheck(normalized, allowed, artist, title);
+  LATIN_TOKEN.lastIndex = 0;
   return LATIN_WORD.test(remaining);
 }
 
 export const RUSSIAN_LANGUAGE_PROMPT_BLOCK = `ЯЗЫК — ТОЛЬКО РУССКИЙ, ДЛЯ ОЗВУЧКИ:
 - Основной текст по-русски. Имена собственные лatinицей МОЖНО и НУЖНО сохранять: Billboard, Cash Box, Rolling Stone, названия групп и треков БЕЗ кавычек (просто Smooth, Hollywood Tonight).
 - НЕ переводи названия журналов, лейблов, артистов и песен — это имена собственные.
-- Знаковые термины и приёмы — тоже лatin/English, НЕ кальки: moonwalk, anti-gravity lean, robot (танец MJ). ПЛОХО: «луноход», «робот», «наклон без гравитации» вместо moonwalk.
+- Знаковые термины и приёмы — тоже лatin/English, НЕ калки: moonwalk, anti-gravity lean, robot (танец MJ). ПЛОХО: «луноход», «робот», «наклон без гравитации» вместо moonwalk.
 - Обычные английские слова (chart, band, single, live, hit, mainstream) переводи по смыслу: чарт, группа, сингл, живой, хит.
 - Pop, Rock, Rap и другие жанры С ЗАГЛАВНОЙ в псевдонимах и именах — НЕ переводи: Jimmy Pop, Kid Rock, Lil Wayne. Жанры в тексте — слитно для озвучки: «хипхоп», «попрок», «фолкрок» (НЕ «хип-хоп», «поп-рок» — TTS ломает).
 - Музыкальный термин flow — пиши «флоу» (как слышится по-английски), НЕ «поток» и НЕ «флоу» с другим ударением.

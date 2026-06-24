@@ -25,13 +25,25 @@ async function synthEdgeSegment(
   voice: string,
   rate: string,
   pitch: string,
+  retries = 4,
 ): Promise<Buffer> {
   const trimmed = text.trim();
   if (!trimmed) return Buffer.alloc(0);
-  const tts = new EdgeTTS(trimmed, voice, { rate, pitch });
-  const buf = Buffer.from(await (await tts.synthesize()).audio.arrayBuffer());
-  if (buf.length < 64) throw new Error('Edge TTS: empty audio buffer');
-  return buf;
+  let lastErr: Error | undefined;
+  for (let attempt = 0; attempt < retries; attempt++) {
+    try {
+      const tts = new EdgeTTS(trimmed, voice, { rate, pitch });
+      const buf = Buffer.from(await (await tts.synthesize()).audio.arrayBuffer());
+      if (buf.length >= 64) return buf;
+      lastErr = new Error('Edge TTS: empty audio buffer');
+    } catch (err) {
+      lastErr = err instanceof Error ? err : new Error(String(err));
+    }
+    if (attempt < retries - 1) {
+      await new Promise((resolve) => setTimeout(resolve, 900 * (attempt + 1)));
+    }
+  }
+  throw lastErr ?? new Error('Edge TTS: empty audio buffer');
 }
 
 function edgeVoiceForLang(

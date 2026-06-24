@@ -87,6 +87,7 @@ export const MUSIC_PROPER_NOUNS = new Set([
 
 /** Generic English → Russian (not proper nouns). Longer phrases first. */
 export const GENERIC_ENGLISH_REPLACEMENTS: Array<[RegExp, string]> = [
+  [/\s+by\s+/gi, ' — '],
   [/\bnative\s+american\b/gi, 'коренных американцев'],
   [/\btop[-\s]?five\b/gi, 'пятёрку'],
   [/\btop[-\s]?5\b/gi, 'пятёрку'],
@@ -293,6 +294,17 @@ function escapeRegExp(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
+/** Strip diacritics for allowlist lookup (journée → journee). */
+export function foldLatinAscii(value: string): string {
+  return value.normalize('NFD').replace(/\p{M}/gu, '').toLowerCase();
+}
+
+function addFoldedLatinVariants(allowed: Set<string>): void {
+  for (const token of [...allowed]) {
+    allowed.add(foldLatinAscii(token));
+  }
+}
+
 /** Latin tokens from English fact snippets (Redbone, Goodman, etc.). */
 export function extractLatinTokensFromFacts(referenceFacts: string[] = []): Set<string> {
   const tokens = new Set<string>();
@@ -340,6 +352,7 @@ export function buildAllowedLatinTokens(
   if (blockTrackLatin) {
     for (const word of blocked) allowed.delete(word);
   }
+  addFoldedLatinVariants(allowed);
   return allowed;
 }
 

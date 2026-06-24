@@ -94,6 +94,23 @@ if (hasEnglishLeak(POP_HYBRID, 'Stromae', 'Alors on danse')) {
   ok('pop-музыки hybrid allowed');
 }
 
+const STROMAE_SCRIPT =
+  'Mauvaise journée — Stromae, и в этой песне слышны отголоски сложной судьбы. Отец из Руанды и бельгийская мать создали тот уникальный фундамент, на котором строится всё звучание. Stromae мастерски переносит этот опыт в современную поп музыку.';
+const stromaeVal = validateStoryScript(STROMAE_SCRIPT, '30s', 'Stromae', 'Mauvaise journée', {
+  referenceFacts: [
+    'Stromae родился в семье руандийского отца и бельгийской матери, что повлияло на его мультикультурное творчество.',
+  ],
+  strictLength: false,
+  speakTrackNamesInVoiceover: true,
+});
+if (hasEnglishLeak(STROMAE_SCRIPT, 'Stromae', 'Mauvaise journée', { blockTrackLatin: false })) {
+  fail('Stromae + Mauvaise journée (accents) should not leak English');
+} else if (!stromaeVal.ok && stromaeVal.reason === 'english words in Russian narration') {
+  fail(`Stromae script rejected for english leak: ${stromaeVal.reason}`);
+} else {
+  ok('Stromae Mauvaise journée title accents allowed');
+}
+
 const marked = prepareYandexTtsText('Трек Lou Bega «Mambo No. 5» в студии.', {
   artist: 'Lou Bega',
   title: 'Mambo No. 5',
