@@ -902,7 +902,6 @@ export function validateStoryScript(
     !skipEnglishCheck &&
     hasEnglishLeak(trimmed, artist, title, {
       referenceFacts,
-      blockTrackLatin: noTrackNames,
     })
   ) {
     return { ok: false, reason: 'english words in Russian narration' };

@@ -111,6 +111,21 @@ if (hasEnglishLeak(STROMAE_SCRIPT, 'Stromae', 'Mauvaise journée', { blockTrackL
   ok('Stromae Mauvaise journée title accents allowed');
 }
 
+const MTV_SCRIPT =
+  'Thriller — Michael Jackson. MTV крутил клип в эфир, когда на канале в основном играли рок.';
+const mtvVal = validateStoryScript(MTV_SCRIPT, '30s', 'Michael Jackson', 'Thriller', {
+  referenceFacts: ['MTV aired the Thriller video in heavy rotation.'],
+  strictLength: false,
+  speakTrackNamesInVoiceover: true,
+});
+if (hasEnglishLeak(MTV_SCRIPT, 'Michael Jackson', 'Thriller')) {
+  fail('MTV + artist/title must not count as English leak');
+} else if (!mtvVal.ok && mtvVal.reason === 'english words in Russian narration') {
+  fail(`MTV script rejected for english leak: ${mtvVal.reason}`);
+} else {
+  ok('MTV and track names allowed in Russian script');
+}
+
 const marked = prepareYandexTtsText('Трек Lou Bega «Mambo No. 5» в студии.', {
   artist: 'Lou Bega',
   title: 'Mambo No. 5',

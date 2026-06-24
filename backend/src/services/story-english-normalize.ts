@@ -321,7 +321,7 @@ export function extractLatinTokensFromFacts(referenceFacts: string[] = []): Set<
     }
     for (const part of fact.split(/[^\p{L}\p{N}]+/u)) {
       const word = part.trim().toLowerCase();
-      if (word.length >= 2 && /[a-z]/.test(word)) tokens.add(word);
+      if (word.length >= 2 && /\p{Script=Latin}/u.test(word)) tokens.add(word);
     }
   }
   return tokens;

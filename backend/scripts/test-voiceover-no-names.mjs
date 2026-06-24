@@ -11,7 +11,6 @@ import {
   scriptLeaksVoiceoverNames,
 } from '../dist/services/voiceover-no-names.js';
 import { resolveArtistGrammarRu } from '../dist/services/artist-grammar.js';
-import { hasEnglishLeak } from '../dist/services/story-russian-language.js';
 import { sanitizeScriptForTts } from '../dist/services/story-quality.js';
 
 let failed = 0;
@@ -149,11 +148,11 @@ if (/[\uE012\uE013]/.test(mjSanitized)) {
   ok('Dirty Diana preserved in sanitize when speak_track_names ON');
 }
 
-// --- Latin block when names off ---
-if (!hasEnglishLeak('Foster The People rocked the stage', ARTIST, TITLE, { blockTrackLatin: true })) {
-  fail('hasEnglishLeak must flag Foster in script when blockTrackLatin');
+// --- Latin block when names off: scriptLeaksVoiceoverNames, not english-leak gate ---
+if (!scriptLeaksVoiceoverNames('Foster The People rocked the stage', ARTIST, TITLE)) {
+  fail('scriptLeaksVoiceoverNames must catch Foster when names off');
 } else {
-  ok('latin artist name flagged when blockTrackLatin');
+  ok('artist name caught by voiceover leak detector when names off');
 }
 
 if (failed > 0) {
