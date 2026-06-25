@@ -1,6 +1,10 @@
 import { harvestTitleVariants } from '../title-harvest-variants.js';
 import { expandArtistSearchNames } from '../artist-search-aliases.js';
-import { isArtistDisambiguationListSeed, isArtistFormationBioSeed } from '../reference-fact-quality.js';
+import {
+  isArtistDisambiguationListSeed,
+  isArtistFormationBioSeed,
+  isListeningStatsFact,
+} from '../reference-fact-quality.js';
 import { isArtistIdentityBioSnippet } from '../web-snippet-accept.js';
 import type { HarvestContext, HarvestedFact } from './types.js';
 import { fetchJson, splitSentences, stripHtml } from './fetch-utils.js';
@@ -38,6 +42,7 @@ function wikiToSentences(raw: string | undefined, scope: 'track' | 'artist'): Ha
       const t = sentence.trim();
       if (t.length < 35) return false;
       if (isArtistDisambiguationListSeed(t)) return false;
+      if (isListeningStatsFact(t)) return false;
       if (/debut single check/i.test(t)) return false;
       if (/Then the (?:first|second|third|fourth|lead|debut) single \w+/i.test(t)) return false;
       if (scope === 'artist' && isArtistIdentityBioSnippet(t)) return false;

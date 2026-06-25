@@ -33,7 +33,7 @@ const { factAppliesToRequest, factMentionsTitle, isNonMusicTitleCollisionFact } 
 );
 const { dedicatedHarvestToBundle } = await import('../dist/services/fact-sources/dedicated-fetch.js');
 const { poolHasTopicDuplicate } = await import('../dist/services/fact-topic.js');
-const { isArtistFormationBioSeed, isTrackDurationCatalogSeed } = await import(
+const { isArtistFormationBioSeed, isTrackDurationCatalogSeed, isListeningStatsFact, interestScore } = await import(
   '../dist/services/reference-fact-quality.js'
 );
 const { rejectSeedForTrackStory } = await import('../dist/services/fact-track-anchor.js');
@@ -543,6 +543,15 @@ assert(
   isRejectedStorySeed(LASTFM_LISTENERS, 'Marino', 'Worst Enemy (Original Mix)', [], 'ru'),
   'Last.fm playcount rejected as story seed',
 );
+
+const RED_LEATHER_SPOTIFY_STREAMS =
+  'Currently, Reno has about 16 million streams on Spotify and Red has about 1.4 million streams on Spotify.';
+assert(isListeningStatsFact(RED_LEATHER_SPOTIFY_STREAMS), 'Spotify stream counts are listening stats');
+assert(
+  isRejectedPickSeed(RED_LEATHER_SPOTIFY_STREAMS, 'GET OUT OF MY HEAD', 'ru', [], 'Red Leather'),
+  'Spotify streams rejected at pick',
+);
+assert(interestScore(RED_LEATHER_SPOTIFY_STREAMS) < 0, 'Spotify streams score negative');
 
 // --- 5d. Artist bank pollution: seed must mention performing artist; guests OK ---
 const { factMentionsArtistLoose } = await import('../dist/services/fact-relevance.js');

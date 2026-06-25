@@ -1,4 +1,4 @@
-import { isCatalogMetadataSeed, isTrackDurationCatalogSeed } from './reference-fact-quality.js';
+import { isCatalogMetadataSeed, isListeningStatsFact, isTrackDurationCatalogSeed } from './reference-fact-quality.js';
 
 /**
  * Generic fact topics — no track/album names in keys.
@@ -52,7 +52,6 @@ type TopicRule = { topic: FactTopicKey; pattern: RegExp };
 
 /** Order matters — first match wins. */
 const TOPIC_RULES: TopicRule[] = [
-  { topic: 'listening_stats', pattern: /\b(?:last\.?fm|слушател|прослушиван|scrobbles?|playcount)\b/i },
   { topic: 'award_ceremony', pattern: /\b(?:grammy|oscar|mtv video music|award|ceremony|номинац|преми[яю]|didn'?t attend)\b/i },
   { topic: 'music_video', pattern: /\b(?:music video|official video|клип|directed by|promotional video|mtv|gondry|режисс|director|visual|анимац|optical illusion)\b/i },
   {
@@ -131,6 +130,7 @@ function significantTokens(text: string): string[] {
 export function classifyFactTopic(fact: string): FactTopicKey {
   const trimmed = fact.trim();
   if (!trimmed) return 'misc';
+  if (isListeningStatsFact(trimmed)) return 'listening_stats';
   for (const { topic, pattern } of TOPIC_RULES) {
     if (pattern.test(trimmed)) return topic;
   }

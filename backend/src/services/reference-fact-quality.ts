@@ -52,9 +52,25 @@ export function isDiscogsPackagingSeed(fact: string): boolean {
   );
 }
 
-/** Last.fm playcount/listeners — never a story seed. */
+/** Playcount / streams / listeners — never harvest, pick, bank, or story seed. */
+const LISTENING_STATS_PATTERNS: RegExp[] = [
+  /\b(?:last\.?fm|scrobbles?|playcount)\b/i,
+  /на\s+Last\.fm\s+у\s*«/i,
+  /\b(?:monthly\s+listeners?|unique\s+listeners?)\b/i,
+  /\bstreams?\s+on\s+(?:spotify|apple\s*music|youtube\s*music|deezer|tidal|soundcloud)\b/i,
+  /\b(?:spotify|apple\s*music|youtube\s*music|deezer|soundcloud)\b.{0,80}\b(?:streams?|plays?|listeners?)\b/i,
+  /\b(?:million|billion)\s+streams?\b/i,
+  /\bhas\s+about\s+[\d.,]+\s+million\s+streams?\b/i,
+  /\bcurrently,?\s+.{0,60}\b(?:million|billion)\s+streams?\b/i,
+  /\b\d[\d.,\s]{2,}\s*(?:слушател\w*|прослушиван\w*)/i,
+  /(?:слушател\w*|прослушиван\w*).{0,40}\d[\d.,\s]{2,}/i,
+  /\b(?:миллион\w*|миллиард\w*)\s+(?:стрим\w*|прослушиван\w*)\b/i,
+  /\b(?:most[- ]streamed|total\s+streams?)\b/i,
+];
+
 export function isListeningStatsFact(fact: string): boolean {
-  return /\b(?:last\.?fm|слушател|прослушиван|scrobbles?|playcount)\b/i.test(fact.trim());
+  const t = fact.trim();
+  return LISTENING_STATS_PATTERNS.some((pattern) => pattern.test(t));
 }
 
 /** Метаданные harvest — в банк можно, в прогресс/pick/hot не идут. */
@@ -440,6 +456,7 @@ export function interestScore(fact: string): number {
   if (/The song(?:'|')s title comes from/i.test(quoteNorm)) return 22;
   if (/\bdescribes the pain of a man feeling left out in a love triangle\b/i.test(quoteNorm)) return 20;
   if (isCitationBibliographySeed(trimmed)) return -40;
+  if (isListeningStatsFact(trimmed)) return -100;
   if (isGenericConcertVenueSeed(trimmed)) return -25;
   if (isCatalogMetadataSeed(trimmed)) return -30;
   if (isGenericMusicVideoSeed(trimmed)) return -25;
@@ -601,6 +618,7 @@ export function isWeakChartSeed(fact: string): boolean {
 export function isBoringFact(fact: string): boolean {
   const trimmed = fact.trim();
   if (trimmed.length < 30) return true;
+  if (isListeningStatsFact(trimmed)) return true;
   if (isTrackMeaningNarrativeSeed(trimmed)) return false;
   if (isCitationBibliographySeed(trimmed)) return true;
   if (isGenericConcertVenueSeed(trimmed)) return true;
@@ -630,6 +648,7 @@ export function filterAndRankFacts(facts: string[], max = 6): string[] {
     })
     .filter((fact) => !isTruncatedMarketingSnippet(fact))
     .filter((fact) => !isUnspeakableWebSeed(fact))
+    .filter((fact) => !isListeningStatsFact(fact))
     .sort((a, b) => interestScore(b) - interestScore(a))
     .filter((fact) => !isBoringFact(fact))
     .slice(0, max);

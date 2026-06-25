@@ -14,6 +14,7 @@ import { fetchTheFlowFacts } from './the-flow-facts.js';
 import { fetchDiscogsFacts } from './discogs-facts.js';
 import { fetchMusixmatchFacts } from './musixmatch-facts.js';
 import { fetchDedicatedSourceFacts } from './dedicated-fetch.js';
+import { isListeningStatsFact } from '../reference-fact-quality.js';
 
 function dedupeFacts(facts: HarvestedFact[]): HarvestedFact[] {
   const seen = new Set<string>();
@@ -36,6 +37,7 @@ function filterForBulk(facts: HarvestedFact[], ctx: HarvestContext): HarvestedFa
   return facts.filter((f) => {
     const trimmed = f.fact.trim();
     if (trimmed.length < 35) return false;
+    if (isListeningStatsFact(trimmed)) return false;
     if (f.scope === 'artist') {
       return factMentionsArtist(trimmed, ctx.artist) || factAppliesToRequest(trimmed, ctx.artist, ctx.title, 'artist', 'indie');
     }

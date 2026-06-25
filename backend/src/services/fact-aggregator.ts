@@ -10,7 +10,7 @@ import {
   hasTrackContextSignal,
   isWebListicleJunk,
 } from './fact-relevance.js';
-import { filterAndRankFacts, interestScore, isArtistDisambiguationListSeed, isArtistFormationBioSeed, isEncyclopediaDefinitionSeed } from './reference-fact-quality.js';
+import { filterAndRankFacts, interestScore, isArtistDisambiguationListSeed, isArtistFormationBioSeed, isEncyclopediaDefinitionSeed, isListeningStatsFact } from './reference-fact-quality.js';
 import { rejectSeedForTrackStory } from './fact-track-anchor.js';
 import { WEAK_TRIVIA_PATTERNS } from './story-fact-hunt.js';
 import { fetchReferenceFactBundle as fetchWikipediaBundle, fetchFastTrackWikiFacts } from './wikipedia-facts.js';
@@ -337,6 +337,7 @@ function pushRaw(
 ): void {
   const trimmed = text.trim();
   if (trimmed.length < RAW_SNIPPET_MIN_LEN) return;
+  if (isListeningStatsFact(trimmed)) return;
   if (WEAK_TRIVIA_PATTERNS.some((p) => p.test(trimmed))) return;
   const norm = normalize(trimmed);
   if (collected.some((s) => normalize(s) === norm)) return;
@@ -496,6 +497,7 @@ function buildRawSnippets(
   const addCandidate = (text: string, source: SnippetSource) => {
     const trimmed = text.trim();
     if (trimmed.length < RAW_SNIPPET_MIN_LEN) return;
+    if (isListeningStatsFact(trimmed)) return;
     if (WEAK_TRIVIA_PATTERNS.some((p) => p.test(trimmed))) return;
     if (isLyricsPageSeed(trimmed) || isWrongEntityDisambiguation(trimmed, artist)) return;
     candidates.push({ text: trimmed.slice(0, 480), source, score: interestScore(trimmed) });

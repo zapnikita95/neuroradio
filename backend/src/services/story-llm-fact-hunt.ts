@@ -3,7 +3,7 @@ import { fuzzyTokenMatch } from './title-transliterate.js';
 import type { SelectedReferenceFact } from './fact-picker.js';
 import { factNamesForeignEntity, factMentionsArtist, factMentionsTitle, hasTrackContextSignal, hasRussianTrackContextSignal } from './fact-relevance.js';
 import { hasAnchoredTrackContext, rejectSeedForTrackStory } from './fact-track-anchor.js';
-import { interestScore, isBoringFact, MIN_PICK_INTEREST_SCORE, isWeakChartSeed, isGenericMusicVideoSeed, isCatalogMetadataSeed, isCitationBibliographySeed, isGenericConcertVenueSeed, isStudioEquipmentCatalogSeed } from './reference-fact-quality.js';
+import { interestScore, isBoringFact, MIN_PICK_INTEREST_SCORE, isWeakChartSeed, isGenericMusicVideoSeed, isCatalogMetadataSeed, isCitationBibliographySeed, isGenericConcertVenueSeed, isStudioEquipmentCatalogSeed, isListeningStatsFact } from './reference-fact-quality.js';
 import { interestRating10 } from './fact-interest-log.js';
 import { MIN_GOOD_SCOPE_INTEREST } from './fact-picker.js';
 import { WEAK_TRIVIA_PATTERNS, FACT_HUNT_LLM_PROMPT_BLOCK } from './story-fact-hunt.js';
@@ -88,6 +88,7 @@ export function shouldRunLlmFactHunt(
   if (selected && isGenericConcertVenueSeed(selected.fact)) return true;
   if (selected && isGenericMusicVideoSeed(selected.fact)) return true;
   if (selected && isStudioEquipmentCatalogSeed(selected.fact)) return true;
+  if (selected && isListeningStatsFact(selected.fact)) return true;
   if (selected.interestScore >= FAST_SEED_INTEREST_SCORE) {
     if (selected.scope === 'track' && title.trim() && !factMentionsTitle(selected.fact, title)) return true;
     if (isGenericMusicVideoSeed(selected.fact)) return true;
@@ -125,6 +126,7 @@ export function explainFactHuntDecision(
     }
     if (isGenericMusicVideoSeed(selected.fact)) return 'generic-music-video-seed';
     if (isStudioEquipmentCatalogSeed(selected.fact)) return 'studio-equipment-catalog-seed';
+    if (isListeningStatsFact(selected.fact)) return 'listening-stats-seed';
     return `fast-seed score=${selected.interestScore}`;
   }
   if (trackFactCount === 0 && selected.scope !== 'track') return 'no-track-facts';
@@ -180,6 +182,9 @@ export function validateLlmSeedCandidate(
   const snippet = rawSnippets[idx] ?? '';
   if (!verifyLlmSeedEvidence(quote, snippet)) {
     return { ok: false, reason: 'evidenceQuote not grounded in snippet' };
+  }
+  if (isListeningStatsFact(fact)) {
+    return { ok: false, reason: 'streaming/listening stats fact' };
   }
   if (WEAK_TRIVIA_PATTERNS.some((p) => p.test(fact))) {
     return { ok: false, reason: 'weak trivia fact (chart/hit/metrics)' };

@@ -12,11 +12,15 @@ const lastfm =
   'На Last.fm у «CONCRETE JUNGLE» (Bad Omens) 177,942 слушателей и 3,270,435 прослушиваний.';
 assert.equal(isListeningStatsFact(lastfm), true);
 
+const spotifyStreams =
+  'Currently, Reno has about 16 million streams on Spotify and Red has about 1.4 million streams.';
+assert.equal(isListeningStatsFact(spotifyStreams), true);
+
 const packaging = 'Gatefold, includes digital download card and hype sticker.';
 assert.equal(isDiscogsPackagingSeed(packaging), true);
 
 const salvage = pickSalvageSnippetSeed(
-  [lastfm, packaging, 'Bad Omens are an American metalcore band from Richmond, Virginia.'],
+  [lastfm, spotifyStreams, packaging, 'Bad Omens are an American metalcore band from Richmond, Virginia.'],
   'Bad Omens',
   'CONCRETE JUNGLE',
 );
