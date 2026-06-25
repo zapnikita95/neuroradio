@@ -4,12 +4,12 @@
 
 const LATIN_APOSTROPHE = "''\u2018\u2019\u02BC\u0060";
 const LATIN_HYPHENS = '\\-\u2010\u2011\u2012\u2013\u2014';
-const LATIN_INNER = `[\\p{Script=Latin}${LATIN_APOSTROPHE}${LATIN_HYPHENS}:.&]`;
+const LATIN_INNER = `[\\p{Script=Latin}${LATIN_APOSTROPHE}${LATIN_HYPHENS}:.&!?]`;
 const LATIN_TOKEN = `\\p{Script=Latin}${LATIN_INNER}{0,}`;
 
-/** One Latin run: words, apostrophes, hyphens, dotted brands (Last.fm). */
+/** One Latin run: words, apostrophes, hyphens, dotted brands (Last.fm), band !? (Panic!). */
 export const LATIN_RUN_RE = new RegExp(
-  `${LATIN_TOKEN}(?:\\s+(?![.!?…]\\s)${LATIN_TOKEN})*`,
+  `${LATIN_TOKEN}(?:\\s+(?![.…]\\s)${LATIN_TOKEN})*`,
   'gu',
 );
 

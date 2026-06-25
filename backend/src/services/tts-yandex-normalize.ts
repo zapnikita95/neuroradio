@@ -3,6 +3,7 @@
 import { mergeLatinCollaborationPhrases } from './tts-grammar-fixes.js';
 import { normalizeGenreTermsForTts } from './tts-genre-pronounce.js';
 import { applyTitleNumeralsInText, titleNumeralsForTts } from './tts-title-numerals.js';
+import { applyMusicNamePunctuationToText } from './tts-music-name-punctuation.js';
 
 const CURLY_APOSTROPHE = /[\u2018\u2019\u02BC\u0060]/g;
 
@@ -84,7 +85,7 @@ function normalizeLoanwordsForRussianTts(text: string): string {
 
 /** Mixed RU/EN tokens that Yandex misreads inside `<lang en-US>` or after apostrophe splits. */
 export function normalizeYandexSpeechTokens(text: string, artist = '', title = ''): string {
-  let result = normalizeLatinApostrophes(text);
+  let result = applyMusicNamePunctuationToText(normalizeLatinApostrophes(text), artist, title);
 
   const titleNorm = normalizeLatinApostrophes(title.trim());
   if (titleNorm) {

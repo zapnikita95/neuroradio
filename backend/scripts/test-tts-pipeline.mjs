@@ -141,6 +141,47 @@ test('SSML keeps Last.fm as one English lang span', () => {
   assert.doesNotMatch(ssml, /<\/lang>\.<lang[^>]*>fm/i);
 });
 
+test('SSML reads Panic! At The Disco as one phrase without bang pause', () => {
+  const ssml = buildYandexSsml(
+    'House of Memories — Panic! At The Disco — трек, который фанаты полюбили.',
+    { artist: 'Panic! at the Disco', title: 'House of Memories' },
+  );
+  assert.match(ssml, /<lang xml:lang="en-US">Panic At The Disco<\/lang>/i);
+  assert.doesNotMatch(ssml, />Panic<\/lang>/i);
+  assert.doesNotMatch(ssml, /Panic!/i);
+});
+
+test('SSML collapses R.E.M. acronym dots without letter pauses', () => {
+  const ssml = buildYandexSsml('коллаборация с R.E.M. вышла в девяностые.');
+  assert.match(ssml, /<lang xml:lang="en-US">REM<\/lang>/i);
+  assert.doesNotMatch(ssml, /R\.E\.M/i);
+});
+
+test('SSML collapses t.A.T.u. dotted name', () => {
+  const ssml = buildYandexSsml('хит t.A.T.u. взорвал чарты.');
+  assert.match(ssml, /<lang xml:lang="en-US">tATu<\/lang>/i);
+});
+
+test('normalizeYandexSpeechTokens strips bang in 3OH!3', () => {
+  const out = normalizeYandexSpeechTokens('группа 3OH!3 записала хит.', '3OH!3', 'Dont Trust Me');
+  assert.match(out, /3OH3/i);
+  assert.doesNotMatch(out, /3OH!3/);
+});
+
+test('prepareYandexTtsText reads Panic! At The Disco without punctuation pauses', () => {
+  const out = prepareYandexTtsText(
+    'House of Memories — Panic! At The Disco — один из самых любимых треков.',
+    {
+      artist: 'Panic! at the Disco',
+      title: 'House of Memories',
+      speakTrackNamesInVoiceover: true,
+    },
+  );
+  const ssml = buildYandexSsml(out);
+  assert.match(ssml, /Panic At The Disco/i);
+  assert.doesNotMatch(ssml, /Panic!/i);
+});
+
 test('prepareYandexTtsText stresses микстейпы', () => {
   const out = prepareYandexTtsText('он выпускал микстейпы Room for Improvement.', {
     artist: 'Drake',

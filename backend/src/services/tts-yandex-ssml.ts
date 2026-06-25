@@ -11,21 +11,28 @@ import {
 } from './tts-yandex-normalize.js';
 import { detectLatinLangCode } from './tts-foreign-lang.js';
 import { LATIN_RUN_RE } from './latin-script.js';
+import {
+  spokenMusicNameForTts,
+  musicNameNeedsPunctuationFix,
+  normalizeMusicPunctuationInLatinRuns,
+} from './tts-music-name-punctuation.js';
 
 const BREAK_SMALL = '\uE020';
 const BREAK_MEDIUM = '\uE021';
 const BREAK_SENTENCE = '\uE022';
 
 export function normalizeLatinForSsml(text: string): string {
-  return normalizeLatinApostrophes(text)
-    .replace(/\bLast\s*\.\s*fm\b/gi, 'Last.fm')
-    .replace(/\bMaroon\s+5\b/gi, 'Maroon Five')
-    .replace(
-      /\b([A-Za-z]{2,})\s+([A-Za-z]{1,4})[\u2010\u2011\u2012\u2013\u2014-]([A-Za-z]{2,})\b/g,
-      '$1 $2-$3',
-    )
-    .replace(/([A-Za-z][A-Za-z0-9 .'’\-]{5,}):\s+/g, '$1, ')
-    .replace(/\s+-\s+/g, '-');
+  return normalizeMusicPunctuationInLatinRuns(
+    normalizeLatinApostrophes(text)
+      .replace(/\bLast\s*\.\s*fm\b/gi, 'Last.fm')
+      .replace(/\bMaroon\s+5\b/gi, 'Maroon Five')
+      .replace(
+        /\b([A-Za-z]{2,})\s+([A-Za-z]{1,4})[\u2010\u2011\u2012\u2013\u2014-]([A-Za-z]{2,})\b/g,
+        '$1 $2-$3',
+      )
+      .replace(/([A-Za-z][A-Za-z0-9 .'’\-]{5,}):\s+/g, '$1, ')
+      .replace(/\s+-\s+/g, '-'),
+  );
 }
 
 export function hasLatinForSsml(text: string): boolean {
@@ -156,7 +163,10 @@ function latinSpanForSsml(span: string, artist = '', title = ''): string {
     title && trimmed.toLowerCase() === title.trim().toLowerCase()
       ? titleNumeralsForTts(title, artist)
       : null;
-  const mapped = titleSpoken ?? splitCamelCaseLatin(trimmed);
+  let mapped = titleSpoken ?? splitCamelCaseLatin(trimmed);
+  if (musicNameNeedsPunctuationFix(mapped)) {
+    mapped = spokenMusicNameForTts(mapped);
+  }
   return stripLatinApostrophesForTts(mapped);
 }
 
