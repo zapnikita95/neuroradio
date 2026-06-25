@@ -49,7 +49,7 @@ const FACT_FETCH_BUDGET_MS = parseInt(process.env.FACT_FETCH_TIMEOUT_MS ?? '1200
 const FACT_FETCH_HARD_CAP_MS = parseInt(process.env.FACT_FETCH_HARD_CAP_MS ?? '9000', 10);
 /** Per-source caps in parallel harvest (all run at once; wall time ≈ max of caps). */
 const FACT_WIKI_CAP_MS = parseInt(process.env.FACT_WIKI_CAP_MS ?? '7000', 10);
-const FACT_WIKI_FAST_CAP_MS = parseInt(process.env.FACT_WIKI_FAST_CAP_MS ?? '8000', 10);
+const FACT_WIKI_FAST_CAP_MS = parseInt(process.env.FACT_WIKI_FAST_CAP_MS ?? '12000', 10);
 const FACT_WEB_CAP_MS = parseInt(process.env.FACT_WEB_CAP_MS ?? '8000', 10);
 const FACT_DEDICATED_CAP_MS = parseInt(process.env.FACT_DEDICATED_CAP_MS ?? '8000', 10);
 
@@ -244,6 +244,10 @@ async function mergeArtistIdentitySnippets(
   artistFacts: string[],
   trackFacts: string[],
 ): Promise<{ webSnippets: string[]; artistFacts: string[]; trackFacts: string[] }> {
+  const hasStrongTrackFacts = trackFacts.some((f) => interestScore(f) >= 10);
+  if (hasStrongTrackFacts) {
+    return { webSnippets, artistFacts, trackFacts };
+  }
   if (!shouldFetchArtistIdentitySnippets(webSnippets, artistFacts, artist)) {
     return { webSnippets, artistFacts, trackFacts };
   }
@@ -251,7 +255,7 @@ async function mergeArtistIdentitySnippets(
     'web-artist-id',
     () => fetchArtistIdentityWebSnippets(artist),
     [],
-    10_000,
+    4000,
   );
   if (identity.length === 0) {
     return { webSnippets, artistFacts, trackFacts };

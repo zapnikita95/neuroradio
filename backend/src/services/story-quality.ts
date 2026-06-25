@@ -17,7 +17,7 @@ import {
   shouldStripLatinTrackNames,
 } from './tts-generic-script.js';
 import { isTruncatedMarketingSnippet, isSpeakableReferenceFact } from './web-snippet-accept.js';
-import { interestScore } from './reference-fact-quality.js';
+import { interestScore, isThinReleaseCatalogSeed, isStudioEquipmentCatalogSeed } from './reference-fact-quality.js';
 import { fixSoloArtistPronounsRu } from './artist-grammar.js';
 import { fixTtsGrammarIssues } from './tts-grammar-fixes.js';
 import { isVoiceoverWithoutTrackNames, scriptLeaksVoiceoverNames } from './voiceover-no-names.js';
@@ -532,6 +532,17 @@ export function findForbiddenNumbers(
   return null;
 }
 
+/** «почти тысяч» / «около миллион» — количество без числа, TTS скипнет. */
+export function findOrphanQuantityPhrase(script: string): string | null {
+  const broken =
+    /(?:^|[\s,.«"—-])(?:почти|около|более|свыше|примерно)\s+(?:тысяч|миллион|миллиона|миллионов|сот(?:ен)?)(?=[\s,.!?»"—-]|$)/iu;
+  if (!broken.test(script)) return null;
+  const withNumber =
+    /(?:^|[\s,.«"—-])(?:один|одна|одно|два|две|три|четыре|пять|шесть|семь|восемь|девять|десять|одиннадцать|двенадцать|тринадцать|четырнадцать|пятнадцать|шестнадцать|семнадцать|восемнадцать|девятнадцать|двадцать|тридцать|сорок|пятьдесят|шестьдесят|семьдесят|восемьдесят|девяносто|сто|двести|триста|четыреста|пятьсот|шестьсот|семьсот|восемьсот|девятьсот|полтора|полмиллиона|миллиард)\s+(?:тысяч|миллион)/iu;
+  if (withNumber.test(script)) return null;
+  return 'orphan quantity phrase without number';
+}
+
 function normalizeForMatch(text: string): string {
   return text.toLowerCase().replace(/[^\p{L}\p{N}\s]/gu, ' ').replace(/\s+/g, ' ').trim();
 }
@@ -943,6 +954,11 @@ export function validateStoryScript(
     return { ok: false, reason: `forbidden numbers: ${numberIssue}` };
   }
 
+  const orphanQty = findOrphanQuantityPhrase(trimmed);
+  if (orphanQty) {
+    return { ok: false, reason: orphanQty };
+  }
+
   if (!skipWatery) {
     const garbage = findLlmGarbage(trimmed, {
       allowVoiceoverPlaceholders: noTrackNames,
@@ -981,9 +997,18 @@ export function validateStoryScript(
     }
     const waterIssue = findWateryContent(trimmed, artist, title, referenceFacts, {
       skipPersonaCliches,
+      storyNarrator: options.storyNarrator,
     });
     if (waterIssue) {
       return { ok: false, reason: waterIssue };
+    }
+    const nostalgiaFluff = findNostalgiaFluffOnThinSeed(trimmed, referenceFacts, options.storyNarrator);
+    if (nostalgiaFluff) {
+      return { ok: false, reason: nostalgiaFluff };
+    }
+    const gearSpam = findStudioGearBrandSpam(trimmed, referenceFacts);
+    if (gearSpam) {
+      return { ok: false, reason: gearSpam };
     }
   }
 
@@ -1234,6 +1259,50 @@ export function findUngroundedClaims(
   return null;
 }
 
+const NOSTALGIA_FLUFF_PATTERNS: RegExp[] = [
+  /помню,\s*как\s+впервые/i,
+  /глоток\s+свежего\s+воздуха/i,
+  /всё\s+казалось\s+проще/i,
+  /включали\s+(?:его|её|на\s+вечерин)/i,
+  /искали\s+что-то\s+простое/i,
+  /отвлечь\s+от\s+бесконечного/i,
+  /не\s+было\s+пафоса/i,
+  /везде\s+звучал\s+уместно/i,
+];
+
+/** Современник/фанат на слабом «N-й сингл с альбома» — отклоняем ностальгию без факта. */
+export function findNostalgiaFluffOnThinSeed(
+  script: string,
+  referenceFacts: string[] = [],
+  storyNarrator?: StoryNarratorId,
+): string | null {
+  if (storyNarrator !== 'fan' && storyNarrator !== 'contemporary') return null;
+  const seed = referenceFacts.find((f) => f.trim()) ?? '';
+  if (!seed || !isThinReleaseCatalogSeed(seed)) return null;
+  const hits = NOSTALGIA_FLUFF_PATTERNS.filter((p) => p.test(script)).length;
+  if (hits >= 2) {
+    return 'nostalgia fluff on thin release seed — anchor on artist/group fact from sources';
+  }
+  return null;
+}
+
+const GEAR_BRAND_RE =
+  /\b(?:Yamaha|Gibson|Mesa Boogie|Line 6|Sterling Sound|Groovemaster|Bogner|Sabian|Evans|Digitech|Sennheiser|Dean Markley|Pro Mark|Lakland)\b/gi;
+
+/** Озвучка с перечислением брендов из Discogs — паузы и вода. */
+export function findStudioGearBrandSpam(
+  script: string,
+  referenceFacts: string[] = [],
+): string | null {
+  const seed = referenceFacts.find((f) => f.trim()) ?? '';
+  if (!seed || !isStudioEquipmentCatalogSeed(seed)) return null;
+  const hits = (script.match(GEAR_BRAND_RE) ?? []).length;
+  if (hits >= 2) {
+    return 'studio gear brand list — use artist quote or song story, not equipment catalog';
+  }
+  return null;
+}
+
 export function findGenericFiction(script: string): string | null {
   const persona = findPersonaCliche(script);
   if (!persona) return null;
@@ -1444,6 +1513,15 @@ const CLICHE_FILLER_PATTERNS: RegExp[] = [
   /эпох[ауе]\s+стриминг/i,
   /уникальност\w*\s+материал/i,
   /это\s+тот\s+случай[^.]{0,50}независим/i,
+  /визитн\w*\s+карточк\w*\s+артист/i,
+  /скрыт\w*\s+глубин/i,
+  /превраща\w*\s+обычн\w*\s+истори/i,
+  /вот\s+как-?то\s+так,\s+друзья/i,
+  /отличного\s+прослушивания/i,
+  /я\s+обожаю/i,
+  /до\s+сих\s+пор\s+не\s+могу\s+оторваться/i,
+  /бетонного\s+леса/i,
+  /энергия\s+буквально\s+врезается/i,
 ];
 
 export function findGenreWater(script: string): string | null {
@@ -1568,6 +1646,8 @@ export function findWateryContent(
 ): string | null {
   const skipPersona = options.skipPersonaCliches ?? false;
   const noTrackNames = isVoiceoverWithoutTrackNames(options.speakTrackNamesInVoiceover);
+  const nostalgiaFluff = findNostalgiaFluffOnThinSeed(script, referenceFacts, options.storyNarrator);
+  if (nostalgiaFluff) return nostalgiaFluff;
   if (options.speakTrackNamesInVoiceover === true && artist.trim() && title.trim()) {
     const nameRep = findExcessiveNameRepetition(script, artist, title, options.storyNarrator);
     if (nameRep) return nameRep;

@@ -43,7 +43,16 @@ export function isAlbumListingSeed(fact: string): boolean {
   return /на Last\.fm указан в альбоме|указан в альбоме «/i.test(fact.trim());
 }
 
-/** Last.fm playcount/listeners — сохраняем в банк, но не считаем успешным фактом. */
+/** Discogs packaging / liner notes — not a story seed. */
+export function isDiscogsPackagingSeed(fact: string): boolean {
+  const t = fact.trim();
+  return (
+    /\b(?:gatefold|hype sticker|download card|printed inner sleeve|shrink wrap|obi strip)\b/i.test(t) ||
+    /includes digital download/i.test(t)
+  );
+}
+
+/** Last.fm playcount/listeners — never a story seed. */
 export function isListeningStatsFact(fact: string): boolean {
   return /\b(?:last\.?fm|слушател|прослушиван|scrobbles?|playcount)\b/i.test(fact.trim());
 }
@@ -84,6 +93,7 @@ export function isGenericConcertVenueSeed(fact: string): boolean {
   if (isCitationBibliographySeed(t)) return true;
   if (isSetlistLiveDebutSeed(t)) return true;
   if (!/\b(?:live at|performed at|concert at|live in|concert in)\b/i.test(t)) return false;
+  if (/\bhigh airplay\b/i.test(t)) return false;
   if (/\b(?:banned|protest|scandal|controvers|riot|arrest|police|historic|milestone|withheld|refused)\b/i.test(t)) {
     return false;
   }
@@ -115,6 +125,29 @@ export function isDiscogsLinerNotesSeed(fact: string): boolean {
     /\ball rights of the owner of copyright\b/i.test(t) ||
     /\bal rights of the owner\b/i.test(t)
   );
+}
+
+/** Студия + мастеринг + список брендов с Discogs — не история, всем похуй. */
+export function isStudioEquipmentCatalogSeed(fact: string): boolean {
+  const t = fact.trim();
+  if (/\bUses:\s/i.test(t)) return true;
+  const gearBrands =
+    (t.match(
+      /\b(?:Yamaha|Gibson|Mesa Boogie|Line 6|Sterling Sound|Groovemaster|Bogner|Sabian|Evans|Digitech|Sennheiser|Dean Markley|Pro Mark|Lakland|Taye|UDrum)\b/gi,
+    ) ?? []).length;
+  if (gearBrands >= 2) return true;
+  const studioMaster =
+    /\b(?:Recorded and mixed at|recorded at|mixed at|Mastered at|mastered at)\b/i.test(t) &&
+    /\b(?:Studios?|Sound)\b/i.test(t);
+  if (
+    studioMaster &&
+    !/\b(?:said|explained|inspired|meaning|controvers|scandal|sampled|wrote|intended)\b/i.test(t)
+  ) {
+    if (gearBrands >= 1) return true;
+    if (/Трек «[^»]+» вошёл в альбом/i.test(t) && t.length >= 100) return true;
+    if (t.split(/[,;]/).length >= 4) return true;
+  }
+  return false;
 }
 
 /** «Трек идёт 3:33» — метаданные, не история про релиз. */
@@ -244,6 +277,31 @@ export const COLLECTOR_FACT_PATTERNS: RegExp[] = [
   /\b(?:did\s+not\s+chart|charted)\b.*\b(?:until|following|after)\b/i,
   /\b(?:прорыв|тикток|стрим\w*|миллиард|миллион|хит\s+100|соавтор|бутлег|винил|лимитк)\b/i,
 ];
+
+/** «третий+ сингл с альбома X» без скандала/чарта — не история; lead/first single оставляем. */
+export function isThinReleaseCatalogSeed(fact: string): boolean {
+  const t = fact.trim();
+  const thinOrdinal =
+    /\b(?:third|fourth|fifth|sixth)\s+single\b/i.test(t) ||
+    /\b(?:трет\w*|четв[её]рт\w*|пят\w*|шест\w*)\s+сингл/i.test(t) ||
+    /\breleased\s+as\s+(?:the|a)\s+(?:album'?s\s+)?(?:third|fourth|fifth|sixth)\s+single\b/i.test(t);
+  if (!thinOrdinal) return false;
+  if (
+    /\b(?:sampled|inspired\s+by|chart|billboard|hot\s+100|grammy|platinum|gold|viral|scandal|controvers|banned|co[- ]?written|written\s+with|produced\s+by\s+(?!the\s+band)|meaning|metaphor|protest)\b/i.test(
+      t,
+    )
+  ) {
+    return false;
+  }
+  if (/\b(?:may|june|july|august|september|october|november|december|january|february|march|april)\s+\d{4}\b/i.test(t)) {
+    return false;
+  }
+  return (
+    /\b(?:from|off\s+of|off)\b[^.]{0,40}\balbum\b/i.test(t) ||
+    /\bальбом\w*\s+«/i.test(t) ||
+    /\b(?:studio|debut|sophomore|third|fourth|fifth)\s+album\b/i.test(t)
+  );
+}
 
 export function isCollectorFact(fact: string): boolean {
   return COLLECTOR_FACT_PATTERNS.some((pattern) => pattern.test(fact));
@@ -378,11 +436,13 @@ export function interestScore(fact: string): number {
   }
   if (isTruncatedMarketingSnippet(trimmed)) score -= 40;
   if (isUnspeakableWebSeed(trimmed)) score -= 50;
+  if (isStudioEquipmentCatalogSeed(trimmed)) score -= 55;
   if (isCollectorFact(fact)) score += 8;
   if (isDedicatedCatalogSeed(trimmed)) score += 12;
   if (
     /Трек «[^»]+» вошёл в альбом/i.test(trimmed) &&
-    /\b(?:Recorded|Mixed|mastered|Studio|studios?)\b/i.test(trimmed)
+    /\b(?:Recorded|Mixed|mastered|Studio|studios?)\b/i.test(trimmed) &&
+    !isStudioEquipmentCatalogSeed(trimmed)
   ) {
     score += 14;
   }
@@ -396,6 +456,15 @@ export function interestScore(fact: string): number {
   }
   if (/\bco[- ]?written\b/i.test(trimmed)) score += 18;
   if (/\b(?:first teased|teased during|Clancy World Tour|Tyler stated|listening events)\b/i.test(trimmed)) {
+    score += 18;
+  }
+  if (
+    /\b(?:frontman|lead singer|vocalist|bassist|guitarist|drummer|singer)\b/i.test(trimmed) &&
+    /\b(?:has said|said that|told|explained|revealed|admitted|stated that)\b/i.test(trimmed)
+  ) {
+    score += 22;
+  }
+  if (/\bhigh airplay\b/i.test(trimmed) && /\b(?:United States|Canada|radio|stations)\b/i.test(trimmed)) {
     score += 18;
   }
   if (/\b(?:can't escape|endless cycle|running away)\b/i.test(trimmed)) score += 12;
@@ -521,6 +590,7 @@ export function isBoringFact(fact: string): boolean {
   if (isGenericConcertVenueSeed(trimmed)) return true;
   if (isCatalogMetadataSeed(trimmed)) return true;
   if (isGenericMusicVideoSeed(trimmed)) return true;
+  if (isStudioEquipmentCatalogSeed(trimmed)) return true;
   if (isDedicatedCatalogSeed(trimmed)) return false;
   if (isWikiBiographyLead(trimmed)) return true;
   if (isCollectorFact(trimmed)) return false;

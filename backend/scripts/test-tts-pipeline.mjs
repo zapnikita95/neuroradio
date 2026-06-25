@@ -326,6 +326,23 @@ test('decades spoken: классикой 80-х → восьмидесятых', 
   assert.doesNotMatch(spoken, /80/i);
 });
 
+test('decades spoken: 2020-х → две тысячи двадцатых', () => {
+  const spoken = normalizeDecadesForRussianTts('Тогда, в начале 2020-х, мы все искали');
+  assert.match(spoken, /две тысячи двадцатых/i);
+  assert.doesNotMatch(spoken, /\b2020\b/i);
+  assert.doesNotMatch(spoken, /^Тогда, в начале двадцатых/i);
+});
+
+test('decades spoken: 2010-х → две тысячи десятых', () => {
+  const spoken = normalizeDecadesForRussianTts('стиль 2010-х');
+  assert.match(spoken, /две тысячи десятых/i);
+});
+
+test('decades spoken: 2000-х → двухтысячных', () => {
+  const spoken = normalizeDecadesForRussianTts('в 2000-х');
+  assert.match(spoken, /двухтысячных/i);
+});
+
 test('closing tail keeps Tous les Mêmes (not ê)', () => {
   const script =
     'Marga Bult — певица. Среди её работ можно выделить Tous les Mêmes.';

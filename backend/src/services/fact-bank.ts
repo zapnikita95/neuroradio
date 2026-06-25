@@ -14,6 +14,7 @@ import {
   interestScore,
   isCatalogMetadataSeed,
   isEncyclopediaDefinitionSeed,
+  isListeningStatsFact,
   MIN_PICK_INTEREST_SCORE,
   isMetadataHarvestFact,
   isArtistFormationBioSeed,
@@ -268,6 +269,7 @@ function buildStoredFact(
 ): StoredFact | null {
   const trimmed = item.fact.trim();
   if (trimmed.length < 35) return null;
+  if (isListeningStatsFact(trimmed)) return null;
   const score = interestScore(trimmed);
   const minScore = item.minScore ?? 6;
   if (score < minScore) return null;
@@ -315,6 +317,7 @@ function isValidStoredFact(fact: StoredFact): boolean {
     return false;
   }
   if (isCatalogMetadataSeed(fact.fact)) return false;
+  if (isListeningStatsFact(fact.fact)) return false;
   if (isEncyclopediaDefinitionSeed(fact.fact)) return false;
   return true;
 }

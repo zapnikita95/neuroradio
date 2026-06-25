@@ -14,6 +14,7 @@ import {
   findOffSeedInvention,
   findUngroundedClaims,
   findPersonaCliche,
+  findNostalgiaFluffOnThinSeed,
   findWateryContent,
   hasConcreteFact,
   anchorsReferenceFact,
@@ -22,7 +23,7 @@ import {
   sanitizeScriptForTts,
   validateStoryScript,
 } from './story-quality.js';
-import { isGenericMusicVideoSeed } from './reference-fact-quality.js';
+import { isGenericMusicVideoSeed, interestScore, isListeningStatsFact, isMetadataHarvestFact } from './reference-fact-quality.js';
 import { isArtistLateLifeHealthFactWithoutTrack } from './fact-track-anchor.js';
 import { factMentionsArtist, storyMentionsPerformingArtist } from './fact-relevance.js';
 import {
@@ -363,6 +364,14 @@ export async function generateStoryScript(
   if (fallback) return fallback;
 
   if (lastCandidate?.script?.trim()) {
+    const garbageSeed =
+      referenceFacts.length > 0 &&
+      referenceFacts.every(
+        (f) => isListeningStatsFact(f) || isMetadataHarvestFact(f) || interestScore(f) < 8,
+      );
+    if (garbageSeed) {
+      throw new Error('OpenRouter could not produce a story grounded in reference facts');
+    }
     const sanitized = sanitizeScriptForTts(
       lastCandidate.script,
       input.artist,
@@ -387,9 +396,11 @@ export async function generateStoryScript(
       !findOffSeedInvention(sanitized, referenceFacts) &&
       !findNewsSeedBleedIntoRecordingStory(sanitized, input.title, referenceFacts) &&
       !findWateryContent(sanitized, input.artist, input.title, referenceFacts, {
-        skipPersonaCliches: true,
+        skipPersonaCliches: input.storyNarrator !== 'fan' && input.storyNarrator !== 'contemporary',
         speakTrackNamesInVoiceover: input.speakTrackNamesInVoiceover,
+        storyNarrator: input.storyNarrator,
       }) &&
+      !findNostalgiaFluffOnThinSeed(sanitized, referenceFacts, input.storyNarrator) &&
       !findArtistSeedTrackMisattribution(sanitized, input.title, referenceFacts) &&
       !referenceFacts.some((f) => isArtistLateLifeHealthFactWithoutTrack(f, input.title)) &&
       !findHardScriptViolation(sanitized) &&

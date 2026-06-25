@@ -149,8 +149,8 @@ export function prepareYandexTtsText(
   });
   text = quality.text;
 
-  text = normalizeYearsForRussianTts(text);
   text = normalizeDecadesForRussianTts(text);
+  text = normalizeYearsForRussianTts(text);
   // Кавычки: только текст внутри, без «в кавычках …» — не занимает эфир.
   text = stripGuillemetsForPreview(text);
   text = normalizeYandexSpeechTokens(text, artist, title);

@@ -85,6 +85,7 @@ const SEASON_GEN_YEAR =
   /(^|[\s,.«"—-])((?:лета|летом|зимой|зимы|весной|весны|осенью|осени))\s+((?:19|20)\d{2})(\s+года(?=[\s,.!?»"—-]|$))?/gu;
 
 const DECADE_GENITIVE: Record<number, string> = {
+  10: 'десятых',
   20: 'двадцатых',
   30: 'тридцатых',
   40: 'сороковых',
@@ -95,10 +96,16 @@ const DECADE_GENITIVE: Record<number, string> = {
   90: 'девяностых',
 };
 
+/** 2000-х / 2010-х / 2020-х — полная русская форма для TTS, не «двадцатых» / «20-х». */
+function millenniumDecadeGenitive(twoDigit: number): string {
+  if (twoDigit === 0) return 'двухтысячных';
+  const tail = DECADE_GENITIVE[twoDigit];
+  if (!tail) return `${twoDigit}-х`;
+  return `две тысячи ${tail}`;
+}
+
 function decadeGenitiveSpoken(twoDigit: number, century: '19' | '20' | null): string {
-  if (century === '20' && twoDigit === 0) return 'двухтысячных';
-  if (century === '20' && twoDigit === 10) return 'десятых';
-  if (century === '20' && twoDigit === 20) return 'двадцатых';
+  if (century === '20') return millenniumDecadeGenitive(twoDigit);
   if (century === '19' || century === null) {
     return DECADE_GENITIVE[twoDigit] ?? `${twoDigit}-х`;
   }
@@ -109,28 +116,55 @@ function decadePrepositionalSpoken(twoDigit: number, century: '19' | '20' | null
   return decadeGenitiveSpoken(twoDigit, century);
 }
 
-const DECADE_ORDINAL_TTS =
-  /(^|[\s,.«"—-])((?:19|20)?(\d{2}))\s*[-–—]?\s*х(?=[\s,.!?»"—-]|$)/giu;
+const FOUR_DIGIT_DECADE_TTS =
+  /(^|[\s,.«"—-])((19|20)(\d{2}))\s*[-–—]?\s*х(?=[\s,.!?»"—-]|$)/giu;
+const TWO_DIGIT_DECADE_TTS =
+  /(^|[\s,.«"—-])((?<!\d)(\d{2}))\s*[-–—]?\s*х(?=[\s,.!?»"—-]|$)/giu;
+
+function replaceDecadeOrdinal(
+  text: string,
+  twoDigitStr: string,
+  century: '19' | '20' | null,
+  lead: string,
+  offset: number,
+  whole: string,
+): string {
+  const two = parseInt(twoDigitStr, 10);
+  const before = whole.slice(Math.max(0, offset - 48), offset);
+  const genitiveCtx =
+    /(?:классик(?:ой|и)|стил(?:ем|я)|эстетик(?:ой|и)|дух(?:ом|а)|наслед(?:и(?:ем|я))|эпох(?:ой|и)|хит(?:ами|ов)?|классик\w*)\s*$/iu.test(
+      before,
+    );
+  const prepCtx =
+    /(?:^|[\s,.«"—-])(?:в|во)\s+$/iu.test(before) ||
+    /(?:^|[\s,.«"—-])(?:в|во)?\s*(?:начале|конце|середине)\s+$/iu.test(before);
+  const spoken =
+    genitiveCtx || prepCtx
+      ? decadePrepositionalSpoken(two, century)
+      : decadeGenitiveSpoken(two, century);
+  return `${lead}${spoken}`;
+}
 
 /** «классикой 80-х» → «классикой восьмидесятых» (TTS only; display keeps «80-х»). */
 export function normalizeDecadesForRussianTts(text: string): string {
-  return text.replace(
-    DECADE_ORDINAL_TTS,
-    (match, lead: string, full: string, twoDigitStr: string, offset: number, whole: string) => {
-      const two = parseInt(twoDigitStr, 10);
-      const century: '19' | '20' | null = /^19/.test(full) ? '19' : /^20/.test(full) ? '20' : null;
-      const before = whole.slice(Math.max(0, offset - 48), offset);
-      const genitiveCtx =
-        /(?:классик(?:ой|и)|стил(?:ем|я)|эстетик(?:ой|и)|дух(?:ом|а)|наслед(?:и(?:ем|я))|эпох(?:ой|и)|хит(?:ами|ов)?|классик\w*)\s*$/iu.test(
-          before,
-        );
-      const prepCtx = /(?:^|[\s,.«"—-])(?:в|во)\s+$/iu.test(before);
-      const spoken = genitiveCtx || prepCtx
-        ? decadePrepositionalSpoken(two, century)
-        : decadeGenitiveSpoken(two, century);
-      return `${lead}${spoken}`;
-    },
+  let result = text.replace(
+    FOUR_DIGIT_DECADE_TTS,
+    (_match, lead: string, _full: string, centuryStr: string, twoDigitStr: string, offset: number, whole: string) =>
+      replaceDecadeOrdinal(
+        text,
+        twoDigitStr,
+        centuryStr === '19' ? '19' : '20',
+        lead,
+        offset,
+        whole,
+      ),
   );
+  result = result.replace(
+    TWO_DIGIT_DECADE_TTS,
+    (_match, lead: string, _full: string, twoDigitStr: string, offset: number, whole: string) =>
+      replaceDecadeOrdinal(text, twoDigitStr, null, lead, offset, whole),
+  );
+  return result;
 }
 
 /** «В 2021 году» → «В двадцать первом году»; «в начале 2010 года» → «в начале две тысячи десятого года». */

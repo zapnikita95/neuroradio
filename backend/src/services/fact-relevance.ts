@@ -1039,6 +1039,22 @@ export function isAlbumScopeFact(fact: string, title: string): boolean {
   );
 }
 
+/** Album is the main hook even when the track title appears in the sentence (e.g. debut-album placement). */
+export function isAlbumPrimaryContextFact(fact: string): boolean {
+  const t = fact.trim();
+  if (!/\b(?:album|альбом)/i.test(t)) return false;
+  return (
+    /\b(?:as part of (?:his|her|their) )?(?:debut )?(?:studio )?album\b/i.test(t) ||
+    /\bfrom (?:the|their) album\b/i.test(t) ||
+    /\bon (?:the|their) (?:debut )?(?:studio )?album\b/i.test(t) ||
+    /\bappears on (?:the|their) (?:debut )?album\b/i.test(t) ||
+    /(?:вошёл|вошла|вошло)\s+в\s+(?:дебютн(?:ый|ый)\s+)?альбом/i.test(t) ||
+    /в\s+составе\s+альбома/i.test(t) ||
+    /дебютн(?:ом|ый)\s+альбом/i.test(t) ||
+    /(?:с|из)\s+альбома(?:\s|«)/i.test(t)
+  );
+}
+
 /** Fact must belong to this artist/title — not a neighbour sentence from the wrong wiki page. */
 export function factAppliesToRequest(
   fact: string,

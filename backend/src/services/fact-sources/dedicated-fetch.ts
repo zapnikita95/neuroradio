@@ -13,6 +13,7 @@ import {
   interestScore,
   isAlbumListingSeed,
   isCatalogMetadataSeed,
+  isListeningStatsFact,
   isTrackDurationCatalogSeed,
 } from '../reference-fact-quality.js';
 import { isTruncatedMarketingSnippet } from '../web-snippet-accept.js';
@@ -97,6 +98,7 @@ function dedicatedFactRelevant(
   const trimmed = fact.trim();
   if (trimmed.length < 35 || isTruncatedMarketingSnippet(trimmed)) return false;
   if (isAlbumListingSeed(trimmed)) return false;
+  if (isListeningStatsFact(trimmed)) return false;
   if (rejectSeedForTrackStory(trimmed, artist, title)) return false;
   if (/multiple artists tracked as/i.test(trimmed)) return false;
   if (factNamesForeignEntity(trimmed, artist, title, artist, 'indie')) return false;
@@ -124,14 +126,18 @@ function parserTrustedDedicatedRelevant(
   const trimmed = item.fact.trim();
   if (trimmed.length < 35 || isTruncatedMarketingSnippet(trimmed)) return false;
   if (isAlbumListingSeed(trimmed)) return false;
+  if (isListeningStatsFact(trimmed)) return false;
   if (rejectSeedForTrackStory(trimmed, artist, title)) return false;
   if (/multiple artists tracked as/i.test(trimmed)) return false;
   if (/creativecommons|user-contributed text is available/i.test(trimmed)) return false;
+  if (item.metadataOnly) return false;
   if (item.scope === 'artist') {
     if (item.source === 'discogs' || item.source === 'lastfm') return true;
     return factMentionsArtist(trimmed, artist);
   }
-  if (item.scope === 'track' && item.source === 'lastfm') return true;
+  if (item.scope === 'track' && item.source === 'lastfm') {
+    return !isListeningStatsFact(trimmed) && !isAlbumListingSeed(trimmed);
+  }
   if (factMentionsTitle(trimmed, title)) return true;
   if (factMentionsArtist(trimmed, artist)) return true;
   return false;
@@ -152,11 +158,17 @@ export function dedicatedHarvestToBundle(
     const bTitle = factMentionsTitle(b.fact, title) ? 1 : 0;
     if (aTitle !== bTitle) return bTitle - aTitle;
     const aCatalog =
-      isTrackDurationCatalogSeed(a.fact) || isCatalogMetadataSeed(a.fact) || isAlbumListingSeed(a.fact)
+      isTrackDurationCatalogSeed(a.fact) ||
+      isCatalogMetadataSeed(a.fact) ||
+      isAlbumListingSeed(a.fact) ||
+      isListeningStatsFact(a.fact)
         ? 0
         : 1;
     const bCatalog =
-      isTrackDurationCatalogSeed(b.fact) || isCatalogMetadataSeed(b.fact) || isAlbumListingSeed(b.fact)
+      isTrackDurationCatalogSeed(b.fact) ||
+      isCatalogMetadataSeed(b.fact) ||
+      isAlbumListingSeed(b.fact) ||
+      isListeningStatsFact(b.fact)
         ? 0
         : 1;
     if (aCatalog !== bCatalog) return bCatalog - aCatalog;
@@ -170,6 +182,7 @@ export function dedicatedHarvestToBundle(
   for (const item of sorted) {
     const key = normalizeKey(item.fact);
     if (seen.has(key)) continue;
+    if (item.metadataOnly || isListeningStatsFact(item.fact)) continue;
     const relevant = isParserTrustedHarvestSource(item.source)
       ? parserTrustedDedicatedRelevant(item, artist, title)
       : dedicatedFactRelevant(item.fact, item.scope, artist, title);

@@ -536,6 +536,14 @@ assert(!isEligibleHotFact(GENERIC_VIDEO, { artist: 'Shakira', title: 'Waka Waka'
 assert(isEligibleHotFact(STRONG_VIDEO, { artist: 'Shakira', title: 'Waka Waka' }), 'strong video stays hot');
 assert(isRejectedPickSeed(GENERIC_VIDEO, 'Waka Waka', 'ru', [], 'Shakira'), 'generic video rejected at pick');
 
+const LASTFM_LISTENERS =
+  'На Last.fm у «Worst Enemy» (Marino) 52,752 слушателей и 395,224 прослушиваний.';
+assert(isRejectedPickSeed(LASTFM_LISTENERS, 'Worst Enemy', 'ru', [], 'Marino'), 'Last.fm playcount rejected at pick');
+assert(
+  isRejectedStorySeed(LASTFM_LISTENERS, 'Marino', 'Worst Enemy (Original Mix)', [], 'ru'),
+  'Last.fm playcount rejected as story seed',
+);
+
 // --- 5d. Artist bank pollution: seed must mention performing artist; guests OK ---
 const { factMentionsArtistLoose } = await import('../dist/services/fact-relevance.js');
 const { lookupCuratedFact } = await import('../dist/services/curated-facts.js');
@@ -677,6 +685,31 @@ const repeatPick = pickReferenceFact(
 assert(
   repeatPick?.scope === 'artist',
   `repeat track scopes prefer artist when track used (got ${repeatPick?.scope ?? 'null'})`,
+);
+
+const { isStudioEquipmentCatalogSeed } = await import('../dist/services/reference-fact-quality.js');
+const PARALYZER_DISCOGS =
+  'Трек «Paralyzer» вошёл в альбом «Them Vs. You Vs. Me»: Recorded and mixed at Groovemaster Studios, Chicago, IL Mastered at Sterling Sound, NYC Finger Eleven Uses: Yamaha Guitars, Gibson Guitars';
+const PARALYZER_SCOTT =
+  "Finger Eleven's frontman Scott Anderson has said that the single has a feel distinct from their earlier work";
+const PARALYZER_AIRPLAY =
+  'The song received high airplay in both the United States and Canada, and was performed at many festivals';
+
+assert(isStudioEquipmentCatalogSeed(PARALYZER_DISCOGS), 'Discogs studio gear is catalog junk');
+const paralyzerPick = pickReferenceFact(
+  { trackFacts: [PARALYZER_DISCOGS, PARALYZER_SCOTT, PARALYZER_AIRPLAY], artistFacts: [] },
+  [],
+  0,
+  'Finger Eleven',
+  'Paralyzer',
+);
+assert(
+  paralyzerPick?.fact.includes('Scott Anderson') || paralyzerPick?.fact.includes('airplay'),
+  `Paralyzer prefers quote/airplay over Discogs gear (got: ${paralyzerPick?.fact?.slice(0, 90) ?? 'null'})`,
+);
+assert(
+  !paralyzerPick?.fact.includes('Groovemaster'),
+  'Paralyzer pick must not be studio gear catalog',
 );
 
 // --- 6. Optional live: real Last.fm + aggregator ---

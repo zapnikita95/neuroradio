@@ -872,24 +872,38 @@ export async function fetchFastTrackWikiFacts(artist: string, title: string): Pr
     }
   }
 
-  const parallelHits = await Promise.all(
-    candidates.slice(0, 5).map((candidate) =>
-      tryFastTrackWikiCandidate(lang, candidate, artist, title, cleanTitle, ambiguousSingleWord),
-    ),
+  const parallelHits = await raceWikiFastCandidates(
+    lang,
+    candidates,
+    artist,
+    title,
+    cleanTitle,
+    ambiguousSingleWord,
   );
-  for (const hit of parallelHits) {
-    if (hit?.length) return hit;
-  }
-  for (const candidate of candidates.slice(5)) {
-    const hit = await tryFastTrackWikiCandidate(
-      lang,
-      candidate,
-      artist,
-      title,
-      cleanTitle,
-      ambiguousSingleWord,
+  if (parallelHits.length > 0) return parallelHits;
+  return [];
+}
+
+/** First successful candidate wins — do not wait for slow hung wiki requests. */
+async function raceWikiFastCandidates(
+  lang: 'en',
+  candidates: string[],
+  artist: string,
+  title: string,
+  cleanTitle: string,
+  ambiguousSingleWord: boolean,
+): Promise<string[]> {
+  const BATCH = 3;
+  for (let i = 0; i < candidates.length; i += BATCH) {
+    const batch = candidates.slice(i, i + BATCH);
+    const hits = await Promise.all(
+      batch.map((candidate) =>
+        tryFastTrackWikiCandidate(lang, candidate, artist, title, cleanTitle, ambiguousSingleWord),
+      ),
     );
-    if (hit?.length) return hit;
+    for (const hit of hits) {
+      if (hit?.length) return hit;
+    }
   }
   return [];
 }

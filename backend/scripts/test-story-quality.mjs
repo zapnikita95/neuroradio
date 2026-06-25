@@ -349,4 +349,20 @@ if (!neffexVal.ok && String(neffexVal.reason).includes('этот')) {
   ok(neffexVal.ok ? 'NEFFEX demo story validates' : `NEFFEX lenient (${neffexVal.reason})`);
 }
 
+const ORPHAN_QTY =
+  'Marino собрал на Last.fm почти тысяч прослушиваний. Это цифры, которые говорят сами за себя.';
+const orphanVal = validateStoryScript(ORPHAN_QTY, '30s', 'Marino', 'Worst Enemy', {
+  referenceFacts: ['На Last.fm у «Worst Enemy» (Marino) 395,224 прослушиваний.'],
+  strictLength: false,
+  skipPersonaCliches: true,
+  speakTrackNamesInVoiceover: true,
+});
+if (orphanVal.ok) {
+  fail('orphan quantity phrase must fail validateStoryScript');
+} else if (!String(orphanVal.reason).includes('orphan quantity')) {
+  fail(`orphan quantity wrong reason: ${orphanVal.reason}`);
+} else {
+  ok('orphan quantity phrase rejected');
+}
+
 process.exit(failed > 0 ? 1 : 0);

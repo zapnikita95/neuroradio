@@ -7,12 +7,15 @@ import {
   isCitationBibliographySeed,
   isArtistDisambiguationListSeed,
   isDiscogsLinerNotesSeed,
+  isStudioEquipmentCatalogSeed,
   isEncyclopediaDefinitionSeed,
   isGenericConcertVenueSeed,
   isGenericMusicVideoSeed,
   isSetlistLiveDebutSeed,
   isBoringFact,
   isCollectorFact,
+  isListeningStatsFact,
+  isThinReleaseCatalogSeed,
   isWeakChartSeed,
   MIN_PICK_INTEREST_SCORE,
   isBackstoryFact,
@@ -70,6 +73,8 @@ export function isRejectedPickSeed(
     return true;
   }
   if (isAlbumListingSeed(fact)) return true;
+  if (isListeningStatsFact(fact)) return true;
+  if (!artistScope && isThinReleaseCatalogSeed(fact)) return true;
   if (isCatalogMetadataSeed(fact)) return true;
   if (isCitationBibliographySeed(fact)) return true;
   if (
@@ -84,6 +89,7 @@ export function isRejectedPickSeed(
   }
   if (isArtistDisambiguationListSeed(fact)) return true;
   if (isDiscogsLinerNotesSeed(fact)) return true;
+  if (isStudioEquipmentCatalogSeed(fact)) return true;
   if (
     !artistScope &&
     title.trim() &&

@@ -3,7 +3,7 @@ import { fuzzyTokenMatch } from './title-transliterate.js';
 import type { SelectedReferenceFact } from './fact-picker.js';
 import { factNamesForeignEntity, factMentionsArtist, factMentionsTitle, hasTrackContextSignal, hasRussianTrackContextSignal } from './fact-relevance.js';
 import { hasAnchoredTrackContext, rejectSeedForTrackStory } from './fact-track-anchor.js';
-import { interestScore, isBoringFact, MIN_PICK_INTEREST_SCORE, isWeakChartSeed, isGenericMusicVideoSeed, isCatalogMetadataSeed, isCitationBibliographySeed, isGenericConcertVenueSeed } from './reference-fact-quality.js';
+import { interestScore, isBoringFact, MIN_PICK_INTEREST_SCORE, isWeakChartSeed, isGenericMusicVideoSeed, isCatalogMetadataSeed, isCitationBibliographySeed, isGenericConcertVenueSeed, isStudioEquipmentCatalogSeed } from './reference-fact-quality.js';
 import { interestRating10 } from './fact-interest-log.js';
 import { MIN_GOOD_SCOPE_INTEREST } from './fact-picker.js';
 import { WEAK_TRIVIA_PATTERNS, FACT_HUNT_LLM_PROMPT_BLOCK } from './story-fact-hunt.js';
@@ -87,6 +87,7 @@ export function shouldRunLlmFactHunt(
   if (selected && isCitationBibliographySeed(selected.fact)) return true;
   if (selected && isGenericConcertVenueSeed(selected.fact)) return true;
   if (selected && isGenericMusicVideoSeed(selected.fact)) return true;
+  if (selected && isStudioEquipmentCatalogSeed(selected.fact)) return true;
   if (selected.interestScore >= FAST_SEED_INTEREST_SCORE) {
     if (selected.scope === 'track' && title.trim() && !factMentionsTitle(selected.fact, title)) return true;
     if (isGenericMusicVideoSeed(selected.fact)) return true;
@@ -123,6 +124,7 @@ export function explainFactHuntDecision(
       return 'track-seed-without-title';
     }
     if (isGenericMusicVideoSeed(selected.fact)) return 'generic-music-video-seed';
+    if (isStudioEquipmentCatalogSeed(selected.fact)) return 'studio-equipment-catalog-seed';
     return `fast-seed score=${selected.interestScore}`;
   }
   if (trackFactCount === 0 && selected.scope !== 'track') return 'no-track-facts';

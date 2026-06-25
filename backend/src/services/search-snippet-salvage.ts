@@ -1,4 +1,5 @@
 import type { ReferenceFactBundle, SelectedReferenceFact } from './fact-picker.js';
+import { buildSelectedReferenceFact } from './fact-picker.js';
 import { factMentionsArtist, factMentionsTitle, factNamesForeignEntity, hasTrackContextSignal } from './fact-relevance.js';
 import { isTrackTitleAnchoredSeed } from './fact-track-anchor.js';
 import { interestRating10 } from './fact-interest-log.js';
@@ -8,8 +9,12 @@ import {
   isAlbumListingSeed,
   isBoringFact,
   isCatalogMetadataSeed,
+  isDiscogsPackagingSeed,
   isEncyclopediaDefinitionSeed,
+  isListeningStatsFact,
   isSetlistLiveDebutSeed,
+  isStudioEquipmentCatalogSeed,
+  isThinReleaseCatalogSeed,
   isWikiBiographyLead,
 } from './reference-fact-quality.js';
 import { acceptSearchGroundedSnippet, acceptIndieEmergingSnippet, isLyricsPageSeed, isPlaylistJunkSnippet, isSpeakableReferenceFact, isUnspeakableWebSeed } from './web-snippet-accept.js';
@@ -22,6 +27,7 @@ import type { StoryLanguageId } from './story-language.js';
 export function isWeakSnippetSeed(fact: string, score = interestScore(fact), title = ''): boolean {
   const trimmed = fact.trim();
   if (isAlbumListingSeed(trimmed)) return true;
+  if (isListeningStatsFact(trimmed)) return true;
   if (isCatalogMetadataSeed(trimmed)) return true;
   if (isSetlistLiveDebutSeed(trimmed)) return true;
   if (isLyricsPageSeed(trimmed)) return true;
@@ -39,14 +45,29 @@ export function isWeakSelectedFact(
 ): boolean {
   if (!selected) return true;
   const trimmed = selected.fact.trim();
+  if (isThinReleaseCatalogSeed(trimmed)) return true;
+  if (isStudioEquipmentCatalogSeed(trimmed)) return true;
   if (isCatalogMetadataSeed(trimmed)) return true;
+  if (isListeningStatsFact(trimmed)) return true;
+  if (isDiscogsPackagingSeed(trimmed)) return true;
   if (isSetlistLiveDebutSeed(trimmed)) return true;
   if (isLyricsPageSeed(trimmed)) return true;
-  if (isEncyclopediaDefinitionSeed(trimmed)) return true;
   if (/^["'][\p{L}\p{N}\s'-]+["']\s+is a song by the (?:rock )?band\b/iu.test(trimmed)) return true;
   const score = Math.max(selected.interestScore ?? 0, interestScore(trimmed));
+  if (isEncyclopediaDefinitionSeed(trimmed)) {
+    if (
+      score >= 40 &&
+      /\b(?:released|single|album|chart|billboard|debut|may \d{4}|june \d{4}|july \d{4})\b/i.test(trimmed)
+    ) {
+      // Concrete release facts (e.g. fifth single from album + date) are usable seeds.
+    } else {
+      return true;
+    }
+  }
   if (title && isTrackTitleAnchoredSeed(trimmed, title) && score >= 10 && !isBoringFact(trimmed)) return false;
   if (score < 6) return true;
+  if (selected.scope === 'artist' && score < 12) return true;
+  if (selected.scope === 'artist' && (selected.interestRating ?? 0) < 7) return true;
   if (isWikiBiographyLead(trimmed)) return true;
   return isUnspeakableWebSeed(trimmed) || !isSpeakableReferenceFact(trimmed, artist, title);
 }
@@ -80,15 +101,7 @@ export function pickSalvageSnippetSeed(
   const best = ranked[0];
   if (!best || interestScore(best) < 6) return null;
 
-  const scope =
-    factMentionsTitle(best, title) || hasTrackContextSignal(best) ? 'track' : 'artist';
-  return {
-    fact: best,
-    scope,
-    scopeLabelRu: scope === 'track' ? 'трек' : 'группа/артист',
-    interestScore: interestScore(best),
-    interestRating: interestRating10(best),
-  };
+  return buildSelectedReferenceFact(best, artist, title);
 }
 
 /** Emerging/indie: truncated press clips (busking, TikTok) when strict accept fails. */
@@ -117,15 +130,7 @@ export function pickRelaxedSnippetSeed(
   if (!best) return null;
 
   const score = Math.max(interestScore(best), 8);
-  const scope =
-    factMentionsTitle(best, title) || hasTrackContextSignal(best) ? 'track' : 'artist';
-  return {
-    fact: best,
-    scope,
-    scopeLabelRu: scope === 'track' ? 'трек' : 'группа/артист',
-    interestScore: score,
-    interestRating: interestRating10(best),
-  };
+  return buildSelectedReferenceFact(best, artist, title, 'auto', undefined);
 }
 
 export function enrichFactBundleWithRawSnippets(
@@ -134,7 +139,14 @@ export function enrichFactBundleWithRawSnippets(
 ): ReferenceFactBundle {
   const extras = rawSnippets
     .map((s) => s.trim())
-    .filter((s) => s.length >= 35 && s.length <= 480 && !isSetlistLiveDebutSeed(s));
+    .filter(
+      (s) =>
+        s.length >= 35 &&
+        s.length <= 480 &&
+        !isSetlistLiveDebutSeed(s) &&
+        !isListeningStatsFact(s) &&
+        !isStudioEquipmentCatalogSeed(s),
+    );
   if (extras.length === 0) return bundle;
   return {
     trackFacts: [...new Set([...bundle.trackFacts, ...extras])],

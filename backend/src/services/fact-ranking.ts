@@ -1,4 +1,10 @@
-import { factAppliesToRequest, factMentionsOtherTrackTitle, factMentionsTitle, isAlbumScopeFact } from './fact-relevance.js';
+import {
+  factAppliesToRequest,
+  factMentionsOtherTrackTitle,
+  factMentionsTitle,
+  isAlbumPrimaryContextFact,
+  isAlbumScopeFact,
+} from './fact-relevance.js';
 import type { ReferenceFactBundle } from './fact-picker.js';
 import {
   interestScore,
@@ -46,7 +52,7 @@ function splitPoolsWithMode(
     if (trimmed.length < 35) continue;
     if (!factAppliesToRequest(trimmed, artist, title, 'track', mode)) continue;
     if (factMentionsOtherTrackTitle(trimmed, title)) continue;
-    if (isAlbumScopeFact(trimmed, title)) album.push(trimmed);
+    if (isAlbumScopeFact(trimmed, title) || isAlbumPrimaryContextFact(trimmed)) album.push(trimmed);
     else track.push(trimmed);
   }
 

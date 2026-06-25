@@ -17,8 +17,10 @@ import {
   adjustedInterestScore,
   isAlbumListingSeed,
   isArtistDisambiguationListSeed,
+  isBoringFact,
   isCatalogMetadataSeed,
   isEncyclopediaDefinitionSeed,
+  isStudioEquipmentCatalogSeed,
 } from './reference-fact-quality.js';
 import { isArtistBackstoryNarrative } from './web-snippet-accept.js';
 import { isMetadataOnlyFallbackFact } from './metadata-facts.js';
@@ -262,6 +264,13 @@ export function isTitleTokenForeignArtistFact(fact: string, artist: string, titl
     return false;
   }
   if (factMentionsArtist(trimmed, artist)) return false;
+  if (
+    /\b(?:former singer|new music with|left the band|lineup change|band member|since former|new lead singer|departure)\b/i.test(
+      trimmed,
+    )
+  ) {
+    return false;
+  }
   if (factNamesForeignEntity(trimmed, artist, title, '', 'strict')) return true;
   if (/\b(?:Claypool|Les Claypool|Primus)\b/i.test(trimmed)) return true;
   return false;
@@ -280,6 +289,7 @@ export function isTrackTitleAnchoredSeed(fact: string, title: string): boolean {
 function isStrongTrackPoolAnchor(fact: string, title: string): boolean {
   const trimmed = fact.trim();
   if (trimmed.length < 35 || !factMentionsTitle(trimmed, title)) return false;
+  if (isStudioEquipmentCatalogSeed(trimmed) || isBoringFact(trimmed)) return false;
   if (/впервые прозвучала на живом выступлении/i.test(trimmed)) return false;
   if (isCatalogMetadataSeed(trimmed) || isAlbumListingSeed(trimmed)) return false;
   if (isMetadataOnlyFallbackFact(trimmed)) return false;
@@ -339,6 +349,13 @@ export function rejectSeedForTrackStory(
   const hasStrongTrackFact = trackPool.some((f) => isStrongTrackPoolAnchor(f, title));
 
   if (hasStrongTrackFact && !hasAnchoredTrackContext(trimmed, title)) {
+    if (
+      factMentionsArtist(trimmed, artist) &&
+      /\b(?:frontman|lead singer|vocalist|bassist|guitarist|drummer|singer)\b/i.test(trimmed) &&
+      /\b(?:has said|said that|told|explained|revealed|admitted|stated that)\b/i.test(trimmed)
+    ) {
+      return false;
+    }
     return true;
   }
 

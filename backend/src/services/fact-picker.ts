@@ -17,6 +17,7 @@ import {
   isCollectorFact,
   isWeakChartSeed,
   isEncyclopediaDefinitionSeed,
+  isThinReleaseCatalogSeed,
   MIN_PICK_INTEREST_SCORE,
 } from './reference-fact-quality.js';
 import type { StoryNarratorId } from './story-narrator.js';
@@ -28,6 +29,7 @@ import { splitBundleByScope, type RankedFactScope } from './fact-ranking.js';
 import {
   factMentionsTitle,
   hasTrackContextSignal,
+  isAlbumPrimaryContextFact,
   isAlbumScopeFact,
   factMentionsOtherTrackTitle,
   isMisattributedBandTrackFact,
@@ -58,6 +60,38 @@ const SCOPE_LABEL: Record<FactScope, string> = {
   album: 'альбом',
   artist: 'группа/артист',
 };
+
+export function scopeLabelRuFor(scope: FactScope): string {
+  return SCOPE_LABEL[scope];
+}
+
+/** Classify which entity the fact is primarily about — track, album, or artist. */
+export function inferFactScope(fact: string, artist: string, title: string): FactScope {
+  const t = fact.trim();
+  if (isAlbumScopeFact(t, title) || isAlbumPrimaryContextFact(t)) {
+    return 'album';
+  }
+  if (
+    factMentionsTitle(t, title) ||
+    hasAnchoredTrackContext(t, title) ||
+    hasTrackContextSignal(t)
+  ) {
+    return 'track';
+  }
+  void artist;
+  return 'artist';
+}
+
+export function buildSelectedReferenceFact(
+  fact: string,
+  artist: string,
+  title: string,
+  narrator: StoryNarratorId = 'auto',
+  scopeOverride?: FactScope,
+): SelectedReferenceFact {
+  const scope = scopeOverride ?? inferFactScope(fact, artist, title);
+  return wrapSelected(fact, scope, narrator);
+}
 
 /** Минимум interestScore в scope, иначе спускаемся на альбом/артиста или LLM. */
 export const MIN_GOOD_SCOPE_INTEREST = parseInt(process.env.MIN_FACT_INTEREST_SCORE ?? '12', 10);
@@ -257,9 +291,16 @@ export function pickReferenceFact(
   const trackScopeStreak = (options.recentScopes ?? []).slice(0, 2).filter((s) => s === 'track').length;
   const minGoodForScope = (scope: FactScope): number => {
     if (scope === 'track') return MIN_GOOD_SCOPE_INTEREST;
+    if (scope === 'album') {
+      const rotatingFromTrack = (options.recentScopes ?? [])[0] === 'track';
+      if (trackScopeStreak >= 2 || rotatingFromTrack) {
+        return Math.max(8, MIN_GOOD_SCOPE_INTEREST - 4);
+      }
+      return MIN_GOOD_SCOPE_INTEREST;
+    }
     const rotatingFromTrack = (options.recentScopes ?? [])[0] === 'track';
     if (trackScopeStreak >= 2 || rotatingFromTrack) {
-      return Math.max(6, MIN_PICK_INTEREST_SCORE - 6);
+      return Math.max(10, MIN_GOOD_SCOPE_INTEREST - 2);
     }
     return MIN_GOOD_SCOPE_INTEREST;
   };
@@ -285,6 +326,25 @@ export function pickReferenceFact(
       options.recentScopes ?? [],
     );
     if (picked && adjustedInterestScore(picked, narrator) >= minScore) {
+      if (
+        (scope === 'track' || scope === 'album') &&
+        isThinReleaseCatalogSeed(picked) &&
+        pools.artist.some(
+          (f) =>
+            adjustedInterestScore(f, narrator) >= minGoodForScope('artist') &&
+            !isRejectedSeed(
+              f,
+              title,
+              storyLanguage,
+              trackPoolForReject,
+              artist,
+              'artist',
+              attributionCorpus,
+            ),
+        )
+      ) {
+        continue;
+      }
       return wrapSelected(picked, scope, narrator);
     }
   }

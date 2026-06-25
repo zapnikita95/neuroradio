@@ -88,16 +88,6 @@ async function fetchTrackInfo(artist: string, title: string): Promise<HarvestedF
   const raw = track?.wiki?.content?.trim() || track?.wiki?.summary?.trim();
   facts.push(...wikiToSentences(raw, 'track'));
 
-  const listeners = parseInt(track?.listeners ?? '0', 10);
-  const playcount = parseInt(track?.playcount ?? '0', 10);
-  if (listeners >= 50_000 && playcount >= 100_000) {
-    facts.push({
-      fact: `На Last.fm у «${resolvedTitle}» (${resolvedArtist}) ${listeners.toLocaleString('en-US')} слушателей и ${playcount.toLocaleString('en-US')} прослушиваний.`,
-      scope: 'track',
-      source: 'lastfm',
-      metadataOnly: true,
-    });
-  }
   if (track?.album?.title) {
     facts.push({
       fact: `Трек «${resolvedTitle}» исполнителя ${resolvedArtist} на Last.fm указан в альбоме «${track.album.title}».`,

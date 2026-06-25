@@ -191,8 +191,11 @@ export async function fetchDiscogsFacts(ctx: HarvestContext): Promise<HarvestedF
     for (const sentence of splitSentences(stripHtml(notes))) {
       if (!sentenceOk(sentence)) continue;
       if (!/\b(?:recorded|mixed|mastered|studio|produced)\b/i.test(sentence)) continue;
+      if (/\bUses:\s/i.test(sentence)) continue;
+      const gearHits = (sentence.match(/\b(?:Guitars?|Amps?|Cymbals?|Strings?|Wireless)\b/gi) ?? []).length;
+      if (gearHits >= 2) continue;
       const line = `Трек «${ctx.title}» вошёл в альбом «${release.title ?? album ?? ctx.title}»: ${sentence}`;
-      if (sentenceOk(line)) push(line, 'track');
+      if (sentenceOk(line) && line.length <= 220) push(line, 'track');
       if (facts.filter((f) => f.scope === 'track').length >= 3) break;
     }
   }

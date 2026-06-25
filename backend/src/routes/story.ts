@@ -13,9 +13,9 @@ import {
 } from '../services/fact-aggregator.js';
 import { fetchDeepWebSearchSnippets, fetchArtistIdentityWebSnippets } from '../services/web-search-facts.js';
 import { fetchFastTrackWikiFacts } from '../services/wikipedia-facts.js';
-import { explainReferenceFactSelection, factsTooSimilar, isRejectedStorySeed, isStrongBundleFallbackFact, pickFallbackSeedFromBundle, type SelectedReferenceFact } from '../services/fact-picker.js';
+import { explainReferenceFactSelection, factsTooSimilar, isRejectedStorySeed, isStrongBundleFallbackFact, pickFallbackSeedFromBundle, buildSelectedReferenceFact, scopeLabelRuFor, type SelectedReferenceFact } from '../services/fact-picker.js';
 import { formatFactPickLog, logFactCandidatePools } from '../services/fact-interest-log.js';
-import { interestScore, isWikiBiographyLead, isCatalogMetadataSeed, isEncyclopediaDefinitionSeed, isGenericConcertVenueSeed, isSetlistLiveDebutSeed } from '../services/reference-fact-quality.js';
+import { interestScore, isWikiBiographyLead, isCatalogMetadataSeed, isEncyclopediaDefinitionSeed, isGenericConcertVenueSeed, isSetlistLiveDebutSeed, isListeningStatsFact } from '../services/reference-fact-quality.js';
 import { isArtistCareerBioWithoutTrack, hasAnchoredTrackContext } from '../services/fact-track-anchor.js';
 import { factMentionsTitle } from '../services/fact-relevance.js';
 import { isUnverifiedQuoteAttributionSeed } from '../services/fact-quote-attribution.js';
@@ -211,12 +211,48 @@ router.get('/quota', (req: Request, res: Response) => {
   });
 });
 
-/** Major artists: wiki bio is enough for story LLM when MB/wiki timed out on first pass. */
+/** Pool has no grounded facts — only Last.fm stats, packaging, or score < 8. */
+function bundleHasOnlyWeakFacts(
+  bundle: { trackFacts: string[]; artistFacts: string[] },
+  artist: string,
+  title: string,
+): boolean {
+  const candidates = [...bundle.trackFacts, ...bundle.artistFacts].filter(
+    (f) => !isMetadataOnlyFallbackFact(f) && !isListeningStatsFact(f) && !isWeakSnippetSeed(f),
+  );
+  if (candidates.length === 0) return true;
+  const best = candidates.sort((a, b) => interestScore(b) - interestScore(a))[0]!;
+  return interestScore(best) < 8;
+}
+
+async function tryWikiFastTrackSeed(
+  artist: string,
+  title: string,
+  narrator: StoryNarratorId,
+): Promise<SelectedReferenceFact | null> {
+  const wikiFastOnly = await fetchFastTrackWikiFacts(artist, title);
+  const best = wikiFastOnly
+    .filter((f) => !isWeakSnippetSeed(f, interestScore(f), title) && interestScore(f) >= 6)
+    .sort((a, b) => interestScore(b) - interestScore(a))[0];
+  if (!best) return null;
+  const seed = buildSelectedReferenceFact(best, artist, title, narrator);
+  if (isWeakSelectedFact(seed, artist, title)) return null;
+  console.log(
+    `[facts] wiki-fast seed for "${artist}" — "${title}": score=${seed.interestScore} fact="${best.slice(0, 120)}"`,
+  );
+  return seed;
+}
+
 function acceptWikiArtistSeed(text: string, tier: 'major' | 'indie', artist: string): boolean {
   if (!isMusicArtistWikiExtract(text)) return false;
   if (!factMentionsArtistLoose(text, artist)) return false;
-  if (tier === 'major') return text.trim().length >= 80;
-  return !isWikiBiographyLead(text);
+  if (isWikiBiographyLead(text)) return false;
+  const score = interestScore(text);
+  const rating = interestRating10(text);
+  if (tier === 'major') {
+    return text.trim().length >= 80 && score >= 12 && rating >= 7;
+  }
+  return score >= 10 && rating >= 6;
 }
 
 function storyFullRateLimit(req: Request, res: Response, next: import('express').NextFunction): void {
@@ -439,7 +475,7 @@ router.post('/full', extractClientSecrets, validateStoryFullBody, storyFullRateL
         bankFact = {
           fact: curatedHit.fact,
           scope: curatedHit.scope,
-          scopeLabelRu: curatedHit.scope === 'track' ? 'трек' : 'группа/артист',
+          scopeLabelRu: scopeLabelRuFor(curatedHit.scope),
           interestScore: curatedScore,
           interestRating: interestRating10(curatedHit.fact),
         };
@@ -646,14 +682,22 @@ router.post('/full', extractClientSecrets, validateStoryFullBody, storyFullRateL
         }
       }
 
-      if (trackFactCount + artistFactCount === 0) {
-        const wikiFastOnly = await fetchFastTrackWikiFacts(metadata.artist, metadata.title);
-        if (wikiFastOnly.length > 0) {
-          factBundle = { trackFacts: wikiFastOnly.slice(0, 4), artistFacts: [] };
-          trackFactCount = factBundle.trackFacts.length;
-          console.log(
-            `[facts] wiki-fast salvage for "${metadata.artist}" — "${metadata.title}": ${trackFactCount} fact(s)`,
-          );
+      if (
+        trackFactCount + artistFactCount === 0 ||
+        bundleHasOnlyWeakFacts(factBundle, metadata.artist, metadata.title)
+      ) {
+        const wikiSeed = await tryWikiFastTrackSeed(
+          metadata.artist,
+          metadata.title,
+          storyNarrator,
+        );
+        if (wikiSeed) {
+          factBundle = {
+            trackFacts: [wikiSeed.fact],
+            artistFacts: [],
+          };
+          trackFactCount = 1;
+          artistFactCount = 0;
         }
       }
 
@@ -816,6 +860,20 @@ router.post('/full', extractClientSecrets, validateStoryFullBody, storyFullRateL
           }
         }
         if (!selectedFact) {
+          const wikiSeed = await tryWikiFastTrackSeed(
+            metadata.artist,
+            metadata.title,
+            storyNarrator,
+          );
+          if (wikiSeed) {
+            selectedFact = wikiSeed;
+            ingestFacts(metadata.artist, metadata.title, [
+              { fact: wikiSeed.fact, scope: wikiSeed.scope, source: 'wiki' },
+            ]);
+            console.log(formatFactPickLog(selectedFact, 'rules') + ' (wiki-fast)');
+          }
+        }
+        if (!selectedFact) {
           const snippetSeed =
             pickSalvageSnippetSeed(mergedSnippets, metadata.artist, metadata.title, storyLang) ??
             pickRelaxedSnippetSeed(mergedSnippets, metadata.artist, metadata.title, storyLang);
@@ -908,6 +966,13 @@ router.post('/full', extractClientSecrets, validateStoryFullBody, storyFullRateL
       selectedFact = null;
     }
 
+    if (selectedFact && isListeningStatsFact(selectedFact.fact)) {
+      console.warn(
+        `[facts] reject listening-stats seed fact="${selectedFact.fact.slice(0, 100)}"`,
+      );
+      selectedFact = null;
+    }
+
     const selectedFactWhy = factFromCurated
       ? 'seed from curated-facts.json — verified catalog entry'
       : factFromBank
@@ -933,13 +998,12 @@ router.post('/full', extractClientSecrets, validateStoryFullBody, storyFullRateL
         narrator: storyNarrator,
       });
       if (wikiEarly && acceptWikiArtistSeed(wikiEarly.text, artistTier, metadata.artist)) {
-        selectedFact = {
-          fact: wikiEarly.text,
-          scope: 'artist',
-          scopeLabelRu: 'группа/артист',
-          interestScore: interestScore(wikiEarly.text),
-          interestRating: interestRating10(wikiEarly.text),
-        };
+        selectedFact = buildSelectedReferenceFact(
+          wikiEarly.text,
+          metadata.artist,
+          metadata.title,
+          storyNarrator,
+        );
         referenceFacts = [wikiEarly.text];
         console.log(
           `[facts] wiki early seed for "${metadata.artist}" chars=${wikiEarly.text.length}`,
@@ -964,21 +1028,12 @@ router.post('/full', extractClientSecrets, validateStoryFullBody, storyFullRateL
         .sort((a, b) => interestScore(b) - interestScore(a));
       const fallbackFact = validatedPool[0];
       if (fallbackFact) {
-        const scope: 'track' | 'album' | 'artist' = factAppliesToRequest(
+        selectedFact = buildSelectedReferenceFact(
           fallbackFact,
           metadata.artist,
           metadata.title,
-          'track',
-        )
-          ? 'track'
-          : 'artist';
-        selectedFact = {
-          fact: fallbackFact,
-          scope,
-          scopeLabelRu: scope === 'track' ? 'трек' : 'группа/артист',
-          interestScore: interestScore(fallbackFact),
-          interestRating: interestRating10(fallbackFact),
-        };
+          storyNarrator,
+        );
         console.log(formatFactPickLog(selectedFact, 'rules'));
         referenceFacts = [selectedFact.fact];
       }
@@ -1044,13 +1099,12 @@ router.post('/full', extractClientSecrets, validateStoryFullBody, storyFullRateL
         narrator: storyNarrator,
       });
       if (wikiSalvage && acceptWikiArtistSeed(wikiSalvage.text, artistTier, metadata.artist)) {
-        selectedFact = {
-          fact: wikiSalvage.text,
-          scope: 'artist',
-          scopeLabelRu: 'группа/артист',
-          interestScore: interestScore(wikiSalvage.text),
-          interestRating: interestRating10(wikiSalvage.text),
-        };
+        selectedFact = buildSelectedReferenceFact(
+          wikiSalvage.text,
+          metadata.artist,
+          metadata.title,
+          storyNarrator,
+        );
         referenceFacts = [wikiSalvage.text];
         console.log(
           `[facts] wiki salvage seed for "${metadata.artist}" chars=${wikiSalvage.text.length}`,
@@ -1143,13 +1197,12 @@ router.post('/full', extractClientSecrets, validateStoryFullBody, storyFullRateL
             narrator: storyNarrator,
           });
           if (wikiLastResort && acceptWikiArtistSeed(wikiLastResort.text, artistTier, metadata.artist)) {
-            selectedFact = {
-              fact: wikiLastResort.text,
-              scope: 'artist',
-              scopeLabelRu: 'группа/артист',
-              interestScore: interestScore(wikiLastResort.text),
-              interestRating: interestRating10(wikiLastResort.text),
-            };
+            selectedFact = buildSelectedReferenceFact(
+              wikiLastResort.text,
+              metadata.artist,
+              metadata.title,
+              storyNarrator,
+            );
             referenceFacts = [wikiLastResort.text];
             console.log(
               `[facts] wiki last-resort seed for "${metadata.artist}" chars=${wikiLastResort.text.length} tier=${artistTier}`,
@@ -1501,7 +1554,7 @@ router.post('/full', extractClientSecrets, validateStoryFullBody, storyFullRateL
 
     throwIfStoryAborted(clientAbort, 'seed-ready');
 
-    const { story, llmUsed } = await (async () => {
+    const { story, llmUsed, deliveredSeed } = await (async () => {
       const hasGroundedSeed = Boolean(selectedFact?.fact && selectedFact.interestScore >= 6 && !isWeakSelectedFact(selectedFact, metadata.artist, metadata.title));
       let effectiveStoryInput = storyInput;
 
@@ -1566,13 +1619,12 @@ router.post('/full', extractClientSecrets, validateStoryFullBody, storyFullRateL
           effectiveStoryInput = {
             ...storyInput,
             referenceFacts: [best],
-            selectedReferenceFact: {
-              fact: best,
-              scope: factBundle.trackFacts.includes(best) ? 'track' : 'artist',
-              scopeLabelRu: factBundle.trackFacts.includes(best) ? 'трек' : 'группа/артист',
-              interestScore: interestScore(best),
-              interestRating: interestRating10(best),
-            },
+            selectedReferenceFact: buildSelectedReferenceFact(
+              best,
+              metadata.artist,
+              metadata.title,
+              storyNarrator,
+            ),
             rawSnippets: undefined,
           };
           console.log(
@@ -1583,13 +1635,12 @@ router.post('/full', extractClientSecrets, validateStoryFullBody, storyFullRateL
           effectiveStoryInput = {
             ...storyInput,
             referenceFacts: [best],
-            selectedReferenceFact: {
-              fact: best,
-              scope: 'artist',
-              scopeLabelRu: 'группа/артист',
-              interestScore: interestScore(best),
-              interestRating: interestRating10(best),
-            },
+            selectedReferenceFact: buildSelectedReferenceFact(
+              best,
+              metadata.artist,
+              metadata.title,
+              storyNarrator,
+            ),
             rawSnippets: undefined,
           };
           console.log(
@@ -1668,19 +1719,23 @@ router.post('/full', extractClientSecrets, validateStoryFullBody, storyFullRateL
                 ? sanitizeScriptForTts(wikiLead.text, metadata.artist, metadata.title, [wikiLead.text])
                 : null);
             if (wikiScriptFinal && countWords(wikiScriptFinal) >= 35) {
-              selectedFact = {
-                fact: wikiLead.text,
-                scope: 'artist',
-                scopeLabelRu: 'группа/артист',
-                interestScore: interestScore(wikiLead.text),
-                interestRating: interestRating10(wikiLead.text),
-              };
+              const wikiSeed = buildSelectedReferenceFact(
+                wikiLead.text,
+                metadata.artist,
+                metadata.title,
+                storyNarrator,
+              );
+              selectedFact = wikiSeed;
               const scripted: StoryScript = {
                 script: wikiScriptFinal,
                 word_count: countWords(wikiScriptFinal),
                 voiceId,
               };
-              return { story: scripted, llmUsed: wikiScript ? `${llmProvider}+wiki` : 'wiki-ru' };
+              return {
+                story: scripted,
+                llmUsed: wikiScript ? `${llmProvider}+wiki` : 'wiki-ru',
+                deliveredSeed: wikiSeed,
+              };
             }
             if (!wikiScript) {
               console.warn(`[indie-wiki] translate failed for "${metadata.artist}" — wiki lead → story LLM`);
@@ -1703,13 +1758,15 @@ router.post('/full', extractClientSecrets, validateStoryFullBody, storyFullRateL
             effectiveStoryInput = {
               ...storyInput,
               referenceFacts: llmReferenceFacts,
-              selectedReferenceFact: {
-                fact: primary,
-                scope: curatedHit?.scope ?? 'artist',
-                scopeLabelRu: curatedHit?.scope === 'track' ? 'трек' : 'группа/артист',
-                interestScore: interestScore(primary),
-                interestRating: interestRating10(primary),
-              },
+              selectedReferenceFact: curatedHit?.scope
+                ? buildSelectedReferenceFact(
+                    primary,
+                    metadata.artist,
+                    metadata.title,
+                    storyNarrator,
+                    curatedHit.scope,
+                  )
+                : buildSelectedReferenceFact(primary, metadata.artist, metadata.title, storyNarrator),
               rawSnippets: undefined,
             };
           }
@@ -1753,13 +1810,12 @@ router.post('/full', extractClientSecrets, validateStoryFullBody, storyFullRateL
             effectiveStoryInput = {
               ...effectiveStoryInput,
               referenceFacts: [wikiLate.text],
-              selectedReferenceFact: {
-                fact: wikiLate.text,
-                scope: 'artist',
-                scopeLabelRu: 'группа/артист',
-                interestScore: interestScore(wikiLate.text),
-                interestRating: interestRating10(wikiLate.text),
-              },
+              selectedReferenceFact: buildSelectedReferenceFact(
+                wikiLate.text,
+                metadata.artist,
+                metadata.title,
+                storyNarrator,
+              ),
             };
             console.log(
               `[facts] wiki late-resort seed for "${metadata.artist}" chars=${wikiLate.text.length} tier=${artistTier}`,
@@ -1773,9 +1829,13 @@ router.post('/full', extractClientSecrets, validateStoryFullBody, storyFullRateL
       const serverManaged = userTier === 'free' && !ownLlmKey;
 
       try {
-        return await generateStoryWithFallback(effectiveStoryInput, llmProvider, {
+        const result = await generateStoryWithFallback(effectiveStoryInput, llmProvider, {
           serverManaged,
         });
+        return {
+          ...result,
+          deliveredSeed: effectiveStoryInput.selectedReferenceFact ?? undefined,
+        };
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
         if (!/could not produce a (?:story grounded in reference facts|usable story)/i.test(msg)) {
@@ -1804,7 +1864,7 @@ router.post('/full', extractClientSecrets, validateStoryFullBody, storyFullRateL
         console.warn(
           `[story-pipeline] quality fail — retry with alt seed: "${alt.fact.slice(0, 100)}"`,
         );
-        return generateStoryWithFallback(
+        const result = await generateStoryWithFallback(
           {
             ...effectiveStoryInput,
             referenceFacts: [alt.fact],
@@ -1814,6 +1874,7 @@ router.post('/full', extractClientSecrets, validateStoryFullBody, storyFullRateL
           llmProvider,
           { serverManaged },
         );
+        return { ...result, deliveredSeed: alt };
       }
     })();
 
@@ -1976,11 +2037,12 @@ router.post('/full', extractClientSecrets, validateStoryFullBody, storyFullRateL
       freeOpenRouterModel: openrouterModelRequested,
       skipDailyQuota: shouldSkipDailyStoryQuota({ ownLlmKey: ownLlmKey, userTtsCredentials }),
     });
-    if (selectedFact?.fact) {
-      response.seed_fact = selectedFact.fact;
-      response.seed_scope = selectedFact.scope;
-      response.seed_interest_score = selectedFact.interestScore;
-      response.seed_interest_rating = selectedFact.interestRating;
+    const seedForResponse = deliveredSeed ?? selectedFact;
+    if (seedForResponse?.fact) {
+      response.seed_fact = seedForResponse.fact;
+      response.seed_scope = seedForResponse.scope;
+      response.seed_interest_score = seedForResponse.interestScore;
+      response.seed_interest_rating = seedForResponse.interestRating;
     }
     attachStoryQuotaHeaders(res, installId);
     console.log(

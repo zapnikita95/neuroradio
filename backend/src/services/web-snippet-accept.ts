@@ -15,6 +15,7 @@ import {
   isCitationBibliographySeed,
   isGenericConcertVenueSeed,
   isGenericMusicVideoSeed,
+  isStudioEquipmentCatalogSeed,
   isArtistFormationBioSeed,
 } from './reference-fact-quality.js';
 import { isTrackTitleAnchoredSeed } from './fact-track-anchor.js';
@@ -272,6 +273,7 @@ export function hasNarrativeSeedSignal(text: string): boolean {
   if (isCitationBibliographySeed(trimmed)) return false;
   if (isGenericConcertVenueSeed(trimmed)) return false;
   if (isGenericMusicVideoSeed(trimmed)) return false;
+  if (isStudioEquipmentCatalogSeed(trimmed)) return false;
   if (isArtistIdentityBioSnippet(trimmed)) return true;
   if (hasTrackContextSignal(trimmed)) return true;
   if (isBackstoryFact(trimmed)) return true;
