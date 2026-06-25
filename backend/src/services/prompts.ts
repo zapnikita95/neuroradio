@@ -1,4 +1,5 @@
 import { FACT_HUNT_PROMPT_BLOCK } from './story-fact-hunt.js';
+import { buildArtistScopeStoryPromptBlockRu } from './artist-bio-track-framing.js';
 import { buildEnglishStoryUserPrompt, buildEnglishSystemPrompt } from './prompts-en.js';
 import { RUSSIAN_LANGUAGE_PROMPT_BLOCK } from './story-russian-language.js';
 import { type StoryLanguageId, DEFAULT_STORY_LANGUAGE } from './story-language.js';
@@ -402,6 +403,9 @@ export function buildStoryUserPrompt(params: {
   if (selected) {
     lines.push('');
     lines.push(`ФОКУС ИСТОРИИ: факт про ${selected.scopeLabelRu.toUpperCase()} (не смешивай с другими темами).`);
+    if (selected.scope === 'artist') {
+      lines.push(buildArtistScopeStoryPromptBlockRu());
+    }
     lines.push('СЕМЯ ИСТОРИИ (проверенный факт из интернета — только это ядро):');
     lines.push(normalizeCatalogSeedFactDisplay(selected.fact, params.artist, params.title));
     lines.push('РЕЦЕПТ ПОДАЧИ:');
@@ -621,6 +625,9 @@ export function buildLocalStoryUserPrompt(params: {
   const selected = params.selectedReferenceFact;
   if (selected) {
     lines.push('');
+    if (selected.scope === 'artist') {
+      lines.push(buildArtistScopeStoryPromptBlockRu());
+    }
     lines.push(`Главный факт (${selected.scopeLabelRu}): ${normalizeCatalogSeedFactDisplay(selected.fact, params.artist, params.title)}`);
   }
   if (facts.length > 0) {

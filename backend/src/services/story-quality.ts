@@ -25,6 +25,10 @@ import { primaryArtistName } from './artist-primary.js';
 import { resolveStoryNarrator, type StoryNarratorId } from './story-narrator.js';
 import { isStaleClosingCliche, sanitizeClosingTail } from './story-closing-phrases.js';
 import { findQuoteSpeakerDrift } from './fact-quote-attribution.js';
+import {
+  buildArtistScopeStoryPromptBlockRu,
+  findArtistBioTrackFalseLinkage,
+} from './artist-bio-track-framing.js';
 
 export { DEFAULT_STORY_LENGTH, getStoryLengthPreset };
 export type { StoryLengthId, StoryLengthPreset };
@@ -976,6 +980,10 @@ export function validateStoryScript(
     const trackMisattribution = findArtistSeedTrackMisattribution(trimmed, title, referenceFacts);
     if (trackMisattribution) {
       return { ok: false, reason: trackMisattribution };
+    }
+    const bioTrackLinkage = findArtistBioTrackFalseLinkage(trimmed, title, referenceFacts);
+    if (bioTrackLinkage) {
+      return { ok: false, reason: bioTrackLinkage };
     }
     const newsBleed = findNewsSeedBleedIntoRecordingStory(trimmed, title, referenceFacts);
     if (newsBleed) {

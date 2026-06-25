@@ -1,4 +1,5 @@
 import { FACT_HUNT_PROMPT_BLOCK } from './story-fact-hunt.js';
+import { buildArtistScopeStoryPromptBlockEn } from './artist-bio-track-framing.js';
 import { ENGLISH_LANGUAGE_PROMPT_BLOCK } from './story-english-language.js';
 import {
   buildLengthStructurePlan,
@@ -221,6 +222,9 @@ export function buildEnglishStoryUserPrompt(params: {
   if (selected) {
     lines.push('');
     lines.push(`STORY FOCUS: fact about ${scopeLabelEn(selected.scope).toUpperCase()}.`);
+    if (selected.scope === 'artist') {
+      lines.push(buildArtistScopeStoryPromptBlockEn());
+    }
     lines.push('STORY SEED (verified fact — this is the core):');
     lines.push(selected.fact);
     lines.push('DELIVERY RECIPE:');

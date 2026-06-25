@@ -44,6 +44,7 @@
     "seed:facts:discogs": "node scripts/bulk-seed-fact-bank.mjs --target=60000 --hot-target=20000 --concurrency=1 --resume --no-proxy --discogs-only --backfill-discogs",
     "test:facts": "npm run build && node scripts/test-fact-topic.mjs && node scripts/test-live-facts-5tracks.mjs",
     "test:fact-pick": "npm run build && node scripts/test-fact-pick-regression.mjs",
+    "test:artist-bio": "npm run build && node scripts/test-artist-bio-track-framing.mjs",
     "test:similar-tracks": "npm run build && node scripts/test-similar-tracks-regression.mjs",
     "verify:track": "npm run build && node scripts/verify-story-track.mjs",
     "verify:multi-pick": "npm run build && node scripts/verify-multi-pick.mjs --rounds 5",
