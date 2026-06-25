@@ -18,6 +18,7 @@ import {
   isWeakChartSeed,
   isEncyclopediaDefinitionSeed,
   isThinReleaseCatalogSeed,
+  isStudioEquipmentCatalogSeed,
   MIN_PICK_INTEREST_SCORE,
 } from './reference-fact-quality.js';
 import type { StoryNarratorId } from './story-narrator.js';
@@ -326,6 +327,28 @@ export function pickReferenceFact(
       options.recentScopes ?? [],
     );
     if (picked && adjustedInterestScore(picked, narrator) >= minScore) {
+      if (
+        (scope === 'track' || scope === 'album') &&
+        (isThinReleaseCatalogSeed(picked) || isStudioEquipmentCatalogSeed(picked)) &&
+        [...pools.track, ...pools.album, ...pools.artist].some(
+          (f) =>
+            f !== picked &&
+            adjustedInterestScore(f, narrator) >= Math.max(10, minScore) &&
+            !isStudioEquipmentCatalogSeed(f) &&
+            !isThinReleaseCatalogSeed(f) &&
+            !isRejectedSeed(
+              f,
+              title,
+              storyLanguage,
+              trackPoolForReject,
+              artist,
+              pools.artist.includes(f) ? 'artist' : pools.album.includes(f) ? 'album' : 'track',
+              attributionCorpus,
+            ),
+        )
+      ) {
+        continue;
+      }
       if (
         (scope === 'track' || scope === 'album') &&
         isThinReleaseCatalogSeed(picked) &&

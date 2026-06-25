@@ -16,6 +16,7 @@ import {
   isGenericConcertVenueSeed,
   isGenericMusicVideoSeed,
   isStudioEquipmentCatalogSeed,
+  isTrackMeaningNarrativeSeed,
   isArtistFormationBioSeed,
 } from './reference-fact-quality.js';
 import { isTrackTitleAnchoredSeed } from './fact-track-anchor.js';
@@ -84,6 +85,9 @@ export function isTruncatedMarketingSnippet(snippet: string): boolean {
 /** Страницы текстов / SEO — не семя для истории (даже если есть год и альбом). */
 export function isLyricsPageSeed(snippet: string): boolean {
   const trimmed = decodeHtmlEntities(snippet).trim();
+  if (isTrackMeaningNarrativeSeed(trimmed)) return false;
+  if (/\blyrics here lamenting\b/i.test(trimmed)) return false;
+  if (/\bwritten from the perspective\b/i.test(trimmed)) return false;
   if (
     /\b(?:текст\s+(?:пісн|песн|песни)|lyrics|songtext|letras|слова\s+песни|текст\s+песни)\b/i.test(
       trimmed,

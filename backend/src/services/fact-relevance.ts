@@ -7,6 +7,7 @@ import { buildTitleMatchVariants, cyrillicToLatin, fuzzyTokenMatch, textMentions
 import { latinPhraseToRussianTts } from './tts-foreign-pronounce.js';
 import { isNonMusicProfessionText } from './wikipedia-music.js';
 import { rejectSeedForTrackStory } from './fact-track-anchor.js';
+import { isTrackMeaningNarrativeSeed } from './reference-fact-quality.js';
 
 function normalize(text: string): string {
   return text
@@ -1092,6 +1093,7 @@ export function factAppliesToRequest(
         hasTrackContextSignal(trimmed) ||
         hasRussianTrackContextSignal(trimmed) ||
         /^[«"']/.test(trimmed) ||
+        isTrackMeaningNarrativeSeed(trimmed) ||
         /\b(?:first teased|teased during|confirmed as a track|track title|Clancy World Tour|Tyler stated)\b/i.test(
           trimmed,
         ) ||

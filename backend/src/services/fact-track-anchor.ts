@@ -21,6 +21,7 @@ import {
   isCatalogMetadataSeed,
   isEncyclopediaDefinitionSeed,
   isStudioEquipmentCatalogSeed,
+  isTrackMeaningNarrativeSeed,
 } from './reference-fact-quality.js';
 import { isArtistBackstoryNarrative } from './web-snippet-accept.js';
 import { isMetadataOnlyFallbackFact } from './metadata-facts.js';
@@ -260,6 +261,7 @@ export function isTitleTokenForeignArtistFact(fact: string, artist: string, titl
   if (!title.trim() || !artist.trim()) return false;
   const trimmed = fact.trim();
   if (!factMentionsTitle(trimmed, title)) return false;
+  if (isTrackMeaningNarrativeSeed(trimmed)) return false;
   if (/\b(?:first teased|teased during|confirmed as a track|track title|listening events)\b/i.test(trimmed)) {
     return false;
   }

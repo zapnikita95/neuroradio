@@ -191,6 +191,7 @@ export async function fetchDiscogsFacts(ctx: HarvestContext): Promise<HarvestedF
     for (const sentence of splitSentences(stripHtml(notes))) {
       if (!sentenceOk(sentence)) continue;
       if (!/\b(?:recorded|mixed|mastered|studio|produced)\b/i.test(sentence)) continue;
+      if (/\b(?:From the (?:back cover|inner sleeve)|Assistant at|Pressing plant|licensed worldwide|Exclusively licensed)\b/i.test(sentence)) continue;
       if (/\bUses:\s/i.test(sentence)) continue;
       const gearHits = (sentence.match(/\b(?:Guitars?|Amps?|Cymbals?|Strings?|Wireless)\b/gi) ?? []).length;
       if (gearHits >= 2) continue;

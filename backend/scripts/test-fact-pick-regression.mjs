@@ -712,6 +712,27 @@ assert(
   'Paralyzer pick must not be studio gear catalog',
 );
 
+const PIXIES_DISCOGS =
+  'Трек «All I Think About Now» вошёл в альбом «Head Carrier»: From the inner sleeve: Recorded at RAK Studios Mixed at Psalm Studios Assistant at RAK: [...] Pressing plant uncredited';
+const PIXIES_APOLOGY =
+  'All I Think About Now is written from the perspective of Black Francis, serving as an apology to Kim Deal for the band breakup';
+const PIXIES_BOWIE =
+  'David Bowie said the Pixies had made just about the most compelling music of the entire decade';
+
+assert(isStudioEquipmentCatalogSeed(PIXIES_DISCOGS), 'Pixies Discogs liner notes are catalog junk');
+const pixiesPick = pickReferenceFact(
+  { trackFacts: [PIXIES_DISCOGS, PIXIES_APOLOGY, PIXIES_BOWIE], artistFacts: [] },
+  [],
+  0,
+  'Pixies',
+  'All I Think About Now',
+);
+assert(
+  pixiesPick?.fact.includes('Black Francis') || pixiesPick?.fact.includes('apology'),
+  `Pixies prefers apology/meaning over Discogs studios (got: ${pixiesPick?.fact?.slice(0, 90) ?? 'null'})`,
+);
+assert(!pixiesPick?.fact.includes('RAK'), 'Pixies pick must not be RAK studio liner notes');
+
 // --- 6. Optional live: real Last.fm + aggregator ---
 if (LIVE) {
   if (!process.env.LASTFM_API_KEY?.trim()) {

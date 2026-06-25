@@ -127,26 +127,40 @@ export function isDiscogsLinerNotesSeed(fact: string): boolean {
   );
 }
 
-/** Студия + мастеринг + список брендов с Discogs — не история, всем похуй. */
+/** Студия + мастеринг + список брендов / Discogs liner notes — не история, всем похуй. */
 export function isStudioEquipmentCatalogSeed(fact: string): boolean {
   const t = fact.trim();
   if (/\bUses:\s/i.test(t)) return true;
+  if (/\b(?:From the (?:back cover|inner sleeve)|inner sleeve:|back cover:)\b/i.test(t)) return true;
+  if (/\b(?:Assistant at|Pressing plant|runout etch|licensed worldwide|play it a[gǵ]ain)\b/i.test(t)) return true;
+  if (/[℗©]\s*&?\s*[©℗]/.test(t) || /\bExclusively licensed\b/i.test(t)) return true;
   const gearBrands =
     (t.match(
-      /\b(?:Yamaha|Gibson|Mesa Boogie|Line 6|Sterling Sound|Groovemaster|Bogner|Sabian|Evans|Digitech|Sennheiser|Dean Markley|Pro Mark|Lakland|Taye|UDrum)\b/gi,
+      /\b(?:Yamaha|Gibson|Mesa Boogie|Line 6|Sterling Sound|Groovemaster|Bogner|Sabian|Evans|Digitech|Sennheiser|Dean Markley|Pro Mark|Lakland|Taye|UDrum|RAK Studios|Psalm Studios)\b/gi,
     ) ?? []).length;
   if (gearBrands >= 2) return true;
   const studioMaster =
-    /\b(?:Recorded and mixed at|recorded at|mixed at|Mastered at|mastered at)\b/i.test(t) &&
+    /\b(?:Recorded and mixed at|Recorded at|recorded at|Mixed at|mixed at|Mastered at|mastered at)\b/i.test(t) &&
     /\b(?:Studios?|Sound)\b/i.test(t);
   if (
     studioMaster &&
-    !/\b(?:said|explained|inspired|meaning|controvers|scandal|sampled|wrote|intended)\b/i.test(t)
+    !/\b(?:said|explained|inspired|meaning|controvers|scandal|sampled|wrote|intended|apology|perspective)\b/i.test(t)
   ) {
     if (gearBrands >= 1) return true;
-    if (/Трек «[^»]+» вошёл в альбом/i.test(t) && t.length >= 100) return true;
+    if (/Трек «[^»]+» вошёл в альбом/i.test(t)) return true;
     if (t.split(/[,;]/).length >= 4) return true;
   }
+  return false;
+}
+
+/** Смысл песни / извинение / интервью про трек — сильное семя, не «lyrics page». */
+export function isTrackMeaningNarrativeSeed(fact: string): boolean {
+  const t = fact.trim();
+  if (/\bwritten from the perspective\b/i.test(t)) return true;
+  if (/\bserving as an (?:apology|tribute|farewell|letter)\b/i.test(t)) return true;
+  if (/\b(?:said of the song|has said of the song|about the song)\b/i.test(t)) return true;
+  if (/\blyrics here lamenting\b/i.test(t)) return true;
+  if (/\b(?:apology to|tribute to|letter to)\s+[A-Z]/i.test(t)) return true;
   return false;
 }
 
@@ -430,6 +444,7 @@ export function interestScore(fact: string): number {
   if (isCatalogMetadataSeed(trimmed)) return -30;
   if (isGenericMusicVideoSeed(trimmed)) return -25;
   if (isLyricsPageSeed(trimmed)) score -= 50;
+  if (isTrackMeaningNarrativeSeed(trimmed)) score += 32;
   if (isArtistIdentityBioSnippet(trimmed)) score += 16;
   if (/«[\p{L}\p{N}\s'().-]+»/u.test(trimmed) && /(?:написал|родился|группа|альбом|Sanremo|Eurovision|стил|prod|сингл)/iu.test(trimmed)) {
     score += 14;
@@ -586,6 +601,7 @@ export function isWeakChartSeed(fact: string): boolean {
 export function isBoringFact(fact: string): boolean {
   const trimmed = fact.trim();
   if (trimmed.length < 30) return true;
+  if (isTrackMeaningNarrativeSeed(trimmed)) return false;
   if (isCitationBibliographySeed(trimmed)) return true;
   if (isGenericConcertVenueSeed(trimmed)) return true;
   if (isCatalogMetadataSeed(trimmed)) return true;

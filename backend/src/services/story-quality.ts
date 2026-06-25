@@ -1010,6 +1010,10 @@ export function validateStoryScript(
     if (gearSpam) {
       return { ok: false, reason: gearSpam };
     }
+    const studioWater = findStudioProductionWater(trimmed, referenceFacts);
+    if (studioWater) {
+      return { ok: false, reason: studioWater };
+    }
   }
 
   if (
@@ -1434,6 +1438,34 @@ export function findOffSeedInvention(script: string, referenceFacts: string[] = 
     /\b(?:7-inch|7 inch|B-side has studio banter|limited edition.*vinyl|rewriting the chorus three times|studio banter about this exact moment)\b/i;
   if (collectorInvention.test(script) && !collectorInvention.test(seed) && !/\bvinyl|7-inch|B-side|banter|press\b/i.test(seed)) {
     return 'invented collector detail not in seed';
+  }
+  if (
+    /(?:ассистент\w*|без упоминания в кредитах|остал\w*\s+без\s+упоминания|кто именно нажимал)/i.test(script) &&
+    !/\bAssistant at\b/i.test(seed)
+  ) {
+    return 'invented studio credit drama not in seed';
+  }
+  return null;
+}
+
+/** Сведение/мастеринг/студии в тексте при слабом Discogs-семени — не история. */
+export function findStudioProductionWater(
+  script: string,
+  referenceFacts: string[] = [],
+): string | null {
+  const seed = referenceFacts.find((f) => f.trim()) ?? '';
+  if (!seed) return null;
+  const studioHits = [
+    /(?:сведени\w*|мастеринг\w*|микширов\w*)/i.test(script),
+    /(?:RAK|Psalm|Sterling|Groovemaster)\b/i.test(script),
+    /(?:ассистент\w*|кредит\w*|внутренн\w*\s+конверт)/i.test(script),
+    /(?:оборудован\w*|арсенал\w*\s+для\s+идеальн\w*\s+звук)/i.test(script),
+  ].filter(Boolean).length;
+  if (studioHits >= 2 && isStudioEquipmentCatalogSeed(seed)) {
+    return 'studio production trivia — use song meaning or band story from sources';
+  }
+  if (isStudioEquipmentCatalogSeed(seed) && studioHits >= 1) {
+    return 'studio liner-notes seed — do not narrate mixing/mastering credits';
   }
   return null;
 }
