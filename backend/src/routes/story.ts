@@ -15,7 +15,7 @@ import { fetchDeepWebSearchSnippets, fetchArtistIdentityWebSnippets } from '../s
 import { fetchFastTrackWikiFacts } from '../services/wikipedia-facts.js';
 import { explainReferenceFactSelection, factsTooSimilar, isRejectedStorySeed, isStrongBundleFallbackFact, pickFallbackSeedFromBundle, buildSelectedReferenceFact, scopeLabelRuFor, type SelectedReferenceFact } from '../services/fact-picker.js';
 import { formatFactPickLog, logFactCandidatePools } from '../services/fact-interest-log.js';
-import { interestScore, isWikiBiographyLead, isCatalogMetadataSeed, isEncyclopediaDefinitionSeed, isGenericConcertVenueSeed, isSetlistLiveDebutSeed, isListeningStatsFact } from '../services/reference-fact-quality.js';
+import { interestScore, isWikiBiographyLead, isCatalogMetadataSeed, isEncyclopediaDefinitionSeed, isGenericConcertVenueSeed, isSetlistLiveDebutSeed, isListeningStatsFact, isThinReleaseCatalogSeed } from '../services/reference-fact-quality.js';
 import { isArtistCareerBioWithoutTrack, hasAnchoredTrackContext } from '../services/fact-track-anchor.js';
 import { factMentionsTitle } from '../services/fact-relevance.js';
 import { isUnverifiedQuoteAttributionSeed } from '../services/fact-quote-attribution.js';
@@ -1575,6 +1575,7 @@ router.post('/full', extractClientSecrets, validateStoryFullBody, storyFullRateL
             if (isWeakSnippetSeed(f)) return false;
             if (isGenericConcertVenueSeed(f)) return false;
             if (isCatalogMetadataSeed(f)) return false;
+            if (isThinReleaseCatalogSeed(f)) return false;
             if (
               isUnverifiedQuoteAttributionSeed(f, metadata.artist, quoteAttributionCorpus)
             ) {
@@ -1611,7 +1612,7 @@ router.post('/full', extractClientSecrets, validateStoryFullBody, storyFullRateL
             return interestScore(b) - interestScore(a);
           });
         const realRefFacts = storyReferenceFacts.filter(
-          (f) => !isMetadataOnlyFallbackFact(f) && !isWeakSnippetSeed(f),
+          (f) => !isMetadataOnlyFallbackFact(f) && !isWeakSnippetSeed(f) && !isThinReleaseCatalogSeed(f),
         );
 
         if (strongBundleFacts.length > 0) {

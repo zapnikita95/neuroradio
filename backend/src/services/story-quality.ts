@@ -1024,6 +1024,10 @@ export function validateStoryScript(
     if (nostalgiaFluff) {
       return { ok: false, reason: nostalgiaFluff };
     }
+    const accidentalSingle = findAccidentalSingleClicheOnThinSeed(trimmed, referenceFacts);
+    if (accidentalSingle) {
+      return { ok: false, reason: accidentalSingle };
+    }
     const gearSpam = findStudioGearBrandSpam(trimmed, referenceFacts);
     if (gearSpam) {
       return { ok: false, reason: gearSpam };
@@ -1248,6 +1252,18 @@ const UNGROUNDED_CLAIM_CHECKS: Array<{ claim: RegExp; factHint: RegExp }> = [
     claim: /(?:стал[аи]?\s+(?:одним\s+из\s+)?(?:самых\s+)?(?:узнаваем|известн)|стала\s+хитом)/i,
     factHint: /(?:\bhit\b|chart|billboard|top\s+\d|platinum|gold|million|хит|чарт)/i,
   },
+  {
+    claim: /фанаты\s+(?:буквально\s+)?заставил/i,
+    factHint: /fans\s+(?:demand|forced|request)|фанаты\s+(?:потребовал|заставил|просил)/i,
+  },
+  {
+    claim: /не\s+планировал\w*\s+(?:выпускать|выпустить)(?:\s+эту\s+песню)?(?:\s+отдельно|\s+как\s+сингл)?/i,
+    factHint: /not\s+(?:originally\s+)?(?:planned|intended)|не\s+планировал\w*\s+выпускать/i,
+  },
+  {
+    claim: /просто\s+была\s+частью\s+пластинки/i,
+    factHint: /not\s+(?:originally\s+)?(?:planned|intended)|part\s+of\s+the\s+album|не\s+планировал/i,
+  },
 ];
 
 export function findUngroundedClaims(
@@ -1304,6 +1320,39 @@ export function findNostalgiaFluffOnThinSeed(
   const hits = NOSTALGIA_FLUFF_PATTERNS.filter((p) => p.test(script)).length;
   if (hits >= 2) {
     return 'nostalgia fluff on thin release seed — anchor on artist/group fact from sources';
+  }
+  return null;
+}
+
+const ACCIDENTAL_SINGLE_CLICHE_PATTERNS: RegExp[] = [
+  /не\s+планировал\w*\s+(?:выпускать|выпустить)/i,
+  /(?:изначально|сначала)\s+(?:группа\s+)?не\s+планировал/i,
+  /фанаты\s+(?:буквально\s+)?заставил/i,
+  /просто\s+была\s+частью\s+пластинки/i,
+  /не\s+был(?:а|и)?\s+написан(?:а|ы)?\s+как\s+(?:явный\s+)?хит/i,
+  /(?:простота|искренност\w*)\s+.*(?:сделал(?:а|и)?|цепля)/i,
+  /сам(?:ые|ая)\s+неожиданн\w*\s+(?:вещ\w*|истор\w*)\s+станов/i,
+  /аудитория\s+сама\s+сделала\s+хит/i,
+  /not\s+(?:originally\s+)?(?:planned|intended)\s+(?:as\s+a\s+)?(?:single|release)/i,
+  /fans\s+(?:literally\s+)?(?:forced|made|demanded)/i,
+];
+
+/** Шаблон «не планировали сингл → фанаты заставили» на каталожном семени — для всех дикторов. */
+export function findAccidentalSingleClicheOnThinSeed(
+  script: string,
+  referenceFacts: string[] = [],
+): string | null {
+  const seed = referenceFacts.find((f) => f.trim()) ?? '';
+  if (!seed || !isThinReleaseCatalogSeed(seed)) return null;
+  const hits = ACCIDENTAL_SINGLE_CLICHE_PATTERNS.filter((p) => p.test(script)).length;
+  if (
+    hits >= 2 ||
+    /фанаты\s+(?:буквально\s+)?заставил/i.test(script) ||
+    /не\s+планировал\w*\s+(?:выпускать|выпустить)\s+(?:эту\s+песню\s+)?(?:отдельно|как\s+сингл)/i.test(
+      script,
+    )
+  ) {
+    return 'accidental-single cliche on thin release seed — pick a narrative fact, not album placement';
   }
   return null;
 }
@@ -1725,6 +1774,8 @@ export function findWateryContent(
   const noTrackNames = isVoiceoverWithoutTrackNames(options.speakTrackNamesInVoiceover);
   const nostalgiaFluff = findNostalgiaFluffOnThinSeed(script, referenceFacts, options.storyNarrator);
   if (nostalgiaFluff) return nostalgiaFluff;
+  const accidentalSingle = findAccidentalSingleClicheOnThinSeed(script, referenceFacts);
+  if (accidentalSingle) return accidentalSingle;
   const inventedIndie = findInventedIndieFiller(script, referenceFacts, artist, title);
   if (inventedIndie) return inventedIndie;
   if (options.speakTrackNamesInVoiceover === true && artist.trim() && title.trim()) {

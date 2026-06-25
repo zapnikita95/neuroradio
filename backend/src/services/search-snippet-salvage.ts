@@ -26,6 +26,7 @@ import type { StoryLanguageId } from './story-language.js';
 /** Seed too weak to ground LLM + quality gate — upgrade to wiki/better facts. */
 export function isWeakSnippetSeed(fact: string, score = interestScore(fact), title = ''): boolean {
   const trimmed = fact.trim();
+  if (isThinReleaseCatalogSeed(trimmed)) return true;
   if (isAlbumListingSeed(trimmed)) return true;
   if (isListeningStatsFact(trimmed)) return true;
   if (isCatalogMetadataSeed(trimmed)) return true;
@@ -57,9 +58,10 @@ export function isWeakSelectedFact(
   if (isEncyclopediaDefinitionSeed(trimmed)) {
     if (
       score >= 40 &&
-      /\b(?:released|single|album|chart|billboard|debut|may \d{4}|june \d{4}|july \d{4})\b/i.test(trimmed)
+      /\b(?:released|single|album|chart|billboard|debut|may \d{4}|june \d{4}|july \d{4})\b/i.test(trimmed) &&
+      !isThinReleaseCatalogSeed(trimmed)
     ) {
-      // Concrete release facts (e.g. fifth single from album + date) are usable seeds.
+      // Concrete release facts (chart, scandal) — usable; «N-й сингл с альбома» — нет.
     } else {
       return true;
     }

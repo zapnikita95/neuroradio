@@ -32,10 +32,6 @@ const DEDICATED_CATALOG_SEED_PATTERNS: RegExp[] = [
   /трек «[^»]+» идёт \d+:\d+/i,
   /(?:electronicore|deathtronica|metalcore|post-punk|shoegaze)\s+band\s+from/i,
   /(?:piece|member)\s+.*\s+band\s+from/i,
-  /\bas the (?:first|second|third|fourth|fifth|lead|debut) single from\b/i,
-  /^It was released on .+ as the (?:first|second|third|fourth|fifth|lead|debut) single\b/i,
-  /^The song was released on .+ as the (?:first|second|third|fourth|lead|debut) single\b/i,
-  /^"[^"]+" is a song by .+ released on .+ as the (?:first|second|third|fourth|lead|debut) single\b/i,
 ];
 
 /** «Указан в альбоме X» — метаданные, не семя для истории (LLM выдумает звук). */
@@ -308,29 +304,58 @@ export const COLLECTOR_FACT_PATTERNS: RegExp[] = [
   /\b(?:прорыв|тикток|стрим\w*|миллиард|миллион|хит\s+100|соавтор|бутлег|винил|лимитк)\b/i,
 ];
 
-/** «третий+ сингл с альбома X» без скандала/чарта — не история; lead/first single оставляем. */
+const THIN_RELEASE_ORDINAL_EN =
+  '(?:first|second|third|fourth|fifth|sixth|seventh|eighth|ninth|tenth|eleventh|twelfth|thirteenth|fourteenth|fifteenth|lead|debut)';
+const THIN_RELEASE_ORDINAL_RU =
+  '(?:перв\\w*|втор\\w*|трет\\w*|четв[её]рт\\w*|пят\\w*|шест\\w*|седьм\\w*|восьм\\w*)';
+
+/** «N-й сингл/трек с альбома X» — каталог, не история; LLM выдумает «фанаты заставили выпустить». */
 export function isThinReleaseCatalogSeed(fact: string): boolean {
   const t = fact.trim();
-  const thinOrdinal =
-    /\b(?:third|fourth|fifth|sixth)\s+single\b/i.test(t) ||
-    /\b(?:трет\w*|четв[её]рт\w*|пят\w*|шест\w*)\s+сингл/i.test(t) ||
-    /\breleased\s+as\s+(?:the|a)\s+(?:album'?s\s+)?(?:third|fourth|fifth|sixth)\s+single\b/i.test(t);
-  if (!thinOrdinal) return false;
+  if (!t) return false;
+
+  const ordinalSingleRe = new RegExp(`\\b${THIN_RELEASE_ORDINAL_EN}\\s+single\\b`, 'i');
+  const ordinalTrackRe = new RegExp(`\\b${THIN_RELEASE_ORDINAL_EN}\\s+track\\b`, 'i');
+  const ordinalSingleRuRe = new RegExp(`${THIN_RELEASE_ORDINAL_RU}\\s+сингл`, 'i');
+  const ordinalTrackRuRe = new RegExp(`${THIN_RELEASE_ORDINAL_RU}\\s+трек`, 'i');
+  const releasedAsSingleRe = new RegExp(
+    `\\breleased(?:\\s+on[^.;]{0,60})?\\s+as\\s+(?:the|a)\\s+(?:album'?s\\s+)?${THIN_RELEASE_ORDINAL_EN}\\s+single\\b`,
+    'i',
+  );
+  const servesAsTrackRe = new RegExp(
+    `\\bserves\\s+as\\s+(?:the\\s+)?${THIN_RELEASE_ORDINAL_EN}\\s+track\\b`,
+    'i',
+  );
+
+  const isPlacement =
+    (ordinalSingleRe.test(t) &&
+      /\b(?:from|off(?:\s+of)?)\s+(?:their|the|his|her|its)\b/i.test(t)) ||
+    releasedAsSingleRe.test(t) ||
+    (ordinalTrackRe.test(t) && /\balbum\b/i.test(t)) ||
+    servesAsTrackRe.test(t) ||
+    ordinalSingleRuRe.test(t) ||
+    (ordinalTrackRuRe.test(t) && /\bальбом/i.test(t)) ||
+    /\b(?:вышел|вышла|вышло)\s+как\s+(?:перв\w*|втор\w*|трет\w*|четв[её]рт\w*|пят\w*|шест\w*)\s+сингл/i.test(
+      t,
+    ) ||
+    /\b(?:third|second|fourth|fifth|sixth|seventh|eighth)\s+track\s+on\s+(?:their|the)\b/i.test(
+      t,
+    );
+
+  if (!isPlacement) return false;
+
   if (
-    /\b(?:sampled|inspired\s+by|chart|billboard|hot\s+100|grammy|platinum|gold|viral|scandal|controvers|banned|co[- ]?written|written\s+with|produced\s+by\s+(?!the\s+band)|meaning|metaphor|protest)\b/i.test(
+    /\b(?:sampled|sample from|inspired\s+by|written\s+(?:about|after|with|during)|meaning|metaphor|protest|scandal|controvers|banned|billboard\s+hot|grammy|platinum|gold|viral|not\s+(?:originally\s+)?(?:intended|planned|meant)\s+(?:as\s+a\s+single|for\s+release)|fans\s+(?:demanded|requested|forced)|audience\s+(?:made|turned))\b/i.test(
+      t,
+    ) ||
+    /\b(?:написан(?:а|о)|вдохновл(?:ён|ена|ено)|протест|скандал|фанаты\s+(?:потребовал|заставил|просил)|не\s+планировал\w*\s+выпускать)\b/i.test(
       t,
     )
   ) {
     return false;
   }
-  if (/\b(?:may|june|july|august|september|october|november|december|january|february|march|april)\s+\d{4}\b/i.test(t)) {
-    return false;
-  }
-  return (
-    /\b(?:from|off\s+of|off)\b[^.]{0,40}\balbum\b/i.test(t) ||
-    /\bальбом\w*\s+«/i.test(t) ||
-    /\b(?:studio|debut|sophomore|third|fourth|fifth)\s+album\b/i.test(t)
-  );
+
+  return true;
 }
 
 export function isCollectorFact(fact: string): boolean {
@@ -591,12 +616,6 @@ export function interestScore(fact: string): number {
   if (/\b(?:widely considered|grunge anthem|ultimate grunge|song'?s success|omnipresence|grew tired of it|removed it from their live)\b/i.test(fact)) {
     score += 14;
   }
-  if (/\b(?:opening track|(?:first|second|third|fourth|lead|debut) single)\b/i.test(fact) &&
-    /\b(?:album|released|debut|studio album|from their|from the)\b/i.test(fact)
-  ) {
-    score += 14;
-  }
-  if (/\b(?:втор\w*|перв\w*|трет\w*|четв[её]рт\w*|пят\w*)\s+сингл/i.test(trimmed)) score += 12;
   if (/\b(?:deodorant|Hanna was referring|inspired the title|wrote the song in)\b/i.test(fact)) score += 10;
   if (
     /\b(?:MP3|MPEG|Fraunhofer|Brandenburg)\b/i.test(trimmed) &&
@@ -610,6 +629,7 @@ export function interestScore(fact: string): number {
   if (/(?:написал\w*|сочинил\w*|автором текста).*(?:Цой|цой|«Кино»|Кино)/i.test(fact)) score += 10;
   if (/\b(?:intended to|repudiat\w*|members? of the (?:band|group|four)|their past|dark past)\b/i.test(fact)) score += 8;
   score += highImpactBonus(fact);
+  if (isThinReleaseCatalogSeed(fact)) score -= 40;
   return score;
 }
 
@@ -635,6 +655,7 @@ export function isBoringFact(fact: string): boolean {
   if (isCatalogMetadataSeed(trimmed)) return true;
   if (isGenericMusicVideoSeed(trimmed)) return true;
   if (isStudioEquipmentCatalogSeed(trimmed)) return true;
+  if (isThinReleaseCatalogSeed(trimmed)) return true;
   if (isDedicatedCatalogSeed(trimmed)) return false;
   if (isWikiBiographyLead(trimmed)) return true;
   if (isCollectorFact(trimmed)) return false;

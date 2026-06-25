@@ -545,6 +545,7 @@ export function isStrongBundleFallbackFact(
   narrator: StoryNarratorId = 'auto',
 ): boolean {
   if (!title.trim()) return true;
+  if (isThinReleaseCatalogSeed(fact)) return false;
   if (factMentionsOtherTrackTitle(fact, title)) return false;
   if (narrator === 'backstage') {
     const trackAnchored =

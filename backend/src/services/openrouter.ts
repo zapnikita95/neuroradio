@@ -15,6 +15,7 @@ import {
   findUngroundedClaims,
   findPersonaCliche,
   findNostalgiaFluffOnThinSeed,
+  findAccidentalSingleClicheOnThinSeed,
   findWateryContent,
   findInventedIndieFiller,
   hasConcreteFact,
@@ -403,6 +404,7 @@ export async function generateStoryScript(
         storyNarrator: input.storyNarrator,
       }) &&
       !findNostalgiaFluffOnThinSeed(sanitized, referenceFacts, input.storyNarrator) &&
+      !findAccidentalSingleClicheOnThinSeed(sanitized, referenceFacts) &&
       !findArtistSeedTrackMisattribution(sanitized, input.title, referenceFacts) &&
       !referenceFacts.some((f) => isArtistLateLifeHealthFactWithoutTrack(f, input.title)) &&
       !findHardScriptViolation(sanitized) &&

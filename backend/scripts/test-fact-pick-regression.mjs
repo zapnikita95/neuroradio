@@ -386,6 +386,60 @@ assert(
   `Lonely prefers track/artist narrative over clip (got: ${lonelyPick?.fact?.slice(0, 90) ?? 'null'})`,
 );
 
+const {
+  isThinReleaseCatalogSeed,
+  isBoringFact,
+} = await import('../dist/services/reference-fact-quality.js');
+const { isStrongBundleFallbackFact } = await import('../dist/services/fact-picker.js');
+const { findAccidentalSingleClicheOnThinSeed } = await import('../dist/services/story-quality.js');
+
+const READ_MIND_THIRD_SINGLE =
+  'It was released on February 13, 2007, as the third single from their second studio album, Sam\'s Town.';
+const READ_MIND_SIXTH_TRACK =
+  '"Read My Mind" is the sixth track on their second album Sam\'s Town.';
+const READ_MIND_YAHOO =
+  'The song is about Brandon Flowers\'s wife, Tana, and how he was afraid of losing her.';
+const AXWELL_SECOND_SINGLE =
+  '"More Than You Know" is the second single from their debut studio album, More Than You Know.';
+
+assert(isThinReleaseCatalogSeed(READ_MIND_THIRD_SINGLE), 'third single + date is thin catalog seed');
+assert(isThinReleaseCatalogSeed(READ_MIND_SIXTH_TRACK), 'sixth track on album is thin catalog seed');
+assert(isThinReleaseCatalogSeed(AXWELL_SECOND_SINGLE), 'second single from debut album is thin catalog seed');
+assert(!isThinReleaseCatalogSeed(READ_MIND_YAHOO), 'Yahoo quote about wife is not thin catalog');
+assert(interestScore(READ_MIND_THIRD_SINGLE) < 6, `third single scores low (got ${interestScore(READ_MIND_THIRD_SINGLE)})`);
+assert(isBoringFact(READ_MIND_THIRD_SINGLE), 'third single is boring fact');
+assert(isWeakSnippetSeed(READ_MIND_THIRD_SINGLE), 'third single is weak snippet seed');
+assert(
+  !isStrongBundleFallbackFact(READ_MIND_THIRD_SINGLE, 'The Killers', 'Read My Mind', 'radio_host'),
+  'third single rejected as strong bundle fallback',
+);
+
+const killersPick = pickReferenceFact(
+  {
+    trackFacts: [READ_MIND_THIRD_SINGLE, READ_MIND_SIXTH_TRACK, READ_MIND_YAHOO],
+    artistFacts: ['The Killers are an American rock band formed in Las Vegas.'],
+  },
+  [],
+  0,
+  'The Killers',
+  'Read My Mind',
+);
+assert(
+  killersPick?.fact.includes('Tana') || killersPick?.fact.includes('wife') || killersPick?.fact.includes('Brandon'),
+  `Read My Mind pick prefers narrative over album placement (got: ${killersPick?.fact?.slice(0, 90) ?? 'null'})`,
+);
+assert(
+  !killersPick || !isThinReleaseCatalogSeed(killersPick.fact),
+  `Read My Mind pick is not thin catalog (got: ${killersPick?.fact?.slice(0, 90) ?? 'null'})`,
+);
+
+const accidentalHitScript =
+  'Read My Mind — The Killers — третий сингл с Sam\'s Town. Изначально группа не планировала выпускать эту песню отдельно — она просто была частью пластинки. Но фанаты буквально заставили их передумать. Трек не был написан как явный хит — скорее, как личная история.';
+assert(
+  findAccidentalSingleClicheOnThinSeed(accidentalHitScript, [READ_MIND_THIRD_SINGLE]),
+  'accidental-single cliche rejected on thin third-single seed',
+);
+
 const ROB_ARTIST = 'Rob Thomas';
 const ROB_TITLE = 'Lonely No More';
 const MATCHBOX_BAND_FACT =
