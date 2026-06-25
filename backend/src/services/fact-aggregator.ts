@@ -10,7 +10,7 @@ import {
   hasTrackContextSignal,
   isWebListicleJunk,
 } from './fact-relevance.js';
-import { filterAndRankFacts, interestScore, isArtistDisambiguationListSeed, isArtistFormationBioSeed, isEncyclopediaDefinitionSeed, isListeningStatsFact } from './reference-fact-quality.js';
+import { filterAndRankFacts, interestScore, isArtistDisambiguationListSeed, isArtistFormationBioSeed, isEncyclopediaDefinitionSeed, isListeningStatsFact, isThinReleaseCatalogSeed } from './reference-fact-quality.js';
 import { rejectSeedForTrackStory } from './fact-track-anchor.js';
 import { WEAK_TRIVIA_PATTERNS } from './story-fact-hunt.js';
 import { fetchReferenceFactBundle as fetchWikipediaBundle, fetchFastTrackWikiFacts } from './wikipedia-facts.js';
@@ -168,6 +168,7 @@ function mergeDedicatedFacts(base: string[], dedicated: string[], max = 10): str
   for (const fact of [...dedicated, ...base]) {
     const trimmed = fact.trim();
     if (trimmed.length < 35) continue;
+    if (isThinReleaseCatalogSeed(trimmed)) continue;
     const key = normalize(trimmed);
     if (seen.has(key)) continue;
     seen.add(key);
@@ -498,6 +499,7 @@ function buildRawSnippets(
     const trimmed = text.trim();
     if (trimmed.length < RAW_SNIPPET_MIN_LEN) return;
     if (isListeningStatsFact(trimmed)) return;
+    if (isThinReleaseCatalogSeed(trimmed)) return;
     if (WEAK_TRIVIA_PATTERNS.some((p) => p.test(trimmed))) return;
     if (isLyricsPageSeed(trimmed) || isWrongEntityDisambiguation(trimmed, artist)) return;
     candidates.push({ text: trimmed.slice(0, 480), source, score: interestScore(trimmed) });
@@ -881,6 +883,16 @@ export async function fetchAggregatedFactContext(
         `[facts] wiki-fast-track merged "${artist}" — "${title}": +${fastTrackFacts.length} track fact(s)`,
       );
     }
+  }
+
+  const curated = lookupCuratedFact(artist, title);
+  if (curated) {
+    if (curated.scope === 'track') {
+      trackFacts = mergeDedicatedFacts(trackFacts, [curated.fact], 8);
+    } else {
+      artistFacts = mergeDedicatedFacts(artistFacts, [curated.fact], 6);
+    }
+    console.log(`[facts] curated merged "${artist}" — "${title}"`);
   }
 
   if (trackFacts.length + artistFacts.length === 0) {

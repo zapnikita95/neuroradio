@@ -1094,6 +1094,7 @@ export function factAppliesToRequest(
         hasRussianTrackContextSignal(trimmed) ||
         /^[«"']/.test(trimmed) ||
         isTrackMeaningNarrativeSeed(trimmed) ||
+        /\b(?:said|wrote|review|peaks with|described|called it|praised|called the)\b/i.test(trimmed) ||
         /\b(?:first teased|teased during|confirmed as a track|track title|Clancy World Tour|Tyler stated)\b/i.test(
           trimmed,
         ) ||

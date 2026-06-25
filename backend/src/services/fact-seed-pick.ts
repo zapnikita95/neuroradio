@@ -82,7 +82,8 @@ export function isRejectedPickSeed(
     !(
       title.trim() &&
       isTrackTitleAnchoredSeed(fact, title) &&
-      interestScore(fact) >= 10
+      interestScore(fact) >= 10 &&
+      !isThinReleaseCatalogSeed(fact)
     )
   ) {
     return true;
@@ -142,7 +143,8 @@ export function isRejectedPickSeed(
     !(
       title &&
       isTrackTitleAnchoredSeed(fact, title) &&
-      (interestScore(fact) >= 10 || !isEncyclopediaDefinitionSeed(fact))
+      (interestScore(fact) >= 10 || !isEncyclopediaDefinitionSeed(fact)) &&
+      !isThinReleaseCatalogSeed(fact)
     )
   ) {
     return true;
@@ -151,7 +153,10 @@ export function isRejectedPickSeed(
     !allowArtistBio &&
     isCollectorFact(fact) &&
     !(title && factMentionsTitle(fact, title)) &&
-    !/\b(?:inspired by|intended to|anti-war|protest song|meaning|metaphor)\b/i.test(fact)
+    !hasTrackContextSignal(fact) &&
+    !/\b(?:inspired by|intended to|anti-war|protest song|meaning|metaphor|tiktok|viral|resurg|success on)\b/i.test(
+      fact,
+    )
   ) {
     return true;
   }

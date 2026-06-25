@@ -14,6 +14,7 @@ import {
   isAlbumListingSeed,
   isCatalogMetadataSeed,
   isListeningStatsFact,
+  isThinReleaseCatalogSeed,
   isTrackDurationCatalogSeed,
 } from '../reference-fact-quality.js';
 import { isTruncatedMarketingSnippet } from '../web-snippet-accept.js';
@@ -183,6 +184,7 @@ export function dedicatedHarvestToBundle(
     const key = normalizeKey(item.fact);
     if (seen.has(key)) continue;
     if (item.metadataOnly || isListeningStatsFact(item.fact)) continue;
+    if (isThinReleaseCatalogSeed(item.fact)) continue;
     const relevant = isParserTrustedHarvestSource(item.source)
       ? parserTrustedDedicatedRelevant(item, artist, title)
       : dedicatedFactRelevant(item.fact, item.scope, artist, title);

@@ -410,6 +410,7 @@ export function pickReferenceFact(
   for (const fact of sortByInterest(anyPool, narrator)) {
     if (isMetadataOnlyFallbackFact(fact)) continue;
     if (isMisattributedBandTrackFact(fact, title)) continue;
+    if (isThinReleaseCatalogSeed(fact)) continue;
     if (isBoringFact(fact) && !(title && (isTrackTitleAnchoredSeed(fact, title) || factMentionsTitle(fact, title)))) continue;
     if (
       isRejectedSeed(

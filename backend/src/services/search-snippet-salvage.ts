@@ -148,7 +148,8 @@ export function enrichFactBundleWithRawSnippets(
         s.length <= 480 &&
         !isSetlistLiveDebutSeed(s) &&
         !isListeningStatsFact(s) &&
-        !isStudioEquipmentCatalogSeed(s),
+        !isStudioEquipmentCatalogSeed(s) &&
+        !isThinReleaseCatalogSeed(s),
     );
   if (extras.length === 0) return bundle;
   return {

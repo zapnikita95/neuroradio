@@ -680,6 +680,7 @@ export function filterAndRankFacts(facts: string[], max = 6): string[] {
     .filter((fact) => !isTruncatedMarketingSnippet(fact))
     .filter((fact) => !isUnspeakableWebSeed(fact))
     .filter((fact) => !isListeningStatsFact(fact))
+    .filter((fact) => !isThinReleaseCatalogSeed(fact))
     .sort((a, b) => interestScore(b) - interestScore(a))
     .filter((fact) => !isBoringFact(fact))
     .slice(0, max);

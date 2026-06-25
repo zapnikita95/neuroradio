@@ -392,6 +392,7 @@ const {
 } = await import('../dist/services/reference-fact-quality.js');
 const { isStrongBundleFallbackFact } = await import('../dist/services/fact-picker.js');
 const { findAccidentalSingleClicheOnThinSeed } = await import('../dist/services/story-quality.js');
+const { isRejectedPickSeed } = await import('../dist/services/fact-seed-pick.js');
 
 const READ_MIND_THIRD_SINGLE =
   'It was released on February 13, 2007, as the third single from their second studio album, Sam\'s Town.';
@@ -435,9 +436,21 @@ assert(
 
 const accidentalHitScript =
   'Read My Mind — The Killers — третий сингл с Sam\'s Town. Изначально группа не планировала выпускать эту песню отдельно — она просто была частью пластинки. Но фанаты буквально заставили их передумать. Трек не был написан как явный хит — скорее, как личная история.';
+  assert(
+    findAccidentalSingleClicheOnThinSeed(accidentalHitScript, [READ_MIND_THIRD_SINGLE]),
+    'accidental-single cliche rejected on thin third-single seed',
+  );
+
 assert(
-  findAccidentalSingleClicheOnThinSeed(accidentalHitScript, [READ_MIND_THIRD_SINGLE]),
-  'accidental-single cliche rejected on thin third-single seed',
+  !isRejectedPickSeed(
+    "On October 28, 2022, the song was released as an EP along with slowed down and sped up versions, as a result of the song's success earlier that year on TikTok.",
+    'House of Memories',
+    'ru',
+    [],
+    'Panic! At The Disco',
+    'track',
+  ),
+  'TikTok resurgence fact is pickable when it has track context',
 );
 
 const ROB_ARTIST = 'Rob Thomas';
@@ -577,7 +590,7 @@ assert(
 );
 
 // --- 5c. Bank pick uses live interest rules (generic video ≠ hot) ---
-const { isEligibleHotFact, isRejectedPickSeed } = await import('../dist/services/fact-seed-pick.js');
+const { isEligibleHotFact } = await import('../dist/services/fact-seed-pick.js');
 
 const GENERIC_VIDEO =
   'The official music video for Waka Waka was directed by Miguel Escotet and filmed in Barcelona.';
