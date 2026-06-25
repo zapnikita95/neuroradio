@@ -1,5 +1,7 @@
 package com.musicstory.app.data.model
 
+import com.musicstory.app.media.MediaJunkFilter
+
 data class TrackInfo(
     val artist: String,
     val title: String,
@@ -16,6 +18,7 @@ data class TrackInfo(
         if (a.contains("вспоминаем трек") || a.contains("remember")) return true
         if (t.contains("скоро начн") || t.contains("остановились") || t.contains("will begin")) return true
         if (t.contains("музыка скоро") || t == "paused") return true
+        if (MediaJunkFilter.isJunkTrack(packageName, artist, title)) return true
         return false
     }
 

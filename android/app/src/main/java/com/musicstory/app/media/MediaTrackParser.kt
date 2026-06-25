@@ -10,15 +10,17 @@ object MediaTrackParser {
     private val TITLE_SEPARATORS = listOf(" — ", " – ", " - ")
 
     fun fromNotificationExtras(extras: Bundle, packageName: String): TrackInfo? {
-        val fromMediaKeys = fromMediaMetadataBundle(extras, packageName)
-        if (fromMediaKeys != null) return fromMediaKeys
-
         val title = extras.getCharSequence(Notification.EXTRA_TITLE)?.toString()?.trim()
             ?.takeIf { it.isNotBlank() }
         val text = extras.getCharSequence(Notification.EXTRA_TEXT)?.toString()?.trim()
             ?.takeIf { it.isNotBlank() }
         val subText = extras.getCharSequence(Notification.EXTRA_SUB_TEXT)?.toString()?.trim()
             ?.takeIf { it.isNotBlank() }
+
+        if (MediaJunkFilter.isJunkNotification(packageName, title, text, subText)) return null
+
+        val fromMediaKeys = fromMediaMetadataBundle(extras, packageName)
+        if (fromMediaKeys != null) return fromMediaKeys
 
         if (title == null) return null
 
