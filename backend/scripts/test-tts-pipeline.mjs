@@ -27,6 +27,8 @@ import { normalizeYearsForRussianTts, normalizeDecadesForRussianTts } from '../d
 import { sanitizeScriptForTts } from '../dist/services/story-quality.js';
 import { sanitizeClosingTail } from '../dist/services/story-closing-phrases.js';
 import { normalizeEdgeRussianOrthography } from '../dist/services/tts-edge-normalize.js';
+import { collapseCyrillicGeminatesForTts } from '../dist/services/tts-cyrillic-geminate.js';
+import { fixWikiTranslationArtifacts } from '../dist/services/wiki-translate-quality.js';
 
 let passed = 0;
 
@@ -582,6 +584,58 @@ test('normalizeEdgeRussianOrthography collapses loanword geminates', () => {
     normalizeEdgeRussianOrthography('Он учился в классе и бассейне.'),
     'Он учился в классе и бассейне.',
   );
+});
+
+test('Muse Time is Running Out — Muse: no dash pause between title and artist', () => {
+  const script =
+    'Time is Running Out — Muse создавался как протестный трек. Bellamy признавался, что для них победа стала неожиданностью.';
+  const marked = prepareYandexTtsText(script, {
+    artist: 'Muse',
+    title: 'Time is Running Out',
+    speakTrackNamesInVoiceover: true,
+  });
+  assert.doesNotMatch(marked, /Running Out\s*<\[medium\]>\s*Muse/i);
+  const ssml = buildYandexSsml(marked, undefined, 'Muse', 'Time is Running Out');
+  assert.match(ssml, /Running-Out by Muse/i);
+  assert.doesNotMatch(ssml, /Running Out\s{2,}/i);
+});
+
+test('Bellamy reads as stressed Cyrillic б+элами, not en-US SSML', () => {
+  const script =
+    'Time is Running Out — Muse создавался как протест. Bellamy признавался в неожиданности.';
+  const marked = prepareYandexTtsText(script, {
+    artist: 'Muse',
+    title: 'Time is Running Out',
+    speakTrackNamesInVoiceover: true,
+  });
+  assert.match(marked, /б\+элами/i);
+  assert.doesNotMatch(marked, /\bBellamy\b/i);
+  const ssml = buildYandexSsml(marked, undefined, 'Muse', 'Time is Running Out');
+  assert.doesNotMatch(ssml, /<lang xml:lang="en-US">Bellamy/i);
+  assert.match(ssml, /б\+элами/i);
+});
+
+test('wiki script shows Беллами for Bellamy in display text', () => {
+  const fixed = fixWikiTranslationArtifacts(
+    'Bellamy признавался в шоке.',
+    'Muse',
+    'Time is Running Out',
+  );
+  assert.match(fixed, /Беллами/);
+  assert.doesNotMatch(fixed, /\bBellamy\b/i);
+});
+
+test('Yandex path collapses Cyrillic geminates without breaking stress markup', () => {
+  assert.equal(
+    collapseCyrillicGeminatesForTts('гитарный рифф и басс-линия'),
+    'гитарный риф и бас-линия',
+  );
+  const marked = prepareYandexTtsText('В аранжировке слышен плотный рифф и басс.', {
+    artist: 'Muse',
+    title: 'Time is Running Out',
+  });
+  assert.match(marked, /риф/i);
+  assert.doesNotMatch(marked, /рифф/i);
 });
 
 console.log(`\n[test-tts-pipeline] ${passed} passed`);

@@ -4,52 +4,7 @@
  */
 
 import { normalizeGenreTermsForTts } from './tts-genre-pronounce.js';
-
-const CYRILLIC_CONSONANT = 'бвгджзклмнпрстфхцчшщ';
-
-/** Слова/корни, где двойная согласная — норма русского правописания, не трогаем. */
-const KEEP_GEMINATE_STEMS = [
-  'класс',
-  'гласс',
-  'пасс',
-  'масс',
-  'росс',
-  'ссор',
-  'ссуд',
-  'групп',
-  'шосс',
-  'террасс',
-  'професс',
-  'ассист',
-  'экспресс',
-  'процесс',
-  'бассейн',
-  'кабель',
-  'грипп',
-  'коллек',
-  'комплек',
-  'телеграф',
-];
-
-function tokenKeepsGeminate(token: string): boolean {
-  const lower = token.toLowerCase();
-  return KEEP_GEMINATE_STEMS.some((stem) => lower.includes(stem));
-}
-
-/**
- * Схлопнуть сдвоенную согласную:
- * - перед гласным окончанием (риффе → рифе, басса → баса)
- * - в конце слова / перед пунктуацией (рифф → риф)
- */
-function collapseGeminateInToken(token: string): string {
-  if (!/[а-яё]/i.test(token) || tokenKeepsGeminate(token)) return token;
-
-  const geminateRe = new RegExp(
-    `([${CYRILLIC_CONSONANT}])\\1(?=[${'аеёиоуыэюя'}]|$|[.,!?;:—–)\\]»])`,
-    'gi',
-  );
-  return token.replace(geminateRe, '$1');
-}
+import { collapseGeminateInCyrillicToken } from './tts-cyrillic-geminate.js';
 
 /** Нормализация кириллицы перед Edge RU (без + и SSML-разметки). */
 export function normalizeEdgeRussianOrthography(text: string): string {
@@ -61,7 +16,7 @@ export function normalizeEdgeRussianOrthography(text: string): string {
     .split(/(\s+)/)
     .map((part) => {
       if (!part.trim() || !/[а-яё]/i.test(part)) return part;
-      return collapseGeminateInToken(part);
+      return collapseGeminateInCyrillicToken(part);
     })
     .join('')
     .replace(/\s+/g, ' ')

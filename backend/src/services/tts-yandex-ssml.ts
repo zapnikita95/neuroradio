@@ -17,6 +17,8 @@ import {
   normalizeMusicPunctuationInLatinRuns,
 } from './tts-music-name-punctuation.js';
 import { lookupArtistPronunciation } from './artist-pronunciation.js';
+import { titleNumeralsForTts } from './tts-title-numerals.js';
+import { primaryArtistName } from './artist-primary.js';
 
 const BREAK_SMALL = '\uE020';
 const BREAK_MEDIUM = '\uE021';
@@ -125,8 +127,6 @@ function trimBreaksAroundLangTags(text: string): string {
     .replace(/(<\/lang>)(\s*)([вскуо])(\s+)(?=[а-яёА-ЯЁ])/g, '$1 $3$4');
 }
 
-import { titleNumeralsForTts } from './tts-title-numerals.js';
-
 const LATIN_SSML_PRONUNCIATION: Record<string, string> = {
   'lo-fi': 'lo fi',
   'lo‑fi': 'lo fi',
@@ -144,6 +144,40 @@ const LATIN_SSML_PRONUNCIATION: Record<string, string> = {
   tshirt: 't shirt',
   'misfits t-shirt': 'Misfits T shirt',
 };
+
+/** Phrasal tails in song titles — hyphenate so EN voice does not pause (Running Out). */
+const PHRASAL_TITLE_TAIL_RE =
+  /\b(running|turning|breaking|hanging|coming|going|looking|waiting|heading|falling|standing|walking|working|messing|freaking|burning|giving|taking|making|moving|passing|rolling|calling|carrying|bringing|holding|keeping|letting|putting|setting|starting|staying|waking|wearing|writing)\s+(out|up|down|off|in|on|away|back|over|through)\b/gi;
+
+function joinPhrasalTailInLatinSpan(span: string): string {
+  return span.replace(PHRASAL_TITLE_TAIL_RE, (_m, verb: string, particle: string) => {
+    return `${verb}-${particle}`;
+  });
+}
+
+function escapeRegExp(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+/** Title — Artist / Title by Artist → one EN phrase for SSML (no gap before artist). */
+export function mergeTitleArtistCitationForSsml(
+  text: string,
+  artist: string,
+  title: string,
+): string {
+  const t = title.trim();
+  const a = primaryArtistName(artist).trim();
+  if (!t || !a) return text;
+  const escT = escapeRegExp(t);
+  const escA = escapeRegExp(a);
+  const re = new RegExp(
+    `(?<![\\p{L}\\p{N}'’-])(${escT})\\s+(?:[—–-]\\s*|by\\s+)(${escA})(?![\\p{L}\\p{N}'’-])`,
+    'giu',
+  );
+  return text.replace(re, (_m, titlePart: string, artistPart: string) => {
+    return `${titlePart} by ${artistPart}`;
+  });
+}
 
 function splitCamelCaseLatin(span: string): string {
   const key = span.trim().toLowerCase();
@@ -178,7 +212,8 @@ function latinSpanForSsml(span: string, artist = '', title = ''): string {
   if (musicNameNeedsPunctuationFix(mapped)) {
     mapped = spokenMusicNameForTts(mapped);
   }
-  return stripLatinApostrophesForTts(mapped);
+  mapped = joinPhrasalTailInLatinSpan(mapped);
+  return stripLatinApostrophesForTts(mapped.replace(/\s{2,}/g, ' ').trim());
 }
 
 /** Last.fm. → SSML lang «Last.fm» + sentence «.» outside — not two lang tags. */
@@ -212,9 +247,13 @@ function stripPausesBeforeLatin(text: string): string {
 }
 
 /** Оборачивает латинские фрагменты в SSML lang; русский текст и +ударения — как есть. */
-export function wrapMixedLanguageBody(text: string, artist = ''): string {
+export function wrapMixedLanguageBody(text: string, artist = '', title = ''): string {
   const prepared = pausesToPlaceholders(
-    stripPausesBeforeLatin(mergeLatinTitleOtArtist(normalizeLatinForSsml(text))),
+    stripPausesBeforeLatin(
+      mergeLatinTitleOtArtist(
+        mergeTitleArtistCitationForSsml(normalizeLatinForSsml(text), artist, title),
+      ),
+    ),
   );
   let last = 0;
   let out = '';
@@ -232,7 +271,7 @@ export function wrapMixedLanguageBody(text: string, artist = ''): string {
       out += escapeSsml(cyrillicAccent);
     } else {
       const { core, trailing } = splitLatinSpanSentencePunct(match[0]);
-      out += `<lang xml:lang="${lang}">${escapeSsml(latinSpanForSsml(core, artist))}</lang>`;
+      out += `<lang xml:lang="${lang}">${escapeSsml(latinSpanForSsml(core, artist, title))}</lang>`;
       if (trailing) out += escapeSsml(trailing);
     }
     last = match.index + match[0].length;
@@ -243,8 +282,13 @@ export function wrapMixedLanguageBody(text: string, artist = ''): string {
   return fixRussianPrepositionsAfterLangTags(trimBreaksAroundLangTags(placeholdersToBreaks(out)));
 }
 
-export function buildYandexSsml(markedText: string, _voice?: YandexVoiceId, artist = ''): string {
-  const body = wrapMixedLanguageBody(markedText, artist);
+export function buildYandexSsml(
+  markedText: string,
+  _voice?: YandexVoiceId,
+  artist = '',
+  title = '',
+): string {
+  const body = wrapMixedLanguageBody(markedText, artist, title);
   return (
     `<speak version="1.0" xmlns="http://www.w3.org/2001/10/synthesis" xml:lang="ru-RU">` +
     `${body}</speak>`

@@ -18,6 +18,8 @@ import {
 } from './tts-yandex-normalize.js';
 import { normalizeDecadesForRussianTts, normalizeYearsForRussianTts } from './tts-russian-years.js';
 import type { TtsPauseProfile } from './tts-voice-profiles.js';
+import { primaryArtistName } from './artist-primary.js';
+import { collapseCyrillicGeminatesForTts } from './tts-cyrillic-geminate.js';
 
 /** @deprecated use RUSSIAN_STRESS from russian-stress.ts */
 const STRESS_OVERRIDES = RUSSIAN_STRESS;
@@ -57,11 +59,52 @@ function addCommaPauses(text: string, profile: TtsPauseProfile): string {
   return text.replace(/,(\s+)(?=[А-ЯЁа-яё])/g, `, ${small}$1`);
 }
 
-function addDashPauses(text: string, profile: TtsPauseProfile): string {
+function addDashPauses(
+  text: string,
+  profile: TtsPauseProfile,
+  title = '',
+  artist = '',
+): string {
+  const { masked, slots } = maskTitleArtistCitationDashes(text, title, artist);
   const medium = profile === 'tight' ? '<[medium]>' : pauseTag(profile, 'medium');
-  return text
+  let result = masked
     .replace(/\s+—\s+/g, ` ${medium} `)
     .replace(/\s+-\s+/g, ` ${pauseTag(profile, 'small')} `);
+  return unmaskTitleArtistCitationDashes(result, slots);
+}
+
+const TITLE_ARTIST_CITATION_SLOT = '\uE030TA';
+const TITLE_ARTIST_CITATION_END = '\uE031';
+
+/** «Title — Artist» в шапке — без паузы Yandex между названием и исполнителем. */
+function maskTitleArtistCitationDashes(
+  text: string,
+  title: string,
+  artist: string,
+): { masked: string; slots: string[] } {
+  const slots: string[] = [];
+  const t = title.trim();
+  const a = primaryArtistName(artist).trim();
+  if (!t || !a) return { masked: text, slots };
+
+  const esc = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const re = new RegExp(
+    `(?<![\\p{L}\\p{N}'’-])(${esc(t)})\\s+([—–-])\\s+(${esc(a)})(?![\\p{L}\\p{N}'’-])`,
+    'giu',
+  );
+  const masked = text.replace(re, (_m, titlePart: string, dash: string, artistPart: string) => {
+    const idx = slots.length;
+    slots.push(`${titlePart} ${dash} ${artistPart}`);
+    return `${TITLE_ARTIST_CITATION_SLOT}${idx}${TITLE_ARTIST_CITATION_END}`;
+  });
+  return { masked, slots };
+}
+
+function unmaskTitleArtistCitationDashes(text: string, slots: string[]): string {
+  return text.replace(
+    new RegExp(`${TITLE_ARTIST_CITATION_SLOT}(\\d+)${TITLE_ARTIST_CITATION_END}`, 'g'),
+    (_, index) => slots[Number(index)] ?? '',
+  );
 }
 
 /** Латинские названия треков/песен — без «в кавычках», только текст. */
@@ -161,11 +204,12 @@ export function prepareYandexTtsText(
   text = options.websitePreview
     ? text
     : applyYandexPersonaTransliteration(text);
+  text = options.websitePreview ? text : collapseCyrillicGeminatesForTts(text);
 
   if (options.sentencePauses !== false) {
     text = addSentencePauses(text, pauseProfile);
     text = addCommaPauses(text, pauseProfile);
-    text = addDashPauses(text, pauseProfile);
+    text = addDashPauses(text, pauseProfile, title, artist);
   }
 
   text = options.websitePreview

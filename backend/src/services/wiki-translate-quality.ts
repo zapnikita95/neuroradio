@@ -22,6 +22,12 @@ const PERSON_NAME_LATIN: Record<string, string> = {
   noodle: 'Noodle',
 };
 
+/** Person names — кириллица в тексте для клиента и RU-озвучки (не en-US SSML). */
+const PERSON_NAME_CYRILLIC: Record<string, string> = {
+  'matt bellamy': 'Мэтт Беллами',
+  bellamy: 'Беллами',
+};
+
 /** Band / act names — keep Latin for SSML en-US pronunciation. */
 const ACT_NAME_LATIN: Record<string, string> = {
   gorillaz: 'Gorillaz',
@@ -98,6 +104,16 @@ function restoreLatinPersonNames(script: string): string {
   return result;
 }
 
+function transliterateKnownPersonNamesToCyrillic(script: string): string {
+  let result = script;
+  const keys = Object.keys(PERSON_NAME_CYRILLIC).sort((a, b) => b.length - a.length);
+  for (const key of keys) {
+    const re = new RegExp(`(?<![\\p{L}\\p{N}'’-])${escapeRegExp(key)}(?![\\p{L}\\p{N}'’-])`, 'giu');
+    result = result.replace(re, PERSON_NAME_CYRILLIC[key]!);
+  }
+  return result;
+}
+
 /** Reject broken wiki translations before they reach TTS or the client. */
 export function findWikiTranslationDefects(
   script: string,
@@ -158,6 +174,7 @@ export function fixWikiTranslationArtifacts(
     result = result.replace(pattern, replacement);
   }
   result = restoreLatinPersonNames(result);
+  result = transliterateKnownPersonNamesToCyrillic(result);
   result = restoreLatinActNames(result, artist);
 
   if (title.trim() && /[A-Za-zÀ-ÿ]/.test(title)) {

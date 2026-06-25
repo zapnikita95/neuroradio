@@ -112,6 +112,7 @@ function buildTtsParams(
   options: TtsOptions,
   audioFormat: YandexAudioFormat = resolveYandexAudioFormat(),
   artist = '',
+  title = '',
 ): URLSearchParams {
   const useSsml = hasLatinForSsml(markedText);
   const params = new URLSearchParams({
@@ -126,7 +127,7 @@ function buildTtsParams(
   }
 
   if (useSsml) {
-    params.set('ssml', buildYandexSsml(markedText, voiceId, artist));
+    params.set('ssml', buildYandexSsml(markedText, voiceId, artist, title));
   } else {
     params.set('text', markedText);
   }
@@ -242,6 +243,8 @@ export async function synthesizeSpeech(
   const audioFormat = options.audioFormat ?? resolveYandexAudioFormat();
   const audioExt = yandexAudioExtension(audioFormat);
   const attempts = buildTtsAttempts(primaryVoice, ttsOptions);
+  const artistName = artist ?? logContext?.artist ?? '';
+  const titleName = title ?? logContext?.title ?? '';
 
   console.log(
     `[yandex-tts] start${installTag}${trackTag} voice=${voiceId}→${primaryVoice} speed=${ttsOptions.speed} emotion=${ttsOptions.emotion} format=${audioFormat} chars=${markedText.length} ssml=${hasLatinForSsml(markedText)} attempts=${attempts.length} billing=${options.credentials ? 'client' : 'server'}`,
@@ -249,7 +252,7 @@ export async function synthesizeSpeech(
   console.log(`[yandex-tts] marked-text-begin${installTag}${trackTag}\n${markedText}\n[yandex-tts] marked-text-end`);
   if (hasLatinForSsml(markedText)) {
     console.log(
-      `[yandex-tts] ssml-begin${installTag}${trackTag}\n${buildYandexSsml(markedText, primaryVoice, artist ?? logContext?.artist ?? '')}\n[yandex-tts] ssml-end`,
+      `[yandex-tts] ssml-begin${installTag}${trackTag}\n${buildYandexSsml(markedText, primaryVoice, artistName, titleName)}\n[yandex-tts] ssml-end`,
     );
   }
 
@@ -258,17 +261,23 @@ export async function synthesizeSpeech(
   const started = Date.now();
   let lastError = 'Yandex TTS failed';
 
-  const artistName = artist ?? logContext?.artist ?? '';
-
   for (const attempt of attempts) {
-    let params = buildTtsParams(markedText, attempt.voice, folderId, attempt.options, audioFormat, artistName);
+    let params = buildTtsParams(
+      markedText,
+      attempt.voice,
+      folderId,
+      attempt.options,
+      audioFormat,
+      artistName,
+      titleName,
+    );
     let response = await requestTts(apiKey, params);
 
     if (!response.ok && params.has('emotion') && attempt.options.emotion !== 'neutral') {
       params = buildTtsParams(markedText, attempt.voice, folderId, {
         ...attempt.options,
         emotion: 'neutral',
-      }, audioFormat, artistName);
+      }, audioFormat, artistName, titleName);
       response = await requestTts(apiKey, params);
     }
 
