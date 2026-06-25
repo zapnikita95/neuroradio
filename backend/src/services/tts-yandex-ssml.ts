@@ -16,6 +16,7 @@ import {
   musicNameNeedsPunctuationFix,
   normalizeMusicPunctuationInLatinRuns,
 } from './tts-music-name-punctuation.js';
+import { lookupArtistPronunciation } from './artist-pronunciation.js';
 
 const BREAK_SMALL = '\uE020';
 const BREAK_MEDIUM = '\uE021';
@@ -164,6 +165,16 @@ function latinSpanForSsml(span: string, artist = '', title = ''): string {
       ? titleNumeralsForTts(title, artist)
       : null;
   let mapped = titleSpoken ?? splitCamelCaseLatin(trimmed);
+  if (artist.trim()) {
+    const entry = lookupArtistPronunciation(artist);
+    if (entry?.en?.trim()) {
+      const artistRe = new RegExp(
+        artist.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&'),
+        'gi',
+      );
+      mapped = mapped.replace(artistRe, entry.en.trim());
+    }
+  }
   if (musicNameNeedsPunctuationFix(mapped)) {
     mapped = spokenMusicNameForTts(mapped);
   }
@@ -201,7 +212,7 @@ function stripPausesBeforeLatin(text: string): string {
 }
 
 /** Оборачивает латинские фрагменты в SSML lang; русский текст и +ударения — как есть. */
-export function wrapMixedLanguageBody(text: string): string {
+export function wrapMixedLanguageBody(text: string, artist = ''): string {
   const prepared = pausesToPlaceholders(
     stripPausesBeforeLatin(mergeLatinTitleOtArtist(normalizeLatinForSsml(text))),
   );
@@ -221,7 +232,7 @@ export function wrapMixedLanguageBody(text: string): string {
       out += escapeSsml(cyrillicAccent);
     } else {
       const { core, trailing } = splitLatinSpanSentencePunct(match[0]);
-      out += `<lang xml:lang="${lang}">${escapeSsml(latinSpanForSsml(core))}</lang>`;
+      out += `<lang xml:lang="${lang}">${escapeSsml(latinSpanForSsml(core, artist))}</lang>`;
       if (trailing) out += escapeSsml(trailing);
     }
     last = match.index + match[0].length;
@@ -232,8 +243,8 @@ export function wrapMixedLanguageBody(text: string): string {
   return fixRussianPrepositionsAfterLangTags(trimBreaksAroundLangTags(placeholdersToBreaks(out)));
 }
 
-export function buildYandexSsml(markedText: string, _voice?: YandexVoiceId): string {
-  const body = wrapMixedLanguageBody(markedText);
+export function buildYandexSsml(markedText: string, _voice?: YandexVoiceId, artist = ''): string {
+  const body = wrapMixedLanguageBody(markedText, artist);
   return (
     `<speak version="1.0" xmlns="http://www.w3.org/2001/10/synthesis" xml:lang="ru-RU">` +
     `${body}</speak>`

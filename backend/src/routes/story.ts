@@ -61,7 +61,7 @@ import {
 } from '../services/artist-wiki-depth.js';
 import { primaryArtistName } from '../services/artist-primary.js';
 import { isMusicArtistWikiExtract } from '../services/wikipedia-music.js';
-import { countWords, detectStoryQualityWarnings, sanitizeScriptForTts } from '../services/story-quality.js';
+import { countWords, detectStoryQualityWarnings, referenceFactsAreAnchorable, sanitizeScriptForTts } from '../services/story-quality.js';
 import type { StoryScript } from '../services/groq.js';
 import { setLogDetail } from '../middleware/request-logger.js';
 import { hasYandexCredentials } from '../services/yandex-tts.js';
@@ -669,7 +669,7 @@ router.post('/full', extractClientSecrets, validateStoryFullBody, storyFullRateL
           metadata.title,
           storyLang,
         );
-        if (relaxedSeed) {
+        if (relaxedSeed && !isWeakSnippetSeed(relaxedSeed.fact, relaxedSeed.interestScore, metadata.title)) {
           factBundle =
             relaxedSeed.scope === 'track'
               ? { trackFacts: [relaxedSeed.fact], artistFacts: [] }
@@ -1827,6 +1827,82 @@ router.post('/full', extractClientSecrets, validateStoryFullBody, storyFullRateL
       }
 
       const serverManaged = userTier === 'free' && !ownLlmKey;
+
+      const storyRefFacts = (effectiveStoryInput.referenceFacts ?? []).filter(
+        (f) => !isMetadataOnlyFallbackFact(f),
+      );
+      if (
+        !factFromBank &&
+        (storyRefFacts.length === 0 ||
+          !referenceFactsAreAnchorable(storyRefFacts, metadata.artist, metadata.title))
+      ) {
+        console.warn(
+          `[story-pipeline] no anchorable facts before LLM for "${metadata.artist}" — "${metadata.title}", emergency rescue`,
+        );
+        const emergencyCtx = await fetchEmergencyFactRescue(
+          metadata.artist,
+          metadata.title,
+          factCtx.rawSnippets,
+        );
+        factCtx = {
+          ...factCtx,
+          bundle: emergencyCtx.bundle,
+          rawSnippets: [...new Set([...factCtx.rawSnippets, ...emergencyCtx.rawSnippets])],
+        };
+        factBundle = emergencyCtx.bundle;
+        const emergencyCandidates = [
+          ...emergencyCtx.bundle.trackFacts,
+          ...emergencyCtx.bundle.artistFacts,
+        ].filter(
+          (f) =>
+            !isWeakSnippetSeed(f, interestScore(f), metadata.title) &&
+            !isListeningStatsFact(f) &&
+            interestScore(f) >= 6,
+        );
+        if (emergencyCandidates.length > 0) {
+          const best = emergencyCandidates.sort((a, b) => interestScore(b) - interestScore(a))[0]!;
+          const emergencySeed = buildSelectedReferenceFact(
+            best,
+            metadata.artist,
+            metadata.title,
+            storyNarrator,
+          );
+          effectiveStoryInput = {
+            ...effectiveStoryInput,
+            referenceFacts: [best],
+            selectedReferenceFact: emergencySeed,
+            rawSnippets: factCtx.rawSnippets,
+          };
+          console.log(
+            `[story-pipeline] emergency rescue seed score=${interestScore(best)} fact="${best.slice(0, 120)}"`,
+          );
+        } else {
+          const wikiLate = await tryRetryArtistWikiSeed({
+            installId,
+            artist: metadata.artist,
+            previousScripts,
+            narrator: storyNarrator,
+          });
+          if (wikiLate && acceptWikiArtistSeed(wikiLate.text, artistTier, metadata.artist)) {
+            const wikiSeed = buildSelectedReferenceFact(
+              wikiLate.text,
+              metadata.artist,
+              metadata.title,
+              storyNarrator,
+            );
+            effectiveStoryInput = {
+              ...effectiveStoryInput,
+              referenceFacts: [wikiLate.text],
+              selectedReferenceFact: wikiSeed,
+            };
+            console.log(
+              `[story-pipeline] emergency wiki seed for "${metadata.artist}" chars=${wikiLate.text.length}`,
+            );
+          } else {
+            throw new NoReferenceFactsError(metadata.artist, metadata.title);
+          }
+        }
+      }
 
       try {
         const result = await generateStoryWithFallback(effectiveStoryInput, llmProvider, {

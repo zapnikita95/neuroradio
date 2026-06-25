@@ -16,6 +16,7 @@ import {
   findPersonaCliche,
   findNostalgiaFluffOnThinSeed,
   findWateryContent,
+  findInventedIndieFiller,
   hasConcreteFact,
   anchorsReferenceFact,
   referenceFactsAreAnchorable,
@@ -395,6 +396,7 @@ export async function generateStoryScript(
       !findUngroundedClaims(sanitized, referenceFacts) &&
       !findOffSeedInvention(sanitized, referenceFacts) &&
       !findNewsSeedBleedIntoRecordingStory(sanitized, input.title, referenceFacts) &&
+      !findInventedIndieFiller(sanitized, referenceFacts, input.artist, input.title) &&
       !findWateryContent(sanitized, input.artist, input.title, referenceFacts, {
         skipPersonaCliches: input.storyNarrator !== 'fan' && input.storyNarrator !== 'contemporary',
         speakTrackNamesInVoiceover: input.speakTrackNamesInVoiceover,

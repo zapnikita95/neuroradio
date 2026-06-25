@@ -117,6 +117,8 @@ export function pickRelaxedSnippetSeed(
     .filter((snippet) => snippet.length >= 35 && snippet.length <= 480)
     .filter((snippet) => acceptIndieEmergingSnippet(snippet, artist, title))
     .filter((snippet) => !isPlaylistJunkSnippet(snippet, artist, title))
+    .filter((snippet) => !isWeakSnippetSeed(snippet, interestScore(snippet), title))
+    .filter((snippet) => !isRejectedPickSeed(snippet, title, storyLanguage, [], artist))
     .sort((a, b) => {
       const boost = (s: string) =>
         (factMentionsArtist(s, artist) ? 25 : 0) +
@@ -127,9 +129,8 @@ export function pickRelaxedSnippetSeed(
     });
 
   const best = ranked[0];
-  if (!best) return null;
+  if (!best || interestScore(best) < 6) return null;
 
-  const score = Math.max(interestScore(best), 8);
   return buildSelectedReferenceFact(best, artist, title, 'auto', undefined);
 }
 

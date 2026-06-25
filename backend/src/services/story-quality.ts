@@ -17,7 +17,14 @@ import {
   shouldStripLatinTrackNames,
 } from './tts-generic-script.js';
 import { isTruncatedMarketingSnippet, isSpeakableReferenceFact } from './web-snippet-accept.js';
-import { interestScore, isThinReleaseCatalogSeed, isStudioEquipmentCatalogSeed } from './reference-fact-quality.js';
+import {
+  interestScore,
+  isAlbumListingSeed,
+  isListeningStatsFact,
+  isThinReleaseCatalogSeed,
+  isStudioEquipmentCatalogSeed,
+} from './reference-fact-quality.js';
+import { isWeakSnippetSeed } from './search-snippet-salvage.js';
 import { fixSoloArtistPronounsRu } from './artist-grammar.js';
 import { fixTtsGrammarIssues } from './tts-grammar-fixes.js';
 import { isVoiceoverWithoutTrackNames, scriptLeaksVoiceoverNames } from './voiceover-no-names.js';
@@ -764,6 +771,9 @@ export function referenceFactsAreAnchorable(
   title = '',
 ): boolean {
   return referenceFacts.some((f) => {
+    if (isListeningStatsFact(f) || isAlbumListingSeed(f) || isWeakSnippetSeed(f, interestScore(f), title)) {
+      return false;
+    }
     if (!isSpeakableReferenceFact(f, artist, title)) return false;
     if (artist.trim() && title.trim()) {
       const mentionsArtist = factMentionsArtist(f, artist);
@@ -1573,6 +1583,33 @@ export function findGenreWater(script: string): string | null {
   return null;
 }
 
+/** LLM invents indie lore when there is no grounded seed (сингл без рекламы, минимал-бит…). */
+const INVENTED_INDIE_FILLER_PATTERNS: RegExp[] = [
+  /минималистичн\w*\s+бит/i,
+  /без\s+громкой\s+рекламной\s+кампании/i,
+  /слушател\w*\s+быстро\s+подхватил\w*/i,
+  /словно\s+разговор\s+с\s+самим\s+собой/i,
+  /отсюда\s+и\s+название/i,
+  /многие\s+узнал\w*\s+в\s+этой\s+музыке\s+что-то\s+своё/i,
+  /сразу\s+привлёк\s+внимание/i,
+  /глубок\w*\s+эмоциональн\w*\s+подач/i,
+];
+
+export function findInventedIndieFiller(
+  script: string,
+  referenceFacts: string[] = [],
+  artist = '',
+  title = '',
+): string | null {
+  if (referenceFactsAreAnchorable(referenceFacts, artist, title)) return null;
+  for (const pattern of INVENTED_INDIE_FILLER_PATTERNS) {
+    if (pattern.test(script)) {
+      return `invented indie filler: ${pattern.source}`;
+    }
+  }
+  return null;
+}
+
 export function findClicheFiller(script: string): string | null {
   for (const pattern of CLICHE_FILLER_PATTERNS) {
     if (pattern.test(script)) {
@@ -1688,6 +1725,8 @@ export function findWateryContent(
   const noTrackNames = isVoiceoverWithoutTrackNames(options.speakTrackNamesInVoiceover);
   const nostalgiaFluff = findNostalgiaFluffOnThinSeed(script, referenceFacts, options.storyNarrator);
   if (nostalgiaFluff) return nostalgiaFluff;
+  const inventedIndie = findInventedIndieFiller(script, referenceFacts, artist, title);
+  if (inventedIndie) return inventedIndie;
   if (options.speakTrackNamesInVoiceover === true && artist.trim() && title.trim()) {
     const nameRep = findExcessiveNameRepetition(script, artist, title, options.storyNarrator);
     if (nameRep) return nameRep;
