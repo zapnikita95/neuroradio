@@ -10,7 +10,7 @@ import {
   hasTrackContextSignal,
   isWebListicleJunk,
 } from './fact-relevance.js';
-import { filterAndRankFacts, interestScore, isArtistDisambiguationListSeed, isArtistFormationBioSeed, isEncyclopediaDefinitionSeed, isListeningStatsFact, isThinReleaseCatalogSeed } from './reference-fact-quality.js';
+import { filterAndRankFacts, interestScore, isArtistDisambiguationListSeed, isArtistFormationBioSeed, isBoringFact, isEncyclopediaDefinitionSeed, isListeningStatsFact, isThinReleaseCatalogSeed, isWikiTrackListingSeed } from './reference-fact-quality.js';
 import { rejectSeedForTrackStory } from './fact-track-anchor.js';
 import { WEAK_TRIVIA_PATTERNS } from './story-fact-hunt.js';
 import { fetchReferenceFactBundle as fetchWikipediaBundle, fetchFastTrackWikiFacts } from './wikipedia-facts.js';
@@ -44,14 +44,27 @@ import { primaryHarvestLookupTitle } from './title-harvest-variants.js';
 const USER_AGENT = 'MusicStoryBFF/1.0 (contact@example.com)';
 const RAW_SNIPPET_MIN_LEN = 30;
 const RAW_SNIPPET_MAX = 18;
-/** Весь параллельный сбор фактов — иначе трек уже сменился. */
-const FACT_FETCH_BUDGET_MS = parseInt(process.env.FACT_FETCH_TIMEOUT_MS ?? '12000', 10);
-const FACT_FETCH_HARD_CAP_MS = parseInt(process.env.FACT_FETCH_HARD_CAP_MS ?? '9000', 10);
-/** Per-source caps in parallel harvest (all run at once; wall time ≈ max of caps). */
-const FACT_WIKI_CAP_MS = parseInt(process.env.FACT_WIKI_CAP_MS ?? '7000', 10);
-const FACT_WIKI_FAST_CAP_MS = parseInt(process.env.FACT_WIKI_FAST_CAP_MS ?? '12000', 10);
-const FACT_WEB_CAP_MS = parseInt(process.env.FACT_WEB_CAP_MS ?? '8000', 10);
-const FACT_DEDICATED_CAP_MS = parseInt(process.env.FACT_DEDICATED_CAP_MS ?? '8000', 10);
+
+function bundleNeedsFullWikiSupplement(trackFacts: string[], artistFacts: string[]): boolean {
+  const merged = [...trackFacts, ...artistFacts];
+  if (merged.length === 0) return true;
+  return !merged.some(
+    (f) => interestScore(f) >= 10 && !isThinReleaseCatalogSeed(f) && !isBoringFact(f),
+  );
+}
+import {
+  FACT_DDG_CAP_MS,
+  FACT_DEDICATED_CAP_MS,
+  FACT_DEDICATED_SOURCE_TIMEOUT_MS,
+  FACT_FETCH_BUDGET_MS,
+  FACT_MB_CAP_MS,
+  FACT_SOURCE_CAP_MS,
+  FACT_WEB_CAP_MS,
+  FACT_WIKI_CAP_MS,
+  FACT_WIKI_FAST_CAP_MS,
+  FACT_WIKI_LEAD_CAP_MS,
+  FACT_WIKIDATA_CAP_MS,
+} from './fact-fetch-timeouts.js';
 
 function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
   return Promise.race([
@@ -68,7 +81,7 @@ async function fetchWithCap<T>(
   label: string,
   fn: () => Promise<T>,
   fallback: T,
-  ms = FACT_FETCH_HARD_CAP_MS,
+  ms = FACT_SOURCE_CAP_MS,
 ): Promise<T> {
   try {
     return await withTimeout(fn(), ms, label);
@@ -256,7 +269,7 @@ async function mergeArtistIdentitySnippets(
     'web-artist-id',
     () => fetchArtistIdentityWebSnippets(artist),
     [],
-    4000,
+    FACT_WEB_CAP_MS,
   );
   if (identity.length === 0) {
     return { webSnippets, artistFacts, trackFacts };
@@ -557,21 +570,21 @@ export async function fetchWikiBundleMerged(
           'wiki-en-fallback',
           () => fetchWikipediaBundle(artist, title, 'US'),
           EMPTY_WIKI,
-          Math.min(FACT_WIKI_CAP_MS, 5000),
+          FACT_WIKI_CAP_MS,
         )
       : inferRuRegionalContext(artist, title)
         ? fetchWithCap(
             'wiki-ru-fallback',
             () => fetchWikipediaBundle(artist, title, 'RU'),
             EMPTY_WIKI,
-            Math.min(FACT_WIKI_CAP_MS, 5000),
+            FACT_WIKI_CAP_MS,
           )
         : primaryLang !== 'RU'
           ? fetchWithCap(
               'wiki-en-fallback',
               () => fetchWikipediaBundle(artist, title, 'US'),
               EMPTY_WIKI,
-              Math.min(FACT_WIKI_CAP_MS, 5000),
+              FACT_WIKI_CAP_MS,
             )
           : Promise.resolve(EMPTY_WIKI),
   ]);
@@ -715,35 +728,30 @@ export async function fetchAggregatedFactContext(
     [],
     FACT_DEDICATED_CAP_MS,
   );
-  const [wiki, wikiLead, ddgUnfiltered, webUnfiltered, webTitleFirst, wdUnfiltered, mbTrackRaw, mbArtistRaw, wikiFastTrack, dedicatedHarvest, discogsHarvest] =
+  const [wikiLead, ddgUnfiltered, webUnfiltered, webTitleFirst, wdUnfiltered, mbTrackRaw, mbArtistRaw, wikiFastTrack, dedicatedHarvest, discogsHarvest] =
     await Promise.all([
-      fetchWithCap(
-        'wiki',
-        () => fetchWikiBundleMerged(artist, lookupTitle, cc, options),
-        EMPTY_WIKI,
-        FACT_WIKI_CAP_MS + 500,
-      ),
-      fetchWithCap('wiki-lead', () => fetchArtistWikiLeadWithRetry(artist, 1), null, 6000),
-      fetchWithCap('ddg', () => fetchDuckDuckGoUnfiltered(artist, lookupTitle), [], 6000),
+      fetchWithCap('wiki-lead', () => fetchArtistWikiLeadWithRetry(artist, 1), null, FACT_WIKI_LEAD_CAP_MS),
+      fetchWithCap('ddg', () => fetchDuckDuckGoUnfiltered(artist, lookupTitle), [], FACT_DDG_CAP_MS),
       fetchWithCap('web', () => fetchWebSearchFactSnippets(artist, lookupTitle), [], FACT_WEB_CAP_MS),
-      fetchWithCap('web-title', () => fetchTitleFirstWebSnippets(lookupTitle), [], 6000),
-      fetchWithCap('wikidata', () => fetchWikidataUnfiltered(artist, lookupTitle, cc), [], 6000),
+      fetchWithCap('web-title', () => fetchTitleFirstWebSnippets(lookupTitle), [], FACT_WEB_CAP_MS),
+      fetchWithCap('wikidata', () => fetchWikidataUnfiltered(artist, lookupTitle, cc), [], FACT_WIKIDATA_CAP_MS),
       fetchWithCap(
         'mb-track',
         () => fetchMusicBrainzAnnotationsUnfiltered('recording', recordingMbid),
         [],
-        6000,
+        FACT_MB_CAP_MS,
       ),
       fetchWithCap(
         'mb-artist',
         () => fetchMusicBrainzAnnotationsUnfiltered('artist', artistMbid),
         [],
-        6000,
+        FACT_MB_CAP_MS,
       ),
       fetchWithCap('wiki-fast-track', () => fetchFastTrackWikiFacts(artist, lookupTitle), [], FACT_WIKI_FAST_CAP_MS),
       dedicatedPromise,
       discogsPromise,
     ]);
+  let wiki = EMPTY_WIKI;
   const combinedDedicated = [...dedicatedHarvest, ...discogsHarvest];
   if (discogsHarvest.length > 0) {
     console.log(
@@ -815,7 +823,6 @@ export async function fetchAggregatedFactContext(
   const trackCandidates = mergeFactsWithWikiLead(
     wikiLeadBundle.trackFacts,
     wiki.trackFacts,
-    wikiFastTrack,
     externalSplit.track,
     wdSplit.track,
     mbTrack,
@@ -851,17 +858,6 @@ export async function fetchAggregatedFactContext(
     artistFacts = salvaged.artistFacts;
   }
 
-  const identityMerged = await mergeArtistIdentitySnippets(
-    artist,
-    title,
-    webAllUnfiltered,
-    artistFacts,
-    trackFacts,
-  );
-  webAllUnfiltered = identityMerged.webSnippets;
-  artistFacts = identityMerged.artistFacts;
-  trackFacts = identityMerged.trackFacts;
-
   const dedicatedBundle = dedicatedHarvestToBundle(combinedDedicated, artist, title);
   if (dedicatedBundle.trackFacts.length + dedicatedBundle.artistFacts.length > 0) {
     trackFacts = mergeDedicatedFacts(trackFacts, dedicatedBundle.trackFacts, 8);
@@ -874,8 +870,11 @@ export async function fetchAggregatedFactContext(
   }
 
   if (wikiFastTrack.length > 0) {
-    const fastTrackFacts = wikiFastTrack.filter(
-      (f) => !rejectSeedForTrackStory(f, artist, title, { trackPoolFacts: trackFacts }),
+    const fastTrackFacts = filterAndRankFacts(
+      wikiFastTrack.filter(
+        (f) => !rejectSeedForTrackStory(f, artist, title, { trackPoolFacts: trackFacts }),
+      ),
+      6,
     );
     if (fastTrackFacts.length > 0) {
       trackFacts = mergeDedicatedFacts(trackFacts, fastTrackFacts, 6);
@@ -885,14 +884,37 @@ export async function fetchAggregatedFactContext(
     }
   }
 
-  const curated = lookupCuratedFact(artist, title);
-  if (curated) {
-    if (curated.scope === 'track') {
-      trackFacts = mergeDedicatedFacts(trackFacts, [curated.fact], 8);
-    } else {
-      artistFacts = mergeDedicatedFacts(artistFacts, [curated.fact], 6);
+  const identityMerged = await mergeArtistIdentitySnippets(
+    artist,
+    title,
+    webAllUnfiltered,
+    artistFacts,
+    trackFacts,
+  );
+  webAllUnfiltered = identityMerged.webSnippets;
+  artistFacts = identityMerged.artistFacts;
+  trackFacts = identityMerged.trackFacts;
+
+  if (bundleNeedsFullWikiSupplement(trackFacts, artistFacts)) {
+    wiki = await fetchWithCap(
+      'wiki',
+      () => fetchWikiBundleMerged(artist, lookupTitle, cc, options),
+      EMPTY_WIKI,
+      FACT_WIKI_CAP_MS,
+    );
+    if (wiki.trackFacts.length + wiki.artistFacts.length > 0) {
+      const extra = finalizeFactBundle(
+        filterAndRankFacts(wiki.trackFacts, 6),
+        filterAndRankFacts(wiki.artistFacts, 4),
+        artist,
+        title,
+      );
+      trackFacts = mergeDedicatedFacts(trackFacts, extra.trackFacts, 8);
+      artistFacts = mergeDedicatedFacts(artistFacts, extra.artistFacts, 6);
+      console.log(
+        `[facts] wiki-full supplement "${artist}" — "${title}": +${extra.trackFacts.length} track +${extra.artistFacts.length} artist`,
+      );
     }
-    console.log(`[facts] curated merged "${artist}" — "${title}"`);
   }
 
   if (trackFacts.length + artistFacts.length === 0) {

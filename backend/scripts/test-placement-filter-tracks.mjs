@@ -65,6 +65,12 @@ for (const { artist, title, cc } of TRACKS) {
     console.log('✓ bundle: no placement-only facts');
   }
 
+  const curatedHit = allFacts.some((f) => /curated|«Read My Mind» — The Killers: Brandon Flowers написал|House of Memories» — Panic/i.test(f));
+  if (curatedHit) {
+    failed += 1;
+    console.log('❌ CURATED BAND-AID IN BUNDLE (should come from wiki/dedicated only)');
+  }
+
   console.log('Top facts:');
   ranked.slice(0, 5).forEach((r, i) => {
     console.log(`  ${i + 1}. [${r.scope}] ${r.interest} | ${r.fact.slice(0, 130)}${r.fact.length > 130 ? '…' : ''}`);

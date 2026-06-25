@@ -267,6 +267,12 @@ export function isTitleTokenForeignArtistFact(fact: string, artist: string, titl
   }
   if (factMentionsArtist(trimmed, artist)) return false;
   if (
+    /\b(?:lead vocalist|frontman|singer|vocalist|guitarist|drummer|bassist|band member)\b/i.test(trimmed) &&
+    /\b(?:said|called|told|explained|revealed|stated|in an interview)\b/i.test(trimmed)
+  ) {
+    return false;
+  }
+  if (
     /\b(?:former singer|new music with|left the band|lineup change|band member|since former|new lead singer|departure)\b/i.test(
       trimmed,
     )

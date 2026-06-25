@@ -9,6 +9,7 @@ import {
 } from '../fact-relevance.js';
 import { rejectSeedForTrackStory } from '../fact-track-anchor.js';
 import { poolHasTopicDuplicate } from '../fact-topic.js';
+import { FACT_DEDICATED_SOURCE_TIMEOUT_MS } from '../fact-fetch-timeouts.js';
 import {
   interestScore,
   isAlbumListingSeed,
@@ -29,7 +30,7 @@ import { fetchSetlistfmFacts } from './setlistfm-facts.js';
 import { fetchRapRuFacts } from './rap-ru-facts.js';
 import { fetchTheFlowFacts } from './the-flow-facts.js';
 
-const SOURCE_TIMEOUT_MS = 11_000;
+const SOURCE_TIMEOUT_MS = FACT_DEDICATED_SOURCE_TIMEOUT_MS;
 
 async function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T | null> {
   try {

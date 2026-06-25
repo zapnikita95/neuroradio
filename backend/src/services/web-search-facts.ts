@@ -281,7 +281,9 @@ async function fetchDdgHtmlResults(query: string, maxResults: number): Promise<D
       'User-Agent': USER_AGENT,
     },
     body: body.toString(),
-    signal: AbortSignal.timeout(14_000),
+    signal: AbortSignal.timeout(
+      parseInt(process.env.FACT_WEB_HTTP_TIMEOUT_MS ?? '20000', 10),
+    ),
   });
   if (!response.ok) return [];
 

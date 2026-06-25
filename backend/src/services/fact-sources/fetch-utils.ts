@@ -62,7 +62,7 @@ async function fetchWithRateLimit(
           Accept: opts.accept ?? 'application/json,*/*',
           ...opts.headers,
         },
-        signal: AbortSignal.timeout(opts.timeoutMs ?? 7000),
+        signal: AbortSignal.timeout(opts.timeoutMs ?? 15_000),
       });
       if (response.status === 429 && attempt < MAX_429_RETRIES) {
         await penalizeHarvestBucket(url, attempt + 1);

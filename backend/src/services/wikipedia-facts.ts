@@ -1,8 +1,8 @@
 import type { ReferenceFactBundle } from './fact-picker.js';
 import { collaboratorNames, primaryArtistName } from './artist-primary.js';
 import { expandArtistSearchNames, factMentionsArtistOrAlias, artistHasSearchAliases } from './artist-search-aliases.js';
-import { isAmbiguousCommonWordTitle, factMentionsOtherTrackTitle, factNamesForeignEntity } from './fact-relevance.js';
-import { filterAndRankFacts, interestScore, isBoringFact, isCollectorFact, isEncyclopediaDefinitionSeed } from './reference-fact-quality.js';
+import { isAmbiguousCommonWordTitle, factMentionsOtherTrackTitle, factNamesForeignEntity, hasTrackContextSignal } from './fact-relevance.js';
+import { filterAndRankFacts, interestScore, isBoringFact, isCollectorFact, isEncyclopediaDefinitionSeed, isMusicVideoLocationSpam, isThinReleaseCatalogSeed, isWikiTrackListingSeed } from './reference-fact-quality.js';
 import { hasAnchoredTrackContext } from './fact-track-anchor.js';
 
 const USER_AGENT = 'MusicStoryBFF/1.0 (https://efir-ai.ru; contact@efir-ai.ru)';
@@ -42,7 +42,7 @@ async function fetchSummary(lang: 'ru' | 'en', title: string): Promise<string | 
   try {
     const response = await wikiFetch(url, {
       headers: { 'User-Agent': USER_AGENT, Accept: 'application/json' },
-      signal: AbortSignal.timeout(6000),
+      signal: AbortSignal.timeout(12_000),
     });
     if (!response.ok) return null;
     const data = (await response.json()) as { extract?: string };
@@ -65,7 +65,7 @@ async function searchWikiTitle(
   try {
     const response = await wikiFetch(url, {
       headers: { 'User-Agent': USER_AGENT, Accept: 'application/json' },
-      signal: AbortSignal.timeout(6000),
+      signal: AbortSignal.timeout(12_000),
     });
     if (!response.ok) return null;
     const data = (await response.json()) as {
@@ -474,6 +474,7 @@ function filterMusicFacts(
 ): string[] {
   return facts.filter((fact) => {
     if (isWeakFact(fact)) return false;
+    if (isThinReleaseCatalogSeed(fact) || isMusicVideoLocationSpam(fact) || isWikiTrackListingSeed(fact)) return false;
     if (WRONG_MUSIC_TOPIC_PATTERNS.some((pattern) => pattern.test(fact)) && !factMentionsArtist(fact, artist)) {
       return false;
     }
@@ -797,21 +798,54 @@ const FAST_TRACK_WIKI_SECTIONS = [
   'Writing',
   'Composition',
   'Recording',
-  'Release',
   'Meaning',
   'History',
   'Legacy',
-  'Music and structure',
-  'Lyrics',
+  'Influence',
   'Controversy',
   'Reception',
-  'Chart performance',
   'Critical reception',
+  'Music and structure',
+  'Lyrics',
+  'Release',
   'Music video',
+  'Chart performance',
 ];
 
+const WIKI_NARRATIVE_SENTENCE =
+  /\b(?:in an interview|said that|called (?:it|the|the tune|the song|the single)|wrote about|written about|inspired by|remix|collaborat|protest|meaning|metaphor|feared|wife|husband|break[- ]?up|Pet Shop Boys|best song (?:he|she|they)|favorite song|kind of our favorite|tiktok|viral|unexpected|controvers|banned|two-star town|perfect match)\b/i;
+
+function mineWikiNarrativeSentences(
+  extract: string,
+  artist: string,
+  title: string,
+  max = 6,
+): string[] {
+  const body = extract.replace(/^==\s+[^\n]+==\s*$/gm, ' ');
+  const sentences = splitWikiSentences(body);
+  return filterAndRankFacts(
+    sentences.filter((sentence) => {
+      if (sentence.length < 35 || sentence.length > 420) return false;
+      if (!WIKI_NARRATIVE_SENTENCE.test(sentence)) return false;
+      if (isThinReleaseCatalogSeed(sentence) || isMusicVideoLocationSpam(sentence) || isWikiTrackListingSeed(sentence)) return false;
+      if (isEncyclopediaDefinitionSeed(sentence) && interestScore(sentence) < 10) return false;
+      if (factMentionsOtherTrackTitle(sentence, title)) return false;
+      return (
+        factMentionsArtist(sentence, artist) ||
+        factMentionsTrack(sentence, title) ||
+        hasTrackContextSignal(sentence)
+      );
+    }),
+    max,
+  );
+}
+
 function extractWikiSection(extract: string, sectionName: string): string | null {
-  const re = new RegExp(`==\\s*${sectionName}\\s*==\\s*([\\s\\S]*?)(?=\\n+==|$)`, 'i');
+  const escaped = sectionName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const re = new RegExp(
+    `==\\s*[^\\n]*\\b${escaped}\\b[^\\n]*==\\s*([\\s\\S]*?)(?=\\n+==|$)`,
+    'i',
+  );
   const match = extract.match(re);
   return match?.[1]?.trim() ?? null;
 }
@@ -930,13 +964,8 @@ async function tryFastTrackWikiCandidate(
   if (!wikiPageTitleMatchesTrack(candidate, title)) return null;
 
   const intro = extract.split(/\n+==/)[0]?.trim() ?? '';
-  const pickedIntro = pickIntroWikiFact(extract, artist, title, ambiguousSingleWord);
-  if (pickedIntro) {
-    console.log(`[wiki-fast-track] "${artist}" — "${title}" page="${candidate}" facts=1`);
-    return [pickedIntro];
-  }
-
-  const sectionFacts: string[] = [];
+  const introPick = pickIntroWikiFact(extract, artist, title, ambiguousSingleWord);
+  const sectionFacts: string[] = introPick ? [introPick] : [];
   if (intro.length >= 60) {
     sectionFacts.push(...filterMusicFacts(extractFactBullets(intro, 6), artist, title, false));
   }
@@ -953,8 +982,9 @@ async function tryFastTrackWikiCandidate(
     title,
     false,
   );
+  const narrative = mineWikiNarrativeSentences(extract, artist, title, 6);
 
-  const merged = filterAndRankFacts([...sectionFacts, ...contextual], 8)
+  const merged = filterAndRankFacts([...sectionFacts, ...contextual, ...narrative], 8)
     .filter((fact) => interestScore(fact) >= 4)
     .filter((fact) => !ambiguousSingleWord || isTrackAnchored(fact, artist, title));
   if (merged.length > 0) {

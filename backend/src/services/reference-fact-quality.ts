@@ -304,6 +304,28 @@ export const COLLECTOR_FACT_PATTERNS: RegExp[] = [
   /\b(?:прорыв|тикток|стрим\w*|миллиард|миллион|хит\s+100|соавтор|бутлег|винил|лимитк)\b/i,
 ];
 
+/** Wikipedia «Track listings» / 7-inch catalog lines — not a story seed. */
+export function isWikiTrackListingSeed(fact: string): boolean {
+  const t = fact.trim();
+  return (
+    /\b(?:7-inch|12-inch|CD:|DVD:|cassette:|vinyl:)\b/i.test(t) ||
+    /\b(?:Track listings|Available iTunes|digital download)\b/i.test(t) ||
+    /\b(?:Remix\)|Album Version)\s*–\s*\d:\d{2}\b/i.test(t)
+  );
+}
+
+/** Перечисление локаций съёмок клипа — не семя для истории. */
+export function isMusicVideoLocationSpam(fact: string): boolean {
+  const t = fact.trim();
+  if (/^It shows them\b/i.test(t)) return true;
+  if (!/\b(?:music video|video shows|directed by|shot in)\b/i.test(t)) return false;
+  const locationHits =
+    t.match(
+      /\b(?:Park|Shrine|district|Tokyo|street|school|bicycle|impersonator|Academy|entertainment|neighborhood|filmed in|shows the band)\b/gi,
+    )?.length ?? 0;
+  return locationHits >= 2 || t.length > 220;
+}
+
 const THIN_RELEASE_ORDINAL_EN =
   '(?:first|second|third|fourth|fifth|sixth|seventh|eighth|ninth|tenth|eleventh|twelfth|thirteenth|fourteenth|fifteenth|lead|debut)';
 const THIN_RELEASE_ORDINAL_RU =
@@ -656,6 +678,8 @@ export function isBoringFact(fact: string): boolean {
   if (isGenericMusicVideoSeed(trimmed)) return true;
   if (isStudioEquipmentCatalogSeed(trimmed)) return true;
   if (isThinReleaseCatalogSeed(trimmed)) return true;
+  if (isMusicVideoLocationSpam(trimmed)) return true;
+  if (isWikiTrackListingSeed(trimmed)) return true;
   if (isDedicatedCatalogSeed(trimmed)) return false;
   if (isWikiBiographyLead(trimmed)) return true;
   if (isCollectorFact(trimmed)) return false;
