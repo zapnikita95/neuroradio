@@ -265,8 +265,10 @@ export function isArtistIdentityBioSnippet(snippet: string): boolean {
       trimmed,
     ) ||
     /\bknown (?:professionally as|by (?:his|her|their) moniker)\b/i.test(trimmed) ||
+    /\bhailing from\b/i.test(trimmed) ||
+    /\belectronic (?:music )?artist\b/i.test(trimmed) ||
     (/(?:артист|исполнитель|музыкант|rapper|musician|singer[- ]?songwriter|recording artist|lead singer)/i.test(trimmed) &&
-      /(?:родился|род\.|born|project of|member of|ex-)/i.test(trimmed))
+      /(?:родился|род\.|born|project of|member of|ex-|hailing from)/i.test(trimmed))
   );
 }
 

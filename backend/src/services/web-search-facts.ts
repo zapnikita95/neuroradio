@@ -73,6 +73,7 @@ export function buildArtistIdentityQueries(artist: string): string[] {
     queries.push(`${trimmed} рэп исполнитель`, `${trimmed} интервью`);
   } else {
     queries.push(`${artistQ} russian rap musician`, `${artistQ} artist biography interview`);
+    queries.push(`${artistQ} site:viberate.com musician`);
   }
   return queries.slice(0, 4);
 }
@@ -180,6 +181,7 @@ export function buildIndieArtistWebQueries(artist: string, title: string): strin
     `${artistQ} musician biography interview`,
     `${artistQ} band history discography`,
     `${artistQ} artist scandal documentary`,
+    `${artistQ} site:viberate.com OR site:soundcharts.com`,
     title ? `${artistQ} "${cleanTrackTitle(title)}" song` : `${artistQ} musical artist`,
   ].slice(0, MAX_DEEP_HTML_QUERIES);
 }

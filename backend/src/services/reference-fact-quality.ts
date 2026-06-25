@@ -463,6 +463,16 @@ export function interestScore(fact: string): number {
   if (isLyricsPageSeed(trimmed)) score -= 50;
   if (isTrackMeaningNarrativeSeed(trimmed)) score += 32;
   if (isArtistIdentityBioSnippet(trimmed)) score += 16;
+  if (/\bhailing from\b/i.test(trimmed) && /\b(?:latvia|latvian|lithuania|estonia|ukraine|russia|rezekne|rīga|riga)\b/i.test(trimmed)) {
+    score += 12;
+  }
+  if (
+    /\breleased(?:\s+on)?\b/i.test(trimmed) &&
+    /\b(?:label|single|sap+hire|℗|©)\b/i.test(trimmed) &&
+    /\b20\d{2}\b/.test(trimmed)
+  ) {
+    score += 10;
+  }
   if (/«[\p{L}\p{N}\s'().-]+»/u.test(trimmed) && /(?:написал|родился|группа|альбом|Sanremo|Eurovision|стил|prod|сингл)/iu.test(trimmed)) {
     score += 14;
   }

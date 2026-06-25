@@ -966,7 +966,7 @@ export async function fetchEmergencyFactRescue(
 
   const junkOnly =
     existingSnippets.length > 0 && !hasActionableSnippets(existingSnippets, artist, title);
-  const [wikiFast, webBack, titleFirst, webDeep, artistIdentity] = await Promise.all([
+  const [wikiFast, webBack, titleFirst, webDeep, artistIdentity, indieArtist] = await Promise.all([
     fetchFastTrackWikiFacts(artist, title),
     junkOnly || existingSnippets.length < 3
       ? fetchBackstoryWebSnippets(artist, title)
@@ -976,9 +976,12 @@ export async function fetchEmergencyFactRescue(
       ? fetchDeepWebSearchSnippets(artist, title)
       : Promise.resolve([]),
     fetchArtistIdentityWebSnippets(artist),
+    fetchIndieArtistWebSnippets(artist, title),
   ]);
 
-  const webRescue = [...new Set([...webBack, ...titleFirst, ...webDeep, ...artistIdentity])];
+  const webRescue = [
+    ...new Set([...webBack, ...titleFirst, ...webDeep, ...artistIdentity, ...indieArtist]),
+  ];
 
   const trackFacts = mergeFacts(wikiFast);
   let artistFacts: string[] = [];

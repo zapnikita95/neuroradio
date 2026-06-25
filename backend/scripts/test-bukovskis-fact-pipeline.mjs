@@ -59,4 +59,24 @@ assert.match(ssml, /Edgars Bukov skees/i);
 assert.doesNotMatch(ssml, /Bukovskis/i);
 ok('Bukovskis TTS uses phonetic respelling');
 
+const VIBERATE_BIO =
+  'Edgars Bukovskis is an electronic music artist hailing from Rezekne, Latvia. Known for his contributions to the dance music scene, he merges catchy beats with engaging melodies.';
+const { filterAndRankFacts, interestScore, isBoringFact } = await import(
+  '../dist/services/reference-fact-quality.js'
+);
+const { isArtistIdentityBioSnippet } = await import('../dist/services/web-snippet-accept.js');
+assert(isArtistIdentityBioSnippet(VIBERATE_BIO), 'viberate bio is identity snippet');
+assert(interestScore(VIBERATE_BIO) >= 4, 'viberate bio scores above boring threshold');
+assert(!isBoringFact(VIBERATE_BIO), 'viberate bio not boring');
+assert(filterAndRankFacts([VIBERATE_BIO], 2).length === 1, 'viberate bio survives filter');
+ok('viberate-style bio passes fact quality gates');
+
+const { lookupCuratedFact } = await import('../dist/services/curated-facts.js');
+const { fetchEmergencyFactRescue } = await import('../dist/services/fact-aggregator.js');
+const curated = lookupCuratedFact('Edgars Bukovskis', 'Alone');
+assert(curated?.fact?.includes('SAPPHIRE'), 'curated fact for Bukovskis Alone');
+const rescue = await fetchEmergencyFactRescue('Edgars Bukovskis', 'Alone', [LASTFM_JUNK]);
+assert(rescue.bundle.trackFacts.length >= 1, 'emergency rescue uses curated fact');
+ok('emergency rescue curated hit for Bukovskis');
+
 console.log(`[test-bukovskis-fact-pipeline] ${passed} passed`);
