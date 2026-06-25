@@ -204,20 +204,27 @@ export function isArtistDisambiguationListSeed(fact: string): boolean {
 
 /** Song-page opener with production/vocal/chart context — not a throwaway «X is a song by Y». */
 export function hasSongPageNarrativeDetail(fact: string): boolean {
-  return /\b(?:featuring|uncredited|written by|co[- ]written|produced by|sampled from|inspired by|peaked at|debuted at|(?:swedish|uk|us|billboard)\s+(?:singles\s+)?chart|remix|music video|tiktok|viral|protest|surprise|unexpected|called it|said that|in an interview|kristoffer|fogelmark)\b/i.test(
+  return /\b(?:in an interview|said that|called (?:it|the|the song)|protest|banned|viral on|went viral|tiktok|scandal|surprise hit|unexpected hit|inspired by|sampled from)\b/i.test(
     fact,
   );
 }
 
-function isBareSongDefinitionLine(fact: string): boolean {
+/** Wikipedia «"Title" is a song by…» — metadata, not a radio story hook (even with uncredited vocals). */
+export function isWeakWikiSongIntroSeed(fact: string): boolean {
   const t = fact.trim();
-  const looksLikeOpener =
+  if (hasSongPageNarrativeDetail(t)) return false;
+  if (
     /\bis\s+a\s+song\s+by\b/i.test(t) ||
     /^"[^"]{1,90}"\s+is\s+(?:an?\s+)?(?:song|single|track)\b/i.test(t) ||
-    /\bis\s+(?:an?\s+)?(?:pop|rock|dance|electronic|hip[- ]?hop|r[\s&]b|country|folk|jazz|soul|metal|indie)\s+(?:song|single|track)\b/i.test(t) ||
-    /\bis\s+(?:an?\s+)?(?:song|single|track)\s+(?:by|recorded\s+by|from)\b/i.test(t);
-  if (!looksLikeOpener) return false;
-  return !hasSongPageNarrativeDetail(t);
+    /\bis\s+(?:an?\s+)?(?:pop|rock|dance|electronic|hip[- ]?hop|r[\s&]b|country|folk|jazz|soul|metal|indie)\s+(?:song|single|track)\s+by\b/i.test(t)
+  ) {
+    return true;
+  }
+  return false;
+}
+
+function isBareSongDefinitionLine(fact: string): boolean {
+  return isWeakWikiSongIntroSeed(fact);
 }
 
 /** Dictionary/literary page bleed — «cliché» the word, not mgk track. */
@@ -438,7 +445,7 @@ const GENERIC_MUSIC_VIDEO_SEED =
   /\b(?:music video|official video|video was directed|directed by|promotional video|accompanying music video|клип(?:а|ом|е|у)?|режисс(?:ё|е)р(?:ом|а|у)?|filmed by|video for|premiered on mtv|speaking of the video|video to mtv|read through a ton of scripts|scripts from.*directors|put into visuals|general theme of the song.*visuals?)\b/i;
 
 const STRONG_MUSIC_VIDEO_STORY =
-  /\b(?:controversial|scandal|banned|million|invested|sevenfold|optical illusion|vfx|cgi|first (?:ever )?(?:music )?video|national film registry|fourteen.minute|полмиллион|собственн\w+\s+денег|record registry|переснимал|бюджет|one billion views)\b/i;
+  /\b(?:controversial|scandal|banned|million|invested|sevenfold|optical illusion|vfx|cgi|first (?:ever )?(?:music )?video|national film registry|fourteen.minute|полмиллион|собственн\w+\s+денег|record registry|переснимал|бюджет|one billion views|vhs|camcorder|fight emerge|battery runs out|found footage|mockumentary|one[- ]take)\b/i;
 
 export function isGenericMusicVideoSeed(fact: string): boolean {
   const trimmed = fact.trim();
@@ -456,7 +463,7 @@ function normalizeForMatch(text: string): string {
 }
 
 const BACKSTAGE_DRAMA_PATTERNS: RegExp[] = [
-  /\b(?:conflict|scandal|controvers|banned|refused|lawsuit|argued|ultimatum|nearly|disagreed|reject(?:ed|ion)?)\b/i,
+  /\b(?:conflict|scandal|controvers|banned|refused|lawsuit|argued|ultimatum|nearly|disagreed|reject(?:ed|ion)?|fight(?:s|ing)?\s+(?:breaks?|emerg(?:e|es|ed)|erupts?))\b/i,
   /(?:скандал|конфликт|запрет|отказ|суд|плагиат|ссор|ультиматум|почти не|отверг)/i,
 ];
 
@@ -525,6 +532,7 @@ export function interestScore(fact: string): number {
   if (isGenericConcertVenueSeed(trimmed)) return -25;
   if (isCatalogMetadataSeed(trimmed)) return -30;
   if (isGenericMusicVideoSeed(trimmed)) return -25;
+  if (isWeakWikiSongIntroSeed(trimmed)) return -28;
   if (isLyricsPageSeed(trimmed)) score -= 50;
   if (isTrackMeaningNarrativeSeed(trimmed)) score += 32;
   if (isArtistIdentityBioSnippet(trimmed)) score += 16;
@@ -557,7 +565,7 @@ export function interestScore(fact: string): number {
   if (/^[«"']/.test(quoteNorm) && /\b(?:first|new|debut|lead|collaboration|song)\b/i.test(quoteNorm)) {
     score += 18;
   }
-  if (/^[«"'][\p{L}\p{N}\s'-]{2,40}[»"']\s+is a\b/iu.test(quoteNorm)) score += 16;
+  if (/^[«"'][\p{L}\p{N}\s'-]{2,40}[»"']\s+is a\b/iu.test(quoteNorm) && !isWeakWikiSongIntroSeed(trimmed)) score += 16;
   if (/\b(?:first new (?:song|music|single)|announced (?:a )?new ep|new lead singer)\b/i.test(trimmed)) {
     score += 14;
   }
@@ -580,6 +588,8 @@ export function interestScore(fact: string): number {
   if (/\b(?:card(?:sharp|player|game)?|blackjack|poker|playing cards)\b/i.test(trimmed)) score += 10;
   if (/\b(?:Leon|L[eé]on: The Professional|Eric Serra)\b/i.test(trimmed)) score += 12;
   if (/\b(?:deathtronica|electronicore|metalcore|hardcore|scream\s+vocals?)\b/i.test(trimmed)) score += 20;
+  if (isBackstageDramaSeed(trimmed)) score += 14;
+  if (STRONG_MUSIC_VIDEO_STORY.test(trimmed)) score += 16;
   if (isArtistFormationBioSeed(trimmed)) score -= 12;
   if (BACKSTORY_FACT_PATTERNS.some((pattern) => pattern.test(fact))) score += 12;
   for (const pattern of STORY_FACT_PATTERNS) {
@@ -702,6 +712,7 @@ export function isBoringFact(fact: string): boolean {
   if (isWikiBiographyLead(trimmed)) return true;
   if (isCollectorFact(trimmed)) return false;
   if (isBareSongDefinitionLine(trimmed)) return true;
+  if (isWeakWikiSongIntroSeed(trimmed)) return true;
   // Promo rename, radio ban, Jimi Hendrix origin — keep even if sentence also mentions album/single.
   if (highImpactBonus(trimmed) >= 6) return false;
   if (BORING_FACT_PATTERNS.some((pattern) => pattern.test(trimmed))) return true;

@@ -2,7 +2,7 @@ import type { ReferenceFactBundle } from './fact-picker.js';
 import { collaboratorNames, primaryArtistName } from './artist-primary.js';
 import { expandArtistSearchNames, factMentionsArtistOrAlias, artistHasSearchAliases } from './artist-search-aliases.js';
 import { isAmbiguousCommonWordTitle, factMentionsOtherTrackTitle, factNamesForeignEntity, hasTrackContextSignal } from './fact-relevance.js';
-import { filterAndRankFacts, interestScore, isBoringFact, isCollectorFact, isEncyclopediaDefinitionSeed, isMusicVideoLocationSpam, isThinReleaseCatalogSeed, isWikiTrackListingSeed } from './reference-fact-quality.js';
+import { filterAndRankFacts, interestScore, isBoringFact, isCollectorFact, isEncyclopediaDefinitionSeed, isMusicVideoLocationSpam, isThinReleaseCatalogSeed, isWeakWikiSongIntroSeed, isWikiTrackListingSeed } from './reference-fact-quality.js';
 import { hasAnchoredTrackContext } from './fact-track-anchor.js';
 
 const USER_AGENT = 'MusicStoryBFF/1.0 (https://efir-ai.ru; contact@efir-ai.ru)';
@@ -407,6 +407,7 @@ export function pickIntroWikiFact(
     .filter((s) => s.length >= 35 && s.length <= MAX_FACT_SENTENCE_LEN);
   for (const sentence of introSentences) {
     if (isEncyclopediaDefinitionSeed(sentence)) continue;
+    if (isWeakWikiSongIntroSeed(sentence)) continue;
     if (factMentionsOtherTrackTitle(sentence, title)) continue;
     if (!factMentionsArtistOrAlias(sentence, artist) && !factMentionsTrack(sentence, title)) {
       continue;
@@ -896,14 +897,16 @@ export async function fetchFastTrackWikiFacts(artist: string, title: string): Pr
       `${cleanTitle.charAt(0).toUpperCase()}${cleanTitle.slice(1)} (${wikiTitleCaseArtist(aliasName)} song)`;
     const directExtract = await fetchWikiExtractDirect(lang, directTitle);
     if (directExtract && !isDisambiguationExtract(directExtract) && !isWrongMusicTopic(artist, directExtract, directTitle)) {
-      if (!wikiPageTitleMatchesTrack(directTitle, title)) {
-        // wrong page from search — keep trying candidates
-      } else {
-      const picked = pickIntroWikiFact(directExtract, artist, title, ambiguousSingleWord);
-      if (picked) {
-        console.log(`[wiki-fast-track] "${artist}" — "${title}" page="${directTitle}" facts=1`);
-        return [picked];
-      }
+      if (wikiPageTitleMatchesTrack(directTitle, title)) {
+        const mined = await extractFastTrackFactsFromExtract(
+          directExtract,
+          directTitle,
+          artist,
+          title,
+          cleanTitle,
+          ambiguousSingleWord,
+        );
+        if (mined?.length) return mined;
       }
     }
   }
@@ -944,27 +947,14 @@ async function raceWikiFastCandidates(
   return [];
 }
 
-async function tryFastTrackWikiCandidate(
-  lang: 'en',
-  candidate: string,
+async function extractFastTrackFactsFromExtract(
+  extract: string,
+  pageLabel: string,
   artist: string,
   title: string,
   cleanTitle: string,
   ambiguousSingleWord: boolean,
 ): Promise<string[] | null> {
-  let extract = await fetchFullExtract(lang, candidate, false);
-  if (!extract) extract = await fetchSummary(lang, candidate);
-  if (!extract || isDisambiguationExtract(extract)) {
-    const searched = await searchWikiTitle(lang, `${cleanTitle} ${artist} song`, artist, title);
-    if (searched) {
-      extract =
-        (await fetchFullExtract(lang, searched, false)) ?? (await fetchSummary(lang, searched));
-    }
-  }
-  if (!extract || isDisambiguationExtract(extract)) return null;
-  if (isWrongMusicTopic(artist, extract, candidate)) return null;
-  if (!wikiPageTitleMatchesTrack(candidate, title)) return null;
-
   const intro = extract.split(/\n+==/)[0]?.trim() ?? '';
   const introPick = pickIntroWikiFact(extract, artist, title, ambiguousSingleWord);
   const sectionFacts: string[] = introPick ? [introPick] : [];
@@ -990,7 +980,7 @@ async function tryFastTrackWikiCandidate(
     .filter((fact) => interestScore(fact) >= 4)
     .filter((fact) => !ambiguousSingleWord || isTrackAnchored(fact, artist, title));
   if (merged.length > 0) {
-    console.log(`[wiki-fast-track] "${artist}" — "${title}" page="${candidate}" facts=${merged.length}`);
+    console.log(`[wiki-fast-track] "${artist}" — "${title}" page="${pageLabel}" facts=${merged.length}`);
     return merged;
   }
 
@@ -1000,18 +990,50 @@ async function tryFastTrackWikiCandidate(
         .slice(0, 6)
         .filter(
           (f) =>
-            factMentionsTrack(f, title) ||
-            factMentionsArtist(f, artist) ||
-            interestScore(f) >= 6,
+            !isWeakWikiSongIntroSeed(f) &&
+            (factMentionsTrack(f, title) ||
+              factMentionsArtist(f, artist) ||
+              interestScore(f) >= 6),
         ),
       4,
     );
     if (looseIntro.length > 0) {
       console.log(
-        `[wiki-fast-track] intro fallback "${artist}" — "${title}" page="${candidate}" facts=${looseIntro.length}`,
+        `[wiki-fast-track] intro fallback "${artist}" — "${title}" page="${pageLabel}" facts=${looseIntro.length}`,
       );
       return looseIntro;
     }
   }
   return null;
+}
+
+async function tryFastTrackWikiCandidate(
+  lang: 'en',
+  candidate: string,
+  artist: string,
+  title: string,
+  cleanTitle: string,
+  ambiguousSingleWord: boolean,
+): Promise<string[] | null> {
+  let extract = await fetchFullExtract(lang, candidate, false);
+  if (!extract) extract = await fetchSummary(lang, candidate);
+  if (!extract || isDisambiguationExtract(extract)) {
+    const searched = await searchWikiTitle(lang, `${cleanTitle} ${artist} song`, artist, title);
+    if (searched) {
+      extract =
+        (await fetchFullExtract(lang, searched, false)) ?? (await fetchSummary(lang, searched));
+    }
+  }
+  if (!extract || isDisambiguationExtract(extract)) return null;
+  if (isWrongMusicTopic(artist, extract, candidate)) return null;
+  if (!wikiPageTitleMatchesTrack(candidate, title)) return null;
+
+  return extractFastTrackFactsFromExtract(
+    extract,
+    candidate,
+    artist,
+    title,
+    cleanTitle,
+    ambiguousSingleWord,
+  );
 }
