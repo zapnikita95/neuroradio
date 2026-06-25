@@ -202,11 +202,30 @@ export function isArtistDisambiguationListSeed(fact: string): boolean {
   return /^\d+\)\s/.test(t) && /\b\d+\)\s/.test(t.slice(3));
 }
 
+/** Song-page opener with production/vocal/chart context — not a throwaway «X is a song by Y». */
+export function hasSongPageNarrativeDetail(fact: string): boolean {
+  return /\b(?:featuring|uncredited|written by|co[- ]written|produced by|sampled from|inspired by|peaked at|debuted at|(?:swedish|uk|us|billboard)\s+(?:singles\s+)?chart|remix|music video|tiktok|viral|protest|surprise|unexpected|called it|said that|in an interview|kristoffer|fogelmark)\b/i.test(
+    fact,
+  );
+}
+
+function isBareSongDefinitionLine(fact: string): boolean {
+  const t = fact.trim();
+  const looksLikeOpener =
+    /\bis\s+a\s+song\s+by\b/i.test(t) ||
+    /^"[^"]{1,90}"\s+is\s+(?:an?\s+)?(?:song|single|track)\b/i.test(t) ||
+    /\bis\s+(?:an?\s+)?(?:pop|rock|dance|electronic|hip[- ]?hop|r[\s&]b|country|folk|jazz|soul|metal|indie)\s+(?:song|single|track)\b/i.test(t) ||
+    /\bis\s+(?:an?\s+)?(?:song|single|track)\s+(?:by|recorded\s+by|from)\b/i.test(t);
+  if (!looksLikeOpener) return false;
+  return !hasSongPageNarrativeDetail(t);
+}
+
 /** Dictionary/literary page bleed — «cliché» the word, not mgk track. */
 /** Also Wikipedia one-liners: «"Sorry" is a song by…» — not a story hook. */
 export function isEncyclopediaDefinitionSeed(fact: string): boolean {
   const t = fact.trim();
   if (highImpactBonus(t) >= 6) return false;
+  if (hasSongPageNarrativeDetail(t)) return false;
   if (
     /\b(?:inspired by|sampled from|written as|wrote (?:it|this|the song)|intended as|protest song|viral on|went viral|banned from|scandal|originally wrote|co-written|co written)\b/i.test(
       t,
@@ -214,6 +233,7 @@ export function isEncyclopediaDefinitionSeed(fact: string): boolean {
   ) {
     return false;
   }
+  if (isBareSongDefinitionLine(t)) return true;
   if (
     /\b(?:song|single|track)\s+originally\s+(?:performed|recorded|released)\s+by\b/i.test(t) ||
     /\bis\s+(?:an?\s+)?(?:pop|rock|hip[- ]?hop|r[\s&]b|dance|electronic|country|folk|jazz|soul|metal|indie)\s+(?:song|single|track)\s+originally\b/i.test(t) ||
@@ -251,8 +271,6 @@ const BORING_FACT_PATTERNS: RegExp[] = [
   /\b(?:duo|trio|quartet)\s+(?:of|comprising|consisting)\b/i,
   /\b(?:musical\s+)?(?:duo|band|group)\s+from\b/i,
   /\bis\s+an?\s+(?:American|British|Canadian|Russian|Ukrainian|Swedish|German|French|Japanese|Korean|Australian)\s+(?:musical\s+)?(?:duo|band|group|artist|rock\s+band)\b/i,
-  /\bis\s+a\s+song\s+by\b/i,
-  /\bis\s+(?:an?\s+)?(?:pop|rock|hip[- ]?hop|r[\s&]b|dance|electronic|country|folk|jazz|soul|metal|indie)\s+(?:song|single|track)\b/i,
   /\b(?:song|single|track)\s+originally\s+(?:performed|recorded|released)\s+by\b/i,
   /\boriginally\s+performed\s+by\b/i,
   /\b(?:was|were)\s+formed\s+in\b/i,
@@ -683,6 +701,7 @@ export function isBoringFact(fact: string): boolean {
   if (isDedicatedCatalogSeed(trimmed)) return false;
   if (isWikiBiographyLead(trimmed)) return true;
   if (isCollectorFact(trimmed)) return false;
+  if (isBareSongDefinitionLine(trimmed)) return true;
   // Promo rename, radio ban, Jimi Hendrix origin — keep even if sentence also mentions album/single.
   if (highImpactBonus(trimmed) >= 6) return false;
   if (BORING_FACT_PATTERNS.some((pattern) => pattern.test(trimmed))) return true;

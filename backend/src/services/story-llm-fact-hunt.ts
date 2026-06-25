@@ -15,6 +15,7 @@ import { callOpenAiChatCompletion } from './llm-openai-chat.js';
 import { resolveOpenRouterModel } from './openrouter-models.js';
 import type { LlmProviderId } from './llm-provider.js';
 import { hasLlmKeyForProvider } from './llm-provider.js';
+import { enrichSnippetsWithWikiSongLookup } from './wiki-song-fact-lookup.js';
 
 const GROQ_API_URL = 'https://api.groq.com/openai/v1/chat/completions';
 const GEMINI_API_BASE = 'https://generativelanguage.googleapis.com/v1beta/models';
@@ -408,7 +409,14 @@ async function huntWithProvider(
 export async function huntReferenceFactWithLlm(
   input: LlmFactHuntInput,
 ): Promise<SelectedReferenceFact | null> {
-  if (input.rawSnippets.length === 0) return null;
+  const titleAnchored = input.rawSnippets.filter((s) => factMentionsTitle(s, input.title)).length;
+  const rawSnippets =
+    input.rawSnippets.length === 0 || titleAnchored < 2
+      ? await enrichSnippetsWithWikiSongLookup(input.artist, input.title, input.rawSnippets)
+      : input.rawSnippets;
+  if (rawSnippets.length === 0) return null;
+
+  const enrichedInput = { ...input, rawSnippets };
 
   const primary = resolveFactHuntProvider(input.preferredProvider);
   let lastReason = 'unknown';
@@ -433,7 +441,7 @@ export async function huntReferenceFactWithLlm(
       try {
         const result = await huntWithProvider(
           primary,
-          modelId ? { ...input, openRouterModel: modelId } : input,
+          modelId ? { ...enrichedInput, openRouterModel: modelId } : enrichedInput,
           attempt > 0 ? lastReason : undefined,
         );
         if (result) return result;

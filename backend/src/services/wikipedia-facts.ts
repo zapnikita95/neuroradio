@@ -859,10 +859,12 @@ export async function fetchFastTrackWikiFacts(artist: string, title: string): Pr
   const cleanTitle = cleanTrackTitle(title);
   const fromBuilder = buildTrackTitleCandidates(artist, title);
   const ambiguousSingleWord = !/\s/.test(cleanTitle.trim()) && cleanTitle.trim().length >= 3;
+  const duoArtist = collaboratorNames(artist).length >= 2;
   const needsSongPageDisambiguation =
     ambiguousSingleWord ||
     isAmbiguousCommonWordTitle(title) ||
     artistHasSearchAliases(artist) ||
+    duoArtist ||
     (cleanTitle.trim().split(/\s+/).length <= 3 && cleanTitle.trim().length <= 32);
   const songCandidate = `${cleanTitle} (song)`;
   const aliasSongCandidates = expandArtistSearchNames(artist)

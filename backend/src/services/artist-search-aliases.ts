@@ -5,7 +5,7 @@
 import { readFileSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { primaryArtistName } from './artist-primary.js';
+import { collaboratorNames, normalizeCollabArtistTag, primaryArtistName } from './artist-primary.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -48,11 +48,25 @@ export function artistHasSearchAliases(artist: string): boolean {
 /** All searchable names for an artist (original, primary, aliases). */
 export function expandArtistSearchNames(artist: string): string[] {
   const primary = primaryArtistName(artist);
-  const out: string[] = [artist.trim(), primary];
+  const normalizedTag = normalizeCollabArtistTag(artist);
+  const out: string[] = [artist.trim(), normalizedTag, primary];
+  const collabs = collaboratorNames(artist);
+  if (collabs.length === 2) {
+    out.push(`${collabs[0]} & ${collabs[1]}`, `${collabs[0]} and ${collabs[1]}`);
+  }
+  out.push(...collabs);
   const map = loadAliasMap();
-  const fromJson = map.get(normalize(primary)) ?? map.get(normalize(artist)) ?? [];
+  const fromJson =
+    map.get(normalize(primary)) ??
+    map.get(normalize(normalizedTag)) ??
+    map.get(normalize(artist)) ??
+    [];
   out.push(...fromJson);
-  const extra = EXTRA_ALIASES[normalize(primary)] ?? EXTRA_ALIASES[normalize(artist)] ?? [];
+  const extra =
+    EXTRA_ALIASES[normalize(primary)] ??
+    EXTRA_ALIASES[normalize(normalizedTag)] ??
+    EXTRA_ALIASES[normalize(artist)] ??
+    [];
   out.push(...extra);
   const seen = new Set<string>();
   return out.filter((name) => {
