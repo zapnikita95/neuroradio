@@ -176,6 +176,30 @@ export function isTrackMeaningNarrativeSeed(fact: string): boolean {
   return false;
 }
 
+/** Личная драма / ревность / измена — сильное семя для истории трека (Mr. Brightside и т.п.). */
+export function isPersonalBackstorySeed(fact: string): boolean {
+  const t = fact.trim();
+  if (isTrackMeaningNarrativeSeed(t)) return true;
+  if (
+    /\b(?:jealous|jealousy|cheated|cheating|affair|heartbreak|breakup|wrote (?:it|the song) after|inspired by (?:jealousy|a breakup|heartbreak))\b/i.test(
+      t,
+    )
+  ) {
+    return true;
+  }
+  const ruBoundary = String.raw`(?<![\p{L}\p{N}_])`;
+  const ruEnd = String.raw`(?![\p{L}\p{N}_])`;
+  return (
+    new RegExp(
+      `${ruBoundary}(?:ревност|измен(?:ил|ила|ы|а|е)?|изменя|любовниц|расстав|развод|heartbreak|личн(?:ой|ая|ую|ое)?\\s+(?:драм|истори|боль|трагед)|написал[аи]?\\s+(?:её|его|песню|трек)\\s+после|сочинил[аи]?\\s+после|вдохновлён(?:ная|ной)?\\s+ревност|свидетел(?:ем|ь)?\\s+измен|увидел[аи]?\\s+(?:измену|как)\\s+(?:его|её|свою))${ruEnd}`,
+      'iu',
+    ).test(t) ||
+    /\b(?:wrote|written|composed)\b.*\b(?:after|when)\b.*\b(?:girlfriend|boyfriend|wife|husband|cheat|affair|bar)\b/i.test(
+      t,
+    )
+  );
+}
+
 /** «Трек идёт 3:33» — метаданные, не история про релиз. */
 export function isTrackDurationCatalogSeed(fact: string): boolean {
   return /трек «[^»]+» идёт \d+:\d+/i.test(fact.trim());

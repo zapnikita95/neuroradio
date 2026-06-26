@@ -27,7 +27,7 @@ import { normalizeYearsForRussianTts, normalizeDecadesForRussianTts } from '../d
 import { sanitizeScriptForTts } from '../dist/services/story-quality.js';
 import { sanitizeClosingTail } from '../dist/services/story-closing-phrases.js';
 import { normalizeEdgeRussianOrthography } from '../dist/services/tts-edge-normalize.js';
-import { collapseCyrillicGeminatesForTts } from '../dist/services/tts-cyrillic-geminate.js';
+import { collapseCyrillicGeminatesForTts, collapseVowelGeminateInCyrillicToken } from '../dist/services/tts-cyrillic-geminate.js';
 import { fixWikiTranslationArtifacts } from '../dist/services/wiki-translate-quality.js';
 
 let passed = 0;
@@ -636,6 +636,27 @@ test('Yandex path collapses Cyrillic geminates without breaking stress markup', 
   });
   assert.match(marked, /риф/i);
   assert.doesNotMatch(marked, /рифф/i);
+});
+
+test('Yandex path collapses doubled vowels (версии) without vers+ii mis-stress', () => {
+  assert.equal(collapseVowelGeminateInCyrillicToken('в+ерсии'), 'в+ерси');
+  assert.equal(collapseVowelGeminateInCyrillicToken('верс+ии'), 'верс+и');
+  assert.equal(collapseVowelGeminateInCyrillicToken('коллекции'), 'коллекци');
+
+  const studio = prepareYandexTtsText('даже в студийной версии', { sentencePauses: false });
+  assert.match(studio, /в\+ерси/);
+  assert.doesNotMatch(studio, /верс\+ии|в\+ерсии/i);
+
+  const plural = prepareYandexTtsText('две версии трека', { sentencePauses: false });
+  assert.match(plural, /верс\+и/);
+  assert.doesNotMatch(plural, /верс\+ии/i);
+
+  const live = prepareYandexTtsText(
+    'можно было скачать живую версию этой песни',
+    { artist: 'Red Hot Chili Peppers', title: 'Snow', sentencePauses: false },
+  );
+  assert.match(live, /в\+ерсию/);
+  assert.doesNotMatch(live, /версии/i);
 });
 
 console.log(`\n[test-tts-pipeline] ${passed} passed`);

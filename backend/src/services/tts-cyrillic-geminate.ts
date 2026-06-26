@@ -1,9 +1,10 @@
 /**
- * Yandex / Edge RU: сдвоенные согласные в заимствованиях (рифф, басс, беллами) ломают TTS.
- * Схлопываем geminate в озвучке, display-скрипт не трогаем.
+ * Yandex / Edge RU: сдвоенные согласные в заимствованиях (рифф, басс, беллами) и
+ * удвоенные гласные (версии, коллекции) ломают TTS. Схлопываем в озвучке, display не трогаем.
  */
 
 const CYRILLIC_CONSONANT = 'бвгджзклмнпрстфхцчшщ';
+const CYRILLIC_VOWEL = 'аеёиоуыэюя';
 
 /** Слова/корни, где двойная согласная — норма русского правописания. */
 const KEEP_GEMINATE_STEMS = [
@@ -34,14 +35,33 @@ function tokenKeepsGeminate(token: string): boolean {
   return KEEP_GEMINATE_STEMS.some((stem) => lower.includes(stem));
 }
 
+/** Схлопнуть удвоенные гласные (версии→верси для TTS) внутри токена. */
+export function collapseVowelGeminateInCyrillicToken(token: string): string {
+  if (!/[а-яё]/i.test(token)) return token;
+
+  let result = token;
+  const doubleVowelRe = new RegExp(`([${CYRILLIC_VOWEL}])\\1+`, 'giu');
+  result = result.replace(doubleVowelRe, '$1');
+  // vers+ii → vers+и (ударение перед первой «и»)
+  result = result.replace(
+    new RegExp(`([${CYRILLIC_VOWEL}])\\+([${CYRILLIC_VOWEL}])\\1`, 'giu'),
+    '$1+$2',
+  );
+  return result;
+}
+
 export function collapseGeminateInCyrillicToken(token: string): string {
-  if (!/[а-яё]/i.test(token) || tokenKeepsGeminate(token)) return token;
+  if (!/[а-яё]/i.test(token) || tokenKeepsGeminate(token)) {
+    return collapseVowelGeminateInCyrillicToken(token);
+  }
 
   const geminateRe = new RegExp(
     `([${CYRILLIC_CONSONANT}])\\1(?=[${'аеёиоуыэюя'}]|$|[.,!?;:—–)\\]»+\\-\u2010\u2011\u2012\u2013\u2014])`,
     'gi',
   );
-  return token.replace(geminateRe, '$1');
+  let result = token.replace(geminateRe, '$1');
+  result = collapseVowelGeminateInCyrillicToken(result);
+  return result;
 }
 
 const LATIN_SLOT = '\uE014L';

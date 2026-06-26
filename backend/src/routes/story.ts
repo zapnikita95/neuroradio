@@ -1632,7 +1632,11 @@ router.post('/full', extractClientSecrets, validateStoryFullBody, storyFullRateL
     throwIfStoryAborted(clientAbort, 'seed-ready');
 
     const { story, llmUsed, deliveredSeed } = await (async () => {
-      const hasGroundedSeed = Boolean(selectedFact?.fact && selectedFact.interestScore >= 6 && !isWeakSelectedFact(selectedFact, metadata.artist, metadata.title));
+      const hasGroundedSeed = Boolean(
+        selectedFact?.fact &&
+          selectedFact.interestScore >= 5 &&
+          !isWeakSelectedFact(selectedFact, metadata.artist, metadata.title),
+      );
       let effectiveStoryInput = storyInput;
 
       if (!hasGroundedSeed && !factFromBank) {

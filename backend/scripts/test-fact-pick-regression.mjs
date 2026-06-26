@@ -915,5 +915,25 @@ if (LIVE) {
   console.log('\n(tip: npm run test:fact-pick -- --live for Last.fm integration)');
 }
 
+const BRIGHTSIDE_ARTIST = 'The Killers';
+const BRIGHTSIDE_TITLE = 'Mr. Brightside';
+const BRIGHTSIDE_JEALOUSY =
+  'Песня «Mr. Brightside» группы The Killers была написана вдохновлённая ревностью — Брэндон Флауэрс сочинил её после того, как его девушка изменила ему с другим мужчиной в баре.';
+
+assert(
+  !isWeakSelectedFact(
+    {
+      fact: BRIGHTSIDE_JEALOUSY,
+      scope: 'track',
+      scopeLabelRu: 'трек',
+      interestScore: 5,
+      interestRating: 4,
+    },
+    BRIGHTSIDE_ARTIST,
+    BRIGHTSIDE_TITLE,
+  ),
+  'Mr. Brightside jealousy backstory is not weak at score=5',
+);
+
 console.log(`\n${failed === 0 ? 'PASS' : 'FAIL'} — ${failed} failed`);
 process.exit(failed === 0 ? 0 : 1);

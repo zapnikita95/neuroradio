@@ -17,6 +17,7 @@ import {
   isThinReleaseCatalogSeed,
   isWikiBiographyLead,
   isCitationBibliographySeed,
+  isPersonalBackstorySeed,
 } from './reference-fact-quality.js';
 import { acceptSearchGroundedSnippet, acceptIndieEmergingSnippet, isLyricsPageSeed, isPlaylistJunkSnippet, isSpeakableReferenceFact, isUnspeakableWebSeed } from './web-snippet-accept.js';
 import { isRejectedPickSeed } from './fact-seed-pick.js';
@@ -69,6 +70,15 @@ export function isWeakSelectedFact(
     }
   }
   if (title && isTrackTitleAnchoredSeed(trimmed, title) && score >= 10 && !isBoringFact(trimmed)) return false;
+  if (
+    title &&
+    isTrackTitleAnchoredSeed(trimmed, title) &&
+    isPersonalBackstorySeed(trimmed) &&
+    score >= 5 &&
+    !isBoringFact(trimmed)
+  ) {
+    return false;
+  }
   if (score < 6) return true;
   if (selected.scope === 'artist' && score < 12) return true;
   if (selected.scope === 'artist' && (selected.interestRating ?? 0) < 7) return true;
@@ -169,8 +179,23 @@ export function pickGuaranteedBaselineSeed(
     });
 
   const best = candidates[0];
-  if (!best) return null;
-  return buildSelectedReferenceFact(best, artist, title, narrator);
+  if (best) return buildSelectedReferenceFact(best, artist, title, narrator);
+
+  const lastResort = [...rawSnippets, ...bundle.trackFacts, ...bundle.artistFacts]
+    .map((s) => s.trim())
+    .filter((s) => s.length >= 20 && s.length <= 800)
+    .filter((s) => factFitsStoryLanguage(s, storyLanguage))
+    .filter((s) => !isPlaylistJunkSnippet(s, artist, title))
+    .filter(
+      (s) =>
+        factMentionsArtist(s, artist) ||
+        factMentionsTitle(s, title) ||
+        hasTrackContextSignal(s),
+    )
+    .sort((a, b) => b.length - a.length)[0];
+  if (lastResort) return buildSelectedReferenceFact(lastResort, artist, title, narrator);
+
+  return null;
 }
 
 export function enrichFactBundleWithRawSnippets(
