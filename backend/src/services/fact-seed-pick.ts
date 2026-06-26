@@ -20,6 +20,8 @@ import {
   isWeakChartSeed,
   MIN_PICK_INTEREST_SCORE,
   isBackstoryFact,
+  isArtistGeographyBioSeed,
+  isSocialMediaInfluencerBleed,
 } from './reference-fact-quality.js';
 import { WEAK_TRIVIA_PATTERNS } from './story-fact-hunt.js';
 import { isMetadataOnlyFallbackFact } from './metadata-facts.js';
@@ -53,6 +55,7 @@ export function isRejectedPickSeed(
   const nonTrackScope = artistScope || albumScope;
 
   if (title.trim() && factMentionsOtherTrackTitle(fact, title)) return true;
+  if (isSocialMediaInfluencerBleed(fact)) return true;
   if (!factFitsStoryLanguage(fact, storyLanguage)) return true;
   if (
     !nonTrackScope &&
@@ -110,6 +113,15 @@ export function isRejectedPickSeed(
     return true;
   }
   if (isMusicVideoContentSeed(fact)) return true;
+  if (
+    title.trim() &&
+    isArtistGeographyBioSeed(fact) &&
+    !factMentionsTitle(fact, title) &&
+    !hasAnchoredTrackContext(fact, title) &&
+    !hasTrackContextSignal(fact)
+  ) {
+    return true;
+  }
   if (
     !artistScope &&
     title.trim() &&

@@ -977,6 +977,7 @@ export function factMentionsOtherTrackTitle(fact: string, title: string): boolea
     'another one bites the dust',
     'dani california',
     'human nature',
+    'show me what i m looking for',
     'группа крови',
     'кукушка',
     'звезда по имени солнце',
@@ -1009,7 +1010,17 @@ export function factMentionsOtherTrackTitle(fact: string, title: string): boolea
     if (/\b(?:album|альбом)\b/i.test(match[1]) || /\(\d{4}\)/.test(match[1])) continue;
     if (/^(?:the|a|an)\s+/i.test(match[1])) continue;
     if (/\b(?:folk|indie|rock|pop|metal|jazz|soul|punk|style|songwriting|alternative)\b/i.test(match[1])) continue;
-    if (match[1].trim().split(/\s+/).length > 5) continue;
+    const quotedWords = match[1].trim().split(/\s+/).length;
+    // Long quoted phrases can still be rival track titles (e.g. «Show Me What I'm Looking For»).
+    if (quotedWords > 9) continue;
+    if (
+      quotedWords > 6 &&
+      !/\b(?:what|you|me|love|night|day|baby|girl|boy|heart|home|life|world|time|never|always|away|back|again|looking|waiting|thinking|feeling|show|say|come|go|let|need|want)\b/i.test(
+        match[1],
+      )
+    ) {
+      continue;
+    }
     const before = fact.slice(Math.max(0, (match.index ?? 0) - 55), match.index ?? 0);
     // «Голос Омерики» after «создателя группы» — band name, not another track title.
     if (

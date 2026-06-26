@@ -934,7 +934,13 @@ export function validateStoryScript(
   }
 
   if (!noTrackNames && artist.trim() && title.trim()) {
-    const nameRep = findExcessiveNameRepetition(trimmed, artist, title, options.storyNarrator);
+    const nameRep = findExcessiveNameRepetition(
+      trimmed,
+      artist,
+      title,
+      options.storyNarrator,
+      options.speakTrackNamesInVoiceover,
+    );
     if (nameRep) {
       return { ok: false, reason: nameRep };
     }
@@ -1749,6 +1755,7 @@ export function findExcessiveNameRepetition(
   artist: string,
   title: string,
   storyNarrator?: StoryNarratorId,
+  speakTrackNamesInVoiceover?: boolean,
 ): string | null {
   const primary = primaryArtistName(artist);
   const artistCount = countPhraseMentions(script, primary);
@@ -1756,7 +1763,12 @@ export function findExcessiveNameRepetition(
     return `excessive name repetition: artist "${primary}" ${artistCount}× (max 2)`;
   }
   const titleCount = countPhraseMentions(script, title);
-  const titleMax = storyNarrator === 'fan' || storyNarrator === 'contemporary' ? 2 : 1;
+  const titleMax =
+    storyNarrator === 'fan' ||
+    storyNarrator === 'contemporary' ||
+    speakTrackNamesInVoiceover === true
+      ? 2
+      : 1;
   if (titleCount > titleMax) {
     return `excessive name repetition: track "${title}" ${titleCount}× (max ${titleMax})`;
   }
@@ -1779,7 +1791,13 @@ export function findWateryContent(
   const inventedIndie = findInventedIndieFiller(script, referenceFacts, artist, title);
   if (inventedIndie) return inventedIndie;
   if (options.speakTrackNamesInVoiceover === true && artist.trim() && title.trim()) {
-    const nameRep = findExcessiveNameRepetition(script, artist, title, options.storyNarrator);
+    const nameRep = findExcessiveNameRepetition(
+      script,
+      artist,
+      title,
+      options.storyNarrator,
+      options.speakTrackNamesInVoiceover,
+    );
     if (nameRep) return nameRep;
   }
   if (!skipPersona) {

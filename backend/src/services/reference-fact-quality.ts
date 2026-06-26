@@ -196,6 +196,31 @@ export function isArtistFormationBioSeed(fact: string): boolean {
   );
 }
 
+/** «Blue October is from Houston» — geography bio, not a track story. */
+export function isArtistGeographyBioSeed(fact: string): boolean {
+  const t = fact.trim();
+  if (/\b(?:wrote|written|recorded|arrangement|studio|backing vocals|co[- ]?written|inspired by)\b/i.test(t)) {
+    return false;
+  }
+  return (
+    /\b(?:is|are)\s+from\s+[A-Z][\w\s,.'-]+(?:Texas|Houston|California|London|Sweden|America|England)\b/i.test(t) ||
+    /\b(?:American|British|Canadian|Swedish|German|Swedish-American)\s+(?:alternative\s+)?(?:rock|pop|metal)\s+band\s+(?:from|based in)\b/i.test(t) ||
+    /\b(?:rock|pop)\s+band\s+from\s+[A-Z]/i.test(t) ||
+    /\bheadquartered\s+in\b/i.test(t) ||
+    /\bbased\s+in\s+[A-Z][\w\s,.'-]+(?:Texas|Houston|California)\b/i.test(t)
+  );
+}
+
+/** YouTuber/TikTok bleed — «Dobrik started using X in vlogs», not a song backstory. */
+export function isSocialMediaInfluencerBleed(fact: string): boolean {
+  const t = fact.trim();
+  return (
+    /\b(?:dobrik|mr\.?\s*beast|logan\s+paul|jake\s+paul|tiktok(?:er|s)?|you(?:tu)?ber|vlog(?:ger|s)?)\b/i.test(t) ||
+    /\b(?:during (?:his|her|their) vlogs?|in (?:his|her|their) videos?|went viral on (?:tiktok|youtube))\b/i.test(t) ||
+    /\bstarted using\b.{0,60}\b(?:vlog|tiktok|youtube|reels?)\b/i.test(t)
+  );
+}
+
 /** Wikipedia/Last.fm disambiguation list — «1) Russian band 2) Argentinian…». */
 export function isArtistDisambiguationListSeed(fact: string): boolean {
   const t = fact.trim();
@@ -462,6 +487,7 @@ export function isGenericMusicVideoSeed(fact: string): boolean {
 const RECORDING_BACKSTORY_PATTERNS: RegExp[] = [
   /\b(?:uncredited vocals?|hidden vocal|guest vocal|session vocalist|vocals (?:were|was) (?:provided|performed) by)\b/i,
   /\b(?:writing session|wrote the lyrics|co[- ]?wrote with|recorded (?:in|at)|demo (?:version|tape)|originally intended|last[- ]minute|surprise vocal|overdub)\b/i,
+  /\b(?:arrangement was developed|developed in the studio|backing vocals|layered over|arranged in the studio)\b/i,
   /(?:не\s+засветил\w*|скрыт\w*\s+вокал|сессионн\w*\s+вокал|соавтор(?:ил|ила|ство))/i,
 ];
 
@@ -715,6 +741,7 @@ export function isBoringFact(fact: string): boolean {
   if (trimmed.length < 30) return true;
   if (isListeningStatsFact(trimmed)) return true;
   if (isTrackMeaningNarrativeSeed(trimmed)) return false;
+  if (isRecordingBackstorySeed(trimmed)) return false;
   if (isCitationBibliographySeed(trimmed)) return true;
   if (isGenericConcertVenueSeed(trimmed)) return true;
   if (isCatalogMetadataSeed(trimmed)) return true;

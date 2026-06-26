@@ -338,8 +338,28 @@ function wikiPageTitleMatchesTrack(pageTitle: string, trackTitle: string): boole
   if (titleNorm.length < 2) return true;
   const pageBase = pageTitle.replace(/\s*\([^)]*\)\s*$/g, '').trim();
   const pageNorm = normalizeForMatch(pageBase);
-  if (pageNorm.includes(titleNorm) || titleNorm.includes(pageNorm)) return true;
-  if (/\(song\)|\(single\)/i.test(pageTitle) && pageNorm.length >= titleNorm.length - 2) return true;
+  if (pageNorm === titleNorm) return true;
+  const titleWords = titleNorm.split(/\s+/).filter(Boolean);
+  const pageWords = pageNorm.split(/\s+/).filter(Boolean);
+  // «Say It» must not match «Say It Isn't So» via substring — exact word sequence only.
+  if (pageWords.length === titleWords.length && pageWords.join(' ') === titleNorm) return true;
+  if (/\(song\)|\(single\)/i.test(pageTitle) && pageNorm === titleNorm) return true;
+  return false;
+}
+
+/** «Say It (Hall & Oates song)» must not feed Blue October — artist in (…) must match request. */
+function wikiSongPageArtistMatches(pageTitle: string, artist: string): boolean {
+  const m = pageTitle.match(/\(([^)]+)\s+(?:song|single)\)\s*$/i);
+  if (!m) return true;
+  const pageArtist = m[1].trim();
+  if (!pageArtist || pageArtist.length < 2) return true;
+  if (factMentionsArtistOrAlias(pageArtist, artist)) return true;
+  const pageNorm = normalizeForMatch(pageArtist);
+  for (const name of expandArtistSearchNames(artist)) {
+    const nameNorm = normalizeForMatch(name);
+    if (nameNorm.length < 2) continue;
+    if (pageNorm.includes(nameNorm) || nameNorm.includes(pageNorm)) return true;
+  }
   return false;
 }
 
@@ -895,7 +915,12 @@ export async function fetchFastTrackWikiFacts(artist: string, title: string): Pr
       searched ??
       `${cleanTitle.charAt(0).toUpperCase()}${cleanTitle.slice(1)} (${wikiTitleCaseArtist(aliasName)} song)`;
     const directExtract = await fetchWikiExtractDirect(lang, directTitle);
-    if (directExtract && !isDisambiguationExtract(directExtract) && !isWrongMusicTopic(artist, directExtract, directTitle)) {
+    if (
+      directExtract &&
+      !isDisambiguationExtract(directExtract) &&
+      !isWrongMusicTopic(artist, directExtract, directTitle) &&
+      wikiSongPageArtistMatches(directTitle, artist)
+    ) {
       if (wikiPageTitleMatchesTrack(directTitle, title)) {
         const mined = await extractFastTrackFactsFromExtract(
           directExtract,
@@ -1025,6 +1050,7 @@ async function tryFastTrackWikiCandidate(
   }
   if (!extract || isDisambiguationExtract(extract)) return null;
   if (isWrongMusicTopic(artist, extract, candidate)) return null;
+  if (!wikiSongPageArtistMatches(candidate, artist)) return null;
   if (!wikiPageTitleMatchesTrack(candidate, title)) return null;
 
   return extractFastTrackFactsFromExtract(

@@ -809,6 +809,88 @@ assert(
 );
 assert(!pixiesPick?.fact.includes('RAK'), 'Pixies pick must not be RAK studio liner notes');
 
+// --- Carolina Liar / Blue October regressions ---
+const { factMentionsOtherTrackTitle } = await import('../dist/services/fact-relevance.js');
+const {
+  isArtistGeographyBioSeed,
+  isSocialMediaInfluencerBleed,
+} = await import('../dist/services/reference-fact-quality.js');
+const { findExcessiveNameRepetition, validateStoryScript } = await import('../dist/services/story-quality.js');
+
+const CAROLINA_ARTIST = 'Carolina Liar';
+const CAROLINA_TITLE = 'Coming to Terms';
+const DOBRIK_BLEED =
+  'David Dobrik started using "Show Me What I\'m Looking For" from Carolina Liar during his vlogs';
+const CAROLINA_BAND =
+  'Carolina Liar is a Swedish-American pop rock band. Lead vocalist Chad Wolf moved from Sweden to Los Angeles to pursue music.';
+
+assert(
+  factMentionsOtherTrackTitle(DOBRIK_BLEED, CAROLINA_TITLE),
+  'Dobrik viral seed mentions other Carolina Liar track',
+);
+assert(isSocialMediaInfluencerBleed(DOBRIK_BLEED), 'Dobrik fact is social-media bleed');
+assert(
+  isRejectedPickSeed(DOBRIK_BLEED, CAROLINA_TITLE, 'ru', [CAROLINA_BAND], CAROLINA_ARTIST, 'artist'),
+  'Dobrik seed rejected for Coming to Terms',
+);
+const carolinaPick = pickReferenceFact(
+  { trackFacts: [], artistFacts: [DOBRIK_BLEED, CAROLINA_BAND], albumFacts: [] },
+  [],
+  0,
+  CAROLINA_ARTIST,
+  CAROLINA_TITLE,
+  new Set(),
+  'night_dj',
+);
+assert(
+  carolinaPick?.fact.includes('Chad Wolf') || carolinaPick?.fact.includes('Swedish'),
+  `Carolina Liar prefers band backstory over Dobrik (got: ${carolinaPick?.fact?.slice(0, 90) ?? 'null'})`,
+);
+assert(!carolinaPick?.fact.includes('Dobrik'), 'Carolina pick must not be Dobrik viral bleed');
+
+const BLUE_ARTIST = 'Blue October';
+const BLUE_TITLE = 'Say It';
+const HOUSTON_BIO = 'Blue October is from Houston, Texas';
+const ARRANGEMENT =
+  "The song's arrangement was developed in the studio with backing vocals layered over the chorus";
+
+assert(isArtistGeographyBioSeed(HOUSTON_BIO), 'Houston line is geography bio');
+assert(
+  isRejectedPickSeed(HOUSTON_BIO, BLUE_TITLE, 'ru', [ARRANGEMENT], BLUE_ARTIST, 'artist'),
+  'Houston bio rejected when track facts exist',
+);
+const bluePick = pickReferenceFact(
+  { trackFacts: [ARRANGEMENT], artistFacts: [HOUSTON_BIO], albumFacts: [] },
+  [],
+  0,
+  BLUE_ARTIST,
+  BLUE_TITLE,
+  new Set(),
+  'radio_host',
+);
+assert(
+  bluePick?.fact.includes('arrangement') || bluePick?.fact.includes('backing vocals'),
+  `Blue October prefers studio arrangement over Houston bio (got: ${bluePick?.fact?.slice(0, 90) ?? 'null'})`,
+);
+
+const sayItScript =
+  'Песня Say It у Blue October — одна из самых личных в их каталоге. Аранжировку собирали прямо в студии, наслаивая бэк-вокал на припев. Именно этот слой голосов делает трек таким узнаваемым.';
+assert(
+  findExcessiveNameRepetition(sayItScript, BLUE_ARTIST, BLUE_TITLE, 'radio_host', true) === null,
+  'Say It 2× allowed when speak_track_names=true',
+);
+const sayItVal = validateStoryScript(sayItScript, '30s', BLUE_ARTIST, BLUE_TITLE, {
+  referenceFacts: [ARRANGEMENT],
+  speakTrackNamesInVoiceover: true,
+  strictLength: false,
+  skipPersonaCliches: true,
+  storyNarrator: 'radio_host',
+});
+assert(
+  !sayItVal.reason?.includes('excessive name repetition'),
+  `Say It script should not fail on 2× title (reason: ${sayItVal.reason})`,
+);
+
 // --- 6. Optional live: real Last.fm + aggregator ---
 if (LIVE) {
   if (!process.env.LASTFM_API_KEY?.trim()) {
