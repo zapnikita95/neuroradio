@@ -14,13 +14,32 @@ object TrackTitleNormalizer {
         """\s*[\(\[\-–—]\s*(?:feat\.?|ft\.?|featuring)\s+[^)\]]+[\)\]]?\s*$""",
         RegexOption.IGNORE_CASE,
     )
+    private val yandexWaveTitle = Regex(
+        """(?i)^(?:моя\s+волна\s+по\s+треку|my\s+wave\s+(?:by|from|based\s+on|for))\s+(.+)$""",
+    )
+    private val liveSuffixComplete = Regex(
+        """(?i)\s*[\(\[]\s*live(?:\s+(?:at|from|in|on|version)\s+[^)\]]*)?[\)\]]?\s*$""",
+    )
+    /** Truncated notification title, e.g. «(Live at». */
+    private val liveSuffixTruncated = Regex("""(?i)\s*\(\s*live(?:\s+(?:at|from|in|on))?\s*$""")
+    private val liveSuffixDash = Regex("""(?i)\s*-\s*live(?:\s+(?:at|from|in|on)\s+.+)?$""")
+
+    /** Yandex «Моя волна по треку …» banner → bare track title. */
+    fun cleanNotificationTitle(title: String): String {
+        val trimmed = title.trim()
+        yandexWaveTitle.matchEntire(trimmed)?.let { return it.groupValues[1].trim() }
+        return trimmed
+    }
 
     fun normalize(title: String): String {
-        var t = title.trim()
+        var t = cleanNotificationTitle(title)
         t = fromFilmRu.replace(t, "").trim()
         t = fromFilmEn.replace(t, "").trim()
         t = fromSeriesRu.replace(t, "").trim()
         t = featSuffix.replace(t, "").trim()
+        t = liveSuffixComplete.replace(t, "").trim()
+        t = liveSuffixTruncated.replace(t, "").trim()
+        t = liveSuffixDash.replace(t, "").trim()
         return t.ifBlank { title.trim() }
     }
 

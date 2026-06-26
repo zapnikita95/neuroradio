@@ -31,4 +31,33 @@ class TrackTitleNormalizerTest {
         val b = TrackTitleNormalizer.matchKey("Coolio", "Gangsta's Paradise")
         assertEquals(a, b)
     }
+
+    @Test
+    fun normalizeStripsLiveSuffix() {
+        assertEquals(
+            "If It Means a Lot to You",
+            TrackTitleNormalizer.normalize("If It Means a Lot to You (Live at The Audio Compound)"),
+        )
+    }
+
+    @Test
+    fun normalizeStripsTruncatedLiveSuffix() {
+        assertEquals(
+            "If It Means a Lot to You",
+            TrackTitleNormalizer.normalize("If It Means a Lot to You (Live at"),
+        )
+    }
+
+    @Test
+    fun matchKeyTreatsStudioAndLiveAsSameSong() {
+        val studio = TrackTitleNormalizer.matchKey(
+            "A Day To Remember",
+            "If It Means a Lot to You",
+        )
+        val live = TrackTitleNormalizer.matchKey(
+            "A Day To Remember",
+            "If It Means a Lot to You (Live at The Audio Compound)",
+        )
+        assertEquals(studio, live)
+    }
 }

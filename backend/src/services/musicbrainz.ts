@@ -121,9 +121,19 @@ async function fetchRecordingSearch(artist: string, title: string): Promise<Musi
 /** Strip Yandex/streaming suffixes like «(из фильма «Форрест Гамп»)» before lookup. */
 export function normalizeStreamingTitle(title: string): string {
   let t = title.trim();
+  t = t.replace(
+    /^(?:моя\s+волна\s+по\s+треку|my\s+wave\s+(?:by|from|based\s+on|for))\s+/iu,
+    '',
+  ).trim();
   t = t.replace(/\s*\(из\s+фильма\s+[«"'].*?[»"']\)\s*$/iu, '').trim();
   t = t.replace(/\s*\(from\s+(?:the\s+)?(?:movie|film|soundtrack)\s+[^)]+\)\s*$/iu, '').trim();
   t = t.replace(/\s*\(из\s+сериала\s+[«"'].*?[»"']\)\s*$/iu, '').trim();
+  t = t.replace(
+    /\s*[\(\[]\s*live(?:\s+(?:at|from|in|on|version)\s+[^)\]]*)?[\)\]]?\s*$/iu,
+    '',
+  ).trim();
+  t = t.replace(/\s*\(\s*live(?:\s+(?:at|from|in|on))?\s*$/iu, '').trim();
+  t = t.replace(/\s*-\s*live(?:\s+(?:at|from|in|on)\s+.+)?$/iu, '').trim();
   return t || title.trim();
 }
 
