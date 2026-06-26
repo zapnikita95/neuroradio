@@ -1,6 +1,7 @@
 package com.musicstory.app.data.repository
 
 import android.os.Build
+import com.musicstory.app.domain.UserFacingError
 import com.musicstory.app.data.local.CachedStory
 import com.musicstory.app.data.local.OfflinePackDao
 import com.musicstory.app.data.local.OfflinePackEntry
@@ -950,31 +951,39 @@ class StoryRepository(
     }
 
     private fun explainError(e: Exception, llmProvider: LlmProvider): String = when (e) {
-        is SocketTimeoutException -> "Сервер долго отвечает — подожди и попробуй ещё раз"
+        is SocketTimeoutException -> "История готовится дольше обычного — подожди минуту или попробуй снова"
         is HttpException -> when (e.code()) {
             429 -> "Лимит сервера Music Story (не Gemini)"
             499 -> "Отменено"
             503 -> "${llmProvider.labelRu} на сервере недоступен"
-            504 -> "Сервер долго отвечает — подожди и попробуй ещё раз"
+            504 -> "История готовится дольше обычного — подожди минуту или попробуй снова"
             else -> "HTTP ${e.code()}"
         }
         is IOException -> {
-            if (e.message?.contains("cancel", ignoreCase = true) == true) {
+            val raw = e.message.orEmpty()
+            if (UserFacingError.isBenignStoryCancelMessage(raw)) {
                 "Отменено"
             } else if (
-                e.message?.contains("timeout", ignoreCase = true) == true ||
-                e.message?.contains("timed out", ignoreCase = true) == true
+                raw.contains("timeout", ignoreCase = true) ||
+                raw.contains("timed out", ignoreCase = true)
             ) {
-                "Сервер долго отвечает — подожди и попробуй ещё раз"
+                "История готовится дольше обычного — подожди минуту или попробуй снова"
             } else if (
-                e.message?.contains("Unable to resolve", ignoreCase = true) == true ||
-                e.message?.contains("Failed to connect", ignoreCase = true) == true ||
-                e.message?.contains("Network is unreachable", ignoreCase = true) == true ||
-                e.message?.contains("ECONNREFUSED", ignoreCase = true) == true
+                raw.contains("Unable to resolve", ignoreCase = true) ||
+                raw.contains("Failed to connect", ignoreCase = true) ||
+                raw.contains("Network is unreachable", ignoreCase = true) ||
+                raw.contains("ECONNREFUSED", ignoreCase = true)
             ) {
-                "Не удалось связаться с сервером — проверь интернет или VPN"
+                "Проблема с интернетом — проверь Wi‑Fi или мобильную сеть"
+            } else if (
+                raw.contains("прерван", ignoreCase = true) ||
+                raw.contains("connection abort", ignoreCase = true) ||
+                raw.contains("stream was reset", ignoreCase = true) ||
+                raw.contains("Socket closed", ignoreCase = true)
+            ) {
+                "История не успела загрузиться — на следующем треке попробуем снова"
             } else {
-                "Сервер долго отвечает — подожди и попробуй ещё раз"
+                "Не получилось подготовить историю — попробуй ещё раз"
             }
         }
         else -> e.message?.take(120) ?: e.javaClass.simpleName

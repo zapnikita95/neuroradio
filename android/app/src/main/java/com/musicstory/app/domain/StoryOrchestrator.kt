@@ -380,6 +380,9 @@ class StoryOrchestrator(
 
         _hintMessage.value = null
         _errorMessage.value = null
+        if (_state.value == OrchestratorState.ERROR) {
+            _state.value = OrchestratorState.LISTENING
+        }
         _pendingFeedback.value?.takeIf { it.trackKey != track.displayKey }?.let {
             _pendingFeedback.value = null
         }
@@ -615,8 +618,7 @@ class StoryOrchestrator(
                 } catch (e: Exception) {
                     StoryLog.e("Story pipeline failed: ${e.message}", e)
                     abortGeneration(session, manual, rollbackAutoTrigger = !manual)
-                    _errorMessage.value = e.message ?: context.getString(R.string.error_story_fetch_failed)
-                    _state.value = OrchestratorState.ERROR
+                    applyStoryFailure(e, manual)
                     recoverMediaDetectionAfterStoryFailure()
                     publishUiState()
                 } finally {
@@ -906,8 +908,9 @@ class StoryOrchestrator(
                 }
             },
             onFailure = { error ->
-                if (error is CancellationException || error.wasStoryRequestCancelled()) {
+                if (UserFacingError.isBenignStoryCancel(error)) {
                     _errorMessage.value = null
+                    _hintMessage.value = null
                     if (_state.value != OrchestratorState.LISTENING) {
                         _state.value = OrchestratorState.LISTENING
                     }
@@ -921,22 +924,20 @@ class StoryOrchestrator(
                     settingsDataStore.setTracksSinceLastStory(
                         triggerEngine.currentTracksSinceLastStory(),
                     )
-                    val msg = error.message?.trim().orEmpty()
-                    if (msg.contains("не получилось", ignoreCase = true)) {
+                    val msg = UserFacingError.message(context, error)
+                    if (msg.isBlank()) {
+                        _errorMessage.value = null
+                        _hintMessage.value = null
+                    } else if (msg.contains("не получилось", ignoreCase = true)) {
                         _errorMessage.value = null
                         _hintMessage.value = msg
-                        _state.value = OrchestratorState.LISTENING
                     } else {
                         _errorMessage.value = null
-                        _hintMessage.value = msg.take(160).ifBlank {
-                            context.getString(R.string.error_story_tell_failed)
-                        }
-                        _state.value = OrchestratorState.LISTENING
+                        _hintMessage.value = msg.take(160)
                     }
+                    _state.value = OrchestratorState.LISTENING
                 } else {
-                    _errorMessage.value = error.message ?: context.getString(R.string.error_story_fetch_failed)
-                    _hintMessage.value = null
-                    _state.value = OrchestratorState.ERROR
+                    applyStoryFailure(error, manual = true)
                     recoverMediaDetectionAfterStoryFailure()
                 }
                 publishUiState()
@@ -944,11 +945,23 @@ class StoryOrchestrator(
         )
     }
 
-    private fun Throwable.wasStoryRequestCancelled(): Boolean {
-        val msg = message.orEmpty()
-        return msg.contains("cancel", ignoreCase = true) ||
-            msg.contains("отмен", ignoreCase = true) ||
-            msg.contains("499")
+    private fun applyStoryFailure(error: Throwable, manual: Boolean) {
+        val mapped = UserFacingError.message(context, error)
+        if (mapped.isBlank()) {
+            _errorMessage.value = null
+            _hintMessage.value = null
+            _state.value = OrchestratorState.LISTENING
+            return
+        }
+        if (manual) {
+            _errorMessage.value = mapped
+            _hintMessage.value = null
+            _state.value = OrchestratorState.ERROR
+        } else {
+            _errorMessage.value = null
+            _hintMessage.value = mapped.take(160)
+            _state.value = OrchestratorState.LISTENING
+        }
     }
 
     private fun trackTitleKey(track: TrackInfo): String =

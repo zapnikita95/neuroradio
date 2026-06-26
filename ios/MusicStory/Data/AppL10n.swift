@@ -123,8 +123,23 @@ struct AppL10n {
     }
     var storyFetchTimeout: String {
         en
-            ? "Story generation timed out. Check your connection and try again."
-            : "История не успела сгенерироваться. Проверь интернет и попробуй ещё раз."
+            ? "Story is taking longer than usual — wait a minute or try again."
+            : "История готовится дольше обычного — подожди минуту или попробуй снова."
+    }
+    var storyGenericFailure: String {
+        en
+            ? "Could not prepare the story. Try again or skip to the next track."
+            : "Не получилось подготовить историю. Попробуй ещё раз или переключи трек."
+    }
+    var storyInterrupted: String {
+        en
+            ? "Story did not finish loading — we will try again on the next track."
+            : "История не успела загрузиться — на следующем треке попробуем снова."
+    }
+    var storyNetworkIssue: String {
+        en
+            ? "No stable internet — check Wi‑Fi or mobile data."
+            : "Нет стабильного интернета — проверь Wi‑Fi или мобильную сеть."
     }
     var offlineNoInternet: String {
         en
@@ -164,6 +179,20 @@ struct AppL10n {
     var accountDeleteCancel: String { en ? "Cancel" : "Отмена" }
     var accountDeleteSuccess: String { en ? "Account deleted" : "Аккаунт удалён" }
     var accountDeleteFailed: String { en ? "Could not delete account" : "Не удалось удалить аккаунт" }
+    var accountRefreshing: String { en ? "Updating…" : "Обновление…" }
+    var devTierSection: String { en ? "Subscription mode" : "Режим подписки" }
+    var devTierHint: String {
+        en
+            ? "Admin: switch tier on the server (free, trial, or paid)."
+            : "Админ: переключение тарифа на сервере (бесплатный, trial или платный)."
+    }
+    func devTierCurrent(_ tier: String) -> String {
+        en ? "Current: \(tier)" : "Сейчас: \(tier)"
+    }
+    var devTierReset: String { en ? "Reset (server default)" : "Сброс (как на сервере)" }
+    var devTierFree: String { en ? "Free" : "Бесплатный" }
+    var devTierTrial: String { en ? "Trial" : "Trial" }
+    var devTierPremium: String { en ? "Paid subscription" : "Платная подписка" }
 
     // MARK: - Billing
 
@@ -342,73 +371,5 @@ extension AppStrings {
         lang == .en
             ? "While another player runs: short Shazam (~10 s), then pause for track length. Music stops — Shazam off."
             : Shazam.autoDetectHint
-    }
-}
-
-extension UserFacingError {
-    static func message(for text: String, lang: ResolvedAppLanguage) -> String {
-        if looksTechnical(text) {
-            return lang == .en
-                ? "Something went wrong. Please try again."
-                : "Что-то пошло не так. Попробуйте ещё раз."
-        }
-        return text
-    }
-
-    static func message(for error: Error, lang: ResolvedAppLanguage) -> String {
-        if let localized = error as? LocalizedError, let text = localized.errorDescription, !text.isEmpty {
-            if !looksTechnical(text) { return text }
-        }
-        return message(for: error as NSError, lang: lang)
-    }
-
-    static func message(for error: NSError, lang: ResolvedAppLanguage) -> String {
-        let en = lang == .en
-        if error.domain == NSURLErrorDomain {
-            switch error.code {
-            case NSURLErrorTimedOut:
-                return en
-                    ? "Server is taking too long. Try again in a minute."
-                    : "Сервер долго не отвечает. Попробуйте ещё раз через минуту."
-            case NSURLErrorSecureConnectionFailed,
-                 NSURLErrorServerCertificateUntrusted,
-                 NSURLErrorServerCertificateHasBadDate,
-                 NSURLErrorServerCertificateNotYetValid:
-                return en
-                    ? "Could not connect to the server. Check internet and update the app."
-                    : "Не удалось подключиться к серверу. Проверьте интернет и обновите приложение."
-            case NSURLErrorNotConnectedToInternet, NSURLErrorNetworkConnectionLost:
-                return en
-                    ? "No internet. Check Wi‑Fi or mobile data."
-                    : "Нет интернета. Проверьте Wi‑Fi или мобильную сеть."
-            case NSURLErrorCannotFindHost, NSURLErrorDNSLookupFailed:
-                return en
-                    ? "Server unavailable. Check your connection."
-                    : "Сервер недоступен. Проверьте интернет."
-            default:
-                break
-            }
-        }
-
-        if error.domain == "com.apple.coreaudio.avfaudio" || error.domain.contains("coreaudio") {
-            return en
-                ? "Could not use the microphone. Close other music apps and try again."
-                : "Не удалось включить микрофон. Закройте другие приложения с музыкой и попробуйте снова."
-        }
-
-        let raw = error.localizedDescription
-        if raw.localizedCaseInsensitiveContains("превышен лимит времени") ||
-            raw.localizedCaseInsensitiveContains("timed out") {
-            return en
-                ? "Server is taking too long. Try again in a minute."
-                : "Сервер долго не отвечает. Попробуйте ещё раз через минуту."
-        }
-
-        if looksTechnical(raw) {
-            return en
-                ? "Something went wrong. Please try again."
-                : "Что-то пошло не так. Попробуйте ещё раз."
-        }
-        return raw
     }
 }

@@ -383,17 +383,23 @@
     <string name="feedback_skip">Пропустить</string>
     <string name="feedback_close">Закрыть</string>
 
-    <string name="server_audio_error_message">Не удалось воспроизвести озвучку с сервера — попробуй ещё раз</string>
+    <string name="server_audio_error_message">Озвучка не запустилась — нажми «Рассказать историю» ещё раз</string>
     <string name="android_tts_error_message">Не удалось озвучить на телефоне — установи русский голос в настройках TTS или вернись на Yandex</string>
     <string name="error_story_playback_failed">Не удалось воспроизвести историю</string>
     <string name="error_story_timeout_local">Слишком долго ждём локальную модель (лимит 20 мин). Смотри логи: Music story\\logs\\local-bff.log</string>
-    <string name="error_story_timeout_server">Сервер не ответил за 8 мин (факты + текст + озвучка). Подожди — история может ещё готовиться на сервере.</string>
-    <string name="error_story_request_cancelled">Запрос прерван приложением. Нажми «Рассказать историю» ещё раз.</string>
-    <string name="error_story_fetch_failed">Не удалось получить историю</string>
-    <string name="error_story_no_facts">Не удалось собрать факт — проверенных данных по треку нет</string>
-    <string name="error_story_server_timeout">Сервер долго отвечает — подожди и попробуй ещё раз</string>
-    <string name="error_story_connection">Не удалось связаться с сервером — проверь интернет или VPN</string>
-    <string name="error_story_tell_failed">Не получилось рассказать историю</string>
+    <string name="error_story_timeout_server">История готовится дольше обычного — подожди минуту или попробуй снова</string>
+    <string name="error_story_request_cancelled">Подготовку остановили — можно запустить снова</string>
+    <string name="error_story_fetch_failed">Не получилось подготовить историю</string>
+    <string name="error_story_no_facts">По этому треку пока нет проверенного факта — попробуй другой</string>
+    <string name="error_story_server_timeout">История готовится дольше обычного — подожди минуту или попробуй снова</string>
+    <string name="error_story_connection">Проблема с интернетом — проверь Wi‑Fi или мобильную сеть</string>
+    <string name="error_story_tell_failed">Не получилось рассказать историю — попробуй ещё раз</string>
+    <string name="error_story_generic">Не получилось подготовить историю. Попробуй ещё раз или переключи трек</string>
+    <string name="error_story_interrupted">История не успела загрузиться — на следующем треке попробуем снова</string>
+    <string name="error_story_network">Нет стабильного интернета — проверь Wi‑Fi или мобильную сеть</string>
+    <string name="error_story_slow">История готовится дольше обычного — подожди минуту или нажми «Рассказать историю» снова</string>
+    <string name="error_story_unavailable">Сейчас не получается подготовить историю — попробуй через минуту</string>
+    <string name="error_story_rate_limit">Дневной лимит историй исчерпан — завтра снова или добавь свой API-ключ в настройках</string>
     <string name="settings_llm_check_local">Укажи URL сервера ПК и Ollama, потом «Сохранить и проверить»</string>
     <string name="settings_llm_check_api_key">Сначала вставь API-ключ, потом нажми «Сохранить и проверить»</string>
 </resources>

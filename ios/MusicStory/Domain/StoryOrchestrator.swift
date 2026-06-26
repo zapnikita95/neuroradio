@@ -97,6 +97,9 @@ final class StoryOrchestrator: ObservableObject {
         guard track.isValid() else { return }
         uiState.currentTrack = track
         uiState.errorMessage = nil
+        if uiState.state == .error {
+            uiState.state = .listening
+        }
         if explicitManualStoryRequest {
             return
         }
@@ -408,16 +411,22 @@ final class StoryOrchestrator: ObservableObject {
         case .failure(let error):
             cancelGenerationPreview()
             isStoryRunning = false
-            if error is CancellationError || (error as? URLError)?.code == .cancelled {
+            if UserFacingError.isBenignStoryCancel(error) {
                 uiState.errorMessage = nil
                 uiState.state = .listening
                 return
             }
             let copy = AppStrings.l10n(settings.resolvedLanguage)
+            let mapped = UserFacingError.storyMessage(for: error, lang: settings.resolvedLanguage)
+            if mapped.isEmpty {
+                uiState.errorMessage = nil
+                uiState.state = .listening
+                return
+            }
             if (error as? URLError)?.code == .timedOut {
                 uiState.errorMessage = copy.storyFetchTimeout
             } else {
-                uiState.errorMessage = error.localizedDescription
+                uiState.errorMessage = mapped
             }
             uiState.state = .error
         }

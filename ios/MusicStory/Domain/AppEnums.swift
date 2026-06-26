@@ -359,51 +359,97 @@ enum ElevenLabsVoice: String, CaseIterable, Identifiable {
 }
 
 enum UserFacingError {
-    static func message(for text: String) -> String {
+    static func isBenignStoryCancel(_ error: Error) -> Bool {
+        if error is CancellationError { return true }
+        if (error as? URLError)?.code == .cancelled { return true }
+        return isBenignStoryCancelMessage(error.localizedDescription)
+    }
+
+    static func isBenignStoryCancelMessage(_ raw: String) -> Bool {
+        let lower = raw.lowercased()
+        if lower.contains("cancel") || lower.contains("отмен") || lower.contains("499") { return true }
+        return isConnectionInterrupt(lower)
+    }
+
+    static func storyMessage(for error: Error, lang: ResolvedAppLanguage = SettingsStore.shared.resolvedLanguage) -> String {
+        if isBenignStoryCancel(error) { return "" }
+        let copy = AppStrings.l10n(lang)
+        if (error as? URLError)?.code == .timedOut {
+            return copy.storyFetchTimeout
+        }
+        return message(for: error, lang: lang)
+    }
+
+    static func message(for text: String, lang: ResolvedAppLanguage = SettingsStore.shared.resolvedLanguage) -> String {
+        let copy = AppStrings.l10n(lang)
+        if isBenignStoryCancelMessage(text) { return "" }
+        if isConnectionInterrupt(text.lowercased()) { return copy.storyInterrupted }
         if looksTechnical(text) {
-            return "Что-то пошло не так. Попробуйте ещё раз."
+            return copy.storyGenericFailure
         }
         return text
     }
 
+    static func message(for text: String) -> String {
+        message(for: text, lang: SettingsStore.shared.resolvedLanguage)
+    }
+
     static func message(for error: Error) -> String {
+        message(for: error, lang: SettingsStore.shared.resolvedLanguage)
+    }
+
+    static func message(for error: Error, lang: ResolvedAppLanguage) -> String {
+        if isBenignStoryCancel(error) { return "" }
+        let copy = AppStrings.l10n(lang)
         if let localized = error as? LocalizedError, let text = localized.errorDescription, !text.isEmpty {
             if !looksTechnical(text) { return text }
         }
-        return message(for: error as NSError)
+        return message(for: error as NSError, lang: lang)
     }
 
-    static func message(for error: NSError) -> String {
+    static func message(for error: NSError, lang: ResolvedAppLanguage) -> String {
+        let copy = AppStrings.l10n(lang)
+        let en = lang == .en
         if error.domain == NSURLErrorDomain {
             switch error.code {
             case NSURLErrorTimedOut:
-                return "Сервер долго не отвечает. Попробуйте ещё раз через минуту."
+                return copy.storyFetchTimeout
             case NSURLErrorSecureConnectionFailed,
                  NSURLErrorServerCertificateUntrusted,
                  NSURLErrorServerCertificateHasBadDate,
                  NSURLErrorServerCertificateNotYetValid:
-                return "Не удалось подключиться к серверу. Проверьте интернет и обновите приложение."
+                return en
+                    ? "Could not connect securely. Check internet and update the app."
+                    : "Не удалось безопасно подключиться. Проверь интернет и обнови приложение."
             case NSURLErrorNotConnectedToInternet, NSURLErrorNetworkConnectionLost:
-                return "Нет интернета. Проверьте Wi‑Fi или мобильную сеть."
+                return copy.storyNetworkIssue
             case NSURLErrorCannotFindHost, NSURLErrorDNSLookupFailed:
-                return "Сервер недоступен. Проверьте интернет."
+                return copy.storyNetworkIssue
+            case NSURLErrorCancelled:
+                return ""
             default:
                 break
             }
         }
 
         if error.domain == "com.apple.coreaudio.avfaudio" || error.domain.contains("coreaudio") {
-            return "Не удалось включить микрофон. Закройте другие приложения с музыкой и попробуйте снова."
+            return en
+                ? "Could not use the microphone. Close other music apps and try again."
+                : "Не удалось включить микрофон. Закрой другие приложения с музыкой и попробуй снова."
         }
 
         let raw = error.localizedDescription
         if raw.localizedCaseInsensitiveContains("превышен лимит времени") ||
             raw.localizedCaseInsensitiveContains("timed out") {
-            return "Сервер долго не отвечает. Попробуйте ещё раз через минуту."
+            return copy.storyFetchTimeout
+        }
+
+        if isConnectionInterrupt(raw.lowercased()) {
+            return copy.storyInterrupted
         }
 
         if looksTechnical(raw) {
-            return "Что-то пошло не так. Попробуйте ещё раз."
+            return copy.storyGenericFailure
         }
         return raw
     }
@@ -433,6 +479,25 @@ enum UserFacingError {
             lower.contains("error -") ||
             lower.contains("nsurlerror") ||
             lower.contains("operation couldn't") ||
-            lower.contains("не удалось завершить операцию")
+            lower.contains("не удалось завершить операцию") ||
+            lower.contains("http ") ||
+            lower.contains("okhttp") ||
+            lower.contains("socket") ||
+            lower.contains("connection abort") ||
+            lower.contains("stream was reset") ||
+            lower.contains("прерван") ||
+            lower.contains("разорван") ||
+            lower.contains("соединен")
+    }
+
+    private static func isConnectionInterrupt(_ lower: String) -> Bool {
+        lower.contains("прерван") ||
+            lower.contains("разорван") ||
+            lower.contains("connection abort") ||
+            lower.contains("stream was reset") ||
+            lower.contains("unexpected end of stream") ||
+            lower.contains("socket closed") ||
+            lower.contains("connection reset") ||
+            (lower.contains("соединен") && (lower.contains("сброш") || lower.contains("закры") || lower.contains("прерван")))
     }
 }
