@@ -15,7 +15,12 @@ import { fileURLToPath } from 'node:url';
 import { harvestAllFacts, fetchDiscogsFacts } from '../dist/services/fact-sources/index.js';
 import { interestScore } from '../dist/services/reference-fact-quality.js';
 import { interestRating10 } from '../dist/services/fact-interest-log.js';
-import { isBoringFact, isMetadataHarvestFact } from '../dist/services/reference-fact-quality.js';
+import {
+  isBoringFact,
+  isListeningStatsFact,
+  isMetadataHarvestFact,
+} from '../dist/services/reference-fact-quality.js';
+import { isEligibleHotFact } from '../dist/services/fact-seed-pick.js';
 import { isArtistBackstoryNarrative } from '../dist/services/web-snippet-accept.js';
 import { BANK_PATH, refreshBankInterestScores } from '../dist/services/fact-bank.js';
 import { classifyFactTopic, poolHasTopicDuplicate } from '../dist/services/fact-topic.js';
@@ -108,6 +113,8 @@ function isHarvestableTrack(track) {
 
 function trackPriority(track) {
   const s = track.source ?? '';
+  if (s.startsWith('seed-global:fact-rich') || s.includes(':fact-rich-retry')) return -8;
+  if (s.startsWith('era-top100:')) return -9;
   if (s.startsWith('seed-global:priority-artist') || s.includes(':priority-retry')) return -7;
   if (s.startsWith('seed-global:priority')) return -6;
   if (s.startsWith('genre-top')) return -5;
@@ -409,6 +416,9 @@ function isMetadataItem(item) {
 
 function upsertFact(bank, artist, title, item) {
   const trimmed = item.fact.trim();
+  if (isListeningStatsFact(trimmed)) {
+    item = { ...item, metadataOnly: true };
+  }
   if (upsertRejectReason(bank, artist, title, item)) return false;
   const isMetadata = isMetadataItem(item);
   const score = interestScore(trimmed);
@@ -424,7 +434,7 @@ function upsertFact(bank, artist, title, item) {
     interestRating: rating,
     source: 'api',
     isMetadata,
-    isHot: !isMetadata && rating >= 6 && !JUNK_FACT.test(trimmed),
+    isHot: isEligibleHotFact(trimmed, { metadata: isMetadata, artist, title }),
     harvestSource: item.source,
     topicKey,
     timesUsed: 0,
@@ -503,7 +513,8 @@ function isTopCatalogTrack(track) {
     s.startsWith('lastfm-global-chart') ||
     s.startsWith('deezer-chart-') ||
     s.startsWith('itunes-chart-') ||
-    s.startsWith('seed-global')
+    s.startsWith('seed-global') ||
+    s.startsWith('era-top100:')
   );
 }
 

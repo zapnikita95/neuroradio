@@ -317,7 +317,8 @@ function isValidStoredFact(fact: StoredFact): boolean {
     return false;
   }
   if (isCatalogMetadataSeed(fact.fact)) return false;
-  if (isListeningStatsFact(fact.fact)) return false;
+  // Last.fm playcounts — metadata only, never a stored story seed.
+  if (isListeningStatsFact(fact.fact)) return Boolean(fact.isMetadata);
   if (isEncyclopediaDefinitionSeed(fact.fact)) return false;
   return true;
 }
@@ -415,6 +416,13 @@ export function refreshBankInterestScores(): number {
   const refreshPool = (pool: StoredFact[], artist: string, title: string) => {
     const trackPoolFacts = pool.map((f) => f.fact);
     for (const entry of pool) {
+      if (isListeningStatsFact(entry.fact) || isMetadataHarvestFact(entry.fact)) {
+        entry.isMetadata = true;
+        if (entry.isHot) {
+          entry.isHot = false;
+          updated += 1;
+        }
+      }
       const live = computeLiveInterest(entry.fact);
       const hot = isEligibleHotFact(entry.fact, {
         metadata: entry.isMetadata,

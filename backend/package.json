@@ -58,6 +58,15 @@
     "harvest:charts": "npm run build && node scripts/weekly-chart-harvest.mjs",
     "harvest:charts:dry": "npm run build && node scripts/weekly-chart-harvest.mjs --dry-run",
     "harvest:charts:status": "npm run build && node scripts/chart-harvest-status.mjs",
+    "build:catalog:era-top100": "node scripts/build-era-top100-catalog.mjs",
+    "seed:retry-genre-top-zero": "node scripts/retry-genre-top-zero.mjs",
+    "audit:lastfm-leaks": "npm run build && node scripts/audit-lastfm-story-leaks.mjs",
+    "bank:demote-lastfm": "npm run build && node scripts/demote-lastfm-metadata.mjs",
+    "benchmark:deep-search": "npm run build && node scripts/benchmark-deep-search.mjs",
+    "enrich:weekly": "npm run build && node scripts/weekly-deep-enrich.mjs",
+    "enrich:weekly:dry": "npm run build && node scripts/weekly-deep-enrich.mjs --dry-run",
+    "enrich:weekly:queue": "npm run build && node scripts/weekly-deep-enrich.mjs --queue",
+    "enrich:weekly:status": "npm run build && node scripts/weekly-deep-enrich.mjs --status",
     "expand:catalog": "npm run build && node scripts/merge-trending-into-catalog.mjs"
   },
   "keywords": [

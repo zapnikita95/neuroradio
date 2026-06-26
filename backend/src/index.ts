@@ -48,6 +48,7 @@ import { resolveWebsiteDir, serveWebsite } from './serve-website.js';
 import publicRouter from './routes/public.js';
 import { startSubscriptionRenewalScheduler } from './services/subscription-renewal.js';
 import { startWeeklyChartHarvestScheduler } from './services/weekly-chart-scheduler.js';
+import { startWeeklyDeepEnrichScheduler } from './services/weekly-deep-enrich-scheduler.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PORT = parseInt(process.env.PORT ?? '3000', 10);
@@ -264,6 +265,7 @@ async function boot(): Promise<void> {
 
   startSubscriptionRenewalScheduler();
   startWeeklyChartHarvestScheduler();
+  startWeeklyDeepEnrichScheduler();
   await probeElevenLabsAtBoot();
 
   const tgWidget = resolveTelegramWidgetBaseUrl();
