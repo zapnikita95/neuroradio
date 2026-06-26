@@ -5,6 +5,7 @@ import { getPool, hasPostgres } from './db.js';
 import { processFeedbackForStyleLearning } from './style-feedback-learn.js';
 import { enrichFeedbackContext } from './style-feedback-backfill.js';
 import { processNegativeFactFeedback } from './feedback-fact-analysis.js';
+import { notifyAdminBoringFeedback } from './feedback-admin-notify.js';
 import type { StoryLanguageId } from './story-language.js';
 import { resolveStoryNarrator } from './story-narrator.js';
 
@@ -94,6 +95,10 @@ export function recordStoryFeedback(entry: StoryFeedbackRecordInput): StoryFeedb
     `[feedback] ${record.vote} reason=${record.reason} install=${record.installId.slice(0, 8)} ` +
       `"${record.artist}" — "${record.title}"`,
   );
+
+  if (record.vote === 'dislike' && record.reason === 'boring_fact') {
+    void notifyAdminBoringFeedback(record, record.seedFact);
+  }
 
   try {
     void enrichFeedbackContext(record).then((ctx) => {

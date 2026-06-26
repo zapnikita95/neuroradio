@@ -409,20 +409,37 @@ export function ingestHarvestFacts(
   return saved;
 }
 
+/** Last.fm playcount / metadata harvest → never hot story seeds (runs on every boot). */
+export function demoteListeningStatsMetadata(): number {
+  const bank = loadBank();
+  let fixed = 0;
+  const demotePool = (pool: StoredFact[]) => {
+    for (const entry of pool) {
+      if (!isListeningStatsFact(entry.fact) && !isMetadataHarvestFact(entry.fact)) continue;
+      if (!entry.isMetadata || entry.isHot) {
+        entry.isMetadata = true;
+        entry.isHot = false;
+        fixed += 1;
+      }
+    }
+  };
+  for (const pool of Object.values(bank.byTrack)) demotePool(pool);
+  for (const pool of Object.values(bank.byArtist)) demotePool(pool);
+  if (fixed > 0) {
+    saveBank(bank);
+    console.log(`[fact-bank] demoted ${fixed} Last.fm/metadata facts → isMetadata=true, isHot=false`);
+  }
+  return fixed;
+}
+
 /** Пересчёт interestScore/isHot в JSON-банке по актуальным правилам pick. */
 export function refreshBankInterestScores(): number {
+  demoteListeningStatsMetadata();
   const bank = loadBank();
   let updated = 0;
   const refreshPool = (pool: StoredFact[], artist: string, title: string) => {
     const trackPoolFacts = pool.map((f) => f.fact);
     for (const entry of pool) {
-      if (isListeningStatsFact(entry.fact) || isMetadataHarvestFact(entry.fact)) {
-        entry.isMetadata = true;
-        if (entry.isHot) {
-          entry.isHot = false;
-          updated += 1;
-        }
-      }
       const live = computeLiveInterest(entry.fact);
       const hot = isEligibleHotFact(entry.fact, {
         metadata: entry.isMetadata,

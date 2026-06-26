@@ -1,10 +1,11 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import { loadCatalogWithOverlays } from './catalog-overlay.js';
 import { huntDeepFact } from './deep-search-orchestrator.js';
 import type { DeepSearchMode } from './deep-search-provider.js';
 import { ingestHarvestFacts } from './fact-bank.js';
 import { isListeningStatsFact } from './reference-fact-quality.js';
-import { sendTelegramAdminMessage } from './telegram-admin-notify.js';
+import { isTelegramAdminNotifyConfigured, sendTelegramAdminMessage } from './telegram-admin-notify.js';
 import {
   isWeeklyDeepEnrichEnabled,
   resolveWeeklyDeepEnrichCap,
@@ -12,7 +13,6 @@ import {
 } from './weekly-deep-enrich-schedule.js';
 
 const DATA_DIR = process.env.ACCOUNT_DATA_DIR?.trim() || path.join(process.cwd(), 'data');
-const CATALOG_PATH = path.join(process.cwd(), 'src/data/popular-tracks-catalog.json');
 const BANK_PATH = path.join(DATA_DIR, 'facts-bank.json');
 const PROGRESS_PATH = path.join(DATA_DIR, 'bulk-seed-progress.json');
 const FEEDBACK_PATH = path.join(DATA_DIR, 'story-feedback.jsonl');
@@ -22,7 +22,7 @@ const QUEUE_SNAPSHOT_PATH = path.join(DATA_DIR, 'weekly-deep-enrich-queue.json')
 export interface DeepEnrichTrack {
   artist: string;
   title: string;
-  reason: 'ru_zero' | 'ru_no_hot' | 'boring_feedback' | 'genre_top_zero' | 'era_top100';
+  reason: 'ru_zero' | 'ru_no_hot' | 'boring_feedback' | 'era_top100';
   priority: number;
 }
 
@@ -83,10 +83,7 @@ function useLlmVerify(): boolean {
 
 /** Build priority queue for weekly deep enrich (deduped). */
 export function buildWeeklyDeepEnrichQueue(cap: number): DeepEnrichTrack[] {
-  const catalog = loadJson<{ tracks?: Array<{ artist: string; title: string; source?: string }> }>(
-    CATALOG_PATH,
-    { tracks: [] },
-  );
+  const catalog = loadCatalogWithOverlays();
   const bank = loadJson<{ byTrack?: Record<string, Array<{ isHot?: boolean; isMetadata?: boolean; fact: string }>> }>(
     BANK_PATH,
     { byTrack: {} },
@@ -162,17 +159,54 @@ export function buildWeeklyDeepEnrichQueue(cap: number): DeepEnrichTrack[] {
     });
   }
 
-  // 5) genre-top EN zero — second pass
-  for (const key of zeroKeys) {
-    const t = catByKey.get(key);
-    if (!t || isRu(t.artist, t.title)) continue;
-    const src = t.source ?? '';
-    if (!src.startsWith('genre-top')) continue;
-    push({ artist: t.artist, title: t.title, reason: 'genre_top_zero', priority: 20 });
-  }
-
   out.sort((a, b) => a.priority - b.priority || a.artist.localeCompare(b.artist));
   return out.slice(0, cap);
+}
+
+export function summarizeWeeklyDeepEnrichQueue(cap: number): {
+  cap: number;
+  poolSize: number;
+  batchSize: number;
+  byReason: Record<DeepEnrichTrack['reason'], number>;
+  nextRunMsk: string;
+  mode: string;
+  llmVerify: boolean;
+} {
+  const pool = buildWeeklyDeepEnrichQueue(cap * 3);
+  const batch = pool.slice(0, cap);
+  const byReason: Record<DeepEnrichTrack['reason'], number> = {
+    boring_feedback: 0,
+    ru_zero: 0,
+    ru_no_hot: 0,
+    era_top100: 0,
+  };
+  for (const row of batch) byReason[row.reason] += 1;
+  return {
+    cap,
+    poolSize: pool.length,
+    batchSize: batch.length,
+    byReason,
+    nextRunMsk: formatNextSunday3amMsk(),
+    mode: resolveEnrichMode(),
+    llmVerify: useLlmVerify(),
+  };
+}
+
+/** Telegram preview on boot: how many tracks Sunday job will take. */
+export async function sendWeeklyDeepEnrichBootDigest(): Promise<void> {
+  if (!isWeeklyDeepEnrichEnabled() || !isTelegramAdminNotifyConfigured()) return;
+  const cap = resolveWeeklyDeepEnrichCap();
+  const s = summarizeWeeklyDeepEnrichQueue(cap);
+  await sendTelegramAdminMessage(
+    `📅 Weekly deep enrich (preview)\n` +
+      `Следующий прогон: ${s.nextRunMsk}\n` +
+      `Cap: ${s.cap} треков | в очереди: ${s.batchSize} (pool ${s.poolSize})\n` +
+      `Mode: ${s.mode} | LLM verify: ${s.llmVerify ? 'on (~$0.005/fact)' : 'off ($0)'}\n\n` +
+      `👎 boring: ${s.byReason.boring_feedback}\n` +
+      `🇷🇺 zero: ${s.byReason.ru_zero}\n` +
+      `🇷🇺 no hot: ${s.byReason.ru_no_hot}\n` +
+      `📻 era-top100: ${s.byReason.era_top100}`,
+  );
 }
 
 export async function runWeeklyDeepEnrich(
