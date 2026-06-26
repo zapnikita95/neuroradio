@@ -3,7 +3,7 @@ import path from 'node:path';
 import { loadCatalogWithOverlays } from './catalog-overlay.js';
 import { huntDeepFact } from './deep-search-orchestrator.js';
 import type { DeepSearchMode } from './deep-search-provider.js';
-import { ingestHarvestFacts } from './fact-bank.js';
+import { ingestHarvestFacts, trackKey as bankTrackKey } from './fact-bank.js';
 import { isListeningStatsFact } from './reference-fact-quality.js';
 import { isTelegramAdminNotifyConfigured, sendTelegramAdminMessage } from './telegram-admin-notify.js';
 import {
@@ -14,7 +14,6 @@ import {
 
 const DATA_DIR = process.env.ACCOUNT_DATA_DIR?.trim() || path.join(process.cwd(), 'data');
 const BANK_PATH = path.join(DATA_DIR, 'facts-bank.json');
-const PROGRESS_PATH = path.join(DATA_DIR, 'bulk-seed-progress.json');
 const FEEDBACK_PATH = path.join(DATA_DIR, 'story-feedback.jsonl');
 const LAST_RUN_PATH = path.join(DATA_DIR, 'weekly-deep-enrich-last-run.json');
 const QUEUE_SNAPSHOT_PATH = path.join(DATA_DIR, 'weekly-deep-enrich-queue.json');
@@ -47,12 +46,8 @@ export interface WeeklyDeepEnrichResult {
 
 let running = false;
 
-function norm(s: string): string {
-  return (s || '').trim().toLowerCase().replace(/\s+/g, ' ');
-}
-
 function trackKey(artist: string, title: string): string {
-  return `${norm(artist)}|${norm(title)}`;
+  return bankTrackKey(artist, title);
 }
 
 function isRu(artist: string, title: string): boolean {
@@ -73,6 +68,7 @@ function resolveEnrichMode(): DeepSearchMode {
   if (env === 'baseline_ddg' || env === 'ddg_jina' || env === 'tavily' || env === 'perplexity') {
     return env;
   }
+  if (process.env.TAVILY_API_KEY?.trim()) return 'tavily';
   return 'ddg_jina';
 }
 
@@ -81,17 +77,29 @@ function useLlmVerify(): boolean {
   return flag === 'true' || flag === '1' || flag === 'on';
 }
 
-/** Build priority queue for weekly deep enrich (deduped). */
-export function buildWeeklyDeepEnrichQueue(cap: number): DeepEnrichTrack[] {
+type BankPool = Array<{ isHot?: boolean; isMetadata?: boolean; fact: string }>;
+
+function trackPool(
+  bank: { byTrack?: Record<string, BankPool> },
+  artist: string,
+  title: string,
+): BankPool {
+  return bank.byTrack?.[trackKey(artist, title)] ?? [];
+}
+
+function substantiveFacts(pool: BankPool): BankPool {
+  return pool.filter((f) => !f.isMetadata && !isListeningStatsFact(f.fact));
+}
+
+function hotFacts(pool: BankPool): BankPool {
+  return pool.filter((f) => f.isHot && !f.isMetadata);
+}
+
+/** Full priority queue (deduped). Does not depend on bulk-seed-progress — scans bank + catalog. */
+export function buildWeeklyDeepEnrichQueueAll(): DeepEnrichTrack[] {
   const catalog = loadCatalogWithOverlays();
-  const bank = loadJson<{ byTrack?: Record<string, Array<{ isHot?: boolean; isMetadata?: boolean; fact: string }>> }>(
-    BANK_PATH,
-    { byTrack: {} },
-  );
-  const prog = loadJson<{ zeroFactKeys?: string[]; doneKeys?: string[] }>(PROGRESS_PATH, {});
-  const zeroKeys = new Set(prog.zeroFactKeys ?? []);
-  const doneKeys = new Set(prog.doneKeys ?? []);
-  const catByKey = new Map((catalog.tracks ?? []).map((t) => [trackKey(t.artist, t.title), t]));
+  const bank = loadJson<{ byTrack?: Record<string, BankPool> }>(BANK_PATH, { byTrack: {} });
+  const bankTrackCount = Object.keys(bank.byTrack ?? {}).length;
 
   const out: DeepEnrichTrack[] = [];
   const seen = new Set<string>();
@@ -123,34 +131,31 @@ export function buildWeeklyDeepEnrichQueue(cap: number): DeepEnrichTrack[] {
     }
   }
 
-  // 2) RU zero-facts
-  for (const key of zeroKeys) {
-    const t = catByKey.get(key);
-    if (!t || !isRu(t.artist, t.title)) continue;
+  // 2) RU catalog tracks with no substantive facts in bank (zero-facts)
+  for (const t of catalog.tracks ?? []) {
+    if (!isRu(t.artist, t.title)) continue;
+    const pool = trackPool(bank, t.artist, t.title);
+    if (substantiveFacts(pool).length > 0) continue;
     push({ artist: t.artist, title: t.title, reason: 'ru_zero', priority: 1 });
   }
 
-  // 3) RU parsed but no hot fact
+  // 3) RU parsed but weak / no hot fact
   for (const t of catalog.tracks ?? []) {
     if (!isRu(t.artist, t.title)) continue;
-    const k = trackKey(t.artist, t.title);
-    if (!doneKeys.has(k)) continue;
-    const pool = bank.byTrack?.[k] ?? [];
-    const hot = pool.filter((f) => f.isHot && !f.isMetadata);
-    if (hot.length > 0) continue;
-    const substantive = pool.filter((f) => !f.isMetadata && !isListeningStatsFact(f.fact));
+    const pool = trackPool(bank, t.artist, t.title);
+    const substantive = substantiveFacts(pool);
+    if (substantive.length === 0) continue;
+    if (hotFacts(pool).length > 0) continue;
     if (substantive.length >= 3) continue;
     push({ artist: t.artist, title: t.title, reason: 'ru_no_hot', priority: 2 });
   }
 
-  // 4) Era top-100 (500 hits) — re-enrich if weak
+  // 4) Era top-100 overlay — re-enrich if weak
   for (const t of catalog.tracks ?? []) {
     const src = t.source ?? '';
     if (!src.startsWith('era-top100:')) continue;
-    const k = trackKey(t.artist, t.title);
-    const pool = bank.byTrack?.[k] ?? [];
-    const hot = pool.filter((f) => f.isHot && !f.isMetadata).length;
-    if (hot >= 2) continue;
+    const pool = trackPool(bank, t.artist, t.title);
+    if (hotFacts(pool).length >= 2) continue;
     push({
       artist: t.artist,
       title: t.title,
@@ -160,32 +165,89 @@ export function buildWeeklyDeepEnrichQueue(cap: number): DeepEnrichTrack[] {
   }
 
   out.sort((a, b) => a.priority - b.priority || a.artist.localeCompare(b.artist));
-  return out.slice(0, cap);
+
+  if (out.length === 0) {
+    console.warn(
+      `[weekly-deep-enrich] queue empty — catalog=${catalog.tracks?.length ?? 0} ` +
+        `bankTracks=${bankTrackCount} bankPath=${BANK_PATH} ` +
+        `eraOverlay=${fs.existsSync(path.join(DATA_DIR, 'era-top100-tracks.json'))}`,
+    );
+  }
+
+  return out;
 }
 
-export function summarizeWeeklyDeepEnrichQueue(cap: number): {
+/** Build priority queue for weekly deep enrich (deduped, capped). */
+export function buildWeeklyDeepEnrichQueue(cap: number): DeepEnrichTrack[] {
+  return buildWeeklyDeepEnrichQueueAll().slice(0, cap);
+}
+
+/** Persist queue snapshot after era overlay / bank refresh (Railway volume). */
+export function persistWeeklyDeepEnrichQueueSnapshot(cap?: number): {
   cap: number;
-  poolSize: number;
-  batchSize: number;
-  byReason: Record<DeepEnrichTrack['reason'], number>;
-  nextRunMsk: string;
-  mode: string;
-  llmVerify: boolean;
+  queue: DeepEnrichTrack[];
+  totalEligible: number;
 } {
-  const pool = buildWeeklyDeepEnrichQueue(cap * 3);
-  const batch = pool.slice(0, cap);
+  const limit = cap ?? resolveWeeklyDeepEnrichCap();
+  const all = buildWeeklyDeepEnrichQueueAll();
+  const queue = all.slice(0, limit);
+  fs.mkdirSync(DATA_DIR, { recursive: true });
+  fs.writeFileSync(
+    QUEUE_SNAPSHOT_PATH,
+    JSON.stringify(
+      {
+        builtAt: new Date().toISOString(),
+        cap: limit,
+        totalEligible: all.length,
+        queue,
+      },
+      null,
+      2,
+    ),
+  );
+  console.log(
+    `[weekly-deep-enrich] queue snapshot ${queue.length}/${all.length} eligible → ${QUEUE_SNAPSHOT_PATH}`,
+  );
+  return { cap: limit, queue, totalEligible: all.length };
+}
+
+function countByReason(rows: DeepEnrichTrack[]): Record<DeepEnrichTrack['reason'], number> {
   const byReason: Record<DeepEnrichTrack['reason'], number> = {
     boring_feedback: 0,
     ru_zero: 0,
     ru_no_hot: 0,
     era_top100: 0,
   };
-  for (const row of batch) byReason[row.reason] += 1;
+  for (const row of rows) byReason[row.reason] += 1;
+  return byReason;
+}
+
+export function summarizeWeeklyDeepEnrichQueue(cap: number): {
+  cap: number;
+  totalEligible: number;
+  batchSize: number;
+  byReason: Record<DeepEnrichTrack['reason'], number>;
+  byReasonTotal: Record<DeepEnrichTrack['reason'], number>;
+  bankTracks: number;
+  catalogTracks: number;
+  eraOverlay: boolean;
+  nextRunMsk: string;
+  mode: string;
+  llmVerify: boolean;
+} {
+  const catalog = loadCatalogWithOverlays();
+  const bank = loadJson<{ byTrack?: Record<string, BankPool> }>(BANK_PATH, { byTrack: {} });
+  const all = buildWeeklyDeepEnrichQueueAll();
+  const batch = all.slice(0, cap);
   return {
     cap,
-    poolSize: pool.length,
+    totalEligible: all.length,
     batchSize: batch.length,
-    byReason,
+    byReason: countByReason(batch),
+    byReasonTotal: countByReason(all),
+    bankTracks: Object.keys(bank.byTrack ?? {}).length,
+    catalogTracks: catalog.tracks?.length ?? 0,
+    eraOverlay: fs.existsSync(path.join(DATA_DIR, 'era-top100-tracks.json')),
     nextRunMsk: formatNextSunday3amMsk(),
     mode: resolveEnrichMode(),
     llmVerify: useLlmVerify(),
@@ -197,15 +259,21 @@ export async function sendWeeklyDeepEnrichBootDigest(): Promise<void> {
   if (!isWeeklyDeepEnrichEnabled() || !isTelegramAdminNotifyConfigured()) return;
   const cap = resolveWeeklyDeepEnrichCap();
   const s = summarizeWeeklyDeepEnrichQueue(cap);
+  const emptyHint =
+    s.totalEligible === 0
+      ? `\n⚠️ очередь пуста: bank=${s.bankTracks} треков, catalog=${s.catalogTracks}, era=${s.eraOverlay ? 'ok' : 'нет overlay'}`
+      : '';
   await sendTelegramAdminMessage(
     `📅 Weekly deep enrich (preview)\n` +
       `Следующий прогон: ${s.nextRunMsk}\n` +
-      `Cap: ${s.cap} треков | в очереди: ${s.batchSize} (pool ${s.poolSize})\n` +
+      `Cap: ${s.cap} | возьмёт: ${s.batchSize} из ${s.totalEligible} eligible\n` +
+      `Bank: ${s.bankTracks} треков | catalog: ${s.catalogTracks} | era overlay: ${s.eraOverlay ? 'да' : 'нет'}\n` +
       `Mode: ${s.mode} | LLM verify: ${s.llmVerify ? 'on (~$0.005/fact)' : 'off ($0)'}\n\n` +
-      `👎 boring: ${s.byReason.boring_feedback}\n` +
-      `🇷🇺 zero: ${s.byReason.ru_zero}\n` +
-      `🇷🇺 no hot: ${s.byReason.ru_no_hot}\n` +
-      `📻 era-top100: ${s.byReason.era_top100}`,
+      `👎 boring: ${s.byReason.boring_feedback} (всего ${s.byReasonTotal.boring_feedback})\n` +
+      `🇷🇺 zero: ${s.byReason.ru_zero} (всего ${s.byReasonTotal.ru_zero})\n` +
+      `🇷🇺 no hot: ${s.byReason.ru_no_hot} (всего ${s.byReasonTotal.ru_no_hot})\n` +
+      `📻 era-top100: ${s.byReason.era_top100} (всего ${s.byReasonTotal.era_top100})` +
+      emptyHint,
   );
 }
 

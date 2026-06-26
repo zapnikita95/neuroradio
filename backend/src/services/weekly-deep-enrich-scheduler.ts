@@ -1,5 +1,5 @@
 import { eraOverlayAgeMs, isEraTop100AutoEnabled, runEraTop100CatalogUpdate } from './era-top100-catalog.js';
-import { runWeeklyDeepEnrich, sendWeeklyDeepEnrichBootDigest } from './weekly-deep-enrich.js';
+import { runWeeklyDeepEnrich, sendWeeklyDeepEnrichBootDigest, persistWeeklyDeepEnrichQueueSnapshot } from './weekly-deep-enrich.js';
 import {
   isWeeklyDeepEnrichEnabled,
   msUntilNextSunday3amMsk,
@@ -9,7 +9,6 @@ const FIRST_RUN_MS = parseInt(
   process.env.WEEKLY_DEEP_ENRICH_DELAY_MS ?? String(6 * 60 * 60_000),
   10,
 );
-const ERA_BOOT_DELAY_MS = parseInt(process.env.ERA_TOP100_BOOT_DELAY_MS ?? String(3 * 60_000), 10);
 const ERA_MAX_AGE_MS = parseInt(
   process.env.ERA_TOP100_MAX_AGE_MS ?? String(7 * 24 * 60 * 60_000),
   10,
@@ -57,11 +56,11 @@ export function startWeeklyDeepEnrichScheduler(): void {
   if (!isWeeklyDeepEnrichEnabled() || started) return;
   started = true;
 
-  void sendWeeklyDeepEnrichBootDigest();
-
-  setTimeout(() => {
-    void maybeRefreshEraTop100Catalog('boot');
-  }, ERA_BOOT_DELAY_MS).unref?.();
+  void (async () => {
+    await maybeRefreshEraTop100Catalog('boot');
+    persistWeeklyDeepEnrichQueueSnapshot();
+    await sendWeeklyDeepEnrichBootDigest();
+  })();
 
   setTimeout(() => {
     void runWeeklyDeepEnrichCycle().finally(() => scheduleRecurringSunday());
