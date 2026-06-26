@@ -83,15 +83,17 @@ class MediaMonitorService : Service() {
     private fun observeTracks(app: MusicStoryApp) {
         trackObserverJob?.cancel()
         trackObserverJob = serviceScope.launch {
-            combine(
-                app.mediaControllerManager.nowPlaying.map { it?.displayKey },
-                MediaNotificationListener.lastNotificationTrack.map { it?.displayKey },
-            ) { sessionKey, notificationKey -> sessionKey ?: notificationKey }
+            app.mediaControllerManager.effectiveNowPlaying
+                .map { track -> track?.takeIf { it.isValid() } }
                 .distinctUntilChanged()
-                .collect { key ->
-                    val track = app.mediaControllerManager.resolveNowPlayingTrack()
-                        ?: app.mediaControllerManager.effectiveNowPlaying.value
-                    if (track != null && track.isValid() && key != null && key != lastTrackKey) {
+                .collect { track ->
+                    if (track == null) {
+                        lastTrackKey = null
+                        updateNotification(null)
+                        return@collect
+                    }
+                    val key = track.displayKey
+                    if (key != lastTrackKey) {
                         val matchKey = TrackTitleNormalizer.matchKey(track)
                         val firstTrack = lastTrackMatchKey == null
                         val titleChanged = !firstTrack && lastTrackMatchKey != matchKey

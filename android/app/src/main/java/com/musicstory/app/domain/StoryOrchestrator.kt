@@ -247,7 +247,20 @@ class StoryOrchestrator(
         }
 
         scope.launch {
-            mediaControllerManager.nowPlaying.collect {
+            var lastEffectiveTrackKey: String? = null
+            mediaControllerManager.effectiveNowPlaying.collect { track ->
+                val valid = track?.takeIf { it.isValid() }
+                val key = valid?.displayKey
+                if (valid != null && key != null) {
+                    if (key != lastEffectiveTrackKey) {
+                        recoverFromStoryError()
+                        lastEffectiveTrackKey = key
+                    } else if (_state.value == OrchestratorState.ERROR) {
+                        recoverFromStoryError()
+                    }
+                } else if (track == null) {
+                    lastEffectiveTrackKey = null
+                }
                 publishUiState()
             }
         }
@@ -584,6 +597,7 @@ class StoryOrchestrator(
                             context.getString(R.string.error_story_timeout_server)
                         }
                         _state.value = OrchestratorState.ERROR
+                        recoverMediaDetectionAfterStoryFailure()
                         publishUiState()
                     } else if (manual && !isUserCancelReason(e.message)) {
                         StoryLog.w("Manual story cancelled by app: ${e.message}")
@@ -603,6 +617,7 @@ class StoryOrchestrator(
                     abortGeneration(session, manual, rollbackAutoTrigger = !manual)
                     _errorMessage.value = e.message ?: context.getString(R.string.error_story_fetch_failed)
                     _state.value = OrchestratorState.ERROR
+                    recoverMediaDetectionAfterStoryFailure()
                     publishUiState()
                 } finally {
                     generationInFlight = false
@@ -922,6 +937,7 @@ class StoryOrchestrator(
                     _errorMessage.value = error.message ?: context.getString(R.string.error_story_fetch_failed)
                     _hintMessage.value = null
                     _state.value = OrchestratorState.ERROR
+                    recoverMediaDetectionAfterStoryFailure()
                 }
                 publishUiState()
             },
@@ -1220,6 +1236,28 @@ class StoryOrchestrator(
 
     fun onHomeHidden() {
         clearTransientState()
+    }
+
+    private fun recoverFromStoryError() {
+        if (_errorMessage.value == null &&
+            _hintMessage.value == null &&
+            _state.value != OrchestratorState.ERROR
+        ) {
+            return
+        }
+        _errorMessage.value = null
+        _hintMessage.value = null
+        if (_state.value == OrchestratorState.ERROR) {
+            _state.value = OrchestratorState.LISTENING
+        }
+    }
+
+    /** Re-sync media session + notification after a failed story request. */
+    private fun recoverMediaDetectionAfterStoryFailure() {
+        mediaControllerManager.refreshActiveController()
+        mediaControllerManager.syncEffectiveNowPlaying()
+        mediaControllerManager.restoreSystemMusicVolumeIfNeeded()
+        mediaControllerManager.resumeMusic()
     }
 
     private fun clearTransientState() {
