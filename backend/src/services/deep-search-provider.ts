@@ -62,80 +62,161 @@ function stripTags(s: string): string {
   return s.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
 }
 
-const TRUSTED_DOMAINS = [
-  'npr.org',
+const MUSIC_PRESS_DOMAINS = [
+  'songfacts.com',
+  'americansongwriter.com',
+  'smoothradio.com',
   'pitchfork.com',
   'rollingstone.com',
   'genius.com',
-  'wikipedia.org',
   'theguardian.com',
   'billboard.com',
   'bbc.com',
+  'bbc.co.uk',
+  'npr.org',
+  'wikipedia.org',
   'rap.ru',
   'the-flow.ru',
 ];
+
+function slugify(s: string): string {
+  return s
+    .toLowerCase()
+    .replace(/[^a-z0-9\u0400-\u04FF]+/g, '-')
+    .replace(/^-|-$/g, '');
+}
+
+function titleTokens(title: string): string[] {
+  return title
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}\s]/gu, ' ')
+    .split(/\s+/)
+    .filter((w) => w.length >= 3);
+}
+
+function artistTokens(artist: string): string[] {
+  return artist
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}\s]/gu, ' ')
+    .split(/\s+/)
+    .filter((w) => w.length >= 2);
+}
+
+/** Drop NPR/chart pages that only mention the song title in passing (Melania, Drake chart, …). */
+export function isRelevantDeepSearchHit(hit: SearchHit, artist: string, title: string): boolean {
+  const blob = `${hit.url} ${hit.title} ${hit.snippet}`.toLowerCase();
+  const aTok = artistTokens(artist);
+  const tTok = titleTokens(title);
+  if (tTok.length === 0 || aTok.length === 0) return true;
+
+  const artistHit = aTok.some((t) => blob.includes(t));
+  const titleHits = tTok.filter((t) => blob.includes(t)).length;
+  const minTitleHits = Math.min(2, tTok.length);
+  const titleHit = titleHits >= minTitleHits;
+
+  const urlSlug = hit.url.toLowerCase();
+  const titleInUrl = tTok.some((t) => urlSlug.includes(t) || urlSlug.includes(t.replace(/\s+/g, '-')));
+
+  if (hit.url.includes('npr.org')) {
+    return artistHit && (titleHit || titleInUrl);
+  }
+  if (hit.url.includes('wikipedia.org')) {
+    return artistHit || titleHit || titleInUrl;
+  }
+  return artistHit && titleHit;
+}
 
 export function scoreSearchHit(hit: SearchHit, artist: string, title: string): number {
   let score = hit.score ?? 0.5;
   const url = hit.url.toLowerCase();
   const text = `${hit.title} ${hit.snippet}`.toLowerCase();
-  const titleTokens = title.toLowerCase().split(/\s+/).filter((w) => w.length >= 4);
-  const artistTokens = artist.toLowerCase().split(/\s+/).filter((w) => w.length >= 3);
+  const tTok = titleTokens(title);
+  const aTok = artistTokens(artist);
 
-  for (const d of TRUSTED_DOMAINS) {
-    if (url.includes(d)) score += 0.25;
+  for (const d of MUSIC_PRESS_DOMAINS) {
+    if (url.includes(d)) score += 0.2;
   }
-  if (titleTokens.some((t) => text.includes(t))) score += 0.3;
-  if (artistTokens.some((t) => text.includes(t))) score += 0.15;
-  if (/interview|meaning|story behind|discusses|explains|интервью|смысл/i.test(text)) score += 0.2;
-  if (/youtube\.com|tiktok\.com|lyrics\.com|azlyrics/i.test(url)) score -= 0.4;
+  if (/songfacts\.com|americansongwriter\.com|smoothradio\.com/.test(url)) score += 0.35;
+  if (url.includes('wikipedia.org') && tTok.some((t) => hit.title.toLowerCase().includes(t))) score += 0.4;
+  if (tTok.filter((t) => text.includes(t)).length >= Math.min(2, tTok.length)) score += 0.35;
+  if (aTok.some((t) => text.includes(t))) score += 0.15;
+  if (/interview|meaning|story behind|discusses|explains|inspiration|интервью|смысл|история песни/i.test(text)) {
+    score += 0.2;
+  }
+  if (/youtube\.com|tiktok\.com|lyrics\.com|azlyrics/i.test(url)) score -= 0.5;
+  if (url.includes('npr.org') && !isRelevantDeepSearchHit(hit, artist, title)) score -= 1.5;
+  if (!isRelevantDeepSearchHit(hit, artist, title)) score -= 0.8;
   return score;
+}
+
+async function fetchDdgHtmlOnce(
+  doFetch: typeof directFetch,
+  query: string,
+  maxResults: number,
+): Promise<SearchHit[]> {
+  const body = new URLSearchParams({ q: query.trim() });
+  const response = await doFetch('https://html.duckduckgo.com/html/', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/x-www-form-urlencoded',
+      'User-Agent': USER_AGENT,
+    },
+    body: body.toString(),
+    signal: AbortSignal.timeout(18000),
+  });
+  if (!response.ok) return [];
+  const html = await response.text();
+  const titles =
+    html.match(/class="result__a"[^>]*>([^<]+)<\/a>/g)?.map((m) => {
+      const hit = m.match(/>([^<]+)<\/a>/);
+      return decodeHtml(stripTags(hit?.[1] ?? ''));
+    }) ?? [];
+  const snippets =
+    html.match(/class="result__snippet"[^>]*>\s*([^<]+)/g)?.map((m) => {
+      const hit = m.match(/>\s*([^<]+)/);
+      return decodeHtml(stripTags(hit?.[1] ?? '')).slice(0, 400);
+    }) ?? [];
+  const urls =
+    html.match(/class="result__a"[^>]*href="(https?:\/\/[^"]+)"/g)?.map((m) => {
+      const hit = m.match(/href="(https?:\/\/[^"]+)"/);
+      let u = hit?.[1] ?? '';
+      if (u.includes('uddg=')) {
+        const decoded = u.match(/uddg=([^&]+)/);
+        if (decoded?.[1]) u = decodeURIComponent(decoded[1]);
+      }
+      return u;
+    }) ?? [];
+
+  const count = Math.min(maxResults, Math.max(titles.length, urls.length));
+  const hits: SearchHit[] = [];
+  for (let i = 0; i < count; i++) {
+    const url = urls[i] ?? '';
+    if (!url.startsWith('http')) continue;
+    hits.push({ url, title: titles[i] ?? '', snippet: snippets[i] ?? '' });
+  }
+  return hits;
 }
 
 export async function searchDdgHtml(query: string, maxResults = 5): Promise<SearchHit[]> {
   try {
-    const body = new URLSearchParams({ q: query.trim() });
-    const response = await directFetch('https://html.duckduckgo.com/html/', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded',
-        'User-Agent': USER_AGENT,
-      },
-      body: body.toString(),
-      signal: AbortSignal.timeout(18000),
-    });
-    if (!response.ok) return [];
-    const html = await response.text();
-    const titles =
-      html.match(/class="result__a"[^>]*>([^<]+)<\/a>/g)?.map((m) => {
-        const hit = m.match(/>([^<]+)<\/a>/);
-        return decodeHtml(stripTags(hit?.[1] ?? ''));
-      }) ?? [];
-    const snippets =
-      html.match(/class="result__snippet"[^>]*>\s*([^<]+)/g)?.map((m) => {
-        const hit = m.match(/>\s*([^<]+)/);
-        return decodeHtml(stripTags(hit?.[1] ?? '')).slice(0, 400);
-      }) ?? [];
-    const urls =
-      html.match(/class="result__a"[^>]*href="(https?:\/\/[^"]+)"/g)?.map((m) => {
-        const hit = m.match(/href="(https?:\/\/[^"]+)"/);
-        let u = hit?.[1] ?? '';
-        if (u.includes('uddg=')) {
-          const decoded = u.match(/uddg=([^&]+)/);
-          if (decoded?.[1]) u = decodeURIComponent(decoded[1]);
-        }
-        return u;
-      }) ?? [];
-
-    const count = Math.min(maxResults, Math.max(titles.length, urls.length));
-    const hits: SearchHit[] = [];
-    for (let i = 0; i < count; i++) {
-      const url = urls[i] ?? '';
-      if (!url.startsWith('http')) continue;
-      hits.push({ url, title: titles[i] ?? '', snippet: snippets[i] ?? '' });
+    let hits = await fetchDdgHtmlOnce(directFetch, query, maxResults);
+    if (hits.length === 0) {
+      hits = await fetchDdgHtmlOnce(proxyFetch, query, maxResults);
+      if (hits.length > 0) {
+        console.log(`[deep-search] ddg proxy ok q="${query.slice(0, 50)}" hits=${hits.length}`);
+      }
     }
     return hits;
   } catch (err) {
+    try {
+      const hits = await fetchDdgHtmlOnce(proxyFetch, query, maxResults);
+      if (hits.length > 0) {
+        console.log(`[deep-search] ddg proxy recover q="${query.slice(0, 50)}" hits=${hits.length}`);
+        return hits;
+      }
+    } catch {
+      /* both failed */
+    }
     console.warn(`[deep-search] ddg fail q="${query.slice(0, 50)}" err=${err instanceof Error ? err.message : err}`);
     return [];
   }
@@ -242,7 +323,7 @@ function extractPressUrls(text: string): string[] {
   return [...new Set(found.map((u) => u.replace(/[.,;]+$/, '')))].filter((u) => !isJunkPressUrl(u));
 }
 
-/** NPR site search via Jina Reader — finds interview URLs when DDG is blocked. */
+/** NPR site search via Jina Reader — only URLs that mention artist + title in path. */
 export async function discoverViaNprSearch(artist: string, title: string): Promise<SearchHit[]> {
   const query = `${artist} ${title}`.trim();
   const searchUrl = `https://www.npr.org/search?query=${encodeURIComponent(query)}`;
@@ -254,14 +335,17 @@ export async function discoverViaNprSearch(artist: string, title: string): Promi
     if (!response.ok) return [];
     const text = await response.text();
     const urls = extractPressUrls(text).filter((u) => u.includes('npr.org/20'));
-    const artistSlug = artist.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
-    const artistWord = artist.split(/\s+/)[0]?.toLowerCase() ?? '';
+    const tTok = titleTokens(title);
+    const aTok = artistTokens(artist);
     const filtered = urls.filter((u) => {
       const lower = u.toLowerCase();
-      return lower.includes(artistSlug) || lower.includes(artistWord);
+      const artistOk = aTok.some((t) => lower.includes(t) || lower.includes(t.replace(/\s+/g, '-')));
+      const titleOk =
+        tTok.some((t) => lower.includes(t) || lower.includes(t.replace(/\s+/g, '-'))) ||
+        tTok.filter((t) => lower.includes(t)).length >= Math.min(2, tTok.length);
+      return artistOk && titleOk;
     });
-    const finalUrls = (filtered.length > 0 ? filtered : urls).slice(0, 3);
-    return finalUrls.map((url) => ({
+    return filtered.slice(0, 3).map((url) => ({
       url,
       title: `NPR: ${artist} — ${title}`,
       snippet: text.slice(0, 300),
@@ -291,6 +375,25 @@ export async function discoverViaGeniusSearch(artist: string, title: string): Pr
       title: `Genius: ${title}`,
       snippet: '',
     }));
+  } catch {
+    return [];
+  }
+}
+
+/** Songfacts uses predictable /facts/artist/title URLs — probe via HEAD (free). */
+export async function discoverViaSongfacts(artist: string, title: string): Promise<SearchHit[]> {
+  const artistSlug = slugify(artist);
+  const titleSlug = slugify(title);
+  if (!artistSlug || !titleSlug) return [];
+  const url = `https://www.songfacts.com/facts/${artistSlug}/${titleSlug}`;
+  try {
+    const response = await directFetch(url, {
+      method: 'HEAD',
+      headers: { 'User-Agent': USER_AGENT },
+      signal: AbortSignal.timeout(8000),
+    });
+    if (!response.ok) return [];
+    return [{ url, title: `Songfacts: ${title}`, snippet: '' }];
   } catch {
     return [];
   }
@@ -352,17 +455,25 @@ async function collectSearchHits(artist: string, title: string): Promise<SearchH
     console.log(`[deep-search] wiki fallback hits=${wikiHits.length} (ddg=${all.length - wikiHits.length})`);
   }
 
-  // NPR + Genius via Jina (free, works when DDG blocked)
-  const nprHits = await discoverViaNprSearch(artist, title);
+  // NPR + Genius + Songfacts via Jina/HEAD (free, works when DDG blocked)
+  const nprHits = (await discoverViaNprSearch(artist, title)).filter((h) =>
+    isRelevantDeepSearchHit(h, artist, title),
+  );
   if (nprHits.length > 0) {
     all.push(...nprHits);
     console.log(`[deep-search] npr hits=${nprHits.length}`);
   }
   const geniusHits = await discoverViaGeniusSearch(artist, title);
   if (geniusHits.length > 0) all.push(...geniusHits);
+  const songfactsHits = await discoverViaSongfacts(artist, title);
+  if (songfactsHits.length > 0) {
+    all.push(...songfactsHits);
+    console.log(`[deep-search] songfacts hit`);
+  }
 
   const byUrl = new Map<string, SearchHit>();
   for (const h of all) {
+    if (!isRelevantDeepSearchHit(h, artist, title)) continue;
     const prev = byUrl.get(h.url);
     if (!prev || scoreSearchHit(h, artist, title) > scoreSearchHit(prev, artist, title)) {
       byUrl.set(h.url, h);
@@ -412,12 +523,10 @@ export async function runDeepSearch(params: {
       .sort((a, b) => (b.score ?? 0) - (a.score ?? 0));
 
     if (mode === 'ddg_jina' || mode === 'tavily' || mode === 'baseline_ddg') {
-      const nprFirst = [...hits].sort((a, b) => {
-        const aNpr = a.url.includes('npr.org') ? 1 : 0;
-        const bNpr = b.url.includes('npr.org') ? 1 : 0;
-        return bNpr - aNpr || (b.score ?? 0) - (a.score ?? 0);
-      });
-      const urls = nprFirst.slice(0, Math.max(maxPages, 3)).map((h) => h.url);
+      const ranked = [...hits]
+        .filter((h) => isRelevantDeepSearchHit(h, artist, title))
+        .sort((a, b) => (b.score ?? 0) - (a.score ?? 0));
+      const urls = ranked.slice(0, Math.max(maxPages, 3)).map((h) => h.url);
       if (urls.length > 0 && mode !== 'baseline_ddg') {
         pages = await extractPagesParallel(urls, 2);
         // Discover press URLs embedded in Wikipedia pages (NPR, Pitchfork, …)

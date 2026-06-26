@@ -49,11 +49,12 @@ export function buildDeepSearchQueries(artist: string, title: string): DeepSearc
   return {
     primary: [
       `${artistQ} "${cleanTitle}" interview meaning`,
-      `${artistQ} "${cleanTitle}" song story behind`,
-      `${artistQ} "${cleanTitle}" Dave Bayley OR frontman OR wrote about`,
+      `${artistQ} "${cleanTitle}" song story behind inspiration`,
+      `${artistQ} "${cleanTitle}" wrote about meaning interview`,
     ],
     press: [
       `${artistQ} "${cleanTitle}" (${siteClause})`,
+      `${artistQ} "${cleanTitle}" site:songfacts.com OR site:americansongwriter.com`,
       `${artistQ} "${cleanTitle}" interview site:genius.com`,
     ],
     artistBio: [

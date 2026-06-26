@@ -68,7 +68,6 @@ function resolveEnrichMode(): DeepSearchMode {
   if (env === 'baseline_ddg' || env === 'ddg_jina' || env === 'tavily' || env === 'perplexity') {
     return env;
   }
-  if (process.env.TAVILY_API_KEY?.trim()) return 'tavily';
   return 'ddg_jina';
 }
 
