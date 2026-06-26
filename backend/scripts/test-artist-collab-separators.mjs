@@ -4,6 +4,7 @@ import {
   collaboratorNames,
   isLikelyMultiArtistTag,
   normalizeCollabArtistTag,
+  normalizeStoryArtist,
   primaryArtistName,
 } from '../dist/services/artist-primary.js';
 
@@ -27,30 +28,37 @@ const CASES = [
   { artist: 'Blond:ish', expectCollabs: 1, multi: false },
   { artist: 'M|O|O|N', expectCollabs: 1, multi: false },
   { artist: 'Yusuf / Cat Stevens', expectCollabs: 2, multi: true },
+  {
+    artist: 'Axwell /\\ Ingrosso, Axwell, Sebastian Ingrosso',
+    expectStoryArtist: 'Axwell & Ingrosso',
+  },
+  { artist: 'Earth, Wind & Fire', expectStoryArtist: 'Earth, Wind & Fire' },
 ];
 
 let failed = 0;
 
 console.log('Artist collab separator tests\n');
 
-for (const { artist, expectCollabs, multi } of CASES) {
+for (const { artist, expectCollabs, multi, expectStoryArtist } of CASES) {
   const collabs = collaboratorNames(artist);
   const norm = normalizeCollabArtistTag(artist);
+  const storyArtist = normalizeStoryArtist(artist);
   const primary = primaryArtistName(artist);
   const isMulti = isLikelyMultiArtistTag(artist);
 
   let ok = true;
   if (typeof expectCollabs === 'number') {
     if (collabs.length !== expectCollabs) ok = false;
-  } else if (JSON.stringify(collabs) !== JSON.stringify(expectCollabs)) {
+  } else if (expectCollabs && JSON.stringify(collabs) !== JSON.stringify(expectCollabs)) {
     ok = false;
   }
-  if (isMulti !== multi) ok = false;
+  if (multi !== undefined && isMulti !== multi) ok = false;
+  if (expectStoryArtist && storyArtist !== expectStoryArtist) ok = false;
 
   const mark = ok ? '✓' : '❌';
   if (!ok) failed += 1;
   console.log(
-    `${mark} ${JSON.stringify(artist)} → [${collabs.join(' | ')}] norm="${norm}" primary="${primary}" multi=${isMulti}`,
+    `${mark} ${JSON.stringify(artist)} → [${collabs.join(' | ')}] norm="${norm}" story="${storyArtist}" primary="${primary}" multi=${isMulti}`,
   );
 }
 

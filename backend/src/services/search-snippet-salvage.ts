@@ -1,6 +1,6 @@
 import type { ReferenceFactBundle, SelectedReferenceFact } from './fact-picker.js';
 import { buildSelectedReferenceFact } from './fact-picker.js';
-import { factMentionsArtist, factMentionsTitle, factNamesForeignEntity, hasTrackContextSignal } from './fact-relevance.js';
+import { factMentionsArtist, factMentionsTitle, factNamesForeignEntity, hasTrackContextSignal, factMentionsOtherTrackTitle, isMisattributedBandTrackFact } from './fact-relevance.js';
 import { isTrackTitleAnchoredSeed } from './fact-track-anchor.js';
 import { interestRating10 } from './fact-interest-log.js';
 import { isMetadataOnlyFallbackFact } from './metadata-facts.js';
@@ -16,12 +16,14 @@ import {
   isStudioEquipmentCatalogSeed,
   isThinReleaseCatalogSeed,
   isWikiBiographyLead,
+  isCitationBibliographySeed,
 } from './reference-fact-quality.js';
 import { acceptSearchGroundedSnippet, acceptIndieEmergingSnippet, isLyricsPageSeed, isPlaylistJunkSnippet, isSpeakableReferenceFact, isUnspeakableWebSeed } from './web-snippet-accept.js';
 import { isRejectedPickSeed } from './fact-seed-pick.js';
 import { isRejectedStorySeed } from './fact-picker.js';
 import { factFitsStoryLanguage } from './fact-language-fit.js';
 import type { StoryLanguageId } from './story-language.js';
+import type { StoryNarratorId } from './story-narrator.js';
 
 /** Seed too weak to ground LLM + quality gate — upgrade to wiki/better facts. */
 export function isWeakSnippetSeed(fact: string, score = interestScore(fact), title = ''): boolean {
@@ -134,6 +136,41 @@ export function pickRelaxedSnippetSeed(
   if (!best || interestScore(best) < 6) return null;
 
   return buildSelectedReferenceFact(best, artist, title, 'auto', undefined);
+}
+
+/**
+ * Never-empty baseline fallback: weakest speakable fact when strict pick/salvage all failed.
+ * Still blocks wrong-track bleed and unspeakable junk; allows album/artist context when wiki is thin.
+ */
+export function pickGuaranteedBaselineSeed(
+  bundle: ReferenceFactBundle,
+  rawSnippets: string[],
+  artist: string,
+  title: string,
+  narrator: StoryNarratorId = 'auto',
+  storyLanguage: StoryLanguageId = 'ru',
+): SelectedReferenceFact | null {
+  const candidates = [...new Set([...rawSnippets, ...bundle.trackFacts, ...bundle.artistFacts])]
+    .map((s) => s.trim())
+    .filter((s) => s.length >= 20 && s.length <= 600)
+    .filter((s) => factFitsStoryLanguage(s, storyLanguage))
+    .filter((s) => !isCitationBibliographySeed(s))
+    .filter((s) => !isPlaylistJunkSnippet(s, artist, title))
+    .filter((s) => !isUnspeakableWebSeed(s))
+    .filter((s) => !factMentionsOtherTrackTitle(s, title))
+    .filter((s) => !isMisattributedBandTrackFact(s, title))
+    .sort((a, b) => {
+      const boost = (s: string) =>
+        (factMentionsArtist(s, artist) ? 30 : 0) +
+        (factMentionsTitle(s, title) ? 25 : 0) +
+        (hasTrackContextSignal(s) ? 12 : 0) +
+        interestScore(s);
+      return boost(b) - boost(a);
+    });
+
+  const best = candidates[0];
+  if (!best) return null;
+  return buildSelectedReferenceFact(best, artist, title, narrator);
 }
 
 export function enrichFactBundleWithRawSnippets(

@@ -11,6 +11,7 @@ import {
   isWebListicleJunk,
 } from './fact-relevance.js';
 import { filterAndRankFacts, interestScore, isArtistDisambiguationListSeed, isArtistFormationBioSeed, isBoringFact, isEncyclopediaDefinitionSeed, isListeningStatsFact, isThinReleaseCatalogSeed, isWikiTrackListingSeed } from './reference-fact-quality.js';
+import { normalizeStoryArtist } from './artist-primary.js';
 import { rejectSeedForTrackStory } from './fact-track-anchor.js';
 import { WEAK_TRIVIA_PATTERNS } from './story-fact-hunt.js';
 import { fetchReferenceFactBundle as fetchWikipediaBundle, fetchFastTrackWikiFacts } from './wikipedia-facts.js';
@@ -709,6 +710,11 @@ export async function fetchAggregatedFactContext(
   options: { storyLanguage?: 'ru' | 'en' } = {},
 ): Promise<AggregatedFactContext> {
   const t0 = Date.now();
+  const rawArtist = artist;
+  artist = normalizeStoryArtist(artist);
+  if (artist !== rawArtist.trim()) {
+    console.log(`[facts] artist normalized "${rawArtist}" → "${artist}"`);
+  }
   const lookupTitle = primaryHarvestLookupTitle(title);
   const cc = resolveFactCountryCode(artist, lookupTitle, countryCode);
   const harvestCtx = { artist, title: lookupTitle, countryCode: cc };
@@ -924,7 +930,7 @@ export async function fetchAggregatedFactContext(
   }
 
   const bundle: ReferenceFactBundle = { trackFacts, artistFacts };
-  const { rawSnippets, snippetSources } = buildRawSnippets(
+  let { rawSnippets, snippetSources } = buildRawSnippets(
     wiki,
     ddgUnfiltered,
     webAllUnfiltered,
@@ -935,6 +941,25 @@ export async function fetchAggregatedFactContext(
     artist,
     title,
   );
+
+  if (rawSnippets.length < 2) {
+    const seen = new Set(rawSnippets.map((s) => s.toLowerCase().trim()));
+    for (const fact of [...trackFacts, ...artistFacts]) {
+      const trimmed = fact.trim();
+      if (trimmed.length < RAW_SNIPPET_MIN_LEN) continue;
+      const key = trimmed.toLowerCase();
+      if (seen.has(key)) continue;
+      seen.add(key);
+      rawSnippets.push(trimmed.slice(0, 480));
+      snippetSources.push('wiki');
+      if (rawSnippets.length >= RAW_SNIPPET_MAX) break;
+    }
+    if (rawSnippets.length > 0) {
+      console.log(
+        `[facts] bundle→snippets supplement "${artist}" — "${title}": snippets=${rawSnippets.length}`,
+      );
+    }
+  }
 
   const storyLanguage: StoryLanguageId = resolveStoryLanguage(options.storyLanguage);
   const langBundle = filterBundleForStoryLanguage(bundle, storyLanguage);

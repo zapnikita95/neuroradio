@@ -445,7 +445,50 @@ export function pickReferenceFact(
   return null;
 }
 
-/** After duplicate-reject: pick next-best bundle fact, ignoring recent-topic similarity (only excluded fingerprints). */
+/**
+ * Never-empty fallback: weakest acceptable track/album fact when strict picker returned null.
+ * Skips encyclopedia junk and wrong-track bleed; allows low-score wiki chunks so story can ship.
+ */
+export function pickLastResortBundleSeed(
+  bundle: ReferenceFactBundle,
+  artist: string,
+  title: string,
+  narrator: StoryNarratorId = 'auto',
+): SelectedReferenceFact | null {
+  const pools = splitBundleByScope(bundle, artist, title);
+  const trackPoolForReject = [...pools.track, ...pools.album];
+  const attributionCorpus = [...pools.track, ...pools.album, ...pools.artist];
+  const order: FactScope[] = ['track', 'album', 'artist'];
+  for (const scope of order) {
+    const pool = pools[scope];
+    const sorted = [...pool].sort(
+      (a, b) => adjustedInterestScore(b, narrator) - adjustedInterestScore(a, narrator),
+    );
+    for (const fact of sorted) {
+      if (isMetadataOnlyFallbackFact(fact)) continue;
+      if (isCitationBibliographySeed(fact)) continue;
+      if (isMisattributedBandTrackFact(fact, title)) continue;
+      if (rejectSeedForTrackStory(fact, artist, title)) continue;
+      if (
+        isRejectedSeed(
+          fact,
+          title,
+          'ru',
+          trackPoolForReject,
+          artist,
+          scope,
+          attributionCorpus,
+        )
+      ) {
+        continue;
+      }
+      if (fact.trim().length < 25) continue;
+      return wrapSelected(fact, scope, narrator);
+    }
+  }
+  return null;
+}
+
 export function pickFallbackSeedFromBundle(
   bundle: ReferenceFactBundle,
   artist: string,

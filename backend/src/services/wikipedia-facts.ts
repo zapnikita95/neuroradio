@@ -809,7 +809,6 @@ const FAST_TRACK_WIKI_SECTIONS = [
   'Music and structure',
   'Lyrics',
   'Release',
-  'Music video',
   'Chart performance',
 ];
 

@@ -37,14 +37,17 @@ const { fetchAggregatedFactContext } = await import('../dist/services/fact-aggre
 const { pickReferenceFact, explainReferenceFactSelection } = await import('../dist/services/fact-picker.js');
 const { splitBundleByScope, rankScopedFacts } = await import('../dist/services/fact-ranking.js');
 const { isThinReleaseCatalogSeed } = await import('../dist/services/reference-fact-quality.js');
+const { normalizeStoryArtist } = await import('../dist/services/artist-primary.js');
 
 let failed = 0;
 
 console.log('Placement-filter live check\n');
 
-for (const { artist, title, cc } of TRACKS) {
+for (const track of TRACKS) {
+  const artist = normalizeStoryArtist(track.artist);
+  const { title, cc } = track;
   console.log('═'.repeat(72));
-  console.log(`${artist} — ${title}`);
+  console.log(`${track.artist} → "${artist}" — ${title}`);
   const t0 = Date.now();
   const ctx = await fetchAggregatedFactContext(artist, title, cc);
   const ms = Date.now() - t0;

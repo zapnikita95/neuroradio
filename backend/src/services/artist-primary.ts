@@ -123,3 +123,42 @@ export function normalizeArtistKey(artist: string): string {
     .replace(/\s+/g, ' ')
     .trim();
 }
+
+function tailRepeatsHeadCredits(head: string, tail: string): boolean {
+  const headParts = collaboratorNames(head);
+  if (headParts.length === 0) return false;
+  const tailLower = tail.toLowerCase();
+  const matched = headParts.filter((part) => {
+    const tokens = part
+      .toLowerCase()
+      .split(/\s+/)
+      .filter((w) => w.length >= 3);
+    return tokens.some((token) => tailLower.includes(token));
+  });
+  return matched.length >= Math.min(2, headParts.length);
+}
+
+/**
+ * Last.fm / Android scrobbler: «Axwell /\ Ingrosso, Axwell, Sebastian Ingrosso» → «Axwell & Ingrosso».
+ * Keeps comma-in-band names (Earth, Wind & Fire) when tail is not a credit expansion.
+ */
+export function normalizeStoryArtist(artist: string): string {
+  const trimmed = artist.trim();
+  if (!trimmed) return artist;
+
+  const commaIdx = trimmed.indexOf(',');
+  if (commaIdx > 0) {
+    const head = trimmed.slice(0, commaIdx).trim();
+    const tail = trimmed.slice(commaIdx + 1).trim();
+    if (
+      head &&
+      tail &&
+      (isLikelyMultiArtistTag(head) || /\/|\\|[Λλ]|\svs\.?\s/i.test(head)) &&
+      tailRepeatsHeadCredits(head, tail)
+    ) {
+      return normalizeCollabArtistTag(head);
+    }
+  }
+
+  return normalizeCollabArtistTag(trimmed);
+}

@@ -3,7 +3,7 @@
  * normalize duo artist tag → search «Title Artist song» → read intro sections.
  * Used when harvest bundle is empty/weak or before LLM fact-hunt.
  */
-import { collaboratorNames, normalizeCollabArtistTag } from './artist-primary.js';
+import { collaboratorNames, normalizeCollabArtistTag, normalizeStoryArtist } from './artist-primary.js';
 import { factMentionsTitle } from './fact-relevance.js';
 import { fetchFastTrackWikiFacts, fetchWikiExtractDirect, pickIntroWikiFact } from './wikipedia-facts.js';
 import { filterAndRankFacts, interestScore } from './reference-fact-quality.js';
@@ -25,6 +25,7 @@ function wikiTitleCaseArtist(name: string): string {
 
 async function searchWikiSongPageTitle(artist: string, title: string): Promise<string | null> {
   const cleanTitle = cleanTrackTitle(title);
+  artist = normalizeStoryArtist(artist);
   const collabs = collaboratorNames(artist);
   const normalized = normalizeCollabArtistTag(artist);
 

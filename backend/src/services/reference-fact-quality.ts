@@ -365,6 +365,10 @@ export function isThinReleaseCatalogSeed(fact: string): boolean {
   const ordinalTrackRe = new RegExp(`\\b${THIN_RELEASE_ORDINAL_EN}\\s+track\\b`, 'i');
   const ordinalSingleRuRe = new RegExp(`${THIN_RELEASE_ORDINAL_RU}\\s+сингл`, 'i');
   const ordinalTrackRuRe = new RegExp(`${THIN_RELEASE_ORDINAL_RU}\\s+трек`, 'i');
+  const asOrdinalSingleRe = new RegExp(
+    `\\bas\\s+(?:the|a)\\s+(?:album'?s\\s+)?${THIN_RELEASE_ORDINAL_EN}\\s+single\\b`,
+    'i',
+  );
   const releasedAsSingleRe = new RegExp(
     `\\breleased(?:\\s+on[^.;]{0,60})?\\s+as\\s+(?:the|a)\\s+(?:album'?s\\s+)?${THIN_RELEASE_ORDINAL_EN}\\s+single\\b`,
     'i',
@@ -375,9 +379,11 @@ export function isThinReleaseCatalogSeed(fact: string): boolean {
   );
 
   const isPlacement =
+    asOrdinalSingleRe.test(t) ||
     (ordinalSingleRe.test(t) &&
       /\b(?:from|off(?:\s+of)?)\s+(?:their|the|his|her|its)\b/i.test(t)) ||
     releasedAsSingleRe.test(t) ||
+    (/\bas\s+a\s+digital\s+download\b/i.test(t) && ordinalSingleRe.test(t)) ||
     (ordinalTrackRe.test(t) && /\balbum\b/i.test(t)) ||
     servesAsTrackRe.test(t) ||
     ordinalSingleRuRe.test(t) ||
@@ -440,18 +446,27 @@ const BACKSTORY_FACT_PATTERNS: RegExp[] = [
 
 export const MIN_PICK_INTEREST_SCORE = 6;
 
-/** «Directed by X» / «music video» без драмы — не топ семя; сильные клипы (бюджет, скандал) не штрафуем. */
-const GENERIC_MUSIC_VIDEO_SEED =
-  /\b(?:music video|official video|video was directed|directed by|promotional video|accompanying music video|клип(?:а|ом|е|у)?|режисс(?:ё|е)р(?:ом|а|у)?|filmed by|video for|premiered on mtv|speaking of the video|video to mtv|read through a ton of scripts|scripts from.*directors|put into visuals|general theme of the song.*visuals?)\b/i;
+/** Клип / съёмки / VHS — не семя: проект про песню и артистов, не про видео. */
+const MUSIC_VIDEO_CONTENT =
+  /\b(?:music video|official video|the video|video was|video is|video shoot|video premiere|video for|promotional video|accompanying music video|directed by|filmed (?:in|at|on|by)|camcorder|vhs|found footage|mockumentary|premiered on mtv|speaking of the video|video to mtv|put into visuals|general theme of the song.*visuals?|scripts from.*directors|read through a ton of scripts|клип(?:а|ом|е|у)?|режисс(?:ё|е)р(?:ом|а|у)?|снимал(?:ся|и)?\s+клип)\b/i;
 
-const STRONG_MUSIC_VIDEO_STORY =
-  /\b(?:controversial|scandal|banned|million|invested|sevenfold|optical illusion|vfx|cgi|first (?:ever )?(?:music )?video|national film registry|fourteen.minute|полмиллион|собственн\w+\s+денег|record registry|переснимал|бюджет|one billion views|vhs|camcorder|fight emerge|battery runs out|found footage|mockumentary|one[- ]take)\b/i;
+export function isMusicVideoContentSeed(fact: string): boolean {
+  return MUSIC_VIDEO_CONTENT.test(fact.trim());
+}
 
+/** @deprecated use isMusicVideoContentSeed — kept for import sites */
 export function isGenericMusicVideoSeed(fact: string): boolean {
-  const trimmed = fact.trim();
-  if (!GENERIC_MUSIC_VIDEO_SEED.test(trimmed)) return false;
-  if (STRONG_MUSIC_VIDEO_STORY.test(trimmed)) return false;
-  return true;
+  return isMusicVideoContentSeed(fact);
+}
+
+const RECORDING_BACKSTORY_PATTERNS: RegExp[] = [
+  /\b(?:uncredited vocals?|hidden vocal|guest vocal|session vocalist|vocals (?:were|was) (?:provided|performed) by)\b/i,
+  /\b(?:writing session|wrote the lyrics|co[- ]?wrote with|recorded (?:in|at)|demo (?:version|tape)|originally intended|last[- ]minute|surprise vocal|overdub)\b/i,
+  /(?:не\s+засветил\w*|скрыт\w*\s+вокал|сессионн\w*\s+вокал|соавтор(?:ил|ила|ство))/i,
+];
+
+export function isRecordingBackstorySeed(fact: string): boolean {
+  return RECORDING_BACKSTORY_PATTERNS.some((p) => p.test(fact.trim()));
 }
 
 function normalizeForMatch(text: string): string {
@@ -531,7 +546,7 @@ export function interestScore(fact: string): number {
   if (isListeningStatsFact(trimmed)) return -100;
   if (isGenericConcertVenueSeed(trimmed)) return -25;
   if (isCatalogMetadataSeed(trimmed)) return -30;
-  if (isGenericMusicVideoSeed(trimmed)) return -25;
+  if (isMusicVideoContentSeed(trimmed)) return -45;
   if (isWeakWikiSongIntroSeed(trimmed)) return -28;
   if (isLyricsPageSeed(trimmed)) score -= 50;
   if (isTrackMeaningNarrativeSeed(trimmed)) score += 32;
@@ -589,7 +604,7 @@ export function interestScore(fact: string): number {
   if (/\b(?:Leon|L[eé]on: The Professional|Eric Serra)\b/i.test(trimmed)) score += 12;
   if (/\b(?:deathtronica|electronicore|metalcore|hardcore|scream\s+vocals?)\b/i.test(trimmed)) score += 20;
   if (isBackstageDramaSeed(trimmed)) score += 14;
-  if (STRONG_MUSIC_VIDEO_STORY.test(trimmed)) score += 16;
+  if (isRecordingBackstorySeed(trimmed)) score += 20;
   if (isArtistFormationBioSeed(trimmed)) score -= 12;
   if (BACKSTORY_FACT_PATTERNS.some((pattern) => pattern.test(fact))) score += 12;
   for (const pattern of STORY_FACT_PATTERNS) {
@@ -703,7 +718,7 @@ export function isBoringFact(fact: string): boolean {
   if (isCitationBibliographySeed(trimmed)) return true;
   if (isGenericConcertVenueSeed(trimmed)) return true;
   if (isCatalogMetadataSeed(trimmed)) return true;
-  if (isGenericMusicVideoSeed(trimmed)) return true;
+  if (isMusicVideoContentSeed(trimmed)) return true;
   if (isStudioEquipmentCatalogSeed(trimmed)) return true;
   if (isThinReleaseCatalogSeed(trimmed)) return true;
   if (isMusicVideoLocationSpam(trimmed)) return true;

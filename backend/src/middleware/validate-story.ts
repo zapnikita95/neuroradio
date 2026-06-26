@@ -11,6 +11,7 @@ import { resolveTtsVoiceStyle, type TtsVoiceStyleId } from '../services/tts-voic
 import type { TtsProviderId, VoiceTier } from '../services/tts-router.js';
 import { resolveStoryLanguage, type StoryLanguageId } from '../services/story-language.js';
 import { resolveEdgeVoicePresetId } from '../services/edge-voices.js';
+import { normalizeStoryArtist } from '../services/artist-primary.js';
 import {
   resolveElevenLabsVoiceSetting,
   type ElevenLabsVoiceSetting,
@@ -122,7 +123,8 @@ function asOptionalFolderId(value: unknown): string | undefined {
 export function validateStoryFullBody(req: Request, res: Response, next: NextFunction): void {
   const body = req.body as StoryFullBody;
 
-  const artist = asTrimmedString(body.artist, SECURITY.maxArtistLength);
+  const artistRaw = asTrimmedString(body.artist, SECURITY.maxArtistLength);
+  const artist = artistRaw ? normalizeStoryArtist(artistRaw) : '';
   const title = asTrimmedString(body.title, SECURITY.maxTitleLength);
   if (!artist || !title) {
     const artistLen = typeof body.artist === 'string' ? body.artist.trim().length : -1;
@@ -130,6 +132,9 @@ export function validateStoryFullBody(req: Request, res: Response, next: NextFun
     setLogDetail(res, `validate: artist/title artistLen=${artistLen} titleLen=${titleLen}`);
     res.status(400).json({ error: 'Invalid artist or title (required, max 200 chars each)' });
     return;
+  }
+  if (artistRaw !== artist) {
+    console.log(`[artist] normalized "${artistRaw}" → "${artist}"`);
   }
 
   let previousScripts: string[] = [];

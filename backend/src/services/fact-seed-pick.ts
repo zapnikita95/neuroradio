@@ -11,6 +11,7 @@ import {
   isEncyclopediaDefinitionSeed,
   isGenericConcertVenueSeed,
   isGenericMusicVideoSeed,
+  isMusicVideoContentSeed,
   isSetlistLiveDebutSeed,
   isBoringFact,
   isCollectorFact,
@@ -74,7 +75,7 @@ export function isRejectedPickSeed(
   }
   if (isAlbumListingSeed(fact)) return true;
   if (isListeningStatsFact(fact)) return true;
-  if (!artistScope && isThinReleaseCatalogSeed(fact)) return true;
+  if (isThinReleaseCatalogSeed(fact)) return true;
   if (isCatalogMetadataSeed(fact)) return true;
   if (isCitationBibliographySeed(fact)) return true;
   if (
@@ -108,7 +109,7 @@ export function isRejectedPickSeed(
   ) {
     return true;
   }
-  if (isGenericMusicVideoSeed(fact)) return true;
+  if (isMusicVideoContentSeed(fact)) return true;
   if (
     !artistScope &&
     title.trim() &&

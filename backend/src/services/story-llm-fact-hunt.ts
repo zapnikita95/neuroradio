@@ -3,7 +3,7 @@ import { fuzzyTokenMatch } from './title-transliterate.js';
 import type { SelectedReferenceFact } from './fact-picker.js';
 import { factNamesForeignEntity, factMentionsArtist, factMentionsTitle, hasTrackContextSignal, hasRussianTrackContextSignal } from './fact-relevance.js';
 import { hasAnchoredTrackContext, rejectSeedForTrackStory } from './fact-track-anchor.js';
-import { interestScore, isBoringFact, MIN_PICK_INTEREST_SCORE, isWeakChartSeed, isGenericMusicVideoSeed, isCatalogMetadataSeed, isCitationBibliographySeed, isGenericConcertVenueSeed, isStudioEquipmentCatalogSeed, isListeningStatsFact } from './reference-fact-quality.js';
+import { interestScore, isBoringFact, MIN_PICK_INTEREST_SCORE, isWeakChartSeed, isGenericMusicVideoSeed, isMusicVideoContentSeed, isThinReleaseCatalogSeed, isCatalogMetadataSeed, isCitationBibliographySeed, isGenericConcertVenueSeed, isStudioEquipmentCatalogSeed, isListeningStatsFact, isRecordingBackstorySeed } from './reference-fact-quality.js';
 import { interestRating10 } from './fact-interest-log.js';
 import { MIN_GOOD_SCOPE_INTEREST } from './fact-picker.js';
 import { WEAK_TRIVIA_PATTERNS, FACT_HUNT_LLM_PROMPT_BLOCK } from './story-fact-hunt.js';
@@ -79,7 +79,10 @@ export function shouldRunLlmFactHunt(
   title = '',
   artist = '',
 ): boolean {
-  if (rawSnippetCount < 2) return false;
+  if (rawSnippetCount < 1) return false;
+  if (rawSnippetCount < 2 && selected && bundleFactCount > 0 && selected.interestScore >= FAST_SEED_INTEREST_SCORE) {
+    return false;
+  }
   if (!selected) return true;
   if (bundleFactCount === 0) return true;
   if (selected && isLyricsPageSeed(selected.fact)) return true;
@@ -88,11 +91,16 @@ export function shouldRunLlmFactHunt(
   if (selected && isCitationBibliographySeed(selected.fact)) return true;
   if (selected && isGenericConcertVenueSeed(selected.fact)) return true;
   if (selected && isGenericMusicVideoSeed(selected.fact)) return true;
+  if (selected && isMusicVideoContentSeed(selected.fact)) return true;
+  if (selected && isThinReleaseCatalogSeed(selected.fact)) return true;
   if (selected && isStudioEquipmentCatalogSeed(selected.fact)) return true;
   if (selected && isListeningStatsFact(selected.fact)) return true;
   if (selected.interestScore >= FAST_SEED_INTEREST_SCORE) {
     if (selected.scope === 'track' && title.trim() && !factMentionsTitle(selected.fact, title)) return true;
     if (isGenericMusicVideoSeed(selected.fact)) return true;
+    if (isMusicVideoContentSeed(selected.fact)) return true;
+    if (isThinReleaseCatalogSeed(selected.fact)) return true;
+    if (!isRecordingBackstorySeed(selected.fact) && !hasNarrativeSeedSignal(selected.fact)) return true;
     return false;
   }
   // No track-level facts — artist trivia is weak for a specific song; let LLM hunt from snippets.
@@ -121,11 +129,15 @@ export function explainFactHuntDecision(
   if (isLyricsPageSeed(selected.fact)) return 'lyrics-page-seed';
   if (!hasNarrativeSeedSignal(selected.fact)) return 'no-narrative-seed';
   if (isCatalogMetadataSeed(selected.fact)) return 'catalog-metadata-seed';
+  if (isThinReleaseCatalogSeed(selected.fact)) return 'thin-release-catalog-seed';
+  if (isMusicVideoContentSeed(selected.fact)) return 'music-video-content-seed';
   if (selected.interestScore >= FAST_SEED_INTEREST_SCORE) {
     if (selected.scope === 'track' && title.trim() && !factMentionsTitle(selected.fact, title)) {
       return 'track-seed-without-title';
     }
     if (isGenericMusicVideoSeed(selected.fact)) return 'generic-music-video-seed';
+    if (isMusicVideoContentSeed(selected.fact)) return 'music-video-content-seed';
+    if (isThinReleaseCatalogSeed(selected.fact)) return 'thin-release-catalog-seed';
     if (isStudioEquipmentCatalogSeed(selected.fact)) return 'studio-equipment-catalog-seed';
     if (isListeningStatsFact(selected.fact)) return 'listening-stats-seed';
     return `fast-seed score=${selected.interestScore}`;

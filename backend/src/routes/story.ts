@@ -12,8 +12,10 @@ import {
   fetchDiscogsFactFallback,
 } from '../services/fact-aggregator.js';
 import { fetchDeepWebSearchSnippets, fetchArtistIdentityWebSnippets } from '../services/web-search-facts.js';
+import { canRunDeepSearch, resolveDeepSearchMode } from '../services/deep-search-config.js';
+import { huntDeepFact } from '../services/deep-search-orchestrator.js';
 import { fetchFastTrackWikiFacts } from '../services/wikipedia-facts.js';
-import { explainReferenceFactSelection, factsTooSimilar, isRejectedStorySeed, isStrongBundleFallbackFact, pickFallbackSeedFromBundle, buildSelectedReferenceFact, scopeLabelRuFor, type SelectedReferenceFact } from '../services/fact-picker.js';
+import { explainReferenceFactSelection, factsTooSimilar, isRejectedStorySeed, isStrongBundleFallbackFact, pickFallbackSeedFromBundle, pickLastResortBundleSeed, buildSelectedReferenceFact, scopeLabelRuFor, type SelectedReferenceFact } from '../services/fact-picker.js';
 import { formatFactPickLog, logFactCandidatePools } from '../services/fact-interest-log.js';
 import { interestScore, isWikiBiographyLead, isCatalogMetadataSeed, isEncyclopediaDefinitionSeed, isGenericConcertVenueSeed, isSetlistLiveDebutSeed, isListeningStatsFact, isThinReleaseCatalogSeed } from '../services/reference-fact-quality.js';
 import { isArtistCareerBioWithoutTrack, hasAnchoredTrackContext } from '../services/fact-track-anchor.js';
@@ -46,7 +48,7 @@ import {
   shouldRunLlmFactHunt,
   explainFactHuntDecision,
 } from '../services/story-llm-fact-hunt.js';
-import { pickSalvageSnippetSeed, pickRelaxedSnippetSeed, isWeakSelectedFact, isWeakSnippetSeed, enrichFactBundleWithRawSnippets } from '../services/search-snippet-salvage.js';
+import { pickSalvageSnippetSeed, pickRelaxedSnippetSeed, pickGuaranteedBaselineSeed, isWeakSelectedFact, isWeakSnippetSeed, enrichFactBundleWithRawSnippets } from '../services/search-snippet-salvage.js';
 import { hasActionableSnippets } from '../services/web-snippet-accept.js';
 import { factMentionsArtistLoose } from '../services/fact-relevance.js';
 import { hasLlmKeyForProvider, resolveLlmProvider, resolveEffectiveStoryLlmProvider, clientKeyForProvider, type ClientLlmKeys, type ClientLocalOllama } from '../services/llm-provider.js';
@@ -179,6 +181,8 @@ interface StoryFullBody {
   speak_track_names_in_voiceover?: boolean;
   /** ios/android — server must synthesize WAV only (see client-audio-format.ts). */
   client_platform?: 'ios' | 'android' | string;
+  /** Opt-in: NPR/interview deep fact hunt (premium/trial + DEEP_SEARCH_ENABLED). */
+  deep_search?: boolean;
 }
 
 router.get('/quota', (req: Request, res: Response) => {
@@ -367,6 +371,7 @@ router.post('/full', extractClientSecrets, validateStoryFullBody, storyFullRateL
   const geminiModel = (req.body as StoryFullBody).gemini_model;
   const groqModel = (req.body as StoryFullBody).groq_model;
   const openrouterModelRequested = (req.body as StoryFullBody).openrouter_model;
+  const deepSearchRequested = (req.body as StoryFullBody).deep_search === true;
   const clientOwnOpenRouter = Boolean(clientLlmKeys.openrouter?.trim());
   const openrouterModelFact = resolveOpenRouterModelForTier(
     userTier,
@@ -554,6 +559,7 @@ router.post('/full', extractClientSecrets, validateStoryFullBody, storyFullRateL
 
     let selectedFact: SelectedReferenceFact | null = bankFact;
     let factFromBank = Boolean(bankFact);
+    let factFromSalvage = false;
 
     if (bankFact) {
       const unused = await countUnusedBankFactsForUser(installId, metadata.artist, metadata.title);
@@ -744,7 +750,43 @@ router.post('/full', extractClientSecrets, validateStoryFullBody, storyFullRateL
         storyNarrator,
         factPickCtx,
       );
-      console.log(formatFactPickLog(selectedFact, 'rules'));
+      if (!selectedFact) {
+        selectedFact = pickLastResortBundleSeed(
+          factBundle,
+          metadata.artist,
+          metadata.title,
+          storyNarrator,
+        );
+        if (selectedFact) {
+          console.log(formatFactPickLog(selectedFact, 'rules', 'last-resort'));
+        }
+      }
+      if (!selectedFact) {
+        selectedFact =
+          pickSalvageSnippetSeed(factCtx.rawSnippets, metadata.artist, metadata.title, storyLang) ??
+          pickRelaxedSnippetSeed(factCtx.rawSnippets, metadata.artist, metadata.title, storyLang);
+        if (selectedFact) {
+          factFromSalvage = true;
+          console.log(formatFactPickLog(selectedFact, 'web-salvage', 'early'));
+        }
+      }
+      if (!selectedFact) {
+        selectedFact = pickGuaranteedBaselineSeed(
+          factBundle,
+          factCtx.rawSnippets,
+          metadata.artist,
+          metadata.title,
+          storyNarrator,
+          storyLang,
+        );
+        if (selectedFact) {
+          factFromSalvage = true;
+          console.log(formatFactPickLog(selectedFact, 'web-salvage', 'guaranteed'));
+        }
+      }
+      if (selectedFact && !factFromSalvage) {
+        console.log(formatFactPickLog(selectedFact, 'rules'));
+      }
     }
 
     throwIfStoryAborted(clientAbort, 'facts-ready');
@@ -760,7 +802,6 @@ router.post('/full', extractClientSecrets, validateStoryFullBody, storyFullRateL
     }
 
     let factHuntLlm = false;
-    let factFromSalvage = false;
     const bundleFactCount = trackFactCount + artistFactCount;
     const groundedFactCount = countGroundedFacts(factBundle);
 
@@ -829,6 +870,42 @@ router.post('/full', extractClientSecrets, validateStoryFullBody, storyFullRateL
               ]);
               console.log(formatFactPickLog(selectedFact, 'llm') + ' (deep-web)');
             }
+          }
+        }
+        if (!selectedFact && canRunDeepSearch(installId, userTier, deepSearchRequested)) {
+          const deepMode = resolveDeepSearchMode(userTier);
+          console.log(
+            `[deep-search] start mode=${deepMode} artist="${metadata.artist}" title="${metadata.title}"`,
+          );
+          const deepFact = await huntDeepFact({
+            artist: metadata.artist,
+            title: metadata.title,
+            mode: deepMode,
+            openRouterApiKey: process.env.OPEN_ROUTER_API_KEY?.trim(),
+            openRouterModel: openrouterModelFact,
+            tavilyApiKey: process.env.TAVILY_API_KEY?.trim(),
+            perplexityApiKey: process.env.PERPLEXITY_API_KEY?.trim(),
+          });
+          if (deepFact) {
+            selectedFact = buildSelectedReferenceFact(
+              deepFact.fact,
+              metadata.artist,
+              metadata.title,
+              storyNarrator,
+              deepFact.scope,
+            );
+            factHuntLlm = true;
+            ingestFacts(metadata.artist, metadata.title, [
+              { fact: deepFact.fact, scope: deepFact.scope, source: 'llm' },
+            ]);
+            console.log(
+              `[deep-search] ok scope=${deepFact.scope} source=${deepFact.source} ` +
+                `cost=$${deepFact.costUsd.toFixed(4)} latency=${deepFact.searchLatencyMs}ms ` +
+                `url=${deepFact.evidenceUrl.slice(0, 80)} fact="${deepFact.fact.slice(0, 100)}"`,
+            );
+            console.log(formatFactPickLog(selectedFact, 'llm', 'deep-search'));
+          } else {
+            console.warn(`[deep-search] no fact mode=${deepMode}`);
           }
         }
         if (!selectedFact) {
@@ -1365,7 +1442,7 @@ router.post('/full', extractClientSecrets, validateStoryFullBody, storyFullRateL
           factFromBank = false;
           factHuntLlm = false;
           factFromSalvage = false;
-          storyReferenceFacts = [selectedFact.fact];
+          storyReferenceFacts = [bundleFallback.fact];
           if (coverCtx.isCover && coverCtx.coverNoteRu) {
             storyReferenceFacts = [coverCtx.coverNoteRu, ...storyReferenceFacts];
           }
