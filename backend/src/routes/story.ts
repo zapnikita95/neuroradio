@@ -29,6 +29,7 @@ import {
   ensureAccount,
   ingestBundleToBank,
   pickBankFactForUser,
+  pickValidBankFactForUser,
   pickFactForUser,
   prefetchArtistFactsToBank,
   recordUserStory,
@@ -475,81 +476,41 @@ router.post('/full', extractClientSecrets, validateStoryFullBody, storyFullRateL
       lookupCuratedFact(coverCtx.factArtist, coverCtx.factTitle) ??
       lookupCuratedFact(artist, title);
     let factFromCurated = false;
-    let bankFact: Awaited<ReturnType<typeof pickBankFactForUser>> = null;
-    if (curatedHit) {
-      const curatedFp = factFingerprint(curatedHit.fact);
-      if (!usedFingerprints.has(curatedFp)) {
-        ingestFacts(coverCtx.factArtist, coverCtx.factTitle, [
-          { fact: curatedHit.fact, scope: curatedHit.scope, source: 'api' },
-        ]);
-        const curatedScore = Math.max(interestScore(curatedHit.fact), 12);
-        bankFact = {
-          fact: curatedHit.fact,
-          scope: curatedHit.scope,
-          scopeLabelRu: scopeLabelRuFor(curatedHit.scope),
-          interestScore: curatedScore,
-          interestRating: interestRating10(curatedHit.fact),
-        };
-        factFromCurated = true;
+    let bankFact: Awaited<ReturnType<typeof pickValidBankFactForUser>> = null;
+
+    if (curatedHit && !usedFingerprints.has(factFingerprint(curatedHit.fact))) {
+      ingestFacts(coverCtx.factArtist, coverCtx.factTitle, [
+        { fact: curatedHit.fact, scope: curatedHit.scope, source: 'api' },
+      ]);
+      const curatedScore = Math.max(interestScore(curatedHit.fact), 12);
+      bankFact = {
+        fact: curatedHit.fact,
+        scope: curatedHit.scope,
+        scopeLabelRu: scopeLabelRuFor(curatedHit.scope),
+        interestScore: curatedScore,
+        interestRating: interestRating10(curatedHit.fact),
+      };
+      factFromCurated = true;
+      console.log(
+        `[facts] ORIGIN=curated (ЗАГОТОВКА curated-facts.json) artist="${coverCtx.factArtist}" title="${coverCtx.factTitle}"`,
+      );
+    } else {
+      if (curatedHit) {
         console.log(
-          `[facts] ORIGIN=curated (ЗАГОТОВКА curated-facts.json) artist="${coverCtx.factArtist}" title="${coverCtx.factTitle}"`,
-        );
-      } else {
-        console.log(
-          `[facts] curated seed already used for "${artist}" — "${title}", trying fact bank`,
-        );
-        bankFact = await pickBankFactForUser(
-          installId,
-          artist,
-          title,
-          coverCtx,
-          factPickCtx,
-          previousScripts.length,
+          `[facts] curated seed heard recently for "${artist}" — "${title}", trying fact bank`,
         );
       }
-    } else {
-      bankFact = await pickBankFactForUser(
+      bankFact = await pickValidBankFactForUser(
         installId,
         artist,
         title,
         coverCtx,
         factPickCtx,
         previousScripts.length,
+        storyLang,
+        metadata.artist,
+        metadata.title,
       );
-    }
-
-    if (bankFact && usedFingerprints.has(factFingerprint(bankFact.fact))) {
-      console.log(
-        `[facts] bank seed already used for "${artist}" — "${title}", trying next bank fact`,
-      );
-      bankFact = await pickBankFactForUser(
-        installId,
-        artist,
-        title,
-        coverCtx,
-        factPickCtx,
-        previousScripts.length + 1,
-      );
-    }
-
-    if (bankFact && !factFitsStoryLanguage(bankFact.fact, storyLang)) {
-      console.log(
-        `[facts] bank seed wrong language (${storyLang}) for "${artist}" — "${title}", fetching fresh facts`,
-      );
-      bankFact = null;
-    }
-
-    if (
-      bankFact &&
-      factsTooSimilar(bankFact.fact, rejectSimilarTo, {
-        pickScope: bankFact.scope,
-        recentScopes: factPickCtx.recentScopes,
-      })
-    ) {
-      console.log(
-        `[facts] bank seed repeats recent topic for "${artist}" — "${title}", fetching fresh facts`,
-      );
-      bankFact = null;
     }
 
     const factArtist = coverCtx.factArtist;
@@ -558,67 +519,46 @@ router.post('/full', extractClientSecrets, validateStoryFullBody, storyFullRateL
     let factBundle = factCtx.bundle;
     let trackFactCount = 0;
     let artistFactCount = 0;
-    if (bankFact && isEncyclopediaDefinitionSeed(bankFact.fact)) {
-      console.log(
-        `[facts] bank seed trivial definition for "${metadata.artist}" — "${metadata.title}", fetching fresh facts`,
-      );
-      bankFact = null;
-    }
-
-    if (bankFact && isArtistCareerBioWithoutTrack(bankFact.fact, metadata.title)) {
-      console.log(
-        `[facts] bank seed artist bio without track for "${metadata.artist}" — "${metadata.title}", fetching fresh facts`,
-      );
-      bankFact = null;
-    }
-
-    if (bankFact && !factMentionsArtistLoose(bankFact.fact, metadata.artist)) {
-      console.warn(
-        `[facts] bank seed off-topic (no "${metadata.artist}") fact="${bankFact.fact.slice(0, 100)}" — trying next bank fact`,
-      );
-      bankFact = await pickBankFactForUser(
-        installId,
-        artist,
-        title,
-        coverCtx,
-        factPickCtx,
-        previousScripts.length + 2,
-      );
-      factFromCurated = false;
-    }
 
     if (!bankFact) {
       const unusedInBank = await countUnusedBankFactsForUser(installId, artist, title);
       if (unusedInBank > 0) {
-        bankFact = await pickBankFactForUser(
+        console.warn(
+          `[facts] bank has ${unusedInBank} unused fact(s) for "${artist}" — "${title}" but pick failed — exhaustive bank walk`,
+        );
+        bankFact = await pickValidBankFactForUser(
           installId,
           artist,
           title,
           coverCtx,
           factPickCtx,
-          previousScripts.length,
+          previousScripts.length + 4,
+          storyLang,
+          metadata.artist,
+          metadata.title,
+          24,
         );
-        if (bankFact) {
-          console.log(
-            `[facts] bank retry install=${installId.slice(0, 8)} artist="${artist}" title="${title}" unused=${unusedInBank}`,
-          );
-        }
       }
     }
 
     let selectedFact: SelectedReferenceFact | null = bankFact;
-    let factFromBank = Boolean(bankFact);
+    let factFromBank = Boolean(bankFact) && !factFromCurated;
     let factFromSalvage = false;
 
     if (bankFact) {
       const unused = await countUnusedBankFactsForUser(installId, metadata.artist, metadata.title);
       console.log(
-        `[facts] cache hit install=${installId.slice(0, 8)} artist="${metadata.artist}" title="${metadata.title}" ` +
-          `unusedInBank=${unused} — skip wiki/web/ddg (seed already saved)`,
+        `[facts] bank-first hit install=${installId.slice(0, 8)} artist="${metadata.artist}" title="${metadata.title}" ` +
+          `unusedInBank=${unused} origin=${factFromCurated ? 'curated' : 'bank'} — skip wiki/web/ddg`,
       );
       timing.mark('facts-fetched', `source=${factFromCurated ? 'curated' : 'bank'} unused=${unused}`);
       console.log(formatFactPickLog(bankFact, factFromCurated ? 'curated' : 'bank'));
     } else {
+      const unusedBeforeFetch = await countUnusedBankFactsForUser(installId, artist, title);
+      console.log(
+        `[facts] bank miss install=${installId.slice(0, 8)} artist="${metadata.artist}" title="${metadata.title}" ` +
+          `unusedInBank=${unusedBeforeFetch} — live fetch`,
+      );
       factCtx = await fetchAggregatedFactContext(
         metadata.artist,
         metadata.title,
@@ -1062,9 +1002,31 @@ router.post('/full', extractClientSecrets, validateStoryFullBody, storyFullRateL
       );
       if (factFromBank) factFromBank = false;
       selectedFact = null;
+      const altBank = await pickValidBankFactForUser(
+        installId,
+        artist,
+        title,
+        coverCtx,
+        factPickCtx,
+        previousScripts.length + 6,
+        storyLang,
+        metadata.artist,
+        metadata.title,
+      );
+      if (altBank) {
+        bankFact = altBank;
+        factFromBank = true;
+        selectedFact = altBank;
+        console.log(`[facts] bank alt after reject: "${altBank.fact.slice(0, 100)}"`);
+      }
     }
 
-    if (!selectedFact && bankFact && countGroundedFacts(factBundle) === 0) {
+    if (
+      !selectedFact &&
+      bankFact &&
+      countGroundedFacts(factBundle) === 0 &&
+      (await countUnusedBankFactsForUser(installId, artist, title)) === 0
+    ) {
       console.log(
         `[facts] bank seed unusable for "${metadata.artist}" — "${metadata.title}", fetching fresh facts`,
       );

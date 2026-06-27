@@ -963,11 +963,11 @@ const stillPick = pickReferenceFact(
 );
 assert(
   stillPick && !isAbstractInfluenceWithoutQuoteSeed(stillPick.fact),
-  `Still Waiting pick avoids abstract 9/11: ${stillPick?.fact?.slice(0, 100)}`,
+  `Still Waiting pick avoids abstract 9/11 when MTV in pool: ${stillPick?.fact?.slice(0, 100)}`,
 );
 assert(
-  isRejectedPickSeed(STILL_WAITING_BAD_911, STILL_WAITING_TITLE, 'ru', stillPool, STILL_WAITING_ARTIST, 'track'),
-  'abstract 9/11 rejected when MTV alternative in pool',
+  !isRejectedPickSeed(STILL_WAITING_BAD_911, STILL_WAITING_TITLE, 'ru', stillPool, STILL_WAITING_ARTIST, 'track'),
+  '9/11 influence seed is never hard-rejected — only ranked below interview',
 );
 
 assert(

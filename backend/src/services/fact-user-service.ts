@@ -23,7 +23,9 @@ import {
   isBoringFact,
   isEncyclopediaDefinitionSeed,
 } from './reference-fact-quality.js';
-import { factMentionsArtistAsEntity, isAmbiguousCommonWordArtist } from './fact-relevance.js';
+import { factMentionsArtistAsEntity, factMentionsArtistLoose, isAmbiguousCommonWordArtist } from './fact-relevance.js';
+import { factFitsStoryLanguage } from './fact-language-fit.js';
+import { isArtistCareerBioWithoutTrack } from './fact-track-anchor.js';
 import type { FactScope, ReferenceFactBundle } from './fact-picker.js';
 import { resolveScopeOrder } from './fact-picker.js';
 import {
@@ -37,6 +39,8 @@ import type { ArtistTier } from './artist-notability.js';
 import { isCatalogMajorArtist } from './artist-notability.js';
 
 const PENDING_SEED_TTL_MS = 3 * 60_000;
+/** Seeds told within this window are skipped; next pick stays in bank. */
+export const RECENT_SEED_SKIP_MS = 3 * 24 * 60 * 60 * 1000;
 const pendingTrackSeeds = new Map<string, { fact: string; at: number }>();
 
 function pendingTrackKey(installId: string, artist: string, title: string): string {
@@ -198,7 +202,7 @@ export async function buildFactPickContext(
 ): Promise<FactPickContext> {
   const [used, recentTrack, recentArtist, blockedTopics, trackScopes, artistScopes, narratorTopic] =
     await Promise.all([
-      getUsedFingerprints(installId, artist, title),
+      getPickUsedFingerprints(installId, artist, title),
       getRecentSeedFactsForTrack(installId, artist, title),
       getRecentSeedFactsForArtist(installId, artist),
       getBlockedTopicsForUser(installId, artist, options.album),
@@ -293,6 +297,29 @@ export async function getUsedFingerprints(
   const lastTrackSeed = await getLastTrackSeedFingerprint(installId, artist, title);
   if (lastTrackSeed) fps.add(lastTrackSeed);
   return fps;
+}
+
+/** Fingerprints to skip at pick time — only this track, only last ~3 days (+ in-flight pending). */
+export async function getPickUsedFingerprints(
+  installId: string,
+  artist: string,
+  title: string,
+  withinMs = RECENT_SEED_SKIP_MS,
+): Promise<Set<string>> {
+  const out = new Set<string>();
+  const pending = peekPendingTrackSeed(installId, artist, title);
+  if (pending) out.add(factFingerprint(pending));
+
+  const cutoff = Date.now() - withinMs;
+  const artistNorm = artist.trim().toLowerCase();
+  const titleNorm = title.trim().toLowerCase();
+  const usedRows = await getAccountUsedSeedsForArtistAsync(installId, artist);
+  for (const row of usedRows) {
+    if (row.artist.trim().toLowerCase() !== artistNorm) continue;
+    if (row.title.trim().toLowerCase() !== titleNorm) continue;
+    if (row.usedAt >= cutoff) out.add(row.factFingerprint);
+  }
+  return out;
 }
 
 /** Hold seed during generation — do not mark as told until playback completes. */
@@ -401,9 +428,8 @@ export async function countUnusedBankFactsForUser(
   title: string,
 ): Promise<number> {
   ensureAccount(installId);
-  const used = await getUsedFingerprints(installId, artist, title);
+  const used = await getPickUsedFingerprints(installId, artist, title);
   const { track, artist: artistFacts } = listBankFacts(artist, title);
-  const trackPoolFacts = [...track, ...artistFacts].map((f) => f.fact);
   let count = 0;
   for (const item of [...track, ...artistFacts]) {
     const live = computeLiveInterest(item.fact);
@@ -412,6 +438,46 @@ export async function countUnusedBankFactsForUser(
     count += 1;
   }
   return count;
+}
+
+/** Walk bank offsets until a seed passes quality gates — never drop to live fetch while bank has facts. */
+export async function pickValidBankFactForUser(
+  installId: string,
+  artist: string,
+  title: string,
+  cover: CoverFactContext | undefined,
+  pickCtx: FactPickContext,
+  storyIndex: number,
+  storyLang: StoryLanguageId,
+  metadataArtist: string,
+  metadataTitle: string,
+  maxAttempts = 16,
+): Promise<SelectedReferenceFact | null> {
+  for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
+    const candidate = await pickBankFactForUser(
+      installId,
+      artist,
+      title,
+      cover,
+      pickCtx,
+      storyIndex + attempt,
+    );
+    if (!candidate) return null;
+    if (!factFitsStoryLanguage(candidate.fact, storyLang)) continue;
+    if (
+      factsTooSimilar(candidate.fact, pickCtx.rejectSimilarTo, {
+        pickScope: candidate.scope,
+        recentScopes: pickCtx.recentScopes,
+      })
+    ) {
+      continue;
+    }
+    if (isEncyclopediaDefinitionSeed(candidate.fact)) continue;
+    if (isArtistCareerBioWithoutTrack(candidate.fact, metadataTitle)) continue;
+    if (!factMentionsArtistLoose(candidate.fact, metadataArtist)) continue;
+    return candidate;
+  }
+  return null;
 }
 
 export async function pickFactForUser(

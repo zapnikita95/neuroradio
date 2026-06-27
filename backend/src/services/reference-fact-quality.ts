@@ -309,7 +309,7 @@ export function isArtistDisambiguationListSeed(fact: string): boolean {
 
 /** Song-page opener with production/vocal/chart context — not a throwaway «X is a song by Y». */
 export function hasSongPageNarrativeDetail(fact: string): boolean {
-  return /\b(?:in an interview|said that|called (?:it|the|the song)|protest|banned|viral on|went viral|tiktok|scandal|surprise hit|unexpected hit|inspired by|sampled from)\b/i.test(
+  return /\b(?:in an interview|said that|called (?:it|the|the song)|protest|banned|viral on|went viral|tiktok|scandal|surprise hit|unexpected hit|inspired by|influenced by|9\/11|september 11|war on terror|sampled from)\b/i.test(
     fact,
   );
 }
@@ -660,9 +660,9 @@ export function storySeedPickScore(
     if (/\b(?:MTV|interview|has said|said that|told|explained|revealed|stated)\b/i.test(t)) score += 16;
     if (isTrackMeaningNarrativeSeed(t)) score += 14;
     if (isPersonalBackstorySeed(t)) score += 12;
-    if (isAbstractInfluenceWithoutQuoteSeed(t)) score -= 55;
-    if (isNumericOrdinalSingleMention(t)) score -= 30;
-    if (isWeakRuStorySeed(t, storyLanguage, artist, title)) score -= 40;
+    // 9/11 / historical context — valid story hook; only rank below direct interview quotes.
+    if (isAbstractInfluenceWithoutQuoteSeed(t)) score -= 8;
+    if (isNumericOrdinalSingleMention(t)) score -= 12;
   }
   if (/\b(?:wrote|written)\b/i.test(t) && /\b(?:after (?:finding|seeing|observing|watching)|in response to)\b/i.test(t)) {
     score += 15;
