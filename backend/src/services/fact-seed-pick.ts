@@ -22,6 +22,9 @@ import {
   isBackstoryFact,
   isArtistGeographyBioSeed,
   isSocialMediaInfluencerBleed,
+  isAbstractInfluenceWithoutQuoteSeed,
+  isNumericOrdinalSingleMention,
+  isWeakRuStorySeed,
 } from './reference-fact-quality.js';
 import { WEAK_TRIVIA_PATTERNS } from './story-fact-hunt.js';
 import { isMetadataOnlyFallbackFact } from './metadata-facts.js';
@@ -79,6 +82,42 @@ export function isRejectedPickSeed(
   if (isAlbumListingSeed(fact)) return true;
   if (isListeningStatsFact(fact)) return true;
   if (isThinReleaseCatalogSeed(fact)) return true;
+  if (
+    isAbstractInfluenceWithoutQuoteSeed(fact) &&
+    trackPool.some(
+      (t) =>
+        !isAbstractInfluenceWithoutQuoteSeed(t) &&
+        adjustedInterestScore(t) >= 10 &&
+        (factMentionsTitle(t, title) || /\b(?:interview|MTV|said|explained|not (?:only|just|directly))\b/i.test(t)),
+    )
+  ) {
+    return true;
+  }
+  if (
+    isNumericOrdinalSingleMention(fact) &&
+    trackPool.some(
+      (t) =>
+        t !== fact &&
+        !isNumericOrdinalSingleMention(t) &&
+        adjustedInterestScore(t) >= 10 &&
+        factMentionsTitle(t, title),
+    )
+  ) {
+    return true;
+  }
+  if (isWeakRuStorySeed(fact, storyLanguage, artist, title)) {
+    if (
+      trackPool.some(
+        (t) =>
+          t !== fact &&
+          !isWeakRuStorySeed(t, storyLanguage, artist, title) &&
+          adjustedInterestScore(t) >= 8 &&
+          (factMentionsTitle(t, title) || hasAnchoredTrackContext(t, title)),
+      )
+    ) {
+      return true;
+    }
+  }
   if (isCatalogMetadataSeed(fact)) return true;
   if (isCitationBibliographySeed(fact)) return true;
   if (

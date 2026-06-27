@@ -20,6 +20,7 @@ import {
   isThinReleaseCatalogSeed,
   isStudioEquipmentCatalogSeed,
   MIN_PICK_INTEREST_SCORE,
+  storySeedPickScore,
 } from './reference-fact-quality.js';
 import type { StoryNarratorId } from './story-narrator.js';
 import { interestRating10 } from './fact-interest-log.js';
@@ -200,9 +201,17 @@ function isRejectedSeed(
   );
 }
 
-function sortByInterest(facts: string[], narrator: StoryNarratorId = 'auto'): string[] {
+function sortByInterest(
+  facts: string[],
+  narrator: StoryNarratorId = 'auto',
+  storyLanguage: StoryLanguageId = 'ru',
+  artist = '',
+  title = '',
+): string[] {
   return [...facts].sort(
-    (a, b) => adjustedInterestScore(b, narrator) - adjustedInterestScore(a, narrator),
+    (a, b) =>
+      storySeedPickScore(b, narrator, storyLanguage, artist, title) -
+      storySeedPickScore(a, narrator, storyLanguage, artist, title),
   );
 }
 
@@ -225,7 +234,7 @@ function pickBestByInterest(
   recentScopes: FactScope[] = [],
 ): string | null {
   const attributionCorpus = [...new Set([...facts, ...trackPool])];
-  for (const fact of sortByInterest(facts, narrator)) {
+  for (const fact of sortByInterest(facts, narrator, storyLanguage, artist, title)) {
     if (
       isRejectedSeed(
         fact,

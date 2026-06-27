@@ -173,6 +173,61 @@ export function isTrackMeaningNarrativeSeed(fact: string): boolean {
   if (/\b(?:said of the song|has said of the song|about the song)\b/i.test(t)) return true;
   if (/\blyrics here lamenting\b/i.test(t)) return true;
   if (/\b(?:apology to|tribute to|letter to)\s+[A-Z]/i.test(t)) return true;
+  if (/\b(?:not (?:only|just)|more than|rather than)\b/i.test(t) && /\b(?:about|war|terror|9\/11|september 11)\b/i.test(t)) {
+    return true;
+  }
+  return false;
+}
+
+/** «11th overall single» — хвост каталога, LLM выдумает «фанаты заставили». */
+export function isNumericOrdinalSingleMention(fact: string): boolean {
+  return /\b\d{1,2}(?:st|nd|rd|th)\s+(?:overall\s+)?single\b/i.test(fact.trim());
+}
+
+/** «influenced by 9/11» без цитаты/интервью — LLM не цепляется в RU-истории. */
+export function isAbstractInfluenceWithoutQuoteSeed(fact: string): boolean {
+  const t = fact.trim();
+  if (
+    !/\b(?:influenced by|influence of)\b/i.test(t) &&
+    !/\bwas influenced by the events of\b/i.test(t)
+  ) {
+    return false;
+  }
+  if (/\b(?:9\/11|september 11|terror|war on terror)\b/i.test(t)) {
+    if (/\b(?:said|stated|told|explained|revealed|interview|MTV|called it|described|emphasized|not (?:only|just|directly))\b/i.test(t)) {
+      return false;
+    }
+    return true;
+  }
+  return false;
+}
+
+/** RU-история: EN-only абстрактное влияние без speakable hook. */
+export function isWeakRuStorySeed(
+  fact: string,
+  storyLanguage: 'ru' | 'en' = 'ru',
+  artist = '',
+  title = '',
+): boolean {
+  if (storyLanguage !== 'ru') return false;
+  const t = fact.trim();
+  if (/[А-Яа-яЁё]/.test(t)) return false;
+  if (isAbstractInfluenceWithoutQuoteSeed(t)) return true;
+  if (
+    isNumericOrdinalSingleMention(t) &&
+    !isTrackMeaningNarrativeSeed(t) &&
+    !isPersonalBackstorySeed(t) &&
+    !/\b(?:satiri|observing|finding himself|youth culture|crowd)\b/i.test(t)
+  ) {
+    return true;
+  }
+  if (
+    /^["'][\p{L}\p{N}\s'-]+["']\s+is a song\b/iu.test(t) &&
+    !/\b(?:said|interview|wrote (?:it )?after|meaning|metaphor|protest|scandal)\b/i.test(t) &&
+    !(artist && title && /\b(?:Whibley|Way|Gerard|Deryck)\b/i.test(t))
+  ) {
+    return true;
+  }
   return false;
 }
 
@@ -187,6 +242,7 @@ export function isPersonalBackstorySeed(fact: string): boolean {
   ) {
     return true;
   }
+  if (/\bwrote\s+["'][^"']+["']\s+after\s+(?:finding|seeing|observing|watching)\b/i.test(t)) return true;
   const ruBoundary = String.raw`(?<![\p{L}\p{N}_])`;
   const ruEnd = String.raw`(?![\p{L}\p{N}_])`;
   return (
@@ -426,8 +482,10 @@ export function isThinReleaseCatalogSeed(fact: string): boolean {
     `\\bserves\\s+as\\s+(?:the\\s+)?${THIN_RELEASE_ORDINAL_EN}\\s+track\\b`,
     'i',
   );
+  const numericOrdinalSingleRe = /\b\d{1,2}(?:st|nd|rd|th)\s+(?:overall\s+)?single\b/i;
 
   const isPlacement =
+    numericOrdinalSingleRe.test(t) ||
     asOrdinalSingleRe.test(t) ||
     (ordinalSingleRe.test(t) &&
       /\b(?:from|off(?:\s+of)?)\s+(?:their|the|his|her|its)\b/i.test(t)) ||
@@ -584,6 +642,32 @@ export function narratorFactBoost(fact: string, narrator: StoryNarratorId = 'aut
 
 export function adjustedInterestScore(fact: string, narrator: StoryNarratorId = 'auto'): number {
   return interestScore(fact) + narratorFactBoost(fact, narrator);
+}
+
+/** Pick ranking: interest + story-readiness for LLM quality gate (not extra retries). */
+export function storySeedPickScore(
+  fact: string,
+  narrator: StoryNarratorId = 'auto',
+  storyLanguage: 'ru' | 'en' = 'ru',
+  artist = '',
+  title = '',
+): number {
+  let score = adjustedInterestScore(fact, narrator);
+  const t = fact.trim();
+  if (storyLanguage === 'ru') {
+    if (/[А-Яа-яЁё]/.test(t)) score += 22;
+    if (/\b(?:интервью|сказал|подчёркивал|объяснил|рассказал)\b/i.test(t)) score += 18;
+    if (/\b(?:MTV|interview|has said|said that|told|explained|revealed|stated)\b/i.test(t)) score += 16;
+    if (isTrackMeaningNarrativeSeed(t)) score += 14;
+    if (isPersonalBackstorySeed(t)) score += 12;
+    if (isAbstractInfluenceWithoutQuoteSeed(t)) score -= 55;
+    if (isNumericOrdinalSingleMention(t)) score -= 30;
+    if (isWeakRuStorySeed(t, storyLanguage, artist, title)) score -= 40;
+  }
+  if (/\b(?:wrote|written)\b/i.test(t) && /\b(?:after (?:finding|seeing|observing|watching)|in response to)\b/i.test(t)) {
+    score += 15;
+  }
+  return score;
 }
 
 export function interestScore(fact: string): number {

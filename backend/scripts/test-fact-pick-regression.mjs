@@ -920,6 +920,56 @@ const BRIGHTSIDE_TITLE = 'Mr. Brightside';
 const BRIGHTSIDE_JEALOUSY =
   'Песня «Mr. Brightside» группы The Killers была написана вдохновлённая ревностью — Брэндон Флауэрс сочинил её после того, как его девушка изменила ему с другим мужчиной в баре.';
 
+const STILL_WAITING_ARTIST = 'Sum 41';
+const STILL_WAITING_TITLE = 'Still Waiting';
+const STILL_WAITING_BAD_911 =
+  '"Still Waiting" is a song written by Sum 41\'s lead vocalist Deryck Whibley and was influenced by the events of 9/11.';
+const STILL_WAITING_MTV =
+  'In an MTV interview Deryck Whibley said "Still Waiting" was not directly about the war on terror — the song is about how the world fails to get along.';
+const STILL_WAITING_MEANING =
+  'Whibley said the lyrics reflect frustration that people cannot communicate — the world "does not get along".';
+
+const MCR_ARTIST = 'My Chemical Romance';
+const MCR_TITLE = 'Teenagers';
+const MCR_NYC =
+  'Gerard Way wrote "Teenagers" after finding himself in New York watching a crowd of teenagers; he wanted a satirical take on youth culture.';
+const MCR_ORDINAL =
+  'Gerard Way wrote "Teenagers" after finding himself in New York; the song is the band\'s 11th overall single.';
+
+const { isAbstractInfluenceWithoutQuoteSeed, isNumericOrdinalSingleMention, storySeedPickScore } = await import(
+  '../dist/services/reference-fact-quality.js'
+);
+
+assert(isAbstractInfluenceWithoutQuoteSeed(STILL_WAITING_BAD_911), '9/11 influence without quote is abstract');
+assert(!isAbstractInfluenceWithoutQuoteSeed(STILL_WAITING_MTV), 'MTV interview seed is not abstract influence');
+assert(isNumericOrdinalSingleMention(MCR_ORDINAL), '11th overall single detected');
+assert(
+  storySeedPickScore(STILL_WAITING_MTV, 'auto', 'ru', STILL_WAITING_ARTIST, STILL_WAITING_TITLE) >
+    storySeedPickScore(STILL_WAITING_BAD_911, 'auto', 'ru', STILL_WAITING_ARTIST, STILL_WAITING_TITLE),
+  'Still Waiting: MTV interview ranks above bare 9/11 influence',
+);
+assert(
+  storySeedPickScore(MCR_NYC, 'auto', 'ru', MCR_ARTIST, MCR_TITLE) >
+    storySeedPickScore(MCR_ORDINAL, 'auto', 'ru', MCR_ARTIST, MCR_TITLE),
+  'Teenagers: NYC narrative ranks above ordinal-single tail',
+);
+const stillPool = [STILL_WAITING_BAD_911, STILL_WAITING_MTV, STILL_WAITING_MEANING];
+const stillPick = pickReferenceFact(
+  { trackFacts: stillPool, artistFacts: [], albumFacts: [] },
+  [],
+  0,
+  STILL_WAITING_ARTIST,
+  STILL_WAITING_TITLE,
+);
+assert(
+  stillPick && !isAbstractInfluenceWithoutQuoteSeed(stillPick.fact),
+  `Still Waiting pick avoids abstract 9/11: ${stillPick?.fact?.slice(0, 100)}`,
+);
+assert(
+  isRejectedPickSeed(STILL_WAITING_BAD_911, STILL_WAITING_TITLE, 'ru', stillPool, STILL_WAITING_ARTIST, 'track'),
+  'abstract 9/11 rejected when MTV alternative in pool',
+);
+
 assert(
   !isWeakSelectedFact(
     {
