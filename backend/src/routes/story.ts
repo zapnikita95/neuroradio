@@ -2073,54 +2073,70 @@ router.post('/full', extractClientSecrets, validateStoryFullBody, storyFullRateL
         }
       }
 
-      try {
-        const result = await generateStoryWithFallback(effectiveStoryInput, llmProvider, {
-          serverManaged,
-        });
-        return {
-          ...result,
-          deliveredSeed: effectiveStoryInput.selectedReferenceFact ?? undefined,
-        };
-      } catch (err) {
-        const msg = err instanceof Error ? err.message : String(err);
-        if (!/could not produce a (?:story grounded in reference facts|usable story)/i.test(msg)) {
-          throw err;
-        }
-        const failedSeed = effectiveStoryInput.selectedReferenceFact?.fact?.trim();
-        const retryCtx = {
-          ...factPickCtx,
-          usedFingerprints: new Set([
-            ...factPickCtx.usedFingerprints,
-            ...(failedSeed ? [factFingerprint(failedSeed)] : []),
-          ]),
-        };
-        const alt = await pickFactForUser(
-          installId,
-          factBundle,
-          metadata.artist,
-          metadata.title,
-          previousScripts.length + 3,
-          storyNarrator,
-          retryCtx,
-        );
-        if (!alt?.fact || alt.fact === failedSeed) {
-          throw err;
-        }
-        console.warn(
-          `[story-pipeline] quality fail — retry with alt seed: "${alt.fact.slice(0, 100)}"`,
-        );
-        const result = await generateStoryWithFallback(
-          {
-            ...effectiveStoryInput,
+      let llmInput = effectiveStoryInput;
+      let lastQualityErr: unknown = null;
+      const failedSeedFps = new Set<string>();
+
+      for (let qualityAttempt = 0; qualityAttempt < 5; qualityAttempt += 1) {
+        try {
+          const result = await generateStoryWithFallback(llmInput, llmProvider, {
+            serverManaged,
+          });
+          return {
+            ...result,
+            deliveredSeed: llmInput.selectedReferenceFact ?? undefined,
+          };
+        } catch (err) {
+          const msg = err instanceof Error ? err.message : String(err);
+          if (!/could not produce a (?:story grounded in reference facts|usable story)/i.test(msg)) {
+            throw err;
+          }
+          lastQualityErr = err;
+          const failedSeed = llmInput.selectedReferenceFact?.fact?.trim();
+          if (failedSeed) {
+            failedSeedFps.add(factFingerprint(failedSeed));
+          }
+          const retryCtx = {
+            ...factPickCtx,
+            usedFingerprints: new Set([...factPickCtx.usedFingerprints, ...failedSeedFps]),
+          };
+          const alt =
+            (await pickFactForUser(
+              installId,
+              factBundle,
+              metadata.artist,
+              metadata.title,
+              previousScripts.length + 3 + qualityAttempt,
+              storyNarrator,
+              retryCtx,
+            )) ??
+            (await pickBankFactForUser(
+              installId,
+              metadata.artist,
+              metadata.title,
+              coverCtx,
+              retryCtx,
+              previousScripts.length + qualityAttempt,
+            )) ??
+            pickLastResortBundleSeed(factBundle, metadata.artist, metadata.title, storyNarrator);
+          if (!alt?.fact || failedSeedFps.has(factFingerprint(alt.fact))) {
+            break;
+          }
+          console.warn(
+            `[story-pipeline] STORY_QUALITY_FAILED attempt ${qualityAttempt + 1}/5 — alt seed: "${alt.fact.slice(0, 100)}"`,
+          );
+          llmInput = {
+            ...llmInput,
             referenceFacts: [alt.fact],
             selectedReferenceFact: alt,
             rawSnippets: undefined,
-          },
-          llmProvider,
-          { serverManaged },
-        );
-        return { ...result, deliveredSeed: alt };
+          };
+        }
       }
+      if (lastQualityErr) {
+        throw lastQualityErr;
+      }
+      throw new Error('Story LLM produced no result');
     })();
 
     throwIfStoryAborted(clientAbort, 'story-text');

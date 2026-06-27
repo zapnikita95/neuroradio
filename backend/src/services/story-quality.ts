@@ -610,6 +610,14 @@ const CONCEPT_BRIDGES: Array<{ factPattern: RegExp; scriptTokens: string[] }> = 
   { factPattern: /bossa nova|jorge ben|mas que nada|samba/i, scriptTokens: ['босса', 'самба', 'жорж', 'бен', 'ритм', 'удар'] },
   { factPattern: /instrumental|wordless|no lyrics/i, scriptTokens: ['без слов', 'инструмент', 'свист', 'крик'] },
   { factPattern: /protest|controvers|prison|police brutality|don't care about us/i, scriptTokens: ['протест', 'тюрьм', 'полиц', 'скандал', 'обществ'] },
+  {
+    factPattern: /9\/11|september 11|influenced by the events|war on terror/i,
+    scriptTokens: ['сентябр', 'террор', 'трагед', 'атак', 'конфликт', 'войн', 'договор', 'мир'],
+  },
+  {
+    factPattern: /gerard way|new york|teenagers|youth culture/i,
+    scriptTokens: ['gerard', 'джерард', 'нью', 'йорк', 'подрост', 'молод', 'толп', 'сверст'],
+  },
   { factPattern: /history album|histrory|anti-?semit|nazi/i, scriptTokens: ['history', 'истори', 'альбом', 'скандал', 'клип'] },
   { factPattern: /jackson|michael/i, scriptTokens: ['джексон', 'мichael', 'king of pop', 'поп'] },
   {
@@ -1846,6 +1854,14 @@ export function findWateryContent(
   }
 
   if (anchorable) {
+    const words = countWords(script);
+    if (
+      words >= 36 &&
+      storyMentionsPerformingArtist(script, artist, title) &&
+      referenceFacts.some((f) => interestScore(f) >= 12 || /wrote|written|influenced|написал|вдохнов/i.test(f))
+    ) {
+      return null;
+    }
     return 'no concrete fact — use detail from seed fact (instrument, label, scandal, sample)';
   }
 

@@ -29,6 +29,7 @@ import {
   RUSSIAN_LANGUAGE_NO_NAMES_OVERRIDE,
 } from './voiceover-no-names.js';
 import { normalizeCatalogSeedFactDisplay } from './tts-grammar-fixes.js';
+import { scopeLabelRuFor } from './fact-picker.js';
 
 export { eraContextForPrompt, resolveTrackLocale };
 export type { TrackLocale };
@@ -402,7 +403,7 @@ export function buildStoryUserPrompt(params: {
   const selected = params.selectedReferenceFact;
   if (selected) {
     lines.push('');
-    lines.push(`ФОКУС ИСТОРИИ: факт про ${selected.scopeLabelRu.toUpperCase()} (не смешивай с другими темами).`);
+    lines.push(`ФОКУС ИСТОРИИ: факт про ${(selected.scopeLabelRu ?? scopeLabelRuFor(selected.scope)).toUpperCase()} (не смешивай с другими темами).`);
     if (selected.scope === 'artist') {
       lines.push(buildArtistScopeStoryPromptBlockRu());
     }
