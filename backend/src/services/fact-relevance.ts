@@ -978,6 +978,8 @@ export function factMentionsOtherTrackTitle(fact: string, title: string): boolea
     'dani california',
     'human nature',
     'show me what i m looking for',
+    'i want you',
+    'truly madly deeply',
     'группа крови',
     'кукушка',
     'звезда по имени солнце',
@@ -999,6 +1001,13 @@ export function factMentionsOtherTrackTitle(fact: string, title: string): boolea
     titleNorm !== 'human nature' &&
     /\b(?:porcaro|steve porcaro)\b/i.test(fact) &&
     /\b(?:originally written|based on a conversation|human nature)\b/i.test(fact)
+  ) {
+    return true;
+  }
+
+  if (
+    !factMentionsTitle(fact, title) &&
+    /\bthe single\b.*\b(?:hit|peaked|charted|reached|went to|number one|top \d)\b/i.test(fact)
   ) {
     return true;
   }

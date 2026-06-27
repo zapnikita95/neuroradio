@@ -49,6 +49,12 @@ const RAW_SNIPPET_MAX = 18;
 function bundleNeedsFullWikiSupplement(trackFacts: string[], artistFacts: string[]): boolean {
   const merged = [...trackFacts, ...artistFacts];
   if (merged.length === 0) return true;
+  if (trackFacts.length >= 2) {
+    const groundedTrack = trackFacts.some(
+      (f) => interestScore(f) >= 8 && !isThinReleaseCatalogSeed(f) && !isBoringFact(f),
+    );
+    if (groundedTrack) return false;
+  }
   return !merged.some(
     (f) => interestScore(f) >= 10 && !isThinReleaseCatalogSeed(f) && !isBoringFact(f),
   );
@@ -734,31 +740,61 @@ export async function fetchAggregatedFactContext(
     [],
     FACT_DEDICATED_CAP_MS,
   );
-  const [wikiLead, ddgUnfiltered, webUnfiltered, webTitleFirst, wdUnfiltered, mbTrackRaw, mbArtistRaw, wikiFastTrack, dedicatedHarvest, discogsHarvest] =
-    await Promise.all([
-      fetchWithCap('wiki-lead', () => fetchArtistWikiLeadWithRetry(artist, 1), null, FACT_WIKI_LEAD_CAP_MS),
-      fetchWithCap('ddg', () => fetchDuckDuckGoUnfiltered(artist, lookupTitle), [], FACT_DDG_CAP_MS),
-      fetchWithCap('web', () => fetchWebSearchFactSnippets(artist, lookupTitle), [], FACT_WEB_CAP_MS),
-      fetchWithCap('web-title', () => fetchTitleFirstWebSnippets(lookupTitle), [], FACT_WEB_CAP_MS),
-      fetchWithCap('wikidata', () => fetchWikidataUnfiltered(artist, lookupTitle, cc), [], FACT_WIKIDATA_CAP_MS),
-      fetchWithCap(
-        'mb-track',
-        () => fetchMusicBrainzAnnotationsUnfiltered('recording', recordingMbid),
-        [],
-        FACT_MB_CAP_MS,
-      ),
-      fetchWithCap(
-        'mb-artist',
-        () => fetchMusicBrainzAnnotationsUnfiltered('artist', artistMbid),
-        [],
-        FACT_MB_CAP_MS,
-      ),
-      fetchWithCap('wiki-fast-track', () => fetchFastTrackWikiFacts(artist, lookupTitle), [], FACT_WIKI_FAST_CAP_MS),
-      dedicatedPromise,
-      discogsPromise,
-    ]);
+  const [wikiLead, wikiFastTrack, dedicatedHarvest, discogsHarvest] = await Promise.all([
+    fetchWithCap('wiki-lead', () => fetchArtistWikiLeadWithRetry(artist, 1), null, FACT_WIKI_LEAD_CAP_MS),
+    fetchWithCap('wiki-fast-track', () => fetchFastTrackWikiFacts(artist, lookupTitle), [], FACT_WIKI_FAST_CAP_MS),
+    dedicatedPromise,
+    discogsPromise,
+  ]);
+  const combinedDedicatedEarly = [...dedicatedHarvest, ...discogsHarvest];
+  const dedicatedTrackEarly = combinedDedicatedEarly.filter(
+    (f) => f.scope === 'track' || f.scope === 'album',
+  ).length;
+  const fastSignalCount = wikiFastTrack.length + combinedDedicatedEarly.length + (wikiLead ? 1 : 0);
+  const skipSlowSources =
+    wikiFastTrack.length >= 2 ||
+    dedicatedTrackEarly >= 2 ||
+    fastSignalCount >= 5;
+  let ddgUnfiltered: string[];
+  let webUnfiltered: string[];
+  let webTitleFirst: string[];
+  let wdUnfiltered: string[];
+  let mbTrackRaw: string[];
+  let mbArtistRaw: string[];
+  if (skipSlowSources) {
+    console.log(
+      `[facts] fast-path skip slow web/ddg/mb for "${artist}" — "${title}" ` +
+        `signals=${fastSignalCount} wikiFast=${wikiFastTrack.length} dedicatedTrack=${dedicatedTrackEarly}`,
+    );
+    ddgUnfiltered = [];
+    webUnfiltered = [];
+    webTitleFirst = [];
+    wdUnfiltered = [];
+    mbTrackRaw = [];
+    mbArtistRaw = [];
+  } else {
+    [ddgUnfiltered, webUnfiltered, webTitleFirst, wdUnfiltered, mbTrackRaw, mbArtistRaw] =
+      await Promise.all([
+        fetchWithCap('ddg', () => fetchDuckDuckGoUnfiltered(artist, lookupTitle), [], FACT_DDG_CAP_MS),
+        fetchWithCap('web', () => fetchWebSearchFactSnippets(artist, lookupTitle), [], FACT_WEB_CAP_MS),
+        fetchWithCap('web-title', () => fetchTitleFirstWebSnippets(lookupTitle), [], FACT_WEB_CAP_MS),
+        fetchWithCap('wikidata', () => fetchWikidataUnfiltered(artist, lookupTitle, cc), [], FACT_WIKIDATA_CAP_MS),
+        fetchWithCap(
+          'mb-track',
+          () => fetchMusicBrainzAnnotationsUnfiltered('recording', recordingMbid),
+          [],
+          FACT_MB_CAP_MS,
+        ),
+        fetchWithCap(
+          'mb-artist',
+          () => fetchMusicBrainzAnnotationsUnfiltered('artist', artistMbid),
+          [],
+          FACT_MB_CAP_MS,
+        ),
+      ]);
+  }
   let wiki = EMPTY_WIKI;
-  const combinedDedicated = [...dedicatedHarvest, ...discogsHarvest];
+  const combinedDedicated = combinedDedicatedEarly;
   if (discogsHarvest.length > 0) {
     console.log(
       `[facts] discogs ok artist="${artist}" title="${title}" count=${discogsHarvest.length}`,

@@ -496,7 +496,15 @@ router.post('/full', extractClientSecrets, validateStoryFullBody, storyFullRateL
         );
       } else {
         console.log(
-          `[facts] curated seed already used for "${artist}" — "${title}", fetching fresh facts`,
+          `[facts] curated seed already used for "${artist}" — "${title}", trying fact bank`,
+        );
+        bankFact = await pickBankFactForUser(
+          installId,
+          artist,
+          title,
+          coverCtx,
+          factPickCtx,
+          previousScripts.length,
         );
       }
     } else {
@@ -511,8 +519,17 @@ router.post('/full', extractClientSecrets, validateStoryFullBody, storyFullRateL
     }
 
     if (bankFact && usedFingerprints.has(factFingerprint(bankFact.fact))) {
-      console.log(`[facts] bank seed already used for "${artist}" — "${title}", fetching fresh facts`);
-      bankFact = null;
+      console.log(
+        `[facts] bank seed already used for "${artist}" — "${title}", trying next bank fact`,
+      );
+      bankFact = await pickBankFactForUser(
+        installId,
+        artist,
+        title,
+        coverCtx,
+        factPickCtx,
+        previousScripts.length + 1,
+      );
     }
 
     if (bankFact && !factFitsStoryLanguage(bankFact.fact, storyLang)) {
@@ -557,10 +574,36 @@ router.post('/full', extractClientSecrets, validateStoryFullBody, storyFullRateL
 
     if (bankFact && !factMentionsArtistLoose(bankFact.fact, metadata.artist)) {
       console.warn(
-        `[facts] bank seed off-topic (no "${metadata.artist}") fact="${bankFact.fact.slice(0, 100)}" — fetching fresh facts`,
+        `[facts] bank seed off-topic (no "${metadata.artist}") fact="${bankFact.fact.slice(0, 100)}" — trying next bank fact`,
       );
-      bankFact = null;
+      bankFact = await pickBankFactForUser(
+        installId,
+        artist,
+        title,
+        coverCtx,
+        factPickCtx,
+        previousScripts.length + 2,
+      );
       factFromCurated = false;
+    }
+
+    if (!bankFact) {
+      const unusedInBank = await countUnusedBankFactsForUser(installId, artist, title);
+      if (unusedInBank > 0) {
+        bankFact = await pickBankFactForUser(
+          installId,
+          artist,
+          title,
+          coverCtx,
+          factPickCtx,
+          previousScripts.length,
+        );
+        if (bankFact) {
+          console.log(
+            `[facts] bank retry install=${installId.slice(0, 8)} artist="${artist}" title="${title}" unused=${unusedInBank}`,
+          );
+        }
+      }
     }
 
     let selectedFact: SelectedReferenceFact | null = bankFact;
@@ -584,6 +627,20 @@ router.post('/full', extractClientSecrets, validateStoryFullBody, storyFullRateL
         metadata.artistMbid,
         { storyLanguage: storyLanguage ?? 'ru' },
       );
+      const earlyIngestBundle = enrichFactBundleWithRawSnippets(
+        factCtx.bundle,
+        factCtx.rawSnippets,
+      );
+      if (earlyIngestBundle.trackFacts.length + earlyIngestBundle.artistFacts.length > 0) {
+        ingestBundleToBank(factArtist, factTitle, earlyIngestBundle);
+        if (coverCtx.isCover) {
+          ingestBundleToBank(artist, title, earlyIngestBundle);
+        }
+        console.log(
+          `[facts] early bank ingest "${metadata.artist}" — "${metadata.title}" ` +
+            `track=${earlyIngestBundle.trackFacts.length} artist=${earlyIngestBundle.artistFacts.length}`,
+        );
+      }
       throwIfStoryAborted(clientAbort, 'facts-fetch');
       timing.mark(
         'facts-fetched',
@@ -1307,6 +1364,30 @@ router.post('/full', extractClientSecrets, validateStoryFullBody, storyFullRateL
     }
 
     const finalReferenceFacts = selectedFact ? [selectedFact.fact] : referenceFacts;
+
+    if (
+      selectedFact &&
+      artistTier === 'major' &&
+      selectedFact.interestScore < 4 &&
+      factBundle.trackFacts.some(
+        (f) => factMentionsTitle(f, title) || hasAnchoredTrackContext(f, title),
+      )
+    ) {
+      const rescued = pickLastResortBundleSeed(
+        factBundle,
+        metadata.artist,
+        metadata.title,
+        storyNarrator,
+      );
+      if (rescued && rescued.interestScore >= 4) {
+        console.log(
+          `[facts] major-artist weak-seed rescue score=${rescued.interestScore} fact="${rescued.fact.slice(0, 90)}"`,
+        );
+        selectedFact = rescued;
+        factFromBank = false;
+        factFromSalvage = false;
+      }
+    }
 
     const coverSituation = assessCoverSituation(
       artist,

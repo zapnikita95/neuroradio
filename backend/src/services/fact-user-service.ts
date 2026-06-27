@@ -325,7 +325,9 @@ export function ingestBundleToBank(artist: string, title: string, bundle: Refere
   const ranked = rankScopedFacts(pools).filter(
     (r) =>
       !r.junk &&
-      r.interest >= 6 &&
+      (r.interest >= 6 ||
+        (r.scope === 'track' && r.interest >= 4) ||
+        (r.scope === 'album' && r.interest >= 5)) &&
       (!isAmbiguousCommonWordArtist(artist) || factMentionsArtistAsEntity(r.fact, artist)),
   );
   return ingestFacts(
@@ -366,25 +368,28 @@ export async function pickBankFactForUser(
     keys.push([cover.factArtist, cover.factTitle]);
   }
   for (const [a, t] of keys) {
-    const fromBank = pickFromBank(
-      a,
-      t,
-      used,
-      scopeOrder,
-      0,
-      rejectSimilarTo,
-      blockedTopics,
-      storyLanguage,
-      { recentScopes },
-    );
-    if (
-      fromBank &&
-      !factsTooSimilar(fromBank.fact, rejectSimilarTo, {
-        pickScope: fromBank.scope,
-        recentScopes,
-      })
-    ) {
-      return storedFactToSelected(fromBank);
+    for (let offset = 0; offset < 8; offset += 1) {
+      const fromBank = pickFromBank(
+        a,
+        t,
+        used,
+        scopeOrder,
+        offset,
+        rejectSimilarTo,
+        blockedTopics,
+        storyLanguage,
+        { recentScopes },
+      );
+      if (
+        fromBank &&
+        !factsTooSimilar(fromBank.fact, rejectSimilarTo, {
+          pickScope: fromBank.scope,
+          recentScopes,
+        })
+      ) {
+        return storedFactToSelected(fromBank);
+      }
+      if (!fromBank) break;
     }
   }
   return null;

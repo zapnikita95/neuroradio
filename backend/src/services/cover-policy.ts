@@ -86,6 +86,19 @@ export function assessCoverSituation(
 
   if (explicit) return { action: 'proceed' };
 
+  // Major artists with grounded track facts in bundle — never block on weak/wrong single trivia.
+  if (artistTier === 'major' && selectedFact && selectedFact.interestScore < 4) {
+    const groundedTrack = bundle.trackFacts
+      .filter((f) => factMentionsTitle(f, title) || factMentionsArtist(f, artist))
+      .sort((a, b) => interestScore(b) - interestScore(a))[0];
+    if (groundedTrack && interestScore(groundedTrack) >= 4) {
+      console.log(
+        `[cover] major proceed with grounded track fact "${artist}" — "${title}" (weak seed discarded)`,
+      );
+      return { action: 'proceed' };
+    }
+  }
+
   // Major artists + any grounded seed — never block with cover heuristics.
   if (artistTier === 'major' && selectedFact && selectedFact.interestScore >= 4) {
     return { action: 'proceed' };
