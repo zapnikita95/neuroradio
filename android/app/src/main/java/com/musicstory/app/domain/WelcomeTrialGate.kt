@@ -45,10 +45,15 @@ object WelcomeTrialGate {
                 premiumUntil = cached?.premiumUntil,
             ),
         )
-        applyWelcomeTrialDefaults(app)
+        applyPremiumExperienceDefaults(app)
         app.storyOrchestrator.notifyTierMayHaveChanged()
         _trialStartedEvents.emit(until)
         StoryLog.i("Welcome trial started after first narrated story until=$until")
+    }
+
+    /** До записи триала в профиль — первая история уже на SpeechKit (preview tier на сервере). */
+    suspend fun preparePremiumExperienceForFirstStory(app: MusicStoryApp) {
+        applyPremiumExperienceDefaults(app)
     }
 
     suspend fun applyWelcomeTrialDefaults(app: MusicStoryApp) {
@@ -63,8 +68,22 @@ object WelcomeTrialGate {
         val lang = resolveAppLanguage(app.settingsDataStore.appLanguage.first())
         app.settingsDataStore.setUserTtsBilling(UserTtsBilling.SERVER)
         when (lang) {
-            ResolvedAppLanguage.RU -> app.settingsDataStore.setServerTtsProvider(ServerTtsProvider.YANDEX)
-            ResolvedAppLanguage.EN -> app.settingsDataStore.setServerTtsProvider(ServerTtsProvider.EDGE)
+            ResolvedAppLanguage.RU -> {
+                app.settingsDataStore.setServerTtsProvider(ServerTtsProvider.YANDEX)
+                app.settingsDataStore.setTtsVoice(TtsVoice.ZAHAR)
+            }
+            ResolvedAppLanguage.EN -> {
+                app.settingsDataStore.setServerTtsProvider(ServerTtsProvider.ELEVENLABS)
+            }
+        }
+    }
+
+    /** Premium-настройки при первой истории (SpeechKit + голоса Yandex). */
+    suspend fun applyPremiumExperienceDefaults(app: MusicStoryApp) {
+        applyWelcomeTrialTtsDefaults(app)
+        val autoOn = app.settingsDataStore.autoIntercept.first()
+        if (autoOn) {
+            applyPremiumPlaybackDefaults(app)
         }
     }
 

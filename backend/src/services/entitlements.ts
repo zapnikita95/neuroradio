@@ -1,5 +1,5 @@
 import { isUnlimitedInstall } from '../config/security.js';
-import { getEntitlementForInstall, type AccountPlan } from './account-store.js';
+import { getEntitlementForInstall, type AccountPlan, isWelcomeTrialEligible } from './account-store.js';
 import { getDevTierOverride } from './dev-tier-store.js';
 import { canUseDevTierSwitch } from './admin-users.js';
 
@@ -46,6 +46,17 @@ export function resolveUserTier(installId: string): UserTier {
   const ent = getEntitlementForInstall(installId);
   if (isPremiumActive(ent.plan, ent.premiumUntil)) return 'premium';
   if (isTrialActive(ent.plan, ent.trialUntil)) return 'trial';
+  return 'free';
+}
+
+/** Trial/premium tier for story/full when welcome trial ещё не записан, но первая озвучка eligible. */
+export function resolveUserTierForStory(
+  installId: string,
+  deviceFingerprint?: string,
+): UserTier {
+  const base = resolveUserTier(installId);
+  if (base !== 'free') return base;
+  if (isWelcomeTrialEligible(installId, deviceFingerprint)) return 'trial';
   return 'free';
 }
 

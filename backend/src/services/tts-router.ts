@@ -8,7 +8,7 @@ import {
   canUseServerSpeechKit,
   SpeechKitSubscriptionRequiredError,
 } from './tts-access.js';
-import { hasPaidStoryTier, isElevenLabsEnabled } from './entitlements.js';
+import { hasPaidStoryTier, isElevenLabsEnabled, type UserTier } from './entitlements.js';
 import { hasElevenLabsCredentials, synthesizeSpeechElevenLabs } from './elevenlabs-tts.js';
 import { resolveElevenLabsVoiceId, resolveElevenLabsVoiceSetting } from './elevenlabs-voices.js';
 import type { StoryLanguageId } from './story-language.js';
@@ -63,6 +63,8 @@ export interface TtsRouteRequest {
   preferMobileWav?: boolean;
   /** @deprecated use preferMobileWav */
   preferIosPlayback?: boolean;
+  /** Welcome-trial preview — eligible first story before grant persisted. */
+  storyTier?: UserTier;
 }
 
 export interface TtsRouteResult extends SynthesisResult {
@@ -107,7 +109,7 @@ function normalizeTtsProvider(requested: TtsProviderId | string | undefined): Tt
 export function resolveEffectiveTtsProvider(
   request: Pick<
     TtsRouteRequest,
-    'voiceTier' | 'ttsProvider' | 'installId' | 'userTtsCredentials' | 'storyLanguage'
+    'voiceTier' | 'ttsProvider' | 'installId' | 'userTtsCredentials' | 'storyLanguage' | 'storyTier'
   >,
 ): EffectiveTtsProvider {
   const ttsProvider = normalizeTtsProvider(request.ttsProvider);
@@ -115,10 +117,18 @@ export function resolveEffectiveTtsProvider(
   if (userProvider === 'yandex') return 'yandex';
   if (userProvider === 'sber') return 'sber';
 
-  const serverSpeechKit = canUseServerSpeechKit(request.installId, request.userTtsCredentials);
+  const tierOverride = request.storyTier;
+  const serverSpeechKit = canUseServerSpeechKit(
+    request.installId,
+    request.userTtsCredentials,
+    tierOverride,
+  );
 
   const requirePaidVoiceTier = () => {
-    if (!hasPaidStoryTier(request.installId)) {
+    const paid = tierOverride
+      ? tierOverride === 'trial' || tierOverride === 'premium' || tierOverride === 'unlimited'
+      : hasPaidStoryTier(request.installId);
+    if (!paid) {
       throw new PremiumTtsAccessError(
         'Премиум-голос доступен на пробном периоде или по подписке 199 ₽/мес.',
       );
@@ -170,7 +180,10 @@ export function resolveEffectiveTtsProvider(
   }
 
   if (request.storyLanguage === 'en') {
-    if (hasPaidStoryTier(request.installId) && canUseElevenLabs()) {
+    const paid = tierOverride
+      ? tierOverride === 'trial' || tierOverride === 'premium' || tierOverride === 'unlimited'
+      : hasPaidStoryTier(request.installId);
+    if (paid && canUseElevenLabs()) {
       return 'elevenlabs';
     }
     return 'edge';

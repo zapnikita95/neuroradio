@@ -64,6 +64,8 @@ data class StoryResponse(
     @SerializedName("seed_interest_score") val seedInterestScore: Int? = null,
     @SerializedName("seed_interest_rating") val seedInterestRating: Int? = null,
     @SerializedName("welcome_trial") val welcomeTrial: WelcomeTrialInfo? = null,
+    @SerializedName("welcome_trial_eligible") val welcomeTrialEligible: Boolean = false,
+    val tier: String? = null,
 )
 
 data class WelcomeTrialInfo(

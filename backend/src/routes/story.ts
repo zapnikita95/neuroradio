@@ -100,6 +100,7 @@ import {
   hasPremiumEntitlement,
   premiumUpsellHintRu,
   resolveUserTier,
+  resolveUserTierForStory,
 } from '../services/entitlements.js';
 import { isAzureSpeechEnabled } from '../services/entitlements.js';
 import { canUseAzureSpeechProduction, hasAzureSpeechCredentials } from '../services/tts-router.js';
@@ -111,7 +112,7 @@ import {
   rateLimitStory,
   recordStoryGeneration,
 } from '../middleware/rate-limit.js';
-import { grantWelcomeTrialAfterFirstNarratedStory } from '../services/account-store.js';
+import { grantWelcomeTrialAfterFirstNarratedStory, isWelcomeTrialEligible } from '../services/account-store.js';
 import {
   getStoryLimitsForTier,
   resolveOpenRouterModelForTier,
@@ -304,7 +305,10 @@ router.post('/full', extractClientSecrets, validateStoryFullBody, storyFullRateL
   );
 
   const requestedProviderRaw = body.llm_provider;
-  const userTier = resolveUserTier(installId);
+  const deviceFingerprint =
+    typeof body.device_fingerprint === 'string' ? body.device_fingerprint : undefined;
+  const welcomeTrialEligible = isWelcomeTrialEligible(installId, deviceFingerprint);
+  const userTier = resolveUserTierForStory(installId, deviceFingerprint);
   const clientLlmKeys: ClientLlmKeys = {
     groq: body.groq_api_key,
     gemini: body.gemini_api_key,
@@ -2066,9 +2070,10 @@ router.post('/full', extractClientSecrets, validateStoryFullBody, storyFullRateL
       installId,
       ttsProvider,
       userTtsCredentials,
+      userTier,
     );
 
-    assertFreeTierTtsAvailable(installId, userTtsCredentials);
+    assertFreeTierTtsAvailable(installId, userTtsCredentials, userTier);
 
     const response: Record<string, unknown> = {
       artist,
@@ -2085,7 +2090,8 @@ router.post('/full', extractClientSecrets, validateStoryFullBody, storyFullRateL
       ttsEmotion: delivery.emotion,
       voiceTier: effectiveVoiceTier,
       demo: false,
-      tier: resolveUserTier(installId),
+      tier: userTier,
+      welcome_trial_eligible: welcomeTrialEligible && userTier === 'trial',
       quota: shouldSkipDailyStoryQuota({ ownLlmKey, userTtsCredentials })
         ? {
             used: 0,
@@ -2170,6 +2176,7 @@ router.post('/full', extractClientSecrets, validateStoryFullBody, storyFullRateL
           title: metadata.title,
         },
         userTtsCredentials,
+        storyTier: userTier,
       });
       response.audioUrl = signAudioAccess(audio.fileName) ?? audio.audioUrl;
       response.audioFile = audio.fileName;
@@ -2199,10 +2206,6 @@ router.post('/full', extractClientSecrets, validateStoryFullBody, storyFullRateL
     });
 
     if (response.audioUrl) {
-      const deviceFingerprint =
-        typeof (req.body as StoryFullBody).device_fingerprint === 'string'
-          ? (req.body as StoryFullBody).device_fingerprint
-          : undefined;
       const welcomeTrial = await grantWelcomeTrialAfterFirstNarratedStory(
         installId,
         deviceFingerprint,

@@ -1379,6 +1379,27 @@ function grantWelcomeTrialIfEligible(account: AccountRecord, deviceFingerprint?:
   return true;
 }
 
+/** Можно ли выдать пробную неделю при первой озвученной истории (без записи в store). */
+export function isWelcomeTrialEligible(installId: string, deviceFingerprint?: string): boolean {
+  const store = loadStore();
+  const fpRaw = deviceFingerprint?.trim();
+  if (fpRaw && fpRaw.length >= 16) {
+    const fpHash = hashDeviceFingerprint(fpRaw);
+    if (store.deviceWelcomeTrialFingerprints?.[fpHash]) {
+      return false;
+    }
+  }
+  const normalized = installId.trim().toLowerCase();
+  const accountId = store.installToAccount[normalized];
+  if (!accountId) return true;
+  const account = store.accountsById[accountId];
+  if (!account) return true;
+  const now = Date.now();
+  if (account.plan === 'premium' && (account.premiumUntil ?? 0) > now) return false;
+  if (account.plan === 'trial' && (account.trialUntil ?? 0) > now) return false;
+  return true;
+}
+
 /** Пробная неделя без регистрации — один раз на устройство (отпечаток с клиента). */
 export async function claimDeviceWelcomeTrial(
   installId: string,

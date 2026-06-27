@@ -11,15 +11,27 @@ enum WelcomeTrialCoordinator {
         profile.plan = "trial"
         profile.trialUntil = until
         settings.accountProfile = profile
-        applyPremiumDefaults(settings: settings)
+        applyPremiumExperienceDefaults(settings: settings)
         NotificationCenter.default.post(name: trialStartedNotification, object: nil, userInfo: ["trialUntil": until])
     }
 
-    static func applyPremiumDefaults(settings: SettingsStore) {
+    static func preparePremiumExperienceForFirstStory(settings: SettingsStore) {
+        applyPremiumExperienceDefaults(settings: settings)
+    }
+
+    static func applyPremiumExperienceDefaults(settings: SettingsStore) {
         settings.serverTtsProvider = .yandex
+        settings.ttsVoice = .zahar
+        if settings.resolvedLanguage == .en {
+            settings.serverTtsProvider = .elevenlabs
+        }
         if settings.autoIntercept {
             settings.applyAutoPlaybackDefaults()
         }
+    }
+
+    static func applyPremiumDefaults(settings: SettingsStore) {
+        applyPremiumExperienceDefaults(settings: settings)
     }
 
     static func enableRadioStationMode(settings: SettingsStore) {

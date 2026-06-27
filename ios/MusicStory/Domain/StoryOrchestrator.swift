@@ -325,6 +325,18 @@ final class StoryOrchestrator: ObservableObject {
 
         switch result {
         case .success(let response):
+            if response.welcomeTrial?.granted == true {
+                WelcomeTrialCoordinator.handleGranted(
+                    settings: settings,
+                    trialUntil: response.welcomeTrial?.trialUntil
+                )
+                if !settings.isReviewerAccount {
+                    await notifications.notifyTrialStarted()
+                }
+            } else if response.welcomeTrialEligible == true || response.tier == "trial" {
+                WelcomeTrialCoordinator.preparePremiumExperienceForFirstStory(settings: settings)
+            }
+
             markStoryTriggered(for: track)
             if !manual {
                 let elapsed = Date().timeIntervalSince(fetchStarted)
@@ -367,13 +379,6 @@ final class StoryOrchestrator: ObservableObject {
                     Task { @MainActor in
                         guard session == self?.playbackSession else { return }
                         self?.uiState.state = .playingStory
-                        if response.welcomeTrial?.granted == true {
-                            WelcomeTrialCoordinator.handleGranted(
-                                settings: self?.settings ?? .shared,
-                                trialUntil: response.welcomeTrial?.trialUntil
-                            )
-                            await NotificationService.shared.notifyTrialStarted()
-                        }
                     }
                 },
                 onFinished: { [weak self] in

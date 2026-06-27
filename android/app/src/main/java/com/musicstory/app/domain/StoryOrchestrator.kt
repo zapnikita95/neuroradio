@@ -784,6 +784,20 @@ class StoryOrchestrator(
                     return@fold
                 }
 
+                val app = context.applicationContext as MusicStoryApp
+                when {
+                    response.welcomeTrial?.granted == true -> {
+                        WelcomeTrialGate.handleWelcomeTrialGranted(
+                            app,
+                            response.welcomeTrial.trialUntil,
+                        )
+                        TrialStartedNotifier.show(context)
+                    }
+                    response.welcomeTrialEligible || response.tier == "trial" -> {
+                        WelcomeTrialGate.preparePremiumExperienceForFirstStory(app)
+                    }
+                }
+
                 startGenerationPreview(
                     normalizeUserFacingTranscript(response.ttsTranscript ?: response.script),
                     session,
@@ -850,17 +864,6 @@ class StoryOrchestrator(
                                 lastStoryStartedAtMs = System.currentTimeMillis()
                                 _state.value = OrchestratorState.PLAYING_STORY
                                 publishUiState()
-                                val welcome = response.welcomeTrial
-                                if (welcome?.granted == true) {
-                                    scope.launch {
-                                        val app = context.applicationContext as MusicStoryApp
-                                        WelcomeTrialGate.handleWelcomeTrialGranted(
-                                            app,
-                                            welcome.trialUntil,
-                                        )
-                                        TrialStartedNotifier.show(context)
-                                    }
-                                }
                             },
                             onFinished = {
                                 if (!isSessionCurrent(session)) return@playStory

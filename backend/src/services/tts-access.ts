@@ -1,4 +1,4 @@
-import { hasPaidStoryTier } from './entitlements.js';
+import { hasPaidStoryTier, type UserTier } from './entitlements.js';
 import {
   hasUserTtsCredentials,
   type UserTtsCredentials,
@@ -6,13 +6,24 @@ import {
 
 export type StoryTtsProviderId = 'auto' | 'yandex' | 'sber' | 'azure' | 'elevenlabs' | 'edge';
 
+function hasPaidStoryTierEffective(
+  installId: string,
+  tierOverride?: UserTier,
+): boolean {
+  if (tierOverride) {
+    return tierOverride === 'trial' || tierOverride === 'premium' || tierOverride === 'unlimited';
+  }
+  return hasPaidStoryTier(installId);
+}
+
 /** Server Yandex SpeechKit — только trial/premium или свой ключ пользователя. */
 export function canUseServerSpeechKit(
   installId: string,
   userTtsCredentials: UserTtsCredentials | null | undefined,
+  tierOverride?: UserTier,
 ): boolean {
   if (hasUserTtsCredentials(userTtsCredentials)) return true;
-  return hasPaidStoryTier(installId);
+  return hasPaidStoryTierEffective(installId, tierOverride);
 }
 
 export function shouldSkipDailyStoryQuota(options: {
@@ -27,6 +38,7 @@ export function resolveStoryTtsProvider(
   installId: string,
   requested: StoryTtsProviderId | string | undefined,
   userTtsCredentials: UserTtsCredentials | null | undefined,
+  tierOverride?: UserTier,
 ): StoryTtsProviderId {
   const normalized =
     requested === 'silero' ? 'edge' : (requested as StoryTtsProviderId | undefined);
@@ -36,7 +48,7 @@ export function resolveStoryTtsProvider(
     if (userTtsCredentials?.provider === 'sber') return 'sber';
   }
 
-  if (canUseServerSpeechKit(installId, userTtsCredentials)) {
+  if (canUseServerSpeechKit(installId, userTtsCredentials, tierOverride)) {
     if (normalized === 'edge') return 'auto';
     return normalized ?? 'auto';
   }
@@ -69,7 +81,8 @@ export class FreeTierEdgeTtsError extends Error {
 export function assertFreeTierTtsAvailable(
   installId: string,
   userTtsCredentials: UserTtsCredentials | null | undefined,
+  tierOverride?: UserTier,
 ): void {
-  if (canUseServerSpeechKit(installId, userTtsCredentials)) return;
+  if (canUseServerSpeechKit(installId, userTtsCredentials, tierOverride)) return;
   // Edge TTS (Microsoft) — без ключей, всегда доступен на бесплатном тарифе.
 }

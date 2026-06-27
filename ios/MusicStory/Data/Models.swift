@@ -76,6 +76,8 @@ struct StoryResponse: Decodable, Sendable {
     let ttsTranscript: String?
     let ttsProvider: String?
     let welcomeTrial: WelcomeTrialInfo?
+    let welcomeTrialEligible: Bool?
+    let tier: String?
 
     enum CodingKeys: String, CodingKey {
         case artist
@@ -98,6 +100,8 @@ struct StoryResponse: Decodable, Sendable {
         case ttsTranscript = "tts_transcript"
         case ttsProvider = "tts_provider"
         case welcomeTrial = "welcome_trial"
+        case welcomeTrialEligible = "welcome_trial_eligible"
+        case tier
     }
 
     init(
@@ -120,7 +124,9 @@ struct StoryResponse: Decodable, Sendable {
         seedInterestRating: Int? = nil,
         ttsTranscript: String? = nil,
         ttsProvider: String? = nil,
-        welcomeTrial: WelcomeTrialInfo? = nil
+        welcomeTrial: WelcomeTrialInfo? = nil,
+        welcomeTrialEligible: Bool? = nil,
+        tier: String? = nil
     ) {
         self.artist = artist
         self.title = title
@@ -142,6 +148,8 @@ struct StoryResponse: Decodable, Sendable {
         self.ttsTranscript = ttsTranscript
         self.ttsProvider = ttsProvider
         self.welcomeTrial = welcomeTrial
+        self.welcomeTrialEligible = welcomeTrialEligible
+        self.tier = tier
     }
 
     init(from decoder: Decoder) throws {
@@ -166,6 +174,8 @@ struct StoryResponse: Decodable, Sendable {
         ttsTranscript = try container.decodeIfPresent(String.self, forKey: .ttsTranscript)
         ttsProvider = try container.decodeIfPresent(String.self, forKey: .ttsProvider)
         welcomeTrial = try container.decodeIfPresent(WelcomeTrialInfo.self, forKey: .welcomeTrial)
+        welcomeTrialEligible = try container.decodeIfPresent(Bool.self, forKey: .welcomeTrialEligible)
+        tier = try container.decodeIfPresent(String.self, forKey: .tier)
     }
 
     var displayTranscript: String {
