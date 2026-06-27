@@ -3,6 +3,7 @@ import type { AccountRecord } from './account-store.js';
 /** Тестовые учётки App Review / Play Review (фиксированный код 000000, без письма, полный Premium). */
 const REVIEWER_ACCOUNTS: Record<string, { code: string }> = {
   'googletester@test.ru': { code: '000000' },
+  'rustoretester@test.ru': { code: '000000' },
   'appletester@test.ru': { code: '000000' },
   'appletester@test.com': { code: '000000' },
 };

@@ -165,13 +165,18 @@ class MediaControllerManager(
         fadedStreamOriginalVolume = null
     }
 
+    /** True when we ducked/paused music for story playback — resume only in that case. */
+    fun hasMusicDuckState(): Boolean = fadedStreamOriginalVolume != null
+
     suspend fun resumeMusicWithFade(seconds: Float) {
-        val savedOriginal = fadedStreamOriginalVolume
+        val savedOriginal = fadedStreamOriginalVolume ?: run {
+            activeController?.transportControls?.play()
+            return
+        }
         restoreSystemMusicVolumeIfNeeded()
         val controls = activeController?.transportControls ?: return
         val maxVolume = audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC)
-        val original = (savedOriginal ?: audioManager.getStreamVolume(AudioManager.STREAM_MUSIC))
-            .coerceIn(1, maxVolume)
+        val original = savedOriginal.coerceIn(1, maxVolume)
         val startVolume = (maxVolume * 0.08f).toInt().coerceAtLeast(1)
         audioManager.setStreamVolume(AudioManager.STREAM_MUSIC, startVolume, 0)
         controls.play()

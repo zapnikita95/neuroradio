@@ -289,6 +289,7 @@ Production и Sandbox — один URL.
 | Email | Код входа | Тариф |
 |-------|-----------|-------|
 | `googletester@test.ru` | `000000` | Premium на 1 год, **без лимита историй** |
+| `rustoretester@test.ru` | `000000` | Premium на 1 год, **без лимита историй** |
 | `appletester@test.ru` | `000000` | Premium на 1 год, **без лимита историй** |
 | `appletester@test.com` | `000000` | то же |
 

@@ -868,7 +868,6 @@ class StoryOrchestrator(
                             onFinished = {
                                 if (!isSessionCurrent(session)) return@playStory
                                 cancelGenerationPreview()
-                                mediaControllerManager.restoreSystemMusicVolumeIfNeeded()
                                 if (musicPausedForStory.get() && storyPlayer.shouldResumeMusic()) {
                                     scope.launch {
                                         mediaControllerManager.resumeMusicWithFade(fadeSeconds)
@@ -1175,7 +1174,7 @@ class StoryOrchestrator(
         cancelledTrackKey?.let(::markTrackStoryCancelled)
         cancelInFlightGenerationImmediate("stopped by user")
         storyPlayer.stop()
-        mediaControllerManager.restoreSystemMusicVolumeIfNeeded()
+        val musicWasDucked = mediaControllerManager.hasMusicDuckState()
         _errorMessage.value = null
         _hintMessage.value = null
         _pendingFeedback.value = null
@@ -1189,11 +1188,13 @@ class StoryOrchestrator(
                 )
                 refreshTracksUntilNext()
             }
-            val fadeSeconds = settingsDataStore.musicFadeSeconds.first()
-            if (fadeSeconds > 0f) {
-                mediaControllerManager.resumeMusicWithFade(fadeSeconds)
-            } else {
-                mediaControllerManager.resumeMusic()
+            if (musicWasDucked) {
+                val fadeSeconds = settingsDataStore.musicFadeSeconds.first()
+                if (fadeSeconds > 0f) {
+                    mediaControllerManager.resumeMusicWithFade(fadeSeconds)
+                } else {
+                    mediaControllerManager.resumeMusic()
+                }
             }
         }
         publishUiState()
