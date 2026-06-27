@@ -2,6 +2,7 @@ package com.musicstory.app.domain
 
 import android.content.Context
 import android.widget.Toast
+import com.musicstory.app.MusicStoryApp
 import com.musicstory.app.R
 import com.musicstory.app.data.local.SettingsDataStore
 import com.musicstory.app.data.model.StoryResponse
@@ -849,6 +850,17 @@ class StoryOrchestrator(
                                 lastStoryStartedAtMs = System.currentTimeMillis()
                                 _state.value = OrchestratorState.PLAYING_STORY
                                 publishUiState()
+                                val welcome = response.welcomeTrial
+                                if (welcome?.granted == true) {
+                                    scope.launch {
+                                        val app = context.applicationContext as MusicStoryApp
+                                        WelcomeTrialGate.handleWelcomeTrialGranted(
+                                            app,
+                                            welcome.trialUntil,
+                                        )
+                                        TrialStartedNotifier.show(context)
+                                    }
+                                }
                             },
                             onFinished = {
                                 if (!isSessionCurrent(session)) return@playStory

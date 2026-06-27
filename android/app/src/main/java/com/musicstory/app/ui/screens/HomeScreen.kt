@@ -76,6 +76,7 @@ import com.musicstory.app.domain.TtsVoice
 import com.musicstory.app.domain.ResolvedAppLanguage
 import com.musicstory.app.domain.resolveAppLanguage
 import com.musicstory.app.ui.uiLabel
+import com.musicstory.app.domain.WelcomeTrialGate
 import com.musicstory.app.domain.TierAccess
 import com.musicstory.app.ui.components.TrialCountdownBanner
 import com.musicstory.app.ui.components.TrialUi
@@ -139,6 +140,7 @@ fun HomeScreen(
     var billingEntitlement by remember { mutableStateOf<BillingEntitlementResponse?>(null) }
     var cachedProfile by remember { mutableStateOf<com.musicstory.app.data.local.CachedAccountProfile?>(null) }
     var showTrialExpiredDialog by remember { mutableStateOf(false) }
+    var showTrialStartedDialog by remember { mutableStateOf(false) }
     val storyHistory by app.storyRepository.storyHistory.collectAsState(initial = emptyList())
     val scope = rememberCoroutineScope()
 
@@ -207,6 +209,25 @@ fun HomeScreen(
         if (trialExpired && !trialExpiredUpsellShown) {
             showTrialExpiredDialog = true
         }
+    }
+
+    LaunchedEffect(Unit) {
+        WelcomeTrialGate.trialStartedEvents.collect {
+            showTrialStartedDialog = true
+        }
+    }
+
+    if (showTrialStartedDialog) {
+        AlertDialog(
+            onDismissRequest = { showTrialStartedDialog = false },
+            title = { Text(context.getString(R.string.trial_started_title)) },
+            text = { Text(context.getString(R.string.trial_started_message)) },
+            confirmButton = {
+                TextButton(onClick = { showTrialStartedDialog = false }) {
+                    Text(context.getString(R.string.trial_started_ok))
+                }
+            },
+        )
     }
 
     if (showTrialExpiredDialog) {

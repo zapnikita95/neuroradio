@@ -53,6 +53,7 @@ final class StoryOrchestrator: ObservableObject {
 
     private var playbackSession = 0
     private var isStoryRunning = false
+    private var genreCache: [String: String] = [:]
     private var previewTask: Task<Void, Never>?
     private var storyFetchTask: Task<Result<StoryResponse, Error>, Never>?
     /// Ручной запрос истории из настроек — не сбрасывать UI в onTrackChanged.
@@ -109,12 +110,13 @@ final class StoryOrchestrator: ObservableObject {
         OfflinePackStore.shared.onTrackHeard(track)
 
         let triggerSettings = settings.triggerSettings
+        let trackGenre = await lookupGenre(artist: track.artist, title: track.title)
         let shouldTrigger = uiState.mode == .auto &&
             triggerEngine.onTrackPlayed(
                 settings: triggerSettings,
                 trackKey: track.displayKey,
                 trackArtist: track.artist,
-                trackGenre: nil
+                trackGenre: trackGenre
             )
 
         uiState.tracksUntilNext = triggerEngine.tracksUntilNext(settings: triggerSettings)
@@ -365,6 +367,13 @@ final class StoryOrchestrator: ObservableObject {
                     Task { @MainActor in
                         guard session == self?.playbackSession else { return }
                         self?.uiState.state = .playingStory
+                        if response.welcomeTrial?.granted == true {
+                            WelcomeTrialCoordinator.handleGranted(
+                                settings: self?.settings ?? .shared,
+                                trialUntil: response.welcomeTrial?.trialUntil
+                            )
+                            await NotificationService.shared.notifyTrialStarted()
+                        }
                     }
                 },
                 onFinished: { [weak self] in
@@ -430,6 +439,20 @@ final class StoryOrchestrator: ObservableObject {
             }
             uiState.state = .error
         }
+    }
+
+    private func lookupGenre(artist: String, title: String) async -> String? {
+        let key = "\(artist.lowercased())|\(title.lowercased())"
+        if let cached = genreCache[key] { return cached }
+        if let fromHistory = historyStore.lookupGenre(artist: artist, title: title) {
+            genreCache[key] = fromHistory
+            return fromHistory
+        }
+        if let mb = await MusicBrainzGenreLookup.fetchGenre(artist: artist, title: title) {
+            genreCache[key] = mb
+            return mb
+        }
+        return nil
     }
 
     private func fetchStoryWithTimeout(for track: TrackInfo) async -> Result<StoryResponse, Error> {

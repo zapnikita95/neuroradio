@@ -63,7 +63,8 @@ final class StoryRepository: ObservableObject {
             edgeVoicePreset: settings.storyEdgeVoicePresetRequest,
             elevenLabsVoice: settings.storyElevenLabsVoiceRequest,
             speakTrackNamesInVoiceover: settings.speakTrackNamesInVoiceover,
-            lang: lang.apiCode
+            lang: lang.apiCode,
+            deviceFingerprint: DeviceFingerprint.current()
         )
 
         do {

@@ -169,6 +169,20 @@ final class NotificationService: NSObject, ObservableObject {
         try? await UNUserNotificationCenter.current().add(request)
     }
 
+    func notifyTrialStarted() async {
+        guard await authorizationGranted() else { return }
+        let content = UNMutableNotificationContent()
+        content.title = AppStrings.l10n(.ru).trialStartedNotifTitle
+        content.body = AppStrings.l10n(.ru).trialStartedNotifBody
+        content.sound = .default
+        let request = UNNotificationRequest(
+            identifier: "welcome-trial-started",
+            content: content,
+            trigger: nil
+        )
+        try? await UNUserNotificationCenter.current().add(request)
+    }
+
     func cancelOfflinePackNotifications() {
         UNUserNotificationCenter.current().removeDeliveredNotifications(withIdentifiers: [
             "offline-pack-collecting",

@@ -75,6 +75,7 @@ class StoryRepository(
     private val connectionChecker: ConnectionChecker = ConnectionChecker(),
     private val offlineAudioStore: StoryOfflineAudioStore,
     private val offlinePackDao: OfflinePackDao? = null,
+    private val deviceFingerprint: String? = null,
 ) {
     private val gson = Gson()
     private val storyFetchMutex = Mutex()
@@ -718,6 +719,7 @@ class StoryRepository(
                         },
                         speakTrackNamesInVoiceover = speakTrackNamesInVoiceover,
                         clientPlatform = "android",
+                        deviceFingerprint = deviceFingerprint,
                         ),
                     ),
                 )

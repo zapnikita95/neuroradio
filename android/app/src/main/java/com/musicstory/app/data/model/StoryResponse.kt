@@ -40,6 +40,7 @@ data class StoryRequest(
     @SerializedName("story_language") val storyLanguage: String = "ru",
     /** Backend serves Yandex WAV (not OGG/Opus) — Huawei/Poco MediaCodec opus decoder crashes. */
     @SerializedName("client_platform") val clientPlatform: String = "android",
+    @SerializedName("device_fingerprint") val deviceFingerprint: String? = null,
 )
 
 data class StoryResponse(
@@ -62,6 +63,13 @@ data class StoryResponse(
     @SerializedName("seed_scope") val seedScope: String? = null,
     @SerializedName("seed_interest_score") val seedInterestScore: Int? = null,
     @SerializedName("seed_interest_rating") val seedInterestRating: Int? = null,
+    @SerializedName("welcome_trial") val welcomeTrial: WelcomeTrialInfo? = null,
+)
+
+data class WelcomeTrialInfo(
+    val granted: Boolean = false,
+    @SerializedName("trial_until") val trialUntil: Long? = null,
+    val plan: String? = null,
 )
 
 data class StorySources(

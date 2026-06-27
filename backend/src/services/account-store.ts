@@ -1432,18 +1432,46 @@ export async function claimDeviceWelcomeTrial(
   const account = store.accountsById[accountId];
   if (!account) return { ok: false, error: 'Аккаунт недоступен' };
 
-  const granted = grantWelcomeTrialIfEligible(account, fpRaw);
-  const trialUntil = account.trialUntil ?? null;
-  if (granted && trialUntil) {
-    recordDeviceWelcomeFingerprint(store, fpHash, account.accountId, trialUntil);
-  }
   await saveStoreAsync(store);
+  const ent = entitlementFromAccount(account);
+  const activeTrialUntil =
+    ent.plan === 'trial' && (ent.trialUntil ?? 0) > now ? ent.trialUntil : null;
   return {
     ok: true,
-    granted,
-    trialUntil: trialUntil && trialUntil > now ? trialUntil : null,
-    entitlement: entitlementFromAccount(account),
+    granted: false,
+    trialUntil: activeTrialUntil,
+    entitlement: ent,
   };
+}
+
+/** Пробная неделя — с первой успешно озвученной истории о треке, не с установки. */
+export async function grantWelcomeTrialAfterFirstNarratedStory(
+  installId: string,
+  deviceFingerprint?: string,
+): Promise<{ granted: boolean; trialUntil: number | null; entitlement: AccountEntitlement }> {
+  const store = await ensureAccountStoreLoaded();
+  const normalized = installId.trim().toLowerCase();
+  let accountId = store.installToAccount[normalized];
+  if (!accountId) {
+    accountId = createAccount(installId).accountId;
+  }
+  const account = store.accountsById[accountId];
+  if (!account) {
+    const ent = getEntitlementForInstall(installId);
+    return { granted: false, trialUntil: null, entitlement: ent };
+  }
+  const granted = grantWelcomeTrialIfEligible(account, deviceFingerprint);
+  await saveStoreAsync(store);
+  const ent = entitlementFromAccount(account);
+  const now = Date.now();
+  const trialUntil =
+    ent.plan === 'trial' && (ent.trialUntil ?? 0) > now ? ent.trialUntil : null;
+  if (granted) {
+    console.log(
+      `[account] welcome trial started after first story install=${normalized.slice(0, 8)} until=${trialUntil ? new Date(trialUntil).toISOString() : 'n/a'}`,
+    );
+  }
+  return { granted, trialUntil, entitlement: ent };
 }
 
 export function grantTrialSubscription(
@@ -1647,8 +1675,6 @@ export async function verifyEmailLogin(
   account.email = email;
   if (isYookassaReviewerEmail(email)) {
     provisionYookassaReviewerAccount(account);
-  } else if (isFirstRegistration) {
-    grantWelcomeTrialIfEligible(account, deviceFingerprint);
   }
   const attach = attachInstallToAccount(store, account, normalized);
   if (!attach.ok) {
@@ -1719,9 +1745,6 @@ export function linkTelegramAccount(
 
   account.telegramId = telegramId;
   account.telegramUsername = username ?? null;
-  if (isFirstRegistration) {
-    grantWelcomeTrialIfEligible(account, deviceFingerprint);
-  }
   if (!account.installIds.includes(normalized)) {
     if (account.installIds.length >= MAX_DEVICES) {
       return { ok: false, error: `Максимум ${MAX_DEVICES} устройств` };
@@ -1764,8 +1787,6 @@ export function linkAppleAccount(
     if (isYookassaReviewerEmail(normalizedEmail)) {
       provisionYookassaReviewerAccount(account);
     }
-  } else if (isFirstRegistration) {
-    grantWelcomeTrialIfEligible(account);
   }
 
   const attach = attachInstallToAccount(store, account, normalized);

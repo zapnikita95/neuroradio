@@ -8,6 +8,7 @@ struct HomeView: View {
     @State private var showSettings = false
     @State private var showHistory = false
     @State private var showAccount = false
+    @State private var showTrialStartedDialog = false
 
     private var lang: ResolvedAppLanguage { settings.resolvedLanguage }
     private var copy: AppL10n { AppStrings.l10n(lang) }
@@ -101,6 +102,16 @@ struct HomeView: View {
         }
         .navigationDestination(isPresented: $showAccount) {
             AccountView()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: WelcomeTrialCoordinator.trialStartedNotification)) { _ in
+            if !settings.isReviewerAccount {
+                showTrialStartedDialog = true
+            }
+        }
+        .alert(copy.trialStartedTitle, isPresented: $showTrialStartedDialog) {
+            Button(copy.trialStartedOk) { showTrialStartedDialog = false }
+        } message: {
+            Text(copy.trialStartedMessage)
         }
     }
 

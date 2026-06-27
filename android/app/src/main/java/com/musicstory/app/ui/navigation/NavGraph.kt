@@ -20,6 +20,7 @@ import com.musicstory.app.ui.screens.AccountLoginScreen
 import com.musicstory.app.ui.screens.HistoryScreen
 import com.musicstory.app.ui.screens.HomeScreen
 import com.musicstory.app.ui.screens.OnboardingScreen
+import com.musicstory.app.ui.screens.RadioModeOnboardingScreen
 import com.musicstory.app.ui.screens.SettingsScreen
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
@@ -27,6 +28,7 @@ import kotlinx.coroutines.launch
 object Routes {
     const val ONBOARDING = "onboarding"
     const val ACCOUNT_LOGIN = "account_login"
+    const val RADIO_MODE = "radio_mode"
     const val HOME = "home"
     const val SETTINGS = "settings"
     const val ACCOUNT = "account"
@@ -61,12 +63,7 @@ fun MusicStoryNavGraph(
                                 popUpTo(Routes.ONBOARDING) { inclusive = true }
                             }
                         } else {
-                            if (!app.settingsDataStore.homeTourCompleted.first()) {
-                                app.settingsDataStore.setHomeTourPending(true)
-                            }
-                            navController.navigate(Routes.HOME) {
-                                popUpTo(Routes.ONBOARDING) { inclusive = true }
-                            }
+                            navigateAfterAccountGate(navController, app)
                         }
                     }
                 },
@@ -80,24 +77,42 @@ fun MusicStoryNavGraph(
                 onLoggedIn = {
                     scope.launch {
                         WelcomeTrialGate.completeAfterLogin(app)
-                        if (!app.settingsDataStore.homeTourCompleted.first()) {
-                            app.settingsDataStore.setHomeTourPending(true)
-                        }
-                        navController.navigate(Routes.HOME) {
-                            popUpTo(Routes.ACCOUNT_LOGIN) { inclusive = true }
-                            launchSingleTop = true
-                        }
+                        navigateAfterAccountGate(navController, app)
                     }
                 },
                 onSkip = {
                     scope.launch {
-                        app.settingsDataStore.setAccountLoginGateCompleted(true)
-                        app.settingsDataStore.setHomeTourPending(true)
+                        WelcomeTrialGate.completeAfterSkip(app)
+                        navigateAfterAccountGate(navController, app)
+                    }
+                },
+            )
+        }
+        composable(Routes.RADIO_MODE) {
+            val context = LocalContext.current
+            val app = context.applicationContext as MusicStoryApp
+            val scope = rememberCoroutineScope()
+            RadioModeOnboardingScreen(
+                onFinished = {
+                    scope.launch {
+                        app.settingsDataStore.setRadioModeOnboardingCompleted(true)
+                        if (!app.settingsDataStore.homeTourCompleted.first()) {
+                            app.settingsDataStore.setHomeTourPending(true)
+                        }
                         navController.navigate(Routes.HOME) {
-                            popUpTo(Routes.ACCOUNT_LOGIN) { inclusive = true }
+                            popUpTo(Routes.RADIO_MODE) { inclusive = true }
                             launchSingleTop = true
                         }
-                        WelcomeTrialGate.completeAfterSkip(app)
+                    }
+                },
+                onEnableRadio = {
+                    scope.launch {
+                        WelcomeTrialGate.enableRadioStationMode(app)
+                    }
+                },
+                onScrobbleOnly = {
+                    scope.launch {
+                        WelcomeTrialGate.enableScrobbleOnlyMode(app)
                     }
                 },
             )
@@ -166,6 +181,24 @@ fun MusicStoryNavGraph(
     }
 }
 
+private suspend fun navigateAfterAccountGate(navController: NavHostController, app: MusicStoryApp) {
+    val radioDone = app.settingsDataStore.radioModeOnboardingCompleted.first()
+    if (!radioDone) {
+        navController.navigate(Routes.RADIO_MODE) {
+            popUpTo(Routes.ACCOUNT_LOGIN) { inclusive = true }
+            launchSingleTop = true
+        }
+        return
+    }
+    if (!app.settingsDataStore.homeTourCompleted.first()) {
+        app.settingsDataStore.setHomeTourPending(true)
+    }
+    navController.navigate(Routes.HOME) {
+        popUpTo(Routes.ACCOUNT_LOGIN) { inclusive = true }
+        launchSingleTop = true
+    }
+}
+
 @Composable
 fun MusicStoryStartupGate(
     hasNotificationAccess: Boolean,
@@ -183,6 +216,7 @@ fun MusicStoryStartupGate(
         startDestination = when {
             !hasNotificationAccess -> Routes.ONBOARDING
             !app.settingsDataStore.accountLoginGateCompleted.first() -> Routes.ACCOUNT_LOGIN
+            !app.settingsDataStore.radioModeOnboardingCompleted.first() -> Routes.RADIO_MODE
             else -> Routes.HOME
         }
     }

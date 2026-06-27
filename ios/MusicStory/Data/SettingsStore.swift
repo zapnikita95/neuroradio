@@ -205,7 +205,7 @@ final class SettingsStore: ObservableObject {
         musicFadeSeconds = defaults.object(forKey: Keys.musicFadeSeconds) as? Float ?? SettingsDefaults.musicFadeSeconds
         specificArtists = defaults.stringArray(forKey: Keys.specificArtists) ?? []
         specificGenres = defaults.stringArray(forKey: Keys.specificGenres) ?? []
-        autoIntercept = defaults.object(forKey: Keys.autoIntercept) as? Bool ?? true
+        autoIntercept = defaults.object(forKey: Keys.autoIntercept) as? Bool ?? false
         speakTrackNamesInVoiceover = defaults.object(forKey: Keys.speakTrackNamesInVoiceover) as? Bool
             ?? SettingsDefaults.speakTrackNamesInVoiceover
         spotifyClientId = defaults.string(forKey: Keys.spotifyClientId) ?? ""

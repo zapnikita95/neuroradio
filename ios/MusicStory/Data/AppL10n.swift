@@ -291,6 +291,39 @@ struct AppL10n {
     var settingsOpenSubscription: String {
         en ? "View plans and subscribe" : "Тарифы и оформление подписки"
     }
+
+    var radioOnboardingTitle: String { en ? "Radio station mode" : "Режим радиостанции" }
+    var radioOnboardingChecklistSubtitle: String {
+        en ? "Auto facts between tracks" : "Авто-факты между треками"
+    }
+    var radioOnboardingBody: String {
+        en
+            ? "The AI host will tell interesting facts about your tracks at the frequency you set. Music pauses briefly — then continues."
+            : "Нейроведущий будет рассказывать интересные факты о ваших треках с той частотой, которую вы настроите. Музыка ненадолго приглушается — и снова играет."
+    }
+    var radioOnboardingEnable: String { en ? "Enable radio station mode" : "Включить режим радиостанции" }
+    var radioOnboardingLater: String { en ? "Not now" : "Пока не включать" }
+    var radioOnboardingDeferTitle: String { en ? "Listen and save" : "Слушаем и сохраняем" }
+    var radioOnboardingDeferBody: String {
+        en
+            ? "Your listening history will be saved. Later you can enable radio mode in Settings and choose regular broadcasts, specific artists, or genres based on what you've heard."
+            : "История ваших прослушиваний будет сохраняться. Позже вы сможете включить режим радиостанции в настройках и выбрать формат: регулярно, по конкретным артистам или по жанрам — на основе того, что уже послушали."
+    }
+    var radioOnboardingContinue: String { en ? "Got it, continue" : "Понятно, продолжить" }
+
+    var trialStartedTitle: String { en ? "Trial week started" : "Запущена пробная неделя" }
+    var trialStartedMessage: String {
+        en
+            ? "7 days of extended access: Yandex SpeechKit and improved fact models. After that, speech and fact models become basic — continue extended access at efir-ai.ru."
+            : "7 дней расширенного доступа: Yandex SpeechKit для озвучки и улучшенные модели подбора фактов. После недели модели синтеза речи и поиска фактов станут базовыми — продлить расширенную версию можно на efir-ai.ru."
+    }
+    var trialStartedOk: String { en ? "Great" : "Отлично" }
+    var trialStartedNotifTitle: String { en ? "Trial week started" : "Пробная неделя запущена" }
+    var trialStartedNotifBody: String {
+        en
+            ? "7 days of Yandex SpeechKit and improved fact models. After — basic models; extended access at efir-ai.ru."
+            : "7 дней Yandex SpeechKit и улучшенных моделей фактов. После — базовые модели; расширенный доступ на efir-ai.ru."
+    }
 }
 
 extension StoryRepository {

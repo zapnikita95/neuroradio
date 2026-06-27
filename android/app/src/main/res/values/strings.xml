@@ -44,7 +44,7 @@
     <string name="onboarding_not_granted_yet">Сначала включите «Эфир AI — мониторинг медиа» в настройках Android. Если система блокирует доступ — раскройте подсказку выше.</string>
 
     <string name="home_tour_welcome_title">Вас приветствует Эфир AI</string>
-    <string name="home_tour_welcome_body">Первую неделю — полный доступ: Yandex SpeechKit (или ElevenLabs на английском), лучшие модели, офлайн-сохранение фактов. Потом — базовый тариф с Edge TTS и обычными моделями; расширенный — по подписке. Истории озвучиваются голосом выбранного амплуа — каждый эфир уникален.</string>
+    <string name="home_tour_welcome_body">Пробная неделя расширенного доступа начинается после первой успешно озвученной истории о треке — не с установки. Тогда включатся Yandex SpeechKit, лучшие модели подбора фактов и офлайн-сохранение. После недели — базовые модели синтеза и поиска фактов; расширенный доступ — на efir-ai.ru.</string>
     <string name="home_tour_track_title">Сейчас играет</string>
     <string name="home_tour_track_body">Когда вы включаете трек в Spotify или Яндекс Музыке, он отображается здесь — название, артист и источник.</string>
     <string name="home_tour_counter_title">Следующая история</string>
@@ -235,15 +235,31 @@
     <string name="settings_tts_engine_elevenlabs">ElevenLabs</string>
     <string name="trial_countdown_title">Пробный Premium</string>
     <string name="trial_countdown_body">Осталось: %1$s</string>
-    <string name="trial_countdown_hint">После окончания пробного периода озвучка переключится на Edge, если не оформить подписку.</string>
+    <string name="trial_countdown_hint">После окончания пробного периода модели синтеза и фактов станут базовыми. Расширенный доступ — на efir-ai.ru.</string>
     <string name="trial_countdown_days_hours">%1$d д %2$d ч</string>
     <string name="trial_countdown_hours_mins">%1$d ч %2$d мин</string>
     <string name="trial_countdown_mins">%1$d мин</string>
     <string name="trial_countdown_dismiss">Скрыть</string>
     <string name="trial_expired_title">Пробный Premium закончился</string>
-    <string name="trial_expired_message">7 дней пробного доступа завершены. Оформите подписку, чтобы снова слушать истории с Yandex SpeechKit и без ограничений бесплатного тарифа.</string>
+    <string name="trial_expired_message">7 дней расширенного доступа завершены. Радиостанция продолжит работать, но модели синтеза речи и подбора фактов станут базовыми. Продолжить расширенную версию можно на сайте efir-ai.ru.</string>
     <string name="trial_expired_subscribe">Оформить подписку</string>
     <string name="trial_expired_later">Позже</string>
+
+    <string name="radio_onboarding_title">Режим радиостанции</string>
+    <string name="radio_onboarding_body">Нейроведущий будет рассказывать интересные факты о ваших треках с той частотой, которую вы настроите. Музыка ненадолго приглушается — и снова играет.</string>
+    <string name="radio_onboarding_enable">Включить режим радиостанции</string>
+    <string name="radio_onboarding_later">Пока не включать</string>
+    <string name="radio_onboarding_defer_title">Слушаем и сохраняем</string>
+    <string name="radio_onboarding_defer_body">История ваших прослушиваний будет сохраняться. Позже вы сможете включить режим радиостанции в настройках и выбрать формат: регулярно, по конкретным артистам или по жанрам — на основе того, что уже послушали.</string>
+    <string name="radio_onboarding_continue">Понятно, продолжить</string>
+
+    <string name="trial_started_title">Запущена пробная неделя</string>
+    <string name="trial_started_message">7 дней расширенного доступа: Yandex SpeechKit для озвучки и улучшенные модели подбора фактов. После недели модели синтеза речи и поиска фактов станут базовыми — продлить расширенную версию можно на efir-ai.ru.</string>
+    <string name="trial_started_ok">Отлично</string>
+    <string name="trial_started_notif_title">Пробная неделя запущена</string>
+    <string name="trial_started_notif_body">7 дней Yandex SpeechKit и улучшенных моделей фактов. После — базовые модели; расширенный доступ на efir-ai.ru.</string>
+    <string name="trial_started_channel_name">Пробный период</string>
+    <string name="trial_started_channel_desc">Уведомления о начале пробной недели</string>
     <string name="settings_edge_voice">Голос Microsoft Edge</string>
     <string name="settings_story_length">Длина истории</string>
     <string name="settings_tts_speed">Скорость речи</string>

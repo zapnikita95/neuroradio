@@ -27,8 +27,8 @@ import androidx.work.ExistingPeriodicWorkPolicy
 import androidx.work.NetworkType
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
-import com.musicstory.app.domain.WelcomeTrialGate
 import com.musicstory.app.worker.AuthRefreshWorker
+import com.musicstory.app.util.DeviceFingerprint
 import com.musicstory.app.util.StoryLog
 import com.musicstory.app.util.LocaleHelper
 import kotlinx.coroutines.CoroutineScope
@@ -129,6 +129,7 @@ class MusicStoryApp : Application() {
             metadataCache = metadataCache,
             offlineAudioStore = offlineAudioStore,
             offlinePackDao = database.offlinePackDao(),
+            deviceFingerprint = DeviceFingerprint.get(this),
         )
         offlinePackRepository = OfflinePackRepository(
             context = this,
@@ -167,7 +168,6 @@ class MusicStoryApp : Application() {
             }
         }
         prefetchBackendAuth()
-        WelcomeTrialGate.ensureDeviceWelcomeTrial(this)
         prefetchAccountHistory()
         appScope.launch {
             storyRepository.dedupeStoryHistory()

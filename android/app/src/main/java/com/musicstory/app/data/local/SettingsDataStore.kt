@@ -100,6 +100,12 @@ class SettingsDataStore(private val context: Context) {
             ?: false
     }
 
+    val radioModeOnboardingCompleted: Flow<Boolean> = context.settingsDataStore.data.map { prefs ->
+        prefs[KEY_RADIO_MODE_ONBOARDING_COMPLETED]
+            ?: prefs[KEY_HOME_TOUR_COMPLETED]
+            ?: false
+    }
+
     val suppressAutoStoryUntilMs: Flow<Long> = context.settingsDataStore.data.map { prefs ->
         prefs[KEY_SUPPRESS_AUTO_STORY_UNTIL] ?: 0L
     }
@@ -413,6 +419,10 @@ class SettingsDataStore(private val context: Context) {
 
     suspend fun setAccountLoginGateCompleted(completed: Boolean) {
         context.settingsDataStore.edit { it[KEY_ACCOUNT_LOGIN_GATE_COMPLETED] = completed }
+    }
+
+    suspend fun setRadioModeOnboardingCompleted(completed: Boolean) {
+        context.settingsDataStore.edit { it[KEY_RADIO_MODE_ONBOARDING_COMPLETED] = completed }
     }
 
     suspend fun setBackendUrl(url: String) {
@@ -825,7 +835,7 @@ class SettingsDataStore(private val context: Context) {
         const val DEFAULT_BACKEND_URL = "https://music-story-production.up.railway.app"
         const val DEFAULT_EVERY_N_TRACKS = 3
         const val DEFAULT_SAME_TRACK_STORY_EVERY_N = 3
-        const val DEFAULT_AUTO_INTERCEPT = true
+        const val DEFAULT_AUTO_INTERCEPT = false
         const val DEFAULT_FACT_NOTIFICATIONS_ENABLED = true
         const val DEFAULT_SPEAK_TRACK_NAMES_IN_VOICEOVER = true
         const val DEFAULT_MUSIC_FADE_SECONDS = 1.5f
@@ -845,6 +855,7 @@ class SettingsDataStore(private val context: Context) {
         private val KEY_HOME_TOUR_PENDING = booleanPreferencesKey("home_tour_pending")
         private val KEY_HOME_TOUR_COMPLETED = booleanPreferencesKey("home_tour_completed")
         private val KEY_ACCOUNT_LOGIN_GATE_COMPLETED = booleanPreferencesKey("account_login_gate_completed")
+        private val KEY_RADIO_MODE_ONBOARDING_COMPLETED = booleanPreferencesKey("radio_mode_onboarding_completed")
         private val KEY_SUPPRESS_AUTO_STORY_UNTIL = longPreferencesKey("suppress_auto_story_until")
         private val KEY_BACKEND_URL = stringPreferencesKey("backend_url")
         private val KEY_AUTH_INSTALL_ID = stringPreferencesKey("auth_install_id")

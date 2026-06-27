@@ -3,55 +3,20 @@ package com.musicstory.app.domain
 import com.musicstory.app.MusicStoryApp
 import com.musicstory.app.data.local.CachedAccountProfile
 import com.musicstory.app.data.local.SettingsDataStore
-import com.musicstory.app.util.DeviceFingerprint
 import com.musicstory.app.util.StoryLog
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
 object WelcomeTrialGate {
-    /** Claim 7-day device trial on cold start (works without login). */
-    fun ensureDeviceWelcomeTrial(app: MusicStoryApp) {
-        app.appScope.launch {
-            runCatching {
-                val profile = app.settingsDataStore.readCachedAccountProfile()
-                val tier = TierAccess.resolveEffectiveTier(
-                    dailyQuotaTier = null,
-                    plan = profile?.plan,
-                    trialUntil = profile?.trialUntil,
-                    premiumUntil = profile?.premiumUntil,
-                )
-                if (TierAccess.isPremiumLike(tier)) {
-                    StoryLog.i("Welcome trial skip: already premium-like tier=$tier")
-                    return@launch
-                }
-                val active = claimWelcomeTrialOnServer(app)
-                if (active) {
-                    StoryLog.i("Welcome trial activated on device")
-                    applyWelcomeTrialDefaults(app)
-                    app.storyOrchestrator.notifyTierMayHaveChanged()
-                } else {
-                    StoryLog.w("Welcome trial not active after claim")
-                }
-            }.onFailure { err ->
-                StoryLog.e("Welcome trial claim on startup failed", err)
-            }
-        }
-    }
+    private val _trialStartedEvents = MutableSharedFlow<Long>(extraBufferCapacity = 1)
+    val trialStartedEvents: SharedFlow<Long> = _trialStartedEvents.asSharedFlow()
 
     suspend fun completeAfterSkip(app: MusicStoryApp) {
         app.settingsDataStore.setAccountLoginGateCompleted(true)
         app.storyOrchestrator.notifyTierMayHaveChanged()
-        app.appScope.launch {
-            runCatching {
-                val trialActive = claimWelcomeTrialOnServer(app)
-                if (trialActive) {
-                    applyWelcomeTrialDefaults(app)
-                    app.storyOrchestrator.notifyTierMayHaveChanged()
-                }
-            }.onFailure { err ->
-                StoryLog.e("Welcome trial claim failed after skip", err)
-            }
-        }
     }
 
     suspend fun completeAfterLogin(app: MusicStoryApp) {
@@ -63,9 +28,35 @@ object WelcomeTrialGate {
         app.storyOrchestrator.notifyTierMayHaveChanged()
     }
 
+    /** Вызывается после первой успешно озвученной истории о треке. */
+    suspend fun handleWelcomeTrialGranted(app: MusicStoryApp, trialUntil: Long?) {
+        val until = trialUntil ?: return
+        if (until <= System.currentTimeMillis()) return
+
+        val cached = app.settingsDataStore.readCachedAccountProfile()
+        app.settingsDataStore.saveAccountProfile(
+            CachedAccountProfile(
+                accountId = cached?.accountId,
+                email = cached?.email,
+                telegramId = cached?.telegramId,
+                telegramUsername = cached?.telegramUsername,
+                plan = "trial",
+                trialUntil = until,
+                premiumUntil = cached?.premiumUntil,
+            ),
+        )
+        applyWelcomeTrialDefaults(app)
+        app.storyOrchestrator.notifyTierMayHaveChanged()
+        _trialStartedEvents.emit(until)
+        StoryLog.i("Welcome trial started after first narrated story until=$until")
+    }
+
     suspend fun applyWelcomeTrialDefaults(app: MusicStoryApp) {
         applyWelcomeTrialTtsDefaults(app)
-        applyPremiumPlaybackDefaults(app)
+        val autoOn = app.settingsDataStore.autoIntercept.first()
+        if (autoOn) {
+            applyPremiumPlaybackDefaults(app)
+        }
     }
 
     suspend fun applyWelcomeTrialTtsDefaults(app: MusicStoryApp) {
@@ -84,26 +75,19 @@ object WelcomeTrialGate {
         app.settingsDataStore.setTriggerMode(TriggerMode.EVERY_N_TRACKS)
     }
 
-    private suspend fun claimWelcomeTrialOnServer(app: MusicStoryApp): Boolean {
-        val url = app.settingsDataStore.backendUrl.first()
-        if (url.isBlank()) return false
-        val fp = DeviceFingerprint.get(app)
-        val result = app.accountAuthManager.claimDeviceWelcomeTrial(url, fp) ?: return false
-        result.entitlement?.let { ent ->
-            val cached = app.settingsDataStore.readCachedAccountProfile()
-            app.settingsDataStore.saveAccountProfile(
-                CachedAccountProfile(
-                    accountId = cached?.accountId,
-                    email = cached?.email,
-                    telegramId = cached?.telegramId,
-                    telegramUsername = cached?.telegramUsername,
-                    plan = ent.plan,
-                    trialUntil = ent.trialUntil,
-                    premiumUntil = ent.premiumUntil,
-                ),
-            )
+    suspend fun enableRadioStationMode(app: MusicStoryApp) {
+        applyPremiumPlaybackDefaults(app)
+    }
+
+    suspend fun enableScrobbleOnlyMode(app: MusicStoryApp) {
+        app.settingsDataStore.setManualMode(true)
+        app.settingsDataStore.setAutoIntercept(false)
+    }
+
+    fun notifyTrialStartedFromPlayback(app: MusicStoryApp, trialUntil: Long) {
+        app.appScope.launch {
+            runCatching { _trialStartedEvents.emit(trialUntil) }
         }
-        return result.trialActive
     }
 
     private fun isTrialActive(profile: CachedAccountProfile?): Boolean {

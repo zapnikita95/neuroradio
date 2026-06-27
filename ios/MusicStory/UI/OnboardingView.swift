@@ -88,6 +88,12 @@ struct OnboardingView: View {
                     title: l10n.onboardingAccountTitle,
                     subtitle: l10n.onboardingAccountSubtitle
                 )
+                onboardingRow(
+                    targetStep: 3,
+                    done: step > 3,
+                    title: l10n.radioOnboardingTitle,
+                    subtitle: l10n.radioOnboardingChecklistSubtitle
+                )
             }
         }
     }
@@ -141,11 +147,17 @@ struct OnboardingView: View {
                 if connected { step = 2 }
             }
         default:
-            AccountAuthPanel(
-                onSuccess: { settings.onboardingComplete = true },
-                onSkip: { settings.onboardingComplete = true },
-                skipTitle: l10n.onboardingStartWithoutLogin
-            )
+            if step == 3 {
+                RadioModeOnboardingView {
+                    settings.onboardingComplete = true
+                }
+            } else {
+                AccountAuthPanel(
+                    onSuccess: { step = 3 },
+                    onSkip: { step = 3 },
+                    skipTitle: l10n.onboardingStartWithoutLogin
+                )
+            }
         }
     }
 

@@ -276,6 +276,26 @@ final class StoryHistoryStore {
         return (try? context.fetch(descriptor)) ?? []
     }
 
+    func lookupGenre(artist: String, title: String) -> String? {
+        let trackKey = TrackInfo(artist: artist, title: title, source: .manual).displayKey
+        let artistLower = artist.lowercased()
+        for entry in allRecentHistory(limit: 300) {
+            if entry.trackKey == trackKey,
+               let genre = entry.genre?.trimmingCharacters(in: .whitespacesAndNewlines),
+               !genre.isEmpty {
+                return genre
+            }
+        }
+        for entry in allRecentHistory(limit: 300) {
+            if entry.artist.lowercased() == artistLower,
+               let genre = entry.genre?.trimmingCharacters(in: .whitespacesAndNewlines),
+               !genre.isEmpty {
+                return genre
+            }
+        }
+        return nil
+    }
+
     func allRecentScrobbles(limit: Int = 500) -> [ScrobbleEntry] {
         var descriptor = FetchDescriptor<ScrobbleEntry>(
             sortBy: [SortDescriptor(\.scrobbledAt, order: .reverse)]

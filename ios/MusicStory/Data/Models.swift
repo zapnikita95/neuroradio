@@ -15,6 +15,7 @@ struct StoryRequest: Encodable, Sendable {
     let elevenLabsVoice: String?
     let speakTrackNamesInVoiceover: Bool
     let lang: String?
+    let deviceFingerprint: String?
 
     enum CodingKeys: String, CodingKey {
         case artist
@@ -31,6 +32,7 @@ struct StoryRequest: Encodable, Sendable {
         case elevenLabsVoice = "elevenlabs_voice"
         case speakTrackNamesInVoiceover = "speak_track_names_in_voiceover"
         case lang
+        case deviceFingerprint = "device_fingerprint"
     }
 
     func encode(to encoder: Encoder) throws {
@@ -49,6 +51,7 @@ struct StoryRequest: Encodable, Sendable {
         try container.encodeIfPresent(elevenLabsVoice, forKey: .elevenLabsVoice)
         try container.encode(speakTrackNamesInVoiceover, forKey: .speakTrackNamesInVoiceover)
         try container.encodeIfPresent(lang, forKey: .lang)
+        try container.encodeIfPresent(deviceFingerprint, forKey: .deviceFingerprint)
     }
 }
 
@@ -72,6 +75,7 @@ struct StoryResponse: Decodable, Sendable {
     let seedInterestRating: Int?
     let ttsTranscript: String?
     let ttsProvider: String?
+    let welcomeTrial: WelcomeTrialInfo?
 
     enum CodingKeys: String, CodingKey {
         case artist
@@ -93,6 +97,7 @@ struct StoryResponse: Decodable, Sendable {
         case seedInterestRating = "seed_interest_rating"
         case ttsTranscript = "tts_transcript"
         case ttsProvider = "tts_provider"
+        case welcomeTrial = "welcome_trial"
     }
 
     init(
@@ -114,7 +119,8 @@ struct StoryResponse: Decodable, Sendable {
         seedInterestScore: Int? = nil,
         seedInterestRating: Int? = nil,
         ttsTranscript: String? = nil,
-        ttsProvider: String? = nil
+        ttsProvider: String? = nil,
+        welcomeTrial: WelcomeTrialInfo? = nil
     ) {
         self.artist = artist
         self.title = title
@@ -135,6 +141,7 @@ struct StoryResponse: Decodable, Sendable {
         self.seedInterestRating = seedInterestRating
         self.ttsTranscript = ttsTranscript
         self.ttsProvider = ttsProvider
+        self.welcomeTrial = welcomeTrial
     }
 
     init(from decoder: Decoder) throws {
@@ -158,6 +165,7 @@ struct StoryResponse: Decodable, Sendable {
         seedInterestRating = try container.decodeIfPresent(Int.self, forKey: .seedInterestRating)
         ttsTranscript = try container.decodeIfPresent(String.self, forKey: .ttsTranscript)
         ttsProvider = try container.decodeIfPresent(String.self, forKey: .ttsProvider)
+        welcomeTrial = try container.decodeIfPresent(WelcomeTrialInfo.self, forKey: .welcomeTrial)
     }
 
     var displayTranscript: String {
@@ -167,6 +175,18 @@ struct StoryResponse: Decodable, Sendable {
         return raw
             .replacingOccurrences(of: "й+утй+уб", with: "YouTube", options: .caseInsensitive)
             .replacingOccurrences(of: "ют+уб", with: "YouTube", options: .caseInsensitive)
+    }
+}
+
+struct WelcomeTrialInfo: Decodable, Sendable {
+    let granted: Bool
+    let trialUntil: Int64?
+    let plan: String?
+
+    enum CodingKeys: String, CodingKey {
+        case granted
+        case trialUntil = "trial_until"
+        case plan
     }
 }
 
@@ -223,6 +243,7 @@ struct LanguageSwitchBundle: Decodable, Sendable {
 struct BillingEntitlement: Decodable, Sendable {
     let plan: String?
     let premiumUntil: Int64?
+    let trialUntil: Int64?
     let subscriptionMarket: String?
     let billingProvider: String?
 }
@@ -234,6 +255,18 @@ struct BillingStatusResponse: Decodable, Sendable {
     let subscriptionMarket: String?
     let billingChannel: String?
     let languageSwitch: LanguageSwitchBundle?
+    let devTierSwitchEnabled: Bool?
+    let devTierOverride: String?
+    let hint: String?
+}
+
+struct DevTierResponse: Decodable, Sendable {
+    let ok: Bool?
+    let tier: String?
+    let devTierOverride: String?
+    let hint: String?
+    let error: String?
+    let code: String?
 }
 
 struct AppStoreVerifyRequest: Encodable, Sendable {

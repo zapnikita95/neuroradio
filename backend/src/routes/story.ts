@@ -111,6 +111,7 @@ import {
   rateLimitStory,
   recordStoryGeneration,
 } from '../middleware/rate-limit.js';
+import { grantWelcomeTrialAfterFirstNarratedStory } from '../services/account-store.js';
 import {
   getStoryLimitsForTier,
   resolveOpenRouterModelForTier,
@@ -183,6 +184,7 @@ interface StoryFullBody {
   client_platform?: 'ios' | 'android' | string;
   /** Opt-in: NPR/interview deep fact hunt (premium/trial + DEEP_SEARCH_ENABLED). */
   deep_search?: boolean;
+  device_fingerprint?: string;
 }
 
 router.get('/quota', (req: Request, res: Response) => {
@@ -2195,6 +2197,25 @@ router.post('/full', extractClientSecrets, validateStoryFullBody, storyFullRateL
       freeOpenRouterModel: openrouterModelRequested,
       skipDailyQuota: shouldSkipDailyStoryQuota({ ownLlmKey: ownLlmKey, userTtsCredentials }),
     });
+
+    if (response.audioUrl) {
+      const deviceFingerprint =
+        typeof (req.body as StoryFullBody).device_fingerprint === 'string'
+          ? (req.body as StoryFullBody).device_fingerprint
+          : undefined;
+      const welcomeTrial = await grantWelcomeTrialAfterFirstNarratedStory(
+        installId,
+        deviceFingerprint,
+      );
+      if (welcomeTrial.granted || welcomeTrial.trialUntil) {
+        (response as Record<string, unknown>).welcome_trial = {
+          granted: welcomeTrial.granted,
+          trial_until: welcomeTrial.trialUntil,
+          plan: welcomeTrial.entitlement.plan,
+        };
+      }
+    }
+
     const seedForResponse = deliveredSeed ?? selectedFact;
     if (seedForResponse?.fact) {
       response.seed_fact = seedForResponse.fact;
