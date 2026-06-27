@@ -531,6 +531,7 @@ const POMPEYA_MOSCOW = '1) POMPEYA is an up-and-coming indie rock band from Mosc
 
 const {
   isEncyclopediaDefinitionSeed,
+  isBareIsASongDefinition,
   isArtistDisambiguationListSeed,
 } = await import('../dist/services/reference-fact-quality.js');
 const { artistsMatchForHarvest, factMentionsArtistOrAlias } = await import(
@@ -677,6 +678,36 @@ const STING_COWRITTEN =
 const STING_SETLIST =
   '«Shape of My Heart» впервые прозвучала на живом выступлении Sting 02-06-2026 (Howard Stern Radio Program, New York, United States).';
 assert(isEncyclopediaDefinitionSeed(STING_WIKI_DEF), 'Sting wiki one-liner is encyclopedia definition');
+
+const IS_A_SONG_ENCYCLOPEDIA = [
+  ['Still Waiting bare', '"Still Waiting" is a song by Sum 41.'],
+  ['Still Waiting album', '"Still Waiting" is a song from the album Does This Look Infected? by Sum 41.'],
+  ['Yesterday', '"Yesterday" is a song originally recorded by the English rock band the Beatles.'],
+  ['mgk cliché bare', '"cliché" is a song by American rapper mgk.'],
+  ['One More Night album', '"One More Night" is a song by Maroon 5 from the album Overexposed.'],
+  ['Rick Astley', '"Never Gonna Give You Up" is a pop song originally performed by Rick Astley.'],
+  ['Teenagers RU bare', '«Teenagers» — песня группы My Chemical Romance с альбома The Black Parade.'],
+  ['Shape of My Heart wiki', STING_WIKI_DEF],
+];
+const IS_A_SONG_NARRATIVE = [
+  ['Still Waiting 9/11', '"Still Waiting" is a song written by Sum 41\'s lead vocalist Deryck Whibley and was influenced by the events of 9/11.'],
+  ['Holiday protest', '"Holiday" is an anti-war protest song by American rock band Green Day.'],
+  ['Zombie protest', '"Zombie" is a protest song by The Cranberries written by Dolores O\'Riordan about the Troubles in Ireland.'],
+  ['Mr Brightside jealousy', '"Mr. Brightside" is a song inspired by jealousy that Brandon Flowers wrote after infidelity in a bar.'],
+  ['Bohemian Rhapsody wrote', '"Bohemian Rhapsody" is a song by Queen that Freddie Mercury wrote in sections over several years.'],
+  ['Born in the USA', '"Born in the U.S.A." is a song by Bruce Springsteen often mistaken for a patriotic anthem but critiques veteran neglect.'],
+  ['Teenagers NYC', '"Teenagers" is a song Gerard Way wrote after watching a youth crowd in New York City.'],
+  ['In the End said', '"In the End" is a song by Linkin Park; Chester Bennington said it was about frustration and perseverance.'],
+];
+for (const [label, fact] of IS_A_SONG_ENCYCLOPEDIA) {
+  assert(isEncyclopediaDefinitionSeed(fact), `encyclopedia (bare is-a-song): ${label}`);
+  assert(isBareIsASongDefinition(fact), `bare is-a-song: ${label}`);
+}
+for (const [label, fact] of IS_A_SONG_NARRATIVE) {
+  assert(!isEncyclopediaDefinitionSeed(fact), `NOT encyclopedia (narrative is-a-song): ${label}`);
+  assert(!isBareIsASongDefinition(fact), `NOT bare is-a-song: ${label}`);
+}
+
 assert(
   !isEncyclopediaDefinitionSeed(STING_COWRITTEN),
   'Sting co-written genius fact is not encyclopedia definition',

@@ -309,27 +309,80 @@ export function isArtistDisambiguationListSeed(fact: string): boolean {
 
 /** Song-page opener with production/vocal/chart context — not a throwaway «X is a song by Y». */
 export function hasSongPageNarrativeDetail(fact: string): boolean {
-  return /\b(?:in an interview|said that|called (?:it|the|the song)|protest|banned|viral on|went viral|tiktok|scandal|surprise hit|unexpected hit|inspired by|influenced by|9\/11|september 11|war on terror|sampled from)\b/i.test(
-    fact,
+  return isIsASongWithStoryHook(fact);
+}
+
+/** Facts in «"Title" is a song…» form (EN/RU). */
+export function isIsASongFormFact(fact: string): boolean {
+  const t = fact.trim();
+  return (
+    /^["'«][^"'»]{1,90}["'»]\s+is\s+(?:an?\s+)?/i.test(t) ||
+    /\bis\s+(?:an?\s+)?(?:(?:anti[- ]?war\s+)?protest\s+|[\w-]+\s+){0,4}(?:song|single|track)\s+by\b/i.test(t) ||
+    /^«[^»]{1,90}»\s+(?:—|-)\s*(?:песня|сингл|трек)(?:\s|[,.;»]|$)/iu.test(t)
   );
 }
 
-/** Wikipedia «"Title" is a song by…» — metadata, not a radio story hook (even with uncredited vocals). */
-export function isWeakWikiSongIntroSeed(fact: string): boolean {
+/** Narrative hook anywhere in fact — written, 9/11, protest meaning, interview, etc. */
+export function isIsASongWithStoryHook(fact: string): boolean {
   const t = fact.trim();
-  if (hasSongPageNarrativeDetail(t)) return false;
+  const hooks: RegExp[] = [
+    /\b(?:written|wrote|co[- ]?written|composed|influenced|inspired)\b/i,
+    /\b(?:has said|said that|stated that|told|explained|revealed|described|called it)\b/i,
+    /\b(?:reflects|reflecting|criticiz|addresses|deals with|in response to)\b/i,
+    /\b(?:after (?:the |a )?(?:9\/11|september|attacks|breakup|cheat|infidelity|war))\b/i,
+    /\b(?:following (?:the )?|mistaken for|misunderstood as|intended as)\b/i,
+    /\b(?:often (?:seen|interpreted|mistaken)|combines|parody|samples)\b/i,
+    /\b(?:not (?:only|just|directly)|more than (?:a |an )?(?:war|protest))\b/i,
+    /\b(?:world (?:doesn[\u2019']t|does not|fail)|lyrics (?:reflect|about|deal))\b/i,
+    /\bthat (?:he|she|they|it|freddie|gerard|deryck|brandon|kurt|michael|stipe|dolores|bruce|chester)\b/i,
+    /\babout (?!the album|their album|his album|her album|the \d{4} album|the record|the soundtrack)\b/i,
+    /\b(?:anti[- ]?war|protest against|protest song)\b/i,
+    /\b(?:написал|написана|вдохновл|протест|скандал|интервью|сказал|объяснил|11 сентября|террор)\b/i,
+    /\b(?:vocalist|frontman|lead singer|bassist|guitarist|drummer)\b.{0,40}\b(?:said|wrote|explained|told)\b/i,
+  ];
+  return hooks.some((re) => re.test(t));
+}
+
+/** Catalog placement only — release date, Nth single, album name, label, originally performed. */
+function isCatalogPlacementTail(fact: string): boolean {
+  const t = fact.trim();
+  return (
+    /\b(?:released (?:on|in|as)|as the (?:first|second|third|fourth|fifth|sixth|seventh|eighth|ninth|tenth|eleventh|twelfth|\d+(?:st|nd|rd|th)) (?:single|track)|from (?:the|their|his|her|its) (?:(?:\d{4} )?album|record|EP|soundtrack)|on (?:the|their) (?:(?:\d{4} )?album|record)|originally (?:performed|recorded|released)|(?:studio|debut|self-titled|fourth solo) album|(?:A&M|EMI|Columbia|Atlantic|Warner|Interscope|Republic) Records|appears on the album|included on the album|taken from the album|fifth single from)\b/i.test(
+      t,
+    ) ||
+    /(?:с альбома|сингл с альбома)/i.test(t) ||
+    /^["'«][^"'»]+["'»]\s+is\s+(?:an?\s+)?(?:\w+\s+){0,3}(?:song|single|track)\s+by\s+[^.;]{3,100}\.\s*$/i.test(t)
+  );
+}
+
+/**
+ * Bare Wikipedia opener: «"Title" is a song by Artist [from album X]» — no story hook.
+ * NOT bare when written/influenced/protest meaning/9/11/said that present.
+ */
+export function isBareIsASongDefinition(fact: string): boolean {
+  const t = fact.trim();
+  if (!isIsASongFormFact(t)) return false;
+  if (isIsASongWithStoryHook(t)) return false;
+  if (isCatalogPlacementTail(t)) return true;
   if (
-    /\bis\s+a\s+song\s+by\b/i.test(t) ||
-    /^"[^"]{1,90}"\s+is\s+(?:an?\s+)?(?:song|single|track)\b/i.test(t) ||
-    /\bis\s+(?:an?\s+)?(?:pop|rock|dance|electronic|hip[- ]?hop|r[\s&]b|country|folk|jazz|soul|metal|indie)\s+(?:song|single|track)\s+by\b/i.test(t)
+    /\bis\s+(?:an?\s+)?(?:\w+\s+){0,3}(?:song|single|track)\s+by\b/i.test(t) &&
+    t.length <= 180
   ) {
+    return true;
+  }
+  if (/^«[^»]+»\s+(?:—|-)\s*(?:песня|сингл|трек)\b/iu.test(t) && t.length <= 200 && isCatalogPlacementTail(t)) {
     return true;
   }
   return false;
 }
 
+/** Wikipedia «"Title" is a song by…» — metadata, not a radio story hook (even with uncredited vocals). */
+export function isWeakWikiSongIntroSeed(fact: string): boolean {
+  return isBareIsASongDefinition(fact.trim());
+}
+
 function isBareSongDefinitionLine(fact: string): boolean {
-  return isWeakWikiSongIntroSeed(fact);
+  return isBareIsASongDefinition(fact);
 }
 
 /** Dictionary/literary page bleed — «cliché» the word, not mgk track. */
@@ -337,7 +390,7 @@ function isBareSongDefinitionLine(fact: string): boolean {
 export function isEncyclopediaDefinitionSeed(fact: string): boolean {
   const t = fact.trim();
   if (highImpactBonus(t) >= 6) return false;
-  if (hasSongPageNarrativeDetail(t)) return false;
+  if (isBareIsASongDefinition(t)) return true;
   if (
     /\b(?:inspired by|sampled from|written as|wrote (?:it|this|the song)|intended as|protest song|viral on|went viral|banned from|scandal|originally wrote|co-written|co written)\b/i.test(
       t,
@@ -345,15 +398,9 @@ export function isEncyclopediaDefinitionSeed(fact: string): boolean {
   ) {
     return false;
   }
-  if (isBareSongDefinitionLine(t)) return true;
   if (
     /\b(?:song|single|track)\s+originally\s+(?:performed|recorded|released)\s+by\b/i.test(t) ||
-    /\bis\s+(?:an?\s+)?(?:pop|rock|hip[- ]?hop|r[\s&]b|dance|electronic|country|folk|jazz|soul|metal|indie)\s+(?:song|single|track)\s+originally\b/i.test(t) ||
-    /\bis\s+(?:an?\s+)?(?:song|single|track)\s+(?:by|recorded\s+by)\b/i.test(t) ||
-    /\bis\s+(?:an?\s+)?(?:song|single|track)\s+from\b/i.test(t) ||
-    /^"[^"]{1,90}"\s+is\s+(?:an?\s+)?(?:song|single|track)\b/i.test(t) ||
-    /^"[^"]{1,90}"\s+is\s+(?:an?\s+)?(?:pop|rock|hip[- ]?hop|r[\s&]b|dance|electronic|country|folk|jazz|soul|metal|indie)\b/i.test(t) ||
-    /^«[^»]{1,90}»\s+(?:—|-)\s+(?:песня|сингл|трек)\b/i.test(t)
+    /^«[^»]{1,90}»\s+(?:—|-)\s+(?:песня|сингл|трек)(?:\s|[,.;»]|$)/iu.test(t)
   ) {
     return true;
   }
