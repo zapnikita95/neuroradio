@@ -8,7 +8,8 @@ plugins {
     alias(libs.plugins.ksp)
 }
 
-val localBuildDir = File(System.getenv("LOCALAPPDATA") ?: System.getProperty("java.io.tmpdir"), "MusicStoryBuild/app")
+val localBuildDir = System.getenv("MUSIC_STORY_BUILD_DIR")?.trim()?.takeIf { it.isNotEmpty() }?.let { File(it) }
+    ?: File(System.getenv("LOCALAPPDATA") ?: System.getProperty("java.io.tmpdir"), "MusicStoryBuild/app")
 layout.buildDirectory.set(localBuildDir)
 
 val keystorePropertiesFile = rootProject.layout.projectDirectory.file("keystore.properties").asFile
@@ -33,8 +34,8 @@ android {
         applicationId = "com.efirai.myapp"
         minSdk = 26
         targetSdk = 35
-        versionCode = 140
-        versionName = "1.5.102"
+        versionCode = 141
+        versionName = "1.5.103"
 
         buildConfigField("String", "VERSION_NAME", "\"$versionName\"")
         buildConfigField("int", "VERSION_CODE", "$versionCode")
