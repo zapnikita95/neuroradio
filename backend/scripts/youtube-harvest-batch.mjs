@@ -14,6 +14,7 @@ import {
   downloadAudio,
   transcribeAudio,
   groqJson,
+  isTransientHarvestError,
   OUT_DIR,
   ROOT,
 } from './youtube-essay-fact-harvest.mjs';
@@ -25,6 +26,8 @@ const STATE_FILE = path.join(DATA, 'youtube-harvest-state.json');
 const CATALOG_FILE = path.join(DATA, 'youtube-harvest-catalog.json');
 const BENCHMARK_FILE = path.join(DATA, 'youtube-stt-benchmark.json');
 const PROGRESS_FILE = path.join(DATA, 'youtube-harvest-progress.json');
+const RETRY_QUEUE_FILE = path.join(DATA, 'youtube-harvest-retry-queue.json');
+const MAX_VIDEO_RETRIES = 5;
 
 function argValue(name) {
   const eq = process.argv.find((a) => a.startsWith(`--${name}=`));
@@ -239,6 +242,57 @@ function saveProgress(progress) {
   saveJson(PROGRESS_FILE, progress);
 }
 
+function loadRetryQueue() {
+  return loadJson(RETRY_QUEUE_FILE, { videos: [] }).videos ?? [];
+}
+
+function saveRetryQueue(videos) {
+  saveJson(RETRY_QUEUE_FILE, { videos, updatedAt: new Date().toISOString() });
+}
+
+function upsertRetryQueue(video, error) {
+  const queue = loadRetryQueue();
+  const idx = queue.findIndex((q) => q.id === video.id);
+  const row = {
+    id: video.id,
+    title: video.title,
+    url: video.url,
+    channelName: video.channelName,
+    languageCode: video.languageCode,
+    lastError: error,
+    attempts: (idx >= 0 ? queue[idx].attempts : 0) + 1,
+    queuedAt: new Date().toISOString(),
+  };
+  if (idx >= 0) queue[idx] = row;
+  else queue.push(row);
+  saveRetryQueue(queue);
+  return row;
+}
+
+function removeFromRetryQueue(videoId) {
+  saveRetryQueue(loadRetryQueue().filter((q) => q.id !== videoId));
+}
+
+async function runOneVideo(v, ctx) {
+  const report = await processVideo(v, {
+    dryRun: ctx.dryRun,
+    maxSeconds: ctx.maxSeconds,
+    languageCode: v.languageCode,
+    sttProvider: ctx.sttProvider,
+    onFactSaved: (f, video, meta) => appendCatalogFact(ctx.catalog, f, video, meta),
+  });
+  ctx.run.reports.push({ videoId: v.id, ok: true, ingested: report.llm.factsIngested });
+  if (!ctx.dryRun) {
+    ctx.state.processedVideoIds = [...new Set([...(ctx.state.processedVideoIds ?? []), v.id])];
+    ctx.state.lastCompletedVideoId = v.id;
+    saveState(ctx.state);
+  }
+  removeFromRetryQueue(v.id);
+  mergeCatalog(ctx.catalog, report);
+  saveCatalog(ctx.catalog);
+  return report;
+}
+
 function appendCatalogFact(catalog, f, video, meta) {
   const fp = `${video.id}:${f.fact.slice(0, 80)}`;
   if (catalog.facts.some((x) => x._fp === fp)) return;
@@ -310,6 +364,27 @@ async function main() {
 
   console.log(`[batch] queued ${videos.length} videos (${mode})`);
   videos = await rankVideosByPopularity(videos);
+
+  const pendingRetry = loadRetryQueue().filter((q) => !(state.processedVideoIds ?? []).includes(q.id));
+  if (pendingRetry.length) {
+    const byId = new Map(videos.map((v) => [v.id, v]));
+    const retryVideos = pendingRetry
+      .map(
+        (q) =>
+          byId.get(q.id) ?? {
+            id: q.id,
+            title: q.title,
+            url: q.url,
+            channelName: q.channelName,
+            languageCode: q.languageCode ?? 'rus',
+            _retryCount: q.attempts ?? 0,
+          },
+      )
+      .filter((v) => !(state.processedVideoIds ?? []).includes(v.id));
+    const retryIds = new Set(retryVideos.map((v) => v.id));
+    videos = [...retryVideos, ...videos.filter((v) => !retryIds.has(v.id))];
+    console.log(`[batch] priority retry queue (${retryVideos.length}): ${retryVideos.map((v) => v.id).join(', ')}`);
+  }
   const tierLabel = { ru_mainstream: 'RU★', int_mainstream: 'INT★', ru_underground: 'RUUG' };
   console.log(
     '[batch] order RU→INT→underground:',
@@ -320,7 +395,7 @@ async function main() {
   );
 
   let sttProvider = cfg.defaults?.sttProvider || 'railway';
-  if (hasFlag('initial') || hasFlag('compare-stt') || mode === 'initial') {
+  if ((hasFlag('initial') || hasFlag('compare-stt') || mode === 'initial') && pendingRetry.length === 0) {
     try {
       const benchVideo = videos[0];
       sttProvider = await compareSttProviders(benchVideo, benchVideo.languageCode);
@@ -330,6 +405,8 @@ async function main() {
         `[batch] STT benchmark skipped: ${err instanceof Error ? err.message : err} → ${sttProvider}`,
       );
     }
+  } else if (pendingRetry.length > 0) {
+    console.log(`[batch] STT benchmark skipped (retry queue ${pendingRetry.length}) → ${sttProvider}`);
   }
   if (argValue('stt')) sttProvider = argValue('stt');
 
@@ -353,63 +430,52 @@ async function main() {
       title: v.title,
       sttProvider,
     });
+    const ctx = { dryRun, maxSeconds, sttProvider, catalog, state, run };
     try {
-      const report = await processVideo(v, {
-        dryRun,
-        maxSeconds,
-        languageCode: v.languageCode,
-        sttProvider,
-        onFactSaved: (f, video, meta) => appendCatalogFact(catalog, f, video, meta),
-      });
-      run.reports.push({ videoId: v.id, ok: true, ingested: report.llm.factsIngested });
-      if (!dryRun) {
-        state.processedVideoIds = [...new Set([...(state.processedVideoIds ?? []), v.id])];
-        state.lastCompletedVideoId = v.id;
-        saveState(state);
-      }
-      mergeCatalog(catalog, report);
-      saveCatalog(catalog);
+      await runOneVideo(v, ctx);
     } catch (err) {
-      console.error(`[batch] FAIL ${v.id}:`, err instanceof Error ? err.message : err);
-      run.reports.push({ videoId: v.id, ok: false, error: err instanceof Error ? err.message : String(err) });
+      const msg = err instanceof Error ? err.message : String(err);
+      console.error(`[batch] FAIL ${v.id}:`, msg);
+      const retryCount = v._retryCount ?? 0;
+      if (isTransientHarvestError(err) && retryCount < MAX_VIDEO_RETRIES) {
+        const requeued = { ...v, _retryCount: retryCount + 1 };
+        videos.splice(i + 1, 0, requeued);
+        upsertRetryQueue(v, msg);
+        console.warn(`[batch] re-queued ${v.id} at position ${i + 2} (${retryCount + 1}/${MAX_VIDEO_RETRIES}): ${msg}`);
+        run.reports.push({ videoId: v.id, ok: false, error: msg, requeued: true, retryCount: retryCount + 1 });
+      } else {
+        run.reports.push({ videoId: v.id, ok: false, error: msg, requeued: false });
+        upsertRetryQueue(v, msg);
+      }
       saveProgress({
         runId: run.id,
         current: i + 1,
         total: videos.length,
         videoId: v.id,
         title: v.title,
-        error: err instanceof Error ? err.message : String(err),
+        error: msg,
+        requeued: isTransientHarvestError(err) && retryCount < MAX_VIDEO_RETRIES,
         sttProvider,
       });
     }
   }
 
-  const failedIds = run.reports.filter((r) => !r.ok).map((r) => r.videoId);
+  const failedIds = [...new Set(run.reports.filter((r) => !r.ok).map((r) => r.videoId))];
   if (failedIds.length > 0) {
-    console.log(`\n[batch] retry pass for ${failedIds.length} failed video(s): ${failedIds.join(', ')}`);
+    console.log(`\n[batch] final retry pass for ${failedIds.length} failed video(s): ${failedIds.join(', ')}`);
+    const ctx = { dryRun, maxSeconds, sttProvider, catalog, state, run };
     for (const videoId of failedIds) {
       const v = videos.find((x) => x.id === videoId);
-      if (!v) continue;
+      if (!v || (state.processedVideoIds ?? []).includes(v.id)) continue;
       console.log(`\n[batch retry] ${v.channelName} — ${v.title}`);
       try {
-        const report = await processVideo(v, {
-          dryRun,
-          maxSeconds,
-          languageCode: v.languageCode,
-          sttProvider,
-          onFactSaved: (f, video, meta) => appendCatalogFact(catalog, f, video, meta),
-        });
+        await runOneVideo(v, ctx);
         const idx = run.reports.findIndex((r) => r.videoId === videoId);
-        if (idx >= 0) run.reports[idx] = { videoId, ok: true, ingested: report.llm.factsIngested, retried: true };
-        if (!dryRun) {
-          state.processedVideoIds = [...new Set([...(state.processedVideoIds ?? []), v.id])];
-          state.lastCompletedVideoId = v.id;
-          saveState(state);
-        }
-        mergeCatalog(catalog, report);
-        saveCatalog(catalog);
+        if (idx >= 0) run.reports[idx] = { ...run.reports[idx], ok: true, retried: true };
       } catch (err) {
-        console.error(`[batch retry] FAIL ${v.id}:`, err instanceof Error ? err.message : err);
+        const msg = err instanceof Error ? err.message : String(err);
+        console.error(`[batch retry] FAIL ${v.id}:`, msg);
+        upsertRetryQueue(v, msg);
       }
     }
   }

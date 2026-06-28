@@ -181,24 +181,43 @@ function sleepMs(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+function sttErrorDetail(err) {
+  const msg = err instanceof Error ? err.message : String(err);
+  const cause = err instanceof Error && err.cause instanceof Error ? err.cause.message : '';
+  const code =
+    err instanceof Error && err.cause && typeof err.cause === 'object' && 'code' in err.cause
+      ? String(err.cause.code)
+      : '';
+  return [msg, cause, code].filter(Boolean).join(' | ');
+}
+
+function isTransientHarvestError(err) {
+  const blob = sttErrorDetail(err);
+  return /fetch failed|ECONNRESET|ETIMEDOUT|ENOTFOUND|socket hang up|EPIPE|ECONNREFUSED|502|503|504|429|rate_limit|stt_failed/i.test(
+    blob,
+  );
+}
+
 async function railwayTranscribe(audioPath, languageCode = 'rus', provider = 'elevenlabs') {
   const secret = process.env.WEBSITE_DEMO_SECRET?.trim();
   if (!secret) {
     throw new Error('WEBSITE_DEMO_SECRET missing in backend/.env — нужен для STT через Railway');
   }
   const buf = fs.readFileSync(audioPath);
-  const maxAttempts = 3;
+  const maxAttempts = 5;
+  const providers = provider === 'groq' ? ['groq'] : ['elevenlabs', 'elevenlabs', 'groq', 'groq', 'groq'];
   let lastErr;
   for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+    const sttProvider = providers[attempt - 1] ?? provider;
     const t0 = Date.now();
     try {
-      const res = await fetch(`${bffBaseUrl()}/v1/public/harvest/stt`, {
+      const res = await httpFetch(`${bffBaseUrl()}/v1/public/harvest/stt`, {
         method: 'POST',
         headers: {
           'x-website-demo-secret': secret,
           'x-audio-filename': path.basename(audioPath),
           'x-language-code': languageCode,
-          'x-stt-provider': provider === 'groq' ? 'groq' : 'elevenlabs',
+          'x-stt-provider': sttProvider,
           'content-type': 'audio/mpeg',
         },
         body: buf,
@@ -206,22 +225,27 @@ async function railwayTranscribe(audioPath, languageCode = 'rus', provider = 'el
       });
       const raw = await res.text();
       if (!res.ok) {
-        throw new Error(`Railway STT ${res.status}: ${raw.slice(0, 400)}`);
+        throw new Error(`Railway STT ${res.status} (${sttProvider}): ${raw.slice(0, 400)}`);
       }
       const data = JSON.parse(raw);
       const text = (data.text || '').trim();
-      if (!text) throw new Error('Railway STT empty');
+      if (!text) throw new Error(`Railway STT empty (${sttProvider})`);
+      if (sttProvider !== provider && attempt > 1) {
+        console.warn(`[stt] recovered via ${sttProvider} fallback on attempt ${attempt}`);
+      }
       return {
         text,
         latencyMs: data.latencyMs ?? Date.now() - t0,
-        provider: data.provider || 'elevenlabs-scribe-railway',
+        provider: data.provider || `${sttProvider}-scribe-railway`,
       };
     } catch (err) {
       lastErr = err;
-      const msg = err instanceof Error ? err.message : String(err);
+      const detail = sttErrorDetail(err);
       if (attempt < maxAttempts) {
-        const wait = attempt * 15_000;
-        console.warn(`[stt] attempt ${attempt}/${maxAttempts} failed (${msg}) — retry in ${wait / 1000}s`);
+        const wait = Math.min(attempt * 20_000, 120_000);
+        console.warn(
+          `[stt] attempt ${attempt}/${maxAttempts} (${sttProvider}) failed: ${detail} — retry in ${wait / 1000}s`,
+        );
         await sleepMs(wait);
       }
     }
@@ -239,13 +263,9 @@ async function transcribeAudio(audioPath, opts) {
   return railwayTranscribe(audioPath, opts.languageCode, railwayProvider);
 }
 
-async function groqJson(system, user, maxTokens = 4096) {
+async function groqJsonWithModel(system, user, maxTokens, model) {
   const apiKey = process.env.GROQ_API_KEY?.trim();
   if (!apiKey) throw new Error('GROQ_API_KEY missing');
-  const model =
-    process.env.GROQ_FACT_MODEL?.trim() ||
-    process.env.GROQ_MODEL?.trim() ||
-    'llama-3.3-70b-versatile';
 
   const t0 = Date.now();
   const res = await httpFetch('https://api.groq.com/openai/v1/chat/completions', {
@@ -269,6 +289,127 @@ async function groqJson(system, user, maxTokens = 4096) {
   const content = data.choices?.[0]?.message?.content;
   if (!content) throw new Error('Groq empty');
   return { parsed: JSON.parse(content), model, latencyMs: Date.now() - t0, usage: data.usage ?? null };
+}
+
+async function geminiJson(system, user, maxTokens = 4096) {
+  const apiKey = process.env.GEMINI_API_KEY?.trim();
+  if (!apiKey) throw new Error('GEMINI_API_KEY missing');
+  const model = process.env.GEMINI_FACT_MODEL?.trim() || 'gemini-2.0-flash';
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(apiKey)}`;
+  const t0 = Date.now();
+  const res = await httpFetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      generationConfig: {
+        temperature: 0.12,
+        maxOutputTokens: maxTokens,
+        responseMimeType: 'application/json',
+      },
+      contents: [{ role: 'user', parts: [{ text: `${system}\n\n${user}` }] }],
+    }),
+    signal: AbortSignal.timeout(180_000),
+  });
+  const raw = await res.text();
+  if (!res.ok) throw new Error(`Gemini ${res.status}: ${raw.slice(0, 400)}`);
+  const data = JSON.parse(raw);
+  const content = data.candidates?.[0]?.content?.parts?.[0]?.text;
+  if (!content) throw new Error('Gemini empty');
+  return { parsed: JSON.parse(content), model, latencyMs: Date.now() - t0, usage: null };
+}
+
+function parseGroqRetryMs(msg) {
+  const m = msg.match(/try again in (?:(\d+)h)?(?:(\d+)m)?(?:([\d.]+)s)?/i);
+  if (!m) return null;
+  const h = Number(m[1] || 0);
+  const min = Number(m[2] || 0);
+  const s = Number(m[3] || 0);
+  return Math.round((h * 3600 + min * 60 + s) * 1000);
+}
+
+async function openRouterJson(system, user, maxTokens = 4096) {
+  const apiKey = process.env.OPENROUTER_API_KEY?.trim();
+  if (!apiKey) throw new Error('OPENROUTER_API_KEY missing');
+  const model =
+    process.env.OPENROUTER_FACT_MODEL?.trim() ||
+    process.env.OPENROUTER_FREE_FACT_MODEL?.trim() ||
+    'google/gemma-3-27b-it';
+  const t0 = Date.now();
+  const res = await httpFetch('https://openrouter.ai/api/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      'Content-Type': 'application/json',
+      'HTTP-Referer': 'https://efir-ai.ru',
+      'X-Title': 'Music Story Harvest',
+    },
+    body: JSON.stringify({
+      model,
+      temperature: 0.12,
+      max_tokens: maxTokens,
+      response_format: { type: 'json_object' },
+      messages: [
+        { role: 'system', content: system },
+        { role: 'user', content: user },
+      ],
+    }),
+    signal: AbortSignal.timeout(180_000),
+  });
+  const raw = await res.text();
+  if (!res.ok) throw new Error(`OpenRouter ${res.status}: ${raw.slice(0, 400)}`);
+  const data = JSON.parse(raw);
+  const content = data.choices?.[0]?.message?.content;
+  if (!content) throw new Error('OpenRouter empty');
+  return { parsed: JSON.parse(content), model, latencyMs: Date.now() - t0, usage: data.usage ?? null };
+}
+
+async function llmJson(system, user, maxTokens = 4096) {
+  const groqModels = [
+    process.env.GROQ_FACT_MODEL?.trim(),
+    'llama-3.1-8b-instant',
+    process.env.GROQ_MODEL?.trim(),
+    'llama-3.3-70b-versatile',
+  ].filter(Boolean);
+  let lastErr;
+  for (const model of [...new Set(groqModels)]) {
+    for (let attempt = 1; attempt <= 2; attempt += 1) {
+      try {
+        return await groqJsonWithModel(system, user, maxTokens, model);
+      } catch (err) {
+        lastErr = err;
+        const msg = err instanceof Error ? err.message : String(err);
+        if (msg.includes('429') || msg.includes('rate_limit')) {
+          const waitMs = parseGroqRetryMs(msg);
+          if (waitMs && waitMs <= 90 * 60 * 1000 && attempt < 2) {
+            console.warn(`[llm] groq ${model} rate limit — wait ${Math.ceil(waitMs / 60000)} min`);
+            await sleepMs(waitMs + 3000);
+            continue;
+          }
+          console.warn(`[llm] groq ${model} rate limited — next model…`);
+          break;
+        }
+        throw err;
+      }
+    }
+  }
+  if (process.env.GEMINI_API_KEY?.trim()) {
+    try {
+      console.warn('[llm] groq exhausted → gemini fallback');
+      return await geminiJson(system, user, maxTokens);
+    } catch (err) {
+      lastErr = err;
+      console.warn(`[llm] gemini failed: ${err instanceof Error ? err.message : err}`);
+    }
+  }
+  if (process.env.OPENROUTER_API_KEY?.trim()) {
+    console.warn('[llm] → openrouter fallback');
+    return openRouterJson(system, user, maxTokens);
+  }
+  throw lastErr instanceof Error ? lastErr : new Error(String(lastErr));
+}
+
+async function groqJson(system, user, maxTokens = 4096) {
+  return llmJson(system, user, maxTokens);
 }
 
 function extractQuotedName(text) {
@@ -338,7 +479,7 @@ interest: 10=редкий закулисный факт, 1=банальност�
 Максимум 30 фактов, сортировка по interest убыванию.`;
 
   const user = `Канал: ${channelName}\nВидео: ${videoTitle}\n\nТРАНСКРИПТ:\n${transcript.slice(0, 48_000)}`;
-  const { parsed, model, latencyMs, usage } = await groqJson(system, user);
+  const { parsed, model, latencyMs, usage } = await llmJson(system, user);
 
   const facts = (Array.isArray(parsed.facts) ? parsed.facts : [])
     .map((f) =>
@@ -364,7 +505,7 @@ async function verifyFactsQualityWithLlm(facts, videoTitle) {
 bankQuality: 10=редкий закулисный, 1=вода/мнение без факта.
 НЕ отсекай факты — только оценка. Сохраняй интересные субъективные детали если есть фактическая опора.`;
   const payload = facts.map((f, i) => ({ i, artist: f.artist, scope: f.scope, title: f.title, fact: f.fact, interest: f.interest }));
-  const { parsed } = await groqJson(system, `Видео: ${videoTitle}\n\n${JSON.stringify(payload).slice(0, 12000)}`, 2048);
+  const { parsed } = await llmJson(system, `Видео: ${videoTitle}\n\n${JSON.stringify(payload).slice(0, 12000)}`, 2048);
   const reviews = new Map((parsed.reviews ?? []).map((r) => [Number(r.i), r]));
   return facts.map((f, i) => {
     const r = reviews.get(i);
@@ -490,8 +631,13 @@ async function processVideo(video, opts) {
       videoTitle: meta.title,
       channelName: meta.channel,
     });
-    const verified = await verifyFactsQualityWithLlm(llm.facts, meta.title);
-    llm.facts = verified;
+    try {
+      llm.facts = await verifyFactsQualityWithLlm(llm.facts, meta.title);
+    } catch (err) {
+      console.warn(
+        `[llm] quality verify skipped: ${err instanceof Error ? err.message : err}`,
+      );
+    }
     fs.writeFileSync(factsRawPath, JSON.stringify(llm, null, 2), 'utf8');
     saveCheckpoint(workDir, { step: 'extracted', ingestedFingerprints: [...ingestedSet] });
   }
@@ -630,6 +776,8 @@ export {
   extractFactsWithLlm,
   verifyFactsQualityWithLlm,
   groqJson,
+  llmJson,
+  isTransientHarvestError,
   bffBaseUrl,
   runYtDlp,
   OUT_DIR,
