@@ -20,7 +20,7 @@ import {
 
 const DATA = path.join(ROOT, 'data');
 const CHANNELS_FILE = path.join(DATA, 'youtube-channels.json');
-const CHANNELS_EXAMPLE = path.join(DATA, 'youtube-channels.example.json');
+const CHANNELS_EXAMPLE = path.join(ROOT, 'config', 'youtube-channels.example.json');
 const STATE_FILE = path.join(DATA, 'youtube-harvest-state.json');
 const CATALOG_FILE = path.join(DATA, 'youtube-harvest-catalog.json');
 const BENCHMARK_FILE = path.join(DATA, 'youtube-stt-benchmark.json');
