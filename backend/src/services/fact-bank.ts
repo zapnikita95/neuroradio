@@ -312,7 +312,13 @@ function isValidStoredFact(
   if (
     fact.artist.trim() &&
     !factMentionsArtistLoose(fact.fact, fact.artist) &&
-    !(fact.scope === 'track' && fact.title.trim() && factMentionsTitle(fact.fact, fact.title))
+    !(fact.scope === 'track' && fact.title.trim() && factMentionsTitle(fact.fact, fact.title)) &&
+    !(
+      options.llmHarvest === true &&
+      fact.scope === 'album' &&
+      fact.title.trim() &&
+      factMentionsTitle(fact.fact, fact.title)
+    )
   ) {
     return false;
   }
