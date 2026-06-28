@@ -15,11 +15,13 @@ struct StoryRequest: Encodable, Sendable {
     let elevenLabsVoice: String?
     let speakTrackNamesInVoiceover: Bool
     let lang: String?
+    let album: String?
     let deviceFingerprint: String?
 
     enum CodingKeys: String, CodingKey {
         case artist
         case title
+        case album
         case previousScripts = "previous_scripts"
         case storyLength = "story_length"
         case storyNarrator = "story_narrator"
@@ -51,6 +53,7 @@ struct StoryRequest: Encodable, Sendable {
         try container.encodeIfPresent(elevenLabsVoice, forKey: .elevenLabsVoice)
         try container.encode(speakTrackNamesInVoiceover, forKey: .speakTrackNamesInVoiceover)
         try container.encodeIfPresent(lang, forKey: .lang)
+        try container.encodeIfPresent(album, forKey: .album)
         try container.encodeIfPresent(deviceFingerprint, forKey: .deviceFingerprint)
     }
 }

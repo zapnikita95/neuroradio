@@ -685,6 +685,7 @@ class StoryRepository(
                         StoryRequest(
                         artist = track.artist,
                         title = track.title,
+                        album = track.album,
                         previousScripts = previousScripts,
                         storyLength = storyLength.id,
                         storyNarrator = storyNarrator.id,

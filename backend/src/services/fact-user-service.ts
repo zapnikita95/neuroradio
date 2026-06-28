@@ -28,6 +28,7 @@ import { factFitsStoryLanguage } from './fact-language-fit.js';
 import { isArtistCareerBioWithoutTrack } from './fact-track-anchor.js';
 import type { FactScope, ReferenceFactBundle } from './fact-picker.js';
 import { resolveScopeOrder } from './fact-picker.js';
+import { resolveTrackAlbumName } from './track-album-resolve.js';
 import {
   classifyFactTopic,
   topicKeySet,
@@ -192,6 +193,7 @@ export interface FactPickContext {
   blockedTopics: Set<FactTopicKey>;
   recentScopes: FactScope[];
   storyLanguage: StoryLanguageId;
+  albumHint?: string | null;
 }
 
 export async function buildFactPickContext(
@@ -220,7 +222,7 @@ export async function buildFactPickContext(
   const rejectSimilarTo = [...new Set([...recentTrack, ...recentArtist])];
   const storyLanguage = options.storyLanguage ?? 'ru';
   const recentScopes = trackScopes.length >= 1 ? trackScopes : artistScopes;
-  return { usedFingerprints: used, rejectSimilarTo, blockedTopics, recentScopes, storyLanguage };
+  return { usedFingerprints: used, rejectSimilarTo, blockedTopics, recentScopes, storyLanguage, albumHint: options.album?.trim() || null };
 }
 
 export async function getRecentSeedFactsForTrack(
@@ -322,7 +324,7 @@ export async function getPickUsedFingerprints(
   return out;
 }
 
-/** Hold seed during generation — do not mark as told until playback completes. */
+/** Hold seed during generation — mark as told immediately so the next pick skips it. */
 export async function reserveSeedForUser(
   installId: string,
   artist: string,
@@ -332,6 +334,15 @@ export async function reserveSeedForUser(
 ): Promise<void> {
   ensureAccount(installId);
   setPendingTrackSeed(installId, artist, title, seed.fact);
+  await recordAccountUsedSeedAsync(installId, {
+    fact: seed.fact,
+    artist,
+    title,
+    scope: seed.scope,
+    interestScore: seed.interestScore,
+    interestRating: seed.interestRating,
+    topicKey: classifyFactTopic(seed.fact),
+  });
 }
 
 /** Release pending seed and undo premature used-seed marks from older app builds. */
@@ -390,6 +401,7 @@ export async function pickBankFactForUser(
     pickCtx ?? (await buildFactPickContext(installId, artist, title));
   const { usedFingerprints: used, rejectSimilarTo, blockedTopics, recentScopes, storyLanguage } = ctx;
   const scopeOrder = resolveScopeOrder(storyIndex, recentScopes);
+  const albumName = await resolveTrackAlbumName(artist, title, ctx.albumHint ?? undefined);
   const keys: Array<[string, string]> = [[artist, title]];
   if (cover?.isCover) {
     keys.push([cover.factArtist, cover.factTitle]);
@@ -405,7 +417,7 @@ export async function pickBankFactForUser(
         rejectSimilarTo,
         blockedTopics,
         storyLanguage,
-        { recentScopes },
+        { recentScopes, albumName },
       );
       if (
         fromBank &&
@@ -494,6 +506,7 @@ export async function pickFactForUser(
     (await buildFactPickContext(installId, artist, title, { storyNarrator: narrator }));
   const { usedFingerprints: used, rejectSimilarTo, blockedTopics, recentScopes, storyLanguage } = ctx;
   const scopeOrder = resolveScopeOrder(storyIndex, recentScopes);
+  const albumName = await resolveTrackAlbumName(artist, title, ctx.albumHint ?? undefined);
 
   for (let offset = 0; offset < 8; offset += 1) {
     const fromBank = pickFromBank(
@@ -505,7 +518,7 @@ export async function pickFactForUser(
       rejectSimilarTo,
       blockedTopics,
       storyLanguage,
-      { recentScopes },
+      { recentScopes, albumName },
     );
     if (
       fromBank &&

@@ -621,10 +621,18 @@ export function exportBankSnapshot(): FactBankFile {
 export function listBankFacts(
   artist: string,
   title: string,
+  album?: string | null,
 ): { track: StoredFact[]; artist: StoredFact[] } {
   const bank = loadBank();
+  const keys = new Set(resolveTrackLookupKeys(artist, title));
+  if (album?.trim()) {
+    keys.add(trackKey(artist, album));
+    for (const variant of harvestTitleVariants(album)) {
+      keys.add(trackKey(artist, variant));
+    }
+  }
   return {
-    track: mergeTrackPools(bank, resolveTrackLookupKeys(artist, title)),
+    track: mergeTrackPools(bank, [...keys]),
     artist: bank.byArtist[artistKey(artist)] ?? [],
   };
 }
@@ -686,9 +694,10 @@ export function pickFromBank(
   rejectSimilarTo: string[] = [],
   blockedTopics: Set<FactTopicKey> = new Set(),
   storyLanguage: StoryLanguageId = 'ru',
-  options: { markUsed?: boolean; recentScopes?: FactScope[] } = {},
+  options: { markUsed?: boolean; recentScopes?: FactScope[]; albumName?: string | null } = {},
 ): StoredFact | null {
-  const { track, artist: artistFacts } = listBankFacts(artist, title);
+  const albumName = options.albumName?.trim() ?? '';
+  const { track, artist: artistFacts } = listBankFacts(artist, title, albumName || null);
   const trackScopeStreak = (options.recentScopes ?? []).slice(0, 2).filter((s) => s === 'track').length;
   const rotatingFromTrack = (options.recentScopes ?? [])[0] === 'track';
   const minScoreForScope = (scope: FactScope): number => {
@@ -734,10 +743,19 @@ export function pickFromBank(
         continue;
       }
       if (
-        (scope === 'track' || scope === 'album') &&
+        scope === 'track' &&
         title.trim() &&
         !factMentionsTitle(fact.fact, title) &&
         !hasAnchoredTrackContext(fact.fact, title)
+      ) {
+        continue;
+      }
+      if (
+        scope === 'album' &&
+        fact.title.trim() &&
+        albumName &&
+        !factMentionsTitle(fact.fact, fact.title) &&
+        !factMentionsTitle(fact.fact, albumName)
       ) {
         continue;
       }

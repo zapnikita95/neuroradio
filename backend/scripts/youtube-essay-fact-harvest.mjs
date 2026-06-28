@@ -24,7 +24,7 @@ const OUT_DIR = path.join(ROOT, 'data', 'youtube-harvest');
 const PYTHON = process.env.YT_DLP_PYTHON?.trim() || 'C:\\Users\\1\\AppData\\Local\\Programs\\Python\\Python312\\python.exe';
 
 /** LLM interest 1–10; facts below this are discarded before ingest. */
-const MIN_BANK_INTEREST = 5;
+const MIN_BANK_INTEREST = 4;
 
 const CHANNELS = {
   broken_dance: 'https://www.youtube.com/@broken_dance/videos',
@@ -177,7 +177,7 @@ function bffBaseUrl() {
   ).replace(/\/$/, '');
 }
 
-async function railwayTranscribe(audioPath, languageCode = 'rus') {
+async function railwayTranscribe(audioPath, languageCode = 'rus', provider = 'elevenlabs') {
   const secret = process.env.WEBSITE_DEMO_SECRET?.trim();
   if (!secret) {
     throw new Error('WEBSITE_DEMO_SECRET missing in backend/.env — нужен для STT через Railway');
@@ -190,6 +190,7 @@ async function railwayTranscribe(audioPath, languageCode = 'rus') {
       'x-website-demo-secret': secret,
       'x-audio-filename': path.basename(audioPath),
       'x-language-code': languageCode,
+      'x-stt-provider': provider === 'groq' ? 'groq' : 'elevenlabs',
       'content-type': 'audio/mpeg',
     },
     body: buf,
@@ -215,7 +216,8 @@ async function transcribeAudio(audioPath, opts) {
   if (opts.sttProvider === 'local') {
     throw new Error('--stt local отключён: ElevenLabs с Windows → Cloudflare 403. Используй --stt railway');
   }
-  return railwayTranscribe(audioPath, opts.languageCode);
+  const railwayProvider = opts.sttProvider === 'railway-groq' ? 'groq' : 'elevenlabs';
+  return railwayTranscribe(audioPath, opts.languageCode, railwayProvider);
 }
 
 async function groqJson(system, user, maxTokens = 4096) {
@@ -337,6 +339,28 @@ interest: 10=редкий закулисный факт, 1=банальност�
   return { primaryArtist: parsed.primaryArtist ?? null, facts, model, latencyMs, usage };
 }
 
+async function verifyFactsQualityWithLlm(facts, videoTitle) {
+  if (!facts.length) return facts;
+  const system = `Оцени музыкальные факты для банка историй. JSON: {"reviews":[{"i":0,"bankQuality":1-10,"note":"кратко"}]}
+bankQuality: 10=редкий закулисный, 1=вода/мнение без факта.
+НЕ отсекай факты — только оценка. Сохраняй интересные субъективные детали если есть фактическая опора.`;
+  const payload = facts.map((f, i) => ({ i, artist: f.artist, scope: f.scope, title: f.title, fact: f.fact, interest: f.interest }));
+  const { parsed } = await groqJson(system, `Видео: ${videoTitle}\n\n${JSON.stringify(payload).slice(0, 12000)}`, 2048);
+  const reviews = new Map((parsed.reviews ?? []).map((r) => [Number(r.i), r]));
+  return facts.map((f, i) => {
+    const r = reviews.get(i);
+    const bankQuality = Math.max(1, Math.min(10, Number(r?.bankQuality) || f.interest));
+    const mergedInterest = Math.max(f.interest, Math.round(bankQuality * 0.85));
+    return {
+      ...f,
+      bankQuality,
+      qualityNote: r?.note ?? null,
+      interest: mergedInterest,
+      keepForBank: f.keepForBank || bankQuality >= 6,
+    };
+  });
+}
+
 function ingestTitleForFact(f) {
   return f.scope === 'artist' ? '' : f.title;
 }
@@ -374,6 +398,8 @@ async function processVideo(video, opts) {
     videoTitle: meta.title,
     channelName: meta.channel,
   });
+  const verified = await verifyFactsQualityWithLlm(llm.facts, meta.title);
+  llm.facts = verified;
   fs.writeFileSync(path.join(workDir, 'facts-raw.json'), JSON.stringify(llm, null, 2), 'utf8');
 
   const bankCandidates = llm.facts.filter((f) => f.keepForBank && f.interest >= MIN_BANK_INTEREST);
@@ -479,7 +505,24 @@ async function main() {
   }
 }
 
-main().catch((err) => {
-  console.error(err);
-  process.exit(1);
-});
+const isCli = process.argv[1] && path.resolve(process.argv[1]) === path.resolve(fileURLToPath(import.meta.url));
+if (isCli) {
+  main().catch((err) => {
+    console.error(err);
+    process.exit(1);
+  });
+}
+
+export {
+  processVideo,
+  listChannelVideos,
+  downloadAudio,
+  transcribeAudio,
+  extractFactsWithLlm,
+  verifyFactsQualityWithLlm,
+  groqJson,
+  bffBaseUrl,
+  runYtDlp,
+  OUT_DIR,
+  ROOT,
+};

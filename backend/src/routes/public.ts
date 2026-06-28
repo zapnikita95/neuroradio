@@ -425,11 +425,22 @@ router.post('/harvest/stt', harvestSttUpload, async (req: Request, res: Response
     typeof req.headers['x-language-code'] === 'string' && req.headers['x-language-code'].trim()
       ? req.headers['x-language-code'].trim().slice(0, 12)
       : 'rus';
+  const sttProvider =
+    typeof req.headers['x-stt-provider'] === 'string' &&
+    req.headers['x-stt-provider'].trim().toLowerCase() === 'groq'
+      ? 'groq'
+      : 'elevenlabs';
 
   try {
     const t0 = Date.now();
-    const { transcribeHarvestAudio } = await import('../services/harvest-stt.js');
-    const out = await transcribeHarvestAudio(buf, filename, { languageCode });
+    let out;
+    if (sttProvider === 'groq') {
+      const { transcribeHarvestAudioGroqOnly } = await import('../services/harvest-stt.js');
+      out = await transcribeHarvestAudioGroqOnly(buf, filename, { languageCode });
+    } else {
+      const { transcribeHarvestAudioElevenOnly } = await import('../services/harvest-stt.js');
+      out = await transcribeHarvestAudioElevenOnly(buf, filename, { languageCode });
+    }
     res.json({
       ok: true,
       text: out.text,

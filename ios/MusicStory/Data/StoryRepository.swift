@@ -64,6 +64,7 @@ final class StoryRepository: ObservableObject {
             elevenLabsVoice: settings.storyElevenLabsVoiceRequest,
             speakTrackNamesInVoiceover: settings.speakTrackNamesInVoiceover,
             lang: lang.apiCode,
+            album: track.album,
             deviceFingerprint: DeviceFingerprint.current()
         )
 

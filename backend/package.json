@@ -67,7 +67,11 @@
     "enrich:weekly:dry": "npm run build && node scripts/weekly-deep-enrich.mjs --dry-run",
     "enrich:weekly:queue": "npm run build && node scripts/weekly-deep-enrich.mjs --queue",
     "enrich:weekly:status": "npm run build && node scripts/weekly-deep-enrich.mjs --status",
-    "expand:catalog": "npm run build && node scripts/merge-trending-into-catalog.mjs"
+    "expand:catalog": "npm run build && node scripts/merge-trending-into-catalog.mjs",
+    "harvest:youtube-essay": "npm run build && node scripts/youtube-essay-fact-harvest.mjs",
+    "harvest:youtube-essay:dry": "npm run build && node scripts/youtube-essay-fact-harvest.mjs --dry-run",
+    "harvest:youtube-batch": "npm run build && node scripts/youtube-harvest-batch.mjs --initial",
+    "harvest:youtube-weekly": "npm run build && node scripts/youtube-harvest-batch.mjs --weekly"
   },
   "keywords": [
     "music",

@@ -84,3 +84,31 @@ export async function transcribeHarvestAudio(
 
   return groqWhisperTranscribe(audio, filename, languageCode);
 }
+
+export async function transcribeHarvestAudioElevenOnly(
+  audio: Buffer,
+  filename: string,
+  options: HarvestSttOptions = {},
+): Promise<HarvestSttResult> {
+  const languageCode = options.languageCode?.trim() || 'rus';
+  const { transcribeSpeechElevenLabs } = await import('./elevenlabs-stt.js');
+  const out = await transcribeSpeechElevenLabs(audio, filename, {
+    languageCode,
+    modelId: options.modelId,
+  });
+  return {
+    text: out.text,
+    provider: 'elevenlabs-scribe',
+    modelId: out.modelId,
+    languageCode: out.languageCode,
+  };
+}
+
+export async function transcribeHarvestAudioGroqOnly(
+  audio: Buffer,
+  filename: string,
+  options: HarvestSttOptions = {},
+): Promise<HarvestSttResult> {
+  const languageCode = options.languageCode?.trim() || 'rus';
+  return groqWhisperTranscribe(audio, filename, languageCode);
+}

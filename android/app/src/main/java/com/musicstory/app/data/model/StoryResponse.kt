@@ -40,6 +40,8 @@ data class StoryRequest(
     @SerializedName("story_language") val storyLanguage: String = "ru",
     /** Backend serves Yandex WAV (not OGG/Opus) — Huawei/Poco MediaCodec opus decoder crashes. */
     @SerializedName("client_platform") val clientPlatform: String = "android",
+    /** Album from MediaSession — helps album-scope facts from fact-bank. */
+    val album: String? = null,
     @SerializedName("device_fingerprint") val deviceFingerprint: String? = null,
 )
 

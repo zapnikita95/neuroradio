@@ -5,3 +5,8 @@ audio/*.ogg
 audio/*.mp3
 audio/*.wav
 !audio/.gitkeep
+data/youtube-harvest/
+data/youtube-channels.json
+data/youtube-harvest-state.json
+data/youtube-harvest-catalog.json
+data/youtube-stt-benchmark.json
