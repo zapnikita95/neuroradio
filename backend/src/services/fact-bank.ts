@@ -19,7 +19,7 @@ import {
   isMetadataHarvestFact,
   isArtistFormationBioSeed,
 } from './reference-fact-quality.js';
-import { isSpeakableReferenceFact, isArtistIdentityBioSnippet } from './web-snippet-accept.js';
+import { isSpeakableReferenceFact, isArtistIdentityBioSnippet, isWikiMarkupJunkFact, sanitizeHarvestFactText } from './web-snippet-accept.js';
 import { factsTooSimilar, type FactScope } from './fact-picker.js';
 import {
   classifyFactTopic,
@@ -269,7 +269,7 @@ function buildStoredFact(
     llmInterest?: number;
   },
 ): StoredFact | null {
-  const trimmed = item.fact.trim();
+  const trimmed = sanitizeHarvestFactText(item.fact);
   if (trimmed.length < 35) return null;
   if (isListeningStatsFact(trimmed)) return null;
   const llmGate = item.llmInterest != null && Number.isFinite(item.llmInterest);
@@ -306,25 +306,28 @@ function isValidStoredFact(
   fact: StoredFact,
   options: { llmHarvest?: boolean } = {},
 ): boolean {
-  if (isAmbiguousCommonWordArtist(fact.artist) && !factMentionsArtistAsEntity(fact.fact, fact.artist)) {
+  const text = sanitizeHarvestFactText(fact.fact);
+  if (text.length < 35) return false;
+  if (isWikiMarkupJunkFact(text)) return false;
+  if (isAmbiguousCommonWordArtist(fact.artist) && !factMentionsArtistAsEntity(text, fact.artist)) {
     return false;
   }
   if (
     fact.artist.trim() &&
-    !factMentionsArtistLoose(fact.fact, fact.artist) &&
-    !(fact.scope === 'track' && fact.title.trim() && factMentionsTitle(fact.fact, fact.title)) &&
+    !factMentionsArtistLoose(text, fact.artist) &&
+    !(fact.scope === 'track' && fact.title.trim() && factMentionsTitle(text, fact.title)) &&
     !(
       options.llmHarvest === true &&
       fact.scope === 'album' &&
       fact.title.trim() &&
-      factMentionsTitle(fact.fact, fact.title)
+      factMentionsTitle(text, fact.title)
     )
   ) {
     return false;
   }
   if (
     isAmbiguousCommonWordArtist(fact.artist) &&
-    /(?:скандал|проститу|шантаж|измен|развод|арест|убий|наркот)/i.test(fact.fact)
+    /(?:скандал|проститу|шантаж|измен|развод|арест|убий|наркот)/i.test(text)
   ) {
     return false;
   }
@@ -334,15 +337,53 @@ function isValidStoredFact(
       (fact.scope === 'artist' && !fact.title.trim()));
   if (!skipTrackAnchor) {
     const trackPool = (loadBank().byTrack[trackKey(fact.artist, fact.title)] ?? []).map((f) => f.fact);
-    if (rejectSeedForTrackStory(fact.fact, fact.artist, fact.title, { trackPoolFacts: trackPool })) {
+    if (rejectSeedForTrackStory(text, fact.artist, fact.title, { trackPoolFacts: trackPool })) {
       return false;
     }
   }
-  if (isCatalogMetadataSeed(fact.fact)) return false;
+  if (
+    fact.scope === 'track' &&
+    fact.title.trim() &&
+    !fact.isMetadata &&
+    !isSpeakableReferenceFact(text, fact.artist, fact.title)
+  ) {
+    return false;
+  }
+  if (
+    fact.scope === 'track' &&
+    fact.title.trim() &&
+    !factMentionsTitle(text, fact.title) &&
+    !hasAnchoredTrackContext(text, fact.title)
+  ) {
+    return false;
+  }
+  if (isCatalogMetadataSeed(text)) return false;
   // Last.fm playcounts — metadata only, never a stored story seed.
-  if (isListeningStatsFact(fact.fact)) return Boolean(fact.isMetadata);
-  if (isEncyclopediaDefinitionSeed(fact.fact)) return false;
+  if (isListeningStatsFact(text)) return Boolean(fact.isMetadata);
+  if (isEncyclopediaDefinitionSeed(text)) return false;
   return true;
+}
+
+function normalizeStoredFactText(f: StoredFact): StoredFact {
+  const clean = sanitizeHarvestFactText(f.fact);
+  return clean !== f.fact && clean.length >= 35 ? { ...f, fact: clean } : f;
+}
+
+/** Dry-run: how many entries would be removed by {@link purgeInvalidBankFacts}. */
+export function countInvalidBankFacts(): number {
+  let removed = 0;
+  const bank = loadBank();
+  for (const pool of Object.values(bank.byTrack)) {
+    for (const raw of pool ?? []) {
+      if (!isValidStoredFact(normalizeStoredFactText(raw), {})) removed += 1;
+    }
+  }
+  for (const pool of Object.values(bank.byArtist)) {
+    for (const raw of pool ?? []) {
+      if (!isValidStoredFact(normalizeStoredFactText(raw), {})) removed += 1;
+    }
+  }
+  return removed;
 }
 
 /** Удаляет ложные факты (Привет и т.п.) из volume-банка. */
@@ -351,17 +392,25 @@ export function purgeInvalidBankFacts(): number {
   let removed = 0;
   for (const key of Object.keys(bank.byTrack)) {
     const pool = bank.byTrack[key] ?? [];
-    const filtered = pool.filter((f) => isValidStoredFact(f, {}));
-    removed += pool.length - filtered.length;
-    if (filtered.length === 0) delete bank.byTrack[key];
-    else bank.byTrack[key] = filtered;
+    const kept: StoredFact[] = [];
+    for (const raw of pool) {
+      const f = normalizeStoredFactText(raw);
+      if (isValidStoredFact(f, {})) kept.push(f);
+      else removed += 1;
+    }
+    if (kept.length === 0) delete bank.byTrack[key];
+    else bank.byTrack[key] = kept;
   }
   for (const key of Object.keys(bank.byArtist)) {
     const pool = bank.byArtist[key] ?? [];
-    const filtered = pool.filter((f) => isValidStoredFact(f, {}));
-    removed += pool.length - filtered.length;
-    if (filtered.length === 0) delete bank.byArtist[key];
-    else bank.byArtist[key] = filtered;
+    const kept: StoredFact[] = [];
+    for (const raw of pool) {
+      const f = normalizeStoredFactText(raw);
+      if (isValidStoredFact(f, {})) kept.push(f);
+      else removed += 1;
+    }
+    if (kept.length === 0) delete bank.byArtist[key];
+    else bank.byArtist[key] = kept;
   }
   if (removed > 0) {
     saveBank(bank);

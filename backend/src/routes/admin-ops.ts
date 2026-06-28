@@ -10,6 +10,7 @@ import {
 import { resolveWeeklyDeepEnrichCap } from '../services/weekly-deep-enrich-schedule.js';
 import { triggerWeeklyDeepEnrichNow } from '../services/weekly-deep-enrich-scheduler.js';
 import { runEraTop100CatalogUpdate } from '../services/era-top100-catalog.js';
+import { countInvalidBankFacts, purgeInvalidBankFacts } from '../services/fact-bank.js';
 import { isTelegramAdminNotifyConfigured, sendTelegramAdminMessage } from '../services/telegram-admin-notify.js';
 
 const router = Router();
@@ -67,6 +68,24 @@ router.post('/weekly-deep-enrich/retry', async (req, res) => {
   }
   restartWeeklyDeepEnrichBatch();
   res.json({ ok: true, restarted: true });
+});
+
+/** GET /v1/admin/fact-bank/purge/preview */
+router.get('/fact-bank/purge/preview', (req, res) => {
+  if (!requireAdmin(req, res)) return;
+  const wouldRemove = countInvalidBankFacts();
+  res.json({ ok: true, wouldRemove });
+});
+
+/** POST /v1/admin/fact-bank/purge */
+router.post('/fact-bank/purge', async (req, res) => {
+  if (!requireAdmin(req, res)) return;
+  const wouldRemove = countInvalidBankFacts();
+  const removed = purgeInvalidBankFacts();
+  if (isTelegramAdminNotifyConfigured() && removed > 0) {
+    void sendTelegramAdminMessage(`🧹 Fact bank purge: removed ${removed} junk entries`);
+  }
+  res.json({ ok: true, wouldRemove, removed });
 });
 
 /** POST /v1/admin/era-top100/rebuild */

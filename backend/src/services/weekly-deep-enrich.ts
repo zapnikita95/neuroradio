@@ -562,7 +562,7 @@ export async function runWeeklyDeepEnrich(
             scope: deep.scope,
             source: 'llm',
             harvestSource: 'deep-search',
-            minScore: 3,
+            minScore: 6,
           },
         ]);
         result.wins += 1;

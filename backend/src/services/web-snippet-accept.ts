@@ -171,6 +171,8 @@ export function isWikiMarkupJunkFact(fact: string): boolean {
   if (/^["[]/.test(trimmed) && /interview with max cavalera|nailbomb/i.test(trimmed)) return true;
   if (/^youtube\.?\s*$/i.test(trimmed) || /^youtube\.\[\[/i.test(trimmed)) return true;
   if (/list_of|cover_versions/i.test(trimmed)) return true;
+  if (/w\/index\.php\?title=|action=edit&section=/i.test(trimmed)) return true;
+  if ((trimmed.match(/https?:\/\//g) ?? []).length >= 2) return true;
   return false;
 }
 
