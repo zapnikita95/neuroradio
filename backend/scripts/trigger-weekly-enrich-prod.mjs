@@ -2,7 +2,7 @@
 /** POST /v1/admin/weekly-deep-enrich/run on production BFF. */
 import '../dist/load-env.js';
 
-const base = (process.env.RAILWAY_URL || 'https://music-story-production.up.railway.app').replace(/\/$/, '');
+const base = (process.env.RAILWAY_URL || process.env.BFF_URL || 'https://www.efir-ai.ru').replace(/\/$/, '');
 const secret = process.env.BILLING_ADMIN_SECRET?.trim();
 if (!secret) {
   console.error('BILLING_ADMIN_SECRET missing in .env');

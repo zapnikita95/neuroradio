@@ -368,6 +368,13 @@ export async function runWeeklyDeepEnrich(
   console.log(
     `[weekly-deep-enrich] start cap=${cap} mode=${mode} llmVerify=${llm} queue=${batch.length}`,
   );
+  if (isTelegramAdminNotifyConfigured()) {
+    await sendTelegramAdminMessage(
+      `▶️ Weekly deep enrich START\n` +
+        `Cap: ${cap} | mode: ${mode} | LLM verify: ${llm ? 'on' : 'off'}\n` +
+        `Очередь: ${batch.length} треков`,
+    );
+  }
 
   for (const row of batch) {
     result.processed += 1;

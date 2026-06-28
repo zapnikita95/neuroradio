@@ -98,18 +98,8 @@ function scheduleCatchUpIfMissed(): void {
     return;
   }
 
-  const now = Date.now();
-  const msk = new Date(now + MSK_OFFSET_MS);
-  const sundayPast3am = msk.getUTCDay() === 0 && msk.getUTCHours() >= SUNDAY_3AM_MSK_HOUR;
-  const delay = sundayPast3am ? 5_000 : CATCHUP_DELAY_MS;
-
-  console.log(
-    `[weekly-deep-enrich] catch-up scheduled in ${Math.round(delay / 1000)}s (missed weekly slot)`,
-  );
-  catchupTimer = setTimeout(() => {
-    void runWeeklyDeepEnrichCycle('boot-catchup-missed-sunday');
-  }, delay);
-  catchupTimer.unref?.();
+  console.log('[weekly-deep-enrich] catch-up — starting now (missed weekly slot)');
+  triggerWeeklyDeepEnrichNow('boot-catchup-missed-sunday');
 }
 
 /** Manual / admin trigger — starts immediately (async, non-blocking caller). */
