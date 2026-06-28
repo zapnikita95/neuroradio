@@ -1,12 +1,18 @@
 import { eraOverlayAgeMs, isEraTop100AutoEnabled, runEraTop100CatalogUpdate } from './era-top100-catalog.js';
-import { runWeeklyDeepEnrich, sendWeeklyDeepEnrichBootDigest, persistWeeklyDeepEnrichQueueSnapshot } from './weekly-deep-enrich.js';
+import {
+  runWeeklyDeepEnrich,
+  sendWeeklyDeepEnrichBootDigest,
+  persistWeeklyDeepEnrichQueueSnapshot,
+  weeklyDeepEnrichRanSinceLastSunday,
+  getWeeklyDeepEnrichLastRun,
+} from './weekly-deep-enrich.js';
 import {
   isWeeklyDeepEnrichEnabled,
   msUntilNextSunday3amMsk,
 } from './weekly-deep-enrich-schedule.js';
 
-const FIRST_RUN_MS = parseInt(
-  process.env.WEEKLY_DEEP_ENRICH_DELAY_MS ?? String(6 * 60 * 60_000),
+const CATCHUP_DELAY_MS = parseInt(
+  process.env.WEEKLY_DEEP_ENRICH_CATCHUP_DELAY_MS ?? String(3 * 60_000),
   10,
 );
 const ERA_MAX_AGE_MS = parseInt(
@@ -16,6 +22,7 @@ const ERA_MAX_AGE_MS = parseInt(
 
 let started = false;
 let recurringTimer: ReturnType<typeof setTimeout> | null = null;
+let catchupTimer: ReturnType<typeof setTimeout> | null = null;
 
 async function maybeRefreshEraTop100Catalog(reason: string): Promise<void> {
   if (!isEraTop100AutoEnabled()) return;
@@ -32,9 +39,19 @@ async function maybeRefreshEraTop100Catalog(reason: string): Promise<void> {
   }
 }
 
-async function runWeeklyDeepEnrichCycle(): Promise<void> {
-  await maybeRefreshEraTop100Catalog('pre-sunday-enrich');
-  await runWeeklyDeepEnrich();
+async function runWeeklyDeepEnrichCycle(reason: string): Promise<void> {
+  try {
+    console.log(`[weekly-deep-enrich] cycle start (${reason})`);
+    await maybeRefreshEraTop100Catalog('pre-enrich');
+    await runWeeklyDeepEnrich();
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    if (msg.includes('already running')) {
+      console.warn(`[weekly-deep-enrich] skip (${reason}) — previous run still active`);
+      return;
+    }
+    console.error(`[weekly-deep-enrich] cycle failed (${reason}):`, msg);
+  }
 }
 
 function scheduleRecurringSunday(): void {
@@ -44,7 +61,7 @@ function scheduleRecurringSunday(): void {
   }
   const delay = msUntilNextSunday3amMsk();
   recurringTimer = setTimeout(() => {
-    void runWeeklyDeepEnrichCycle().finally(() => scheduleRecurringSunday());
+    void runWeeklyDeepEnrichCycle('sunday-03-msk').finally(() => scheduleRecurringSunday());
   }, delay);
   recurringTimer.unref?.();
   console.log(
@@ -52,9 +69,50 @@ function scheduleRecurringSunday(): void {
   );
 }
 
+const MSK_OFFSET_MS = 3 * 60 * 60 * 1000;
+const SUNDAY_3AM_MSK_HOUR = 3;
+
+function shouldRunCatchUp(): boolean {
+  if (weeklyDeepEnrichRanSinceLastSunday()) return false;
+  const now = Date.now();
+  const msk = new Date(now + MSK_OFFSET_MS);
+  const dow = msk.getUTCDay();
+  const hour = msk.getUTCHours();
+  // Before today's Sunday 03:00 MSK — regular timer will fire, don't duplicate
+  if (dow === 0 && hour < SUNDAY_3AM_MSK_HOUR) return false;
+  return true;
+}
+
+function scheduleCatchUpIfMissed(): void {
+  if (catchupTimer) {
+    clearTimeout(catchupTimer);
+    catchupTimer = null;
+  }
+  if (!shouldRunCatchUp()) {
+    const last = getWeeklyDeepEnrichLastRun();
+    console.log(
+      `[weekly-deep-enrich] catch-up skip — last=${last?.finishedAt ?? 'never'} ` +
+        `ranSinceSunday=${weeklyDeepEnrichRanSinceLastSunday()}`,
+    );
+    return;
+  }
+
+  console.log(
+    `[weekly-deep-enrich] catch-up scheduled in ${Math.round(CATCHUP_DELAY_MS / 60_000)}m (missed weekly slot)`,
+  );
+  catchupTimer = setTimeout(() => {
+    void runWeeklyDeepEnrichCycle('boot-catchup-missed-sunday');
+  }, CATCHUP_DELAY_MS);
+  catchupTimer.unref?.();
+}
+
 export function startWeeklyDeepEnrichScheduler(): void {
   if (!isWeeklyDeepEnrichEnabled() || started) return;
   started = true;
+
+  // Sunday timer immediately — survives independently of any catch-up run
+  scheduleRecurringSunday();
+  scheduleCatchUpIfMissed();
 
   void (async () => {
     await maybeRefreshEraTop100Catalog('boot');
@@ -62,14 +120,7 @@ export function startWeeklyDeepEnrichScheduler(): void {
     await sendWeeklyDeepEnrichBootDigest();
   })();
 
-  setTimeout(() => {
-    void runWeeklyDeepEnrichCycle().finally(() => scheduleRecurringSunday());
-  }, FIRST_RUN_MS).unref?.();
-
-  console.log(
-    `[weekly-deep-enrich] scheduler started — first run in ${Math.round(FIRST_RUN_MS / 60_000)}m, ` +
-      `then every Sunday 03:00 MSK`,
-  );
+  console.log('[weekly-deep-enrich] scheduler started — Sunday 03:00 MSK + catch-up if missed');
 }
 
 export { isWeeklyDeepEnrichEnabled, msUntilNextSunday3amMsk } from './weekly-deep-enrich-schedule.js';

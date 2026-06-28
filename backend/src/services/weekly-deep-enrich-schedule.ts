@@ -8,4 +8,4 @@ export function resolveWeeklyDeepEnrichCap(): number {
   return Math.max(1, parseInt(process.env.WEEKLY_DEEP_ENRICH_CAP ?? '50', 10));
 }
 
-export { msUntilNextSunday3amMsk, formatNextSunday3amMsk } from './chart-harvest-schedule.js';
+export { msUntilNextSunday3amMsk, formatNextSunday3amMsk, lastSunday3amMskUtc } from './chart-harvest-schedule.js';

@@ -10,6 +10,7 @@ import {
   isWeeklyDeepEnrichEnabled,
   resolveWeeklyDeepEnrichCap,
   formatNextSunday3amMsk,
+  lastSunday3amMskUtc,
 } from './weekly-deep-enrich-schedule.js';
 
 const DATA_DIR = process.env.ACCOUNT_DATA_DIR?.trim() || path.join(process.cwd(), 'data');
@@ -254,16 +255,37 @@ export function summarizeWeeklyDeepEnrichQueue(cap: number): {
 }
 
 /** Telegram preview on boot: how many tracks Sunday job will take. */
+export function getWeeklyDeepEnrichLastRun(): (WeeklyDeepEnrichResult & {
+  finishedAt?: string;
+  mode?: string;
+}) | null {
+  return loadJson(LAST_RUN_PATH, null);
+}
+
+/** True if a successful weekly run finished since last Sunday 03:00 MSK. */
+export function weeklyDeepEnrichRanSinceLastSunday(): boolean {
+  const last = getWeeklyDeepEnrichLastRun();
+  if (!last?.finishedAt) return false;
+  const finishedMs = new Date(last.finishedAt).getTime();
+  return finishedMs >= lastSunday3amMskUtc();
+}
+
+/** Telegram preview on boot: how many tracks Sunday job will take. */
 export async function sendWeeklyDeepEnrichBootDigest(): Promise<void> {
   if (!isWeeklyDeepEnrichEnabled() || !isTelegramAdminNotifyConfigured()) return;
   const cap = resolveWeeklyDeepEnrichCap();
   const s = summarizeWeeklyDeepEnrichQueue(cap);
+  const last = getWeeklyDeepEnrichLastRun();
+  const lastLine = last?.finishedAt
+    ? `Последний прогон: ${last.finishedAt} (wins ${last.wins ?? 0}/${last.processed ?? 0})\n`
+    : 'Последний прогон: ещё не было\n';
   const emptyHint =
     s.totalEligible === 0
       ? `\n⚠️ очередь пуста: bank=${s.bankTracks} треков, catalog=${s.catalogTracks}, era=${s.eraOverlay ? 'ok' : 'нет overlay'}`
       : '';
   await sendTelegramAdminMessage(
     `📅 Weekly deep enrich (preview)\n` +
+      lastLine +
       `Следующий прогон: ${s.nextRunMsk}\n` +
       `Cap: ${s.cap} | возьмёт: ${s.batchSize} из ${s.totalEligible} eligible\n` +
       `Bank: ${s.bankTracks} треков | catalog: ${s.catalogTracks} | era overlay: ${s.eraOverlay ? 'да' : 'нет'}\n` +
