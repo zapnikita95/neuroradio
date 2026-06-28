@@ -324,8 +324,8 @@ function isValidStoredFact(
   }
   const skipTrackAnchor =
     options.llmHarvest === true &&
-    fact.scope === 'artist' &&
-    !fact.title.trim();
+    (fact.scope === 'album' ||
+      (fact.scope === 'artist' && !fact.title.trim()));
   if (!skipTrackAnchor) {
     const trackPool = (loadBank().byTrack[trackKey(fact.artist, fact.title)] ?? []).map((f) => f.fact);
     if (rejectSeedForTrackStory(fact.fact, fact.artist, fact.title, { trackPoolFacts: trackPool })) {

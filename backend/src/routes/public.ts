@@ -1,4 +1,5 @@
 import { Router, Request, Response } from 'express';
+import express from 'express';
 import {
   createYooKassaPayment,
   isYooKassaConfigured,
@@ -389,6 +390,61 @@ router.post('/subscribe', async (req: Request, res: Response) => {
   } catch (err) {
     console.error('[public/subscribe] email send failed:', err instanceof Error ? err.message : err);
     res.status(502).json({ error: 'Не удалось отправить письмо, попробуйте позже' });
+  }
+});
+
+/** YouTube harvest STT — ElevenLabs Scribe on Railway (local RF → Cloudflare 403). */
+const harvestSttUpload = express.raw({
+  type: ['audio/mpeg', 'audio/mp3', 'audio/*', 'application/octet-stream'],
+  limit: process.env.HARVEST_STT_MAX_BYTES?.trim() || '12mb',
+});
+
+router.post('/harvest/stt', harvestSttUpload, async (req: Request, res: Response) => {
+  const secret = String(req.headers['x-website-demo-secret'] ?? '');
+  const expected = process.env.WEBSITE_DEMO_SECRET?.trim();
+  if (!expected || secret !== expected) {
+    res.status(403).json({ error: 'forbidden' });
+    return;
+  }
+
+  const buf = req.body;
+  if (!Buffer.isBuffer(buf) || buf.length < 1024) {
+    res.status(400).json({ error: 'invalid audio body' });
+    return;
+  }
+  if (buf.length > 12 * 1024 * 1024) {
+    res.status(413).json({ error: 'audio too large (max 12mb)' });
+    return;
+  }
+
+  const filename =
+    typeof req.headers['x-audio-filename'] === 'string' && req.headers['x-audio-filename'].trim()
+      ? req.headers['x-audio-filename'].trim().slice(0, 120)
+      : 'audio.mp3';
+  const languageCode =
+    typeof req.headers['x-language-code'] === 'string' && req.headers['x-language-code'].trim()
+      ? req.headers['x-language-code'].trim().slice(0, 12)
+      : 'rus';
+
+  try {
+    const t0 = Date.now();
+    const { transcribeSpeechElevenLabs } = await import('../services/elevenlabs-stt.js');
+    const out = await transcribeSpeechElevenLabs(buf, filename, { languageCode });
+    res.json({
+      ok: true,
+      text: out.text,
+      provider: 'elevenlabs-scribe',
+      modelId: out.modelId,
+      languageCode: out.languageCode,
+      latencyMs: Date.now() - t0,
+      bytes: buf.length,
+    });
+  } catch (err) {
+    console.error('[public/harvest/stt]', err instanceof Error ? err.message : err);
+    res.status(502).json({
+      error: 'stt_failed',
+      detail: err instanceof Error ? err.message : String(err),
+    });
   }
 });
 
