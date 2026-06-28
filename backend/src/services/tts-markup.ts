@@ -16,6 +16,7 @@ import { enhanceMixedLanguageText } from './tts-en-normalize.js';
 import {
   normalizeYandexSpeechTokens,
 } from './tts-yandex-normalize.js';
+import { normalizeSocialPlatformsForRussianTts } from './tts-social-platforms.js';
 import { normalizeDecadesForRussianTts, normalizeYearsForRussianTts } from './tts-russian-years.js';
 import type { TtsPauseProfile } from './tts-voice-profiles.js';
 import { primaryArtistName } from './artist-primary.js';
@@ -179,6 +180,7 @@ export function prepareYandexTtsText(
   const pauseProfile = options.pauseProfile ?? 'tight';
 
   let text = preserveMusicProperNames(script, artist, title);
+  text = normalizeSocialPlatformsForRussianTts(text);
   text = sanitizeScriptForTts(text, artist, title, [], {
     speakTrackNamesInVoiceover: options.speakTrackNamesInVoiceover,
     trackArtist: options.artist ?? '',

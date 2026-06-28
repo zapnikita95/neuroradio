@@ -1,6 +1,7 @@
 import type { StoryNarratorId } from './story-narrator.js';
 import type { StoryLanguageId } from './story-language.js';
 import { scriptSimilarity } from './story-quality.js';
+import { normalizeSocialPlatformsForRussianTts } from './tts-social-platforms.js';
 
 type PersonaKey = Exclude<StoryNarratorId, 'auto'>;
 
@@ -264,6 +265,9 @@ function sanitizeClosingPhrase(phrase: string, lang: StoryLanguageId): string {
     s = s.replace(/[а-яёА-ЯЁ]+/g, ' ').replace(/\s{2,}/g, ' ').trim();
     return s;
   }
+
+  s = normalizeSocialPlatformsForRussianTts(s);
+  s = s.replace(/\bR\s*&\s*B\b/gi, 'ар эн би');
 
   for (const [latin, ru] of Object.entries(CLOSING_LATIN_TO_RU)) {
     s = s.replace(new RegExp(`\\b${latin}\\b`, 'gi'), ru);

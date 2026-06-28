@@ -14,6 +14,7 @@ import {
   normalizeLatinApostrophes,
   stripApostrophesInLatinRuns,
 } from './tts-yandex-normalize.js';
+import { normalizeSocialPlatformsForRussianTts } from './tts-social-platforms.js';
 import {
   scriptContainsLatinTrackCitation,
   shouldStripLatinTrackNames,
@@ -67,6 +68,7 @@ export function prepareEdgeTtsText(
   const speakNames = options.speakTrackNamesInVoiceover === true;
 
   let text = preserveMusicProperNames(script, artist, title);
+  text = normalizeSocialPlatformsForRussianTts(text);
   text = sanitizeScriptForTts(text, artist, title, [], {
     speakTrackNamesInVoiceover: speakNames,
     trackArtist: artist,

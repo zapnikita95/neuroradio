@@ -4,6 +4,7 @@ import { mergeLatinCollaborationPhrases } from './tts-grammar-fixes.js';
 import { normalizeGenreTermsForTts } from './tts-genre-pronounce.js';
 import { applyTitleNumeralsInText, titleNumeralsForTts } from './tts-title-numerals.js';
 import { applyMusicNamePunctuationToText } from './tts-music-name-punctuation.js';
+import { normalizeSocialPlatformsForRussianTts } from './tts-social-platforms.js';
 
 const CURLY_APOSTROPHE = /[\u2018\u2019\u02BC\u0060]/g;
 
@@ -99,6 +100,8 @@ export function normalizeYandexSpeechTokens(text: string, artist = '', title = '
   if (artistNorm && artistNorm !== artist.trim()) {
     result = result.replaceAll(artist.trim(), artistNorm);
   }
+
+  result = normalizeSocialPlatformsForRussianTts(result);
 
   for (const [pattern, replacement] of MIXED_TTS_REPLACEMENTS) {
     result = result.replace(pattern, replacement);

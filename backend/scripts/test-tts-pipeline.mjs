@@ -137,10 +137,27 @@ test('normalizeYandexSpeechTokens reads LO-FI as л+оу ф+ай', () => {
   assert.doesNotMatch(ssml, /<lang[^>]*>lo[\s-]?fi/i);
 });
 
-test('SSML keeps Last.fm as one English lang span', () => {
-  const ssml = buildYandexSsml('сингл попал в ротацию на Last.fm.');
-  assert.match(ssml, /<lang xml:lang="en-US">Last\.fm<\/lang>/i);
-  assert.doesNotMatch(ssml, /<\/lang>\.<lang[^>]*>fm/i);
+test('SSML reads social platforms in Russian without en-US lang switch', () => {
+  const cases = [
+    { raw: 'сингл попал в ротацию на Last.fm.', expectRu: /Ласт эф эм/i, noEnTag: /Last\.fm/i },
+    { raw: 'Клип стал viral в TikTok осенью.', expectRu: /ТикТок/i, noEnTag: /TikTok/i },
+    { raw: 'Пост разошёлся по Facebook и MySpace.', expectRu: /Фейсбук.*Майспейс/i, noEnTag: /Facebook/i },
+  ];
+  for (const { raw, expectRu, noEnTag } of cases) {
+    const marked = prepareYandexTtsText(raw);
+    const ssml = buildYandexSsml(marked);
+    assert.match(marked, expectRu);
+    assert.doesNotMatch(ssml, noEnTag);
+    assert.doesNotMatch(ssml, /<lang xml:lang="en-US">/i);
+  }
+});
+
+test('в TikTok — no emphasis pause on preposition before platform', () => {
+  const marked = prepareYandexTtsText('Хит взлетел в TikTok за неделю.');
+  const ssml = buildYandexSsml(marked);
+  assert.match(marked, /в\s+ТикТок/i);
+  assert.doesNotMatch(ssml, /<lang xml:lang="en-US">TikTok<\/lang>/i);
+  assert.doesNotMatch(ssml, /<emphasis[^>]*>в<\/emphasis>\s*<lang/i);
 });
 
 test('SSML reads Panic! At The Disco as one phrase without bang pause', () => {
@@ -285,23 +302,23 @@ test('years in начале 2010 года spoken for TTS', () => {
   assert.doesNotMatch(spoken, /\b2010\b/);
 });
 
-test('prepareYandexTtsText rewrites с Bandcamp to на Bandcamp', () => {
+test('prepareYandexTtsText reads Bandcamp in Cyrillic for Russian voice', () => {
   const out = prepareYandexTtsText(
     'можно было скачать прямо с Bandcamp — и это было ново.',
     { artist: 'Океан Ельзи', title: 'Без бою' },
   );
-  assert.match(out, /на Bandcamp/i);
-  assert.doesNotMatch(out, /\sс Bandcamp/i);
+  assert.match(out, /Бэндкемп/i);
+  assert.doesNotMatch(out, /Bandcamp/i);
 });
 
-test('SSML reads на Bandcamp without letter эс', () => {
+test('SSML reads Бэндкемп without en-US lang switch', () => {
   const marked = prepareYandexTtsText(
     'скачать прямо с Bandcamp — ново для нас.',
     { artist: 'Test', title: 'Test' },
   );
   const ssml = buildYandexSsml(marked);
-  assert.match(ssml, /на\s*<lang xml:lang="en-US">Bandcamp/i);
-  assert.doesNotMatch(ssml, /<emphasis level="reduced">[сС]<\/emphasis>/i);
+  assert.match(ssml, /Бэндкемп/i);
+  assert.doesNotMatch(ssml, /<lang xml:lang="en-US">Bandcamp/i);
 });
 
 test('SSML reads в начале две тысячи десятого года', () => {
