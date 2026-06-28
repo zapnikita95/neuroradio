@@ -3,6 +3,8 @@ import path from 'node:path';
 import type { UserTier } from './entitlements.js';
 import { hasPostgres } from './db.js';
 import { hydrateKvFromPostgres, persistKv } from './pg-kv.js';
+import { getAccountProfile } from './account-store.js';
+import { canUseDevTierSwitch, isListedAdminEmail } from './admin-users.js';
 
 const DATA_DIR = process.env.ACCOUNT_DATA_DIR?.trim() || path.join(process.cwd(), 'data');
 const STORE_PATH = path.join(DATA_DIR, 'dev-tier-overrides.json');
@@ -55,21 +57,53 @@ export function isDevTierSwitchEnabled(): boolean {
   return flag === 'true' || flag === '1' || flag === 'on';
 }
 
+const EMAIL_KEY_PREFIX = 'email:';
+
+function normalizeStoredTier(raw: unknown): UserTier | null {
+  if (raw === 'free' || raw === 'trial' || raw === 'premium') return raw;
+  return null;
+}
+
+function emailStorageKey(email: string): string {
+  return `${EMAIL_KEY_PREFIX}${email.trim().toLowerCase()}`;
+}
+
+function adminEmailForInstall(installId: string): string | null {
+  if (!canUseDevTierSwitch(installId)) return null;
+  const email = getAccountProfile(installId).email?.trim().toLowerCase();
+  if (!email || !isListedAdminEmail(email)) return null;
+  return email;
+}
+
+function applyTierToKey(store: DevTierFile, key: string, tier: UserTier | null): void {
+  if (tier === null) {
+    delete store[key];
+  } else if (tier === 'free' || tier === 'trial' || tier === 'premium') {
+    store[key] = tier;
+  }
+}
+
 export function getDevTierOverride(installId: string): UserTier | null {
   const normalized = installId.trim().toLowerCase();
-  const tier = load()[normalized];
-  if (tier === 'free' || tier === 'trial' || tier === 'premium') return tier;
-  return null;
+  const store = load();
+  const fromInstall = normalizeStoredTier(store[normalized]);
+  if (fromInstall) return fromInstall;
+
+  const email = adminEmailForInstall(installId);
+  if (!email) return null;
+  return normalizeStoredTier(store[emailStorageKey(email)]);
 }
 
 export function setDevTierOverride(installId: string, tier: UserTier | null): UserTier | null {
   const normalized = installId.trim().toLowerCase();
   const store = { ...load() };
-  if (tier === null) {
-    delete store[normalized];
-  } else if (tier === 'free' || tier === 'trial' || tier === 'premium') {
-    store[normalized] = tier;
+  applyTierToKey(store, normalized, tier);
+
+  const email = adminEmailForInstall(installId);
+  if (email) {
+    applyTierToKey(store, emailStorageKey(email), tier);
   }
+
   save(store);
   return getDevTierOverride(installId);
 }

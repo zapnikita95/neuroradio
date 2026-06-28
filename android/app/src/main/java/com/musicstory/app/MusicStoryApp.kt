@@ -250,6 +250,7 @@ class MusicStoryApp : Application() {
         appScope.launch {
             val backendUrl = settingsDataStore.backendUrl.first()
             backendAuthManager.warmUp(backendUrl)
+            storyRepository.restoreDevTierOverrideIfSaved()
         }
     }
 

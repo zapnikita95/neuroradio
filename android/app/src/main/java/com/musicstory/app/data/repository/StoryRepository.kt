@@ -289,6 +289,20 @@ class StoryRepository(
         }
     }
 
+    /** Re-apply admin test tier saved on device — survives app restart and install_id churn. */
+    suspend fun restoreDevTierOverrideIfSaved() {
+        val tier = settingsDataStore.readDevTierOverrideLocal() ?: return
+        val backendUrl = settingsDataStore.backendUrl.first().trim()
+        if (!shouldTryBackend(backendUrl)) return
+        runCatching {
+            apiClient.setDevTier(backendUrl, tier)
+            refreshQuota()
+            StoryLog.i("Dev tier override restored on startup: $tier")
+        }.onFailure {
+            StoryLog.w("Dev tier restore failed: ${it.message}")
+        }
+    }
+
     /** User-entered LLM key (OpenRouter/Groq/Gemini/local Ollama) — not Railway URL. */
     suspend fun hasPersonalApiKeyConfigured(): Boolean {
         val provider = settingsDataStore.llmProvider.first()

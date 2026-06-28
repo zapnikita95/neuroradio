@@ -203,6 +203,23 @@ class SettingsDataStore(private val context: Context) {
         }
     }
 
+    /** Admin test tier — persisted locally and re-applied to server on cold start. */
+    suspend fun readDevTierOverrideLocal(): String? {
+        val raw = context.settingsDataStore.data.first()[KEY_DEV_TIER_OVERRIDE_LOCAL]?.trim().orEmpty()
+        return raw.takeIf { it in DEV_TIER_VALUES }
+    }
+
+    suspend fun setDevTierOverrideLocal(tier: String?) {
+        context.settingsDataStore.edit { prefs ->
+            val normalized = tier?.trim()?.lowercase()
+            if (normalized != null && normalized in DEV_TIER_VALUES) {
+                prefs[KEY_DEV_TIER_OVERRIDE_LOCAL] = normalized
+            } else {
+                prefs.remove(KEY_DEV_TIER_OVERRIDE_LOCAL)
+            }
+        }
+    }
+
     val groqApiKey: Flow<String> = context.settingsDataStore.data.map { prefs ->
         secureApiKeyStore.read(SecureApiKeyStore.GROQ, prefs[KEY_GROQ_API_KEY])
     }
@@ -919,6 +936,8 @@ class SettingsDataStore(private val context: Context) {
         private val KEY_SETTINGS_SYNCED_AT = longPreferencesKey("settings_synced_at")
         private val KEY_TRIAL_EXPIRED_UPSELL_SHOWN = booleanPreferencesKey("trial_expired_upsell_shown")
         private val KEY_TRIAL_BANNER_DISMISSED = stringPreferencesKey("trial_banner_dismissed_milestones")
+        private val KEY_DEV_TIER_OVERRIDE_LOCAL = stringPreferencesKey("dev_tier_override_local")
+        private val DEV_TIER_VALUES = setOf("free", "trial", "premium")
         private const val OPENROUTER_FORCE_VERSION = 2
     }
 }

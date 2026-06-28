@@ -572,7 +572,8 @@ fun SettingsScreen(
             languageSwitchToEn = status.languageSwitch?.toEn
             devTierSwitchEnabled = status.devTierSwitchEnabled == true || BuildConfig.DEBUG
             if (devTierSwitchEnabled) {
-                devTierLabel = status.devTierOverride ?: status.tier
+                val localTier = app.settingsDataStore.readDevTierOverrideLocal()
+                devTierLabel = status.devTierOverride ?: localTier ?: status.tier
             } else {
                 devTierLabel = null
             }
@@ -1933,11 +1934,12 @@ fun SettingsScreen(
                                     scope.launch {
                                         devTierFeedback = null
                                         try {
+                                            app.settingsDataStore.setDevTierOverrideLocal(tierId)
                                             val resp = app.apiClient.setDevTier(
                                                 backendUrl.trim().trimEnd('/'),
                                                 tierId,
                                             )
-                                            devTierLabel = resp.tier ?: resp.devTierOverride
+                                            devTierLabel = resp.tier ?: resp.devTierOverride ?: tierId
                                             devTierFeedback = resp.hint ?: resp.error
                                             app.storyRepository.refreshQuota()
                                         } catch (e: Exception) {
