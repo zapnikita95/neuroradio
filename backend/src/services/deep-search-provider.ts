@@ -138,6 +138,35 @@ export function isRelevantDeepSearchHit(hit: SearchHit, artist: string, title: s
   return artistHit && titleHit;
 }
 
+function normalizeArtistTokens(artist: string): string[] {
+  return artistTokens(artist.replace(/[#@]/g, ' '));
+}
+
+/** Drop wiki disambiguation / wrong-song pages (e.g. «Правила» → Кирхгоф). */
+export function strictSourceHitForTrack(hit: SearchHit, artist: string, title: string): boolean {
+  if (!isRelevantDeepSearchHit(hit, artist, title)) return false;
+  const blob = `${hit.title} ${hit.url} ${hit.snippet}`.toLowerCase();
+  const aTok = normalizeArtistTokens(artist);
+  const tTok = titleTokens(title);
+
+  if (/songfacts\.com|genius\.com/.test(hit.url)) {
+    const slug = tTok.join('-');
+    return slug.length >= 3 && hit.url.toLowerCase().includes(slug.slice(0, 40));
+  }
+
+  if (!hit.url.includes('wikipedia.org')) return true;
+
+  const titleInPage = tTok.filter((t) => t.length >= 3).some((t) => blob.includes(t));
+  const artistInPage = aTok.filter((t) => t.length >= 3).some((t) => blob.includes(t));
+  const genericTitle = tTok.length <= 1 && (tTok[0]?.length ?? 0) <= 12;
+
+  if (genericTitle) return artistInPage;
+  if (/[\u0400-\u04FF]/.test(artist + title)) {
+    return titleInPage && (artistInPage || aTok.length === 0);
+  }
+  return titleInPage || artistInPage;
+}
+
 export function scoreSearchHit(hit: SearchHit, artist: string, title: string): number {
   let score = hit.score ?? 0.5;
   const url = hit.url.toLowerCase();
@@ -419,7 +448,7 @@ export async function searchViaWikipedia(
 ): Promise<SearchHit[]> {
   const isRu = lang === 'ru';
   const queries = isRu
-    ? [`${artist} ${title}`, `${title} песня`, `${artist} музыкант`, title]
+    ? [`${artist} ${title}`, `"${artist}" "${title}"`, `${artist} ${title} песня`, `${artist} музыкант`, title]
     : [`"${title}" ${artist} song`, `${title} ${artist}`, `${artist} band`];
   const hits: SearchHit[] = [];
   const seenTitles = new Set<string>();
@@ -500,7 +529,7 @@ async function collectSearchHits(artist: string, title: string): Promise<SearchH
 
   const byUrl = new Map<string, SearchHit>();
   for (const h of all) {
-    if (!isRelevantDeepSearchHit(h, artist, title)) continue;
+    if (!strictSourceHitForTrack(h, artist, title)) continue;
     const prev = byUrl.get(h.url);
     if (!prev || scoreSearchHit(h, artist, title) > scoreSearchHit(prev, artist, title)) {
       byUrl.set(h.url, h);
@@ -551,9 +580,20 @@ export async function runDeepSearch(params: {
 
     if (mode === 'ddg_jina' || mode === 'tavily' || mode === 'baseline_ddg') {
       const ranked = [...hits]
-        .filter((h) => isRelevantDeepSearchHit(h, artist, title))
+        .filter((h) => strictSourceHitForTrack(h, artist, title))
         .sort((a, b) => (b.score ?? 0) - (a.score ?? 0));
-      const urls = ranked.slice(0, Math.max(maxPages, 3)).map((h) => h.url);
+      if (ranked.length === 0) {
+        console.log(`[deep-search] no strict sources for "${artist}" — "${title}"`);
+      }
+      const songfactsFirst = ranked.filter((h) => h.url.includes('songfacts.com'));
+      const wikiSong = ranked.filter(
+        (h) => h.url.includes('wikipedia.org') && strictSourceHitForTrack(h, artist, title),
+      );
+      const rest = ranked.filter(
+        (h) => !h.url.includes('songfacts.com') && !wikiSong.some((w) => w.url === h.url),
+      );
+      const ordered = [...songfactsFirst, ...wikiSong, ...rest];
+      const urls = ordered.slice(0, Math.max(maxPages, 2)).map((h) => h.url);
       if (urls.length > 0 && mode !== 'baseline_ddg') {
         pages = await extractPagesParallel(urls, 2);
         // Discover press URLs embedded in Wikipedia pages (NPR, Pitchfork, …)

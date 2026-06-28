@@ -265,15 +265,22 @@ function buildStoredFact(
     source?: StoredFact['source'];
     harvestSource?: string;
     minScore?: number;
+    /** LLM 1–10 interest — bypasses regex interestScore for YouTube essay harvest. */
+    llmInterest?: number;
   },
 ): StoredFact | null {
   const trimmed = item.fact.trim();
   if (trimmed.length < 35) return null;
   if (isListeningStatsFact(trimmed)) return null;
-  const score = interestScore(trimmed);
-  const minScore = item.minScore ?? 6;
+  const llmGate = item.llmInterest != null && Number.isFinite(item.llmInterest);
+  const score = llmGate
+    ? Math.round(Math.max(1, Math.min(10, item.llmInterest!)) * 3)
+    : interestScore(trimmed);
+  const minScore = llmGate ? 0 : (item.minScore ?? 6);
   if (score < minScore) return null;
-  const rating = interestRating10(trimmed);
+  const rating = llmGate
+    ? Math.round(Math.max(1, Math.min(10, item.llmInterest!)))
+    : interestRating10(trimmed);
   const isMetadata = isMetadataHarvestFact(trimmed);
   const draft: StoredFact = {
     id: crypto.randomUUID(),
@@ -291,11 +298,14 @@ function buildStoredFact(
     timesUsed: 0,
     addedAt: Date.now(),
   };
-  if (!isValidStoredFact(draft)) return null;
+  if (!isValidStoredFact(draft, { llmHarvest: llmGate })) return null;
   return draft;
 }
 
-function isValidStoredFact(fact: StoredFact): boolean {
+function isValidStoredFact(
+  fact: StoredFact,
+  options: { llmHarvest?: boolean } = {},
+): boolean {
   if (isAmbiguousCommonWordArtist(fact.artist) && !factMentionsArtistAsEntity(fact.fact, fact.artist)) {
     return false;
   }
@@ -312,9 +322,15 @@ function isValidStoredFact(fact: StoredFact): boolean {
   ) {
     return false;
   }
-  const trackPool = (loadBank().byTrack[trackKey(fact.artist, fact.title)] ?? []).map((f) => f.fact);
-  if (rejectSeedForTrackStory(fact.fact, fact.artist, fact.title, { trackPoolFacts: trackPool })) {
-    return false;
+  const skipTrackAnchor =
+    options.llmHarvest === true &&
+    fact.scope === 'artist' &&
+    !fact.title.trim();
+  if (!skipTrackAnchor) {
+    const trackPool = (loadBank().byTrack[trackKey(fact.artist, fact.title)] ?? []).map((f) => f.fact);
+    if (rejectSeedForTrackStory(fact.fact, fact.artist, fact.title, { trackPoolFacts: trackPool })) {
+      return false;
+    }
   }
   if (isCatalogMetadataSeed(fact.fact)) return false;
   // Last.fm playcounts — metadata only, never a stored story seed.
@@ -329,14 +345,14 @@ export function purgeInvalidBankFacts(): number {
   let removed = 0;
   for (const key of Object.keys(bank.byTrack)) {
     const pool = bank.byTrack[key] ?? [];
-    const filtered = pool.filter(isValidStoredFact);
+    const filtered = pool.filter((f) => isValidStoredFact(f, {}));
     removed += pool.length - filtered.length;
     if (filtered.length === 0) delete bank.byTrack[key];
     else bank.byTrack[key] = filtered;
   }
   for (const key of Object.keys(bank.byArtist)) {
     const pool = bank.byArtist[key] ?? [];
-    const filtered = pool.filter(isValidStoredFact);
+    const filtered = pool.filter((f) => isValidStoredFact(f, {}));
     removed += pool.length - filtered.length;
     if (filtered.length === 0) delete bank.byArtist[key];
     else bank.byArtist[key] = filtered;
@@ -371,6 +387,7 @@ export function ingestHarvestFacts(
     source?: StoredFact['source'];
     harvestSource?: string;
     minScore?: number;
+    llmInterest?: number;
   }>,
 ): number {
   const bank = loadBank();

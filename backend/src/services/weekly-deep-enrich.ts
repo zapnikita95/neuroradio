@@ -552,6 +552,7 @@ export async function runWeeklyDeepEnrich(
         openRouterModel: process.env.OPENROUTER_FACT_MODEL?.trim(),
         tavilyApiKey: mode === 'tavily' ? process.env.TAVILY_API_KEY?.trim() : undefined,
         perplexityApiKey: mode === 'perplexity' ? process.env.PERPLEXITY_API_KEY?.trim() : undefined,
+        weeklyBulk: true,
       });
       result.costUsd += deep?.costUsd ?? 0;
       if (deep?.fact) {

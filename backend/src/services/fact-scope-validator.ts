@@ -1,6 +1,6 @@
 import { factMentionsTitle, hasTrackContextSignal } from './fact-relevance.js';
 import { rejectSeedForTrackStory } from './fact-track-anchor.js';
-import { interestScore } from './reference-fact-quality.js';
+import { interestScore, isBoringFact } from './reference-fact-quality.js';
 
 export type FactScope = 'track' | 'album' | 'artist';
 
@@ -60,6 +60,73 @@ export interface ScopeValidationResult {
   ok: boolean;
   reason?: string;
   adjustedScope?: FactScope;
+}
+
+function titleSlugTokens(title: string): string[] {
+  return title
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}\s]/gu, ' ')
+    .split(/\s+/)
+    .filter((w) => w.length >= 3);
+}
+
+/** Wikipedia (песня)/(song) or songfacts slug — page is about this track, not a disambiguation. */
+export function isDedicatedSongPageUrl(url: string, title: string): boolean {
+  let decoded = url;
+  try {
+    decoded = decodeURIComponent(url);
+  } catch {
+    /* keep raw */
+  }
+  const u = decoded.toLowerCase();
+  if (/songfacts\.com\/facts\//.test(u)) {
+    const slug = titleSlugTokens(title).join('-');
+    return slug.length >= 3 && u.includes(slug.slice(0, 40));
+  }
+  if (!u.includes('wikipedia.org')) return false;
+  if (/list_of|disambiguation|\(значения\)|cover_versions|\(альбом\)|\(album\)/i.test(u)) {
+    return false;
+  }
+  if (/\((?:песня|song|single|сингл)\)/i.test(u)) {
+    const tTok = titleSlugTokens(title);
+    if (tTok.length === 0) return false;
+    const pathNorm = u.replace(/_/g, ' ');
+    return tTok.filter((t) => pathNorm.includes(t)).length >= Math.min(2, tTok.length);
+  }
+  const tTok = titleSlugTokens(title);
+  if (tTok.length === 0) return false;
+  const pathSlug = (u.split('/wiki/')[1]?.split('#')[0] ?? '').replace(/_/g, ' ').toLowerCase();
+  if (pathSlug.length < 4) return false;
+  return tTok.every((t) => pathSlug.includes(t));
+}
+
+/** Weekly bulk: accept facts from dedicated song pages without title in every sentence. */
+export function validateWeeklyBulkScopedFact(
+  candidate: ScopedFactCandidate,
+  artist: string,
+  title: string,
+  pageText: string,
+): ScopeValidationResult {
+  const fact = candidate.fact.trim();
+  if (fact.length < 35) return { ok: false, reason: 'too_short' };
+  if (!verifyQuoteInText(candidate.evidenceQuote, pageText)) {
+    return { ok: false, reason: 'quote_not_in_page' };
+  }
+  const onSongPage = isDedicatedSongPageUrl(candidate.evidenceUrl, title);
+  if (!onSongPage && rejectSeedForTrackStory(fact, artist, title)) {
+    return { ok: false, reason: 'not_anchored_to_track' };
+  }
+  if (isArtistBioBleedForTrackRequest(fact, title, candidate.scope) && !onSongPage) {
+    return { ok: false, reason: 'artist_bio_bleed' };
+  }
+  if (isBoringFact(fact) && !onSongPage) {
+    return { ok: false, reason: 'boring' };
+  }
+  const minInterest = onSongPage ? 2 : 4;
+  if (interestScore(fact) < minInterest && !factMentionsTitle(fact, title) && !onSongPage) {
+    return { ok: false, reason: 'low_interest' };
+  }
+  return { ok: true, adjustedScope: onSongPage ? 'track' : candidate.scope };
 }
 
 export function validateScopedFact(
@@ -122,6 +189,9 @@ export function heuristicExtractFactFromPage(
 
   for (const sentence of sentences) {
     if (/^\(SOUNDBITE|^GLASS ANIMALS:\s*\(Singing\)/i.test(sentence)) continue;
+    if (/^\[?(?:Video|Image)\s+\d+\]?/i.test(sentence.trim())) continue;
+    if (/^\*\s*!\[Image|^\|\s*\d{4}\s*\|/i.test(sentence.trim())) continue;
+    if (/^[\[\|*]/.test(sentence.trim()) && sentence.length < 80) continue;
     const lower = sentence.toLowerCase();
     const mentionsTitle = titleHit(sentence);
     const mentionsArtist = artistTokens.some((w) => lower.includes(w));

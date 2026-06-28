@@ -62,7 +62,7 @@ export function formatChunksWithProvenance(url: string, chunks: string[]): strin
 }
 
 /** Free article extraction via Jina Reader (no API key). */
-export async function extractPageViaJina(url: string, timeoutMs = 35000): Promise<ExtractedPage | null> {
+export async function extractPageViaJina(url: string, timeoutMs = 45000): Promise<ExtractedPage | null> {
   const target = url.trim();
   if (!target.startsWith('http')) return null;
   try {

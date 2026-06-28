@@ -6,6 +6,7 @@ import { runDeepSearch } from './deep-search-provider.js';
 import {
   heuristicExtractFactFromPage,
   validateScopedFact,
+  validateWeeklyBulkScopedFact,
   type ScopedFactCandidate,
 } from './fact-scope-validator.js';
 import { interestScore } from './reference-fact-quality.js';
@@ -24,7 +25,20 @@ export interface DeepFactResult {
   allSources: Array<{ url: string; title: string }>;
 }
 
-function buildDeepFactHuntSystemPrompt(): string {
+function buildDeepFactHuntSystemPrompt(weeklyBulk = false): string {
+  if (weeklyBulk) {
+    return `Ты — исследователь музыкальных фактов для пополнения банка фактов.
+Отвечай ТОЛЬКО валидным JSON.
+Допустимы: смысл песни, вдохновение, цитата артиста, история записи, необычный факт из songfacts/wikipedia/interview.
+НЕ нужны: только дата релиза, «вошла в альбом X», playcount, длительность.
+scope="track" — факт про ЭТОТ трек.
+evidenceQuote — дословная цитата из snippet.
+
+Формат успеха:
+{"fact":"русское предложение 35+ символов","scope":"track"|"album"|"artist","evidenceSnippetIndex":0,"evidenceQuote":"..."}
+Формат отказа:
+{"reject":true,"reason":"..."}`;
+  }
   return `Ты — исследователь музыкальных фактов с доступом к ПОЛНЫМ текстам статей и интервью.
 Отвечай ТОЛЬКО валидным JSON.
 ${FACT_HUNT_LLM_PROMPT_BLOCK}
@@ -47,6 +61,7 @@ async function extractFactWithLlm(
   rawSnippets: string[],
   openRouterKey: string,
   model: string,
+  weeklyBulk = false,
 ): Promise<ScopedFactCandidate | null> {
   const numbered = rawSnippets.map((s, i) => `${i}. ${s}`).join('\n');
   const userPrompt = `Артист: ${artist}
@@ -62,7 +77,7 @@ ${numbered}
       url: 'https://openrouter.ai/api/v1/chat/completions',
       apiKey: openRouterKey,
       model,
-      systemPrompt: buildDeepFactHuntSystemPrompt(),
+      systemPrompt: buildDeepFactHuntSystemPrompt(weeklyBulk),
       userPrompt,
       maxTokens: 600,
       temperature: 0.35,
@@ -83,10 +98,16 @@ ${numbered}
       evidenceQuote?: string;
       reject?: boolean;
     };
-    if (parsed.reject) return null;
+    if (parsed.reject) {
+      console.warn(`[deep-fact] llm extract reject: ${(parsed as { reason?: string }).reason ?? 'unknown'}`);
+      return null;
+    }
 
     const validated = validateLlmSeedCandidate(parsed, rawSnippets, artist, title);
-    if (!validated.ok) return null;
+    if (!validated.ok) {
+      console.warn(`[deep-fact] llm extract invalid: ${validated.reason ?? 'validation failed'}`);
+      return null;
+    }
 
     const snippet = rawSnippets[validated.snippetIndex] ?? '';
     const urlMatch = snippet.match(/\[(https?:\/\/[^\]]+)\]/);
@@ -114,6 +135,8 @@ export async function huntDeepFact(params: {
   openRouterModel?: string;
   tavilyApiKey?: string;
   perplexityApiKey?: string;
+  /** Weekly bulk: LLM extract + scope check only (skip heuristic junk + double verify). */
+  weeklyBulk?: boolean;
 }): Promise<DeepFactResult | null> {
   const search = await runDeepSearch({
     artist: params.artist,
@@ -140,41 +163,65 @@ export async function huntDeepFact(params: {
       search.rawSnippets,
       params.openRouterApiKey,
       model,
+      params.weeklyBulk === true,
     );
     llmCost = 0.003;
     if (llmCandidate) {
       const pageText =
         pageTextByUrl.get(llmCandidate.evidenceUrl) ?? search.rawSnippets.join('\n');
-      const scopeOk = validateScopedFact(llmCandidate, params.artist, params.title, pageText);
-      if (scopeOk.ok && params.openRouterApiKey) {
-        const verified = await verifyDeepFactWithLlm(
-          {
-            artist: params.artist,
-            title: params.title,
-            fact: llmCandidate.fact,
-            scope: llmCandidate.scope,
-            evidenceUrl: llmCandidate.evidenceUrl,
-            evidenceQuote: llmCandidate.evidenceQuote,
-            pageText,
-          },
-          params.openRouterApiKey,
-          model,
-        );
-        llmCost += 0.002;
-        if (verified.verified) {
+      const scopeOk = params.weeklyBulk
+        ? validateWeeklyBulkScopedFact(llmCandidate, params.artist, params.title, pageText)
+        : validateScopedFact(llmCandidate, params.artist, params.title, pageText);
+      if (scopeOk.ok) {
+        if (params.weeklyBulk) {
           candidate = llmCandidate;
-          if (verified.factRu && verified.factRu.length >= 35) {
-            candidate = { ...llmCandidate, fact: verified.factRu };
+          console.log(`[deep-fact] weekly llm ok scope=${llmCandidate.scope}`);
+        } else if (params.openRouterApiKey) {
+          const verified = await verifyDeepFactWithLlm(
+            {
+              artist: params.artist,
+              title: params.title,
+              fact: llmCandidate.fact,
+              scope: llmCandidate.scope,
+              evidenceUrl: llmCandidate.evidenceUrl,
+              evidenceQuote: llmCandidate.evidenceQuote,
+              pageText,
+            },
+            params.openRouterApiKey,
+            model,
+          );
+          llmCost += 0.002;
+          if (verified.verified) {
+            candidate = llmCandidate;
+            if (verified.factRu && verified.factRu.length >= 35) {
+              candidate = { ...llmCandidate, fact: verified.factRu };
+            }
+            console.log(`[deep-fact] llm+verify ok reason=${verified.reason}`);
+          } else {
+            console.warn(`[deep-fact] llm verify reject: ${verified.reason}`);
           }
-          console.log(`[deep-fact] llm+verify ok reason=${verified.reason}`);
-        } else {
-          console.warn(`[deep-fact] llm verify reject: ${verified.reason}`);
         }
       }
+    } else {
+      console.warn('[deep-fact] llm extract: no candidate from snippets');
     }
   }
 
-  if (!candidate) {
+  if (!candidate && params.weeklyBulk) {
+    for (const page of search.pages) {
+      if (!/songfacts\.com|wikipedia\.org/.test(page.url)) continue;
+      const h = heuristicExtractFactFromPage(page, params.artist, params.title);
+      if (!h) continue;
+      const pageText = pageTextByUrl.get(h.evidenceUrl) ?? page.text;
+      const check = validateWeeklyBulkScopedFact(h, params.artist, params.title, pageText);
+      if (!check.ok) continue;
+      candidate = h;
+      console.log(`[deep-fact] weekly heuristic ok (${page.url.slice(0, 60)})`);
+      break;
+    }
+  }
+
+  if (!candidate && !params.weeklyBulk) {
     const heuristicCandidates: ScopedFactCandidate[] = [];
     for (const page of search.pages) {
       if (page.url.startsWith('perplexity:')) continue;

@@ -93,7 +93,7 @@ function maybeRestartZeroWinBatch(): boolean {
   const last = getWeeklyDeepEnrichLastRun();
   const processed = progress?.processed ?? 0;
   const wins = progress?.wins ?? 0;
-  if (processed >= 3 && wins === 0) {
+  if (processed >= 25 && wins === 0) {
     console.log(
       `[weekly-deep-enrich] auto-restart: 0 wins after ${processed} tracks (broken batch)`,
     );
