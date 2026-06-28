@@ -94,7 +94,15 @@ function resolveEnrichMode(): DeepSearchMode {
 
 function useLlmVerify(): boolean {
   const flag = process.env.DEEP_ENRICH_LLM_VERIFY?.trim().toLowerCase();
-  return flag === 'true' || flag === '1' || flag === 'on';
+  if (flag === 'false' || flag === '0' || flag === 'off') return false;
+  if (flag === 'true' || flag === '1' || flag === 'on') return true;
+  // Railway: wiki+jina without LLM → almost always 0 wins on RU catalog
+  const onServer = Boolean(
+    process.env.RAILWAY_ENVIRONMENT?.trim() ||
+      process.env.RAILWAY_PROJECT_ID?.trim() ||
+      process.env.RAILWAY_GIT_COMMIT_SHA?.trim(),
+  );
+  return onServer && Boolean(process.env.OPEN_ROUTER_API_KEY?.trim());
 }
 
 function formatDurationSec(sec: number): string {
@@ -157,6 +165,24 @@ export function isWeeklyDeepEnrichInProgress(): boolean {
   if (!p || p.processed >= p.cap) return false;
   const age = Date.now() - new Date(p.startedAt).getTime();
   return age >= 0 && age < PROGRESS_MAX_AGE_MS;
+}
+
+export function getWeeklyDeepEnrichProgress(): WeeklyEnrichProgress | null {
+  return loadProgress();
+}
+
+export function clearWeeklyDeepEnrichProgress(): void {
+  clearProgress();
+}
+
+/** Drop in-progress batch and restart from scratch (after search pipeline fix). */
+export function restartWeeklyDeepEnrichBatch(): void {
+  clearProgress();
+  if (running) {
+    console.warn('[weekly-deep-enrich] restart requested while running — skip');
+    return;
+  }
+  void runWeeklyDeepEnrich();
 }
 
 type BankPool = Array<{ isHot?: boolean; isMetadata?: boolean; fact: string }>;

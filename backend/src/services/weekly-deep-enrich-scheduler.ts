@@ -5,7 +5,10 @@ import {
   persistWeeklyDeepEnrichQueueSnapshot,
   weeklyDeepEnrichRanSinceLastSunday,
   getWeeklyDeepEnrichLastRun,
+  getWeeklyDeepEnrichProgress,
   isWeeklyDeepEnrichInProgress,
+  clearWeeklyDeepEnrichProgress,
+  restartWeeklyDeepEnrichBatch,
 } from './weekly-deep-enrich.js';
 import {
   isWeeklyDeepEnrichEnabled,
@@ -85,6 +88,28 @@ function shouldRunCatchUp(): boolean {
   return true;
 }
 
+function maybeRestartZeroWinBatch(): boolean {
+  const progress = getWeeklyDeepEnrichProgress();
+  const last = getWeeklyDeepEnrichLastRun();
+  const processed = progress?.processed ?? 0;
+  const wins = progress?.wins ?? 0;
+  if (processed >= 3 && wins === 0) {
+    console.log(
+      `[weekly-deep-enrich] auto-restart: 0 wins after ${processed} tracks (broken batch)`,
+    );
+    clearWeeklyDeepEnrichProgress();
+    restartWeeklyDeepEnrichBatch();
+    return true;
+  }
+  if (last && (last.processed ?? 0) >= 10 && (last.wins ?? 0) === 0 && !progress) {
+    console.log('[weekly-deep-enrich] auto-restart: last run had 0 wins');
+    clearWeeklyDeepEnrichProgress();
+    restartWeeklyDeepEnrichBatch();
+    return true;
+  }
+  return false;
+}
+
 function scheduleCatchUpIfMissed(): void {
   if (catchupTimer) {
     clearTimeout(catchupTimer);
@@ -124,9 +149,12 @@ export function startWeeklyDeepEnrichScheduler(): void {
   if (!isWeeklyDeepEnrichEnabled() || started) return;
   started = true;
 
-  // Sunday timer immediately — survives independently of any catch-up run
   scheduleRecurringSunday();
-  scheduleCatchUpIfMissed();
+  if (maybeRestartZeroWinBatch()) {
+    console.log('[weekly-deep-enrich] scheduler started — zero-win batch restart');
+  } else {
+    scheduleCatchUpIfMissed();
+  }
 
   void (async () => {
     await maybeRefreshEraTop100Catalog('boot');

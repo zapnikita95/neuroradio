@@ -132,7 +132,7 @@ export async function huntDeepFact(params: {
   let llmCost = 0;
   const pageTextByUrl = new Map(search.pages.map((p) => [p.url, p.text]));
 
-  if (params.openRouterApiKey && search.rawSnippets.length >= 2) {
+  if (params.openRouterApiKey && search.rawSnippets.length >= (search.pages.length > 0 ? 1 : 2)) {
     const model = params.openRouterModel ?? 'deepseek/deepseek-chat-v3-0324';
     const llmCandidate = await extractFactWithLlm(
       params.artist,

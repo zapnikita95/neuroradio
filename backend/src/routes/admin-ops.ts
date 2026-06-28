@@ -4,6 +4,8 @@ import {
   getWeeklyDeepEnrichStatus,
   summarizeWeeklyDeepEnrichQueue,
   persistWeeklyDeepEnrichQueueSnapshot,
+  clearWeeklyDeepEnrichProgress,
+  restartWeeklyDeepEnrichBatch,
 } from '../services/weekly-deep-enrich.js';
 import { resolveWeeklyDeepEnrichCap } from '../services/weekly-deep-enrich-schedule.js';
 import { triggerWeeklyDeepEnrichNow } from '../services/weekly-deep-enrich-scheduler.js';
@@ -50,6 +52,21 @@ router.post('/weekly-deep-enrich/run', async (req, res) => {
   }
   void triggerWeeklyDeepEnrichNow('admin-api', { forceEra });
   res.json({ ok: true, started: true, forceEra });
+});
+
+/** POST /v1/admin/weekly-deep-enrich/retry  — clear progress, restart full batch */
+router.post('/weekly-deep-enrich/retry', async (req, res) => {
+  if (!requireAdmin(req, res)) return;
+  if (!isWeeklyDeepEnrichEnabled()) {
+    res.status(400).json({ error: 'WEEKLY_DEEP_ENRICH not enabled' });
+    return;
+  }
+  clearWeeklyDeepEnrichProgress();
+  if (isTelegramAdminNotifyConfigured()) {
+    void sendTelegramAdminMessage('🔄 Weekly deep enrich — полный перезапуск (search fix)');
+  }
+  restartWeeklyDeepEnrichBatch();
+  res.json({ ok: true, restarted: true });
 });
 
 /** POST /v1/admin/era-top100/rebuild */

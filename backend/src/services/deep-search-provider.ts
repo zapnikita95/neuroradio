@@ -10,6 +10,14 @@ import {
 const USER_AGENT = 'Mozilla/5.0 (compatible; MusicStoryDeepSearch/1.0; +https://efir-ai.ru)';
 
 /** DDG often blocked on RU/datacenter IPs — use native fetch for search/discovery. */
+function hasOutboundProxy(): boolean {
+  return Boolean(
+    process.env.OUTBOUND_PROXY?.trim() ||
+      process.env.HTTPS_PROXY?.trim() ||
+      process.env.HTTP_PROXY?.trim(),
+  );
+}
+
 async function directFetch(input: string | URL, init?: RequestInit): Promise<Response> {
   const prevHttp = process.env.HTTP_PROXY;
   const prevHttps = process.env.HTTPS_PROXY;
@@ -121,6 +129,10 @@ export function isRelevantDeepSearchHit(hit: SearchHit, artist: string, title: s
     return artistHit && (titleHit || titleInUrl);
   }
   if (hit.url.includes('wikipedia.org')) {
+    const cyrillic = /[\u0400-\u04FF]/.test(artist + title);
+    if (cyrillic) {
+      return artistHit || titleHit || titleInUrl || titleHits >= 1;
+    }
     return artistHit || titleHit || titleInUrl;
   }
   return artistHit && titleHit;
@@ -400,19 +412,23 @@ export async function discoverViaSongfacts(artist: string, title: string): Promi
 }
 
 /** Wikipedia works when DDG is blocked (common on RU/datacenter IPs). */
-export async function searchViaWikipedia(artist: string, title: string): Promise<SearchHit[]> {
-  const queries = [
-    `"${title}" ${artist} song`,
-    `${title} ${artist}`,
-    `${artist} band`,
-  ];
+export async function searchViaWikipedia(
+  artist: string,
+  title: string,
+  lang: 'en' | 'ru' = 'en',
+): Promise<SearchHit[]> {
+  const isRu = lang === 'ru';
+  const queries = isRu
+    ? [`${artist} ${title}`, `${title} песня`, `${artist} музыкант`, title]
+    : [`"${title}" ${artist} song`, `${title} ${artist}`, `${artist} band`];
   const hits: SearchHit[] = [];
   const seenTitles = new Set<string>();
+  const host = isRu ? 'ru.wikipedia.org' : 'en.wikipedia.org';
 
   for (const q of queries) {
     try {
       const apiUrl =
-        `https://en.wikipedia.org/w/api.php?action=query&list=search` +
+        `https://${host}/w/api.php?action=query&list=search` +
         `&srsearch=${encodeURIComponent(q)}&srlimit=4&format=json&origin=*`;
       const response = await directFetch(apiUrl, {
         headers: { 'User-Agent': USER_AGENT },
@@ -426,7 +442,7 @@ export async function searchViaWikipedia(artist: string, title: string): Promise
         const pageTitle = item.title?.trim();
         if (!pageTitle || seenTitles.has(pageTitle)) continue;
         seenTitles.add(pageTitle);
-        const wikiUrl = `https://en.wikipedia.org/wiki/${encodeURIComponent(pageTitle.replace(/ /g, '_'))}`;
+        const wikiUrl = `https://${host}/wiki/${encodeURIComponent(pageTitle.replace(/ /g, '_'))}`;
         hits.push({
           url: wikiUrl,
           title: pageTitle,
@@ -434,41 +450,52 @@ export async function searchViaWikipedia(artist: string, title: string): Promise
         });
       }
     } catch (err) {
-      console.warn(`[deep-search] wiki search fail q="${q.slice(0, 40)}" err=${err instanceof Error ? err.message : err}`);
+      console.warn(
+        `[deep-search] wiki ${lang} fail q="${q.slice(0, 40)}" err=${err instanceof Error ? err.message : err}`,
+      );
     }
   }
   return hits;
 }
 
+export async function searchViaWikipediaRu(artist: string, title: string): Promise<SearchHit[]> {
+  return searchViaWikipedia(artist, title, 'ru');
+}
+
 async function collectSearchHits(artist: string, title: string): Promise<SearchHit[]> {
-  const queries = flattenDeepSearchQueries(artist, title, 3);
+  const isRuTrack = /[\u0400-\u04FF]/.test(artist + title);
   const all: SearchHit[] = [];
 
-  for (const q of queries) {
-    const hits = await searchDdgHtml(q, 3);
-    all.push(...hits);
+  // Free sources that work on Railway without DDG/proxy
+  const [wikiEn, wikiRu, songfactsHits, geniusHits] = await Promise.all([
+    searchViaWikipedia(artist, title, 'en'),
+    isRuTrack ? searchViaWikipediaRu(artist, title) : Promise.resolve([]),
+    discoverViaSongfacts(artist, title),
+    discoverViaGeniusSearch(artist, title),
+  ]);
+  all.push(...wikiEn, ...wikiRu, ...songfactsHits, ...geniusHits);
+  if (wikiEn.length + wikiRu.length > 0) {
+    console.log(
+      `[deep-search] wiki en=${wikiEn.length} ru=${wikiRu.length} songfacts=${songfactsHits.length} genius=${geniusHits.length}`,
+    );
   }
 
-  if (all.length < 2) {
-    const wikiHits = await searchViaWikipedia(artist, title);
-    all.push(...wikiHits);
-    console.log(`[deep-search] wiki fallback hits=${wikiHits.length} (ddg=${all.length - wikiHits.length})`);
+  if (hasOutboundProxy()) {
+    const queries = flattenDeepSearchQueries(artist, title, 3);
+    for (const q of queries) {
+      all.push(...(await searchDdgHtml(q, 3)));
+    }
+  } else {
+    console.log('[deep-search] ddg skipped (no outbound proxy — Railway/local without VPN)');
   }
 
-  // NPR + Genius + Songfacts via Jina/HEAD (free, works when DDG blocked)
+  // NPR via Jina (free, works when DDG blocked)
   const nprHits = (await discoverViaNprSearch(artist, title)).filter((h) =>
     isRelevantDeepSearchHit(h, artist, title),
   );
   if (nprHits.length > 0) {
     all.push(...nprHits);
     console.log(`[deep-search] npr hits=${nprHits.length}`);
-  }
-  const geniusHits = await discoverViaGeniusSearch(artist, title);
-  if (geniusHits.length > 0) all.push(...geniusHits);
-  const songfactsHits = await discoverViaSongfacts(artist, title);
-  if (songfactsHits.length > 0) {
-    all.push(...songfactsHits);
-    console.log(`[deep-search] songfacts hit`);
   }
 
   const byUrl = new Map<string, SearchHit>();
