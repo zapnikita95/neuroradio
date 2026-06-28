@@ -8,7 +8,8 @@ import {
   normalizeFactForBankStorage,
   isGenericDeferredSongOpenerWithoutTitle,
   isEnglishOnlyFactForCyrillicTrack,
-  isFictionOrGameBleedFact,
+  isNonMusicDomainFact,
+  hasMusicDomainContext,
   isNonMusicWikiPageUrl,
 } from './web-snippet-accept.js';
 
@@ -133,8 +134,11 @@ export function validateWeeklyBulkScopedFact(
   if (isEnglishOnlyFactForCyrillicTrack(artist, title, fact)) {
     return { ok: false, reason: 'english_only_ru_track' };
   }
-  if (isFictionOrGameBleedFact(fact, artist, title)) {
-    return { ok: false, reason: 'fiction_or_game_bleed' };
+  if (isNonMusicDomainFact(fact, artist, title)) {
+    return { ok: false, reason: 'non_music_domain' };
+  }
+  if (!hasMusicDomainContext(fact, artist, title)) {
+    return { ok: false, reason: 'no_music_context' };
   }
   if (/[\u0400-\u04FF]/.test(title) && !factMentionsArtistLoose(fact, artist) && !factMentionsArtist(fact, artist)) {
     return { ok: false, reason: 'artist_not_in_fact' };
@@ -171,6 +175,12 @@ export function validateScopedFact(
   if (fact.length < 35) return { ok: false, reason: 'too_short' };
   if (!verifyQuoteInText(candidate.evidenceQuote, pageText)) {
     return { ok: false, reason: 'quote_not_in_page' };
+  }
+  if (isGenericDeferredSongOpenerWithoutTitle(fact, title)) {
+    return { ok: false, reason: 'generic_song_bleed' };
+  }
+  if (isNonMusicDomainFact(fact, artist, title)) {
+    return { ok: false, reason: 'non_music_domain' };
   }
   if (rejectSeedForTrackStory(fact, artist, title)) {
     return { ok: false, reason: 'not_anchored_to_track' };

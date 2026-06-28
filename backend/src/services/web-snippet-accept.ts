@@ -4,8 +4,10 @@ import {
   factMentionsOtherTrackTitle,
   factMentionsTitle,
   factNamesForeignEntity,
+  hasRussianTrackContextSignal,
   hasTrackContextSignal,
   isWebListicleJunk,
+  titleMentionVariants,
 } from './fact-relevance.js';
 import {
   interestScore,
@@ -186,42 +188,89 @@ export function isNonMusicWikiPageUrl(url: string): boolean {
     /* keep */
   }
   const u = decoded.toLowerCase();
-  return (
-    /mega_drive|mega\s*drive|\(game\)|\(video_game\)|\(игра\)|\(фильм\)|\(film\)|\(сериал\)|playstation|nintendo|sega|game_boy|xbox|super_nintendo|dreamcast/i.test(
+  if (
+    /\(game\)|\(video_game\)|\(игра\)|\(фильм\)|\(film\)|\(сериал\)|\(series\)|\(season\)|\(episode\)|\(character\)|\(franchise\)|\(медиафраншиза\)|\(personnage\)|\(born\)|\(city\)|\(river\)|\(company\)|\(plant\)|\(species\)|\(animal\)|\(insect\)|\(municipality\)|\(province\)|\(county\)|\(university\)|\(hospital\)|\(airport\)|\(stadium\)|\(anatomy\)|\(village\)|\(town\)|\(district\)|\(region\)|\(state\)|\(country\)|\(war\)|\(battle\)|\(treaty\)|\(formula\)|\(theorem\)|\(element\)/i.test(
       u,
-    ) ||
-    /disney[''\u2019]?s_aladdin|disney%E2%80%99s_aladdin/i.test(u) ||
-    /\(character\)|\(franchise\)|\(медиафраншиза\)|\(personnage\)/i.test(u)
-  );
+    )
+  ) {
+    return true;
+  }
+  if (
+    /mega_drive|mega\s*drive|playstation|nintendo|sega|game_boy|xbox|super_nintendo|dreamcast|video_game|visual_novel|light_novel/i.test(
+      u,
+    )
+  ) {
+    return true;
+  }
+  return false;
 }
 
-/** Game level / Disney character wiki — title token matched but not the music track. */
-export function isFictionOrGameBleedFact(fact: string, artist: string, title: string): boolean {
+const MUSIC_DOMAIN_RE =
+  /\b(?:песн(?:я|и|е|ю|ей)|трек(?:а|е|у|ом|ов)?|single|song|альбом|album|клип|music video|mv\b|сингл|запис\w*|recorded|released|выш\w+|дебют|chart|billboard|радио|стрим|spotify|feat\.|featuring|исполн\w*|групп\w*|band\b|rapper|rap\b|hip[- ]?hop|vocalist|produc\w*|songwriter|lyric|studio session|продюсер|музык\w*|композиц|мелоди|вокал|concert tour|world tour|grammy|eurovision|sanremo|soundtrack\b|music video|music group|duo\b|коллектив|лейбл|label\b)/i;
+
+const NON_MUSIC_DOMAIN_RE =
+  /\b(?:уровень\s+\d|level\s+\d|gameplay|video game|видеоигр|из\s+игры|platformer|boss fight|королевск\w*\s+страж|royal guard|охранник\w*|препятств|episode\s+\d|сериал\b|сезон\s+\d|season\s+\d|фильм\b|movie\b|character\b|franchise|mythology|legend\b|city of|population\b|capital of|dissertation|was born|died in|treatment plant|формул\w*|теорем\w*|element\b|compound\b|species\b|genus\b|anatomy|village in|municipality|province of|river in|mountain|stadium|airport|university|hospital|church|monastery|castle|fictional character|superhero|anime|manga|mega drive|playstation|nintendo|sega\b|опера\b|ballet|painting|sculpture|novel\b|poem\b|playwright|architect|politician|president|prime minister|general\b|battle of|world war|olympic|football|basketball|tennis player|actor\b|actress\b)/i;
+
+function titleQuotedInFact(fact: string, title: string): boolean {
+  if (!title.trim()) return false;
+  const variants = titleMentionVariants(title).filter((v) => v.length >= 3);
+  if (variants.length === 0) return false;
+  const quoted = [...fact.matchAll(/«([^»]{2,120})»/g)].map((m) => m[1]!.toLowerCase());
+  if (quoted.length === 0) return false;
+  return quoted.some((q) => variants.some((v) => q.includes(v.toLowerCase())));
+}
+
+/** Snippet without track context — reject obvious encyclopedia/game topics only. */
+function isClearlyNonMusicSnippet(fact: string): boolean {
   const t = fact.trim();
-  if (/\b(?:уровень\s+\d|level\s+\d+)\b/i.test(t)) return true;
-  if (/\b(?:аграб|agrabah)\b/i.test(t)) return true;
+  return NON_MUSIC_DOMAIN_RE.test(t) && !MUSIC_DOMAIN_RE.test(t);
+}
+
+/** Fact is about music (track/album/artist career) — not a random encyclopedia hit on the title word. */
+export function hasMusicDomainContext(fact: string, artist: string, title: string): boolean {
+  const t = fact.trim();
+  if (isGenericDeferredSongOpenerWithoutTitle(t, title)) return false;
+
+  const mentionsArtist = factMentionsArtist(t, artist) || factMentionsArtistLoose(t, artist);
+  const mentionsTitle = title.trim() ? factMentionsTitle(t, title) : false;
+
+  if (NON_MUSIC_DOMAIN_RE.test(t)) {
+    if (mentionsArtist && MUSIC_DOMAIN_RE.test(t)) return true;
+    if (titleQuotedInFact(t, title)) return true;
+    if (mentionsTitle && mentionsArtist && MUSIC_DOMAIN_RE.test(t)) return true;
+    return false;
+  }
+
+  if (mentionsArtist && MUSIC_DOMAIN_RE.test(t)) return true;
   if (
-    /\b(?:королевск\w*\s+страж|royal guard|mega drive|sega genesis|playstation|nintendo|video game|видеоигр|platformer|gameplay)\b/i.test(
+    mentionsArtist &&
+    /\b(?:band|group|групп\w*|rapper|singer|artist|duo|вокал|album|альбом|single|сингл|дебют|chart|musician|коллектив|лейбл|label)\b/i.test(
       t,
     )
   ) {
     return true;
   }
-  if (/\bdisney[''\u2019]?s?\s+aladdin\b/i.test(t)) return true;
-  const mentionsArtist = factMentionsArtist(t, artist) || factMentionsArtistLoose(t, artist);
-  if (mentionsArtist) return false;
-  if (/\b(?:охранник|препятств|босс|boss fight|сабл|кинжал|wooden pole)\b/i.test(t)) return true;
-  const titleKey = title.toLowerCase().replace(/[^\p{L}\p{N}]/gu, '');
-  if (/(?:алладдин|aladdin)/i.test(titleKey) && /(?:алладдин|aladdin)/i.test(t)) {
-    if (
-      !/\b(?:песн|трек|single|song|альбом|клип|musical|rapper|rap|hip[- ]?hop|исполн|групп|feat|сингл|запис)\b/i.test(
-        t,
-      )
-    ) {
-      return true;
-    }
+  if (titleQuotedInFact(t, title)) return true;
+  if (mentionsTitle && MUSIC_DOMAIN_RE.test(t)) return true;
+  if (
+    (hasRussianTrackContextSignal(t) || hasTrackContextSignal(t)) &&
+    (mentionsTitle || mentionsArtist)
+  ) {
+    return true;
   }
+  if (MUSIC_DOMAIN_RE.test(t) && (mentionsTitle || mentionsArtist)) return true;
   return false;
+}
+
+/** Reject facts that are not about music — games, cities, seasons, characters, etc. */
+export function isNonMusicDomainFact(fact: string, artist: string, title: string): boolean {
+  if (isGenericDeferredSongOpenerWithoutTitle(fact, title)) return true;
+  return !hasMusicDomainContext(fact, artist, title);
+}
+
+/** @deprecated Use {@link isNonMusicDomainFact}. */
+export function isFictionOrGameBleedFact(fact: string, artist: string, title: string): boolean {
+  return isNonMusicDomainFact(fact, artist, title);
 }
 
 function escapeRegExp(s: string): string {
@@ -287,7 +336,7 @@ export function isEnglishOnlyFactForCyrillicTrack(artist: string, title: string,
 export function isUnspeakableWebSeed(snippet: string): boolean {
   const trimmed = decodeHtmlEntities(snippet).trim();
   if (isWikiMarkupJunkFact(trimmed)) return true;
-  if (isFictionOrGameBleedFact(trimmed, '', '')) return true;
+  if (isClearlyNonMusicSnippet(trimmed)) return true;
   if (isCitationBibliographySeed(trimmed)) return true;
   if (isGenericConcertVenueSeed(trimmed)) return true;
   if (isLyricsPageSeed(trimmed)) return true;

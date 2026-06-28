@@ -7,6 +7,7 @@ import {
   type ExtractedPage,
 } from './page-content-extractor.js';
 import { isNonMusicWikiPageUrl } from './web-snippet-accept.js';
+import { isDedicatedSongPageUrl } from './fact-scope-validator.js';
 
 const USER_AGENT = 'Mozilla/5.0 (compatible; MusicStoryDeepSearch/1.0; +https://efir-ai.ru)';
 
@@ -162,11 +163,14 @@ export function strictSourceHitForTrack(hit: SearchHit, artist: string, title: s
   const artistInPage = aTok.filter((t) => t.length >= 3).some((t) => blob.includes(t));
   const genericTitle = tTok.length <= 1 && (tTok[0]?.length ?? 0) <= 12;
 
-  if (genericTitle) return artistInPage;
-  if (/[\u0400-\u04FF]/.test(artist + title)) {
-    return titleInPage && (artistInPage || aTok.length === 0);
-  }
-  return titleInPage || artistInPage;
+  const isMusicPageUrl = /\((?:song|single|album|ep|песня|сингл|альбом|мини[- ]?альбом)\)/i.test(hit.url);
+  if (isDedicatedSongPageUrl(hit.url, title)) return true;
+  if (isMusicPageUrl && titleInPage) return true;
+  if (artistInPage) return true;
+  if (genericTitle) return false;
+  // Title token on a random wiki page (game, city, character) — reject.
+  if (titleInPage && !artistInPage) return false;
+  return false;
 }
 
 export function scoreSearchHit(hit: SearchHit, artist: string, title: string): number {
