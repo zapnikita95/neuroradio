@@ -17,7 +17,27 @@ const DATA_DIR = process.env.ACCOUNT_DATA_DIR?.trim() || path.join(process.cwd()
 const BANK_PATH = path.join(DATA_DIR, 'facts-bank.json');
 const FEEDBACK_PATH = path.join(DATA_DIR, 'story-feedback.jsonl');
 const LAST_RUN_PATH = path.join(DATA_DIR, 'weekly-deep-enrich-last-run.json');
+const PROGRESS_PATH = path.join(DATA_DIR, 'weekly-deep-enrich-progress.json');
 const QUEUE_SNAPSHOT_PATH = path.join(DATA_DIR, 'weekly-deep-enrich-queue.json');
+const MSK_OFFSET_MS = 3 * 60 * 60 * 1000;
+const PROGRESS_TG_EVERY = parseInt(process.env.WEEKLY_DEEP_ENRICH_TG_EVERY ?? '10', 10);
+const PROGRESS_MAX_AGE_MS = parseInt(
+  process.env.WEEKLY_DEEP_ENRICH_PROGRESS_MAX_AGE_MS ?? String(12 * 60 * 60_000),
+  10,
+);
+
+interface WeeklyEnrichProgress {
+  startedAt: string;
+  cap: number;
+  processed: number;
+  wins: number;
+  errors: number;
+  costUsd: number;
+  mode: string;
+  llmVerify: boolean;
+  batchKeys: string[];
+  tracks: WeeklyDeepEnrichResult['tracks'];
+}
 
 export interface DeepEnrichTrack {
   artist: string;
@@ -75,6 +95,68 @@ function resolveEnrichMode(): DeepSearchMode {
 function useLlmVerify(): boolean {
   const flag = process.env.DEEP_ENRICH_LLM_VERIFY?.trim().toLowerCase();
   return flag === 'true' || flag === '1' || flag === 'on';
+}
+
+function formatDurationSec(sec: number): string {
+  const s = Math.max(0, Math.round(sec));
+  if (s < 60) return `${s} сек`;
+  if (s < 3600) return `${Math.round(s / 60)} мин`;
+  const h = Math.floor(s / 3600);
+  const m = Math.round((s % 3600) / 60);
+  return m > 0 ? `${h} ч ${m} мин` : `${h} ч`;
+}
+
+function formatMskTime(ms: number): string {
+  const d = new Date(ms + MSK_OFFSET_MS);
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCDate())} ${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())} MSK`;
+}
+
+/** Static estimate before run (Railway ddg_jina ≈30–50 s/track from prod logs). */
+export function estimateWeeklyEnrichDurationLabel(
+  cap: number,
+  mode: DeepSearchMode = resolveEnrichMode(),
+  llm = useLlmVerify(),
+): string {
+  const perTrackSec =
+    mode === 'tavily' ? 28 : mode === 'perplexity' ? 25 : mode === 'ddg_jina' ? (llm ? 42 : 35) : 30;
+  const minSec = cap * (perTrackSec - 10);
+  const maxSec = cap * (perTrackSec + 20);
+  return `${formatDurationSec(minSec)}–${formatDurationSec(maxSec)} (~${perTrackSec} сек/трек)`;
+}
+
+function formatEtaFromProgress(processed: number, total: number, startedMs: number): string {
+  if (processed < 2) return 'уточняется после 2–3 треков';
+  const elapsedSec = (Date.now() - startedMs) / 1000;
+  const perTrack = elapsedSec / processed;
+  const remainingSec = (total - processed) * perTrack;
+  return `${formatDurationSec(remainingSec)} → ~${formatMskTime(Date.now() + remainingSec * 1000)}`;
+}
+
+function loadProgress(): WeeklyEnrichProgress | null {
+  return loadJson<WeeklyEnrichProgress | null>(PROGRESS_PATH, null);
+}
+
+function saveProgress(p: WeeklyEnrichProgress): void {
+  fs.mkdirSync(DATA_DIR, { recursive: true });
+  fs.writeFileSync(PROGRESS_PATH, JSON.stringify(p, null, 2), 'utf8');
+}
+
+function clearProgress(): void {
+  try {
+    if (fs.existsSync(PROGRESS_PATH)) fs.unlinkSync(PROGRESS_PATH);
+  } catch {
+    /* ignore */
+  }
+}
+
+/** True if a run is active in this process or persisted on volume (survives redeploy). */
+export function isWeeklyDeepEnrichInProgress(): boolean {
+  if (running) return true;
+  const p = loadProgress();
+  if (!p || p.processed >= p.cap) return false;
+  const age = Date.now() - new Date(p.startedAt).getTime();
+  return age >= 0 && age < PROGRESS_MAX_AGE_MS;
 }
 
 type BankPool = Array<{ isHot?: boolean; isMetadata?: boolean; fact: string }>;
@@ -313,6 +395,12 @@ export async function sendWeeklyDeepEnrichBootDigest(): Promise<void> {
   const lastLine = last?.finishedAt
     ? `Последний прогон: ${last.finishedAt} (wins ${last.wins ?? 0}/${last.processed ?? 0})\n`
     : 'Последний прогон: ещё не было\n';
+  const inProgress = isWeeklyDeepEnrichInProgress();
+  const progress = loadProgress();
+  const progressLine = inProgress && progress
+    ? `🔄 Сейчас идёт: ${progress.processed}/${progress.cap} (wins ${progress.wins}) с ${progress.startedAt}\n`
+    : '';
+  const etaLine = `⏱ Оценка прогона cap=${cap}: ${estimateWeeklyEnrichDurationLabel(cap, resolveEnrichMode(), s.llmVerify)}\n`;
   const emptyHint =
     s.totalEligible === 0
       ? `\n⚠️ очередь пуста: bank=${s.bankTracks} треков, catalog=${s.catalogTracks}, era=${s.eraOverlay ? 'ok' : 'нет overlay'}`
@@ -320,6 +408,8 @@ export async function sendWeeklyDeepEnrichBootDigest(): Promise<void> {
   await sendTelegramAdminMessage(
     `📅 Weekly deep enrich (preview)\n` +
       lastLine +
+      progressLine +
+      etaLine +
       `Следующий прогон: ${s.nextRunMsk}\n` +
       `Cap: ${s.cap} | возьмёт: ${s.batchSize} из ${s.totalEligible} eligible\n` +
       `Bank: ${s.bankTracks} треков | catalog: ${s.catalogTracks} | era overlay: ${s.eraOverlay ? 'да' : 'нет'}\n` +
@@ -340,43 +430,92 @@ export async function runWeeklyDeepEnrich(
   }
   running = true;
   const cap = opts.cap ?? resolveWeeklyDeepEnrichCap();
+  const mode = resolveEnrichMode();
+  const llm = useLlmVerify();
+  const openRouterKey = llm ? process.env.OPEN_ROUTER_API_KEY?.trim() : undefined;
+
   const queue = buildWeeklyDeepEnrichQueue(cap * 3);
   const batch = queue.slice(0, cap);
 
   fs.mkdirSync(DATA_DIR, { recursive: true });
   fs.writeFileSync(QUEUE_SNAPSHOT_PATH, JSON.stringify({ builtAt: new Date().toISOString(), queue: batch }, null, 2));
 
-  const result: WeeklyDeepEnrichResult = {
-    cap,
-    queued: batch.length,
-    processed: 0,
-    wins: 0,
-    errors: 0,
-    costUsd: 0,
-    tracks: [],
-  };
+  const saved = loadProgress();
+  const canResume =
+    saved &&
+    saved.cap === cap &&
+    saved.processed > 0 &&
+    saved.processed < cap &&
+    Date.now() - new Date(saved.startedAt).getTime() < PROGRESS_MAX_AGE_MS;
+
+  const result: WeeklyDeepEnrichResult = canResume
+    ? {
+        cap: saved!.cap,
+        queued: batch.length,
+        processed: saved!.processed,
+        wins: saved!.wins,
+        errors: saved!.errors,
+        costUsd: saved!.costUsd,
+        tracks: saved!.tracks,
+      }
+    : {
+        cap,
+        queued: batch.length,
+        processed: 0,
+        wins: 0,
+        errors: 0,
+        costUsd: 0,
+        tracks: [],
+      };
+
+  const startedMs = canResume ? new Date(saved!.startedAt).getTime() : Date.now();
+  let startIndex = canResume ? saved!.processed : 0;
 
   if (opts.dryRun) {
     running = false;
     return result;
   }
 
-  const mode = resolveEnrichMode();
-  const llm = useLlmVerify();
-  const openRouterKey = llm ? process.env.OPEN_ROUTER_API_KEY?.trim() : undefined;
-
+  const durationLabel = estimateWeeklyEnrichDurationLabel(cap, mode, llm);
   console.log(
-    `[weekly-deep-enrich] start cap=${cap} mode=${mode} llmVerify=${llm} queue=${batch.length}`,
+    `[weekly-deep-enrich] start cap=${cap} mode=${mode} llmVerify=${llm} queue=${batch.length} resume=${canResume} from=${startIndex}`,
   );
+
   if (isTelegramAdminNotifyConfigured()) {
-    await sendTelegramAdminMessage(
-      `▶️ Weekly deep enrich START\n` +
-        `Cap: ${cap} | mode: ${mode} | LLM verify: ${llm ? 'on' : 'off'}\n` +
-        `Очередь: ${batch.length} треков`,
-    );
+    if (canResume) {
+      await sendTelegramAdminMessage(
+        `▶️ Weekly deep enrich RESUME\n` +
+          `[${result.processed}/${cap}] wins=${result.wins}\n` +
+          `Осталось: ${formatEtaFromProgress(result.processed, cap, startedMs)}\n` +
+          `Mode: ${mode} | LLM: ${llm ? 'on' : 'off'}`,
+      );
+    } else {
+      clearProgress();
+      await sendTelegramAdminMessage(
+        `▶️ Weekly deep enrich START\n` +
+          `Cap: ${cap} | mode: ${mode} | LLM verify: ${llm ? 'on' : 'off'}\n` +
+          `Очередь: ${batch.length} треков\n` +
+          `⏱ Оценка: ${durationLabel}\n` +
+          `Финиш ~${formatMskTime(startedMs + cap * 35 * 1000)} (среднее, 35 сек/трек)`,
+      );
+    }
   }
 
-  for (const row of batch) {
+  saveProgress({
+    startedAt: new Date(startedMs).toISOString(),
+    cap,
+    processed: result.processed,
+    wins: result.wins,
+    errors: result.errors,
+    costUsd: result.costUsd,
+    mode,
+    llmVerify: llm,
+    batchKeys: batch.map((r) => trackKey(r.artist, r.title)),
+    tracks: result.tracks,
+  });
+
+  for (let i = startIndex; i < batch.length; i += 1) {
+    const row = batch[i]!;
     result.processed += 1;
     try {
       const deep = await huntDeepFact({
@@ -412,6 +551,12 @@ export async function runWeeklyDeepEnrich(
         console.log(
           `[weekly-deep-enrich] WIN ${row.artist} — ${row.title}: ${deep.fact.slice(0, 90)}…`,
         );
+        if (isTelegramAdminNotifyConfigured()) {
+          await sendTelegramAdminMessage(
+            `✅ [${result.processed}/${cap}] ${row.artist} — ${row.title}\n` +
+              `${deep.fact.slice(0, 280)}${deep.fact.length > 280 ? '…' : ''}`,
+          );
+        }
       } else {
         result.tracks.push({
           artist: row.artist,
@@ -423,45 +568,79 @@ export async function runWeeklyDeepEnrich(
       }
     } catch (err) {
       result.errors += 1;
+      const errMsg = err instanceof Error ? err.message : String(err);
       result.tracks.push({
         artist: row.artist,
         title: row.title,
         reason: row.reason,
         ok: false,
-        error: err instanceof Error ? err.message : String(err),
+        error: errMsg,
       });
+      if (isTelegramAdminNotifyConfigured()) {
+        await sendTelegramAdminMessage(
+          `❌ [${result.processed}/${cap}] ${row.artist} — ${row.title}\n${errMsg.slice(0, 200)}`,
+        );
+      }
+    }
+
+    saveProgress({
+      startedAt: new Date(startedMs).toISOString(),
+      cap,
+      processed: result.processed,
+      wins: result.wins,
+      errors: result.errors,
+      costUsd: result.costUsd,
+      mode,
+      llmVerify: llm,
+      batchKeys: batch.map((r) => trackKey(r.artist, r.title)),
+      tracks: result.tracks,
+    });
+
+    const every = Math.max(1, PROGRESS_TG_EVERY);
+    if (
+      isTelegramAdminNotifyConfigured() &&
+      (result.processed % every === 0 || result.processed === cap)
+    ) {
+      const elapsedSec = (Date.now() - startedMs) / 1000;
+      await sendTelegramAdminMessage(
+        `📊 Weekly deep enrich ${result.processed}/${cap}\n` +
+          `Wins: ${result.wins} | пусто: ${result.processed - result.wins - result.errors} | ошибок: ${result.errors}\n` +
+          `Прошло: ${formatDurationSec(elapsedSec)} | осталось: ${formatEtaFromProgress(result.processed, cap, startedMs)}`,
+      );
     }
   }
 
+  clearProgress();
   const finishedAt = new Date().toISOString();
+  const totalSec = (Date.now() - startedMs) / 1000;
   fs.writeFileSync(
     LAST_RUN_PATH,
-    JSON.stringify({ ...result, finishedAt, mode }, null, 2),
+    JSON.stringify({ ...result, finishedAt, mode, durationSec: totalSec }, null, 2),
     'utf8',
   );
 
-  if (result.wins > 0) {
-    const lines = result.tracks
-      .filter((t) => t.ok && t.fact)
-      .slice(0, 15)
-      .map(
-        (t) =>
-          `• ${t.artist} — ${t.title}\n  ${t.fact!.slice(0, 120)}${t.fact!.length > 120 ? '…' : ''}`,
-      );
-    await sendTelegramAdminMessage(
-      `🎵 Weekly deep enrich (${mode})\n` +
-        `Wins: ${result.wins}/${result.processed} | $${result.costUsd.toFixed(3)}\n\n` +
-        lines.join('\n\n') +
-        (result.wins > 15 ? `\n\n…ещё ${result.wins - 15}` : ''),
+  const winLines = result.tracks
+    .filter((t) => t.ok && t.fact)
+    .slice(0, 12)
+    .map(
+      (t) =>
+        `• ${t.artist} — ${t.title}\n  ${t.fact!.slice(0, 100)}${t.fact!.length > 100 ? '…' : ''}`,
     );
-  } else {
+
+  if (isTelegramAdminNotifyConfigured()) {
     await sendTelegramAdminMessage(
-      `Weekly deep enrich: 0/${result.processed} wins (mode=${mode}). Queue exhausted or sources weak.`,
+      `🏁 Weekly deep enrich ГОТОВО (${mode})\n` +
+        `Wins: ${result.wins}/${result.processed} | ошибок: ${result.errors}\n` +
+        `Время: ${formatDurationSec(totalSec)} | $${result.costUsd.toFixed(3)}\n` +
+        `LLM verify: ${llm ? 'on' : 'off'}\n\n` +
+        (winLines.length > 0
+          ? winLines.join('\n\n') + (result.wins > 12 ? `\n\n…ещё ${result.wins - 12} win` : '')
+          : 'Ни одного факта не добавлено — источники слабые или DDG недоступен.'),
     );
   }
 
   console.log(
-    `[weekly-deep-enrich] done wins=${result.wins}/${result.processed} cost=$${result.costUsd.toFixed(3)}`,
+    `[weekly-deep-enrich] done wins=${result.wins}/${result.processed} cost=$${result.costUsd.toFixed(3)} duration=${formatDurationSec(totalSec)}`,
   );
   running = false;
   return result;

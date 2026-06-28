@@ -5,6 +5,7 @@ import {
   persistWeeklyDeepEnrichQueueSnapshot,
   weeklyDeepEnrichRanSinceLastSunday,
   getWeeklyDeepEnrichLastRun,
+  isWeeklyDeepEnrichInProgress,
 } from './weekly-deep-enrich.js';
 import {
   isWeeklyDeepEnrichEnabled,
@@ -88,6 +89,11 @@ function scheduleCatchUpIfMissed(): void {
   if (catchupTimer) {
     clearTimeout(catchupTimer);
     catchupTimer = null;
+  }
+  if (isWeeklyDeepEnrichInProgress()) {
+    console.log('[weekly-deep-enrich] catch-up — resume in-progress run on volume');
+    triggerWeeklyDeepEnrichNow('boot-resume-in-progress');
+    return;
   }
   if (!shouldRunCatchUp()) {
     const last = getWeeklyDeepEnrichLastRun();
