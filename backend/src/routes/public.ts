@@ -428,12 +428,12 @@ router.post('/harvest/stt', harvestSttUpload, async (req: Request, res: Response
 
   try {
     const t0 = Date.now();
-    const { transcribeSpeechElevenLabs } = await import('../services/elevenlabs-stt.js');
-    const out = await transcribeSpeechElevenLabs(buf, filename, { languageCode });
+    const { transcribeHarvestAudio } = await import('../services/harvest-stt.js');
+    const out = await transcribeHarvestAudio(buf, filename, { languageCode });
     res.json({
       ok: true,
       text: out.text,
-      provider: 'elevenlabs-scribe',
+      provider: out.provider,
       modelId: out.modelId,
       languageCode: out.languageCode,
       latencyMs: Date.now() - t0,
