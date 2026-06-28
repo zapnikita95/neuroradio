@@ -318,15 +318,6 @@ async function geminiJson(system, user, maxTokens = 4096) {
   return { parsed: JSON.parse(content), model, latencyMs: Date.now() - t0, usage: null };
 }
 
-function parseGroqRetryMs(msg) {
-  const m = msg.match(/try again in (?:(\d+)h)?(?:(\d+)m)?(?:([\d.]+)s)?/i);
-  if (!m) return null;
-  const h = Number(m[1] || 0);
-  const min = Number(m[2] || 0);
-  const s = Number(m[3] || 0);
-  return Math.round((h * 3600 + min * 60 + s) * 1000);
-}
-
 async function openRouterJson(system, user, maxTokens = 4096) {
   const apiKey = process.env.OPENROUTER_API_KEY?.trim();
   if (!apiKey) throw new Error('OPENROUTER_API_KEY missing');
@@ -363,46 +354,70 @@ async function openRouterJson(system, user, maxTokens = 4096) {
   return { parsed: JSON.parse(content), model, latencyMs: Date.now() - t0, usage: data.usage ?? null };
 }
 
+async function railwayLlmJson(system, user, maxTokens = 4096) {
+  const secret = process.env.WEBSITE_DEMO_SECRET?.trim();
+  if (!secret) throw new Error('WEBSITE_DEMO_SECRET missing');
+  const t0 = Date.now();
+  const res = await httpFetch(`${bffBaseUrl()}/v1/public/harvest/llm`, {
+    method: 'POST',
+    headers: {
+      'x-website-demo-secret': secret,
+      'content-type': 'application/json',
+    },
+    body: JSON.stringify({ system, user, maxTokens }),
+    signal: AbortSignal.timeout(180_000),
+  });
+  const raw = await res.text();
+  if (!res.ok) throw new Error(`Railway LLM ${res.status}: ${raw.slice(0, 400)}`);
+  const data = JSON.parse(raw);
+  if (!data.parsed) throw new Error('Railway LLM empty');
+  return {
+    parsed: data.parsed,
+    model: data.model || data.provider || 'railway',
+    latencyMs: data.latencyMs ?? Date.now() - t0,
+    usage: null,
+    provider: data.provider || 'railway',
+  };
+}
+
 async function llmJson(system, user, maxTokens = 4096) {
+  if (process.env.WEBSITE_DEMO_SECRET?.trim() && !hasFlag('llm-local')) {
+    try {
+      const out = await railwayLlmJson(system, user, maxTokens);
+      console.log(`[llm] railway ${out.provider}/${out.model} ${out.latencyMs}ms`);
+      return out;
+    } catch (err) {
+      console.warn(`[llm] railway: ${err instanceof Error ? err.message : err} → local`);
+    }
+  }
+
   const groqModels = [
     process.env.GROQ_FACT_MODEL?.trim(),
     'llama-3.1-8b-instant',
-    process.env.GROQ_MODEL?.trim(),
-    'llama-3.3-70b-versatile',
   ].filter(Boolean);
   let lastErr;
   for (const model of [...new Set(groqModels)]) {
-    for (let attempt = 1; attempt <= 2; attempt += 1) {
-      try {
-        return await groqJsonWithModel(system, user, maxTokens, model);
-      } catch (err) {
-        lastErr = err;
-        const msg = err instanceof Error ? err.message : String(err);
-        if (msg.includes('429') || msg.includes('rate_limit')) {
-          const waitMs = parseGroqRetryMs(msg);
-          if (waitMs && waitMs <= 90 * 60 * 1000 && attempt < 2) {
-            console.warn(`[llm] groq ${model} rate limit — wait ${Math.ceil(waitMs / 60000)} min`);
-            await sleepMs(waitMs + 3000);
-            continue;
-          }
-          console.warn(`[llm] groq ${model} rate limited — next model…`);
-          break;
-        }
-        throw err;
+    try {
+      return await groqJsonWithModel(system, user, maxTokens, model);
+    } catch (err) {
+      lastErr = err;
+      const msg = err instanceof Error ? err.message : String(err);
+      if (msg.includes('429') || msg.includes('rate_limit')) {
+        console.warn(`[llm] local groq ${model} rate limited — skip wait, next provider`);
+        continue;
       }
+      throw err;
     }
   }
   if (process.env.GEMINI_API_KEY?.trim()) {
     try {
-      console.warn('[llm] groq exhausted → gemini fallback');
       return await geminiJson(system, user, maxTokens);
     } catch (err) {
       lastErr = err;
-      console.warn(`[llm] gemini failed: ${err instanceof Error ? err.message : err}`);
+      console.warn(`[llm] gemini: ${err instanceof Error ? err.message : err}`);
     }
   }
   if (process.env.OPENROUTER_API_KEY?.trim()) {
-    console.warn('[llm] → openrouter fallback');
     return openRouterJson(system, user, maxTokens);
   }
   throw lastErr instanceof Error ? lastErr : new Error(String(lastErr));
@@ -609,10 +624,15 @@ async function processVideo(video, opts) {
 
   const transcriptPath = path.join(workDir, 'transcript.txt');
   let stt;
-  if (fs.existsSync(transcriptPath) && ['transcribed', 'extracted', 'ingesting', 'done'].includes(checkpoint.step)) {
-    const text = fs.readFileSync(transcriptPath, 'utf8').trim();
-    stt = { text, provider: 'checkpoint-resume', latencyMs: 0 };
-    console.log(`[stt] resume ${stt.text.length} chars`);
+  const savedTranscript = fs.existsSync(transcriptPath)
+    ? fs.readFileSync(transcriptPath, 'utf8').trim()
+    : '';
+  if (savedTranscript.length > 100) {
+    stt = { text: savedTranscript, provider: 'checkpoint-resume', latencyMs: 0 };
+    console.log(`[stt] resume ${stt.text.length} chars (transcript.txt)`);
+    if (!['transcribed', 'extracted', 'extracted-partial', 'ingesting', 'done'].includes(checkpoint.step)) {
+      saveCheckpoint(workDir, { step: 'transcribed', ingestedFingerprints: [...ingestedSet] });
+    }
   } else {
     stt = await transcribeAudio(audioPath, opts);
     fs.writeFileSync(transcriptPath, stt.text, 'utf8');
@@ -622,21 +642,33 @@ async function processVideo(video, opts) {
 
   const factsRawPath = path.join(workDir, 'facts-raw.json');
   let llm;
-  if (fs.existsSync(factsRawPath) && ['extracted', 'ingesting', 'done'].includes(checkpoint.step)) {
+  if (fs.existsSync(factsRawPath)) {
     llm = JSON.parse(fs.readFileSync(factsRawPath, 'utf8'));
-    console.log(`[llm] resume ${llm.facts?.length ?? 0} facts`);
+    console.log(`[llm] resume ${llm.facts?.length ?? 0} facts (facts-raw.json)`);
+    if (!llm.verified && llm.facts?.length) {
+      try {
+        llm.facts = await verifyFactsQualityWithLlm(llm.facts, meta.title);
+        llm.verified = true;
+        fs.writeFileSync(factsRawPath, JSON.stringify(llm, null, 2), 'utf8');
+        saveCheckpoint(workDir, { step: 'extracted', ingestedFingerprints: [...ingestedSet] });
+      } catch (err) {
+        console.warn(`[llm] quality verify skipped: ${err instanceof Error ? err.message : err}`);
+      }
+    }
   } else {
     llm = await extractFactsWithLlm({
       transcript: stt.text,
       videoTitle: meta.title,
       channelName: meta.channel,
     });
+    fs.writeFileSync(factsRawPath, JSON.stringify({ ...llm, verified: false }, null, 2), 'utf8');
+    saveCheckpoint(workDir, { step: 'extracted-partial', ingestedFingerprints: [...ingestedSet] });
+    console.log(`[llm] extracted ${llm.facts.length} facts → saved facts-raw.json`);
     try {
       llm.facts = await verifyFactsQualityWithLlm(llm.facts, meta.title);
+      llm.verified = true;
     } catch (err) {
-      console.warn(
-        `[llm] quality verify skipped: ${err instanceof Error ? err.message : err}`,
-      );
+      console.warn(`[llm] quality verify skipped: ${err instanceof Error ? err.message : err}`);
     }
     fs.writeFileSync(factsRawPath, JSON.stringify(llm, null, 2), 'utf8');
     saveCheckpoint(workDir, { step: 'extracted', ingestedFingerprints: [...ingestedSet] });

@@ -459,6 +459,42 @@ router.post('/harvest/stt', harvestSttUpload, async (req: Request, res: Response
   }
 });
 
+router.post('/harvest/llm', express.json({ limit: '512kb' }), async (req: Request, res: Response) => {
+  const secret = String(req.headers['x-website-demo-secret'] ?? '');
+  const expected = process.env.WEBSITE_DEMO_SECRET?.trim();
+  if (!expected || secret !== expected) {
+    res.status(403).json({ error: 'forbidden' });
+    return;
+  }
+
+  const system = typeof req.body?.system === 'string' ? req.body.system.trim() : '';
+  const user = typeof req.body?.user === 'string' ? req.body.user.trim() : '';
+  const maxTokens = Math.min(Math.max(Number(req.body?.maxTokens) || 4096, 256), 8192);
+  if (!system || !user) {
+    res.status(400).json({ error: 'system and user required' });
+    return;
+  }
+
+  try {
+    const t0 = Date.now();
+    const { harvestLlmJson } = await import('../services/harvest-llm.js');
+    const out = await harvestLlmJson({ system, user, maxTokens });
+    res.json({
+      ok: true,
+      parsed: out.parsed,
+      provider: out.provider,
+      model: out.model,
+      latencyMs: Date.now() - t0,
+    });
+  } catch (err) {
+    console.error('[public/harvest/llm]', err instanceof Error ? err.message : err);
+    res.status(502).json({
+      error: 'llm_failed',
+      detail: err instanceof Error ? err.message : String(err),
+    });
+  }
+});
+
 /** Offline website demo audio — ElevenLabs via Railway (local RF gets Cloudflare 403). */
 router.post('/website-demo/tts', async (req: Request, res: Response) => {
   const secret = String(req.headers['x-website-demo-secret'] ?? '');
