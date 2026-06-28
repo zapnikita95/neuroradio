@@ -1,6 +1,11 @@
-import { factMentionsTitle, hasTrackContextSignal } from './fact-relevance.js';
-import { rejectSeedForTrackStory } from './fact-track-anchor.js';
+import { factMentionsArtist, factMentionsTitle, hasTrackContextSignal } from './fact-relevance.js';
+import { hasAnchoredTrackContext, rejectSeedForTrackStory } from './fact-track-anchor.js';
 import { interestScore, isBoringFact } from './reference-fact-quality.js';
+import {
+  isSpeakableReferenceFact,
+  isWikiMarkupJunkFact,
+  sanitizeHarvestFactText,
+} from './web-snippet-accept.js';
 
 export type FactScope = 'track' | 'album' | 'artist';
 
@@ -100,33 +105,47 @@ export function isDedicatedSongPageUrl(url: string, title: string): boolean {
   return tTok.every((t) => pathSlug.includes(t));
 }
 
-/** Weekly bulk: accept facts from dedicated song pages without title in every sentence. */
+/** Weekly bulk: harvest only speakable facts anchored to this track. */
 export function validateWeeklyBulkScopedFact(
   candidate: ScopedFactCandidate,
   artist: string,
   title: string,
   pageText: string,
 ): ScopeValidationResult {
-  const fact = candidate.fact.trim();
+  const fact = sanitizeHarvestFactText(candidate.fact);
   if (fact.length < 35) return { ok: false, reason: 'too_short' };
+  if (isWikiMarkupJunkFact(fact)) return { ok: false, reason: 'wiki_ui_junk' };
+  if (/list_of|cover_versions|disambiguation|\(значения\)/i.test(candidate.evidenceUrl)) {
+    return { ok: false, reason: 'wrong_wiki_page' };
+  }
   if (!verifyQuoteInText(candidate.evidenceQuote, pageText)) {
     return { ok: false, reason: 'quote_not_in_page' };
   }
-  const onSongPage = isDedicatedSongPageUrl(candidate.evidenceUrl, title);
-  if (!onSongPage && rejectSeedForTrackStory(fact, artist, title)) {
+  if (rejectSeedForTrackStory(fact, artist, title)) {
     return { ok: false, reason: 'not_anchored_to_track' };
   }
-  if (isArtistBioBleedForTrackRequest(fact, title, candidate.scope) && !onSongPage) {
+  if (isArtistBioBleedForTrackRequest(fact, title, candidate.scope)) {
     return { ok: false, reason: 'artist_bio_bleed' };
   }
-  if (isBoringFact(fact) && !onSongPage) {
+  if (
+    title.trim() &&
+    !factMentionsTitle(fact, title) &&
+    !hasAnchoredTrackContext(fact, title) &&
+    !(onSongPage(candidate.evidenceUrl, title) && factMentionsArtist(fact, artist) && hasTrackContextSignal(fact))
+  ) {
+    return { ok: false, reason: 'not_about_this_track' };
+  }
+  if (!isSpeakableReferenceFact(fact, artist, title)) {
+    return { ok: false, reason: 'not_speakable' };
+  }
+  if (isBoringFact(fact) && interestScore(fact) < 5) {
     return { ok: false, reason: 'boring' };
   }
-  const minInterest = onSongPage ? 2 : 4;
-  if (interestScore(fact) < minInterest && !factMentionsTitle(fact, title) && !onSongPage) {
-    return { ok: false, reason: 'low_interest' };
-  }
-  return { ok: true, adjustedScope: onSongPage ? 'track' : candidate.scope };
+  return { ok: true, adjustedScope: 'track' };
+}
+
+function onSongPage(url: string, title: string): boolean {
+  return isDedicatedSongPageUrl(url, title);
 }
 
 export function validateScopedFact(

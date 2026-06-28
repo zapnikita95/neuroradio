@@ -141,9 +141,43 @@ export function isWrongEntityDisambiguation(snippet: string, artist: string): bo
   return false;
 }
 
+/** Strip markdown/wiki chrome from Jina page extracts before storing or speaking. */
+export function sanitizeHarvestFactText(raw: string): string {
+  return decodeHtmlEntities(raw)
+    .replace(/!\[[^\]]*\]\([^)]+\)/g, '')
+    .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
+    .replace(/\[\[\d+\]\]\([^)]+\)/g, '')
+    .replace(/#cite_note-\d+\)?/g, '')
+    .replace(/\[\d+\]/g, '')
+    .replace(/\*\*\[\^\]\([^)]+\)\*\*/g, '')
+    .replace(/\[\[edit\][^\]]*\]/gi, '')
+    .replace(/\*{2,}/g, '')
+    .replace(/\|/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+/** Wikipedia table/nav junk — not a fact sentence. */
+export function isWikiMarkupJunkFact(fact: string): boolean {
+  const trimmed = sanitizeHarvestFactText(fact);
+  if (trimmed.length < 35) return true;
+  if (/служебная:указатель|найти страницы, начинающиеся|pages that start with/i.test(trimmed)) {
+    return true;
+  }
+  if (/\[\[edit\]|edit section:/i.test(trimmed)) return true;
+  if (/^\s*видеоклип\s*---|логотип youtube|upload\.wikimedia\.org/i.test(trimmed)) return true;
+  if (/^[\[\|\*]{2,}/.test(trimmed)) return true;
+  if (/\bcite_ref-\d+\b/i.test(trimmed)) return true;
+  if (/^["[]/.test(trimmed) && /interview with max cavalera|nailbomb/i.test(trimmed)) return true;
+  if (/^youtube\.?\s*$/i.test(trimmed) || /^youtube\.\[\[/i.test(trimmed)) return true;
+  if (/list_of|cover_versions/i.test(trimmed)) return true;
+  return false;
+}
+
 /** SEO, Reddit, platform UI — not a speakable story seed. */
 export function isUnspeakableWebSeed(snippet: string): boolean {
   const trimmed = decodeHtmlEntities(snippet).trim();
+  if (isWikiMarkupJunkFact(trimmed)) return true;
   if (isCitationBibliographySeed(trimmed)) return true;
   if (isGenericConcertVenueSeed(trimmed)) return true;
   if (isLyricsPageSeed(trimmed)) return true;

@@ -11,6 +11,7 @@ import {
 } from './fact-scope-validator.js';
 import { interestScore } from './reference-fact-quality.js';
 import { verifyDeepFactWithLlm } from './fact-deep-verify.js';
+import { sanitizeHarvestFactText } from './web-snippet-accept.js';
 
 export interface DeepFactResult {
   fact: string;
@@ -210,6 +211,7 @@ export async function huntDeepFact(params: {
   if (!candidate && params.weeklyBulk) {
     for (const page of search.pages) {
       if (!/songfacts\.com|wikipedia\.org/.test(page.url)) continue;
+      if (/list_of|cover_versions|disambiguation|\(значения\)/i.test(page.url)) continue;
       const h = heuristicExtractFactFromPage(page, params.artist, params.title);
       if (!h) continue;
       const pageText = pageTextByUrl.get(h.evidenceUrl) ?? page.text;
@@ -264,11 +266,14 @@ export async function huntDeepFact(params: {
 
   if (!candidate) return null;
 
+  const cleanFact = params.weeklyBulk ? sanitizeHarvestFactText(candidate.fact) : candidate.fact.trim();
+  if (cleanFact.length < 35) return null;
+
   const pageText =
     pageTextByUrl.get(candidate.evidenceUrl) ?? search.rawSnippets.join('\n');
 
   return {
-    fact: candidate.fact,
+    fact: cleanFact,
     scope: candidate.scope,
     evidenceUrl: candidate.evidenceUrl,
     evidenceQuote: candidate.evidenceQuote,
