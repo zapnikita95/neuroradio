@@ -1,10 +1,13 @@
 import { factMentionsArtist, factMentionsTitle, hasTrackContextSignal } from './fact-relevance.js';
-import { hasAnchoredTrackContext, rejectSeedForTrackStory } from './fact-track-anchor.js';
+import { rejectSeedForTrackStory } from './fact-track-anchor.js';
 import { interestScore, isBoringFact } from './reference-fact-quality.js';
 import {
   isSpeakableReferenceFact,
   isWikiMarkupJunkFact,
   sanitizeHarvestFactText,
+  normalizeFactForBankStorage,
+  isGenericDeferredSongOpenerWithoutTitle,
+  isEnglishOnlyFactForCyrillicTrack,
 } from './web-snippet-accept.js';
 
 export type FactScope = 'track' | 'album' | 'artist';
@@ -112,7 +115,7 @@ export function validateWeeklyBulkScopedFact(
   title: string,
   pageText: string,
 ): ScopeValidationResult {
-  const fact = sanitizeHarvestFactText(candidate.fact);
+  const fact = normalizeFactForBankStorage(artist, title, candidate.fact);
   if (fact.length < 35) return { ok: false, reason: 'too_short' };
   if (isWikiMarkupJunkFact(fact)) return { ok: false, reason: 'wiki_ui_junk' };
   if (/list_of|cover_versions|disambiguation|\(значения\)/i.test(candidate.evidenceUrl)) {
@@ -120,6 +123,12 @@ export function validateWeeklyBulkScopedFact(
   }
   if (!verifyQuoteInText(candidate.evidenceQuote, pageText)) {
     return { ok: false, reason: 'quote_not_in_page' };
+  }
+  if (isGenericDeferredSongOpenerWithoutTitle(fact, title)) {
+    return { ok: false, reason: 'generic_song_bleed' };
+  }
+  if (isEnglishOnlyFactForCyrillicTrack(artist, title, fact)) {
+    return { ok: false, reason: 'english_only_ru_track' };
   }
   if (rejectSeedForTrackStory(fact, artist, title)) {
     return { ok: false, reason: 'not_anchored_to_track' };
@@ -130,10 +139,9 @@ export function validateWeeklyBulkScopedFact(
   if (
     title.trim() &&
     !factMentionsTitle(fact, title) &&
-    !hasAnchoredTrackContext(fact, title) &&
-    !(onSongPage(candidate.evidenceUrl, title) && factMentionsArtist(fact, artist) && hasTrackContextSignal(fact))
+    !isDedicatedSongPageUrl(candidate.evidenceUrl, title)
   ) {
-    return { ok: false, reason: 'not_about_this_track' };
+    return { ok: false, reason: 'title_not_in_fact' };
   }
   if (!isSpeakableReferenceFact(fact, artist, title)) {
     return { ok: false, reason: 'not_speakable' };
@@ -142,10 +150,6 @@ export function validateWeeklyBulkScopedFact(
     return { ok: false, reason: 'boring' };
   }
   return { ok: true, adjustedScope: 'track' };
-}
-
-function onSongPage(url: string, title: string): boolean {
-  return isDedicatedSongPageUrl(url, title);
 }
 
 export function validateScopedFact(

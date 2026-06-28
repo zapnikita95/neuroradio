@@ -19,7 +19,7 @@ import {
   isMetadataHarvestFact,
   isArtistFormationBioSeed,
 } from './reference-fact-quality.js';
-import { isSpeakableReferenceFact, isArtistIdentityBioSnippet, isWikiMarkupJunkFact, sanitizeHarvestFactText } from './web-snippet-accept.js';
+import { isSpeakableReferenceFact, isArtistIdentityBioSnippet, isWikiMarkupJunkFact, sanitizeHarvestFactText, normalizeFactForBankStorage, isGenericDeferredSongOpenerWithoutTitle, isEnglishOnlyFactForCyrillicTrack } from './web-snippet-accept.js';
 import { factsTooSimilar, type FactScope } from './fact-picker.js';
 import {
   classifyFactTopic,
@@ -269,7 +269,7 @@ function buildStoredFact(
     llmInterest?: number;
   },
 ): StoredFact | null {
-  const trimmed = sanitizeHarvestFactText(item.fact);
+  const trimmed = normalizeFactForBankStorage(artist, title, item.fact);
   if (trimmed.length < 35) return null;
   if (isListeningStatsFact(trimmed)) return null;
   const llmGate = item.llmInterest != null && Number.isFinite(item.llmInterest);
@@ -299,16 +299,34 @@ function buildStoredFact(
     addedAt: Date.now(),
   };
   if (!isValidStoredFact(draft, { llmHarvest: llmGate })) return null;
+  if (
+    item.scope !== 'artist' &&
+    isDuplicateFactOnOtherTrack(artist, title, trimmed, loadBank())
+  ) {
+    return null;
+  }
   return draft;
+}
+
+function isDuplicateFactOnOtherTrack(artist: string, title: string, factText: string, bank: FactBankFile): boolean {
+  const fp = factFingerprint(factText);
+  const myKey = trackKey(artist, title);
+  for (const [k, pool] of Object.entries(bank.byTrack)) {
+    if (k === myKey) continue;
+    if ((pool ?? []).some((f) => factFingerprint(f.fact) === fp)) return true;
+  }
+  return false;
 }
 
 function isValidStoredFact(
   fact: StoredFact,
   options: { llmHarvest?: boolean } = {},
 ): boolean {
-  const text = sanitizeHarvestFactText(fact.fact);
+  const text = normalizeFactForBankStorage(fact.artist, fact.title, fact.fact);
   if (text.length < 35) return false;
   if (isWikiMarkupJunkFact(text)) return false;
+  if (isGenericDeferredSongOpenerWithoutTitle(text, fact.title)) return false;
+  if (isEnglishOnlyFactForCyrillicTrack(fact.artist, fact.title, text)) return false;
   if (isAmbiguousCommonWordArtist(fact.artist) && !factMentionsArtistAsEntity(text, fact.artist)) {
     return false;
   }
@@ -352,8 +370,7 @@ function isValidStoredFact(
   if (
     fact.scope === 'track' &&
     fact.title.trim() &&
-    !factMentionsTitle(text, fact.title) &&
-    !hasAnchoredTrackContext(text, fact.title)
+    !factMentionsTitle(text, fact.title)
   ) {
     return false;
   }
@@ -365,7 +382,7 @@ function isValidStoredFact(
 }
 
 function normalizeStoredFactText(f: StoredFact): StoredFact {
-  const clean = sanitizeHarvestFactText(f.fact);
+  const clean = normalizeFactForBankStorage(f.artist, f.title, f.fact);
   return clean !== f.fact && clean.length >= 35 ? { ...f, fact: clean } : f;
 }
 

@@ -11,7 +11,7 @@ import {
 } from './fact-scope-validator.js';
 import { interestScore } from './reference-fact-quality.js';
 import { verifyDeepFactWithLlm } from './fact-deep-verify.js';
-import { sanitizeHarvestFactText } from './web-snippet-accept.js';
+import { normalizeFactForBankStorage } from './web-snippet-accept.js';
 
 export interface DeepFactResult {
   fact: string;
@@ -32,8 +32,9 @@ function buildDeepFactHuntSystemPrompt(weeklyBulk = false): string {
 Отвечай ТОЛЬКО валидным JSON.
 Допустимы: смысл песни, вдохновение, цитата артиста, история записи, необычный факт из songfacts/wikipedia/interview.
 НЕ нужны: только дата релиза, «вошла в альбом X», playcount, длительность.
-scope="track" — факт про ЭТОТ трек.
+scope="track" — факт про ЭТОТ трек (название трека должно быть в fact или явно следовать из контекста).
 evidenceQuote — дословная цитата из snippet.
+Если артист/трек кириллицей — fact только на русском; имена артистов кириллицей (Элджей, не Eldzhey).
 
 Формат успеха:
 {"fact":"русское предложение 35+ символов","scope":"track"|"album"|"artist","evidenceSnippetIndex":0,"evidenceQuote":"..."}
@@ -266,7 +267,9 @@ export async function huntDeepFact(params: {
 
   if (!candidate) return null;
 
-  const cleanFact = params.weeklyBulk ? sanitizeHarvestFactText(candidate.fact) : candidate.fact.trim();
+  const cleanFact = params.weeklyBulk
+    ? normalizeFactForBankStorage(params.artist, params.title, candidate.fact)
+    : candidate.fact.trim();
   if (cleanFact.length < 35) return null;
 
   const pageText =

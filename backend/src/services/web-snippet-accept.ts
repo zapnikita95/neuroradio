@@ -20,6 +20,7 @@ import {
   isArtistFormationBioSeed,
 } from './reference-fact-quality.js';
 import { isTrackTitleAnchoredSeed } from './fact-track-anchor.js';
+import { lookupArtistPronunciation } from './artist-pronunciation.js';
 
 const LOW_QUALITY_WEB_PREFIX =
   /^(?:Explore songs|Be the first to comment|Provided to YouTube|Nobody|Add your thoughts|Watch exclusive videos|There have been few stars)/i;
@@ -174,6 +175,65 @@ export function isWikiMarkupJunkFact(fact: string): boolean {
   if (/w\/index\.php\?title=|action=edit&section=/i.test(trimmed)) return true;
   if ((trimmed.match(/https?:\/\//g) ?? []).length >= 2) return true;
   return false;
+}
+
+function escapeRegExp(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function displayRuPronunciation(ru: string): string {
+  const clean = ru.replace(/\+/g, '').trim();
+  if (!clean) return clean;
+  return clean.charAt(0).toUpperCase() + clean.slice(1);
+}
+
+/** Latin artist spellings → Cyrillic for bank/TTS (Eldzhey → Элджей). */
+export function normalizeFactForBankStorage(artist: string, title: string, raw: string): string {
+  let t = sanitizeHarvestFactText(raw).replace(/[\u200B-\u200D\uFEFF\uFFFD]/g, '');
+  const names = new Set<string>();
+  for (const part of artist.split(/\s*&\s*/)) names.add(part.trim());
+  names.add(artist.trim());
+  for (const name of names) {
+    if (!name) continue;
+    const entry = lookupArtistPronunciation(name);
+    if (!entry) continue;
+    const ru = displayRuPronunciation(entry.ru);
+    const variants = [name, ...(entry.aliases ?? [])];
+    for (const v of variants) {
+      if (v.length < 3) continue;
+      t = t.replace(new RegExp(`\\b${escapeRegExp(v)}\\b`, 'gi'), ru);
+    }
+  }
+  for (const extra of ['Feduk', 'Фeduk']) {
+    const entry = lookupArtistPronunciation(extra);
+    if (entry) {
+      const ru = displayRuPronunciation(entry.ru);
+      t = t.replace(new RegExp(`\\b${escapeRegExp(extra)}\\b`, 'gi'), ru);
+    }
+  }
+  return t.replace(/\s+/g, ' ').trim();
+}
+
+/** «The song became…» on artist wiki — not about the requested track. */
+export function isGenericDeferredSongOpenerWithoutTitle(fact: string, title: string): boolean {
+  if (factMentionsTitle(fact, title)) return false;
+  const t = fact.trim();
+  return (
+    /^(?:The song|The video|The single|The track)\b/i.test(t) ||
+    /\bmost[- ]watched\b.*\b(?:russian|language)\b.*\byoutube\b/i.test(t) ||
+    /\bviral sensation\b.*\b(?:youtube|most[- ]watched)\b/i.test(t) ||
+    /\b(?:imya|имя)\s*505\b/i.test(t)
+  );
+}
+
+/** RU catalog track but fact is English boilerplate without naming the title. */
+export function isEnglishOnlyFactForCyrillicTrack(artist: string, title: string, fact: string): boolean {
+  if (!/[\u0400-\u04FF]/.test(`${artist} ${title}`)) return false;
+  if (factMentionsTitle(fact, title)) return false;
+  const letters = fact.match(/\p{L}/gu)?.length ?? 0;
+  if (letters < 20) return false;
+  const cyr = fact.match(/[\u0400-\u04FF]/g)?.length ?? 0;
+  return cyr / letters < 0.2;
 }
 
 /** SEO, Reddit, platform UI — not a speakable story seed. */
