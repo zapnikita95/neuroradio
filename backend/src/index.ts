@@ -46,6 +46,7 @@ import {
 } from './services/telegram-oidc.js';
 import { resolveWebsiteDir, serveWebsite } from './serve-website.js';
 import publicRouter from './routes/public.js';
+import adminOpsRouter from './routes/admin-ops.js';
 import { startSubscriptionRenewalScheduler } from './services/subscription-renewal.js';
 import { startWeeklyChartHarvestScheduler } from './services/weekly-chart-scheduler.js';
 import { startWeeklyDeepEnrichScheduler } from './services/weekly-deep-enrich-scheduler.js';
@@ -184,6 +185,7 @@ app.use('/v1/llm', llmProbeRouter);
 app.use('/v1/story', storyRouter);
 app.use('/v1/facts', factsHintRouter);
 app.use('/v1/public', publicRouter);
+app.use('/v1/admin', adminOpsRouter);
 
 /** Telegram Login Widget — before static site so /telegram-login is never swallowed. */
 function sendTelegramWidgetPage(req: express.Request, res: express.Response): void {

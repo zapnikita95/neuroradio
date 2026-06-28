@@ -95,6 +95,37 @@ function hotFacts(pool: BankPool): BankPool {
   return pool.filter((f) => f.isHot && !f.isMetadata);
 }
 
+function eraOverlayFileCount(): number {
+  try {
+    const p = path.join(DATA_DIR, 'era-top100-tracks.json');
+    if (!fs.existsSync(p)) return 0;
+    const overlay = JSON.parse(fs.readFileSync(p, 'utf8')) as { tracks?: unknown[] };
+    return overlay.tracks?.length ?? 0;
+  } catch {
+    return 0;
+  }
+}
+
+function eraTop100Stats(
+  catalog: ReturnType<typeof loadCatalogWithOverlays>,
+  bank: { byTrack?: Record<string, BankPool> },
+): { catalogTagged: number; eligible: number; skippedHot: number; overlayFile: number } {
+  let catalogTagged = 0;
+  let eligible = 0;
+  let skippedHot = 0;
+  for (const t of catalog.tracks ?? []) {
+    if (!t.source?.startsWith('era-top100:')) continue;
+    catalogTagged += 1;
+    const pool = trackPool(bank, t.artist, t.title);
+    if (hotFacts(pool).length >= 2) {
+      skippedHot += 1;
+    } else {
+      eligible += 1;
+    }
+  }
+  return { catalogTagged, eligible, skippedHot, overlayFile: eraOverlayFileCount() };
+}
+
 /** Full priority queue (deduped). Does not depend on bulk-seed-progress — scans bank + catalog. */
 export function buildWeeklyDeepEnrichQueueAll(): DeepEnrichTrack[] {
   const catalog = loadCatalogWithOverlays();
@@ -231,6 +262,7 @@ export function summarizeWeeklyDeepEnrichQueue(cap: number): {
   bankTracks: number;
   catalogTracks: number;
   eraOverlay: boolean;
+  eraTop100: { catalogTagged: number; eligible: number; skippedHot: number; overlayFile: number };
   nextRunMsk: string;
   mode: string;
   llmVerify: boolean;
@@ -239,6 +271,7 @@ export function summarizeWeeklyDeepEnrichQueue(cap: number): {
   const bank = loadJson<{ byTrack?: Record<string, BankPool> }>(BANK_PATH, { byTrack: {} });
   const all = buildWeeklyDeepEnrichQueueAll();
   const batch = all.slice(0, cap);
+  const era = eraTop100Stats(catalog, bank);
   return {
     cap,
     totalEligible: all.length,
@@ -248,6 +281,7 @@ export function summarizeWeeklyDeepEnrichQueue(cap: number): {
     bankTracks: Object.keys(bank.byTrack ?? {}).length,
     catalogTracks: catalog.tracks?.length ?? 0,
     eraOverlay: fs.existsSync(path.join(DATA_DIR, 'era-top100-tracks.json')),
+    eraTop100: era,
     nextRunMsk: formatNextSunday3amMsk(),
     mode: resolveEnrichMode(),
     llmVerify: useLlmVerify(),
@@ -293,7 +327,7 @@ export async function sendWeeklyDeepEnrichBootDigest(): Promise<void> {
       `👎 boring: ${s.byReason.boring_feedback} (всего ${s.byReasonTotal.boring_feedback})\n` +
       `🇷🇺 zero: ${s.byReason.ru_zero} (всего ${s.byReasonTotal.ru_zero})\n` +
       `🇷🇺 no hot: ${s.byReason.ru_no_hot} (всего ${s.byReasonTotal.ru_no_hot})\n` +
-      `📻 era-top100: ${s.byReason.era_top100} (всего ${s.byReasonTotal.era_top100})` +
+      `📻 era-top100: в overlay ${s.eraTop100.overlayFile} | в каталоге ${s.eraTop100.catalogTagged} | в очередь ${s.eraTop100.eligible} (≥2 hot: ${s.eraTop100.skippedHot})` +
       emptyHint,
   );
 }
