@@ -1,4 +1,4 @@
-import { factMentionsArtist, factMentionsTitle, hasTrackContextSignal } from './fact-relevance.js';
+import { factMentionsArtist, factMentionsArtistLoose, factMentionsTitle, hasTrackContextSignal } from './fact-relevance.js';
 import { rejectSeedForTrackStory } from './fact-track-anchor.js';
 import { interestScore, isBoringFact } from './reference-fact-quality.js';
 import {
@@ -8,6 +8,8 @@ import {
   normalizeFactForBankStorage,
   isGenericDeferredSongOpenerWithoutTitle,
   isEnglishOnlyFactForCyrillicTrack,
+  isFictionOrGameBleedFact,
+  isNonMusicWikiPageUrl,
 } from './web-snippet-accept.js';
 
 export type FactScope = 'track' | 'album' | 'artist';
@@ -92,6 +94,7 @@ export function isDedicatedSongPageUrl(url: string, title: string): boolean {
     return slug.length >= 3 && u.includes(slug.slice(0, 40));
   }
   if (!u.includes('wikipedia.org')) return false;
+  if (isNonMusicWikiPageUrl(url)) return false;
   if (/list_of|disambiguation|\(значения\)|cover_versions|\(альбом\)|\(album\)/i.test(u)) {
     return false;
   }
@@ -129,6 +132,12 @@ export function validateWeeklyBulkScopedFact(
   }
   if (isEnglishOnlyFactForCyrillicTrack(artist, title, fact)) {
     return { ok: false, reason: 'english_only_ru_track' };
+  }
+  if (isFictionOrGameBleedFact(fact, artist, title)) {
+    return { ok: false, reason: 'fiction_or_game_bleed' };
+  }
+  if (/[\u0400-\u04FF]/.test(title) && !factMentionsArtistLoose(fact, artist) && !factMentionsArtist(fact, artist)) {
+    return { ok: false, reason: 'artist_not_in_fact' };
   }
   if (rejectSeedForTrackStory(fact, artist, title)) {
     return { ok: false, reason: 'not_anchored_to_track' };

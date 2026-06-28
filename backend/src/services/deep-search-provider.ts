@@ -6,6 +6,7 @@ import {
   formatChunksWithProvenance,
   type ExtractedPage,
 } from './page-content-extractor.js';
+import { isNonMusicWikiPageUrl } from './web-snippet-accept.js';
 
 const USER_AGENT = 'Mozilla/5.0 (compatible; MusicStoryDeepSearch/1.0; +https://efir-ai.ru)';
 
@@ -155,6 +156,7 @@ export function strictSourceHitForTrack(hit: SearchHit, artist: string, title: s
   }
 
   if (!hit.url.includes('wikipedia.org')) return true;
+  if (isNonMusicWikiPageUrl(hit.url)) return false;
 
   const titleInPage = tTok.filter((t) => t.length >= 3).some((t) => blob.includes(t));
   const artistInPage = aTok.filter((t) => t.length >= 3).some((t) => blob.includes(t));
@@ -184,6 +186,7 @@ export function scoreSearchHit(hit: SearchHit, artist: string, title: string): n
   if (/interview|meaning|story behind|discusses|explains|inspiration|интервью|смысл|история песни/i.test(text)) {
     score += 0.2;
   }
+  if (url.includes('wikipedia.org') && isNonMusicWikiPageUrl(url)) score -= 2;
   if (/youtube\.com|tiktok\.com|lyrics\.com|azlyrics/i.test(url)) score -= 0.5;
   if (url.includes('npr.org') && !isRelevantDeepSearchHit(hit, artist, title)) score -= 1.5;
   if (!isRelevantDeepSearchHit(hit, artist, title)) score -= 0.8;

@@ -11,7 +11,7 @@ import {
 } from './fact-scope-validator.js';
 import { interestScore } from './reference-fact-quality.js';
 import { verifyDeepFactWithLlm } from './fact-deep-verify.js';
-import { normalizeFactForBankStorage } from './web-snippet-accept.js';
+import { normalizeFactForBankStorage, isNonMusicWikiPageUrl } from './web-snippet-accept.js';
 
 export interface DeepFactResult {
   fact: string;
@@ -213,6 +213,7 @@ export async function huntDeepFact(params: {
     for (const page of search.pages) {
       if (!/songfacts\.com|wikipedia\.org/.test(page.url)) continue;
       if (/list_of|cover_versions|disambiguation|\(значения\)/i.test(page.url)) continue;
+      if (isNonMusicWikiPageUrl(page.url)) continue;
       const h = heuristicExtractFactFromPage(page, params.artist, params.title);
       if (!h) continue;
       const pageText = pageTextByUrl.get(h.evidenceUrl) ?? page.text;

@@ -19,7 +19,7 @@ import {
   isMetadataHarvestFact,
   isArtistFormationBioSeed,
 } from './reference-fact-quality.js';
-import { isSpeakableReferenceFact, isArtistIdentityBioSnippet, isWikiMarkupJunkFact, sanitizeHarvestFactText, normalizeFactForBankStorage, isGenericDeferredSongOpenerWithoutTitle, isEnglishOnlyFactForCyrillicTrack } from './web-snippet-accept.js';
+import { isSpeakableReferenceFact, isArtistIdentityBioSnippet, isWikiMarkupJunkFact, sanitizeHarvestFactText, normalizeFactForBankStorage, isGenericDeferredSongOpenerWithoutTitle, isEnglishOnlyFactForCyrillicTrack, isFictionOrGameBleedFact } from './web-snippet-accept.js';
 import { factsTooSimilar, type FactScope } from './fact-picker.js';
 import {
   classifyFactTopic,
@@ -327,6 +327,7 @@ function isValidStoredFact(
   if (isWikiMarkupJunkFact(text)) return false;
   if (isGenericDeferredSongOpenerWithoutTitle(text, fact.title)) return false;
   if (isEnglishOnlyFactForCyrillicTrack(fact.artist, fact.title, text)) return false;
+  if (isFictionOrGameBleedFact(text, fact.artist, fact.title)) return false;
   if (isAmbiguousCommonWordArtist(fact.artist) && !factMentionsArtistAsEntity(text, fact.artist)) {
     return false;
   }

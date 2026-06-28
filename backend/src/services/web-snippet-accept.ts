@@ -177,6 +177,53 @@ export function isWikiMarkupJunkFact(fact: string): boolean {
   return false;
 }
 
+/** Wikipedia about games/films/franchises — not a song page. */
+export function isNonMusicWikiPageUrl(url: string): boolean {
+  let decoded = url;
+  try {
+    decoded = decodeURIComponent(url);
+  } catch {
+    /* keep */
+  }
+  const u = decoded.toLowerCase();
+  return (
+    /mega_drive|mega\s*drive|\(game\)|\(video_game\)|\(игра\)|\(фильм\)|\(film\)|\(сериал\)|playstation|nintendo|sega|game_boy|xbox|super_nintendo|dreamcast/i.test(
+      u,
+    ) ||
+    /disney[''\u2019]?s_aladdin|disney%E2%80%99s_aladdin/i.test(u) ||
+    /\(character\)|\(franchise\)|\(медиафраншиза\)|\(personnage\)/i.test(u)
+  );
+}
+
+/** Game level / Disney character wiki — title token matched but not the music track. */
+export function isFictionOrGameBleedFact(fact: string, artist: string, title: string): boolean {
+  const t = fact.trim();
+  if (/\b(?:уровень\s+\d|level\s+\d+)\b/i.test(t)) return true;
+  if (/\b(?:аграб|agrabah)\b/i.test(t)) return true;
+  if (
+    /\b(?:королевск\w*\s+страж|royal guard|mega drive|sega genesis|playstation|nintendo|video game|видеоигр|platformer|gameplay)\b/i.test(
+      t,
+    )
+  ) {
+    return true;
+  }
+  if (/\bdisney[''\u2019]?s?\s+aladdin\b/i.test(t)) return true;
+  const mentionsArtist = factMentionsArtist(t, artist) || factMentionsArtistLoose(t, artist);
+  if (mentionsArtist) return false;
+  if (/\b(?:охранник|препятств|босс|boss fight|сабл|кинжал|wooden pole)\b/i.test(t)) return true;
+  const titleKey = title.toLowerCase().replace(/[^\p{L}\p{N}]/gu, '');
+  if (/(?:алладдин|aladdin)/i.test(titleKey) && /(?:алладдин|aladdin)/i.test(t)) {
+    if (
+      !/\b(?:песн|трек|single|song|альбом|клип|musical|rapper|rap|hip[- ]?hop|исполн|групп|feat|сингл|запис)\b/i.test(
+        t,
+      )
+    ) {
+      return true;
+    }
+  }
+  return false;
+}
+
 function escapeRegExp(s: string): string {
   return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
@@ -240,6 +287,7 @@ export function isEnglishOnlyFactForCyrillicTrack(artist: string, title: string,
 export function isUnspeakableWebSeed(snippet: string): boolean {
   const trimmed = decodeHtmlEntities(snippet).trim();
   if (isWikiMarkupJunkFact(trimmed)) return true;
+  if (isFictionOrGameBleedFact(trimmed, '', '')) return true;
   if (isCitationBibliographySeed(trimmed)) return true;
   if (isGenericConcertVenueSeed(trimmed)) return true;
   if (isLyricsPageSeed(trimmed)) return true;
