@@ -24,6 +24,7 @@ const CHANNELS_EXAMPLE = path.join(ROOT, 'config', 'youtube-channels.example.jso
 const STATE_FILE = path.join(DATA, 'youtube-harvest-state.json');
 const CATALOG_FILE = path.join(DATA, 'youtube-harvest-catalog.json');
 const BENCHMARK_FILE = path.join(DATA, 'youtube-stt-benchmark.json');
+const PROGRESS_FILE = path.join(DATA, 'youtube-harvest-progress.json');
 
 function argValue(name) {
   const eq = process.argv.find((a) => a.startsWith(`--${name}=`));
@@ -87,22 +88,61 @@ async function lastfmListeners(artist) {
   }
 }
 
+/** RU market priority: mainstream RU → global stars → RU underground. */
+const TIER_RANK = {
+  ru_mainstream: 0,
+  int_mainstream: 1,
+  ru_underground: 2,
+  other: 3,
+};
+
+function hasCyrillic(text) {
+  return /[\u0400-\u04FF]/.test(text ?? '');
+}
+
+function ruChannel(channelKey, languageCode) {
+  return languageCode === 'rus' || /broken|fast_flow|risazatvorchestvo/i.test(channelKey ?? '');
+}
+
+function classifyMarketTier(artist, listeners, video, llmTier) {
+  const tier = String(llmTier ?? '').trim();
+  if (tier in TIER_RANK) return tier;
+
+  const name = artist ?? '';
+  const ruName = hasCyrillic(name) || (ruChannel(video.channelKey, video.languageCode) && hasCyrillic(video.title));
+  const ruMainMin = 60_000;
+  const intMainMin = 120_000;
+
+  if (ruName && listeners >= ruMainMin) return 'ru_mainstream';
+  if (ruName) return 'ru_underground';
+  if (listeners >= intMainMin) return 'int_mainstream';
+  if (!ruName && listeners >= 30_000) return 'int_mainstream';
+  return ruName ? 'ru_underground' : 'other';
+}
+
 async function guessArtistsFromTitles(videos) {
   const { parsed } = await groqJson(
-    `Из названий YouTube-эссе о музыке верни JSON: {"items":[{"id":"videoId","artists":["главный артист"]}]}
-Только реальные музыкальные артисты/группы из видео, не название канала.`,
+    `Из названий YouTube-эссе о музыке (аудитория — Россия / русскоязычные). JSON:
+{"items":[{"id":"videoId","artists":["главный артист"],"marketTier":"ru_mainstream|int_mainstream|ru_underground"}]}
+marketTier:
+- ru_mainstream — массово известен в РФ (Каста, Бастa, Скриптонит, Кино, Земфира, Макс Корж, Morgenshtern, ЛSP…)
+- int_mainstream — мировая звезда, которую слушают в РФ (Eminem, Bowie, Beatles, Radiohead, Kanye…)
+- ru_underground — русский андеграунд/ниша/культ, не топ-радио (Krec/Крек, ранний питерский рэп, малоизвестные инди)
+Только реальные артисты из видео, не канал.`,
     JSON.stringify(videos.map((v) => ({ id: v.id, title: v.title, channel: v.channelKey }))).slice(0, 24000),
     4096,
   );
-  const map = new Map();
+  const artists = new Map();
+  const tiers = new Map();
   for (const row of parsed.items ?? []) {
-    map.set(row.id, Array.isArray(row.artists) ? row.artists.map(String) : []);
+    artists.set(row.id, Array.isArray(row.artists) ? row.artists.map(String) : []);
+    if (row.marketTier) tiers.set(row.id, String(row.marketTier));
   }
-  return map;
+  return { artists, tiers };
 }
 
 async function rankVideosByPopularity(videos) {
-  const artistMap = await guessArtistsFromTitles(videos);
+  const { artists: artistMap, tiers: tierMap } = await guessArtistsFromTitles(videos);
   const scored = [];
   for (const v of videos) {
     const artists = artistMap.get(v.id) ?? [];
@@ -115,9 +155,15 @@ async function rankVideosByPopularity(videos) {
         topArtist = a;
       }
     }
-    scored.push({ ...v, topArtist, listeners: best, artists });
+    const marketTier = classifyMarketTier(topArtist, best, v, tierMap.get(v.id));
+    scored.push({ ...v, topArtist, listeners: best, artists, marketTier });
   }
-  scored.sort((a, b) => b.listeners - a.listeners || b.durationSec - a.durationSec);
+  scored.sort((a, b) => {
+    const ta = TIER_RANK[a.marketTier] ?? 9;
+    const tb = TIER_RANK[b.marketTier] ?? 9;
+    if (ta !== tb) return ta - tb;
+    return b.listeners - a.listeners || b.durationSec - a.durationSec;
+  });
   return scored;
 }
 
@@ -188,7 +234,33 @@ function collectVideos(cfg, state, mode) {
   return all;
 }
 
+function saveProgress(progress) {
+  progress.updatedAt = new Date().toISOString();
+  saveJson(PROGRESS_FILE, progress);
+}
+
+function appendCatalogFact(catalog, f, video, meta) {
+  const fp = `${video.id}:${f.fact.slice(0, 80)}`;
+  if (catalog.facts.some((x) => x._fp === fp)) return;
+  catalog.facts.push({
+    _fp: fp,
+    artist: f.artist,
+    title: f.title,
+    scope: f.scope,
+    fact: f.fact,
+    interest: f.interest,
+    bankQuality: f.bankQuality ?? f.interest,
+    videoId: video.id,
+    videoTitle: meta.title,
+    saved: f.saved,
+    at: new Date().toISOString(),
+  });
+  catalog.facts.sort((a, b) => (b.bankQuality ?? b.interest) - (a.bankQuality ?? a.interest));
+  saveCatalog(catalog);
+}
+
 function mergeCatalog(catalog, report) {
+  if (catalog.videos.some((v) => v.id === report.video.id)) return;
   catalog.videos.push({
     id: report.video.id,
     title: report.video.title,
@@ -219,7 +291,8 @@ async function main() {
   const state = loadState();
   const catalog = loadCatalog();
   const dryRun = hasFlag('dry-run');
-  const maxSeconds = parseInt(argValue('max-seconds') ?? '0', 10) || 0;
+  const maxSeconds =
+    parseInt(argValue('max-seconds') ?? String(cfg.defaults?.maxAudioSeconds ?? 600), 10) || 600;
 
   if (hasFlag('compare-stt-only')) {
     const sample = collectVideos(cfg, { processedVideoIds: [] }, 'initial')[0];
@@ -237,13 +310,26 @@ async function main() {
 
   console.log(`[batch] queued ${videos.length} videos (${mode})`);
   videos = await rankVideosByPopularity(videos);
-  console.log('[batch] top by Last.fm listeners:', videos.slice(0, 5).map((v) => `${v.topArtist ?? '?'} (${v.listeners})`).join(', '));
+  const tierLabel = { ru_mainstream: 'RU★', int_mainstream: 'INT★', ru_underground: 'RUUG' };
+  console.log(
+    '[batch] order RU→INT→underground:',
+    videos
+      .slice(0, 8)
+      .map((v) => `${tierLabel[v.marketTier] ?? v.marketTier}:${v.topArtist ?? '?'}`)
+      .join(', '),
+  );
 
   let sttProvider = cfg.defaults?.sttProvider || 'railway';
   if (hasFlag('initial') || hasFlag('compare-stt') || mode === 'initial') {
-    const benchVideo = videos[0];
-    sttProvider = await compareSttProviders(benchVideo, benchVideo.languageCode);
-    console.log(`[batch] STT chosen: ${sttProvider}`);
+    try {
+      const benchVideo = videos[0];
+      sttProvider = await compareSttProviders(benchVideo, benchVideo.languageCode);
+      console.log(`[batch] STT chosen: ${sttProvider}`);
+    } catch (err) {
+      console.warn(
+        `[batch] STT benchmark skipped: ${err instanceof Error ? err.message : err} → ${sttProvider}`,
+      );
+    }
   }
   if (argValue('stt')) sttProvider = argValue('stt');
 
@@ -259,16 +345,26 @@ async function main() {
   for (let i = 0; i < videos.length; i += 1) {
     const v = videos[i];
     console.log(`\n[batch ${i + 1}/${videos.length}] ${v.channelName} — ${v.title}`);
+    saveProgress({
+      runId: run.id,
+      current: i + 1,
+      total: videos.length,
+      videoId: v.id,
+      title: v.title,
+      sttProvider,
+    });
     try {
       const report = await processVideo(v, {
         dryRun,
         maxSeconds,
         languageCode: v.languageCode,
         sttProvider,
+        onFactSaved: (f, video, meta) => appendCatalogFact(catalog, f, video, meta),
       });
       run.reports.push({ videoId: v.id, ok: true, ingested: report.llm.factsIngested });
       if (!dryRun) {
         state.processedVideoIds = [...new Set([...(state.processedVideoIds ?? []), v.id])];
+        state.lastCompletedVideoId = v.id;
         saveState(state);
       }
       mergeCatalog(catalog, report);
@@ -276,8 +372,49 @@ async function main() {
     } catch (err) {
       console.error(`[batch] FAIL ${v.id}:`, err instanceof Error ? err.message : err);
       run.reports.push({ videoId: v.id, ok: false, error: err instanceof Error ? err.message : String(err) });
+      saveProgress({
+        runId: run.id,
+        current: i + 1,
+        total: videos.length,
+        videoId: v.id,
+        title: v.title,
+        error: err instanceof Error ? err.message : String(err),
+        sttProvider,
+      });
     }
   }
+
+  const failedIds = run.reports.filter((r) => !r.ok).map((r) => r.videoId);
+  if (failedIds.length > 0) {
+    console.log(`\n[batch] retry pass for ${failedIds.length} failed video(s): ${failedIds.join(', ')}`);
+    for (const videoId of failedIds) {
+      const v = videos.find((x) => x.id === videoId);
+      if (!v) continue;
+      console.log(`\n[batch retry] ${v.channelName} — ${v.title}`);
+      try {
+        const report = await processVideo(v, {
+          dryRun,
+          maxSeconds,
+          languageCode: v.languageCode,
+          sttProvider,
+          onFactSaved: (f, video, meta) => appendCatalogFact(catalog, f, video, meta),
+        });
+        const idx = run.reports.findIndex((r) => r.videoId === videoId);
+        if (idx >= 0) run.reports[idx] = { videoId, ok: true, ingested: report.llm.factsIngested, retried: true };
+        if (!dryRun) {
+          state.processedVideoIds = [...new Set([...(state.processedVideoIds ?? []), v.id])];
+          state.lastCompletedVideoId = v.id;
+          saveState(state);
+        }
+        mergeCatalog(catalog, report);
+        saveCatalog(catalog);
+      } catch (err) {
+        console.error(`[batch retry] FAIL ${v.id}:`, err instanceof Error ? err.message : err);
+      }
+    }
+  }
+
+  saveProgress({ runId: run.id, status: 'finished', finishedAt: new Date().toISOString() });
 
   run.finishedAt = new Date().toISOString();
   state.runs = [...(state.runs ?? []), run].slice(-40);

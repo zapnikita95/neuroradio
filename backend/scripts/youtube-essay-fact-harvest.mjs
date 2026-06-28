@@ -15,7 +15,7 @@ import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { ingestHarvestFacts } from '../dist/services/fact-bank.js';
+import { ingestHarvestFacts, flushFactBankSync, factFingerprint } from '../dist/services/fact-bank.js';
 import { isAlbumPrimaryContextFact } from '../dist/services/fact-relevance.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -177,37 +177,56 @@ function bffBaseUrl() {
   ).replace(/\/$/, '');
 }
 
+function sleepMs(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 async function railwayTranscribe(audioPath, languageCode = 'rus', provider = 'elevenlabs') {
   const secret = process.env.WEBSITE_DEMO_SECRET?.trim();
   if (!secret) {
     throw new Error('WEBSITE_DEMO_SECRET missing in backend/.env — нужен для STT через Railway');
   }
   const buf = fs.readFileSync(audioPath);
-  const t0 = Date.now();
-  const res = await fetch(`${bffBaseUrl()}/v1/public/harvest/stt`, {
-    method: 'POST',
-    headers: {
-      'x-website-demo-secret': secret,
-      'x-audio-filename': path.basename(audioPath),
-      'x-language-code': languageCode,
-      'x-stt-provider': provider === 'groq' ? 'groq' : 'elevenlabs',
-      'content-type': 'audio/mpeg',
-    },
-    body: buf,
-    signal: AbortSignal.timeout(600_000),
-  });
-  const raw = await res.text();
-  if (!res.ok) {
-    throw new Error(`Railway STT ${res.status}: ${raw.slice(0, 400)}`);
+  const maxAttempts = 3;
+  let lastErr;
+  for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+    const t0 = Date.now();
+    try {
+      const res = await fetch(`${bffBaseUrl()}/v1/public/harvest/stt`, {
+        method: 'POST',
+        headers: {
+          'x-website-demo-secret': secret,
+          'x-audio-filename': path.basename(audioPath),
+          'x-language-code': languageCode,
+          'x-stt-provider': provider === 'groq' ? 'groq' : 'elevenlabs',
+          'content-type': 'audio/mpeg',
+        },
+        body: buf,
+        signal: AbortSignal.timeout(600_000),
+      });
+      const raw = await res.text();
+      if (!res.ok) {
+        throw new Error(`Railway STT ${res.status}: ${raw.slice(0, 400)}`);
+      }
+      const data = JSON.parse(raw);
+      const text = (data.text || '').trim();
+      if (!text) throw new Error('Railway STT empty');
+      return {
+        text,
+        latencyMs: data.latencyMs ?? Date.now() - t0,
+        provider: data.provider || 'elevenlabs-scribe-railway',
+      };
+    } catch (err) {
+      lastErr = err;
+      const msg = err instanceof Error ? err.message : String(err);
+      if (attempt < maxAttempts) {
+        const wait = attempt * 15_000;
+        console.warn(`[stt] attempt ${attempt}/${maxAttempts} failed (${msg}) — retry in ${wait / 1000}s`);
+        await sleepMs(wait);
+      }
+    }
   }
-  const data = JSON.parse(raw);
-  const text = (data.text || '').trim();
-  if (!text) throw new Error('Railway STT empty');
-  return {
-    text,
-    latencyMs: data.latencyMs ?? Date.now() - t0,
-    provider: data.provider || 'elevenlabs-scribe-railway',
-  };
+  throw lastErr instanceof Error ? lastErr : new Error(String(lastErr));
 }
 
 async function transcribeAudio(audioPath, opts) {
@@ -374,33 +393,108 @@ function estimateScribeCost(durationSec) {
   };
 }
 
-async function processVideo(video, opts) {
-  const slug = `${video.id}-${Date.now()}`;
-  const workDir = path.join(OUT_DIR, slug);
+function videoWorkDir(videoId) {
+  return path.join(OUT_DIR, videoId);
+}
+
+function loadCheckpoint(workDir) {
+  const cpPath = path.join(workDir, 'checkpoint.json');
+  if (!fs.existsSync(cpPath)) {
+    return { step: 'pending', ingestedFingerprints: [], updatedAt: null };
+  }
+  try {
+    return JSON.parse(fs.readFileSync(cpPath, 'utf8'));
+  } catch {
+    return { step: 'pending', ingestedFingerprints: [], updatedAt: null };
+  }
+}
+
+function saveCheckpoint(workDir, checkpoint) {
   fs.mkdirSync(workDir, { recursive: true });
+  checkpoint.updatedAt = new Date().toISOString();
+  const target = path.join(workDir, 'checkpoint.json');
+  const tmp = `${target}.${process.pid}.tmp`;
+  fs.writeFileSync(tmp, JSON.stringify(checkpoint, null, 2), 'utf8');
+  fs.renameSync(tmp, target);
+}
+
+function findExistingAudio(workDir, videoId) {
+  for (const ext of ['mp3', 'm4a', 'webm', 'opus', 'ogg']) {
+    const p = path.join(workDir, `${videoId}.${ext}`);
+    if (fs.existsSync(p)) return p;
+  }
+  const any = fs.readdirSync(workDir, { withFileTypes: true }).find(
+    (e) => e.isFile() && /\.(mp3|m4a|webm|opus|ogg)$/i.test(e.name),
+  );
+  return any ? path.join(workDir, any.name) : null;
+}
+
+async function processVideo(video, opts) {
+  const workDir = videoWorkDir(video.id);
+  fs.mkdirSync(workDir, { recursive: true });
+  const checkpoint = loadCheckpoint(workDir);
+  const ingestedSet = new Set(checkpoint.ingestedFingerprints ?? []);
 
   console.log(`\n=== ${video.title} ===`);
-  console.log(`url=${video.url} duration=${video.durationSec}s stt=${opts.sttProvider} bff=${bffBaseUrl()}`);
+  console.log(
+    `url=${video.url} duration=${video.durationSec}s stt=${opts.sttProvider} checkpoint=${checkpoint.step} workDir=${workDir}`,
+  );
 
-  const { meta, audioPath, audioBytes } = downloadAudio(video.url, workDir, opts.maxSeconds);
+  let meta = {
+    id: video.id,
+    title: video.title,
+    durationSec: video.durationSec,
+    url: video.url,
+    channel: video.channel || video.channelName || '',
+  };
+  let audioPath = findExistingAudio(workDir, video.id);
+  let audioBytes = audioPath ? fs.statSync(audioPath).size : 0;
   const billedSec =
-    opts.maxSeconds > 0 ? Math.min(opts.maxSeconds, meta.durationSec || opts.maxSeconds) : meta.durationSec;
+    opts.maxSeconds > 0
+      ? Math.min(opts.maxSeconds, meta.durationSec || opts.maxSeconds)
+      : meta.durationSec;
   const cost = estimateScribeCost(billedSec);
 
-  console.log(`[download] ${audioPath} (${(audioBytes / 1024 / 1024).toFixed(2)} MB)`);
+  if (!audioPath) {
+    const dl = downloadAudio(video.url, workDir, opts.maxSeconds);
+    meta = dl.meta;
+    audioPath = dl.audioPath;
+    audioBytes = dl.audioBytes;
+    saveCheckpoint(workDir, { ...checkpoint, step: 'downloaded', ingestedFingerprints: [...ingestedSet] });
+    console.log(`[download] ${audioPath} (${(audioBytes / 1024 / 1024).toFixed(2)} MB)`);
+  } else {
+    console.log(`[download] resume ${audioPath} (${(audioBytes / 1024 / 1024).toFixed(2)} MB)`);
+  }
 
-  const stt = await transcribeAudio(audioPath, opts);
-  fs.writeFileSync(path.join(workDir, 'transcript.txt'), stt.text, 'utf8');
-  console.log(`[stt] ${stt.provider} ${stt.text.length} chars ${stt.latencyMs}ms`);
+  const transcriptPath = path.join(workDir, 'transcript.txt');
+  let stt;
+  if (fs.existsSync(transcriptPath) && ['transcribed', 'extracted', 'ingesting', 'done'].includes(checkpoint.step)) {
+    const text = fs.readFileSync(transcriptPath, 'utf8').trim();
+    stt = { text, provider: 'checkpoint-resume', latencyMs: 0 };
+    console.log(`[stt] resume ${stt.text.length} chars`);
+  } else {
+    stt = await transcribeAudio(audioPath, opts);
+    fs.writeFileSync(transcriptPath, stt.text, 'utf8');
+    saveCheckpoint(workDir, { step: 'transcribed', ingestedFingerprints: [...ingestedSet] });
+    console.log(`[stt] ${stt.provider} ${stt.text.length} chars ${stt.latencyMs}ms`);
+  }
 
-  const llm = await extractFactsWithLlm({
-    transcript: stt.text,
-    videoTitle: meta.title,
-    channelName: meta.channel,
-  });
-  const verified = await verifyFactsQualityWithLlm(llm.facts, meta.title);
-  llm.facts = verified;
-  fs.writeFileSync(path.join(workDir, 'facts-raw.json'), JSON.stringify(llm, null, 2), 'utf8');
+  const factsRawPath = path.join(workDir, 'facts-raw.json');
+  let llm;
+  if (fs.existsSync(factsRawPath) && ['extracted', 'ingesting', 'done'].includes(checkpoint.step)) {
+    llm = JSON.parse(fs.readFileSync(factsRawPath, 'utf8'));
+    console.log(`[llm] resume ${llm.facts?.length ?? 0} facts`);
+  } else {
+    llm = await extractFactsWithLlm({
+      transcript: stt.text,
+      videoTitle: meta.title,
+      channelName: meta.channel,
+    });
+    const verified = await verifyFactsQualityWithLlm(llm.facts, meta.title);
+    llm.facts = verified;
+    fs.writeFileSync(factsRawPath, JSON.stringify(llm, null, 2), 'utf8');
+    saveCheckpoint(workDir, { step: 'extracted', ingestedFingerprints: [...ingestedSet] });
+  }
 
   const bankCandidates = llm.facts.filter((f) => f.keepForBank && f.interest >= MIN_BANK_INTEREST);
   const rejected = llm.facts.filter((f) => !f.keepForBank || f.interest < MIN_BANK_INTEREST);
@@ -411,8 +505,15 @@ async function processVideo(video, opts) {
   let ingested = 0;
   const ingestLog = [];
   if (!opts.dryRun) {
+    saveCheckpoint(workDir, { step: 'ingesting', ingestedFingerprints: [...ingestedSet] });
     for (const f of bankCandidates) {
+      const fp = factFingerprint(f.fact);
       const title = ingestTitleForFact(f);
+      if (ingestedSet.has(fp)) {
+        ingestLog.push({ ...f, ingestTitle: title, saved: true, resumed: true });
+        ingested += 1;
+        continue;
+      }
       const saved = ingestHarvestFacts(f.artist, title, [
         {
           fact: f.fact,
@@ -422,8 +523,15 @@ async function processVideo(video, opts) {
           llmInterest: f.interest,
         },
       ]);
-      ingestLog.push({ ...f, ingestTitle: title, saved: saved > 0 });
-      if (saved > 0) ingested += saved;
+      flushFactBankSync();
+      if (saved > 0) {
+        ingestedSet.add(fp);
+        ingested += saved;
+        saveCheckpoint(workDir, { step: 'ingesting', ingestedFingerprints: [...ingestedSet] });
+      }
+      const row = { ...f, ingestTitle: title, saved: saved > 0 };
+      ingestLog.push(row);
+      opts.onFactSaved?.(row, video, meta);
     }
     for (const f of rejected) {
       ingestLog.push({
@@ -432,6 +540,7 @@ async function processVideo(video, opts) {
         rejectReason: f.rejectReason || (f.interest < MIN_BANK_INTEREST ? 'interest_below_threshold' : 'keepForBank=false'),
       });
     }
+    saveCheckpoint(workDir, { step: 'done', ingestedFingerprints: [...ingestedSet] });
   }
 
   const report = {

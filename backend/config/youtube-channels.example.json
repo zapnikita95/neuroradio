@@ -30,6 +30,8 @@
     "videosPerChannel": 10,
     "weeklyNewPerChannel": 1,
     "maxVideoDurationSec": 7200,
-    "sttProvider": "railway"
+    "maxAudioSeconds": 600,
+    "sttProvider": "railway",
+    "sortPolicy": "ru_mainstream → int_mainstream → ru_underground (within tier: Last.fm listeners desc)"
   }
 }

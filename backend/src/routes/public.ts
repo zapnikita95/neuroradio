@@ -396,7 +396,7 @@ router.post('/subscribe', async (req: Request, res: Response) => {
 /** YouTube harvest STT — ElevenLabs Scribe on Railway (local RF → Cloudflare 403). */
 const harvestSttUpload = express.raw({
   type: ['audio/mpeg', 'audio/mp3', 'audio/*', 'application/octet-stream'],
-  limit: process.env.HARVEST_STT_MAX_BYTES?.trim() || '12mb',
+  limit: process.env.HARVEST_STT_MAX_BYTES?.trim() || '32mb',
 });
 
 router.post('/harvest/stt', harvestSttUpload, async (req: Request, res: Response) => {
@@ -412,8 +412,8 @@ router.post('/harvest/stt', harvestSttUpload, async (req: Request, res: Response
     res.status(400).json({ error: 'invalid audio body' });
     return;
   }
-  if (buf.length > 12 * 1024 * 1024) {
-    res.status(413).json({ error: 'audio too large (max 12mb)' });
+  if (buf.length > 32 * 1024 * 1024) {
+    res.status(413).json({ error: 'audio too large (max 32mb)' });
     return;
   }
 
