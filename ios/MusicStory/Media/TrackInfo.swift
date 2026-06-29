@@ -32,9 +32,20 @@ struct TrackInfo: Equatable, Sendable {
         "\(artist.lowercased())|\(title.lowercased())"
     }
 
+    func isPlaceholder() -> Bool {
+        let a = artist.lowercased()
+        let t = title.lowercased()
+        if a.contains("вспоминаем трек") || a.contains("remember") { return true }
+        if t.contains("скоро начн") || t.contains("остановились") || t.contains("will begin") { return true }
+        if t.contains("музыка скоро") || t == "paused" { return true }
+        if MediaJunkFilter.isNonMusicPlaybackMetadata(artist: artist, title: title) { return true }
+        return false
+    }
+
     func isValid() -> Bool {
         !artist.isEmpty &&
             !title.isEmpty &&
+            !isPlaceholder() &&
             artist.count <= 200 &&
             title.count <= 200
     }

@@ -160,6 +160,7 @@ final class NowPlayingCoordinator: ObservableObject {
     }
 
     private func publish(track: TrackInfo, isPlaying: Bool? = nil) {
+        guard track.isValid() else { return }
         let playing = isPlaying ?? (track.source == .spotify ? spotify.isPlaying : appleMusic.isPlaying)
         currentTrack = track
         self.isPlaying = playing

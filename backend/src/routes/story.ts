@@ -37,6 +37,7 @@ import {
   rollbackReservedSeed,
 } from '../services/fact-user-service.js';
 import { classifyFactTopic, FACT_TOPIC_LABELS_RU } from '../services/fact-topic.js';
+import { isNonMusicTrackMetadata } from '../services/track-metadata-junk.js';
 import { factFitsStoryLanguage } from '../services/fact-language-fit.js';
 import { ingestFacts, factFingerprint } from '../services/fact-bank.js';
 import { resolveArtistTier, isCatalogMajorArtist } from '../services/artist-notability.js';
@@ -305,6 +306,19 @@ router.post('/full', extractClientSecrets, validateStoryFullBody, storyFullRateL
       `artist="${body.artist}" title="${body.title}"`,
   );
 
+  if (isNonMusicTrackMetadata(body.artist ?? '', body.title ?? '')) {
+    console.log(
+      `[story] reject non-music metadata install=${installId.slice(0, 8)} ` +
+        `artist="${body.artist}" title="${body.title}"`,
+    );
+    res.status(400).json({
+      error: 'Not a music track',
+      code: 'NON_MUSIC_TRACK_METADATA',
+      message: 'Voice messages and messenger audio are not supported.',
+    });
+    return;
+  }
+
   const requestedProviderRaw = body.llm_provider;
   const deviceFingerprint =
     typeof body.device_fingerprint === 'string' ? body.device_fingerprint : undefined;
@@ -469,6 +483,11 @@ router.post('/full', extractClientSecrets, validateStoryFullBody, storyFullRateL
       storyNarrator,
       storyLanguage: storyLang,
     });
+    if (previousScripts.length > 0) {
+      factPickCtx.rejectSimilarTo = [
+        ...new Set([...factPickCtx.rejectSimilarTo, ...previousScripts]),
+      ];
+    }
     const usedFingerprints = factPickCtx.usedFingerprints;
     const rejectSimilarTo = factPickCtx.rejectSimilarTo;
 

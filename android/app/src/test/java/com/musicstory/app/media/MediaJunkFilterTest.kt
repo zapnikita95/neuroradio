@@ -46,4 +46,34 @@ class MediaJunkFilterTest {
             ),
         )
     }
+
+    @Test
+    fun voiceMessageMetadataIsJunk() {
+        assertTrue(
+            MediaJunkFilter.isNonMusicPlaybackMetadata(
+                artist = "Voice message",
+                title = "Ульяна Митяева",
+            ),
+        )
+        assertTrue(
+            MediaJunkFilter.isNonMusicPlaybackMetadata(
+                artist = "Аня 💚",
+                title = "Voice message",
+            ),
+        )
+        assertFalse(
+            TrackInfo(
+                artist = "Voice message",
+                title = "Ульяна Митяева",
+                packageName = "org.telegram.messenger",
+            ).isValid(),
+        )
+        assertTrue(
+            TrackInfo(
+                artist = "Radiohead",
+                title = "Creep",
+                packageName = "org.telegram.messenger",
+            ).isValid(),
+        )
+    }
 }

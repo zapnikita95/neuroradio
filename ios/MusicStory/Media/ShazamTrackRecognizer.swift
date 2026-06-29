@@ -140,7 +140,11 @@ final class ShazamTrackRecognizer: ObservableObject {
         guard !artist.isEmpty, !title.isEmpty else {
             throw ShazamError.noMatch
         }
-        return TrackInfo(artist: artist, title: title, album: nil, source: .shazam)
+        let track = TrackInfo(artist: artist, title: title, album: nil, source: .shazam)
+        guard track.isValid() else {
+            throw ShazamError.noMatch
+        }
+        return track
     }
 
     private func requestMicrophonePermission() async -> Bool {

@@ -31,6 +31,10 @@ final class OtherAudioShazamWatcher {
 
                 do {
                     let track = try await nowPlaying.recognizeWithShazam(autoTriggered: true)
+                    guard track.isValid() else {
+                        self.policy.recordFailure()
+                        continue
+                    }
                     self.policy.recordSuccess(track)
                     if track.displayKey != self.lastRecognizedKey {
                         self.lastRecognizedKey = track.displayKey

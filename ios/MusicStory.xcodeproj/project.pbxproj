@@ -64,6 +64,7 @@
 		B1000052 /* RadioModeOnboardingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1000052 /* RadioModeOnboardingView.swift */; };
 		B1000053 /* MusicBrainzGenreLookup.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1000053 /* MusicBrainzGenreLookup.swift */; };
 		B1000054 /* DeviceFingerprint.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1000054 /* DeviceFingerprint.swift */; };
+		B1000055 /* MediaJunkFilter.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1000055 /* MediaJunkFilter.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -152,6 +153,7 @@
 		F1000052 /* RadioModeOnboardingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RadioModeOnboardingView.swift; sourceTree = "<group>"; };
 		F1000053 /* MusicBrainzGenreLookup.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MusicBrainzGenreLookup.swift; sourceTree = "<group>"; };
 		F1000054 /* DeviceFingerprint.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeviceFingerprint.swift; sourceTree = "<group>"; };
+		F1000055 /* MediaJunkFilter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MediaJunkFilter.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -241,6 +243,7 @@
 			isa = PBXGroup;
 			children = (
 				F1000003 /* TrackInfo.swift */,
+				F1000055 /* MediaJunkFilter.swift */,
 				F1000004 /* AppleMusicNowPlaying.swift */,
 				F1000005 /* SpotifyAppRemoteManager.swift */,
 				F1000006 /* ShazamTrackRecognizer.swift */,
@@ -432,6 +435,7 @@
 				B1000001 /* MusicStoryApp.swift in Sources */,
 				B1000002 /* AppContainer.swift in Sources */,
 				B1000003 /* TrackInfo.swift in Sources */,
+				B1000055 /* MediaJunkFilter.swift in Sources */,
 				B1000004 /* AppleMusicNowPlaying.swift in Sources */,
 				B1000005 /* SpotifyAppRemoteManager.swift in Sources */,
 				B1000006 /* ShazamTrackRecognizer.swift in Sources */,
