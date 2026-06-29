@@ -191,6 +191,7 @@ export function buildYoutubeHarvestDashboardFromFiles(): YoutubeHarvestDashboard
 
 export function loadYoutubeHarvestDashboard(): YoutubeHarvestDashboard | null {
   const cached = readJson<YoutubeHarvestDashboard | null>(DASHBOARD_FILE, null);
+  if (cached?.videos?.length) return cached;
   const built = buildYoutubeHarvestDashboardFromFiles();
   if (!built && cached) return cached;
   if (!built) return null;

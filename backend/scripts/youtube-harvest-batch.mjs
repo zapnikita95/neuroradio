@@ -356,17 +356,34 @@ async function main() {
   }
 
   const mode = hasFlag('weekly') ? 'weekly' : 'initial';
-  let videos = collectVideos(cfg, state, mode);
-  if (!videos.length) {
+  const retryOnly = hasFlag('retry-only');
+  let videos = retryOnly ? [] : collectVideos(cfg, state, mode);
+  const pendingRetry = loadRetryQueue().filter((q) => !(state.processedVideoIds ?? []).includes(q.id));
+  if (retryOnly) {
+    if (!pendingRetry.length) {
+      console.log('[batch] retry-only: retry queue empty');
+      return;
+    }
+    videos = pendingRetry.map((q) => ({
+      id: q.id,
+      title: q.title,
+      url: q.url,
+      channelName: q.channelName,
+      languageCode: q.languageCode ?? 'rus',
+      _retryCount: q.attempts ?? 0,
+    }));
+    console.log(`[batch] retry-only: ${videos.length} video(s): ${videos.map((v) => v.id).join(', ')}`);
+  } else if (!videos.length && !pendingRetry.length) {
     console.log('[batch] no new videos to process');
     return;
   }
 
-  console.log(`[batch] queued ${videos.length} videos (${mode})`);
-  videos = await rankVideosByPopularity(videos);
+  if (!retryOnly) {
+    console.log(`[batch] queued ${videos.length} videos (${mode})`);
+    videos = await rankVideosByPopularity(videos);
+  }
 
-  const pendingRetry = loadRetryQueue().filter((q) => !(state.processedVideoIds ?? []).includes(q.id));
-  if (pendingRetry.length) {
+  if (!retryOnly && pendingRetry.length) {
     const byId = new Map(videos.map((v) => [v.id, v]));
     const retryVideos = pendingRetry
       .map(
@@ -395,7 +412,7 @@ async function main() {
   );
 
   let sttProvider = cfg.defaults?.sttProvider || 'railway';
-  if ((hasFlag('initial') || hasFlag('compare-stt') || mode === 'initial') && pendingRetry.length === 0) {
+  if ((hasFlag('initial') || hasFlag('compare-stt') || mode === 'initial') && pendingRetry.length === 0 && !retryOnly) {
     try {
       const benchVideo = videos[0];
       sttProvider = await compareSttProviders(benchVideo, benchVideo.languageCode);
@@ -405,8 +422,8 @@ async function main() {
         `[batch] STT benchmark skipped: ${err instanceof Error ? err.message : err} → ${sttProvider}`,
       );
     }
-  } else if (pendingRetry.length > 0) {
-    console.log(`[batch] STT benchmark skipped (retry queue ${pendingRetry.length}) → ${sttProvider}`);
+  } else if (pendingRetry.length > 0 || retryOnly) {
+    console.log(`[batch] STT benchmark skipped (retry${retryOnly ? '-only' : ` queue ${pendingRetry.length}`}) → ${sttProvider}`);
   }
   if (argValue('stt')) sttProvider = argValue('stt');
 
@@ -568,7 +585,10 @@ async function publishHarvestDashboard({ state, catalog, run, videos }) {
   };
 
   saveJson(DASHBOARD_FILE, dashboard);
+  const siteDash = path.join(ROOT, '..', 'website', 'admin', 'harvest-data.json');
+  saveJson(siteDash, dashboard);
   console.log(`[batch] dashboard: ${DASHBOARD_FILE}`);
+  console.log(`[batch] site snapshot: ${siteDash}`);
 
   const token = process.env.HARVEST_DASHBOARD_TOKEN?.trim();
   const bff =

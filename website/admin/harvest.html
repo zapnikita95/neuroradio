@@ -140,6 +140,10 @@
     const saved = localStorage.getItem(TOKEN_KEY);
     if (saved) tokenEl.value = saved;
 
+    function apiBase() {
+      return (window.EFIR_API_BASE || window.location.origin || '').replace(/\/$/, '');
+    }
+
     async function load() {
       const token = tokenEl.value.trim();
       if (!token) {
@@ -150,15 +154,34 @@
       document.getElementById('loadBtn').disabled = true;
       showErr('');
       try {
-        const res = await fetch('/v1/admin/youtube-harvest/status?token=' + encodeURIComponent(token));
+        const res = await fetch(apiBase() + '/v1/admin/youtube-harvest/status?token=' + encodeURIComponent(token));
         const data = await res.json();
-        if (!res.ok) throw new Error(data.error || data.hint || res.statusText);
-        render(data.dashboard);
+        if (res.ok && data.dashboard) {
+          render(data.dashboard, 'Railway');
+          return;
+        }
+        if (data.error === 'no_harvest_data') {
+          await loadStaticFallback();
+          return;
+        }
+        var hint = data.hint ? ' — ' + data.hint : '';
+        throw new Error((data.error || res.statusText) + hint);
       } catch (e) {
-        showErr(e.message || String(e));
+        try {
+          await loadStaticFallback();
+        } catch (e2) {
+          showErr(e.message || String(e));
+        }
       } finally {
         document.getElementById('loadBtn').disabled = false;
       }
+    }
+
+    async function loadStaticFallback() {
+      const res = await fetch('harvest-data.json?_=' + Date.now());
+      if (!res.ok) throw new Error('Нет данных на сервере и нет harvest-data.json на сайте');
+      const dashboard = await res.json();
+      render(dashboard, 'snapshot (сайт)');
     }
 
     function showErr(msg) {
@@ -167,7 +190,7 @@
       el.textContent = msg;
     }
 
-    function render(d) {
+    function render(d, sourceLabel) {
       document.getElementById('stats').hidden = false;
       document.getElementById('meta').hidden = false;
       document.getElementById('tableWrap').hidden = false;
@@ -186,6 +209,7 @@
 
       document.getElementById('meta').textContent =
         'Обновлено: ' + (d.updatedAt || '—') +
+        ' · источник: ' + (sourceLabel || d.source || '—') +
         ' · run: ' + (d.runId || '—') +
         (d.finishedAt ? ' · finished ' + d.finishedAt : '') +
         ' · STT: ' + (d.sttProvider || 'railway');

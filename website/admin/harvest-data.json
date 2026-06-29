@@ -1,0 +1,449 @@
+{
+  "updatedAt": "2026-06-29T22:26:27.359Z",
+  "source": "local-batch",
+  "runId": "run-1782753501506",
+  "mode": "initial",
+  "startedAt": "2026-06-29T17:18:21.506Z",
+  "finishedAt": "2026-06-29T17:24:56.162Z",
+  "sttProvider": "railway",
+  "queued": 3,
+  "processed": 44,
+  "pending": 0,
+  "failed": 0,
+  "ok": 3,
+  "ingestedRun": 43,
+  "catalogFacts": 937,
+  "catalogVideos": 44,
+  "bankYoutubeFacts": 0,
+  "retryQueue": 0,
+  "failedVideoIds": [],
+  "videos": [
+    {
+      "videoId": "CA6fMwidRW0",
+      "title": "25 Albums in One Decade: The King Gizzard Phenomenon",
+      "channel": "Middle8",
+      "ok": true,
+      "ingested": 19,
+      "checkpoint": "done",
+      "transcriptChars": 10431,
+      "factsExtracted": 23
+    },
+    {
+      "videoId": "eZwkQ3Z90Vw",
+      "title": "I'm so over brat",
+      "channel": "Middle8",
+      "ok": true,
+      "ingested": 15,
+      "checkpoint": "done",
+      "transcriptChars": 9548,
+      "factsExtracted": 17
+    },
+    {
+      "videoId": "GlUPGI7pElA",
+      "title": "Something weird is happening in hip-hop",
+      "channel": "Middle8",
+      "ok": true,
+      "ingested": 9,
+      "checkpoint": "done",
+      "transcriptChars": 11016,
+      "factsExtracted": 11
+    },
+    {
+      "videoId": "U3VMv4Kd8b8",
+      "title": "How Justice turned rock fans into rave kids",
+      "channel": "Middle 8",
+      "ok": true
+    },
+    {
+      "videoId": "JvGrJff1uF8",
+      "title": "T-Fest — Никто не обещал | Разбор трека",
+      "channel": "Риса за Творчество",
+      "ok": true
+    },
+    {
+      "videoId": "arrnt_S7rNY",
+      "title": "Yanix — Ай Ай | Разбор трека",
+      "channel": "Риса за Творчество",
+      "ok": true
+    },
+    {
+      "videoId": "PzCPKJn5mNg",
+      "title": "Выбрал 20 ЛУЧШИХ БИТОВ русского рэпа. Кого забыл?",
+      "channel": "БРОКЕН ДЭНС",
+      "ok": true,
+      "checkpoint": "done",
+      "transcriptChars": 8537,
+      "factsExtracted": 5
+    },
+    {
+      "videoId": "FW9mIhLDo9M",
+      "title": "2013: Max Korzh, VERSUS, Pasha Technic, ENJOYKIN, trap, GORSHOK (rip)",
+      "channel": "NA",
+      "ok": true,
+      "checkpoint": "done",
+      "transcriptChars": 8835,
+      "factsExtracted": 11
+    },
+    {
+      "videoId": "ZXLZidIIYEg",
+      "title": "Forgotten Treasures of Soviet Post-Punk",
+      "channel": "NA",
+      "ok": true,
+      "checkpoint": "done",
+      "transcriptChars": 8560,
+      "factsExtracted": 8
+    },
+    {
+      "videoId": "AAc32JDGtoU",
+      "title": "EGOR LETOV is a great producer (seriously!)",
+      "channel": "NA",
+      "ok": true,
+      "checkpoint": "done",
+      "transcriptChars": 9033,
+      "factsExtracted": 10
+    },
+    {
+      "videoId": "w480XGGOAQ0",
+      "title": "What does the Scriptonite universe consist of?",
+      "channel": "NA",
+      "ok": true,
+      "checkpoint": "done",
+      "transcriptChars": 8475,
+      "factsExtracted": 57
+    },
+    {
+      "videoId": "LLF3T9Xux_A",
+      "title": "Atlanta Summer Festival Ticket Giveaway Results (July 11-12, St. Petersburg)",
+      "channel": "NA",
+      "ok": true,
+      "checkpoint": "done",
+      "transcriptChars": 7934,
+      "factsExtracted": 5
+    },
+    {
+      "videoId": "ur87VXIG1yk",
+      "title": "������ � ����� ��� ����� ������� ��������?",
+      "channel": "NA",
+      "ok": true,
+      "checkpoint": "done",
+      "transcriptChars": 7741,
+      "factsExtracted": 10
+    },
+    {
+      "videoId": "G5iwSKHrN6Y",
+      "title": "\"Battle for Respect\" is the first show about Russian rap on TV.",
+      "channel": "NA",
+      "ok": true,
+      "checkpoint": "done",
+      "transcriptChars": 10032,
+      "factsExtracted": 0
+    },
+    {
+      "videoId": "xjX7lVgEaRU",
+      "title": "Lida, плм, KSB muzic — NPC | Разбор трека",
+      "channel": "Риса за Творчество",
+      "ok": true,
+      "checkpoint": "done",
+      "transcriptChars": 8039,
+      "factsExtracted": 15
+    },
+    {
+      "videoId": "EsKyq3zVvCg",
+      "title": "Aarne, Платина — На бумере | Разбор трека",
+      "channel": "Риса за Творчество",
+      "ok": true,
+      "checkpoint": "done",
+      "transcriptChars": 6935,
+      "factsExtracted": 10
+    },
+    {
+      "videoId": "fiJ1tc_22xo",
+      "title": "SALUKI — homecoming | Разбор трека",
+      "channel": "Риса за Творчество",
+      "ok": true,
+      "checkpoint": "done",
+      "transcriptChars": 6927,
+      "factsExtracted": 8
+    },
+    {
+      "videoId": "Ozx8ahf9PJw",
+      "title": "4n Way — ИИ | Разбор трека",
+      "channel": "Риса за Творчество",
+      "ok": true,
+      "checkpoint": "done",
+      "transcriptChars": 8147,
+      "factsExtracted": 0
+    },
+    {
+      "videoId": "PKcFPnwut5g",
+      "title": "R.I. — Дома буду поздно | Разбор трека",
+      "channel": "Риса за Творчество",
+      "ok": true,
+      "checkpoint": "done",
+      "transcriptChars": 8134,
+      "factsExtracted": 10
+    },
+    {
+      "videoId": "_9aJIJ6R4dY",
+      "title": "GOSHA PIK — Отражение | Разбор трека",
+      "channel": "Риса за Творчество",
+      "ok": true,
+      "checkpoint": "done",
+      "transcriptChars": 9793,
+      "factsExtracted": 10
+    },
+    {
+      "videoId": "Dd94DGE_bQE",
+      "title": "Уральский рэп — феномен нашей музыки",
+      "channel": "ФЛОУ",
+      "ok": true,
+      "checkpoint": "done",
+      "transcriptChars": 9885,
+      "factsExtracted": 0
+    },
+    {
+      "videoId": "8l0CLalr7aM",
+      "title": "Другой такой группы в русском рэпе не было",
+      "channel": "ФЛОУ",
+      "ok": true,
+      "checkpoint": "done",
+      "transcriptChars": 9750,
+      "factsExtracted": 15
+    },
+    {
+      "videoId": "mP3Y7gY7t3s",
+      "title": "Серега Пират — Вот мой альбом, сори | Разбор альбома",
+      "channel": "Риса за Творчество",
+      "ok": true,
+      "checkpoint": "done",
+      "transcriptChars": 8434,
+      "factsExtracted": 0
+    },
+    {
+      "videoId": "R0A-wPN9Vns",
+      "title": "When you can't keep the band together",
+      "channel": "Middle 8",
+      "ok": true,
+      "checkpoint": "done",
+      "transcriptChars": 11503,
+      "factsExtracted": 15
+    },
+    {
+      "videoId": "t8q6EuQSXRk",
+      "title": "Does The Dare sound too much like LCD Soundsystem?",
+      "channel": "Middle 8",
+      "ok": true,
+      "checkpoint": "done",
+      "transcriptChars": 8829,
+      "factsExtracted": 15
+    },
+    {
+      "videoId": "sf2MjuePK-k",
+      "title": "The Last Time TV Made a Band",
+      "channel": "Middle 8",
+      "ok": true,
+      "checkpoint": "done",
+      "transcriptChars": 8015,
+      "factsExtracted": 15
+    },
+    {
+      "videoId": "fWtcTk7Dh2Y",
+      "title": "Why Don't Rappers Like Their Dads?",
+      "channel": "NA",
+      "ok": true,
+      "checkpoint": "done",
+      "transcriptChars": 9437,
+      "factsExtracted": 0
+    },
+    {
+      "videoId": "4o9BvC-osAg",
+      "title": "Why is Rem Digga unique?",
+      "channel": "NA",
+      "ok": true,
+      "checkpoint": "done",
+      "transcriptChars": 8569,
+      "factsExtracted": 0
+    },
+    {
+      "videoId": "cQl3XqsQBI4",
+      "title": "�������: ������, CRIMLID, ���������, ����� ��������, sputnik waves, tenak00, MIMIKO, PRAI$ � ��.",
+      "channel": "NA",
+      "ok": true,
+      "checkpoint": "done",
+      "transcriptChars": 8678,
+      "factsExtracted": 8
+    },
+    {
+      "videoId": "QAVaGLaMyl4",
+      "title": "������ ������ ������ ����� ���?",
+      "channel": "NA",
+      "ok": true,
+      "checkpoint": "done",
+      "transcriptChars": 10223,
+      "factsExtracted": 25
+    },
+    {
+      "videoId": "_LEv56m58r0",
+      "title": "�� ���� ������� ��������� ����?",
+      "channel": "NA",
+      "ok": true,
+      "checkpoint": "done",
+      "transcriptChars": 9699,
+      "factsExtracted": 0
+    },
+    {
+      "videoId": "cjZZuEdVgHw",
+      "title": "BATO — Miura 2 | Разбор трека и клипа",
+      "channel": "Риса за Творчество",
+      "ok": true,
+      "checkpoint": "done",
+      "transcriptChars": 8335,
+      "factsExtracted": 10
+    },
+    {
+      "videoId": "CsTvZct5Acw",
+      "title": "���� ������: ������������ ���� �����",
+      "channel": "NA",
+      "ok": true,
+      "checkpoint": "done",
+      "transcriptChars": 10084,
+      "factsExtracted": 15
+    },
+    {
+      "videoId": "QAAekkeN3r0",
+      "title": "Something weird is happening in post-punk",
+      "channel": "NA",
+      "ok": true,
+      "checkpoint": "done",
+      "transcriptChars": 9116,
+      "factsExtracted": 58
+    },
+    {
+      "videoId": "_a6rtSN3Cfk",
+      "title": "2012 ���: ��������, ����, �����, ��������� � �������� ������",
+      "channel": "NA",
+      "ok": true,
+      "checkpoint": "done",
+      "transcriptChars": 8657,
+      "factsExtracted": 11
+    },
+    {
+      "videoId": "fsTF0xYybtA",
+      "title": "������, ��������� ����� ������ ���������",
+      "channel": "NA",
+      "ok": true,
+      "checkpoint": "done",
+      "transcriptChars": 8621,
+      "factsExtracted": 0
+    },
+    {
+      "videoId": "8qwfdspf9gY",
+      "title": "��� ����� ������� ������ � ���?",
+      "channel": "NA",
+      "ok": true,
+      "checkpoint": "done",
+      "transcriptChars": 8896,
+      "factsExtracted": 15
+    },
+    {
+      "videoId": "ynZnf803wx0",
+      "title": "Why We Lose Interest in Music (and It's Normal)",
+      "channel": "NA",
+      "ok": true,
+      "checkpoint": "done",
+      "transcriptChars": 9522,
+      "factsExtracted": 0
+    },
+    {
+      "videoId": "CqsCGF7qPq4",
+      "title": "When you have three #1 albums with zero hits",
+      "channel": "Middle8",
+      "ok": true,
+      "checkpoint": "done",
+      "transcriptChars": 10377,
+      "factsExtracted": 10
+    },
+    {
+      "videoId": "oVww_Y4k9Y4",
+      "title": "������� ��� ������������ � ������ 2015!",
+      "channel": "БРОКЕН ДЭНС",
+      "ok": true,
+      "checkpoint": "done",
+      "transcriptChars": 9176,
+      "factsExtracted": 0
+    },
+    {
+      "videoId": "_Rvq1Tpho4o",
+      "title": "Eminem: How a Loser Became the World's Most Powerful Rapper",
+      "channel": "The Fast Flow",
+      "ok": true,
+      "checkpoint": "done",
+      "transcriptChars": 8597,
+      "factsExtracted": 16
+    },
+    {
+      "videoId": "oaob9WokgEU",
+      "title": "How David Bowie�s Blackstar Turned Death into Art",
+      "channel": "Middle8",
+      "ok": true,
+      "checkpoint": "done",
+      "transcriptChars": 9413,
+      "factsExtracted": 52
+    },
+    {
+      "videoId": "OqcKkdlXYw8",
+      "title": "Why The Flaming Lips Still Matter",
+      "channel": "Middle8",
+      "ok": true,
+      "checkpoint": "done",
+      "transcriptChars": 10348,
+      "factsExtracted": 12
+    },
+    {
+      "videoId": "j0AjWTk5Suc",
+      "title": "How KREC Taught Russian Rap to Feel Sad / THE BASICS",
+      "channel": "БРОКЕН ДЭНС",
+      "ok": true,
+      "checkpoint": "done",
+      "transcriptChars": 8928,
+      "factsExtracted": 10
+    }
+  ],
+  "channels": [
+    {
+      "name": "Middle8",
+      "processed": 6,
+      "total": 6
+    },
+    {
+      "name": "Middle 8",
+      "processed": 4,
+      "total": 4
+    },
+    {
+      "name": "Риса за Творчество",
+      "processed": 10,
+      "total": 10
+    },
+    {
+      "name": "БРОКЕН ДЭНС",
+      "processed": 3,
+      "total": 3
+    },
+    {
+      "name": "NA",
+      "processed": 18,
+      "total": 18
+    },
+    {
+      "name": "ФЛОУ",
+      "processed": 2,
+      "total": 2
+    },
+    {
+      "name": "The Fast Flow",
+      "processed": 1,
+      "total": 1
+    }
+  ]
+}
