@@ -19,6 +19,17 @@ import {
   saveYoutubeHarvestDashboard,
   type YoutubeHarvestDashboard,
 } from '../services/youtube-harvest-dashboard.js';
+import {
+  appendManualQueue,
+  clearManualQueue,
+  discoverChannelVideos,
+  loadHarvestChannels,
+  loadHarvestLiveProgress,
+  loadManualQueue,
+  saveHarvestLiveProgress,
+  type HarvestLiveProgress,
+  type HarvestManualQueueVideo,
+} from '../services/youtube-harvest-admin.js';
 
 const router = Router();
 
@@ -125,7 +136,7 @@ router.get('/youtube-harvest/status', (req, res) => {
     res.status(404).json({ error: 'no_harvest_data', hint: 'Run batch sync or copy state to volume' });
     return;
   }
-  res.json({ ok: true, dashboard: dash });
+  res.json({ ok: true, dashboard: dash, live: dash.live ?? loadHarvestLiveProgress() });
 });
 
 /** POST /v1/admin/youtube-harvest/sync — push dashboard snapshot from local batch */
@@ -139,6 +150,76 @@ router.post('/youtube-harvest/sync', (req, res) => {
   }
   saveYoutubeHarvestDashboard({ ...payload, updatedAt: new Date().toISOString(), source: 'api-sync' });
   res.json({ ok: true, updatedAt: payload.updatedAt, videos: payload.videos.length });
+});
+
+/** POST /v1/admin/youtube-harvest/progress — live batch progress from local runner */
+router.post('/youtube-harvest/progress', (req, res) => {
+  if (!requireHarvestAdmin(req, res)) return;
+  const body = req.body as HarvestLiveProgress;
+  if (!body || typeof body !== 'object') {
+    res.status(400).json({ error: 'invalid progress payload' });
+    return;
+  }
+  saveHarvestLiveProgress({ ...body, updatedAt: new Date().toISOString() });
+  res.json({ ok: true, status: body.status });
+});
+
+/** GET /v1/admin/youtube-harvest/channels */
+router.get('/youtube-harvest/channels', (req, res) => {
+  if (!requireHarvestAdmin(req, res)) return;
+  res.json({ ok: true, channels: loadHarvestChannels() });
+});
+
+/** GET /v1/admin/youtube-harvest/discover?channel=middle8&limit=15 */
+router.get('/youtube-harvest/discover', async (req, res) => {
+  if (!requireHarvestAdmin(req, res)) return;
+  const channel = String(req.query.channel ?? '').trim();
+  const limit = Math.min(Math.max(Number(req.query.limit) || 15, 1), 30);
+  if (!channel) {
+    res.status(400).json({ error: 'channel query required' });
+    return;
+  }
+  try {
+    const videos = await discoverChannelVideos(channel, limit);
+    res.json({ ok: true, channel, videos });
+  } catch (err) {
+    res.status(500).json({ error: err instanceof Error ? err.message : String(err) });
+  }
+});
+
+/** GET /v1/admin/youtube-harvest/queue */
+router.get('/youtube-harvest/queue', (req, res) => {
+  if (!requireHarvestAdmin(req, res)) return;
+  const q = loadManualQueue();
+  res.json({ ok: true, ...q });
+});
+
+/** POST /v1/admin/youtube-harvest/queue — add videos to manual run queue */
+router.post('/youtube-harvest/queue', (req, res) => {
+  if (!requireHarvestAdmin(req, res)) return;
+  const body = req.body as { videos?: HarvestManualQueueVideo[] };
+  const items = Array.isArray(body.videos) ? body.videos : [];
+  if (!items.length) {
+    res.status(400).json({ error: 'videos array required' });
+    return;
+  }
+  const normalized = items.map((v) => ({
+    id: String(v.id ?? '').trim(),
+    title: String(v.title ?? v.id).trim(),
+    url: String(v.url ?? `https://www.youtube.com/watch?v=${v.id}`).trim(),
+    channelName: String(v.channelName ?? '').trim(),
+    languageCode: v.languageCode,
+    addedBy: 'dashboard',
+  })).filter((v) => v.id.length >= 6);
+  const videos = appendManualQueue(normalized);
+  res.json({ ok: true, queued: normalized.length, total: videos.length, videos });
+});
+
+/** DELETE /v1/admin/youtube-harvest/queue */
+router.delete('/youtube-harvest/queue', (req, res) => {
+  if (!requireHarvestAdmin(req, res)) return;
+  clearManualQueue();
+  res.json({ ok: true, cleared: true });
 });
 
 export default router;

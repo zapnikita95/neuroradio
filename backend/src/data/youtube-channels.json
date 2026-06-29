@@ -1,0 +1,39 @@
+{
+  "version": 1,
+  "channels": [
+    {
+      "id": "broken_dance",
+      "name": "БРОКЕН ДЭНС",
+      "url": "https://www.youtube.com/@broken_dance/videos",
+      "channelId": "UCWZ57aki9Xi0ZqhVBwZ87Pw",
+      "lang": "rus"
+    },
+    {
+      "id": "the_fast_flow",
+      "name": "The Fast Flow",
+      "url": "https://www.youtube.com/@the-fast-flow/videos",
+      "channelId": "UCouPUk4vlKSo4Lsw3TX3yiA",
+      "lang": "rus"
+    },
+    {
+      "id": "risazatvorchestvo",
+      "name": "РЗТ",
+      "url": "https://www.youtube.com/@risazatvorchestvo/videos",
+      "channelId": "UCTSqa9dBButQvhLmrBBzneQ",
+      "lang": "rus"
+    },
+    {
+      "id": "middle8",
+      "name": "Middle8",
+      "url": "https://www.youtube.com/@Middle8/videos",
+      "channelId": "UCfeppgcy70ERp4gQrsYijsg",
+      "lang": "eng"
+    }
+  ],
+  "defaults": {
+    "videosPerChannel": 10,
+    "weeklyNewPerChannel": 1,
+    "maxVideoDurationSec": 7200,
+    "sttProvider": "railway"
+  }
+}

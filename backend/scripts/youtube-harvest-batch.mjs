@@ -240,6 +240,73 @@ function collectVideos(cfg, state, mode) {
 function saveProgress(progress) {
   progress.updatedAt = new Date().toISOString();
   saveJson(PROGRESS_FILE, progress);
+  void syncProgressRemote(progress);
+}
+
+async function syncProgressRemote(progress) {
+  const token = process.env.HARVEST_DASHBOARD_TOKEN?.trim();
+  const bff =
+    process.env.WEBSITE_DEMO_API_BASE?.trim() ||
+    process.env.BFF_URL?.trim() ||
+    process.env.PUBLIC_BFF_URL?.trim() ||
+    'https://www.efir-ai.ru';
+  if (!token) return;
+  try {
+    await fetch(`${bff.replace(/\/$/, '')}/v1/admin/youtube-harvest/progress`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'x-harvest-dashboard-token': token },
+      body: JSON.stringify({ status: 'running', ...progress }),
+      signal: AbortSignal.timeout(30_000),
+    });
+  } catch {
+    /* best-effort */
+  }
+}
+
+async function pullRemoteManualQueue() {
+  const token = process.env.HARVEST_DASHBOARD_TOKEN?.trim();
+  const bff =
+    process.env.WEBSITE_DEMO_API_BASE?.trim() ||
+    process.env.BFF_URL?.trim() ||
+    process.env.PUBLIC_BFF_URL?.trim() ||
+    'https://www.efir-ai.ru';
+  if (!token) return [];
+  try {
+    const res = await fetch(`${bff.replace(/\/$/, '')}/v1/admin/youtube-harvest/queue`, {
+      headers: { 'x-harvest-dashboard-token': token },
+      signal: AbortSignal.timeout(30_000),
+    });
+    if (!res.ok) return [];
+    const data = await res.json();
+    return (data.videos ?? []).map((v) => ({
+      id: v.id,
+      title: v.title,
+      url: v.url,
+      channelName: v.channelName,
+      languageCode: v.languageCode ?? 'rus',
+    }));
+  } catch {
+    return [];
+  }
+}
+
+async function clearRemoteManualQueue() {
+  const token = process.env.HARVEST_DASHBOARD_TOKEN?.trim();
+  const bff =
+    process.env.WEBSITE_DEMO_API_BASE?.trim() ||
+    process.env.BFF_URL?.trim() ||
+    process.env.PUBLIC_BFF_URL?.trim() ||
+    'https://www.efir-ai.ru';
+  if (!token) return;
+  try {
+    await fetch(`${bff.replace(/\/$/, '')}/v1/admin/youtube-harvest/queue`, {
+      method: 'DELETE',
+      headers: { 'x-harvest-dashboard-token': token },
+      signal: AbortSignal.timeout(30_000),
+    });
+  } catch {
+    /* best-effort */
+  }
 }
 
 function loadRetryQueue() {
@@ -357,9 +424,18 @@ async function main() {
 
   const mode = hasFlag('weekly') ? 'weekly' : 'initial';
   const retryOnly = hasFlag('retry-only');
-  let videos = retryOnly ? [] : collectVideos(cfg, state, mode);
+  const fromQueue = hasFlag('from-queue');
+  let videos = retryOnly || fromQueue ? [] : collectVideos(cfg, state, mode);
   const pendingRetry = loadRetryQueue().filter((q) => !(state.processedVideoIds ?? []).includes(q.id));
-  if (retryOnly) {
+  if (fromQueue) {
+    const manual = await pullRemoteManualQueue();
+    if (!manual.length) {
+      console.log('[batch] from-queue: remote queue empty');
+      return;
+    }
+    videos = manual;
+    console.log(`[batch] from-queue: ${videos.length} video(s) from dashboard`);
+  } else if (retryOnly) {
     if (!pendingRetry.length) {
       console.log('[batch] retry-only: retry queue empty');
       return;
@@ -429,23 +505,40 @@ async function main() {
 
   const run = {
     id: `run-${Date.now()}`,
-    mode,
+    mode: fromQueue ? 'manual-queue' : mode,
     startedAt: new Date().toISOString(),
     sttProvider,
     videoIds: videos.map((v) => v.id),
     reports: [],
   };
 
+  saveProgress({
+    runId: run.id,
+    status: 'running',
+    mode: run.mode,
+    startedAt: run.startedAt,
+    current: 0,
+    total: videos.length,
+    sttProvider,
+    queue: videos.map((v) => ({ videoId: v.id, title: v.title, channel: v.channelName })),
+    message: `Старт: ${videos.length} видео`,
+  });
+
   for (let i = 0; i < videos.length; i += 1) {
     const v = videos[i];
     console.log(`\n[batch ${i + 1}/${videos.length}] ${v.channelName} — ${v.title}`);
     saveProgress({
       runId: run.id,
+      status: 'running',
+      mode: run.mode,
+      startedAt: run.startedAt,
       current: i + 1,
       total: videos.length,
       videoId: v.id,
       title: v.title,
+      step: 'processing',
       sttProvider,
+      queue: videos.slice(i).map((x) => ({ videoId: x.id, title: x.title, channel: x.channelName })),
     });
     const ctx = { dryRun, maxSeconds, sttProvider, catalog, state, run };
     try {
@@ -497,7 +590,8 @@ async function main() {
     }
   }
 
-  saveProgress({ runId: run.id, status: 'finished', finishedAt: new Date().toISOString() });
+  saveProgress({ runId: run.id, status: 'finished', finishedAt: new Date().toISOString(), mode: run.mode });
+  if (fromQueue) await clearRemoteManualQueue();
 
   run.finishedAt = new Date().toISOString();
   state.runs = [...(state.runs ?? []), run].slice(-40);
@@ -509,83 +603,22 @@ async function main() {
   console.log(`[batch] catalog: ${CATALOG_FILE}`);
   console.log(`[batch] state: ${STATE_FILE}`);
 
-  await publishHarvestDashboard({ state, catalog, run, videos });
+  await publishHarvestDashboard();
 }
 
-async function publishHarvestDashboard({ state, catalog, run, videos }) {
+async function publishHarvestDashboard() {
+  const { buildYoutubeHarvestDashboardFromFiles, saveYoutubeHarvestDashboard } = await import(
+    '../dist/services/youtube-harvest-dashboard.js'
+  );
+  const dashboard = buildYoutubeHarvestDashboardFromFiles();
+  if (!dashboard) {
+    console.warn('[batch] dashboard build skipped — no state');
+    return;
+  }
+  saveYoutubeHarvestDashboard(dashboard);
   const DASHBOARD_FILE = path.join(DATA, 'youtube-harvest-dashboard.json');
-  const failedIds = [...new Set((run.reports ?? []).filter((r) => !r.ok).map((r) => r.videoId))];
-  const ingestedRun = (run.reports ?? []).filter((r) => r.ok).reduce((s, r) => s + (r.ingested ?? 0), 0);
-  const catalogById = new Map((catalog.videos ?? []).map((v) => [v.id, v]));
-  const reportById = new Map((run.reports ?? []).map((r) => [r.videoId, r]));
-
-  function checkpointStep(videoId) {
-    const cp = path.join(OUT_DIR, videoId, 'checkpoint.json');
-    if (!fs.existsSync(cp)) return undefined;
-    try {
-      return JSON.parse(fs.readFileSync(cp, 'utf8')).step;
-    } catch {
-      return undefined;
-    }
-  }
-
-  function transcriptChars(videoId) {
-    const p = path.join(OUT_DIR, videoId, 'transcript.txt');
-    if (!fs.existsSync(p)) return undefined;
-    return fs.readFileSync(p, 'utf8').trim().length;
-  }
-
-  function factsExtracted(videoId) {
-    const p = path.join(OUT_DIR, videoId, 'facts-raw.json');
-    if (!fs.existsSync(p)) return undefined;
-    try {
-      const raw = JSON.parse(fs.readFileSync(p, 'utf8'));
-      return Array.isArray(raw.facts) ? raw.facts.length : undefined;
-    } catch {
-      return undefined;
-    }
-  }
-
-  const videoIds = [...new Set([...(run.videoIds ?? []), ...(state.processedVideoIds ?? []), ...failedIds])];
-  const dashboard = {
-    updatedAt: new Date().toISOString(),
-    source: 'local-batch',
-    runId: run.id,
-    mode: run.mode,
-    startedAt: run.startedAt,
-    finishedAt: run.finishedAt,
-    sttProvider: run.sttProvider,
-    queued: run.videoIds?.length ?? videoIds.length,
-    processed: state.processedVideoIds?.length ?? 0,
-    pending: Math.max(0, (run.videoIds?.length ?? 0) - (state.processedVideoIds?.length ?? 0)),
-    failed: failedIds.length,
-    ok: (run.reports ?? []).filter((r) => r.ok).length,
-    ingestedRun,
-    catalogFacts: catalog.facts?.length ?? 0,
-    catalogVideos: catalog.videos?.length ?? 0,
-    bankYoutubeFacts: 0,
-    retryQueue: loadRetryQueue().length,
-    failedVideoIds: failedIds,
-    videos: videoIds.map((videoId) => {
-      const meta = catalogById.get(videoId) ?? videos.find((v) => v.id === videoId);
-      const rep = reportById.get(videoId);
-      return {
-        videoId,
-        title: meta?.title ?? videoId,
-        channel: meta?.channelName ?? meta?.channel,
-        ok: rep ? rep.ok : (state.processedVideoIds ?? []).includes(videoId),
-        ingested: rep?.ingested,
-        error: rep?.error?.slice(0, 200),
-        retried: rep?.retried,
-        checkpoint: checkpointStep(videoId),
-        transcriptChars: transcriptChars(videoId),
-        factsExtracted: factsExtracted(videoId),
-      };
-    }),
-  };
-
-  saveJson(DASHBOARD_FILE, dashboard);
   const siteDash = path.join(ROOT, '..', 'website', 'admin', 'harvest-data.json');
+  saveJson(DASHBOARD_FILE, dashboard);
   saveJson(siteDash, dashboard);
   console.log(`[batch] dashboard: ${DASHBOARD_FILE}`);
   console.log(`[batch] site snapshot: ${siteDash}`);

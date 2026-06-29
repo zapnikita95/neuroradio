@@ -7,7 +7,7 @@
   "scripts": {
     "dev": "tsx watch src/index.ts",
     "start": "node dist/index.js",
-    "build": "tsc && node -e \"const fs=require('fs'); fs.mkdirSync('dist/data',{recursive:true}); for (const f of ['known-artists.json','curated-facts.json','cover-classics.json','known-cover-originals.json','popular-tracks-catalog.json','facts-bank-seed.json','solo-artist-grammar.json','german-pronunciation.json','french-pronunciation.json','artist-pronunciation.json','style-corpus-seed.jsonl']) { const s='src/data/'+f; if(fs.existsSync(s)) fs.copyFileSync(s,'dist/data/'+f); }\"",
+    "build": "tsc && node -e \"const fs=require('fs'); fs.mkdirSync('dist/data',{recursive:true}); for (const f of ['known-artists.json','curated-facts.json','cover-classics.json','known-cover-originals.json','popular-tracks-catalog.json','facts-bank-seed.json','solo-artist-grammar.json','german-pronunciation.json','french-pronunciation.json','artist-pronunciation.json','style-corpus-seed.jsonl','youtube-channels.json']) { const s='src/data/'+f; if(fs.existsSync(s)) fs.copyFileSync(s,'dist/data/'+f); }\"",
     "test:fr-phonetic": "npm run build && node scripts/test-fr-phonetic.mjs",
     "typecheck": "tsc --noEmit",
     "test:gemini": "npm run build && node scripts/test-live-gemini-story.mjs",
@@ -71,6 +71,9 @@
     "harvest:youtube-essay": "npm run build && node scripts/youtube-essay-fact-harvest.mjs",
     "harvest:youtube-essay:dry": "npm run build && node scripts/youtube-essay-fact-harvest.mjs --dry-run",
     "harvest:youtube-batch": "npm run build && node scripts/youtube-harvest-batch.mjs --initial",
+    "harvest:youtube-retry": "npm run build && node scripts/youtube-harvest-batch.mjs --retry-only",
+    "harvest:youtube-from-queue": "npm run build && node scripts/youtube-harvest-batch.mjs --from-queue",
+    "harvest:youtube-reingest": "npm run build && node scripts/youtube-harvest-reingest-catalog.mjs",
     "harvest:youtube-weekly": "npm run build && node scripts/youtube-harvest-batch.mjs --weekly",
     "harvest:youtube-dashboard": "npm run build && node scripts/youtube-harvest-publish-dashboard.mjs"
   },

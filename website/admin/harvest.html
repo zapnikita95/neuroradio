@@ -8,115 +8,81 @@
   <link rel="icon" type="image/png" sizes="32x32" href="../assets/favicon-32.png" />
   <style>
     :root {
-      --bg: #08070f;
-      --card: #12101c;
-      --border: #2a2540;
-      --text: #eceaf5;
-      --muted: #9b94b8;
-      --ok: #3dd68c;
-      --fail: #ff6b8a;
-      --accent: #8b7cf6;
+      --bg: #08070f; --card: #12101c; --border: #2a2540; --text: #eceaf5;
+      --muted: #9b94b8; --ok: #3dd68c; --fail: #ff6b8a; --accent: #8b7cf6; --warn: #f5c542;
     }
     * { box-sizing: border-box; }
-    body {
-      margin: 0;
-      font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
-      background: var(--bg);
-      color: var(--text);
-      line-height: 1.45;
-    }
-    .wrap { max-width: 1100px; margin: 0 auto; padding: 24px 16px 48px; }
+    body { margin: 0; font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; background: var(--bg); color: var(--text); line-height: 1.45; }
+    .wrap { max-width: 1200px; margin: 0 auto; padding: 24px 16px 48px; }
     h1 { font-size: 1.35rem; margin: 0 0 8px; }
-    .sub { color: var(--muted); font-size: 0.9rem; margin-bottom: 20px; }
-    .auth {
-      background: var(--card);
-      border: 1px solid var(--border);
-      border-radius: 12px;
-      padding: 16px;
-      margin-bottom: 20px;
-      display: flex;
-      gap: 10px;
-      flex-wrap: wrap;
-      align-items: center;
-    }
-    .auth input {
-      flex: 1;
-      min-width: 220px;
-      padding: 10px 12px;
-      border-radius: 8px;
-      border: 1px solid var(--border);
-      background: #0c0a14;
-      color: var(--text);
-    }
-    button {
-      padding: 10px 16px;
-      border-radius: 8px;
-      border: none;
-      background: var(--accent);
-      color: #fff;
-      cursor: pointer;
-      font-weight: 600;
-    }
+    h2 { font-size: 1rem; margin: 0 0 12px; }
+    .sub { color: var(--muted); font-size: 0.9rem; margin-bottom: 16px; }
+    .auth, .card { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 16px; margin-bottom: 16px; }
+    .auth { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+    .auth input, select { flex: 1; min-width: 180px; padding: 10px 12px; border-radius: 8px; border: 1px solid var(--border); background: #0c0a14; color: var(--text); }
+    button { padding: 10px 16px; border-radius: 8px; border: none; background: var(--accent); color: #fff; cursor: pointer; font-weight: 600; }
+    button.secondary { background: #2a2540; }
     button:disabled { opacity: 0.5; cursor: wait; }
-    .grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
-      gap: 12px;
-      margin-bottom: 24px;
-    }
-    .stat {
-      background: var(--card);
-      border: 1px solid var(--border);
-      border-radius: 12px;
-      padding: 14px;
-    }
-    .stat b { display: block; font-size: 1.6rem; margin-bottom: 4px; }
-    .stat span { color: var(--muted); font-size: 0.8rem; }
-    table {
-      width: 100%;
-      border-collapse: collapse;
-      font-size: 0.85rem;
-    }
-    th, td {
-      text-align: left;
-      padding: 10px 8px;
-      border-bottom: 1px solid var(--border);
-      vertical-align: top;
-    }
+    .live { border-color: var(--ok); background: rgba(61,214,140,0.08); }
+    .live.idle { border-color: var(--border); background: var(--card); }
+    .live.running { border-color: var(--warn); background: rgba(245,197,66,0.08); animation: pulse 2s infinite; }
+    @keyframes pulse { 50% { opacity: 0.85; } }
+    .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 12px; margin-bottom: 16px; }
+    .stat { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 14px; }
+    .stat b { display: block; font-size: 1.5rem; margin-bottom: 4px; }
+    .stat span { color: var(--muted); font-size: 0.78rem; }
+    table { width: 100%; border-collapse: collapse; font-size: 0.82rem; }
+    th, td { text-align: left; padding: 8px 6px; border-bottom: 1px solid var(--border); vertical-align: top; }
     th { color: var(--muted); font-weight: 600; }
-    .pill {
-      display: inline-block;
-      padding: 2px 8px;
-      border-radius: 999px;
-      font-size: 0.75rem;
-      font-weight: 600;
-    }
+    .pill { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 0.72rem; font-weight: 600; }
     .pill.ok { background: rgba(61,214,140,0.15); color: var(--ok); }
     .pill.fail { background: rgba(255,107,138,0.15); color: var(--fail); }
+    .pill.queue { background: rgba(139,124,246,0.15); color: var(--accent); }
     .err { color: var(--fail); font-size: 0.9rem; }
+    .hint { color: var(--muted); font-size: 0.82rem; margin-top: 8px; }
     a { color: var(--accent); }
-    .card {
-      background: var(--card);
-      border: 1px solid var(--border);
-      border-radius: 12px;
-      padding: 16px;
-      overflow-x: auto;
-    }
+    .discover-list { max-height: 320px; overflow-y: auto; margin-top: 12px; }
+    .discover-row { display: flex; gap: 8px; align-items: flex-start; padding: 8px 0; border-bottom: 1px solid var(--border); }
+    .discover-row label { flex: 1; cursor: pointer; }
+    .discover-row small { color: var(--muted); display: block; }
+    .row-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
+    code { background: #0c0a14; padding: 2px 6px; border-radius: 4px; font-size: 0.85em; }
   </style>
 </head>
 <body>
   <div class="wrap">
     <h1>YouTube Essay Harvest</h1>
-    <p class="sub">Разбор видео → STT (ElevenLabs) → факты → банк. Доступ по токену <code>HARVEST_DASHBOARD_TOKEN</code>.</p>
+    <p class="sub">STT → LLM → каталог → банк. Прогон идёт <strong>локально</strong> на твоей машине; дашборд показывает синхронизированное состояние.</p>
 
     <div class="auth">
-      <input id="token" type="password" placeholder="Токен дашборда" autocomplete="off" />
+      <input id="token" type="password" placeholder="HARVEST_DASHBOARD_TOKEN" autocomplete="off" />
       <button id="loadBtn" type="button">Обновить</button>
+      <label><input type="checkbox" id="autoRefresh" checked /> авто 10с</label>
     </div>
     <p id="err" class="err" hidden></p>
 
+    <div id="liveBox" class="card live idle" hidden>
+      <h2 id="liveTitle">Прогон</h2>
+      <p id="liveBody" class="sub" style="margin:0"></p>
+      <div id="liveQueue" class="hint"></div>
+    </div>
+
     <div id="stats" class="grid" hidden></div>
     <div id="meta" class="sub" hidden></div>
+
+    <div id="discoverBox" class="card" hidden>
+      <h2>Добавить видео в прогон</h2>
+      <p class="hint">Поиск по RSS каналов (Broken Dance, Fast Flow, РЗТ, Middle8). Выбери → «В очередь». Запуск локально: <code>npm run harvest:youtube-from-queue</code></p>
+      <div class="row-actions">
+        <select id="channelPick"></select>
+        <button id="discoverBtn" type="button">Найти видео</button>
+        <button id="queueBtn" type="button" class="secondary" disabled>Добавить выбранные в очередь</button>
+        <button id="clearQueueBtn" type="button" class="secondary">Очистить очередь</button>
+      </div>
+      <div id="discoverList" class="discover-list"></div>
+      <p id="queueInfo" class="hint"></p>
+    </div>
+
     <div id="tableWrap" class="card" hidden>
       <table>
         <thead>
@@ -139,103 +105,229 @@
     const tokenEl = document.getElementById('token');
     const saved = localStorage.getItem(TOKEN_KEY);
     if (saved) tokenEl.value = saved;
+    let pollTimer = null;
+    let discoverVideos = [];
 
     function apiBase() {
       return (window.EFIR_API_BASE || window.location.origin || '').replace(/\/$/, '');
     }
+    function token() { return tokenEl.value.trim(); }
+    function hdr() { return { 'x-harvest-dashboard-token': token() }; }
 
-    async function load() {
-      const token = tokenEl.value.trim();
-      if (!token) {
-        showErr('Вставь токен из Railway → HARVEST_DASHBOARD_TOKEN');
-        return;
-      }
-      localStorage.setItem(TOKEN_KEY, token);
-      document.getElementById('loadBtn').disabled = true;
-      showErr('');
-      try {
-        const res = await fetch(apiBase() + '/v1/admin/youtube-harvest/status?token=' + encodeURIComponent(token));
-        const data = await res.json();
-        if (res.ok && data.dashboard) {
-          render(data.dashboard, 'Railway');
-          return;
-        }
-        if (data.error === 'no_harvest_data') {
-          await loadStaticFallback();
-          return;
-        }
-        var hint = data.hint ? ' — ' + data.hint : '';
-        throw new Error((data.error || res.statusText) + hint);
-      } catch (e) {
-        try {
-          await loadStaticFallback();
-        } catch (e2) {
-          showErr(e.message || String(e));
-        }
-      } finally {
-        document.getElementById('loadBtn').disabled = false;
-      }
+    async function apiGet(path) {
+      const res = await fetch(apiBase() + path + (path.includes('?') ? '&' : '?') + 'token=' + encodeURIComponent(token()));
+      const data = await res.json();
+      if (!res.ok) throw data;
+      return data;
     }
-
-    async function loadStaticFallback() {
-      const res = await fetch('harvest-data.json?_=' + Date.now());
-      if (!res.ok) throw new Error('Нет данных на сервере и нет harvest-data.json на сайте');
-      const dashboard = await res.json();
-      render(dashboard, 'snapshot (сайт)');
+    async function apiPost(path, body) {
+      const res = await fetch(apiBase() + path, { method: 'POST', headers: { ...hdr(), 'content-type': 'application/json' }, body: JSON.stringify(body) });
+      const data = await res.json();
+      if (!res.ok) throw data;
+      return data;
+    }
+    async function apiDelete(path) {
+      const res = await fetch(apiBase() + path + '?token=' + encodeURIComponent(token()), { method: 'DELETE', headers: hdr() });
+      return res.json();
     }
 
     function showErr(msg) {
       const el = document.getElementById('err');
       el.hidden = !msg;
-      el.textContent = msg;
+      el.textContent = msg || '';
+    }
+
+    function fmt(n) { return n == null ? '0' : String(n); }
+
+    function renderLive(live, d) {
+      const box = document.getElementById('liveBox');
+      box.hidden = false;
+      box.className = 'card live ' + (live && live.status === 'running' ? 'running' : 'idle');
+      const title = document.getElementById('liveTitle');
+      const body = document.getElementById('liveBody');
+      const qEl = document.getElementById('liveQueue');
+      if (!live || live.status === 'idle' || live.status === 'finished') {
+        title.textContent = live && live.status === 'finished' ? 'Последний прогон завершён' : 'Сейчас прогон не идёт';
+        body.textContent = d
+          ? 'Run ' + (d.runId || '—') + ' · mode ' + (d.mode || '—') +
+            (d.finishedAt ? ' · finished ' + new Date(d.finishedAt).toLocaleString('ru') : '') +
+            ' · в очереди на сервере: ' + fmt(d.manualQueue) + ' · retry: ' + fmt(d.retryQueue)
+          : 'Запусти локально batch — прогресс появится здесь после sync.';
+        qEl.textContent = live && live.status === 'finished' && live.finishedAt
+          ? 'Finished: ' + new Date(live.finishedAt).toLocaleString('ru')
+          : 'Команда: cd backend && npm run harvest:youtube-batch -- --from-queue';
+        return;
+      }
+      title.textContent = 'Идёт прогон ' + (live.runId || '');
+      body.textContent = (live.current || '?') + ' / ' + (live.total || '?') + ' — ' + (live.title || live.videoId || '…') +
+        (live.step ? ' [' + live.step + ']' : '') + (live.sttProvider ? ' · STT ' + live.sttProvider : '');
+      const q = live.queue || [];
+      qEl.innerHTML = q.length
+        ? '<strong>Очередь:</strong> ' + q.slice(0, 8).map(function (x) { return escapeHtml(x.title || x.videoId); }).join(' → ') +
+          (q.length > 8 ? ' … +' + (q.length - 8) : '')
+        : '';
     }
 
     function render(d, sourceLabel) {
       document.getElementById('stats').hidden = false;
       document.getElementById('meta').hidden = false;
       document.getElementById('tableWrap').hidden = false;
+      document.getElementById('discoverBox').hidden = false;
 
       const stats = [
-        ['processed', d.processed, 'разобрано'],
-        ['pending', d.pending, 'осталось'],
-        ['failed', d.failed, 'упало'],
-        ['ingestedRun', d.ingestedRun, 'в банк (run)'],
-        ['catalogFacts', d.catalogFacts, 'в каталоге'],
-        ['catalogVideos', d.catalogVideos, 'видео в каталоге'],
+        [d.processed, 'разобрано'],
+        [d.pending, 'осталось'],
+        [d.failed, 'упало'],
+        [d.catalogSavedTotal ?? d.ingestedRun, 'в банке (каталог)'],
+        [d.catalogFacts, 'фактов в каталоге'],
+        [d.manualQueue ?? 0, 'в очереди UI'],
+        [d.retryQueue ?? 0, 'retry'],
       ];
       document.getElementById('stats').innerHTML = stats
-        .map(([k, v, label]) => '<div class="stat"><b>' + v + '</b><span>' + label + '</span></div>')
+        .map(function (pair) { return '<div class="stat"><b>' + pair[0] + '</b><span>' + pair[1] + '</span></div>'; })
         .join('');
 
       document.getElementById('meta').textContent =
-        'Обновлено: ' + (d.updatedAt || '—') +
+        'Обновлено: ' + (d.updatedAt ? new Date(d.updatedAt).toLocaleString('ru') : '—') +
         ' · источник: ' + (sourceLabel || d.source || '—') +
-        ' · run: ' + (d.runId || '—') +
-        (d.finishedAt ? ' · finished ' + d.finishedAt : '') +
-        ' · STT: ' + (d.sttProvider || 'railway');
+        ' · run: ' + (d.runId || '—') + ' · mode: ' + (d.mode || '—') +
+        (d.startedAt ? ' · started ' + new Date(d.startedAt).toLocaleString('ru') : '');
+
+      renderLive(d.live, d);
 
       const tbody = document.getElementById('rows');
       tbody.innerHTML = (d.videos || []).map(function (v) {
-        const stt = v.transcriptChars ? v.transcriptChars + ' sym' : '—';
-        const facts = v.factsExtracted != null ? v.factsExtracted : '—';
-        const ing = v.ingested != null ? v.ingested : '—';
-        const status = v.ok
-          ? '<span class="pill ok">OK</span>'
-          : '<span class="pill fail">FAIL</span>';
+        const stt = v.transcriptChars != null ? v.transcriptChars + ' sym' : '—';
+        const facts = fmt(v.factsExtracted ?? v.catalogFacts ?? 0);
+        const bank = fmt(v.catalogSaved ?? v.ingested ?? 0);
+        let status = v.ok ? '<span class="pill ok">OK</span>' : '<span class="pill fail">FAIL</span>';
+        if (v.inRetryQueue) status += ' <span class="pill queue">retry</span>';
         const title = '<a href="https://www.youtube.com/watch?v=' + v.videoId + '" target="_blank" rel="noopener">' +
           escapeHtml(v.title || v.videoId) + '</a>';
         return '<tr><td>' + status + '</td><td>' + title + '</td><td>' + escapeHtml(v.channel || '—') +
-          '</td><td>' + stt + '</td><td>' + facts + '</td><td>' + ing + '</td><td>' +
+          '</td><td>' + stt + '</td><td>' + facts + '</td><td>' + bank + '</td><td>' +
           escapeHtml(v.checkpoint || '—') + '</td></tr>';
       }).join('');
+    }
+
+    async function loadStaticFallback() {
+      const res = await fetch('harvest-data.json?_=' + Date.now());
+      if (!res.ok) throw new Error('Нет данных');
+      return res.json();
+    }
+
+    async function load() {
+      if (!token()) { showErr('Вставь HARVEST_DASHBOARD_TOKEN'); return; }
+      localStorage.setItem(TOKEN_KEY, token());
+      document.getElementById('loadBtn').disabled = true;
+      showErr('');
+      try {
+        const data = await apiGet('/v1/admin/youtube-harvest/status');
+        render(data.dashboard, 'Railway');
+      } catch (e) {
+        try {
+          const dash = await loadStaticFallback();
+          render(dash, 'snapshot (сайт)');
+        } catch (e2) {
+          showErr((e.error || e.message || String(e)) + ' — нет snapshot');
+        }
+      } finally {
+        document.getElementById('loadBtn').disabled = false;
+      }
+    }
+
+    async function loadChannels() {
+      if (!token()) return;
+      try {
+        const data = await apiGet('/v1/admin/youtube-harvest/channels');
+        const sel = document.getElementById('channelPick');
+        sel.innerHTML = (data.channels || []).map(function (c) {
+          return '<option value="' + escapeHtml(c.id) + '">' + escapeHtml(c.name) + '</option>';
+        }).join('');
+      } catch (_) { /* optional */ }
+    }
+
+    async function loadQueueInfo() {
+      if (!token()) return;
+      try {
+        const q = await apiGet('/v1/admin/youtube-harvest/queue');
+        document.getElementById('queueInfo').textContent = 'В очереди на сервере: ' + (q.videos || []).length +
+          ' · запуск: npm run harvest:youtube-from-queue';
+      } catch (_) {}
+    }
+
+    async function discover() {
+      if (!token()) return;
+      const ch = document.getElementById('channelPick').value;
+      document.getElementById('discoverBtn').disabled = true;
+      try {
+        const data = await apiGet('/v1/admin/youtube-harvest/discover?channel=' + encodeURIComponent(ch) + '&limit=20');
+        discoverVideos = data.videos || [];
+        document.getElementById('discoverList').innerHTML = discoverVideos.map(function (v, i) {
+          const dis = v.alreadyProcessed ? ' disabled' : '';
+          const tag = v.alreadyProcessed ? ' <small>(уже разобрано)</small>' : '';
+          return '<div class="discover-row"><input type="checkbox" data-idx="' + i + '"' + dis + ' />' +
+            '<label><strong>' + escapeHtml(v.title) + '</strong>' + tag +
+            '<small>' + escapeHtml(v.channelName) + ' · ' + (v.publishedAt || '').slice(0, 10) + '</small></label></div>';
+        }).join('');
+        document.getElementById('queueBtn').disabled = false;
+      } catch (e) {
+        showErr(e.error || e.message || 'discover failed');
+      } finally {
+        document.getElementById('discoverBtn').disabled = false;
+      }
+    }
+
+    async function queueSelected() {
+      const picks = [];
+      document.querySelectorAll('#discoverList input[type=checkbox]:checked').forEach(function (el) {
+        const v = discoverVideos[Number(el.dataset.idx)];
+        if (v) picks.push({ id: v.id, title: v.title, url: v.url, channelName: v.channelName, languageCode: v.channelName === 'Middle8' ? 'eng' : 'rus' });
+      });
+      if (!picks.length) { showErr('Выбери хотя бы одно видео'); return; }
+      try {
+        const r = await apiPost('/v1/admin/youtube-harvest/queue?token=' + encodeURIComponent(token()), { videos: picks });
+        showErr('');
+        document.getElementById('queueInfo').textContent = 'Добавлено ' + r.queued + ', всего в очереди: ' + r.total;
+        await load();
+      } catch (e) {
+        showErr(e.error || e.message || 'queue failed');
+      }
+    }
+
+    async function clearQueue() {
+      try {
+        await apiDelete('/v1/admin/youtube-harvest/queue');
+        document.getElementById('queueInfo').textContent = 'Очередь очищена';
+        await load();
+      } catch (e) {
+        showErr(e.error || e.message || 'clear failed');
+      }
     }
 
     function escapeHtml(s) {
       return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;');
     }
 
-    document.getElementById('loadBtn').addEventListener('click', load);
-    if (saved) load();
+    function setupPoll() {
+      if (pollTimer) clearInterval(pollTimer);
+      if (document.getElementById('autoRefresh').checked) {
+        pollTimer = setInterval(load, 10000);
+      }
+    }
+
+    document.getElementById('loadBtn').addEventListener('click', function () { load(); loadQueueInfo(); });
+    document.getElementById('discoverBtn').addEventListener('click', discover);
+    document.getElementById('queueBtn').addEventListener('click', queueSelected);
+    document.getElementById('clearQueueBtn').addEventListener('click', clearQueue);
+    document.getElementById('autoRefresh').addEventListener('change', setupPoll);
+
+    if (saved) {
+      load();
+      loadChannels();
+      loadQueueInfo();
+      setupPoll();
+    }
   </script>
 </body>
 </html>

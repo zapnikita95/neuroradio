@@ -1,6 +1,8 @@
 import fs from 'node:fs';
 import path from 'node:path';
 
+import { loadHarvestLiveProgress, loadManualQueue } from './youtube-harvest-admin.js';
+
 const DATA_DIR = process.env.ACCOUNT_DATA_DIR?.trim() || path.join(process.cwd(), 'data');
 const DASHBOARD_FILE = path.join(DATA_DIR, 'youtube-harvest-dashboard.json');
 
@@ -9,12 +11,21 @@ export interface YoutubeHarvestVideoRow {
   title: string;
   channel?: string;
   ok: boolean;
+  /** Facts extracted by LLM (work dir or catalog). */
+  factsExtracted?: number;
+  /** Facts marked saved in harvest catalog (= actually in bank). */
+  catalogSaved?: number;
+  /** All bank candidates in catalog for this video. */
+  catalogFacts?: number;
+  /** Ingested during last batch run only (legacy). */
+  ingestedLastRun?: number;
+  /** @deprecated use catalogSaved */
   ingested?: number;
   error?: string;
   retried?: boolean;
   checkpoint?: string;
   transcriptChars?: number;
-  factsExtracted?: number;
+  inRetryQueue?: boolean;
 }
 
 export interface YoutubeHarvestDashboard {
@@ -31,13 +42,32 @@ export interface YoutubeHarvestDashboard {
   failed: number;
   ok: number;
   ingestedRun: number;
+  /** Total facts saved to bank across all videos (catalog). */
+  catalogSavedTotal?: number;
   catalogFacts: number;
   catalogVideos: number;
   bankYoutubeFacts: number;
   retryQueue: number;
+  manualQueue?: number;
   failedVideoIds: string[];
   videos: YoutubeHarvestVideoRow[];
   channels?: Array<{ name: string; processed: number; total: number }>;
+  live?: import('./youtube-harvest-admin.js').HarvestLiveProgress;
+}
+
+function catalogStatsByVideo(
+  facts: Array<{ videoId?: string; saved?: boolean }>,
+): Map<string, { total: number; saved: number }> {
+  const map = new Map<string, { total: number; saved: number }>();
+  for (const f of facts) {
+    const id = f.videoId?.trim();
+    if (!id) continue;
+    const row = map.get(id) ?? { total: 0, saved: 0 };
+    row.total += 1;
+    if (f.saved === true) row.saved += 1;
+    map.set(id, row);
+  }
+  return map;
 }
 
 function readJson<T>(p: string, fallback: T): T {
@@ -115,45 +145,67 @@ export function buildYoutubeHarvestDashboardFromFiles(): YoutubeHarvestDashboard
     }>;
   }>(statePath, { processedVideoIds: [], runs: [] });
 
-  const catalog = readJson<{ facts?: unknown[]; videos?: Array<{ id: string; title: string; channel?: string }> }>(
-    path.join(DATA_DIR, 'youtube-harvest-catalog.json'),
-    { facts: [], videos: [] },
-  );
-  const retry = readJson<{ videos?: unknown[] }>(path.join(DATA_DIR, 'youtube-harvest-retry-queue.json'), {
+  const catalog = readJson<{
+    facts?: Array<{ videoId?: string; saved?: boolean; videoTitle?: string }>;
+    videos?: Array<{ id: string; title: string; channel?: string }>;
+  }>(path.join(DATA_DIR, 'youtube-harvest-catalog.json'), { facts: [], videos: [] });
+  const retry = readJson<{ videos?: Array<{ id: string }> }>(path.join(DATA_DIR, 'youtube-harvest-retry-queue.json'), {
     videos: [],
   });
+  const retryIds = new Set((retry.videos ?? []).map((v) => v.id));
+  const catalogByVideo = catalogStatsByVideo(catalog.facts ?? []);
+  const catalogSavedTotal = [...catalogByVideo.values()].reduce((s, r) => s + r.saved, 0);
 
   const run = state.runs?.[state.runs.length - 1];
+  const allRunReports = new Map<string, { ok: boolean; ingested?: number; error?: string; retried?: boolean }>();
+  for (const r of state.runs ?? []) {
+    for (const rep of r.reports ?? []) {
+      const prev = allRunReports.get(rep.videoId);
+      allRunReports.set(rep.videoId, {
+        ok: prev?.ok ?? rep.ok,
+        ingested: (prev?.ingested ?? 0) + (rep.ingested ?? 0),
+        error: rep.error ?? prev?.error,
+        retried: rep.retried ?? prev?.retried,
+      });
+    }
+  }
   const queued = run?.videoIds?.length ?? state.processedVideoIds?.length ?? 0;
   const processed = state.processedVideoIds?.length ?? 0;
   const reports = run?.reports ?? [];
-  const failedIds = [...new Set(reports.filter((r) => !r.ok).map((r) => r.videoId))];
-  const ingestedRun = reports.filter((r) => r.ok).reduce((s, r) => s + (r.ingested ?? 0), 0);
+  const failedIds = [...new Set([...allRunReports.entries()].filter(([, r]) => !r.ok).map(([id]) => id))];
+  const ingestedRun = [...allRunReports.values()].reduce((s, r) => s + (r.ingested ?? 0), 0);
 
   const catalogById = new Map((catalog.videos ?? []).map((v) => [v.id, v]));
-  const reportById = new Map(reports.map((r) => [r.videoId, r]));
+  const lastReportById = new Map(reports.map((r) => [r.videoId, r]));
 
   const videoIds = [...new Set([...(run?.videoIds ?? []), ...(state.processedVideoIds ?? []), ...failedIds])];
   const videos: YoutubeHarvestVideoRow[] = videoIds.map((videoId) => {
     const meta = catalogById.get(videoId);
-    const rep = reportById.get(videoId);
+    const agg = allRunReports.get(videoId);
+    const lastRep = lastReportById.get(videoId);
+    const cat = catalogByVideo.get(videoId);
+    const factsFromDir = factsExtractedForVideo(videoId);
     return {
       videoId,
       title: meta?.title ?? videoId,
       channel: meta?.channel,
-      ok: rep ? rep.ok : (state.processedVideoIds ?? []).includes(videoId),
-      ingested: rep?.ingested,
-      error: rep?.error?.slice(0, 200),
-      retried: rep?.retried,
+      ok: agg ? agg.ok : (state.processedVideoIds ?? []).includes(videoId),
+      catalogFacts: cat?.total ?? 0,
+      catalogSaved: cat?.saved ?? 0,
+      factsExtracted: factsFromDir ?? cat?.total ?? 0,
+      ingestedLastRun: lastRep?.ingested,
+      ingested: cat?.saved ?? 0,
+      error: agg?.error?.slice(0, 200),
+      retried: agg?.retried,
+      inRetryQueue: retryIds.has(videoId),
       checkpoint: checkpointForVideo(videoId),
       transcriptChars: transcriptCharsForVideo(videoId),
-      factsExtracted: factsExtractedForVideo(videoId),
     };
   });
 
   videos.sort((a, b) => {
     if (a.ok !== b.ok) return a.ok ? -1 : 1;
-    return (b.ingested ?? 0) - (a.ingested ?? 0);
+    return (b.catalogSaved ?? 0) - (a.catalogSaved ?? 0);
   });
 
   const channelMap = new Map<string, { processed: number; total: number }>();
@@ -179,24 +231,31 @@ export function buildYoutubeHarvestDashboardFromFiles(): YoutubeHarvestDashboard
     failed: failedIds.length,
     ok: reports.filter((r) => r.ok).length,
     ingestedRun,
+    catalogSavedTotal,
     catalogFacts: catalog.facts?.length ?? 0,
     catalogVideos: catalog.videos?.length ?? 0,
     bankYoutubeFacts: countBankYoutubeFacts(),
     retryQueue: retry.videos?.length ?? 0,
+    manualQueue: loadManualQueue().videos.length,
     failedVideoIds: failedIds,
     videos,
     channels: [...channelMap.entries()].map(([name, stats]) => ({ name, ...stats })),
+    live: loadHarvestLiveProgress(),
   };
 }
 
 export function loadYoutubeHarvestDashboard(): YoutubeHarvestDashboard | null {
-  const cached = readJson<YoutubeHarvestDashboard | null>(DASHBOARD_FILE, null);
-  if (cached?.videos?.length) return cached;
   const built = buildYoutubeHarvestDashboardFromFiles();
-  if (!built && cached) return cached;
-  if (!built) return null;
-  if (cached?.updatedAt && cached.updatedAt > built.updatedAt) return cached;
-  return built;
+  const cached = readJson<YoutubeHarvestDashboard | null>(DASHBOARD_FILE, null);
+  if (built) {
+    built.live = loadHarvestLiveProgress();
+    return built;
+  }
+  if (cached?.videos?.length) {
+    cached.live = loadHarvestLiveProgress();
+    return cached;
+  }
+  return null;
 }
 
 export function saveYoutubeHarvestDashboard(payload: YoutubeHarvestDashboard): void {
