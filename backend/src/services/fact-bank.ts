@@ -336,8 +336,8 @@ function llmHarvestBypassesNoArtistAnchor(
   title: string,
 ): boolean {
   if (!llmHarvest) return false;
-  // Essay about one artist: anchor is metadata; body uses «Он» / «Автор» without the name.
-  if (scope === 'artist' && artist.trim()) return true;
+  // Essay: anchor is metadata (artist / album / track title); body uses pronouns without the name.
+  if ((scope === 'artist' || scope === 'album') && artist.trim()) return true;
   if (!title.trim()) return false;
   return (
     factMentionsTitle(text, title) ||
@@ -354,7 +354,7 @@ function isValidStoredFact(
   const text = normalizeFactForBankStorage(fact.artist, fact.title, fact.fact);
   if (text.length < 35) return false;
   if (isWikiMarkupJunkFact(text)) return false;
-  if (isGenericDeferredSongOpenerWithoutTitle(text, fact.title)) return false;
+  if (!options.llmHarvest && isGenericDeferredSongOpenerWithoutTitle(text, fact.title)) return false;
   if (isEnglishOnlyFactForCyrillicTrack(fact.artist, fact.title, text)) return false;
   if (
     !options.llmHarvest &&
@@ -368,7 +368,9 @@ function isValidStoredFact(
     !hasMusicDomainContext(text, fact.artist, fact.title) &&
     !(
       options.llmHarvest === true &&
-      (factMentionsTitle(text, fact.title) || factMentionsArtistLoose(text, fact.artist))
+      (factMentionsTitle(text, fact.title) ||
+        factMentionsArtistLoose(text, fact.artist) ||
+        textHasEssayMusicContext(text))
     )
   ) {
     return false;
@@ -468,7 +470,7 @@ export function explainHarvestIngestReject(
   };
   const text = normalizeFactForBankStorage(draft.artist, draft.title, draft.fact);
   if (isWikiMarkupJunkFact(text)) return 'wiki_junk';
-  if (isGenericDeferredSongOpenerWithoutTitle(text, draft.title)) return 'deferred_opener';
+  if (!llmGate && isGenericDeferredSongOpenerWithoutTitle(text, draft.title)) return 'deferred_opener';
   if (isEnglishOnlyFactForCyrillicTrack(draft.artist, draft.title, text)) return 'en_only_cyrillic';
   if (!llmGate && isNonMusicDomainFact(text, draft.artist, draft.title)) return 'non_music';
   if (
@@ -477,7 +479,9 @@ export function explainHarvestIngestReject(
     !hasMusicDomainContext(text, draft.artist, draft.title) &&
     !(
       llmGate &&
-      (factMentionsTitle(text, draft.title) || factMentionsArtistLoose(text, draft.artist))
+      (factMentionsTitle(text, draft.title) ||
+        factMentionsArtistLoose(text, draft.artist) ||
+        textHasEssayMusicContext(text))
     )
   ) {
     return 'no_music_domain';
