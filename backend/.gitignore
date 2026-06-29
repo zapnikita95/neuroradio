@@ -12,3 +12,4 @@ data/youtube-harvest-catalog.json
 data/youtube-stt-benchmark.json
 data/youtube-harvest-progress.json
 data/youtube-harvest-retry-queue.json
+data/youtube-harvest-dashboard.json

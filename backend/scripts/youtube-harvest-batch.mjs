@@ -491,6 +491,114 @@ async function main() {
   console.log(`\n[batch] done videos=${run.reports.filter((r) => r.ok).length}/${videos.length} ingestedThisRun=${ingested} catalogFacts=${totalFacts}`);
   console.log(`[batch] catalog: ${CATALOG_FILE}`);
   console.log(`[batch] state: ${STATE_FILE}`);
+
+  await publishHarvestDashboard({ state, catalog, run, videos });
+}
+
+async function publishHarvestDashboard({ state, catalog, run, videos }) {
+  const DASHBOARD_FILE = path.join(DATA, 'youtube-harvest-dashboard.json');
+  const failedIds = [...new Set((run.reports ?? []).filter((r) => !r.ok).map((r) => r.videoId))];
+  const ingestedRun = (run.reports ?? []).filter((r) => r.ok).reduce((s, r) => s + (r.ingested ?? 0), 0);
+  const catalogById = new Map((catalog.videos ?? []).map((v) => [v.id, v]));
+  const reportById = new Map((run.reports ?? []).map((r) => [r.videoId, r]));
+
+  function checkpointStep(videoId) {
+    const cp = path.join(OUT_DIR, videoId, 'checkpoint.json');
+    if (!fs.existsSync(cp)) return undefined;
+    try {
+      return JSON.parse(fs.readFileSync(cp, 'utf8')).step;
+    } catch {
+      return undefined;
+    }
+  }
+
+  function transcriptChars(videoId) {
+    const p = path.join(OUT_DIR, videoId, 'transcript.txt');
+    if (!fs.existsSync(p)) return undefined;
+    return fs.readFileSync(p, 'utf8').trim().length;
+  }
+
+  function factsExtracted(videoId) {
+    const p = path.join(OUT_DIR, videoId, 'facts-raw.json');
+    if (!fs.existsSync(p)) return undefined;
+    try {
+      const raw = JSON.parse(fs.readFileSync(p, 'utf8'));
+      return Array.isArray(raw.facts) ? raw.facts.length : undefined;
+    } catch {
+      return undefined;
+    }
+  }
+
+  const videoIds = [...new Set([...(run.videoIds ?? []), ...(state.processedVideoIds ?? []), ...failedIds])];
+  const dashboard = {
+    updatedAt: new Date().toISOString(),
+    source: 'local-batch',
+    runId: run.id,
+    mode: run.mode,
+    startedAt: run.startedAt,
+    finishedAt: run.finishedAt,
+    sttProvider: run.sttProvider,
+    queued: run.videoIds?.length ?? videoIds.length,
+    processed: state.processedVideoIds?.length ?? 0,
+    pending: Math.max(0, (run.videoIds?.length ?? 0) - (state.processedVideoIds?.length ?? 0)),
+    failed: failedIds.length,
+    ok: (run.reports ?? []).filter((r) => r.ok).length,
+    ingestedRun,
+    catalogFacts: catalog.facts?.length ?? 0,
+    catalogVideos: catalog.videos?.length ?? 0,
+    bankYoutubeFacts: 0,
+    retryQueue: loadRetryQueue().length,
+    failedVideoIds: failedIds,
+    videos: videoIds.map((videoId) => {
+      const meta = catalogById.get(videoId) ?? videos.find((v) => v.id === videoId);
+      const rep = reportById.get(videoId);
+      return {
+        videoId,
+        title: meta?.title ?? videoId,
+        channel: meta?.channelName ?? meta?.channel,
+        ok: rep ? rep.ok : (state.processedVideoIds ?? []).includes(videoId),
+        ingested: rep?.ingested,
+        error: rep?.error?.slice(0, 200),
+        retried: rep?.retried,
+        checkpoint: checkpointStep(videoId),
+        transcriptChars: transcriptChars(videoId),
+        factsExtracted: factsExtracted(videoId),
+      };
+    }),
+  };
+
+  saveJson(DASHBOARD_FILE, dashboard);
+  console.log(`[batch] dashboard: ${DASHBOARD_FILE}`);
+
+  const token = process.env.HARVEST_DASHBOARD_TOKEN?.trim();
+  const bff =
+    process.env.WEBSITE_DEMO_API_BASE?.trim() ||
+    process.env.BFF_URL?.trim() ||
+    process.env.PUBLIC_BFF_URL?.trim() ||
+    'https://www.efir-ai.ru';
+  if (!token) {
+    console.warn('[batch] HARVEST_DASHBOARD_TOKEN missing — dashboard not synced to Railway');
+    return;
+  }
+  try {
+    const res = await fetch(`${bff.replace(/\/$/, '')}/v1/admin/youtube-harvest/sync`, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        'x-harvest-dashboard-token': token,
+      },
+      body: JSON.stringify(dashboard),
+      signal: AbortSignal.timeout(60_000),
+    });
+    const raw = await res.text();
+    if (!res.ok) {
+      console.warn(`[batch] dashboard sync ${res.status}: ${raw.slice(0, 200)}`);
+      return;
+    }
+    console.log(`[batch] dashboard synced → ${bff}`);
+  } catch (err) {
+    console.warn(`[batch] dashboard sync failed: ${err instanceof Error ? err.message : err}`);
+  }
 }
 
 main().catch((err) => {

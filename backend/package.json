@@ -71,7 +71,8 @@
     "harvest:youtube-essay": "npm run build && node scripts/youtube-essay-fact-harvest.mjs",
     "harvest:youtube-essay:dry": "npm run build && node scripts/youtube-essay-fact-harvest.mjs --dry-run",
     "harvest:youtube-batch": "npm run build && node scripts/youtube-harvest-batch.mjs --initial",
-    "harvest:youtube-weekly": "npm run build && node scripts/youtube-harvest-batch.mjs --weekly"
+    "harvest:youtube-weekly": "npm run build && node scripts/youtube-harvest-batch.mjs --weekly",
+    "harvest:youtube-dashboard": "npm run build && node scripts/youtube-harvest-publish-dashboard.mjs"
   },
   "keywords": [
     "music",

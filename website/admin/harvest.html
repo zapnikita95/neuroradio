@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="robots" content="noindex, nofollow" />
+  <title>YouTube Harvest — Эфир AI</title>
+  <link rel="icon" type="image/png" sizes="32x32" href="../assets/favicon-32.png" />
+  <style>
+    :root {
+      --bg: #08070f;
+      --card: #12101c;
+      --border: #2a2540;
+      --text: #eceaf5;
+      --muted: #9b94b8;
+      --ok: #3dd68c;
+      --fail: #ff6b8a;
+      --accent: #8b7cf6;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.45;
+    }
+    .wrap { max-width: 1100px; margin: 0 auto; padding: 24px 16px 48px; }
+    h1 { font-size: 1.35rem; margin: 0 0 8px; }
+    .sub { color: var(--muted); font-size: 0.9rem; margin-bottom: 20px; }
+    .auth {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 16px;
+      margin-bottom: 20px;
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+    .auth input {
+      flex: 1;
+      min-width: 220px;
+      padding: 10px 12px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: #0c0a14;
+      color: var(--text);
+    }
+    button {
+      padding: 10px 16px;
+      border-radius: 8px;
+      border: none;
+      background: var(--accent);
+      color: #fff;
+      cursor: pointer;
+      font-weight: 600;
+    }
+    button:disabled { opacity: 0.5; cursor: wait; }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+      gap: 12px;
+      margin-bottom: 24px;
+    }
+    .stat {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 14px;
+    }
+    .stat b { display: block; font-size: 1.6rem; margin-bottom: 4px; }
+    .stat span { color: var(--muted); font-size: 0.8rem; }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.85rem;
+    }
+    th, td {
+      text-align: left;
+      padding: 10px 8px;
+      border-bottom: 1px solid var(--border);
+      vertical-align: top;
+    }
+    th { color: var(--muted); font-weight: 600; }
+    .pill {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 999px;
+      font-size: 0.75rem;
+      font-weight: 600;
+    }
+    .pill.ok { background: rgba(61,214,140,0.15); color: var(--ok); }
+    .pill.fail { background: rgba(255,107,138,0.15); color: var(--fail); }
+    .err { color: var(--fail); font-size: 0.9rem; }
+    a { color: var(--accent); }
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 16px;
+      overflow-x: auto;
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>YouTube Essay Harvest</h1>
+    <p class="sub">Разбор видео → STT (ElevenLabs) → факты → банк. Доступ по токену <code>HARVEST_DASHBOARD_TOKEN</code>.</p>
+
+    <div class="auth">
+      <input id="token" type="password" placeholder="Токен дашборда" autocomplete="off" />
+      <button id="loadBtn" type="button">Обновить</button>
+    </div>
+    <p id="err" class="err" hidden></p>
+
+    <div id="stats" class="grid" hidden></div>
+    <div id="meta" class="sub" hidden></div>
+    <div id="tableWrap" class="card" hidden>
+      <table>
+        <thead>
+          <tr>
+            <th>Статус</th>
+            <th>Видео</th>
+            <th>Канал</th>
+            <th>STT</th>
+            <th>Факты</th>
+            <th>В банк</th>
+            <th>Checkpoint</th>
+          </tr>
+        </thead>
+        <tbody id="rows"></tbody>
+      </table>
+    </div>
+  </div>
+  <script>
+    const TOKEN_KEY = 'harvest_dashboard_token';
+    const tokenEl = document.getElementById('token');
+    const saved = localStorage.getItem(TOKEN_KEY);
+    if (saved) tokenEl.value = saved;
+
+    async function load() {
+      const token = tokenEl.value.trim();
+      if (!token) {
+        showErr('Вставь токен из Railway → HARVEST_DASHBOARD_TOKEN');
+        return;
+      }
+      localStorage.setItem(TOKEN_KEY, token);
+      document.getElementById('loadBtn').disabled = true;
+      showErr('');
+      try {
+        const res = await fetch('/v1/admin/youtube-harvest/status?token=' + encodeURIComponent(token));
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || data.hint || res.statusText);
+        render(data.dashboard);
+      } catch (e) {
+        showErr(e.message || String(e));
+      } finally {
+        document.getElementById('loadBtn').disabled = false;
+      }
+    }
+
+    function showErr(msg) {
+      const el = document.getElementById('err');
+      el.hidden = !msg;
+      el.textContent = msg;
+    }
+
+    function render(d) {
+      document.getElementById('stats').hidden = false;
+      document.getElementById('meta').hidden = false;
+      document.getElementById('tableWrap').hidden = false;
+
+      const stats = [
+        ['processed', d.processed, 'разобрано'],
+        ['pending', d.pending, 'осталось'],
+        ['failed', d.failed, 'упало'],
+        ['ingestedRun', d.ingestedRun, 'в банк (run)'],
+        ['catalogFacts', d.catalogFacts, 'в каталоге'],
+        ['catalogVideos', d.catalogVideos, 'видео в каталоге'],
+      ];
+      document.getElementById('stats').innerHTML = stats
+        .map(([k, v, label]) => '<div class="stat"><b>' + v + '</b><span>' + label + '</span></div>')
+        .join('');
+
+      document.getElementById('meta').textContent =
+        'Обновлено: ' + (d.updatedAt || '—') +
+        ' · run: ' + (d.runId || '—') +
+        (d.finishedAt ? ' · finished ' + d.finishedAt : '') +
+        ' · STT: ' + (d.sttProvider || 'railway');
+
+      const tbody = document.getElementById('rows');
+      tbody.innerHTML = (d.videos || []).map(function (v) {
+        const stt = v.transcriptChars ? v.transcriptChars + ' sym' : '—';
+        const facts = v.factsExtracted != null ? v.factsExtracted : '—';
+        const ing = v.ingested != null ? v.ingested : '—';
+        const status = v.ok
+          ? '<span class="pill ok">OK</span>'
+          : '<span class="pill fail">FAIL</span>';
+        const title = '<a href="https://www.youtube.com/watch?v=' + v.videoId + '" target="_blank" rel="noopener">' +
+          escapeHtml(v.title || v.videoId) + '</a>';
+        return '<tr><td>' + status + '</td><td>' + title + '</td><td>' + escapeHtml(v.channel || '—') +
+          '</td><td>' + stt + '</td><td>' + facts + '</td><td>' + ing + '</td><td>' +
+          escapeHtml(v.checkpoint || '—') + '</td></tr>';
+      }).join('');
+    }
+
+    function escapeHtml(s) {
+      return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;');
+    }
+
+    document.getElementById('loadBtn').addEventListener('click', load);
+    if (saved) load();
+  </script>
+</body>
+</html>
