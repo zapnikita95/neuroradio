@@ -318,6 +318,35 @@ function isDuplicateFactOnOtherTrack(artist: string, title: string, factText: st
   return false;
 }
 
+/** Essay harvest: artist-scope facts often use «Он» without repeating the name. */
+function textHasEssayMusicContext(text: string): boolean {
+  return (
+    /«[^»]{2,80}»/.test(text) ||
+    /(?:музык|жанр|альбом|сингл|клип|трек|микстейп|рэп|хип[\s-]?хоп|бит|прод[\s.-]?юс|соавтор|коллаб|дебют|вокал|лейбл|хит|сцен|коллектив|album|single|track|hip[\s-]?hop|r[\s&]?b)/i.test(
+      text,
+    )
+  );
+}
+
+function llmHarvestBypassesNoArtistAnchor(
+  llmHarvest: boolean,
+  scope: FactScope,
+  text: string,
+  artist: string,
+  title: string,
+): boolean {
+  if (!llmHarvest) return false;
+  // Essay about one artist: anchor is metadata; body uses «Он» / «Автор» without the name.
+  if (scope === 'artist' && artist.trim()) return true;
+  if (!title.trim()) return false;
+  return (
+    factMentionsTitle(text, title) ||
+    factMentionsArtistLoose(text, artist) ||
+    hasMusicDomainContext(text, artist, title) ||
+    textHasEssayMusicContext(text)
+  );
+}
+
 function isValidStoredFact(
   fact: StoredFact,
   options: { llmHarvest?: boolean } = {},
@@ -327,8 +356,21 @@ function isValidStoredFact(
   if (isWikiMarkupJunkFact(text)) return false;
   if (isGenericDeferredSongOpenerWithoutTitle(text, fact.title)) return false;
   if (isEnglishOnlyFactForCyrillicTrack(fact.artist, fact.title, text)) return false;
-  if (isNonMusicDomainFact(text, fact.artist, fact.title)) return false;
-  if (fact.scope === 'track' && fact.title.trim() && !hasMusicDomainContext(text, fact.artist, fact.title)) {
+  if (
+    !options.llmHarvest &&
+    isNonMusicDomainFact(text, fact.artist, fact.title)
+  ) {
+    return false;
+  }
+  if (
+    fact.scope === 'track' &&
+    fact.title.trim() &&
+    !hasMusicDomainContext(text, fact.artist, fact.title) &&
+    !(
+      options.llmHarvest === true &&
+      (factMentionsTitle(text, fact.title) || factMentionsArtistLoose(text, fact.artist))
+    )
+  ) {
     return false;
   }
   if (isAmbiguousCommonWordArtist(fact.artist) && !factMentionsArtistAsEntity(text, fact.artist)) {
@@ -338,11 +380,12 @@ function isValidStoredFact(
     fact.artist.trim() &&
     !factMentionsArtistLoose(text, fact.artist) &&
     !(fact.scope === 'track' && fact.title.trim() && factMentionsTitle(text, fact.title)) &&
-    !(
-      options.llmHarvest === true &&
-      fact.scope === 'album' &&
-      fact.title.trim() &&
-      factMentionsTitle(text, fact.title)
+    !llmHarvestBypassesNoArtistAnchor(
+      options.llmHarvest === true,
+      fact.scope,
+      text,
+      fact.artist,
+      fact.title,
     )
   ) {
     return false;
@@ -356,6 +399,7 @@ function isValidStoredFact(
   const skipTrackAnchor =
     options.llmHarvest === true &&
     (fact.scope === 'album' ||
+      fact.scope === 'track' ||
       (fact.scope === 'artist' && !fact.title.trim()));
   if (!skipTrackAnchor) {
     const trackPool = (loadBank().byTrack[trackKey(fact.artist, fact.title)] ?? []).map((f) => f.fact);
@@ -367,6 +411,7 @@ function isValidStoredFact(
     fact.scope === 'track' &&
     fact.title.trim() &&
     !fact.isMetadata &&
+    !options.llmHarvest &&
     !isSpeakableReferenceFact(text, fact.artist, fact.title)
   ) {
     return false;
@@ -374,7 +419,12 @@ function isValidStoredFact(
   if (
     fact.scope === 'track' &&
     fact.title.trim() &&
-    !factMentionsTitle(text, fact.title)
+    !factMentionsTitle(text, fact.title) &&
+    !(
+      options.llmHarvest === true &&
+      (factMentionsArtistLoose(text, fact.artist) ||
+        hasMusicDomainContext(text, fact.artist, fact.title))
+    )
   ) {
     return false;
   }
@@ -383,6 +433,103 @@ function isValidStoredFact(
   if (isListeningStatsFact(text)) return Boolean(fact.isMetadata);
   if (isEncyclopediaDefinitionSeed(text)) return false;
   return true;
+}
+
+/** Debug: why a YouTube harvest fact would not enter the bank. */
+export function explainHarvestIngestReject(
+  artist: string,
+  title: string,
+  item: { fact: string; scope: FactScope; llmInterest?: number },
+): string | null {
+  const trimmed = normalizeFactForBankStorage(artist, title, item.fact);
+  if (trimmed.length < 35) return 'too_short';
+  if (isListeningStatsFact(trimmed)) return 'listening_stats';
+  const llmGate = item.llmInterest != null && Number.isFinite(item.llmInterest);
+  const score = llmGate
+    ? Math.round(Math.max(1, Math.min(10, item.llmInterest!)) * 3)
+    : interestScore(trimmed);
+  const minScore = llmGate ? 0 : 6;
+  if (score < minScore) return 'low_score';
+  const draft: StoredFact = {
+    id: 'debug',
+    artist,
+    title,
+    scope: item.scope,
+    fact: trimmed,
+    interestScore: score,
+    interestRating: llmGate ? item.llmInterest! : interestRating10(trimmed),
+    source: 'llm',
+    isMetadata: isMetadataHarvestFact(trimmed),
+    isHot: false,
+    harvestSource: 'youtube:debug',
+    topicKey: classifyFactTopic(trimmed),
+    timesUsed: 0,
+    addedAt: Date.now(),
+  };
+  const text = normalizeFactForBankStorage(draft.artist, draft.title, draft.fact);
+  if (isWikiMarkupJunkFact(text)) return 'wiki_junk';
+  if (isGenericDeferredSongOpenerWithoutTitle(text, draft.title)) return 'deferred_opener';
+  if (isEnglishOnlyFactForCyrillicTrack(draft.artist, draft.title, text)) return 'en_only_cyrillic';
+  if (!llmGate && isNonMusicDomainFact(text, draft.artist, draft.title)) return 'non_music';
+  if (
+    draft.scope === 'track' &&
+    draft.title.trim() &&
+    !hasMusicDomainContext(text, draft.artist, draft.title) &&
+    !(
+      llmGate &&
+      (factMentionsTitle(text, draft.title) || factMentionsArtistLoose(text, draft.artist))
+    )
+  ) {
+    return 'no_music_domain';
+  }
+  if (isAmbiguousCommonWordArtist(draft.artist) && !factMentionsArtistAsEntity(text, draft.artist)) {
+    return 'ambiguous_artist';
+  }
+  if (
+    draft.artist.trim() &&
+    !factMentionsArtistLoose(text, draft.artist) &&
+    !(draft.scope === 'track' && draft.title.trim() && factMentionsTitle(text, draft.title)) &&
+    !llmHarvestBypassesNoArtistAnchor(llmGate, draft.scope, text, draft.artist, draft.title)
+  ) {
+    return 'no_artist_anchor';
+  }
+  const skipTrackAnchor =
+    llmGate &&
+    (draft.scope === 'album' ||
+      draft.scope === 'track' ||
+      (draft.scope === 'artist' && !draft.title.trim()));
+  if (!skipTrackAnchor) {
+    const trackPool = (loadBank().byTrack[trackKey(draft.artist, draft.title)] ?? []).map((f) => f.fact);
+    if (rejectSeedForTrackStory(text, draft.artist, draft.title, { trackPoolFacts: trackPool })) {
+      return 'reject_seed_track';
+    }
+  }
+  if (
+    draft.scope === 'track' &&
+    draft.title.trim() &&
+    !draft.isMetadata &&
+    !llmGate &&
+    !isSpeakableReferenceFact(text, draft.artist, draft.title)
+  ) {
+    return 'not_speakable';
+  }
+  if (
+    draft.scope === 'track' &&
+    draft.title.trim() &&
+    !factMentionsTitle(text, draft.title) &&
+    !(llmGate && (factMentionsArtistLoose(text, draft.artist) || hasMusicDomainContext(text, draft.artist, draft.title)))
+  ) {
+    return 'no_title_mention';
+  }
+  if (isCatalogMetadataSeed(text)) return 'catalog_metadata';
+  if (isEncyclopediaDefinitionSeed(text)) return 'encyclopedia';
+  if (
+    item.scope !== 'artist' &&
+    isDuplicateFactOnOtherTrack(artist, title, trimmed, loadBank())
+  ) {
+    return 'duplicate_other_track';
+  }
+  return null;
 }
 
 function normalizeStoredFactText(f: StoredFact): StoredFact {

@@ -1,5 +1,5 @@
 {
-  "updatedAt": "2026-06-29T22:50:58.289Z",
+  "updatedAt": "2026-06-29T23:18:25.102Z",
   "source": "local-batch",
   "runId": "run-1782753501506",
   "mode": "initial",
@@ -12,10 +12,10 @@
   "failed": 9,
   "ok": 3,
   "ingestedRun": 192,
-  "catalogSavedTotal": 600,
+  "catalogSavedTotal": 824,
   "catalogFacts": 937,
   "catalogVideos": 44,
-  "bankYoutubeFacts": 0,
+  "bankYoutubeFacts": 77,
   "retryQueue": 0,
   "manualQueue": 0,
   "failedVideoIds": [
@@ -31,14 +31,27 @@
   ],
   "videos": [
     {
+      "videoId": "w480XGGOAQ0",
+      "title": "What does the Scriptonite universe consist of?",
+      "channel": "NA",
+      "ok": true,
+      "catalogFacts": 95,
+      "catalogSaved": 91,
+      "factsExtracted": 57,
+      "ingested": 91,
+      "inRetryQueue": false,
+      "checkpoint": "done",
+      "transcriptChars": 8475
+    },
+    {
       "videoId": "QAAekkeN3r0",
       "title": "Something weird is happening in post-punk",
       "channel": "NA",
       "ok": true,
       "catalogFacts": 88,
-      "catalogSaved": 67,
+      "catalogSaved": 79,
       "factsExtracted": 58,
-      "ingested": 67,
+      "ingested": 79,
       "error": "Gemini 400: {\n  \"error\": {\n    \"code\": 400,\n    \"message\": \"API key not valid. Please pass a valid API key.\",\n    \"status\": \"INVALID_ARGUMENT\",\n    \"details\": [\n      {\n        \"@type\": \"type.googleap",
       "retried": true,
       "inRetryQueue": false,
@@ -46,14 +59,40 @@
       "transcriptChars": 9116
     },
     {
+      "videoId": "8l0CLalr7aM",
+      "title": "Другой такой группы в русском рэпе не было",
+      "channel": "ФЛОУ",
+      "ok": true,
+      "catalogFacts": 30,
+      "catalogSaved": 30,
+      "factsExtracted": 15,
+      "ingested": 30,
+      "inRetryQueue": false,
+      "checkpoint": "done",
+      "transcriptChars": 9750
+    },
+    {
+      "videoId": "R0A-wPN9Vns",
+      "title": "When you can't keep the band together",
+      "channel": "Middle 8",
+      "ok": true,
+      "catalogFacts": 30,
+      "catalogSaved": 30,
+      "factsExtracted": 15,
+      "ingested": 30,
+      "inRetryQueue": false,
+      "checkpoint": "done",
+      "transcriptChars": 11503
+    },
+    {
       "videoId": "t8q6EuQSXRk",
       "title": "Does The Dare sound too much like LCD Soundsystem?",
       "channel": "Middle 8",
       "ok": true,
       "catalogFacts": 30,
-      "catalogSaved": 28,
+      "catalogSaved": 30,
       "factsExtracted": 15,
-      "ingested": 28,
+      "ingested": 30,
       "inRetryQueue": false,
       "checkpoint": "done",
       "transcriptChars": 8829
@@ -64,12 +103,27 @@
       "channel": "Middle 8",
       "ok": true,
       "catalogFacts": 30,
-      "catalogSaved": 28,
+      "catalogSaved": 30,
       "factsExtracted": 15,
-      "ingested": 28,
+      "ingested": 30,
       "inRetryQueue": false,
       "checkpoint": "done",
       "transcriptChars": 8015
+    },
+    {
+      "videoId": "QAVaGLaMyl4",
+      "title": "������ ������ ������ ����� ���?",
+      "channel": "NA",
+      "ok": true,
+      "catalogFacts": 44,
+      "catalogSaved": 26,
+      "factsExtracted": 25,
+      "ingested": 26,
+      "error": "Gemini 400: {\n  \"error\": {\n    \"code\": 400,\n    \"message\": \"API key not valid. Please pass a valid API key.\",\n    \"status\": \"INVALID_ARGUMENT\",\n    \"details\": [\n      {\n        \"@type\": \"type.googleap",
+      "retried": true,
+      "inRetryQueue": false,
+      "checkpoint": "done",
+      "transcriptChars": 10223
     },
     {
       "videoId": "CsTvZct5Acw",
@@ -87,6 +141,19 @@
       "transcriptChars": 10084
     },
     {
+      "videoId": "FW9mIhLDo9M",
+      "title": "2013: Max Korzh, VERSUS, Pasha Technic, ENJOYKIN, trap, GORSHOK (rip)",
+      "channel": "NA",
+      "ok": true,
+      "catalogFacts": 22,
+      "catalogSaved": 22,
+      "factsExtracted": 11,
+      "ingested": 22,
+      "inRetryQueue": false,
+      "checkpoint": "done",
+      "transcriptChars": 8835
+    },
+    {
       "videoId": "_a6rtSN3Cfk",
       "title": "2012 ���: ��������, ����, �����, ��������� � �������� ������",
       "channel": "NA",
@@ -102,19 +169,6 @@
       "transcriptChars": 8657
     },
     {
-      "videoId": "FW9mIhLDo9M",
-      "title": "2013: Max Korzh, VERSUS, Pasha Technic, ENJOYKIN, trap, GORSHOK (rip)",
-      "channel": "NA",
-      "ok": true,
-      "catalogFacts": 22,
-      "catalogSaved": 20,
-      "factsExtracted": 11,
-      "ingested": 20,
-      "inRetryQueue": false,
-      "checkpoint": "done",
-      "transcriptChars": 8835
-    },
-    {
       "videoId": "AAc32JDGtoU",
       "title": "EGOR LETOV is a great producer (seriously!)",
       "channel": "NA",
@@ -126,6 +180,19 @@
       "inRetryQueue": false,
       "checkpoint": "done",
       "transcriptChars": 9033
+    },
+    {
+      "videoId": "ur87VXIG1yk",
+      "title": "������ � ����� ��� ����� ������� ��������?",
+      "channel": "NA",
+      "ok": true,
+      "catalogFacts": 20,
+      "catalogSaved": 20,
+      "factsExtracted": 10,
+      "ingested": 20,
+      "inRetryQueue": false,
+      "checkpoint": "done",
+      "transcriptChars": 7741
     },
     {
       "videoId": "PKcFPnwut5g",
@@ -152,19 +219,6 @@
       "inRetryQueue": false,
       "checkpoint": "done",
       "transcriptChars": 9793
-    },
-    {
-      "videoId": "8l0CLalr7aM",
-      "title": "Другой такой группы в русском рэпе не было",
-      "channel": "ФЛОУ",
-      "ok": true,
-      "catalogFacts": 30,
-      "catalogSaved": 18,
-      "factsExtracted": 15,
-      "ingested": 18,
-      "inRetryQueue": false,
-      "checkpoint": "done",
-      "transcriptChars": 9750
     },
     {
       "videoId": "xjX7lVgEaRU",
@@ -208,17 +262,19 @@
       "transcriptChars": 8560
     },
     {
-      "videoId": "ur87VXIG1yk",
-      "title": "������ � ����� ��� ����� ������� ��������?",
+      "videoId": "8qwfdspf9gY",
+      "title": "��� ����� ������� ������ � ���?",
       "channel": "NA",
       "ok": true,
-      "catalogFacts": 20,
+      "catalogFacts": 30,
       "catalogSaved": 14,
-      "factsExtracted": 10,
+      "factsExtracted": 15,
       "ingested": 14,
+      "error": "Gemini 400: {\n  \"error\": {\n    \"code\": 400,\n    \"message\": \"API key not valid. Please pass a valid API key.\",\n    \"status\": \"INVALID_ARGUMENT\",\n    \"details\": [\n      {\n        \"@type\": \"type.googleap",
+      "retried": true,
       "inRetryQueue": false,
       "checkpoint": "done",
-      "transcriptChars": 7741
+      "transcriptChars": 8896
     },
     {
       "videoId": "fiJ1tc_22xo",
@@ -234,17 +290,15 @@
       "transcriptChars": 6927
     },
     {
-      "videoId": "R0A-wPN9Vns",
-      "title": "When you can't keep the band together",
+      "videoId": "U3VMv4Kd8b8",
+      "title": "How Justice turned rock fans into rave kids",
       "channel": "Middle 8",
       "ok": true,
-      "catalogFacts": 30,
-      "catalogSaved": 12,
-      "factsExtracted": 15,
-      "ingested": 12,
-      "inRetryQueue": false,
-      "checkpoint": "done",
-      "transcriptChars": 11503
+      "catalogFacts": 10,
+      "catalogSaved": 10,
+      "factsExtracted": 10,
+      "ingested": 10,
+      "inRetryQueue": false
     },
     {
       "videoId": "PzCPKJn5mNg",
@@ -258,17 +312,6 @@
       "inRetryQueue": false,
       "checkpoint": "done",
       "transcriptChars": 8537
-    },
-    {
-      "videoId": "U3VMv4Kd8b8",
-      "title": "How Justice turned rock fans into rave kids",
-      "channel": "Middle 8",
-      "ok": true,
-      "catalogFacts": 10,
-      "catalogSaved": 9,
-      "factsExtracted": 10,
-      "ingested": 9,
-      "inRetryQueue": false
     },
     {
       "videoId": "EsKyq3zVvCg",
@@ -299,19 +342,6 @@
       "transcriptChars": 8335
     },
     {
-      "videoId": "w480XGGOAQ0",
-      "title": "What does the Scriptonite universe consist of?",
-      "channel": "NA",
-      "ok": true,
-      "catalogFacts": 95,
-      "catalogSaved": 6,
-      "factsExtracted": 57,
-      "ingested": 6,
-      "inRetryQueue": false,
-      "checkpoint": "done",
-      "transcriptChars": 8475
-    },
-    {
       "videoId": "JvGrJff1uF8",
       "title": "T-Fest — Никто не обещал | Разбор трека",
       "channel": "Риса за Творчество",
@@ -334,21 +364,6 @@
       "inRetryQueue": false,
       "checkpoint": "done",
       "transcriptChars": 7934
-    },
-    {
-      "videoId": "8qwfdspf9gY",
-      "title": "��� ����� ������� ������ � ���?",
-      "channel": "NA",
-      "ok": true,
-      "catalogFacts": 30,
-      "catalogSaved": 4,
-      "factsExtracted": 15,
-      "ingested": 4,
-      "error": "Gemini 400: {\n  \"error\": {\n    \"code\": 400,\n    \"message\": \"API key not valid. Please pass a valid API key.\",\n    \"status\": \"INVALID_ARGUMENT\",\n    \"details\": [\n      {\n        \"@type\": \"type.googleap",
-      "retried": true,
-      "inRetryQueue": false,
-      "checkpoint": "done",
-      "transcriptChars": 8896
     },
     {
       "videoId": "arrnt_S7rNY",
@@ -444,21 +459,6 @@
       "transcriptChars": 8569
     },
     {
-      "videoId": "QAVaGLaMyl4",
-      "title": "������ ������ ������ ����� ���?",
-      "channel": "NA",
-      "ok": true,
-      "catalogFacts": 44,
-      "catalogSaved": 0,
-      "factsExtracted": 25,
-      "ingested": 0,
-      "error": "Gemini 400: {\n  \"error\": {\n    \"code\": 400,\n    \"message\": \"API key not valid. Please pass a valid API key.\",\n    \"status\": \"INVALID_ARGUMENT\",\n    \"details\": [\n      {\n        \"@type\": \"type.googleap",
-      "retried": true,
-      "inRetryQueue": false,
-      "checkpoint": "done",
-      "transcriptChars": 10223
-    },
-    {
       "videoId": "_LEv56m58r0",
       "title": "�� ���� ������� ��������� ����?",
       "channel": "NA",
@@ -509,9 +509,9 @@
       "channel": "Middle8",
       "ok": false,
       "catalogFacts": 68,
-      "catalogSaved": 52,
+      "catalogSaved": 60,
       "factsExtracted": 52,
-      "ingested": 52,
+      "ingested": 60,
       "error": "Gemini 400: {\n  \"error\": {\n    \"code\": 400,\n    \"message\": \"API key not valid. Please pass a valid API key.\",\n    \"status\": \"INVALID_ARGUMENT\",\n    \"details\": [\n      {\n        \"@type\": \"type.googleap",
       "retried": true,
       "inRetryQueue": false,
@@ -524,14 +524,29 @@
       "channel": "Middle8",
       "ok": false,
       "catalogFacts": 42,
-      "catalogSaved": 38,
+      "catalogSaved": 40,
       "factsExtracted": 23,
       "ingestedLastRun": 19,
-      "ingested": 38,
+      "ingested": 40,
       "error": "Gemini 400: {\n  \"error\": {\n    \"code\": 400,\n    \"message\": \"API key not valid. Please pass a valid API key.\",\n    \"status\": \"INVALID_ARGUMENT\",\n    \"details\": [\n      {\n        \"@type\": \"type.googleap",
       "inRetryQueue": false,
       "checkpoint": "done",
       "transcriptChars": 10431
+    },
+    {
+      "videoId": "_Rvq1Tpho4o",
+      "title": "Eminem: How a Loser Became the World's Most Powerful Rapper",
+      "channel": "The Fast Flow",
+      "ok": false,
+      "catalogFacts": 32,
+      "catalogSaved": 32,
+      "factsExtracted": 16,
+      "ingested": 32,
+      "error": "Gemini 400: {\n  \"error\": {\n    \"code\": 400,\n    \"message\": \"API key not valid. Please pass a valid API key.\",\n    \"status\": \"INVALID_ARGUMENT\",\n    \"details\": [\n      {\n        \"@type\": \"type.googleap",
+      "retried": true,
+      "inRetryQueue": false,
+      "checkpoint": "done",
+      "transcriptChars": 8597
     },
     {
       "videoId": "eZwkQ3Z90Vw",
@@ -549,6 +564,50 @@
       "transcriptChars": 9548
     },
     {
+      "videoId": "GlUPGI7pElA",
+      "title": "Something weird is happening in hip-hop",
+      "channel": "Middle8",
+      "ok": false,
+      "catalogFacts": 22,
+      "catalogSaved": 20,
+      "factsExtracted": 11,
+      "ingestedLastRun": 9,
+      "ingested": 20,
+      "error": "Gemini 400: {\n  \"error\": {\n    \"code\": 400,\n    \"message\": \"API key not valid. Please pass a valid API key.\",\n    \"status\": \"INVALID_ARGUMENT\",\n    \"details\": [\n      {\n        \"@type\": \"type.googleap",
+      "inRetryQueue": false,
+      "checkpoint": "done",
+      "transcriptChars": 11016
+    },
+    {
+      "videoId": "CqsCGF7qPq4",
+      "title": "When you have three #1 albums with zero hits",
+      "channel": "Middle8",
+      "ok": false,
+      "catalogFacts": 20,
+      "catalogSaved": 20,
+      "factsExtracted": 10,
+      "ingested": 20,
+      "error": "yt-dlp failed: WARNING: [youtube] No supported JavaScript runtime could be found. Only deno is enabled by default; to use another runtime add  --js-runtimes RUNTIME[:PATH]  to your command/config. You",
+      "inRetryQueue": false,
+      "checkpoint": "done",
+      "transcriptChars": 10377
+    },
+    {
+      "videoId": "OqcKkdlXYw8",
+      "title": "Why The Flaming Lips Still Matter",
+      "channel": "Middle8",
+      "ok": false,
+      "catalogFacts": 24,
+      "catalogSaved": 20,
+      "factsExtracted": 12,
+      "ingested": 20,
+      "error": "Gemini 400: {\n  \"error\": {\n    \"code\": 400,\n    \"message\": \"API key not valid. Please pass a valid API key.\",\n    \"status\": \"INVALID_ARGUMENT\",\n    \"details\": [\n      {\n        \"@type\": \"type.googleap",
+      "retried": true,
+      "inRetryQueue": false,
+      "checkpoint": "done",
+      "transcriptChars": 10348
+    },
+    {
       "videoId": "j0AjWTk5Suc",
       "title": "How KREC Taught Russian Rap to Feel Sad / THE BASICS",
       "channel": "БРОКЕН ДЭНС",
@@ -563,50 +622,6 @@
       "transcriptChars": 8928
     },
     {
-      "videoId": "GlUPGI7pElA",
-      "title": "Something weird is happening in hip-hop",
-      "channel": "Middle8",
-      "ok": false,
-      "catalogFacts": 22,
-      "catalogSaved": 18,
-      "factsExtracted": 11,
-      "ingestedLastRun": 9,
-      "ingested": 18,
-      "error": "Gemini 400: {\n  \"error\": {\n    \"code\": 400,\n    \"message\": \"API key not valid. Please pass a valid API key.\",\n    \"status\": \"INVALID_ARGUMENT\",\n    \"details\": [\n      {\n        \"@type\": \"type.googleap",
-      "inRetryQueue": false,
-      "checkpoint": "done",
-      "transcriptChars": 11016
-    },
-    {
-      "videoId": "CqsCGF7qPq4",
-      "title": "When you have three #1 albums with zero hits",
-      "channel": "Middle8",
-      "ok": false,
-      "catalogFacts": 20,
-      "catalogSaved": 18,
-      "factsExtracted": 10,
-      "ingested": 18,
-      "error": "yt-dlp failed: WARNING: [youtube] No supported JavaScript runtime could be found. Only deno is enabled by default; to use another runtime add  --js-runtimes RUNTIME[:PATH]  to your command/config. You",
-      "inRetryQueue": false,
-      "checkpoint": "done",
-      "transcriptChars": 10377
-    },
-    {
-      "videoId": "_Rvq1Tpho4o",
-      "title": "Eminem: How a Loser Became the World's Most Powerful Rapper",
-      "channel": "The Fast Flow",
-      "ok": false,
-      "catalogFacts": 32,
-      "catalogSaved": 18,
-      "factsExtracted": 16,
-      "ingested": 18,
-      "error": "Gemini 400: {\n  \"error\": {\n    \"code\": 400,\n    \"message\": \"API key not valid. Please pass a valid API key.\",\n    \"status\": \"INVALID_ARGUMENT\",\n    \"details\": [\n      {\n        \"@type\": \"type.googleap",
-      "retried": true,
-      "inRetryQueue": false,
-      "checkpoint": "done",
-      "transcriptChars": 8597
-    },
-    {
       "videoId": "oVww_Y4k9Y4",
       "title": "������� ��� ������������ � ������ 2015!",
       "channel": "БРОКЕН ДЭНС",
@@ -619,21 +634,6 @@
       "inRetryQueue": false,
       "checkpoint": "done",
       "transcriptChars": 9176
-    },
-    {
-      "videoId": "OqcKkdlXYw8",
-      "title": "Why The Flaming Lips Still Matter",
-      "channel": "Middle8",
-      "ok": false,
-      "catalogFacts": 24,
-      "catalogSaved": 0,
-      "factsExtracted": 12,
-      "ingested": 0,
-      "error": "Gemini 400: {\n  \"error\": {\n    \"code\": 400,\n    \"message\": \"API key not valid. Please pass a valid API key.\",\n    \"status\": \"INVALID_ARGUMENT\",\n    \"details\": [\n      {\n        \"@type\": \"type.googleap",
-      "retried": true,
-      "inRetryQueue": false,
-      "checkpoint": "done",
-      "transcriptChars": 10348
     }
   ],
   "channels": [
@@ -641,6 +641,11 @@
       "name": "NA",
       "processed": 18,
       "total": 18
+    },
+    {
+      "name": "ФЛОУ",
+      "processed": 2,
+      "total": 2
     },
     {
       "name": "Middle 8",
@@ -651,11 +656,6 @@
       "name": "Риса за Творчество",
       "processed": 10,
       "total": 10
-    },
-    {
-      "name": "ФЛОУ",
-      "processed": 2,
-      "total": 2
     },
     {
       "name": "БРОКЕН ДЭНС",

@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta name="robots" content="noindex, nofollow" />
-  <title>YouTube Harvest — Эфир AI</title>
+  <title>Harvest Dashboard — Эфир AI</title>
   <link rel="icon" type="image/png" sizes="32x32" href="../assets/favicon-32.png" />
   <style>
     :root {
@@ -47,12 +47,23 @@
     .discover-row small { color: var(--muted); display: block; }
     .row-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
     code { background: #0c0a14; padding: 2px 6px; border-radius: 4px; font-size: 0.85em; }
+    .tabs { display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: wrap; }
+    .tabs button { background: #2a2540; }
+    .tabs button.active { background: var(--accent); }
+    .warn-box { border-color: var(--warn); background: rgba(245,197,66,0.08); }
+    .source-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); gap: 8px; font-size: 0.78rem; margin-top: 12px; }
+    .source-grid div { background: #0c0a14; padding: 8px; border-radius: 8px; }
   </style>
 </head>
 <body>
   <div class="wrap">
-    <h1>YouTube Essay Harvest</h1>
-    <p class="sub">STT → LLM → каталог → банк. Прогон идёт <strong>локально</strong> на твоей машине; дашборд показывает синхронизированное состояние.</p>
+    <h1>Harvest Dashboard</h1>
+    <p class="sub">YouTube essay + локальный bulk-seed. Прогоны идут на твоей машине; дашборд — синхронизированное состояние.</p>
+
+    <div class="tabs">
+      <button type="button" id="tabYoutube" class="active">YouTube essay</button>
+      <button type="button" id="tabBulk">Bulk seed (каталог)</button>
+    </div>
 
     <div class="auth">
       <input id="token" type="password" placeholder="HARVEST_DASHBOARD_TOKEN" autocomplete="off" />
@@ -61,6 +72,21 @@
     </div>
     <p id="err" class="err" hidden></p>
 
+    <div id="bulkPanel" hidden>
+      <div id="bulkLiveBox" class="card live idle">
+        <h2 id="bulkLiveTitle">Bulk seed</h2>
+        <p id="bulkLiveBody" class="sub" style="margin:0"></p>
+      </div>
+      <div id="bulkWarn" class="card warn-box" hidden></div>
+      <div id="bulkStats" class="grid" hidden></div>
+      <div id="bulkMeta" class="sub" hidden></div>
+      <div id="bulkSources" class="card" hidden>
+        <h2>Источники фактов</h2>
+        <div id="bulkSourceGrid" class="source-grid"></div>
+      </div>
+    </div>
+
+    <div id="youtubePanel">
     <div id="liveBox" class="card live idle" hidden>
       <h2 id="liveTitle">Прогон</h2>
       <p id="liveBody" class="sub" style="margin:0"></p>
@@ -99,6 +125,7 @@
         <tbody id="rows"></tbody>
       </table>
     </div>
+    </div>
   </div>
   <script>
     const TOKEN_KEY = 'harvest_dashboard_token';
@@ -107,6 +134,17 @@
     if (saved) tokenEl.value = saved;
     let pollTimer = null;
     let discoverVideos = [];
+    let activeTab = 'youtube';
+    let lastBulk = null;
+
+    function setTab(tab) {
+      activeTab = tab;
+      document.getElementById('tabYoutube').classList.toggle('active', tab === 'youtube');
+      document.getElementById('tabBulk').classList.toggle('active', tab === 'bulk');
+      document.getElementById('youtubePanel').hidden = tab !== 'youtube';
+      document.getElementById('bulkPanel').hidden = tab !== 'bulk';
+      document.getElementById('liveBox').hidden = tab !== 'youtube';
+    }
 
     function apiBase() {
       return (window.EFIR_API_BASE || window.location.origin || '').replace(/\/$/, '');
@@ -168,7 +206,90 @@
         : '';
     }
 
-    function render(d, sourceLabel) {
+    function renderBulk(b, sourceLabel) {
+      lastBulk = b;
+      document.getElementById('bulkStats').hidden = false;
+      document.getElementById('bulkMeta').hidden = false;
+      document.getElementById('bulkSources').hidden = false;
+
+      const live = b.live;
+      const liveBox = document.getElementById('bulkLiveBox');
+      liveBox.className = 'card live ' + (b.runStatus === 'running' ? 'running' : 'idle');
+      document.getElementById('bulkLiveTitle').textContent =
+        b.runStatus === 'running' ? 'Идёт bulk-seed' :
+        b.runStatus === 'finished' ? 'Bulk-seed завершён' :
+        b.runStatus === 'stale' ? 'Bulk-seed, похоже, остановлен' : 'Bulk-seed не запущен';
+      if (live && live.status === 'running' && live.artist) {
+        document.getElementById('bulkLiveBody').textContent =
+          (live.index || '?') + ' / ' + (live.total || b.catalogTotal || '?') +
+          ' — ' + live.artist + ' — ' + (live.title || '…') +
+          (b.tracksPerMin ? ' · ~' + b.tracksPerMin + ' треков/мин' : '') +
+          (b.etaLabel ? ' · ETA ' + b.etaLabel : '');
+      } else {
+        document.getElementById('bulkLiveBody').textContent =
+          'Треки ' + fmt(b.tracksDone) + ' / ' + fmt(b.catalogTotal) +
+          ' (' + (b.tracksPct || 0) + '%) · факты ' + fmt(b.factsSubstantive) + ' / ' + fmt(b.factsTarget) +
+          ' · hot ' + fmt(b.hotFacts) + ' / ' + fmt(b.hotTarget) +
+          (b.etaLabel ? ' · ETA ' + b.etaLabel : '') +
+          ' · команда: cd backend && npm run seed:hot-push';
+      }
+
+      const warn = document.getElementById('bulkWarn');
+      if (b.runStatus === 'stale') {
+        warn.hidden = false;
+        warn.textContent = '⚠ Чекпоинт ' + (b.staleMinutes || '?') + ' мин назад — процесс, скорее всего, не работает. Запуск: scripts/run-bulk-seed-detached.ps1';
+      } else {
+        warn.hidden = true;
+      }
+
+      const stats = [
+        [b.tracksDone + ' / ' + b.catalogTotal, 'треков (' + (b.tracksPct || 0) + '%)'],
+        [b.tracksRemaining, 'осталось треков'],
+        [b.factsSubstantive + ' / ' + b.factsTarget, 'фактов (' + (b.factsPct || 0) + '%)'],
+        [b.hotFacts + ' / ' + b.hotTarget, 'hot (' + (b.hotPct || 0) + '%)'],
+        [b.zeroFacts, 'zero-facts треков'],
+        [b.bankFileMb != null ? b.bankFileMb + ' MB' : '—', 'facts-bank.json'],
+      ];
+      document.getElementById('bulkStats').innerHTML = stats
+        .map(function (pair) { return '<div class="stat"><b>' + pair[0] + '</b><span>' + pair[1] + '</span></div>'; })
+        .join('');
+
+      document.getElementById('bulkMeta').textContent =
+        'Обновлено: ' + (b.updatedAt ? new Date(b.updatedAt).toLocaleString('ru') : '—') +
+        ' · checkpoint: ' + (b.savedAt ? new Date(b.savedAt).toLocaleString('ru') : '—') +
+        ' · статус: ' + (b.runStatus || '—') +
+        ' · источник: ' + (sourceLabel || b.source || '—') +
+        (b.finishedAt ? ' · finished ' + new Date(b.finishedAt).toLocaleString('ru') : '') +
+        ' · sync: npm run seed:dashboard';
+
+      const src = b.bySource || {};
+      document.getElementById('bulkSourceGrid').innerHTML = Object.keys(src).sort(function (a, b) { return src[b] - src[a]; })
+        .map(function (k) { return '<div><b>' + src[k] + '</b><br>' + escapeHtml(k) + '</div>'; }).join('');
+    }
+
+    async function loadBulkStaticFallback() {
+      const res = await fetch('bulk-seed-data.json?_=' + Date.now());
+      if (!res.ok) throw new Error('Нет bulk snapshot');
+      return res.json();
+    }
+
+    async function loadBulk(sourceLabel) {
+      try {
+        const data = await apiGet('/v1/admin/bulk-seed/status');
+        renderBulk(data.bulkSeed, sourceLabel || 'Railway');
+        return true;
+      } catch (e) {
+        try {
+          const dash = await loadBulkStaticFallback();
+          renderBulk(dash, sourceLabel || 'snapshot (сайт)');
+          return true;
+        } catch (e2) {
+          if (activeTab === 'bulk') showErr((e.error || e.message || String(e)) + ' — нет bulk snapshot');
+          return false;
+        }
+      }
+    }
+    function renderYoutube(d, sourceLabel) {
       document.getElementById('stats').hidden = false;
       document.getElementById('meta').hidden = false;
       document.getElementById('tableWrap').hidden = false;
@@ -223,13 +344,17 @@
       showErr('');
       try {
         const data = await apiGet('/v1/admin/youtube-harvest/status');
-        render(data.dashboard, 'Railway');
+        renderYoutube(data.dashboard, 'Railway');
+        if (data.bulkSeed) renderBulk(data.bulkSeed, 'Railway');
+        else await loadBulk('Railway');
       } catch (e) {
         try {
           const dash = await loadStaticFallback();
-          render(dash, 'snapshot (сайт)');
+          renderYoutube(dash, 'snapshot (сайт)');
+          await loadBulk('snapshot (сайт)');
         } catch (e2) {
           showErr((e.error || e.message || String(e)) + ' — нет snapshot');
+          await loadBulk('snapshot (сайт)');
         }
       } finally {
         document.getElementById('loadBtn').disabled = false;
@@ -316,6 +441,8 @@
       }
     }
 
+    document.getElementById('tabYoutube').addEventListener('click', function () { setTab('youtube'); });
+    document.getElementById('tabBulk').addEventListener('click', function () { setTab('bulk'); if (!lastBulk) loadBulk(); });
     document.getElementById('loadBtn').addEventListener('click', function () { load(); loadQueueInfo(); });
     document.getElementById('discoverBtn').addEventListener('click', discover);
     document.getElementById('queueBtn').addEventListener('click', queueSelected);

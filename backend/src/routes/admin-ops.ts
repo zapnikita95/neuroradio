@@ -30,6 +30,14 @@ import {
   type HarvestLiveProgress,
   type HarvestManualQueueVideo,
 } from '../services/youtube-harvest-admin.js';
+import {
+  buildBulkSeedDashboardFromFiles,
+  loadBulkSeedDashboard,
+  saveBulkSeedDashboard,
+  saveBulkSeedLiveProgress,
+  type BulkSeedDashboard,
+  type BulkSeedLiveProgress,
+} from '../services/bulk-seed-dashboard.js';
 
 const router = Router();
 
@@ -136,7 +144,12 @@ router.get('/youtube-harvest/status', (req, res) => {
     res.status(404).json({ error: 'no_harvest_data', hint: 'Run batch sync or copy state to volume' });
     return;
   }
-  res.json({ ok: true, dashboard: dash, live: dash.live ?? loadHarvestLiveProgress() });
+  res.json({
+    ok: true,
+    dashboard: dash,
+    live: dash.live ?? loadHarvestLiveProgress(),
+    bulkSeed: loadBulkSeedDashboard() ?? buildBulkSeedDashboardFromFiles(),
+  });
 });
 
 /** POST /v1/admin/youtube-harvest/sync — push dashboard snapshot from local batch */
@@ -220,6 +233,42 @@ router.delete('/youtube-harvest/queue', (req, res) => {
   if (!requireHarvestAdmin(req, res)) return;
   clearManualQueue();
   res.json({ ok: true, cleared: true });
+});
+
+/** GET /v1/admin/bulk-seed/status */
+router.get('/bulk-seed/status', (req, res) => {
+  if (!requireHarvestAdmin(req, res)) return;
+  const dash = loadBulkSeedDashboard() ?? buildBulkSeedDashboardFromFiles();
+  if (!dash) {
+    res.status(404).json({ error: 'no_bulk_seed_data', hint: 'Run bulk-seed or sync progress' });
+    return;
+  }
+  res.json({ ok: true, bulkSeed: dash, live: dash.live });
+});
+
+/** POST /v1/admin/bulk-seed/sync — push dashboard snapshot from local runner */
+router.post('/bulk-seed/sync', (req, res) => {
+  if (!requireHarvestAdmin(req, res)) return;
+  const body = req.body as BulkSeedDashboard | { bulkSeed?: BulkSeedDashboard };
+  const payload = (body as { bulkSeed?: BulkSeedDashboard }).bulkSeed ?? (body as BulkSeedDashboard);
+  if (!payload || typeof payload !== 'object' || payload.tracksDone == null) {
+    res.status(400).json({ error: 'invalid bulk seed payload' });
+    return;
+  }
+  saveBulkSeedDashboard({ ...payload, updatedAt: new Date().toISOString(), source: 'api-sync' });
+  res.json({ ok: true, tracksDone: payload.tracksDone, factsSubstantive: payload.factsSubstantive });
+});
+
+/** POST /v1/admin/bulk-seed/progress — live track from local runner */
+router.post('/bulk-seed/progress', (req, res) => {
+  if (!requireHarvestAdmin(req, res)) return;
+  const body = req.body as BulkSeedLiveProgress;
+  if (!body || typeof body !== 'object') {
+    res.status(400).json({ error: 'invalid progress payload' });
+    return;
+  }
+  saveBulkSeedLiveProgress(body);
+  res.json({ ok: true, status: body.status });
 });
 
 export default router;

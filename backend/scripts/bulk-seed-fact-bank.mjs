@@ -30,7 +30,66 @@ const __dir = dirname(fileURLToPath(import.meta.url));
 const CATALOG = join(__dir, '../src/data/popular-tracks-catalog.json');
 const PRIORITY_ARTISTS_PATH = join(__dir, '../src/data/priority-fact-artists.json');
 const PROGRESS = join(__dir, '../data/bulk-seed-progress.json');
+const LIVE_FILE = join(__dir, '../data/bulk-seed-live.json');
 const SEED_OUT = join(__dir, '../data/facts-bank-seed.json');
+
+let catalogTrackTotal = 0;
+
+function bffBase() {
+  return (
+    process.env.WEBSITE_DEMO_API_BASE?.trim() ||
+    process.env.BFF_URL?.trim() ||
+    process.env.PUBLIC_BFF_URL?.trim() ||
+    'https://www.efir-ai.ru'
+  ).replace(/\/$/, '');
+}
+
+async function syncBulkSeedLiveRemote(live) {
+  const token = process.env.HARVEST_DASHBOARD_TOKEN?.trim();
+  if (!token) return;
+  try {
+    await fetch(`${bffBase()}/v1/admin/bulk-seed/progress`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'x-harvest-dashboard-token': token },
+      body: JSON.stringify(live),
+      signal: AbortSignal.timeout(20_000),
+    });
+  } catch {
+    /* best-effort */
+  }
+}
+
+async function syncBulkSeedDashboardRemote() {
+  const token = process.env.HARVEST_DASHBOARD_TOKEN?.trim();
+  if (!token) return;
+  try {
+    const { buildBulkSeedDashboardFromFiles } = await import('../dist/services/bulk-seed-dashboard.js');
+    const dash = buildBulkSeedDashboardFromFiles();
+    if (!dash) return;
+    dash.source = 'local-batch';
+    await fetch(`${bffBase()}/v1/admin/bulk-seed/sync`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'x-harvest-dashboard-token': token },
+      body: JSON.stringify(dash),
+      signal: AbortSignal.timeout(30_000),
+    });
+  } catch {
+    /* best-effort */
+  }
+}
+
+function saveLiveTrack(track, index, total) {
+  const live = {
+    status: 'running',
+    artist: track.artist,
+    title: track.title,
+    index,
+    total,
+    updatedAt: new Date().toISOString(),
+  };
+  writeFileSync(LIVE_FILE, JSON.stringify(live, null, 2));
+  void syncBulkSeedLiveRemote(live);
+}
 
 const args = process.argv.slice(2);
 const target = parseInt(args.find((a) => a.startsWith('--target='))?.split('=')[1] ?? '60000', 10);
@@ -349,6 +408,28 @@ function saveCheckpoint(bank, stats, doneKeys, zeroFactKeys) {
   stats.substantive = bankSummary.substantive;
   saveBank(BANK_PATH, bank);
   saveBank(SEED_OUT, buildHotSeed(bank));
+
+  let prev = null;
+  try {
+    if (existsSync(PROGRESS)) prev = JSON.parse(readFileSync(PROGRESS, 'utf8'));
+  } catch {
+    /* ignore */
+  }
+  const now = new Date();
+  const doneCount = doneKeys.size;
+  let tracksPerMin = prev?.tracksPerMin ?? null;
+  let etaMinutes = prev?.etaMinutes ?? null;
+  if (prev?.savedAt && prev?.doneKeys?.length != null) {
+    const mins = (now.getTime() - new Date(prev.savedAt).getTime()) / 60000;
+    const delta = doneCount - prev.doneKeys.length;
+    if (mins > 0.05 && delta > 0) {
+      tracksPerMin = Math.round((delta / mins) * 100) / 100;
+      if (catalogTrackTotal > doneCount) {
+        etaMinutes = Math.round((catalogTrackTotal - doneCount) / tracksPerMin);
+      }
+    }
+  }
+
   writeFileSync(
     PROGRESS,
     JSON.stringify(
@@ -358,12 +439,16 @@ function saveCheckpoint(bank, stats, doneKeys, zeroFactKeys) {
         stats,
         target,
         hotTarget,
-        savedAt: new Date().toISOString(),
+        catalogTotal: catalogTrackTotal,
+        tracksPerMin,
+        etaMinutes,
+        savedAt: now.toISOString(),
       },
       null,
       2,
     ),
   );
+  if (doneCount % 10 === 0) void syncBulkSeedDashboardRemote();
 }
 
 function isSongMeaningNarrative(trimmed) {
@@ -584,6 +669,7 @@ async function runPool(tracks, bank, stats, doneKeys, zeroFactKeys) {
       const i = idx++;
       const track = tracks[i];
       const key = trackKey(track.artist, track.title);
+      saveLiveTrack(track, i + 1, tracks.length);
       try {
         const { saved, savedMetadata, savedLastfm, harvested, rejectCounts } = await processTrack(
           bank,
@@ -690,6 +776,7 @@ async function main() {
   const catalog = JSON.parse(readFileSync(CATALOG, 'utf8'));
   let tracks = (catalog.tracks ?? []).filter(isHarvestableTrack);
   if (trackLimit > 0) tracks = tracks.slice(0, trackLimit);
+  catalogTrackTotal = tracks.length;
 
   const bank = loadBank(BANK_PATH);
   const stats = { total: 0, hot: 0, tracks: 0, zeroFacts: 0, bySource: {} };
@@ -783,11 +870,18 @@ async function main() {
     stats,
     target,
     hotTarget,
+    catalogTotal: catalogTrackTotal,
+    savedAt: new Date().toISOString(),
   };
   if (stats.total >= target) {
     finishedPayload.finishedAt = new Date().toISOString();
   }
   writeFileSync(PROGRESS, JSON.stringify(finishedPayload, null, 2));
+  writeFileSync(
+    LIVE_FILE,
+    JSON.stringify({ status: finishedPayload.finishedAt ? 'finished' : 'idle', updatedAt: new Date().toISOString() }),
+  );
+  void syncBulkSeedDashboardRemote();
 
   const hotCount =
     Object.values(bank.byTrack).flat().filter((f) => f.isHot && !f.isMetadata).length +

@@ -75,7 +75,8 @@
     "harvest:youtube-from-queue": "npm run build && node scripts/youtube-harvest-batch.mjs --from-queue",
     "harvest:youtube-reingest": "npm run build && node scripts/youtube-harvest-reingest-catalog.mjs",
     "harvest:youtube-weekly": "npm run build && node scripts/youtube-harvest-batch.mjs --weekly",
-    "harvest:youtube-dashboard": "npm run build && node scripts/youtube-harvest-publish-dashboard.mjs"
+    "harvest:youtube-dashboard": "npm run build && node scripts/youtube-harvest-publish-dashboard.mjs",
+    "seed:dashboard": "npm run build && node scripts/bulk-seed-publish-dashboard.mjs"
   },
   "keywords": [
     "music",

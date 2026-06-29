@@ -1,0 +1,34 @@
+{
+  "updatedAt": "2026-06-29T23:16:56.017Z",
+  "source": "local-batch",
+  "savedAt": "2026-06-29T23:16:16.650Z",
+  "runStatus": "stopped",
+  "staleMinutes": 1,
+  "catalogTotal": 246108,
+  "tracksDone": 95069,
+  "tracksRemaining": 151039,
+  "tracksPct": 38.6,
+  "factsSubstantive": 101040,
+  "factsTarget": 120000,
+  "factsPct": 84.2,
+  "hotFacts": 27807,
+  "hotTarget": 20000,
+  "hotPct": 139,
+  "zeroFacts": 5602,
+  "metadata": 33807,
+  "bySource": {
+    "web": 37,
+    "wiki": 8742,
+    "setlistfm": 6158,
+    "lastfm": 57091,
+    "wikidata": 2067,
+    "genius": 9237,
+    "discogs": 21776
+  },
+  "byScope": {
+    "track": 57180,
+    "album": 20107,
+    "artist": 23753
+  },
+  "bankFileMb": 76.4
+}
