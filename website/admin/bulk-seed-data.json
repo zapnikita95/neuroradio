@@ -1,34 +1,34 @@
 {
-  "updatedAt": "2026-06-29T23:16:56.017Z",
+  "updatedAt": "2026-06-30T20:26:31.992Z",
   "source": "local-batch",
-  "savedAt": "2026-06-29T23:16:16.650Z",
-  "runStatus": "stopped",
+  "savedAt": "2026-06-30T20:25:20.423Z",
+  "runStatus": "running",
   "staleMinutes": 1,
   "catalogTotal": 246108,
-  "tracksDone": 95069,
-  "tracksRemaining": 151039,
-  "tracksPct": 38.6,
-  "factsSubstantive": 101040,
+  "tracksDone": 104969,
+  "tracksRemaining": 141139,
+  "tracksPct": 42.7,
+  "factsSubstantive": 104191,
   "factsTarget": 120000,
-  "factsPct": 84.2,
-  "hotFacts": 27807,
+  "factsPct": 86.8,
+  "hotFacts": 28735,
   "hotTarget": 20000,
-  "hotPct": 139,
-  "zeroFacts": 5602,
-  "metadata": 33807,
+  "hotPct": 143.7,
+  "zeroFacts": 5706,
+  "metadata": 36231,
   "bySource": {
     "web": 37,
-    "wiki": 8742,
+    "wiki": 9041,
     "setlistfm": 6158,
-    "lastfm": 57091,
-    "wikidata": 2067,
-    "genius": 9237,
-    "discogs": 21776
+    "lastfm": 58298,
+    "wikidata": 2202,
+    "genius": 9579,
+    "discogs": 22944
   },
   "byScope": {
-    "track": 57180,
-    "album": 20107,
-    "artist": 23753
+    "track": 59077,
+    "album": 21115,
+    "artist": 23999
   },
-  "bankFileMb": 76.4
+  "bankFileMb": 79.6
 }

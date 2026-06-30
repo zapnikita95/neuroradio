@@ -59,7 +59,7 @@
 <body>
   <div class="wrap">
     <h1>Harvest Dashboard</h1>
-    <p class="sub">YouTube essay + локальный bulk-seed. <strong>Прогон крутится только на твоём ПК</strong> — дашборд показывает синхронизированное состояние, не запускает job сам. Для кнопки «Запустить» один раз: <code>cd backend && npm run seed:agent</code></p>
+    <p class="sub">YouTube essay + локальный bulk-seed. <strong>Прогон крутится только на твоём ПК</strong> — дашборд показывает синхронизированное состояние. Агент (PowerShell): <code>Set-Location "...\backend"; npm run seed:agent</code></p>
 
     <div class="tabs">
       <button type="button" id="tabYoutube" class="active">YouTube essay</button>
@@ -198,7 +198,7 @@
       const el = document.getElementById('agentStatus');
       const ok = await pingAgent();
       if (!ok) {
-        el.innerHTML = 'Агент не запущен — в терминале: <code>cd backend && npm run seed:agent</code>';
+        el.innerHTML = 'Агент не запущен — PowerShell: <code>Set-Location "C:\Users\1\OneDrive\Desktop\Music story\backend"; npm run seed:agent</code>';
         return false;
       }
       try {
@@ -221,7 +221,7 @@
       showErr('');
       try {
         if (!(await pingAgent())) {
-          showErr('Локальный агент не запущен. В отдельном терминале: cd backend && npm run seed:agent');
+          showErr('Локальный агент не запущен. PowerShell: Set-Location "...\\backend"; npm run seed:agent');
           return;
         }
         const r = await fetch(AGENT_BASE + '/start/bulk-seed', { method: 'POST', signal: AbortSignal.timeout(120000) });

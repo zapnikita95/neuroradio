@@ -116,6 +116,7 @@ export function buildBulkSeedDashboardFromFiles(): BulkSeedDashboard | null {
   let runStatus: BulkSeedDashboard['runStatus'] = 'stopped';
   if (reallyFinished) runStatus = 'finished';
   else if (live.status === 'running' && staleMinutes < 15) runStatus = 'running';
+  else if (!prog.finishedAt && staleMinutes <= 15) runStatus = 'running';
   else if (staleMinutes > 30 && !prog.finishedAt) runStatus = 'stale';
   else if (live.status === 'running') runStatus = 'running';
 
