@@ -14,6 +14,7 @@ export interface BulkSeedLiveProgress {
   title?: string;
   index?: number;
   total?: number;
+  stopReason?: string;
   updatedAt?: string;
 }
 
@@ -43,6 +44,7 @@ export interface BulkSeedDashboard {
   etaMinutes?: number;
   etaLabel?: string;
   bankFileMb?: number;
+  stopReason?: string;
   live?: BulkSeedLiveProgress;
 }
 
@@ -146,7 +148,8 @@ export function buildBulkSeedDashboardFromFiles(): BulkSeedDashboard | null {
     etaMinutes: etaMinutes ?? undefined,
     etaLabel,
     bankFileMb: bankFileMb(),
-    live: live.status !== 'idle' ? live : undefined,
+    stopReason: live.stopReason,
+    live: live.status !== 'idle' ? live : live.stopReason ? live : undefined,
   };
 }
 

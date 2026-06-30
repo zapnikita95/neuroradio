@@ -78,6 +78,27 @@ async function syncBulkSeedDashboardRemote() {
   }
 }
 
+function markBulkSeedStopped(reason) {
+  try {
+    writeFileSync(
+      LIVE_FILE,
+      JSON.stringify({ status: 'idle', stopReason: reason, updatedAt: new Date().toISOString() }, null, 2),
+    );
+    void syncBulkSeedDashboardRemote();
+  } catch {
+    /* ignore */
+  }
+}
+
+process.on('SIGINT', () => {
+  markBulkSeedStopped('SIGINT (Ctrl+C или закрыли терминал)');
+  process.exit(130);
+});
+process.on('SIGTERM', () => {
+  markBulkSeedStopped('SIGTERM');
+  process.exit(143);
+});
+
 function saveLiveTrack(track, index, total) {
   const live = {
     status: 'running',
@@ -901,5 +922,6 @@ async function main() {
 
 main().catch((e) => {
   console.error(e);
+  markBulkSeedStopped(e instanceof Error ? e.message : String(e));
   process.exit(1);
 });

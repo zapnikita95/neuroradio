@@ -22,6 +22,7 @@
     .auth input, select { flex: 1; min-width: 180px; padding: 10px 12px; border-radius: 8px; border: 1px solid var(--border); background: #0c0a14; color: var(--text); }
     button { padding: 10px 16px; border-radius: 8px; border: none; background: var(--accent); color: #fff; cursor: pointer; font-weight: 600; }
     button.secondary { background: #2a2540; }
+    button.success { background: #2a7a52; }
     button:disabled { opacity: 0.5; cursor: wait; }
     .live { border-color: var(--ok); background: rgba(61,214,140,0.08); }
     .live.idle { border-color: var(--border); background: var(--card); }
@@ -58,7 +59,7 @@
 <body>
   <div class="wrap">
     <h1>Harvest Dashboard</h1>
-    <p class="sub">YouTube essay + локальный bulk-seed. Прогоны идут на твоей машине; дашборд — синхронизированное состояние.</p>
+    <p class="sub">YouTube essay + локальный bulk-seed. <strong>Прогон крутится только на твоём ПК</strong> — дашборд показывает синхронизированное состояние, не запускает job сам. Для кнопки «Запустить» один раз: <code>cd backend && npm run seed:agent</code></p>
 
     <div class="tabs">
       <button type="button" id="tabYoutube" class="active">YouTube essay</button>
@@ -76,6 +77,11 @@
       <div id="bulkLiveBox" class="card live idle">
         <h2 id="bulkLiveTitle">Bulk seed</h2>
         <p id="bulkLiveBody" class="sub" style="margin:0"></p>
+        <div class="row-actions" style="margin-top:12px">
+          <button id="startBulkBtn" type="button" class="success">▶ Запустить bulk-seed на этом ПК</button>
+          <button id="syncDashBtn" type="button" class="secondary">Sync snapshot</button>
+          <span id="agentStatus" class="hint"></span>
+        </div>
       </div>
       <div id="bulkWarn" class="card warn-box" hidden></div>
       <div id="bulkStats" class="grid" hidden></div>
@@ -98,12 +104,13 @@
 
     <div id="discoverBox" class="card" hidden>
       <h2>Добавить видео в прогон</h2>
-      <p class="hint">Поиск по RSS каналов (Broken Dance, Fast Flow, РЗТ, Middle8). Выбери → «В очередь». Запуск локально: <code>npm run harvest:youtube-from-queue</code></p>
+      <p class="hint">Поиск по RSS каналов (Broken Dance, Fast Flow, РЗТ, Middle8). Выбери → «В очередь».</p>
       <div class="row-actions">
         <select id="channelPick"></select>
         <button id="discoverBtn" type="button">Найти видео</button>
         <button id="queueBtn" type="button" class="secondary" disabled>Добавить выбранные в очередь</button>
         <button id="clearQueueBtn" type="button" class="secondary">Очистить очередь</button>
+        <button id="startYoutubeBtn" type="button" class="success">▶ YouTube из очереди (локально)</button>
       </div>
       <div id="discoverList" class="discover-list"></div>
       <p id="queueInfo" class="hint"></p>
@@ -129,6 +136,7 @@
   </div>
   <script>
     const TOKEN_KEY = 'harvest_dashboard_token';
+    const AGENT_BASE = 'http://127.0.0.1:17842';
     const tokenEl = document.getElementById('token');
     const saved = localStorage.getItem(TOKEN_KEY);
     if (saved) tokenEl.value = saved;
@@ -177,6 +185,84 @@
 
     function fmt(n) { return n == null ? '0' : String(n); }
 
+    async function pingAgent() {
+      try {
+        const r = await fetch(AGENT_BASE + '/health', { signal: AbortSignal.timeout(2500) });
+        return r.ok;
+      } catch (_) {
+        return false;
+      }
+    }
+
+    async function refreshAgentStatus() {
+      const el = document.getElementById('agentStatus');
+      const ok = await pingAgent();
+      if (!ok) {
+        el.innerHTML = 'Агент не запущен — в терминале: <code>cd backend && npm run seed:agent</code>';
+        return false;
+      }
+      try {
+        const r = await fetch(AGENT_BASE + '/status', { signal: AbortSignal.timeout(3000) });
+        const data = await r.json();
+        const bulk = data.bulkSeed || {};
+        el.textContent = bulk.running
+          ? 'Агент OK · bulk-seed PID ' + (bulk.pids || []).join(', ')
+          : 'Агент OK · bulk-seed не крутится';
+        return true;
+      } catch (_) {
+        el.textContent = 'Агент OK';
+        return true;
+      }
+    }
+
+    async function startBulkLocal() {
+      const btn = document.getElementById('startBulkBtn');
+      btn.disabled = true;
+      showErr('');
+      try {
+        if (!(await pingAgent())) {
+          showErr('Локальный агент не запущен. В отдельном терминале: cd backend && npm run seed:agent');
+          return;
+        }
+        const r = await fetch(AGENT_BASE + '/start/bulk-seed', { method: 'POST', signal: AbortSignal.timeout(120000) });
+        const data = await r.json();
+        if (!r.ok) throw data;
+        if (data.alreadyRunning) {
+          showErr('Bulk-seed уже работает (PID ' + (data.pids || []).join(', ') + ')');
+        } else if (data.started) {
+          document.getElementById('agentStatus').textContent = 'Запущен PID ' + (data.pids || []).join(', ');
+        } else {
+          showErr('Старт отправлен, но процесс не виден — смотри backend/logs/bulk-seed.err.log');
+        }
+        setTimeout(load, 3000);
+      } catch (e) {
+        showErr(e.error || e.message || 'start failed');
+      } finally {
+        btn.disabled = false;
+      }
+    }
+
+    async function startYoutubeLocal() {
+      const btn = document.getElementById('startYoutubeBtn');
+      btn.disabled = true;
+      try {
+        if (!(await pingAgent())) {
+          showErr('Агент не запущен: cd backend && npm run seed:agent');
+          return;
+        }
+        const r = await fetch(AGENT_BASE + '/start/youtube-queue', { method: 'POST', signal: AbortSignal.timeout(15000) });
+        const data = await r.json();
+        if (!r.ok) throw data;
+        showErr('');
+        document.getElementById('queueInfo').textContent = 'YouTube batch запущен локально (PID ' + (data.pid || '?') + ')';
+        setTimeout(load, 3000);
+      } catch (e) {
+        showErr(e.error || e.message || 'youtube start failed');
+      } finally {
+        btn.disabled = false;
+      }
+    }
+
     function renderLive(live, d) {
       const box = document.getElementById('liveBox');
       box.hidden = false;
@@ -218,7 +304,7 @@
       document.getElementById('bulkLiveTitle').textContent =
         b.runStatus === 'running' ? 'Идёт bulk-seed' :
         b.runStatus === 'finished' ? 'Bulk-seed завершён' :
-        b.runStatus === 'stale' ? 'Bulk-seed, похоже, остановлен' : 'Bulk-seed не запущен';
+        b.runStatus === 'stale' ? 'Bulk-seed, похоже, упал или завис' : 'Bulk-seed не запущен';
       if (live && live.status === 'running' && live.artist) {
         document.getElementById('bulkLiveBody').textContent =
           (live.index || '?') + ' / ' + (live.total || b.catalogTotal || '?') +
@@ -226,18 +312,28 @@
           (b.tracksPerMin ? ' · ~' + b.tracksPerMin + ' треков/мин' : '') +
           (b.etaLabel ? ' · ETA ' + b.etaLabel : '');
       } else {
-        document.getElementById('bulkLiveBody').textContent =
+        let body =
           'Треки ' + fmt(b.tracksDone) + ' / ' + fmt(b.catalogTotal) +
           ' (' + (b.tracksPct || 0) + '%) · факты ' + fmt(b.factsSubstantive) + ' / ' + fmt(b.factsTarget) +
           ' · hot ' + fmt(b.hotFacts) + ' / ' + fmt(b.hotTarget) +
-          (b.etaLabel ? ' · ETA ' + b.etaLabel : '') +
-          ' · команда: cd backend && npm run seed:hot-push';
+          (b.etaLabel ? ' · ETA ' + b.etaLabel : '');
+        if (b.stopReason) body += ' · стоп: ' + b.stopReason;
+        else if (b.runStatus === 'stopped' || b.runStatus === 'stale') {
+          body += ' · обычно: VPN/Last.fm off, закрыли терминал Cursor, или crash — жми ▶ Запустить';
+        }
+        document.getElementById('bulkLiveBody').textContent = body;
       }
 
       const warn = document.getElementById('bulkWarn');
       if (b.runStatus === 'stale') {
         warn.hidden = false;
-        warn.textContent = '⚠ Чекпоинт ' + (b.staleMinutes || '?') + ' мин назад — процесс, скорее всего, не работает. Запуск: scripts/run-bulk-seed-detached.ps1';
+        warn.textContent =
+          '⚠ Чекпоинт ' + (b.staleMinutes || '?') + ' мин назад — процесс не обновлялся. ' +
+          (b.stopReason ? 'Причина: ' + b.stopReason + '. ' : '') +
+          'Лог: backend/logs/bulk-seed.err.log · перезапуск: кнопка ▶ или scripts/run-bulk-seed-detached.ps1';
+      } else if (b.runStatus === 'stopped' && b.stopReason) {
+        warn.hidden = false;
+        warn.textContent = 'Последний стоп: ' + b.stopReason;
       } else {
         warn.hidden = true;
       }
@@ -358,6 +454,7 @@
         }
       } finally {
         document.getElementById('loadBtn').disabled = false;
+        refreshAgentStatus();
       }
     }
 
@@ -442,8 +539,13 @@
     }
 
     document.getElementById('tabYoutube').addEventListener('click', function () { setTab('youtube'); });
-    document.getElementById('tabBulk').addEventListener('click', function () { setTab('bulk'); if (!lastBulk) loadBulk(); });
+    document.getElementById('tabBulk').addEventListener('click', function () { setTab('bulk'); if (!lastBulk) loadBulk(); refreshAgentStatus(); });
     document.getElementById('loadBtn').addEventListener('click', function () { load(); loadQueueInfo(); });
+    document.getElementById('startBulkBtn').addEventListener('click', startBulkLocal);
+    document.getElementById('startYoutubeBtn').addEventListener('click', startYoutubeLocal);
+    document.getElementById('syncDashBtn').addEventListener('click', function () {
+      showErr('Локально: cd backend && npm run seed:dashboard');
+    });
     document.getElementById('discoverBtn').addEventListener('click', discover);
     document.getElementById('queueBtn').addEventListener('click', queueSelected);
     document.getElementById('clearQueueBtn').addEventListener('click', clearQueue);
