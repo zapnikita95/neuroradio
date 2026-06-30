@@ -249,7 +249,7 @@ async function syncProgressRemote(progress) {
     process.env.WEBSITE_DEMO_API_BASE?.trim() ||
     process.env.BFF_URL?.trim() ||
     process.env.PUBLIC_BFF_URL?.trim() ||
-    'https://www.efir-ai.ru';
+    'https://music-story-production.up.railway.app';
   if (!token) return;
   try {
     await fetch(`${bff.replace(/\/$/, '')}/v1/admin/youtube-harvest/progress`, {
@@ -269,7 +269,7 @@ async function pullRemoteManualQueue() {
     process.env.WEBSITE_DEMO_API_BASE?.trim() ||
     process.env.BFF_URL?.trim() ||
     process.env.PUBLIC_BFF_URL?.trim() ||
-    'https://www.efir-ai.ru';
+    'https://music-story-production.up.railway.app';
   if (!token) return [];
   try {
     const res = await fetch(`${bff.replace(/\/$/, '')}/v1/admin/youtube-harvest/queue`, {
@@ -296,7 +296,7 @@ async function clearRemoteManualQueue() {
     process.env.WEBSITE_DEMO_API_BASE?.trim() ||
     process.env.BFF_URL?.trim() ||
     process.env.PUBLIC_BFF_URL?.trim() ||
-    'https://www.efir-ai.ru';
+    'https://music-story-production.up.railway.app';
   if (!token) return;
   try {
     await fetch(`${bff.replace(/\/$/, '')}/v1/admin/youtube-harvest/queue`, {
@@ -628,7 +628,7 @@ async function publishHarvestDashboard() {
     process.env.WEBSITE_DEMO_API_BASE?.trim() ||
     process.env.BFF_URL?.trim() ||
     process.env.PUBLIC_BFF_URL?.trim() ||
-    'https://www.efir-ai.ru';
+    'https://music-story-production.up.railway.app';
   if (!token) {
     console.warn('[batch] HARVEST_DASHBOARD_TOKEN missing — dashboard not synced to Railway');
     return;
