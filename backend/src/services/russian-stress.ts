@@ -31,6 +31,9 @@ export const RUSSIAN_STRESS: Record<string, string> = {
   барабан: 'бараб+ан',
   батарея: 'батар+ея',
   батарее: 'батар+ее',
+  диджей: 'дидж+ей',
+  диджеев: 'дидж+еев',
+  диджея: 'дидж+ея',
   флоу: 'фл+оу',
   дубль: 'д+убль',
   дубля: 'д+убля',
@@ -147,6 +150,7 @@ export const RUSSIAN_STRESS: Record<string, string> = {
   ребрендинге: 'ребр+эндинге',
   ребрендингу: 'ребр+эндингу',
   аранжировкой: 'аранжир+овкой',
+  спонтано: 'спонт+анно',
   пластинка: 'пласт+инка',
   пластинке: 'пласт+инке',
   пластинку: 'пласт+инку',
@@ -195,7 +199,7 @@ export const RUSSIAN_STRESS: Record<string, string> = {
   идясь: 'ид+ясь',
   живя: 'жив+я',
   сидя: 'сид+я',
-  стоя: 'сто+я',
+  стоя: 'ст+оя',
   лежа: 'леж+а',
   боясь: 'боя+сь',
   имея: 'им+ея',
@@ -244,6 +248,34 @@ export function normalizeNuMetalPronunciation(text: string): string {
  * версия / версии / версию — ударение на «е» (в+ерсии), не «верс+ии».
  * Исключение: мн. ч. им. (две версии) — vers+ii на последнем слоге.
  */
+export function normalizeComparativeNeStress(text: string): string {
+  return text.replace(
+    /(?<![\p{L}\p{N}_+])([\p{L}]{3,})нее(?![\p{L}\p{N}_])/giu,
+    '$1н+ее',
+  );
+}
+
+export function normalizeAdverbNnStress(text: string): string {
+  return text.replace(
+    /(?<![\p{L}\p{N}_+])(спонтанно|непрерывно|постоянно|мгновенно)(?![\p{L}\p{N}_])/giu,
+    (word) => {
+      const lower = word.toLowerCase();
+      const map: Record<string, string> = {
+        спонтанно: 'спонт+анно',
+        постоянно: 'посто+янно',
+        непрерывно: 'непрерыв+но',
+        мгновенно: 'мгнов+енно',
+      };
+      const marked = map[lower];
+      if (!marked) return word;
+      if (word[0] === word[0].toUpperCase()) {
+        return marked.charAt(0).toUpperCase() + marked.slice(1);
+      }
+      return marked;
+    },
+  );
+}
+
 export function normalizeVersiyaStress(text: string): string {
   if (!/верси/i.test(text)) return text;
 
@@ -265,6 +297,24 @@ export function normalizeVersiyaStress(text: string): string {
   for (const [pattern, replacement] of forms) {
     result = result.replace(pattern, replacement);
   }
+  // ремикс-версию, live-версии — ударение на каждой части через дефис.
+  result = result.replace(
+    /-(версиями|версиях|версиям|версией|версий|версию|версии|версия)(?![\p{L}\p{N}_])/giu,
+    (_m, form: string) => {
+      const lower = form.toLowerCase();
+      const map: Record<string, string> = {
+        версиями: '-в+ерсиями',
+        версиях: '-в+ерсиях',
+        версиям: '-в+ерсиям',
+        версией: '-в+ерсией',
+        версий: '-в+ерсий',
+        версию: '-в+ерсию',
+        версии: '-в+ерсии',
+        версия: '-в+ерсия',
+      };
+      return map[lower] ?? `-${form}`;
+    },
+  );
   return result;
 }
 
@@ -323,8 +373,12 @@ const LATIN_SLOT_END = '\uE015';
 /** Латиница не трогается ударениями и ё-нормализацией — иначе Hollywood → Hollywуd. */
 export function applyRussianStressSafe(text: string): string {
   const prepped = normalizeVersiyaStress(
-    normalizeGenreRockStress(
-      normalizePopMusicStress(normalizeNuMetalPronunciation(text)),
+    normalizeComparativeNeStress(
+      normalizeAdverbNnStress(
+        normalizeGenreRockStress(
+          normalizePopMusicStress(normalizeNuMetalPronunciation(text)),
+        ),
+      ),
     ),
   );
   const slots: string[] = [];

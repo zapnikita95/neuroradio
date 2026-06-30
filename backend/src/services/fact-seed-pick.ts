@@ -39,6 +39,7 @@ import type { StoryLanguageId } from './story-language.js';
 import { interestRating10 } from './fact-interest-log.js';
 import type { RankedFactScope } from './fact-ranking.js';
 import { isUnverifiedQuoteAttributionSeed } from './fact-quote-attribution.js';
+import { isMisanchoredBSideSeed } from './fact-bside-anchor.js';
 
 /** Shared reject gates for live pick + bank pick + push hot — одна логика с pickReferenceFact. */
 export function isRejectedPickSeed(
@@ -55,6 +56,7 @@ export function isRejectedPickSeed(
   const nonTrackScope = artistScope || albumScope;
 
   if (title.trim() && factMentionsOtherTrackTitle(fact, title)) return true;
+  if (title.trim() && isMisanchoredBSideSeed(fact, title)) return true;
   if (isSocialMediaInfluencerBleed(fact)) return true;
   if (!factFitsStoryLanguage(fact, storyLanguage)) return true;
   if (

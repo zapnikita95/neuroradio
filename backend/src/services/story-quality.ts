@@ -4,11 +4,12 @@ import {
   StoryLengthId,
   StoryLengthPreset,
 } from './story-length.js';
-import { COVER_CONTEXT_RE, factMentionsArtist, factMentionsTitle, hasTrackContextSignal, storyMentionsPerformingArtist, storyNamesForeignArtist } from './fact-relevance.js';
+import { COVER_CONTEXT_RE, factAppliesToRequest, factMentionsArtist, factMentionsTitle, hasTrackContextSignal, storyMentionsPerformingArtist, storyNamesForeignArtist } from './fact-relevance.js';
 import { hasRussianLeak } from './story-english-language.js';
 import { repairRussianScriptLanguage } from './story-russian-language.js';
 import type { StoryLanguageId } from './story-language.js';
 import { prepareStoryScriptLanguage } from './story-english-normalize.js';
+import { findSeedBSideRoleFlip } from './fact-bside-anchor.js';
 import { applyForeignPronunciation } from './tts-foreign-pronounce.js';
 import {
   genericizeScriptForVoiceover,
@@ -1001,6 +1002,22 @@ export function validateStoryScript(
     if (platformMismatch) {
       return { ok: false, reason: platformMismatch };
     }
+    const actorFlip =
+      referenceFacts.length > 0 ? findSeedActorRoleFlip(trimmed, referenceFacts) : null;
+    if (actorFlip) {
+      return { ok: false, reason: actorFlip };
+    }
+    const bSideFlip =
+      referenceFacts.length > 0 && title.trim()
+        ? findSeedBSideRoleFlip(trimmed, referenceFacts, title)
+        : null;
+    if (bSideFlip) {
+      return { ok: false, reason: bSideFlip };
+    }
+    const seedBandBleed = findSeedForeignBandBleed(artist, title, referenceFacts);
+    if (seedBandBleed) {
+      return { ok: false, reason: seedBandBleed };
+    }
     const trackMisattribution = findArtistSeedTrackMisattribution(trimmed, title, referenceFacts);
     if (trackMisattribution) {
       return { ok: false, reason: trackMisattribution };
@@ -1562,6 +1579,53 @@ export function findNewsSeedBleedIntoRecordingStory(
   if (!NEWS_POLITICS_SEED_RE.test(primary)) return null;
   if (RECORDING_STUDIO_SCRIPT_RE.test(script)) {
     return 'news/politics seed incorrectly woven into track recording story';
+  }
+  return null;
+}
+
+/** British vs American homonym bands: seed says one party must rename, script flips to track artist. */
+export function findSeedActorRoleFlip(
+  script: string,
+  referenceFacts: string[],
+): string | null {
+  if (referenceFacts.length === 0) return null;
+  const seed = referenceFacts.join(' ');
+  const dualPartySeed =
+    /\bbritish\b/i.test(seed) &&
+    /\bamerican\b/i.test(seed) &&
+    (/\bchange\s+(?:their|his|her)\s+name\b/i.test(seed) ||
+      /\bthreatened\b/i.test(seed) ||
+      /\blawsuit\b/i.test(seed));
+  if (!dualPartySeed) return null;
+
+  const refusedRename =
+    /(?:не\s+(?:стал\w*|сдал\w*)|отказал\w*|не\s+сменил\w*|не\s+изменил\w*).{0,70}(?:своё\s+)?(?:имя|назван)/i.test(
+      script,
+    );
+  const artistAsTarget =
+    /(?:этот\s+коллектив|коллектив|групп\w*|артист\w*).{0,50}(?:имя|назван)/i.test(script) ||
+    /(?:пригрозил\w*|угрожал\w*).{0,30}\s+им\b/i.test(script);
+
+  if (refusedRename && artistAsTarget) {
+    return 'dual-party seed: name-change lawsuit misattributed to track artist';
+  }
+  return null;
+}
+
+/** Seed fact does not belong to this artist/track (title collision, wrong wiki page). */
+export function findSeedForeignBandBleed(
+  artist: string,
+  title: string,
+  referenceFacts: string[],
+): string | null {
+  if (referenceFacts.length === 0 || !artist.trim()) return null;
+  const primary = referenceFacts[0]?.trim() ?? '';
+  if (!primary) return null;
+  const applies =
+    factAppliesToRequest(primary, artist, title, 'track', 'indie') ||
+    factAppliesToRequest(primary, artist, title, 'artist', 'indie');
+  if (!applies) {
+    return 'seed fact does not apply to this artist/track';
   }
   return null;
 }

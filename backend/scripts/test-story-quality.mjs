@@ -365,4 +365,29 @@ if (orphanVal.ok) {
   ok('orphan quantity phrase rejected');
 }
 
+const { findSeedBSideRoleFlip } = await import('../dist/services/fact-bside-anchor.js');
+const RADIO_B_SIDE_SEED =
+  'It was instead used as the B-side to the single release of "Radio Ga Ga".';
+const RADIO_B_SIDE_SCRIPT =
+  'Radio Ga Ga — Queen изначально вышла как би-сайд к синглу. Но именно эта песня затмила главный трек и стала визитной карточкой группы.';
+const radioFlip = findSeedBSideRoleFlip(RADIO_B_SIDE_SCRIPT, [RADIO_B_SIDE_SEED], 'Radio Ga Ga');
+if (!radioFlip) {
+  fail('Queen Radio Ga Ga B-side role flip must be detected');
+} else {
+  ok(`B-side role flip: ${radioFlip}`);
+}
+const radioVal = validateStoryScript(RADIO_B_SIDE_SCRIPT, '30s', 'Queen', 'Radio Ga Ga', {
+  referenceFacts: [RADIO_B_SIDE_SEED],
+  strictLength: false,
+  skipPersonaCliches: true,
+  speakTrackNamesInVoiceover: true,
+});
+if (radioVal.ok) {
+  fail('Radio Ga Ga B-side flip script must fail validateStoryScript');
+} else if (!String(radioVal.reason).includes('B-side role flip')) {
+  fail(`Radio Ga Ga flip wrong reason: ${radioVal.reason}`);
+} else {
+  ok('Radio Ga Ga B-side flip rejected by validateStoryScript');
+}
+
 process.exit(failed > 0 ? 1 : 0);

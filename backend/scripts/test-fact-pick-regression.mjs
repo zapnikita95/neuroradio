@@ -32,7 +32,8 @@ const { factAppliesToRequest, factMentionsTitle, isNonMusicTitleCollisionFact } 
   '../dist/services/fact-relevance.js'
 );
 const { dedicatedHarvestToBundle } = await import('../dist/services/fact-sources/dedicated-fetch.js');
-const { poolHasTopicDuplicate } = await import('../dist/services/fact-topic.js');
+const { poolHasTopicDuplicate, classifyFactTopic } = await import('../dist/services/fact-topic.js');
+const { factsTooSimilar } = await import('../dist/services/fact-picker.js');
 const { isArtistFormationBioSeed, isTrackDurationCatalogSeed, isListeningStatsFact, interestScore } = await import(
   '../dist/services/reference-fact-quality.js'
 );
@@ -475,6 +476,20 @@ assert(
   !isRejectedStorySeed(ROB_DEBUT_SINGLE, ROB_ARTIST, ROB_TITLE, [ROB_DEBUT_SINGLE]),
   'central gate accepts title-anchored debut single',
 );
+
+const { isMisanchoredBSideSeed } = await import('../dist/services/fact-bside-anchor.js');
+const QUEEN_RADIO = 'Radio Ga Ga';
+const RADIO_B_SIDE_MISANCHOR =
+  'It was instead used as the B-side to the single release of "Radio Ga Ga".';
+assert(
+  isMisanchoredBSideSeed(RADIO_B_SIDE_MISANCHOR, QUEEN_RADIO),
+  'mis-anchored B-side wiki line detected',
+);
+assert(
+  isRejectedStorySeed(RADIO_B_SIDE_MISANCHOR, 'Queen', QUEEN_RADIO, [], 'ru'),
+  'Radio Ga Ga B-side-to-single seed rejected at pick gate',
+);
+
 assert(
   !isWeakSelectedFact(
     {
@@ -1014,6 +1029,21 @@ assert(
     BRIGHTSIDE_TITLE,
   ),
   'Mr. Brightside jealousy backstory is not weak at score=5',
+);
+
+const BONES_EN =
+  'Imagine Dragons announced "Bones" on TikTok one day before release, saying the song would drop on March 11.';
+const BONES_RU =
+  'Bones — Imagine Dragons — трек, о котором группа объявила буквально за день до релиза. Они просто выложили тизер в TikTok и сообщили, что песня выйдет уже 11 марта.';
+assert(classifyFactTopic(BONES_EN) === 'release_teaser', 'Bones EN seed is release_teaser topic');
+assert(classifyFactTopic(BONES_RU) === 'release_teaser', 'Bones RU script is release_teaser topic');
+assert(
+  factsTooSimilar(BONES_EN, [BONES_RU], { pickScope: 'track', recentScopes: ['track'] }),
+  'EN seed rejected when same TikTok teaser already told in RU script',
+);
+assert(
+  factsTooSimilar(BONES_EN, [BONES_RU], { pickScope: 'artist', recentScopes: ['track'] }),
+  'EN seed still rejected when rotating to artist scope if text overlaps',
 );
 
 console.log(`\n${failed === 0 ? 'PASS' : 'FAIL'} — ${failed} failed`);

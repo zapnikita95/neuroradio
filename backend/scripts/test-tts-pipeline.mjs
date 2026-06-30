@@ -676,4 +676,40 @@ test('Yandex path collapses doubled vowels (версии) without vers+ii mis-st
   assert.doesNotMatch(live, /версии/i);
 });
 
+test('Yandex path: сильнее, спонтанно, raw-мощь, ремикс-версию', () => {
+  const closing = prepareYandexTtsText(
+    'От таких деталей только сильнее тянет слушать их снова.',
+    { sentencePauses: false },
+  );
+  assert.match(closing, /сильн\+е/i);
+  assert.doesNotMatch(closing, /\bсильне(?![+её])/i);
+
+  const spont = prepareYandexTtsText('а вокал ложился спонтанно.', { sentencePauses: false });
+  assert.match(spont, /спонт\+ан/i);
+
+  const rawPower = prepareYandexTtsText(
+    'В треке чувствуется та raw-мощь, когда голос рвётся наружу.',
+    { artist: 'PAIN', title: 'Shut Your Mouth', sentencePauses: false },
+  );
+  assert.match(rawPower, /сырая\s+мощ/i);
+  assert.doesNotMatch(rawPower, /\braw-/i);
+
+  const remix = prepareYandexTtsText('они выпустили ремикс-версию.', { sentencePauses: false });
+  assert.match(remix, /ремикс-в\+ерсию/i);
+
+  const stoya = prepareYandexTtsText(
+    'написал текст буквально за несколько минут, стоя у окна в гостиничном номере.',
+    { sentencePauses: false },
+  );
+  assert.match(stoya, /ст\+оя/u);
+  assert.doesNotMatch(stoya, /сто\+я/u);
+});
+
+test('Yandex path preserves genitive plural -еев (диджеев)', () => {
+  assert.equal(collapseVowelGeminateInCyrillicToken('диджеев'), 'диджеев');
+  const djs = prepareYandexTtsText('конец эпохи живых диджеев.', { sentencePauses: false });
+  assert.match(djs, /дидж\+еев/i);
+  assert.doesNotMatch(djs, /\bдиджев\b/i);
+});
+
 console.log(`\n[test-tts-pipeline] ${passed} passed`);

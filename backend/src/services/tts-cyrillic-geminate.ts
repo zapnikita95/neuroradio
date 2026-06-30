@@ -3,6 +3,8 @@
  * удвоенные гласные (версии, коллекции) ломают TTS. Схлопываем в озвучке, display не трогаем.
  */
 
+import { RUSSIAN_STRESS } from './russian-stress.js';
+
 const CYRILLIC_CONSONANT = 'бвгджзклмнпрстфхцчшщ';
 const CYRILLIC_VOWEL = 'аеёиоуыэюя';
 
@@ -36,8 +38,21 @@ function tokenKeepsGeminate(token: string): boolean {
 }
 
 /** Схлопнуть удвоенные гласные (версии→верси для TTS) внутри токена. */
+function preservesVowelGeminateToken(lowerBare: string): boolean {
+  const stem = lowerBare.replace(/[.,!?;:—–)\]»]+$/u, '');
+  if (/еев$/iu.test(stem)) return true;
+  if (/[бвгджзклмнпрстфхцчшщ]нее$/iu.test(stem)) return true;
+  if (/[бвгджзклмнпрстфхцчшщ]ее$/iu.test(stem) && !/ии$/iu.test(stem)) return true;
+  return false;
+}
+
 export function collapseVowelGeminateInCyrillicToken(token: string): string {
   if (!/[а-яё]/i.test(token)) return token;
+
+  const lowerBare = token.toLowerCase().replace(/\+/g, '');
+  if (preservesVowelGeminateToken(lowerBare)) {
+    return token;
+  }
 
   let result = token;
   const doubleVowelRe = new RegExp(`([${CYRILLIC_VOWEL}])\\1+`, 'giu');
@@ -50,7 +65,32 @@ export function collapseVowelGeminateInCyrillicToken(token: string): string {
   return result;
 }
 
-export function collapseGeminateInCyrillicToken(token: string): string {
+/** После схлопывания — вернуть ударение из словаря (спонтано → спонт+анно). */
+function reapplyKnownStress(token: string): string {
+  const bare = token.replace(/\+/g, '').toLowerCase();
+  const marked = RUSSIAN_STRESS[bare];
+  if (!marked) return token;
+  if (token[0] === token[0].toUpperCase() && token[0] !== token[0].toLowerCase()) {
+    return marked.charAt(0).toUpperCase() + marked.slice(1);
+  }
+  return marked;
+}
+
+function collapseTokenSegments(token: string): string {
+  if (!token.includes('-')) {
+    const collapsed = collapseGeminateInCyrillicTokenCore(token);
+    return reapplyKnownStress(collapsed);
+  }
+  return token
+    .split('-')
+    .map((seg) => {
+      const collapsed = collapseGeminateInCyrillicTokenCore(seg);
+      return reapplyKnownStress(collapsed);
+    })
+    .join('-');
+}
+
+function collapseGeminateInCyrillicTokenCore(token: string): string {
   if (!/[а-яё]/i.test(token) || tokenKeepsGeminate(token)) {
     return collapseVowelGeminateInCyrillicToken(token);
   }
@@ -62,6 +102,10 @@ export function collapseGeminateInCyrillicToken(token: string): string {
   let result = token.replace(geminateRe, '$1');
   result = collapseVowelGeminateInCyrillicToken(result);
   return result;
+}
+
+export function collapseGeminateInCyrillicToken(token: string): string {
+  return collapseTokenSegments(token);
 }
 
 const LATIN_SLOT = '\uE014L';
@@ -86,7 +130,7 @@ export function collapseCyrillicGeminatesForTts(text: string): string {
     .split(/(\s+)/)
     .map((part) => {
       if (!part.trim() || !/[а-яё]/i.test(part)) return part;
-      return collapseGeminateInCyrillicToken(part);
+      return collapseTokenSegments(part);
     })
     .join('');
 
