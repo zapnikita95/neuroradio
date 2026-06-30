@@ -128,6 +128,18 @@ async function startYoutubeFromQueue() {
   return { ok: true, pid: child.pid };
 }
 
+async function startYoutubeRetry() {
+  const npm = process.platform === 'win32' ? 'npm.cmd' : 'npm';
+  const child = spawn(npm, ['run', 'harvest:youtube-retry'], {
+    cwd: BACKEND,
+    detached: true,
+    stdio: 'ignore',
+    shell: process.platform === 'win32',
+  });
+  child.unref();
+  return { ok: true, pid: child.pid };
+}
+
 async function handle(req, res) {
   const origin = req.headers.origin ?? '';
   if (req.method === 'OPTIONS') {
@@ -179,6 +191,16 @@ async function handle(req, res) {
   if (req.method === 'POST' && url.pathname === '/start/youtube-queue') {
     try {
       const result = await startYoutubeFromQueue();
+      json(res, 200, result, origin);
+    } catch (e) {
+      json(res, 500, { ok: false, error: e instanceof Error ? e.message : String(e) }, origin);
+    }
+    return;
+  }
+
+  if (req.method === 'POST' && url.pathname === '/start/youtube-retry') {
+    try {
+      const result = await startYoutubeRetry();
       json(res, 200, result, origin);
     } catch (e) {
       json(res, 500, { ok: false, error: e instanceof Error ? e.message : String(e) }, origin);

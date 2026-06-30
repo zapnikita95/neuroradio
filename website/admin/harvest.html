@@ -53,7 +53,15 @@
     .tabs button.active { background: var(--accent); }
     .warn-box { border-color: var(--warn); background: rgba(245,197,66,0.08); }
     .source-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); gap: 8px; font-size: 0.78rem; margin-top: 12px; }
-    .source-grid div { background: #0c0a14; padding: 8px; border-radius: 8px; }
+    .pill.warn { background: rgba(245,197,66,0.15); color: var(--warn); }
+    .facts-panel { background: #0c0a14; border-radius: 8px; padding: 12px; margin-top: 8px; font-size: 0.78rem; max-height: 360px; overflow-y: auto; }
+    .fact-row { padding: 8px 0; border-bottom: 1px solid var(--border); }
+    .fact-row:last-child { border-bottom: none; }
+    .fact-meta { color: var(--muted); font-size: 0.72rem; margin-bottom: 4px; }
+    .btn-sm { padding: 4px 10px; font-size: 0.72rem; border-radius: 6px; }
+    tr.expanded td { background: rgba(139,124,246,0.06); }
+    .err-cell { color: var(--fail); font-size: 0.75rem; max-width: 200px; }
+    .agent-bar { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-bottom: 12px; }
   </style>
 </head>
 <body>
@@ -93,6 +101,12 @@
     </div>
 
     <div id="youtubePanel">
+    <div class="agent-bar">
+      <button id="startYoutubeBtn" type="button" class="success">▶ Запустить прогон (очередь)</button>
+      <button id="startRetryBtn" type="button" class="secondary">↻ Retry failed</button>
+      <span id="youtubeAgentStatus" class="hint"></span>
+    </div>
+
     <div id="liveBox" class="card live idle" hidden>
       <h2 id="liveTitle">Прогон</h2>
       <p id="liveBody" class="sub" style="margin:0"></p>
@@ -104,13 +118,12 @@
 
     <div id="discoverBox" class="card" hidden>
       <h2>Добавить видео в прогон</h2>
-      <p class="hint">Поиск по RSS каналов (Broken Dance, Fast Flow, РЗТ, Middle8). Выбери → «В очередь».</p>
+      <p class="hint">15 каналов (RU + EN essay). RSS → выбери → «В очередь» → «▶ Запустить». Агент локально: <code>npm run seed:agent</code></p>
       <div class="row-actions">
         <select id="channelPick"></select>
         <button id="discoverBtn" type="button">Найти видео</button>
         <button id="queueBtn" type="button" class="secondary" disabled>Добавить выбранные в очередь</button>
         <button id="clearQueueBtn" type="button" class="secondary">Очистить очередь</button>
-        <button id="startYoutubeBtn" type="button" class="success">▶ YouTube из очереди (локально)</button>
       </div>
       <div id="discoverList" class="discover-list"></div>
       <p id="queueInfo" class="hint"></p>
@@ -120,13 +133,16 @@
       <table>
         <thead>
           <tr>
+            <th></th>
             <th>Статус</th>
             <th>Видео</th>
             <th>Канал</th>
             <th>STT</th>
-            <th>Факты</th>
+            <th>Каталог</th>
             <th>В банк</th>
-            <th>Checkpoint</th>
+            <th>Этап</th>
+            <th>Ошибка</th>
+            <th></th>
           </tr>
         </thead>
         <tbody id="rows"></tbody>
@@ -183,7 +199,66 @@
       el.textContent = msg || '';
     }
 
-    function fmt(n) { return n == null ? '0' : String(n); }
+    let lastYoutubeDash = null;
+    let expandedVideo = null;
+
+    const STEP_RU = { done: 'готово', download: 'скачивание', stt: 'STT', llm: 'факты LLM', ingest: 'банк', error: 'ошибка' };
+    function stepRu(s) { return STEP_RU[s] || s || '—'; }
+
+    function statusPill(v) {
+      const st = v.harvestStatus || (v.ok ? 'ok' : 'fail');
+      if (st === 'ok') return '<span class="pill ok">OK</span>';
+      if (st === 'partial') return '<span class="pill warn">PARTIAL</span>';
+      return '<span class="pill fail">FAIL</span>';
+    }
+
+    function renderFactsPanel(facts, videoId) {
+      if (!facts || !facts.length) {
+        return '<p class="hint">Нет фактов в snapshot. Обнови после sync или открой с Railway token.</p>';
+      }
+      return facts.map(function (f) {
+        const score = f.interest ?? f.bankQuality ?? '—';
+        const saved = f.saved ? '<span class="pill ok">банк</span>' : '<span class="pill queue">каталог</span>';
+        const scope = escapeHtml(f.scope || 'track');
+        const who = escapeHtml((f.artist || '') + (f.title ? ' — ' + f.title : ''));
+        return '<div class="fact-row"><div class="fact-meta">' + saved + ' · ' + scope + ' · ' + who + ' · интерес <b>' + score + '</b>/10</div>' +
+          escapeHtml(f.fact) + '</div>';
+      }).join('');
+    }
+
+    async function retryVideo(v) {
+      if (!token()) return;
+      try {
+        await apiPost('/v1/admin/youtube-harvest/retry?token=' + encodeURIComponent(token()), {
+          videoId: v.videoId,
+          title: v.title,
+          url: 'https://www.youtube.com/watch?v=' + v.videoId,
+          channelName: v.channel || '',
+        });
+        if (await pingAgent()) {
+          await fetch(AGENT_BASE + '/start/youtube-retry', { method: 'POST', signal: AbortSignal.timeout(15000) });
+          showErr('');
+          document.getElementById('youtubeAgentStatus').textContent = 'Retry batch запущен для ' + v.videoId;
+        } else {
+          showErr('В retry-очереди. Запусти агент: npm run seed:agent → ↻ Retry failed');
+        }
+        await load();
+      } catch (e) {
+        showErr(e.error || e.message || 'retry failed');
+      }
+    }
+
+    async function toggleExpand(videoId) {
+      expandedVideo = expandedVideo === videoId ? null : videoId;
+      if (lastYoutubeDash) renderYoutube(lastYoutubeDash, lastYoutubeDash._sourceLabel);
+      if (expandedVideo && token()) {
+        try {
+          const data = await apiGet('/v1/admin/youtube-harvest/video/' + encodeURIComponent(expandedVideo) + '/facts');
+          const el = document.getElementById('facts-' + expandedVideo);
+          if (el) el.innerHTML = renderFactsPanel(data.facts, expandedVideo);
+        } catch (_) { /* snapshot facts */ }
+      }
+    }
 
     async function pingAgent() {
       try {
@@ -194,11 +269,35 @@
       }
     }
 
+    async function refreshYoutubeAgentStatus() {
+      const el = document.getElementById('youtubeAgentStatus');
+      const ok = await pingAgent();
+      if (!ok) {
+        el.innerHTML = 'Агент не запущен — <code>cd backend && npm run seed:agent</code>';
+        return false;
+      }
+      el.textContent = 'Агент OK — можно жать ▶ Запустить';
+      return true;
+    }
+
+    async function startRetryBatch() {
+      const btn = document.getElementById('startRetryBtn');
+      btn.disabled = true;
+      try {
+        if (!(await pingAgent())) { showErr('Агент не запущен'); return; }
+        await fetch(AGENT_BASE + '/start/youtube-retry', { method: 'POST' });
+        document.getElementById('youtubeAgentStatus').textContent = 'Retry batch запущен';
+      } catch (e) { showErr(e.message); }
+      finally { btn.disabled = false; }
+    }
+
+    function fmt(n) { return n == null ? '0' : String(n); }
+
     async function refreshAgentStatus() {
       const el = document.getElementById('agentStatus');
       const ok = await pingAgent();
       if (!ok) {
-        el.innerHTML = 'Агент не запущен — PowerShell: <code>Set-Location "C:\Users\1\OneDrive\Desktop\Music story\backend"; npm run seed:agent</code>';
+        el.innerHTML = 'Агент не запущен — <code>cd backend && npm run seed:agent</code>';
         return false;
       }
       try {
@@ -283,8 +382,9 @@
         return;
       }
       title.textContent = 'Идёт прогон ' + (live.runId || '');
+      const stepLabel = stepRu(live.step);
       body.textContent = (live.current || '?') + ' / ' + (live.total || '?') + ' — ' + (live.title || live.videoId || '…') +
-        (live.step ? ' [' + live.step + ']' : '') + (live.sttProvider ? ' · STT ' + live.sttProvider : '');
+        ' · этап: ' + stepLabel + (live.sttProvider ? ' · STT ' + live.sttProvider : '');
       const q = live.queue || [];
       qEl.innerHTML = q.length
         ? '<strong>Очередь:</strong> ' + q.slice(0, 8).map(function (x) { return escapeHtml(x.title || x.videoId); }).join(' → ') +
@@ -386,6 +486,8 @@
       }
     }
     function renderYoutube(d, sourceLabel) {
+      lastYoutubeDash = d;
+      lastYoutubeDash._sourceLabel = sourceLabel;
       document.getElementById('stats').hidden = false;
       document.getElementById('meta').hidden = false;
       document.getElementById('tableWrap').hidden = false;
@@ -415,16 +517,38 @@
       const tbody = document.getElementById('rows');
       tbody.innerHTML = (d.videos || []).map(function (v) {
         const stt = v.transcriptChars != null ? v.transcriptChars + ' sym' : '—';
-        const facts = fmt(v.factsExtracted ?? v.catalogFacts ?? 0);
+        const catalog = fmt(v.catalogFacts ?? v.factsExtracted ?? 0);
         const bank = fmt(v.catalogSaved ?? v.ingested ?? 0);
-        let status = v.ok ? '<span class="pill ok">OK</span>' : '<span class="pill fail">FAIL</span>';
-        if (v.inRetryQueue) status += ' <span class="pill queue">retry</span>';
+        let pills = statusPill(v);
+        if (v.inRetryQueue) pills += ' <span class="pill queue">retry</span>';
         const title = '<a href="https://www.youtube.com/watch?v=' + v.videoId + '" target="_blank" rel="noopener">' +
           escapeHtml(v.title || v.videoId) + '</a>';
-        return '<tr><td>' + status + '</td><td>' + title + '</td><td>' + escapeHtml(v.channel || '—') +
-          '</td><td>' + stt + '</td><td>' + facts + '</td><td>' + bank + '</td><td>' +
-          escapeHtml(v.checkpoint || '—') + '</td></tr>';
+        const err = v.errorSummary || (v.harvestStatus === 'ok' ? '—' : (v.error ? escapeHtml(v.error.slice(0, 80)) : '—'));
+        const stage = escapeHtml(v.checkpointLabel || stepRu(v.checkpoint));
+        const exp = expandedVideo === v.videoId;
+        const retryBtn = (v.harvestStatus !== 'ok')
+          ? '<button type="button" class="btn-sm secondary retry-one" data-vid="' + escapeHtml(v.videoId) + '">↻</button>'
+          : '';
+        const expandBtn = '<button type="button" class="btn-sm secondary expand-one" data-vid="' + escapeHtml(v.videoId) + '">' + (exp ? '▾' : '▸') + '</button>';
+        let row = '<tr class="' + (exp ? 'expanded' : '') + '"><td>' + expandBtn + '</td><td>' + pills + '</td><td>' + title + '</td><td>' + escapeHtml(v.channel || '—') +
+          '</td><td>' + stt + '</td><td>' + catalog + '</td><td>' + bank + '</td><td>' + stage + '</td>' +
+          '<td class="err-cell">' + err + '</td><td>' + retryBtn + '</td></tr>';
+        if (exp) {
+          row += '<tr class="expanded"><td colspan="10"><div class="facts-panel" id="facts-' + escapeHtml(v.videoId) + '">' +
+            renderFactsPanel(v.factsPreview, v.videoId) + '</div></td></tr>';
+        }
+        return row;
       }).join('');
+
+      tbody.querySelectorAll('.expand-one').forEach(function (btn) {
+        btn.addEventListener('click', function () { toggleExpand(btn.dataset.vid); });
+      });
+      tbody.querySelectorAll('.retry-one').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+          const v = (d.videos || []).find(function (x) { return x.videoId === btn.dataset.vid; });
+          if (v) retryVideo(v);
+        });
+      });
     }
 
     async function loadStaticFallback() {
@@ -455,6 +579,7 @@
       } finally {
         document.getElementById('loadBtn').disabled = false;
         refreshAgentStatus();
+        refreshYoutubeAgentStatus();
       }
     }
 
@@ -473,8 +598,8 @@
       if (!token()) return;
       try {
         const q = await apiGet('/v1/admin/youtube-harvest/queue');
-        document.getElementById('queueInfo').textContent = 'В очереди на сервере: ' + (q.videos || []).length +
-          ' · запуск: npm run harvest:youtube-from-queue';
+        document.getElementById('queueInfo').textContent = 'В очереди: ' + (q.videos || []).length +
+          ' · жми ▶ Запустить прогон (нужен seed:agent)';
       } catch (_) {}
     }
 
@@ -543,6 +668,7 @@
     document.getElementById('loadBtn').addEventListener('click', function () { load(); loadQueueInfo(); });
     document.getElementById('startBulkBtn').addEventListener('click', startBulkLocal);
     document.getElementById('startYoutubeBtn').addEventListener('click', startYoutubeLocal);
+    document.getElementById('startRetryBtn').addEventListener('click', startRetryBatch);
     document.getElementById('syncDashBtn').addEventListener('click', function () {
       showErr('Локально: cd backend && npm run seed:dashboard');
     });

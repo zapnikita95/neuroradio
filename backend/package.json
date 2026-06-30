@@ -7,7 +7,7 @@
   "scripts": {
     "dev": "tsx watch src/index.ts",
     "start": "node dist/index.js",
-    "build": "tsc && node -e \"const fs=require('fs'); fs.mkdirSync('dist/data',{recursive:true}); for (const f of ['known-artists.json','curated-facts.json','cover-classics.json','known-cover-originals.json','popular-tracks-catalog.json','facts-bank-seed.json','solo-artist-grammar.json','german-pronunciation.json','french-pronunciation.json','artist-pronunciation.json','style-corpus-seed.jsonl','youtube-channels.json']) { const s='src/data/'+f; if(fs.existsSync(s)) fs.copyFileSync(s,'dist/data/'+f); }\"",
+    "build": "tsc && node -e \"const fs=require('fs'); fs.mkdirSync('dist/data',{recursive:true}); for (const f of ['known-artists.json','curated-facts.json','cover-classics.json','known-cover-originals.json','popular-tracks-catalog.json','facts-bank-seed.json','solo-artist-grammar.json','german-pronunciation.json','french-pronunciation.json','artist-pronunciation.json','style-corpus-seed.jsonl','youtube-channels.json','youtube-channels-full.json']) { const s='src/data/'+f; if(fs.existsSync(s)) fs.copyFileSync(s,'dist/data/'+f); }\"",
     "test:fr-phonetic": "npm run build && node scripts/test-fr-phonetic.mjs",
     "typecheck": "tsc --noEmit",
     "test:gemini": "npm run build && node scripts/test-live-gemini-story.mjs",

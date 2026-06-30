@@ -76,11 +76,17 @@ function writeJson(p: string, data: unknown): void {
 
 export function loadHarvestChannels(): HarvestChannel[] {
   const local = path.join(DATA_DIR, 'youtube-channels.json');
-  const cfg = readJson<{ channels?: HarvestChannel[] }>(
-    fs.existsSync(local) ? local : bundledChannelsPath,
-    { channels: [] },
-  );
-  return cfg.channels ?? [];
+  const bundled = bundledChannelsPath;
+  const bundledFull = path.join(path.dirname(bundledChannelsPath), 'youtube-channels-full.json');
+  const seen = new Map<string, HarvestChannel>();
+  for (const src of [bundledFull, bundled, local]) {
+    if (!fs.existsSync(src)) continue;
+    const cfg = readJson<{ channels?: HarvestChannel[] }>(src, { channels: [] });
+    for (const ch of cfg.channels ?? []) {
+      if (ch.id && !seen.has(ch.id)) seen.set(ch.id, ch);
+    }
+  }
+  return [...seen.values()];
 }
 
 export function processedVideoIds(): Set<string> {
@@ -122,6 +128,55 @@ export function appendManualQueue(
 
 export function clearManualQueue(): void {
   saveManualQueue([]);
+}
+
+const RETRY_QUEUE_FILE = path.join(DATA_DIR, 'youtube-harvest-retry-queue.json');
+const CATALOG_FILE = path.join(DATA_DIR, 'youtube-harvest-catalog.json');
+
+export function loadRetryQueue(): { videos: HarvestManualQueueVideo[] } {
+  return readJson(RETRY_QUEUE_FILE, { videos: [] });
+}
+
+export function appendRetryQueue(
+  items: Array<Omit<HarvestManualQueueVideo, 'addedAt'>>,
+): HarvestManualQueueVideo[] {
+  const q = loadRetryQueue();
+  const seen = new Set(q.videos.map((v) => v.id));
+  for (const item of items) {
+    if (seen.has(item.id)) continue;
+    seen.add(item.id);
+    q.videos.push({ ...item, addedAt: new Date().toISOString(), addedBy: item.addedBy ?? 'dashboard-retry' });
+  }
+  writeJson(RETRY_QUEUE_FILE, { videos: q.videos, updatedAt: new Date().toISOString() });
+  return q.videos;
+}
+
+export function loadCatalogFactsForVideo(videoId: string, limit = 80): Array<{
+  fact: string;
+  scope: string;
+  artist: string;
+  title?: string;
+  interest?: number;
+  bankQuality?: number;
+  saved?: boolean;
+}> {
+  const catalog = readJson<{ facts?: Array<Record<string, unknown>> }>(CATALOG_FILE, { facts: [] });
+  return (catalog.facts ?? [])
+    .filter((f) => f.videoId === videoId && typeof f.fact === 'string')
+    .sort(
+      (a, b) =>
+        Number(b.interest ?? b.bankQuality ?? 0) - Number(a.interest ?? a.bankQuality ?? 0),
+    )
+    .slice(0, limit)
+    .map((f) => ({
+      fact: String(f.fact),
+      scope: String(f.scope ?? 'track'),
+      artist: String(f.artist ?? ''),
+      title: f.title ? String(f.title) : undefined,
+      interest: Number(f.interest ?? f.bankQuality ?? 0) || undefined,
+      bankQuality: Number(f.bankQuality ?? 0) || undefined,
+      saved: f.saved === true,
+    }));
 }
 
 function decodeXml(s: string): string {

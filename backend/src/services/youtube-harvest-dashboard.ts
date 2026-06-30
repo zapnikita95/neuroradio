@@ -6,11 +6,25 @@ import { loadHarvestLiveProgress, loadManualQueue } from './youtube-harvest-admi
 const DATA_DIR = process.env.ACCOUNT_DATA_DIR?.trim() || path.join(process.cwd(), 'data');
 const DASHBOARD_FILE = path.join(DATA_DIR, 'youtube-harvest-dashboard.json');
 
+export type HarvestVideoStatus = 'ok' | 'partial' | 'fail';
+
+export interface YoutubeHarvestFactPreview {
+  fact: string;
+  scope: string;
+  artist: string;
+  title?: string;
+  interest?: number;
+  bankQuality?: number;
+  saved?: boolean;
+}
+
 export interface YoutubeHarvestVideoRow {
   videoId: string;
   title: string;
   channel?: string;
   ok: boolean;
+  /** ok = в банке, partial = STT/каталог есть но был сбой прогона, fail = пусто */
+  harvestStatus: HarvestVideoStatus;
   /** Facts extracted by LLM (work dir or catalog). */
   factsExtracted?: number;
   /** Facts marked saved in harvest catalog (= actually in bank). */
@@ -21,11 +35,17 @@ export interface YoutubeHarvestVideoRow {
   ingestedLastRun?: number;
   /** @deprecated use catalogSaved */
   ingested?: number;
+  /** Raw error from last batch run (may be stale if retry succeeded). */
   error?: string;
+  /** Short human-readable explanation for dashboard. */
+  errorSummary?: string;
   retried?: boolean;
   checkpoint?: string;
+  checkpointLabel?: string;
   transcriptChars?: number;
   inRetryQueue?: boolean;
+  /** Preview for expandable row (full list via /video/:id/facts). */
+  factsPreview?: YoutubeHarvestFactPreview[];
 }
 
 export interface YoutubeHarvestDashboard {
@@ -41,6 +61,7 @@ export interface YoutubeHarvestDashboard {
   pending: number;
   failed: number;
   ok: number;
+  partial?: number;
   ingestedRun: number;
   /** Total facts saved to bank across all videos (catalog). */
   catalogSavedTotal?: number;
@@ -96,10 +117,90 @@ function countBankYoutubeFacts(): number {
   return n;
 }
 
+const CHECKPOINT_LABELS: Record<string, string> = {
+  done: 'готово',
+  download: 'скачивание',
+  stt: 'STT',
+  llm: 'факты LLM',
+  ingest: 'банк',
+  error: 'ошибка',
+};
+
+export function checkpointLabel(step?: string): string {
+  if (!step) return '—';
+  return CHECKPOINT_LABELS[step] ?? step;
+}
+
+export function humanizeHarvestError(error?: string): string | undefined {
+  if (!error?.trim()) return undefined;
+  const e = error.trim();
+  if (/API key not valid|INVALID_ARGUMENT.*api key/i.test(e)) {
+    return 'Первый прогон: Gemini ключ невалиден (данные могли появиться после retry/OpenRouter)';
+  }
+  if (/yt-dlp|JavaScript runtime/i.test(e)) {
+    return 'yt-dlp: не скачалось аудио (нужен Node/Deno для YouTube)';
+  }
+  if (/413|too large|payload/i.test(e)) {
+    return 'LLM: промпт слишком большой (413)';
+  }
+  if (/429|rate limit/i.test(e)) {
+    return 'LLM/STT: rate limit';
+  }
+  if (/ENOENT|no such file|transcript/i.test(e)) {
+    return 'Нет транскрипта / файл не найден';
+  }
+  return e.length > 120 ? `${e.slice(0, 117)}…` : e;
+}
+
+export function deriveHarvestStatus(row: {
+  catalogSaved?: number;
+  catalogFacts?: number;
+  transcriptChars?: number;
+  checkpoint?: string;
+  error?: string;
+}): HarvestVideoStatus {
+  const saved = row.catalogSaved ?? 0;
+  const catalog = row.catalogFacts ?? 0;
+  const stt = row.transcriptChars ?? 0;
+  if (saved > 0 && (row.checkpoint === 'done' || catalog > 0)) return 'ok';
+  if (catalog > 0 || stt > 200) return 'partial';
+  if (row.error && !catalog && stt < 50) return 'fail';
+  return row.checkpoint === 'done' && saved === 0 && catalog === 0 ? 'partial' : 'fail';
+}
+
 function checkpointForVideo(videoId: string): string | undefined {
   const cpPath = path.join(DATA_DIR, 'youtube-harvest', videoId, 'checkpoint.json');
   const cp = readJson<{ step?: string }>(cpPath, {});
   return cp.step;
+}
+
+function catalogFactsForVideo(
+  facts: Array<{
+    videoId?: string;
+    fact?: string;
+    scope?: string;
+    artist?: string;
+    title?: string;
+    interest?: number;
+    bankQuality?: number;
+    saved?: boolean;
+  }>,
+  videoId: string,
+  limit = 40,
+): YoutubeHarvestFactPreview[] {
+  return facts
+    .filter((f) => f.videoId === videoId && f.fact && f.fact.length >= 20)
+    .sort((a, b) => (b.interest ?? b.bankQuality ?? 0) - (a.interest ?? a.bankQuality ?? 0))
+    .slice(0, limit)
+    .map((f) => ({
+      fact: f.fact!,
+      scope: f.scope ?? 'track',
+      artist: f.artist ?? '',
+      title: f.title,
+      interest: f.interest ?? f.bankQuality,
+      bankQuality: f.bankQuality,
+      saved: f.saved,
+    }));
 }
 
 function transcriptCharsForVideo(videoId: string): number | undefined {
@@ -146,9 +247,20 @@ export function buildYoutubeHarvestDashboardFromFiles(): YoutubeHarvestDashboard
   }>(statePath, { processedVideoIds: [], runs: [] });
 
   const catalog = readJson<{
-    facts?: Array<{ videoId?: string; saved?: boolean; videoTitle?: string }>;
+    facts?: Array<{
+      videoId?: string;
+      saved?: boolean;
+      videoTitle?: string;
+      fact?: string;
+      scope?: string;
+      artist?: string;
+      title?: string;
+      interest?: number;
+      bankQuality?: number;
+    }>;
     videos?: Array<{ id: string; title: string; channel?: string }>;
   }>(path.join(DATA_DIR, 'youtube-harvest-catalog.json'), { facts: [], videos: [] });
+  const catalogFactsAll = catalog.facts ?? [];
   const retry = readJson<{ videos?: Array<{ id: string }> }>(path.join(DATA_DIR, 'youtube-harvest-retry-queue.json'), {
     videos: [],
   });
@@ -161,10 +273,11 @@ export function buildYoutubeHarvestDashboardFromFiles(): YoutubeHarvestDashboard
   for (const r of state.runs ?? []) {
     for (const rep of r.reports ?? []) {
       const prev = allRunReports.get(rep.videoId);
+      const mergedOk = prev?.ok && rep.ok ? true : rep.ok;
       allRunReports.set(rep.videoId, {
-        ok: prev?.ok ?? rep.ok,
+        ok: mergedOk,
         ingested: (prev?.ingested ?? 0) + (rep.ingested ?? 0),
-        error: rep.error ?? prev?.error,
+        error: rep.ok ? prev?.error : rep.error ?? prev?.error,
         retried: rep.retried ?? prev?.retried,
       });
     }
@@ -172,39 +285,57 @@ export function buildYoutubeHarvestDashboardFromFiles(): YoutubeHarvestDashboard
   const queued = run?.videoIds?.length ?? state.processedVideoIds?.length ?? 0;
   const processed = state.processedVideoIds?.length ?? 0;
   const reports = run?.reports ?? [];
-  const failedIds = [...new Set([...allRunReports.entries()].filter(([, r]) => !r.ok).map(([id]) => id))];
+  const legacyFailedIds = [...allRunReports.entries()].filter(([, r]) => !r.ok).map(([id]) => id);
   const ingestedRun = [...allRunReports.values()].reduce((s, r) => s + (r.ingested ?? 0), 0);
 
   const catalogById = new Map((catalog.videos ?? []).map((v) => [v.id, v]));
   const lastReportById = new Map(reports.map((r) => [r.videoId, r]));
 
-  const videoIds = [...new Set([...(run?.videoIds ?? []), ...(state.processedVideoIds ?? []), ...failedIds])];
+  const videoIds = [...new Set([...(run?.videoIds ?? []), ...(state.processedVideoIds ?? []), ...legacyFailedIds])];
   const videos: YoutubeHarvestVideoRow[] = videoIds.map((videoId) => {
     const meta = catalogById.get(videoId);
     const agg = allRunReports.get(videoId);
     const lastRep = lastReportById.get(videoId);
     const cat = catalogByVideo.get(videoId);
     const factsFromDir = factsExtractedForVideo(videoId);
+    const catalogFacts = cat?.total ?? 0;
+    const catalogSaved = cat?.saved ?? 0;
+    const checkpoint = checkpointForVideo(videoId);
+    const transcriptChars = transcriptCharsForVideo(videoId);
+    const error = agg?.error?.slice(0, 400);
+    const harvestStatus = deriveHarvestStatus({
+      catalogSaved,
+      catalogFacts,
+      transcriptChars,
+      checkpoint,
+      error,
+    });
     return {
       videoId,
       title: meta?.title ?? videoId,
       channel: meta?.channel,
-      ok: agg ? agg.ok : (state.processedVideoIds ?? []).includes(videoId),
-      catalogFacts: cat?.total ?? 0,
-      catalogSaved: cat?.saved ?? 0,
-      factsExtracted: factsFromDir ?? cat?.total ?? 0,
+      ok: harvestStatus === 'ok',
+      harvestStatus,
+      catalogFacts,
+      catalogSaved,
+      factsExtracted: catalogFacts || factsFromDir || 0,
       ingestedLastRun: lastRep?.ingested,
-      ingested: cat?.saved ?? 0,
-      error: agg?.error?.slice(0, 200),
+      ingested: catalogSaved,
+      error,
+      errorSummary: harvestStatus === 'ok' ? undefined : humanizeHarvestError(error),
       retried: agg?.retried,
       inRetryQueue: retryIds.has(videoId),
-      checkpoint: checkpointForVideo(videoId),
-      transcriptChars: transcriptCharsForVideo(videoId),
+      checkpoint,
+      checkpointLabel: checkpointLabel(checkpoint),
+      transcriptChars,
+      factsPreview: catalogFactsForVideo(catalogFactsAll, videoId),
     };
   });
 
   videos.sort((a, b) => {
-    if (a.ok !== b.ok) return a.ok ? -1 : 1;
+    const rank = (s: HarvestVideoStatus) => (s === 'fail' ? 0 : s === 'partial' ? 1 : 2);
+    const dr = rank(a.harvestStatus) - rank(b.harvestStatus);
+    if (dr !== 0) return dr;
     return (b.catalogSaved ?? 0) - (a.catalogSaved ?? 0);
   });
 
@@ -213,9 +344,13 @@ export function buildYoutubeHarvestDashboardFromFiles(): YoutubeHarvestDashboard
     const ch = v.channel || '—';
     const row = channelMap.get(ch) ?? { processed: 0, total: 0 };
     row.total += 1;
-    if (v.ok) row.processed += 1;
+    if (v.harvestStatus === 'ok') row.processed += 1;
     channelMap.set(ch, row);
   }
+
+  const failedIds = videos.filter((v) => v.harvestStatus === 'fail').map((v) => v.videoId);
+  const okCount = videos.filter((v) => v.harvestStatus === 'ok').length;
+  const partialCount = videos.filter((v) => v.harvestStatus === 'partial').length;
 
   return {
     updatedAt: new Date().toISOString(),
@@ -229,7 +364,8 @@ export function buildYoutubeHarvestDashboardFromFiles(): YoutubeHarvestDashboard
     processed,
     pending: Math.max(0, queued - processed),
     failed: failedIds.length,
-    ok: reports.filter((r) => r.ok).length,
+    ok: okCount,
+    partial: partialCount,
     ingestedRun,
     catalogSavedTotal,
     catalogFacts: catalog.facts?.length ?? 0,

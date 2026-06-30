@@ -1,0 +1,117 @@
+{
+  "version": 1,
+  "channels": [
+    {
+      "id": "broken_dance",
+      "name": "БРОКЕН ДЭНС",
+      "url": "https://www.youtube.com/@broken_dance/videos",
+      "channelId": "UCWZ57aki9Xi0ZqhVBwZ87Pw",
+      "lang": "rus"
+    },
+    {
+      "id": "the_fast_flow",
+      "name": "The Fast Flow",
+      "url": "https://www.youtube.com/@the-fast-flow/videos",
+      "channelId": "UCouPUk4vlKSo4Lsw3TX3yiA",
+      "lang": "rus"
+    },
+    {
+      "id": "risazatvorchestvo",
+      "name": "РЗТ",
+      "url": "https://www.youtube.com/@risazatvorchestvo/videos",
+      "channelId": "UCTSqa9dBButQvhLmrBBzneQ",
+      "lang": "rus"
+    },
+    {
+      "id": "ruspopshow",
+      "name": "Истории русской попсы",
+      "url": "https://www.youtube.com/@ruspopshow/videos",
+      "channelId": "UCSwmLxrSnvlbO-yRjvMRnPw",
+      "lang": "rus"
+    },
+    {
+      "id": "propesni",
+      "name": "ProПesni",
+      "url": "https://www.youtube.com/@propesni/videos",
+      "channelId": "UC9xaGOJ_8Jk9uZPEQlB-Bkw",
+      "lang": "rus"
+    },
+    {
+      "id": "lenta_video",
+      "name": "Lenta.ru — история поп-музыки",
+      "url": "https://www.youtube.com/@LentaruVideo/videos",
+      "channelId": "UCXkNod_JcH7PleOjwK_8rYQ",
+      "lang": "rus"
+    },
+    {
+      "id": "neskusound",
+      "name": "Нескучный саунд",
+      "url": "https://www.youtube.com/@neskusound/videos",
+      "channelId": "UC3pYf01vuy1_WlScQwKwXOA",
+      "lang": "rus"
+    },
+    {
+      "id": "bkz",
+      "name": "Буквы. Кадры. Звуки.",
+      "url": "https://www.youtube.com/@BKZchannel/videos",
+      "channelId": "UC0j3VMMETJ68Yp6MygBOTQQ",
+      "lang": "rus"
+    },
+    {
+      "id": "middle8",
+      "name": "Middle8",
+      "url": "https://www.youtube.com/@Middle8/videos",
+      "channelId": "UCfeppgcy70ERp4gQrsYijsg",
+      "lang": "eng"
+    },
+    {
+      "id": "polyphonic",
+      "name": "Polyphonic",
+      "url": "https://www.youtube.com/@Polyphonic/videos",
+      "channelId": "UCxHcoI9ndIdAihEB7ODTOfQ",
+      "lang": "eng"
+    },
+    {
+      "id": "trash_theory",
+      "name": "Trash Theory",
+      "url": "https://www.youtube.com/@TrashTheory/videos",
+      "channelId": "UCTUtqcDkzw7bisadh6AOx5w",
+      "lang": "eng"
+    },
+    {
+      "id": "twelve_tone",
+      "name": "12tone",
+      "url": "https://www.youtube.com/@12tone/videos",
+      "channelId": "UCc1a1Nm8aNFoqv1G4CfyHzA",
+      "lang": "eng"
+    },
+    {
+      "id": "sound_field",
+      "name": "Sound Field (PBS)",
+      "url": "https://www.youtube.com/@SoundFieldPBS/videos",
+      "channelId": "UCvMLMyKPomE6kTTL9Kv8Iww",
+      "lang": "eng"
+    },
+    {
+      "id": "bandsplaining",
+      "name": "Bandsplaining",
+      "url": "https://www.youtube.com/@Bandsplaining/videos",
+      "channelId": "UCtZE8Xa4ArAxQmHxRVtNnVg",
+      "lang": "eng"
+    },
+    {
+      "id": "dissect",
+      "name": "Dissect",
+      "url": "https://www.youtube.com/@dissectpodcast/videos",
+      "channelId": "UCaiXlXOldcHLgNWUiY3mf5A",
+      "lang": "eng"
+    }
+  ],
+  "defaults": {
+    "videosPerChannel": 10,
+    "weeklyNewPerChannel": 1,
+    "maxVideoDurationSec": 7200,
+    "maxAudioSeconds": 600,
+    "sttProvider": "railway"
+  }
+}

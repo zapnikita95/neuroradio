@@ -26,6 +26,8 @@ import {
   loadHarvestChannels,
   loadHarvestLiveProgress,
   loadManualQueue,
+  loadCatalogFactsForVideo,
+  appendRetryQueue,
   saveHarvestLiveProgress,
   type HarvestLiveProgress,
   type HarvestManualQueueVideo,
@@ -233,6 +235,48 @@ router.delete('/youtube-harvest/queue', (req, res) => {
   if (!requireHarvestAdmin(req, res)) return;
   clearManualQueue();
   res.json({ ok: true, cleared: true });
+});
+
+/** GET /v1/admin/youtube-harvest/video/:videoId/facts */
+router.get('/youtube-harvest/video/:videoId/facts', (req, res) => {
+  if (!requireHarvestAdmin(req, res)) return;
+  const videoId = String(req.params.videoId ?? '').trim();
+  if (videoId.length < 6) {
+    res.status(400).json({ error: 'invalid videoId' });
+    return;
+  }
+  const facts = loadCatalogFactsForVideo(videoId, 100);
+  res.json({ ok: true, videoId, facts, total: facts.length });
+});
+
+/** POST /v1/admin/youtube-harvest/retry — queue one or more videos for re-run */
+router.post('/youtube-harvest/retry', (req, res) => {
+  if (!requireHarvestAdmin(req, res)) return;
+  const body = req.body as {
+    videoId?: string;
+    videoIds?: string[];
+    title?: string;
+    url?: string;
+    channelName?: string;
+  };
+  const ids = body.videoIds?.length
+    ? body.videoIds
+    : body.videoId
+      ? [body.videoId]
+      : [];
+  if (!ids.length) {
+    res.status(400).json({ error: 'videoId or videoIds required' });
+    return;
+  }
+  const items = ids.map((id) => ({
+    id: id.trim(),
+    title: body.title?.trim() || id,
+    url: body.url?.trim() || `https://www.youtube.com/watch?v=${id}`,
+    channelName: body.channelName?.trim() || '',
+    addedBy: 'dashboard-retry',
+  }));
+  const videos = appendRetryQueue(items);
+  res.json({ ok: true, queued: items.length, total: videos.length, videos });
 });
 
 /** GET /v1/admin/bulk-seed/status */
