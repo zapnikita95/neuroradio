@@ -29,18 +29,21 @@ const ALLOW_ORIGINS = new Set([
   'http://localhost:8080',
 ]);
 
-function corsHeaders(origin) {
-  const o = origin && ALLOW_ORIGINS.has(origin) ? origin : 'https://www.efir-ai.ru';
-  return {
+function corsHeaders(origin, req) {
+  const o = origin && ALLOW_ORIGINS.has(origin) ? origin : '*';
+  const headers = {
     'access-control-allow-origin': o,
     'access-control-allow-methods': 'GET, POST, OPTIONS',
-    'access-control-allow-headers': 'content-type',
+    'access-control-allow-headers': req?.headers?.['access-control-request-headers'] ?? 'content-type',
+    // Chrome: https://efir-ai.ru → 127.0.0.1 requires Private Network Access
+    'access-control-allow-private-network': 'true',
   };
+  return headers;
 }
 
-function json(res, status, body, origin) {
+function json(res, status, body, origin, req) {
   const payload = JSON.stringify(body);
-  res.writeHead(status, { 'content-type': 'application/json; charset=utf-8', ...corsHeaders(origin) });
+  res.writeHead(status, { 'content-type': 'application/json; charset=utf-8', ...corsHeaders(origin, req) });
   res.end(payload);
 }
 
@@ -143,7 +146,7 @@ async function startYoutubeRetry() {
 async function handle(req, res) {
   const origin = req.headers.origin ?? '';
   if (req.method === 'OPTIONS') {
-    res.writeHead(204, corsHeaders(origin));
+    res.writeHead(204, corsHeaders(origin, req));
     res.end();
     return;
   }
@@ -151,7 +154,7 @@ async function handle(req, res) {
   const url = new URL(req.url ?? '/', `http://127.0.0.1:${PORT}`);
 
   if (req.method === 'GET' && url.pathname === '/health') {
-    json(res, 200, { ok: true, service: 'harvest-local-agent', port: PORT }, origin);
+    json(res, 200, { ok: true, service: 'harvest-local-agent', port: PORT }, origin, req);
     return;
   }
 
@@ -174,6 +177,7 @@ async function handle(req, res) {
         logMtime,
       },
       origin,
+      req,
     );
     return;
   }
@@ -181,9 +185,9 @@ async function handle(req, res) {
   if (req.method === 'POST' && url.pathname === '/start/bulk-seed') {
     try {
       const result = await startBulkSeedDetached();
-      json(res, 200, result, origin);
+      json(res, 200, result, origin, req);
     } catch (e) {
-      json(res, 500, { ok: false, error: e instanceof Error ? e.message : String(e) }, origin);
+      json(res, 500, { ok: false, error: e instanceof Error ? e.message : String(e) }, origin, req);
     }
     return;
   }
@@ -191,9 +195,9 @@ async function handle(req, res) {
   if (req.method === 'POST' && url.pathname === '/start/youtube-queue') {
     try {
       const result = await startYoutubeFromQueue();
-      json(res, 200, result, origin);
+      json(res, 200, result, origin, req);
     } catch (e) {
-      json(res, 500, { ok: false, error: e instanceof Error ? e.message : String(e) }, origin);
+      json(res, 500, { ok: false, error: e instanceof Error ? e.message : String(e) }, origin, req);
     }
     return;
   }
@@ -201,23 +205,34 @@ async function handle(req, res) {
   if (req.method === 'POST' && url.pathname === '/start/youtube-retry') {
     try {
       const result = await startYoutubeRetry();
-      json(res, 200, result, origin);
+      json(res, 200, result, origin, req);
     } catch (e) {
-      json(res, 500, { ok: false, error: e instanceof Error ? e.message : String(e) }, origin);
+      json(res, 500, { ok: false, error: e instanceof Error ? e.message : String(e) }, origin, req);
     }
     return;
   }
 
-  json(res, 404, { error: 'not_found' }, origin);
+  json(res, 404, { error: 'not_found' }, origin, req);
 }
 
-createServer((req, res) => {
+const server = createServer((req, res) => {
   handle(req, res).catch((e) => {
-    json(res, 500, { error: e instanceof Error ? e.message : String(e) }, req.headers.origin ?? '');
+    json(res, 500, { error: e instanceof Error ? e.message : String(e) }, req.headers.origin ?? '', req);
   });
-}).listen(PORT, '127.0.0.1', () => {
+});
+
+server.on('error', (err) => {
+  if (err && err.code === 'EADDRINUSE') {
+    console.log(`Агент уже работает → http://127.0.0.1:${PORT}/health`);
+    console.log('Не запускай второй раз. Обнови harvest.html в браузере.');
+    process.exit(0);
+  }
+  throw err;
+});
+
+server.listen(PORT, '127.0.0.1', () => {
   console.log(`Harvest local agent → http://127.0.0.1:${PORT}`);
   console.log('  GET  /health  /status');
-  console.log('  POST /start/bulk-seed  /start/youtube-queue');
+  console.log('  POST /start/bulk-seed  /start/youtube-queue  /start/youtube-retry');
   console.log('Dashboard: https://www.efir-ai.ru/admin/harvest.html');
 });

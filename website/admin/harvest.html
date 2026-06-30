@@ -240,7 +240,7 @@
           showErr('');
           document.getElementById('youtubeAgentStatus').textContent = 'Retry batch запущен для ' + v.videoId;
         } else {
-          showErr('В retry-очереди. Запусти агент: npm run seed:agent → ↻ Retry failed');
+          showErr('В retry-очереди. Агент: ' + AGENT_PS + ' → ↻ Retry failed');
         }
         await load();
       } catch (e) {
@@ -262,18 +262,21 @@
 
     async function pingAgent() {
       try {
-        const r = await fetch(AGENT_BASE + '/health', { signal: AbortSignal.timeout(2500) });
+        const r = await fetch(AGENT_BASE + '/health', { mode: 'cors', signal: AbortSignal.timeout(2500) });
         return r.ok;
       } catch (_) {
         return false;
       }
     }
 
+    const AGENT_PS = 'Set-Location "C:\\Users\\1\\OneDrive\\Desktop\\Music story\\backend"; npm run seed:agent';
+    const AGENT_BUSY_HINT = 'Если EADDRINUSE — агент уже работает, не запускай второй раз. Обнови страницу (F5).';
+
     async function refreshYoutubeAgentStatus() {
       const el = document.getElementById('youtubeAgentStatus');
       const ok = await pingAgent();
       if (!ok) {
-        el.innerHTML = 'Агент не запущен — <code>cd backend && npm run seed:agent</code>';
+        el.innerHTML = 'Браузер не видит агент (Chrome блокирует localhost?). Проверь: <code>Invoke-WebRequest http://127.0.0.1:17842/health</code> · ' + AGENT_BUSY_HINT;
         return false;
       }
       el.textContent = 'Агент OK — можно жать ▶ Запустить';
@@ -297,7 +300,7 @@
       const el = document.getElementById('agentStatus');
       const ok = await pingAgent();
       if (!ok) {
-        el.innerHTML = 'Агент не запущен — <code>cd backend && npm run seed:agent</code>';
+        el.innerHTML = 'Браузер не видит агент (Chrome блокирует localhost?). Проверь: <code>Invoke-WebRequest http://127.0.0.1:17842/health</code> · ' + AGENT_BUSY_HINT;
         return false;
       }
       try {
@@ -320,7 +323,7 @@
       showErr('');
       try {
         if (!(await pingAgent())) {
-          showErr('Локальный агент не запущен. PowerShell: Set-Location "...\\backend"; npm run seed:agent');
+          showErr('Агент недоступен из браузера. PowerShell: ' + AGENT_PS + ' · ' + AGENT_BUSY_HINT);
           return;
         }
         const r = await fetch(AGENT_BASE + '/start/bulk-seed', { method: 'POST', signal: AbortSignal.timeout(120000) });
@@ -346,7 +349,7 @@
       btn.disabled = true;
       try {
         if (!(await pingAgent())) {
-          showErr('Агент не запущен: cd backend && npm run seed:agent');
+          showErr('Агент недоступен из браузера. ' + AGENT_PS);
           return;
         }
         const r = await fetch(AGENT_BASE + '/start/youtube-queue', { method: 'POST', signal: AbortSignal.timeout(15000) });
@@ -378,7 +381,7 @@
           : 'Запусти локально batch — прогресс появится здесь после sync.';
         qEl.textContent = live && live.status === 'finished' && live.finishedAt
           ? 'Finished: ' + new Date(live.finishedAt).toLocaleString('ru')
-          : 'Команда: cd backend && npm run harvest:youtube-batch -- --from-queue';
+          : 'Локально: Set-Location "...\\backend"; npm run harvest:youtube-from-queue';
         return;
       }
       title.textContent = 'Идёт прогон ' + (live.runId || '');
@@ -670,7 +673,7 @@
     document.getElementById('startYoutubeBtn').addEventListener('click', startYoutubeLocal);
     document.getElementById('startRetryBtn').addEventListener('click', startRetryBatch);
     document.getElementById('syncDashBtn').addEventListener('click', function () {
-      showErr('Локально: cd backend && npm run seed:dashboard');
+      showErr('Локально: Set-Location "...\\backend"; npm run seed:dashboard');
     });
     document.getElementById('discoverBtn').addEventListener('click', discover);
     document.getElementById('queueBtn').addEventListener('click', queueSelected);
