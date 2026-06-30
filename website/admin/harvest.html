@@ -67,7 +67,7 @@
 <body>
   <div class="wrap">
     <h1>Harvest Dashboard</h1>
-    <p class="sub">YouTube essay + локальный bulk-seed. <strong>Прогон крутится только на твоём ПК</strong> — дашборд показывает синхронизированное состояние. Агент (PowerShell): <code>Set-Location "...\backend"; npm run seed:agent</code></p>
+    <p class="sub">Веб → Railway → твой ПК. Кнопки шлют команду на BFF; <code>npm run seed:agent</code> на ПК опрашивает Railway и запускает job.</p>
 
     <div class="tabs">
       <button type="button" id="tabYoutube" class="active">YouTube essay</button>
@@ -150,9 +150,9 @@
     </div>
     </div>
   </div>
+  <script>window.EFIR_API_BASE = 'https://music-story-production.up.railway.app';</script>
   <script>
     const TOKEN_KEY = 'harvest_dashboard_token';
-    const AGENT_BASE = 'http://127.0.0.1:17842';
     const tokenEl = document.getElementById('token');
     const saved = localStorage.getItem(TOKEN_KEY);
     if (saved) tokenEl.value = saved;
@@ -235,13 +235,9 @@
           url: 'https://www.youtube.com/watch?v=' + v.videoId,
           channelName: v.channel || '',
         });
-        if (await pingAgent()) {
-          await fetch(AGENT_BASE + '/start/youtube-retry', { method: 'POST', signal: AbortSignal.timeout(15000) });
-          showErr('');
-          document.getElementById('youtubeAgentStatus').textContent = 'Retry batch запущен для ' + v.videoId;
-        } else {
-          showErr('В retry-очереди. Агент: ' + AGENT_PS + ' → ↻ Retry failed');
-        }
+        await queueHarvestCommand('youtube-retry');
+        showErr('');
+        document.getElementById('youtubeAgentStatus').textContent = 'Retry в очереди Railway → ПК';
         await load();
       } catch (e) {
         showErr(e.error || e.message || 'retry failed');
@@ -260,61 +256,64 @@
       }
     }
 
-    async function pingAgent() {
+    async function loadAgentBridge() {
+      if (!token()) return null;
       try {
-        const r = await fetch(AGENT_BASE + '/health', { mode: 'cors', signal: AbortSignal.timeout(2500) });
-        return r.ok;
+        return await apiGet('/v1/admin/harvest-agent/status');
       } catch (_) {
-        return false;
+        return null;
       }
     }
 
-    const AGENT_PS = 'Set-Location "C:\\Users\\1\\OneDrive\\Desktop\\Music story\\backend"; npm run seed:agent';
-    const AGENT_BUSY_HINT = 'Если EADDRINUSE — агент уже работает, не запускай второй раз. Обнови страницу (F5).';
+    async function queueHarvestCommand(action) {
+      return apiPost('/v1/admin/harvest-agent/command?token=' + encodeURIComponent(token()), { action: action });
+    }
 
     async function refreshYoutubeAgentStatus() {
       const el = document.getElementById('youtubeAgentStatus');
-      const ok = await pingAgent();
-      if (!ok) {
-        el.innerHTML = 'Браузер не видит агент (Chrome блокирует localhost?). Проверь: <code>Invoke-WebRequest http://127.0.0.1:17842/health</code> · ' + AGENT_BUSY_HINT;
+      const b = await loadAgentBridge();
+      if (!b) {
+        el.textContent = 'Railway API недоступен — проверь token';
         return false;
       }
-      el.textContent = 'Агент OK — можно жать ▶ Запустить';
-      return true;
+      if (b.agentOnline) {
+        el.textContent = 'ПК-агент онлайн (Railway) · pending ' + (b.pending || 0);
+        return true;
+      }
+      el.innerHTML = 'ПК-агент офлайн — PowerShell: <code>' + AGENT_PS + '</code>';
+      return false;
     }
 
     async function startRetryBatch() {
       const btn = document.getElementById('startRetryBtn');
       btn.disabled = true;
       try {
-        if (!(await pingAgent())) { showErr('Агент не запущен'); return; }
-        await fetch(AGENT_BASE + '/start/youtube-retry', { method: 'POST' });
-        document.getElementById('youtubeAgentStatus').textContent = 'Retry batch запущен';
-      } catch (e) { showErr(e.message); }
-      finally { btn.disabled = false; }
+        const r = await queueHarvestCommand('youtube-retry');
+        showErr(r.hint || '');
+        document.getElementById('youtubeAgentStatus').textContent = 'Retry в очереди Railway → ПК';
+        setTimeout(load, 3000);
+      } catch (e) {
+        showErr(e.error || e.message || 'retry queue failed');
+      } finally {
+        btn.disabled = false;
+      }
     }
 
     function fmt(n) { return n == null ? '0' : String(n); }
 
+    const AGENT_PS = 'Set-Location "C:\\Users\\1\\OneDrive\\Desktop\\Music story\\backend"; npm run seed:agent';
+
     async function refreshAgentStatus() {
       const el = document.getElementById('agentStatus');
-      const ok = await pingAgent();
-      if (!ok) {
-        el.innerHTML = 'Браузер не видит агент (Chrome блокирует localhost?). Проверь: <code>Invoke-WebRequest http://127.0.0.1:17842/health</code> · ' + AGENT_BUSY_HINT;
+      const b = await loadAgentBridge();
+      if (!b) {
+        el.textContent = 'Railway bridge недоступен';
         return false;
       }
-      try {
-        const r = await fetch(AGENT_BASE + '/status', { signal: AbortSignal.timeout(3000) });
-        const data = await r.json();
-        const bulk = data.bulkSeed || {};
-        el.textContent = bulk.running
-          ? 'Агент OK · bulk-seed PID ' + (bulk.pids || []).join(', ')
-          : 'Агент OK · bulk-seed не крутится';
-        return true;
-      } catch (_) {
-        el.textContent = 'Агент OK';
-        return true;
-      }
+      el.textContent = b.agentOnline
+        ? 'ПК-агент онлайн · pending ' + (b.pending || 0)
+        : 'ПК-агент офлайн — запусти seed:agent на ПК';
+      return b.agentOnline;
     }
 
     async function startBulkLocal() {
@@ -322,20 +321,10 @@
       btn.disabled = true;
       showErr('');
       try {
-        if (!(await pingAgent())) {
-          showErr('Агент недоступен из браузера. PowerShell: ' + AGENT_PS + ' · ' + AGENT_BUSY_HINT);
-          return;
-        }
-        const r = await fetch(AGENT_BASE + '/start/bulk-seed', { method: 'POST', signal: AbortSignal.timeout(120000) });
-        const data = await r.json();
-        if (!r.ok) throw data;
-        if (data.alreadyRunning) {
-          showErr('Bulk-seed уже работает (PID ' + (data.pids || []).join(', ') + ')');
-        } else if (data.started) {
-          document.getElementById('agentStatus').textContent = 'Запущен PID ' + (data.pids || []).join(', ');
-        } else {
-          showErr('Старт отправлен, но процесс не виден — смотри backend/logs/bulk-seed.err.log');
-        }
+        const r = await queueHarvestCommand('bulk-seed');
+        if (r.hint) showErr(r.hint);
+        else showErr('');
+        document.getElementById('agentStatus').textContent = 'Bulk-seed в очереди Railway → ПК';
         setTimeout(load, 3000);
       } catch (e) {
         showErr(e.error || e.message || 'start failed');
@@ -348,15 +337,10 @@
       const btn = document.getElementById('startYoutubeBtn');
       btn.disabled = true;
       try {
-        if (!(await pingAgent())) {
-          showErr('Агент недоступен из браузера. ' + AGENT_PS);
-          return;
-        }
-        const r = await fetch(AGENT_BASE + '/start/youtube-queue', { method: 'POST', signal: AbortSignal.timeout(15000) });
-        const data = await r.json();
-        if (!r.ok) throw data;
-        showErr('');
-        document.getElementById('queueInfo').textContent = 'YouTube batch запущен локально (PID ' + (data.pid || '?') + ')';
+        const r = await queueHarvestCommand('youtube-queue');
+        showErr(r.hint || '');
+        document.getElementById('youtubeAgentStatus').textContent = 'YouTube прогон в очереди Railway → ПК';
+        document.getElementById('queueInfo').textContent = 'Команда отправлена на Railway, агент на ПК подхватит за ~5 сек';
         setTimeout(load, 3000);
       } catch (e) {
         showErr(e.error || e.message || 'youtube start failed');

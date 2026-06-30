@@ -40,6 +40,14 @@ import {
   type BulkSeedDashboard,
   type BulkSeedLiveProgress,
 } from '../services/bulk-seed-dashboard.js';
+import {
+  claimPendingHarvestCommands,
+  enqueueHarvestAgentCommand,
+  finishHarvestAgentCommand,
+  getHarvestAgentBridgeStatus,
+  touchHarvestAgentPoll,
+  type HarvestAgentAction,
+} from '../services/harvest-agent-bridge.js';
 
 const router = Router();
 
@@ -313,6 +321,56 @@ router.post('/bulk-seed/progress', (req, res) => {
   }
   saveBulkSeedLiveProgress(body);
   res.json({ ok: true, status: body.status });
+});
+
+/** GET /v1/admin/harvest-agent/status — dashboard: is local PC agent polling Railway? */
+router.get('/harvest-agent/status', (req, res) => {
+  if (!requireHarvestAdmin(req, res)) return;
+  res.json({ ok: true, ...getHarvestAgentBridgeStatus() });
+});
+
+/** POST /v1/admin/harvest-agent/command — web → Railway queue → local agent */
+router.post('/harvest-agent/command', (req, res) => {
+  if (!requireHarvestAdmin(req, res)) return;
+  const action = String(req.body?.action ?? '').trim() as HarvestAgentAction;
+  if (!['youtube-queue', 'youtube-retry', 'bulk-seed'].includes(action)) {
+    res.status(400).json({ error: 'invalid action', allowed: ['youtube-queue', 'youtube-retry', 'bulk-seed'] });
+    return;
+  }
+  const cmd = enqueueHarvestAgentCommand(action, 'dashboard');
+  const after = getHarvestAgentBridgeStatus();
+  res.json({
+    ok: true,
+    queued: cmd,
+    hint: after.agentOnline ? undefined : 'Команда в очереди — запусти seed:agent на ПК',
+    ...after,
+  });
+});
+
+/** GET /v1/admin/harvest-agent/poll — local agent pulls pending commands */
+router.get('/harvest-agent/poll', (req, res) => {
+  if (!requireHarvestAdmin(req, res)) return;
+  touchHarvestAgentPoll({
+    pid: Number(req.query.pid) || undefined,
+    version: String(req.query.v ?? '1'),
+  });
+  const commands = claimPendingHarvestCommands(5);
+  res.json({ ok: true, commands });
+});
+
+/** POST /v1/admin/harvest-agent/ack — local agent reports command result */
+router.post('/harvest-agent/ack', (req, res) => {
+  if (!requireHarvestAdmin(req, res)) return;
+  const id = String(req.body?.id ?? '').trim();
+  if (!id) {
+    res.status(400).json({ error: 'id required' });
+    return;
+  }
+  const ok = req.body?.ok !== false;
+  const result = typeof req.body?.result === 'string' ? req.body.result : undefined;
+  const cmd = finishHarvestAgentCommand(id, ok, result);
+  touchHarvestAgentPoll();
+  res.json({ ok: true, command: cmd });
 });
 
 export default router;
