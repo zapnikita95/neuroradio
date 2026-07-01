@@ -2,11 +2,19 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import fetch from '../proxy-fetch.js';
+import {
+  fetchYoutubeOembedTitle,
+  looksBrokenTitle,
+  repairMojibakeTitle,
+  resolveDisplayTitle,
+} from './youtube-title-repair.js';
 
 const DATA_DIR = process.env.ACCOUNT_DATA_DIR?.trim() || path.join(process.cwd(), 'data');
 const PROGRESS_FILE = path.join(DATA_DIR, 'youtube-harvest-progress.json');
 const MANUAL_QUEUE_FILE = path.join(DATA_DIR, 'youtube-harvest-manual-queue.json');
 const STATE_FILE = path.join(DATA_DIR, 'youtube-harvest-state.json');
+const DASHBOARD_FILE = path.join(DATA_DIR, 'youtube-harvest-dashboard.json');
+const CATALOG_FILE = path.join(DATA_DIR, 'youtube-harvest-catalog.json');
 
 const bundledChannelsPath = path.join(
   path.dirname(fileURLToPath(import.meta.url)),
@@ -94,6 +102,29 @@ export function processedVideoIds(): Set<string> {
   return new Set(state.processedVideoIds ?? []);
 }
 
+/** All video ids we should not offer for a fresh harvest run. */
+export function harvestedVideoIds(): Set<string> {
+  const ids = new Set<string>();
+  for (const id of processedVideoIds()) ids.add(id);
+  const catalog = readJson<{ videos?: Array<{ id?: string }> }>(CATALOG_FILE, {});
+  for (const v of catalog.videos ?? []) {
+    if (v.id) ids.add(v.id);
+  }
+  const dash = readJson<{ videos?: Array<{ videoId?: string }> }>(DASHBOARD_FILE, {});
+  for (const v of dash.videos ?? []) {
+    if (v.videoId) ids.add(v.videoId);
+  }
+  return ids;
+}
+
+async function enrichDiscoverTitle(videoId: string, rawTitle: string): Promise<string> {
+  let title = resolveDisplayTitle(rawTitle, videoId);
+  if (!looksBrokenTitle(title) && !/\uFFFD|\.\.(?=\s|$|[#])/u.test(title)) return title;
+  const oembed = await fetchYoutubeOembedTitle(videoId);
+  if (oembed) return oembed;
+  return repairMojibakeTitle(rawTitle);
+}
+
 export function loadHarvestLiveProgress(): HarvestLiveProgress {
   const p = readJson<Partial<HarvestLiveProgress>>(PROGRESS_FILE, {});
   return { status: 'idle', ...p, updatedAt: p.updatedAt ?? new Date().toISOString() };
@@ -130,8 +161,15 @@ export function clearManualQueue(): void {
   saveManualQueue([]);
 }
 
+export function removeManualQueueItem(videoId: string): HarvestManualQueueVideo[] {
+  const id = videoId.trim();
+  const q = loadManualQueue();
+  const videos = q.videos.filter((v) => v.id !== id);
+  saveManualQueue(videos);
+  return videos;
+}
+
 const RETRY_QUEUE_FILE = path.join(DATA_DIR, 'youtube-harvest-retry-queue.json');
-const CATALOG_FILE = path.join(DATA_DIR, 'youtube-harvest-catalog.json');
 
 export function loadRetryQueue(): { videos: HarvestManualQueueVideo[] } {
   return readJson(RETRY_QUEUE_FILE, { videos: [] });
@@ -194,6 +232,7 @@ function decodeXml(s: string): string {
 export async function discoverChannelVideos(
   channelKey: string,
   limit = 15,
+  opts: { onlyNew?: boolean; maxScan?: number } = {},
 ): Promise<HarvestDiscoverVideo[]> {
   const channels = loadHarvestChannels();
   const ch = channels.find((c) => c.id === channelKey);
@@ -207,17 +246,25 @@ export async function discoverChannelVideos(
   if (!res.ok) throw new Error(`YouTube RSS ${res.status}`);
   const buf = Buffer.from(await res.arrayBuffer());
   const xml = buf.toString('utf8');
-  const processed = processedVideoIds();
+  const onlyNew = opts.onlyNew !== false;
+  const maxScan = opts.maxScan ?? 120;
+  const harvested = harvestedVideoIds();
+  const queued = new Set(loadManualQueue().videos.map((v) => v.id));
   const out: HarvestDiscoverVideo[] = [];
 
   const entryRe = /<entry>([\s\S]*?)<\/entry>/g;
   let m: RegExpExecArray | null;
-  while ((m = entryRe.exec(xml)) && out.length < limit) {
+  let scanned = 0;
+  while ((m = entryRe.exec(xml)) && out.length < limit && scanned < maxScan) {
+    scanned += 1;
     const block = m[1];
     const id = block.match(/<yt:videoId>([^<]+)<\/yt:videoId>/)?.[1]?.trim();
-    const title = decodeXml(block.match(/<title>([^<]*)<\/title>/)?.[1]?.trim() ?? '');
+    const rawTitle = decodeXml(block.match(/<title>([^<]*)<\/title>/)?.[1]?.trim() ?? '');
     const publishedAt = block.match(/<published>([^<]+)<\/published>/)?.[1]?.trim();
-    if (!id || !title) continue;
+    if (!id || !rawTitle) continue;
+    const alreadyProcessed = harvested.has(id) || queued.has(id);
+    if (onlyNew && alreadyProcessed) continue;
+    const title = await enrichDiscoverTitle(id, rawTitle);
     out.push({
       id,
       title,
@@ -225,7 +272,7 @@ export async function discoverChannelVideos(
       publishedAt,
       channelId: ch.channelId,
       channelName: ch.name,
-      alreadyProcessed: processed.has(id),
+      alreadyProcessed,
     });
   }
   return out;

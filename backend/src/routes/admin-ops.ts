@@ -27,6 +27,7 @@ import {
   loadHarvestLiveProgress,
   loadManualQueue,
   loadCatalogFactsForVideo,
+  removeManualQueueItem,
   appendRetryQueue,
   saveHarvestLiveProgress,
   type HarvestLiveProgress,
@@ -158,6 +159,7 @@ router.get('/youtube-harvest/status', (req, res) => {
     ok: true,
     dashboard: dash,
     live: dash.live ?? loadHarvestLiveProgress(),
+    manualQueue: loadManualQueue(),
     bulkSeed: loadBulkSeedDashboard() ?? buildBulkSeedDashboardFromFiles(),
   });
 });
@@ -203,8 +205,9 @@ router.get('/youtube-harvest/discover', async (req, res) => {
     return;
   }
   try {
-    const videos = await discoverChannelVideos(channel, limit);
-    res.json({ ok: true, channel, videos });
+    const onlyNew = String(req.query.onlyNew ?? '1') !== '0';
+    const videos = await discoverChannelVideos(channel, limit, { onlyNew, maxScan: 120 });
+    res.json({ ok: true, channel, onlyNew, videos });
   } catch (err) {
     res.status(500).json({ error: err instanceof Error ? err.message : String(err) });
   }
@@ -238,11 +241,17 @@ router.post('/youtube-harvest/queue', (req, res) => {
   res.json({ ok: true, queued: normalized.length, total: videos.length, videos });
 });
 
-/** DELETE /v1/admin/youtube-harvest/queue */
+/** DELETE /v1/admin/youtube-harvest/queue — clear all, or ?videoId= for one item */
 router.delete('/youtube-harvest/queue', (req, res) => {
   if (!requireHarvestAdmin(req, res)) return;
+  const videoId = String(req.query.videoId ?? '').trim();
+  if (videoId.length >= 6) {
+    const videos = removeManualQueueItem(videoId);
+    res.json({ ok: true, removed: videoId, total: videos.length, videos });
+    return;
+  }
   clearManualQueue();
-  res.json({ ok: true, cleared: true });
+  res.json({ ok: true, cleared: true, total: 0, videos: [] });
 });
 
 /** GET /v1/admin/youtube-harvest/video/:videoId/facts */

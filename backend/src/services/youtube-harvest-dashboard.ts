@@ -409,18 +409,26 @@ export function buildYoutubeHarvestDashboardFromFiles(): YoutubeHarvestDashboard
   };
 }
 
+function overlayLiveDashboardFields(dash: YoutubeHarvestDashboard): YoutubeHarvestDashboard {
+  const manual = loadManualQueue();
+  const retry = readJson<{ videos?: Array<{ id: string }> }>(
+    path.join(DATA_DIR, 'youtube-harvest-retry-queue.json'),
+    { videos: [] },
+  );
+  return {
+    ...dash,
+    manualQueue: manual.videos.length,
+    retryQueue: retry.videos?.length ?? dash.retryQueue ?? 0,
+    live: loadHarvestLiveProgress(),
+  };
+}
+
 export function loadYoutubeHarvestDashboard(): YoutubeHarvestDashboard | null {
   const built = buildYoutubeHarvestDashboardFromFiles();
   const cached = readJson<YoutubeHarvestDashboard | null>(DASHBOARD_FILE, null);
-  if (built) {
-    built.live = loadHarvestLiveProgress();
-    return built;
-  }
-  if (cached?.videos?.length) {
-    cached.live = loadHarvestLiveProgress();
-    return cached;
-  }
-  return null;
+  const dash = built ?? (cached?.videos?.length ? cached : null);
+  if (!dash) return null;
+  return overlayLiveDashboardFields(dash);
 }
 
 export function slimYoutubeHarvestDashboardForSync(payload: YoutubeHarvestDashboard): YoutubeHarvestDashboard {

@@ -46,6 +46,10 @@
     .discover-row { display: flex; gap: 8px; align-items: flex-start; padding: 8px 0; border-bottom: 1px solid var(--border); }
     .discover-row label { flex: 1; cursor: pointer; }
     .discover-row small { color: var(--muted); display: block; }
+    .queue-panel { margin-top: 12px; }
+    .queue-row { display: flex; gap: 8px; align-items: flex-start; padding: 8px 0; border-bottom: 1px solid var(--border); font-size: 0.82rem; }
+    .queue-row label { flex: 1; }
+    .queue-row small { color: var(--muted); display: block; }
     .row-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
     code { background: #0c0a14; padding: 2px 6px; border-radius: 4px; font-size: 0.85em; }
     .tabs { display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: wrap; }
@@ -118,7 +122,7 @@
 
     <div id="discoverBox" class="card" hidden>
       <h2>Добавить видео в прогон</h2>
-      <p class="hint">15 каналов (RU + EN essay). RSS → выбери → «В очередь» → «▶ Запустить». Агент локально: <code>npm run seed:agent</code></p>
+      <p class="hint">15 каналов (RU + EN essay). RSS → только <b>новые</b> (не в прогоне) → «В очередь» → «▶ Запустить».</p>
       <div class="row-actions">
         <select id="channelPick"></select>
         <button id="discoverBtn" type="button">Найти видео</button>
@@ -126,6 +130,11 @@
         <button id="clearQueueBtn" type="button" class="secondary">Очистить очередь</button>
       </div>
       <div id="discoverList" class="discover-list"></div>
+      <p id="discoverHint" class="hint"></p>
+      <div id="queuePanel" class="queue-panel card" hidden>
+        <h2>Очередь прогона (<span id="queueCount">0</span>)</h2>
+        <div id="queueList"></div>
+      </div>
       <p id="queueInfo" class="hint"></p>
     </div>
 
@@ -157,6 +166,7 @@
     if (saved) tokenEl.value = saved;
     let pollTimer = null;
     let discoverVideos = [];
+    let manualQueueVideos = [];
     let activeTab = 'youtube';
     let lastBulk = null;
 
@@ -498,6 +508,7 @@
     function renderYoutube(d, sourceLabel) {
       lastYoutubeDash = d;
       lastYoutubeDash._sourceLabel = sourceLabel;
+      if (manualQueueVideos.length) d.manualQueue = manualQueueVideos.length;
       document.getElementById('stats').hidden = false;
       document.getElementById('meta').hidden = false;
       document.getElementById('tableWrap').hidden = false;
@@ -574,6 +585,9 @@
       showErr('');
       try {
         const data = await apiGet('/v1/admin/youtube-harvest/status');
+        if (data.manualQueue && data.manualQueue.videos) {
+          renderManualQueue(data.manualQueue.videos);
+        }
         renderYoutube(data.dashboard, 'Railway');
         if (data.bulkSeed) renderBulk(data.bulkSeed, 'Railway');
         else await loadBulk('Railway');
@@ -605,12 +619,49 @@
       } catch (_) { /* optional */ }
     }
 
+    function renderManualQueue(videos) {
+      manualQueueVideos = videos || [];
+      const n = manualQueueVideos.length;
+      document.getElementById('queueCount').textContent = String(n);
+      document.getElementById('queuePanel').hidden = n === 0;
+      document.getElementById('queueList').innerHTML = manualQueueVideos.map(function (v) {
+        return '<div class="queue-row"><label><strong>' + escapeHtml(v.title || v.id) + '</strong>' +
+          '<small>' + escapeHtml(v.channelName || '—') + ' · ' + escapeHtml(v.id) +
+          (v.addedAt ? ' · ' + new Date(v.addedAt).toLocaleString('ru') : '') + '</small></label>' +
+          '<button type="button" class="btn-sm secondary queue-del" data-vid="' + escapeHtml(v.id) + '">✕</button></div>';
+      }).join('');
+      document.getElementById('queueInfo').textContent = n
+        ? 'В очереди ' + n + ' · жми ▶ Запустить прогон'
+        : 'Очередь пуста — найди видео и добавь';
+      document.querySelectorAll('.queue-del').forEach(function (btn) {
+        btn.addEventListener('click', function () { removeQueueItem(btn.dataset.vid); });
+      });
+    }
+
+    async function removeQueueItem(videoId) {
+      if (!videoId || !token()) return;
+      try {
+        const res = await fetch(apiBase() + '/v1/admin/youtube-harvest/queue?videoId=' + encodeURIComponent(videoId) + '&token=' + encodeURIComponent(token()), {
+          method: 'DELETE',
+          headers: hdr(),
+        });
+        const data = await res.json();
+        if (!res.ok) throw data;
+        renderManualQueue(data.videos || []);
+        if (lastYoutubeDash) {
+          lastYoutubeDash.manualQueue = (data.videos || []).length;
+          renderYoutube(lastYoutubeDash, lastYoutubeDash._sourceLabel);
+        }
+      } catch (e) {
+        showErr(e.error || e.message || 'remove failed');
+      }
+    }
+
     async function loadQueueInfo() {
       if (!token()) return;
       try {
         const q = await apiGet('/v1/admin/youtube-harvest/queue');
-        document.getElementById('queueInfo').textContent = 'В очереди: ' + (q.videos || []).length +
-          ' · жми ▶ Запустить прогон (нужен seed:agent)';
+        renderManualQueue(q.videos || []);
       } catch (_) {}
     }
 
@@ -619,15 +670,20 @@
       const ch = document.getElementById('channelPick').value;
       document.getElementById('discoverBtn').disabled = true;
       try {
-        const data = await apiGet('/v1/admin/youtube-harvest/discover?channel=' + encodeURIComponent(ch) + '&limit=20');
+        const data = await apiGet('/v1/admin/youtube-harvest/discover?channel=' + encodeURIComponent(ch) + '&limit=20&onlyNew=1');
         discoverVideos = data.videos || [];
-        document.getElementById('discoverList').innerHTML = discoverVideos.map(function (v, i) {
-          const dis = v.alreadyProcessed ? ' disabled' : '';
-          const tag = v.alreadyProcessed ? ' <small>(уже разобрано)</small>' : '';
-          return '<div class="discover-row"><input type="checkbox" data-idx="' + i + '"' + dis + ' />' +
-            '<label><strong>' + escapeHtml(v.title) + '</strong>' + tag +
-            '<small>' + escapeHtml(v.channelName) + ' · ' + (v.publishedAt || '').slice(0, 10) + '</small></label></div>';
-        }).join('');
+        const hint = document.getElementById('discoverHint');
+        if (!discoverVideos.length) {
+          hint.textContent = 'Новых видео нет — все последние уже в прогоне или в очереди.';
+          document.getElementById('discoverList').innerHTML = '';
+        } else {
+          hint.textContent = 'Только видео, которых ещё нет в прогоне и не в очереди.';
+          document.getElementById('discoverList').innerHTML = discoverVideos.map(function (v, i) {
+            return '<div class="discover-row"><input type="checkbox" data-idx="' + i + '" />' +
+              '<label><strong>' + escapeHtml(v.title) + '</strong>' +
+              '<small>' + escapeHtml(v.channelName) + ' · ' + (v.publishedAt || '').slice(0, 10) + '</small></label></div>';
+          }).join('');
+        }
         document.getElementById('queueBtn').disabled = false;
       } catch (e) {
         showErr(e.error || e.message || 'discover failed');
@@ -647,6 +703,7 @@
         const r = await apiPost('/v1/admin/youtube-harvest/queue?token=' + encodeURIComponent(token()), { videos: picks });
         showErr('');
         document.getElementById('queueInfo').textContent = 'Добавлено ' + r.queued + ', всего в очереди: ' + r.total;
+        renderManualQueue(r.videos || []);
         await load();
       } catch (e) {
         showErr(e.error || e.message || 'queue failed');
@@ -656,7 +713,7 @@
     async function clearQueue() {
       try {
         await apiDelete('/v1/admin/youtube-harvest/queue');
-        document.getElementById('queueInfo').textContent = 'Очередь очищена';
+        renderManualQueue([]);
         await load();
       } catch (e) {
         showErr(e.error || e.message || 'clear failed');
