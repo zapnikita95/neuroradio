@@ -333,8 +333,11 @@ router.get('/harvest-agent/status', (req, res) => {
 router.post('/harvest-agent/command', (req, res) => {
   if (!requireHarvestAdmin(req, res)) return;
   const action = String(req.body?.action ?? '').trim() as HarvestAgentAction;
-  if (!['youtube-queue', 'youtube-retry', 'bulk-seed'].includes(action)) {
-    res.status(400).json({ error: 'invalid action', allowed: ['youtube-queue', 'youtube-retry', 'bulk-seed'] });
+  if (!['youtube-queue', 'youtube-retry', 'bulk-seed', 'sync-dashboard'].includes(action)) {
+    res.status(400).json({
+      error: 'invalid action',
+      allowed: ['youtube-queue', 'youtube-retry', 'bulk-seed', 'sync-dashboard'],
+    });
     return;
   }
   const cmd = enqueueHarvestAgentCommand(action, 'dashboard');

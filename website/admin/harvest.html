@@ -322,6 +322,23 @@
       return b.agentOnline;
     }
 
+    async function syncSnapshot() {
+      const btn = document.getElementById('syncDashBtn');
+      btn.disabled = true;
+      showErr('');
+      try {
+        const r = await queueHarvestCommand('sync-dashboard');
+        document.getElementById('agentStatus').textContent =
+          'Sync в очереди Railway → ПК (bulk + YouTube snapshot)';
+        if (r.hint) showErr(r.hint);
+        setTimeout(function () { load(); setupPoll(); }, 5000);
+      } catch (e) {
+        showErr(e.error || e.message || 'sync failed');
+      } finally {
+        btn.disabled = false;
+      }
+    }
+
     async function startBulkLocal() {
       const btn = document.getElementById('startBulkBtn');
       btn.disabled = true;
@@ -449,7 +466,7 @@
         ' · статус: ' + (b.runStatus || '—') +
         ' · источник: ' + (sourceLabel || b.source || '—') +
         (b.finishedAt ? ' · finished ' + new Date(b.finishedAt).toLocaleString('ru') : '') +
-        ' · sync: npm run seed:dashboard';
+        ' · sync: кнопка Sync snapshot или агент авто каждые ~45с';
 
       const src = b.bySource || {};
       document.getElementById('bulkSourceGrid').innerHTML = Object.keys(src).sort(function (a, b) { return src[b] - src[a]; })
@@ -573,6 +590,7 @@
         document.getElementById('loadBtn').disabled = false;
         refreshAgentStatus();
         refreshYoutubeAgentStatus();
+        setupPoll();
       }
     }
 
@@ -651,9 +669,11 @@
 
     function setupPoll() {
       if (pollTimer) clearInterval(pollTimer);
-      if (document.getElementById('autoRefresh').checked) {
-        pollTimer = setInterval(load, 10000);
-      }
+      if (!document.getElementById('autoRefresh').checked) return;
+      const bulkRunning = lastBulk && lastBulk.runStatus === 'running';
+      const ytRunning = lastYoutubeDash && lastYoutubeDash.live && lastYoutubeDash.live.status === 'running';
+      const ms = bulkRunning || ytRunning ? 3000 : 10000;
+      pollTimer = setInterval(load, ms);
     }
 
     document.getElementById('tabYoutube').addEventListener('click', function () { setTab('youtube'); });
@@ -662,9 +682,7 @@
     document.getElementById('startBulkBtn').addEventListener('click', startBulkLocal);
     document.getElementById('startYoutubeBtn').addEventListener('click', startYoutubeLocal);
     document.getElementById('startRetryBtn').addEventListener('click', startRetryBatch);
-    document.getElementById('syncDashBtn').addEventListener('click', function () {
-      showErr('Локально: Set-Location "...\\backend"; npm run seed:dashboard');
-    });
+    document.getElementById('syncDashBtn').addEventListener('click', syncSnapshot);
     document.getElementById('discoverBtn').addEventListener('click', discover);
     document.getElementById('queueBtn').addEventListener('click', queueSelected);
     document.getElementById('clearQueueBtn').addEventListener('click', clearQueue);

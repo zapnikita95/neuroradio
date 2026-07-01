@@ -7,7 +7,7 @@ const DATA_DIR = process.env.ACCOUNT_DATA_DIR?.trim() || path.join(process.cwd()
 const COMMANDS_FILE = path.join(DATA_DIR, 'harvest-agent-commands.json');
 const AGENT_STATE_FILE = path.join(DATA_DIR, 'harvest-agent-state.json');
 
-export type HarvestAgentAction = 'youtube-queue' | 'youtube-retry' | 'bulk-seed';
+export type HarvestAgentAction = 'youtube-queue' | 'youtube-retry' | 'bulk-seed' | 'sync-dashboard';
 
 export interface HarvestAgentCommand {
   id: string;

@@ -420,6 +420,8 @@ function normalizeBankMetadata(bank) {
   }
 }
 
+let lastRemoteSyncAt = 0;
+
 function saveCheckpoint(bank, stats, doneKeys, zeroFactKeys) {
   normalizeBankMetadata(bank);
   const bankSummary = summarizeBank(bank);
@@ -469,7 +471,12 @@ function saveCheckpoint(bank, stats, doneKeys, zeroFactKeys) {
       2,
     ),
   );
-  if (doneCount % 10 === 0) void syncBulkSeedDashboardRemote();
+  const shouldSync =
+    doneCount % 5 === 0 || Date.now() - lastRemoteSyncAt > 45_000;
+  if (shouldSync) {
+    lastRemoteSyncAt = Date.now();
+    void syncBulkSeedDashboardRemote();
+  }
 }
 
 function isSongMeaningNarrative(trimmed) {

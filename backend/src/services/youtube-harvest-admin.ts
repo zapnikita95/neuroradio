@@ -185,7 +185,9 @@ function decodeXml(s: string): string {
     .replace(/&lt;/g, '<')
     .replace(/&gt;/g, '>')
     .replace(/&quot;/g, '"')
-    .replace(/&#39;/g, "'");
+    .replace(/&#39;/g, "'")
+    .replace(/&#(\d+);/g, (_, n) => String.fromCharCode(Number(n)))
+    .replace(/&#x([0-9a-f]+);/gi, (_, h) => String.fromCharCode(parseInt(h, 16)));
 }
 
 /** YouTube public RSS — no API key, works on Railway. */
@@ -198,9 +200,13 @@ export async function discoverChannelVideos(
   if (!ch?.channelId) throw new Error(`channel not found or missing channelId: ${channelKey}`);
 
   const url = `https://www.youtube.com/feeds/videos.xml?channel_id=${encodeURIComponent(ch.channelId)}`;
-  const res = await fetch(url, { signal: AbortSignal.timeout(30_000) });
+  const res = await fetch(url, {
+    signal: AbortSignal.timeout(30_000),
+    headers: { accept: 'application/atom+xml, application/xml, text/xml; charset=utf-8' },
+  });
   if (!res.ok) throw new Error(`YouTube RSS ${res.status}`);
-  const xml = await res.text();
+  const buf = Buffer.from(await res.arrayBuffer());
+  const xml = buf.toString('utf8');
   const processed = processedVideoIds();
   const out: HarvestDiscoverVideo[] = [];
 

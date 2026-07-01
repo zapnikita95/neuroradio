@@ -9,12 +9,39 @@ import {
   saveYoutubeHarvestDashboard,
   slimYoutubeHarvestDashboardForSync,
 } from '../dist/services/youtube-harvest-dashboard.js';
+import { repairVideoTitles } from '../dist/services/youtube-title-repair.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.join(__dirname, '..');
 const DATA = path.join(ROOT, 'data');
+const CATALOG_FILE = path.join(DATA, 'youtube-harvest-catalog.json');
+
+async function repairCatalogTitles() {
+  if (!fs.existsSync(CATALOG_FILE)) return 0;
+  const catalog = JSON.parse(fs.readFileSync(CATALOG_FILE, 'utf8'));
+  const videos = catalog.videos ?? [];
+  if (!videos.length) return 0;
+  let n = 0;
+  const fixed = await repairVideoTitles(videos, {
+    onFixed: (id, title) => {
+      const v = videos.find((x) => x.id === id);
+      if (v) {
+        v.title = title;
+        n += 1;
+        console.log('[titles]', id, title.slice(0, 60));
+      }
+    },
+  });
+  if (fixed.size) {
+    catalog.updatedAt = new Date().toISOString();
+    fs.writeFileSync(CATALOG_FILE, JSON.stringify(catalog, null, 2), 'utf8');
+  }
+  return n;
+}
 
 async function main() {
+  const repaired = await repairCatalogTitles();
+  if (repaired) console.log('repaired titles:', repaired);
   let dashboard = buildYoutubeHarvestDashboardFromFiles();
   if (!dashboard) {
     const dashPath = path.join(DATA, 'youtube-harvest-dashboard.json');

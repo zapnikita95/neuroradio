@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 import { loadHarvestLiveProgress, loadManualQueue } from './youtube-harvest-admin.js';
+import { resolveDisplayTitle } from './youtube-title-repair.js';
 
 const DATA_DIR = process.env.ACCOUNT_DATA_DIR?.trim() || path.join(process.cwd(), 'data');
 const DASHBOARD_FILE = path.join(DATA_DIR, 'youtube-harvest-dashboard.json');
@@ -131,11 +132,28 @@ export function checkpointLabel(step?: string): string {
   return CHECKPOINT_LABELS[step] ?? step;
 }
 
-export function humanizeHarvestError(error?: string): string | undefined {
+export function humanizeHarvestError(
+  error?: string,
+  ctx?: {
+    harvestStatus?: HarvestVideoStatus;
+    transcriptChars?: number;
+    catalogFacts?: number;
+    catalogSaved?: number;
+    checkpoint?: string;
+  },
+): string | undefined {
   if (!error?.trim()) return undefined;
   const e = error.trim();
-  if (/API key not valid|INVALID_ARGUMENT.*api key/i.test(e)) {
-    return 'Первый прогон: Gemini ключ невалиден (данные могли появиться после retry/OpenRouter)';
+  const stt = ctx?.transcriptChars ?? 0;
+  const catalog = ctx?.catalogFacts ?? 0;
+  const saved = ctx?.catalogSaved ?? 0;
+
+  if (/API key not valid|INVALID_ARGUMENT.*api key|GEMINI_API_KEY|generativelanguage\.googleapis/i.test(e)) {
+    if (saved > 0 || catalog > 0) return undefined;
+    if (stt > 500) {
+      return 'STT готов, факты LLM не извлечены — нажми ↻ Retry (ключи на Railway/OpenRouter)';
+    }
+    return 'LLM: проверь GEMINI/OpenRouter на Railway и нажми Retry';
   }
   if (/yt-dlp|JavaScript runtime/i.test(e)) {
     return 'yt-dlp: не скачалось аудио (нужен Node/Deno для YouTube)';
@@ -277,7 +295,7 @@ export function buildYoutubeHarvestDashboardFromFiles(): YoutubeHarvestDashboard
       allRunReports.set(rep.videoId, {
         ok: mergedOk,
         ingested: (prev?.ingested ?? 0) + (rep.ingested ?? 0),
-        error: rep.ok ? prev?.error : rep.error ?? prev?.error,
+        error: rep.ok ? undefined : rep.error ?? prev?.error,
         retried: rep.retried ?? prev?.retried,
       });
     }
@@ -302,17 +320,19 @@ export function buildYoutubeHarvestDashboardFromFiles(): YoutubeHarvestDashboard
     const catalogSaved = cat?.saved ?? 0;
     const checkpoint = checkpointForVideo(videoId);
     const transcriptChars = transcriptCharsForVideo(videoId);
-    const error = agg?.error?.slice(0, 400);
+    const errorRaw = lastRep?.error ?? agg?.error;
     const harvestStatus = deriveHarvestStatus({
       catalogSaved,
       catalogFacts,
       transcriptChars,
       checkpoint,
-      error,
+      error: errorRaw,
     });
+    const error = harvestStatus === 'ok' ? undefined : errorRaw?.slice(0, 400);
+    const rawTitle = meta?.title ?? videoId;
     return {
       videoId,
-      title: meta?.title ?? videoId,
+      title: resolveDisplayTitle(rawTitle, videoId),
       channel: meta?.channel,
       ok: harvestStatus === 'ok',
       harvestStatus,
@@ -322,7 +342,16 @@ export function buildYoutubeHarvestDashboardFromFiles(): YoutubeHarvestDashboard
       ingestedLastRun: lastRep?.ingested,
       ingested: catalogSaved,
       error,
-      errorSummary: harvestStatus === 'ok' ? undefined : humanizeHarvestError(error),
+      errorSummary:
+        harvestStatus === 'ok'
+          ? undefined
+          : humanizeHarvestError(errorRaw, {
+              harvestStatus,
+              transcriptChars,
+              catalogFacts,
+              catalogSaved,
+              checkpoint,
+            }),
       retried: agg?.retried,
       inRetryQueue: retryIds.has(videoId),
       checkpoint,

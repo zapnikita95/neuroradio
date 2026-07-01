@@ -381,15 +381,20 @@ function appendCatalogFact(catalog, f, video, meta) {
 }
 
 function mergeCatalog(catalog, report) {
-  if (catalog.videos.some((v) => v.id === report.video.id)) return;
-  catalog.videos.push({
-    id: report.video.id,
-    title: report.video.title,
-    channel: report.video.channel,
-    processedAt: new Date().toISOString(),
-    stt: report.scribe.provider,
-    factsIngested: report.llm.factsIngested,
-  });
+  const idx = catalog.videos.findIndex((v) => v.id === report.video.id);
+  if (idx < 0) {
+    catalog.videos.push({
+      id: report.video.id,
+      title: report.video.title,
+      channel: report.video.channel,
+      processedAt: new Date().toISOString(),
+      stt: report.scribe.provider,
+      factsIngested: report.llm.factsIngested,
+    });
+  } else if (report.video.title && !/[\uFFFD]/.test(report.video.title)) {
+    catalog.videos[idx].title = report.video.title;
+    catalog.videos[idx].channel = report.video.channel || catalog.videos[idx].channel;
+  }
   for (const f of report.bankCandidates ?? []) {
     catalog.facts.push({
       artist: f.artist,

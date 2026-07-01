@@ -16,12 +16,16 @@ import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
 
 const execFileAsync = promisify(execFile);
+const execAsync = promisify(execFile);
 const __dir = dirname(fileURLToPath(import.meta.url));
 const BACKEND = join(__dir, '..');
 const LOG_DIR = join(BACKEND, 'logs');
 const PID_FILE = join(LOG_DIR, 'bulk-seed.pid');
 const LOG_FILE = join(LOG_DIR, 'bulk-seed.log');
 const ERR_FILE = join(LOG_DIR, 'bulk-seed.err.log');
+const YT_LOG_FILE = join(LOG_DIR, 'youtube-harvest.log');
+const YT_ERR_FILE = join(LOG_DIR, 'youtube-harvest.err.log');
+const SYNC_LOG_FILE = join(LOG_DIR, 'harvest-sync.log');
 const PORT = parseInt(process.env.HARVEST_LOCAL_AGENT_PORT ?? '17842', 10);
 const POLL_MS = parseInt(process.env.HARVEST_AGENT_POLL_MS ?? '4000', 10);
 
@@ -141,22 +145,94 @@ async function startBulkSeedDetached() {
   return { ok: true, started: Boolean(pids?.length), pids: pids ?? [] };
 }
 
-function spawnNpmJob(script) {
+async function isYoutubeHarvestRunning() {
+  if (process.platform === 'win32') {
+    try {
+      const { stdout } = await execFileAsync(
+        'powershell',
+        [
+          '-NoProfile',
+          '-Command',
+          "Get-CimInstance Win32_Process -ErrorAction SilentlyContinue | Where-Object { $_.CommandLine -like '*youtube-harvest-batch.mjs*' } | Select-Object -ExpandProperty ProcessId",
+        ],
+        { timeout: 8000 },
+      );
+      const pids = stdout
+        .trim()
+        .split(/\s+/)
+        .map((s) => parseInt(s, 10))
+        .filter((n) => Number.isFinite(n) && n > 0);
+      return pids.length ? pids : null;
+    } catch {
+      return null;
+    }
+  }
+  return null;
+}
+
+async function startYoutubeHarvestDetached(mode) {
+  const running = await isYoutubeHarvestRunning();
+  if (running?.length) return { ok: true, alreadyRunning: true, pids: running, mode };
+
+  if (process.platform === 'win32') {
+    const ps1 = join(__dir, 'run-youtube-harvest-detached.ps1');
+    await execFileAsync(
+      'powershell',
+      ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', ps1, '-Mode', mode],
+      { cwd: BACKEND, timeout: 120_000 },
+    );
+  } else {
+    const batchArg = mode === 'retry' ? '--retry-only' : '--from-queue';
+    spawn('node', ['scripts/youtube-harvest-batch.mjs', batchArg], {
+      cwd: BACKEND,
+      detached: true,
+      stdio: 'ignore',
+    }).unref();
+  }
+  await new Promise((r) => setTimeout(r, 1500));
+  const pids = await isYoutubeHarvestRunning();
+  return { ok: true, started: Boolean(pids?.length), pids: pids ?? [], mode, log: YT_LOG_FILE };
+}
+
+async function runSyncDashboard() {
   const npm = process.platform === 'win32' ? 'npm.cmd' : 'npm';
-  const child = spawn(npm, ['run', script], {
+  const shell = process.platform === 'win32';
+  await execAsync(npm, ['run', 'build'], { cwd: BACKEND, timeout: 180_000, shell });
+  await execAsync('node', ['scripts/bulk-seed-publish-dashboard.mjs'], {
     cwd: BACKEND,
-    detached: true,
-    stdio: 'ignore',
-    shell: process.platform === 'win32',
+    timeout: 120_000,
+    shell,
   });
-  child.unref();
-  return { ok: true, pid: child.pid, script };
+  await execAsync('node', ['scripts/youtube-harvest-publish-dashboard.mjs'], {
+    cwd: BACKEND,
+    timeout: 180_000,
+    shell,
+  });
+  return { ok: true, synced: true, log: SYNC_LOG_FILE };
+}
+
+let lastAutoSyncAt = 0;
+async function maybeAutoSyncWhileRunning() {
+  if (!dashboardToken()) return;
+  const bulk = await isBulkSeedRunning();
+  const yt = await isYoutubeHarvestRunning();
+  if (!bulk?.length && !yt?.length) return;
+  const now = Date.now();
+  if (now - lastAutoSyncAt < 45_000) return;
+  lastAutoSyncAt = now;
+  try {
+    console.log('[agent] auto sync snapshot (bulk/yt running)');
+    await runSyncDashboard();
+  } catch (e) {
+    console.warn('[agent] auto sync failed:', e instanceof Error ? e.message : e);
+  }
 }
 
 async function runCommand(action) {
   if (action === 'bulk-seed') return startBulkSeedDetached();
-  if (action === 'youtube-queue') return spawnNpmJob('harvest:youtube-from-queue');
-  if (action === 'youtube-retry') return spawnNpmJob('harvest:youtube-retry');
+  if (action === 'youtube-queue') return startYoutubeHarvestDetached('from-queue');
+  if (action === 'youtube-retry') return startYoutubeHarvestDetached('retry');
+  if (action === 'sync-dashboard') return runSyncDashboard();
   throw new Error(`unknown action: ${action}`);
 }
 
@@ -187,6 +263,7 @@ async function pollRailwayCommands() {
   } catch (e) {
     console.warn('[agent] poll:', e instanceof Error ? e.message : e);
   }
+  await maybeAutoSyncWhileRunning();
 }
 
 function corsHeaders() {
