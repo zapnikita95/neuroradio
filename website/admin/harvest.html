@@ -111,10 +111,16 @@
       <span id="youtubeAgentStatus" class="hint"></span>
     </div>
 
-    <div id="liveBox" class="card live idle" hidden>
+    <div id="liveBox" class="card live idle">
       <h2 id="liveTitle">Прогон</h2>
       <p id="liveBody" class="sub" style="margin:0"></p>
       <div id="liveQueue" class="hint"></div>
+    </div>
+
+    <div id="retryPanel" class="card" hidden>
+      <h2>Retry-очередь (<span id="retryCount">0</span>)</h2>
+      <p class="hint">Видео на повторный прогон (PARTIAL / ошибка LLM). ↻ Retry failed — запустить все.</p>
+      <div id="retryList"></div>
     </div>
 
     <div id="stats" class="grid" hidden></div>
@@ -167,6 +173,8 @@
     let pollTimer = null;
     let discoverVideos = [];
     let manualQueueVideos = [];
+    let retryQueueVideos = [];
+    let lastAgentBridge = null;
     let activeTab = 'youtube';
     let lastBulk = null;
 
@@ -253,7 +261,8 @@
         });
         await queueHarvestCommand('youtube-retry');
         showErr('');
-        document.getElementById('youtubeAgentStatus').textContent = 'Retry в очереди Railway → ПК';
+        document.getElementById('youtubeAgentStatus').textContent = 'Retry отправлен на ПК — смотри жёлтый блок выше';
+        setupPoll(true);
         await load();
       } catch (e) {
         showErr(e.error || e.message || 'retry failed');
@@ -262,7 +271,7 @@
 
     async function toggleExpand(videoId) {
       expandedVideo = expandedVideo === videoId ? null : videoId;
-      if (lastYoutubeDash) renderYoutube(lastYoutubeDash, lastYoutubeDash._sourceLabel);
+      if (lastYoutubeDash) renderYoutube(lastYoutubeDash, lastYoutubeDash._sourceLabel, lastAgentBridge);
       if (expandedVideo && token()) {
         try {
           const data = await apiGet('/v1/admin/youtube-harvest/video/' + encodeURIComponent(expandedVideo) + '/facts');
@@ -306,8 +315,10 @@
       try {
         const r = await queueHarvestCommand('youtube-retry');
         showErr(r.hint || '');
-        document.getElementById('youtubeAgentStatus').textContent = 'Retry в очереди Railway → ПК';
-        setTimeout(load, 3000);
+        document.getElementById('youtubeAgentStatus').textContent =
+          'Retry ALL отправлен на ПК · в очереди ' + (retryQueueVideos.length || '?') + ' видео';
+        setupPoll(true);
+        setTimeout(load, 2000);
       } catch (e) {
         showErr(e.error || e.message || 'retry queue failed');
       } finally {
@@ -382,34 +393,117 @@
       }
     }
 
-    function renderLive(live, d) {
+    function renderRetryQueue(videos) {
+      retryQueueVideos = videos || [];
+      const n = retryQueueVideos.length;
+      document.getElementById('retryCount').textContent = String(n);
+      document.getElementById('retryPanel').hidden = n === 0;
+      document.getElementById('retryList').innerHTML = retryQueueVideos.map(function (v) {
+        return '<div class="queue-row"><label><strong>' + escapeHtml(v.title || v.id) + '</strong>' +
+          '<small>' + escapeHtml(v.channelName || '—') + ' · ' + escapeHtml(v.id) + '</small></label>' +
+          '<button type="button" class="btn-sm secondary retry-del" data-vid="' + escapeHtml(v.id) + '">✕</button></div>';
+      }).join('');
+      document.querySelectorAll('.retry-del').forEach(function (btn) {
+        btn.addEventListener('click', function () { removeRetryItem(btn.dataset.vid); });
+      });
+    }
+
+    async function removeRetryItem(videoId) {
+      if (!videoId || !token()) return;
+      try {
+        const res = await fetch(apiBase() + '/v1/admin/youtube-harvest/retry?videoId=' + encodeURIComponent(videoId) + '&token=' + encodeURIComponent(token()), {
+          method: 'DELETE',
+          headers: hdr(),
+        });
+        const data = await res.json();
+        if (!res.ok) throw data;
+        renderRetryQueue(data.videos || []);
+        if (lastYoutubeDash) {
+          lastYoutubeDash.retryQueue = (data.videos || []).length;
+          renderYoutube(lastYoutubeDash, lastYoutubeDash._sourceLabel, lastAgentBridge);
+        }
+      } catch (e) {
+        showErr(e.error || e.message || 'retry remove failed');
+      }
+    }
+
+    function parseAgentResult(raw) {
+      if (!raw) return {};
+      try { return JSON.parse(raw); } catch (_) { return { message: raw }; }
+    }
+
+    function renderLive(live, d, agent) {
       const box = document.getElementById('liveBox');
       box.hidden = false;
-      box.className = 'card live ' + (live && live.status === 'running' ? 'running' : 'idle');
       const title = document.getElementById('liveTitle');
       const body = document.getElementById('liveBody');
       const qEl = document.getElementById('liveQueue');
-      if (!live || live.status === 'idle' || live.status === 'finished') {
-        title.textContent = live && live.status === 'finished' ? 'Последний прогон завершён' : 'Сейчас прогон не идёт';
-        body.textContent = d
-          ? 'Run ' + (d.runId || '—') + ' · mode ' + (d.mode || '—') +
-            (d.finishedAt ? ' · finished ' + new Date(d.finishedAt).toLocaleString('ru') : '') +
-            ' · в очереди на сервере: ' + fmt(d.manualQueue) + ' · retry: ' + fmt(d.retryQueue)
-          : 'Запусти локально batch — прогресс появится здесь после sync.';
-        qEl.textContent = live && live.status === 'finished' && live.finishedAt
-          ? 'Finished: ' + new Date(live.finishedAt).toLocaleString('ru')
-          : 'Локально: Set-Location "...\\backend"; npm run harvest:youtube-from-queue';
+
+      if (live && live.status === 'running') {
+        box.className = 'card live running';
+        title.textContent = '▶ Сейчас идёт прогон';
+        const stepLabel = stepRu(live.step);
+        body.textContent =
+          (live.current || 0) + ' из ' + (live.total || '?') + ' видео · ' +
+          (live.title || live.videoId || '…') + ' · этап: ' + stepLabel +
+          (live.sttProvider ? ' · STT ' + live.sttProvider : '');
+        const q = live.queue || [];
+        qEl.textContent = q.length
+          ? 'Дальше: ' + q.slice(0, 5).map(function (x) { return escapeHtml(x.title || x.videoId); }).join(' → ')
+          : (live.message || '');
         return;
       }
-      title.textContent = 'Идёт прогон ' + (live.runId || '');
-      const stepLabel = stepRu(live.step);
-      body.textContent = (live.current || '?') + ' / ' + (live.total || '?') + ' — ' + (live.title || live.videoId || '…') +
-        ' · этап: ' + stepLabel + (live.sttProvider ? ' · STT ' + live.sttProvider : '');
-      const q = live.queue || [];
-      qEl.innerHTML = q.length
-        ? '<strong>Очередь:</strong> ' + q.slice(0, 8).map(function (x) { return escapeHtml(x.title || x.videoId); }).join(' → ') +
-          (q.length > 8 ? ' … +' + (q.length - 8) : '')
-        : '';
+
+      if (agent && agent.pending > 0) {
+        box.className = 'card live running';
+        title.textContent = '⏳ Команда ушла на твой ПК';
+        body.textContent = 'Агент подхватит за ~5 сек · pending ' + agent.pending;
+        qEl.textContent = '';
+        return;
+      }
+
+      const lastCmd = agent && agent.recent && agent.recent[0];
+      if (lastCmd && lastCmd.finishedAt) {
+        const ago = Date.now() - new Date(lastCmd.finishedAt).getTime();
+        if (ago < 90_000 && (lastCmd.action === 'youtube-retry' || lastCmd.action === 'youtube-queue')) {
+          const res = parseAgentResult(lastCmd.result);
+          if (lastCmd.status === 'done' && res.started) {
+            box.className = 'card live running';
+            title.textContent = '▶ Прогон запущен на ПК';
+            body.textContent = 'PID ' + (res.pids || []).join(', ') + ' · обновление каждые 3 сек';
+            qEl.textContent = 'Лог: backend/logs/youtube-harvest.log';
+            return;
+          }
+          if (lastCmd.status === 'failed') {
+            box.className = 'card live idle';
+            title.textContent = '✕ Не удалось запустить';
+            body.textContent = res.message || res.error || lastCmd.result || 'ошибка агента';
+            qEl.textContent = '';
+            return;
+          }
+        }
+      }
+
+      if (retryQueueVideos.length > 0) {
+        box.className = 'card live idle';
+        title.textContent = '⏸ Retry ждёт запуска';
+        body.textContent = retryQueueVideos.length + ' видео в retry-очереди · нажми «↻ Retry failed» или ↻ у строки в таблице';
+        qEl.textContent = '';
+        return;
+      }
+
+      box.className = 'card live idle';
+      title.textContent = 'Прогон сейчас не идёт';
+      const fin = live && live.finishedAt
+        ? new Date(live.finishedAt).toLocaleString('ru')
+        : (d && d.finishedAt ? new Date(d.finishedAt).toLocaleString('ru') : '—');
+      body.textContent =
+        'Последний раз: ' + fin +
+        ' · всего разобрано ' + fmt(d && d.processed) +
+        ' · OK ' + fmt(d && d.ok) + ' · PARTIAL ' + fmt(d && d.partial);
+      qEl.textContent = (manualQueueVideos.length
+        ? 'В очереди на прогон: ' + manualQueueVideos.length + ' видео · жми ▶ Запустить'
+        : '');
     }
 
     function renderBulk(b, sourceLabel) {
@@ -505,10 +599,11 @@
         }
       }
     }
-    function renderYoutube(d, sourceLabel) {
+    function renderYoutube(d, sourceLabel, agent) {
       lastYoutubeDash = d;
       lastYoutubeDash._sourceLabel = sourceLabel;
       if (manualQueueVideos.length) d.manualQueue = manualQueueVideos.length;
+      if (retryQueueVideos.length) d.retryQueue = retryQueueVideos.length;
       document.getElementById('stats').hidden = false;
       document.getElementById('meta').hidden = false;
       document.getElementById('tableWrap').hidden = false;
@@ -521,7 +616,7 @@
         [d.catalogSavedTotal ?? d.ingestedRun, 'в банке (каталог)'],
         [d.catalogFacts, 'фактов в каталоге'],
         [d.manualQueue ?? 0, 'в очереди UI'],
-        [d.retryQueue ?? 0, 'retry'],
+        [d.retryQueue ?? retryQueueVideos.length ?? 0, 'retry'],
       ];
       document.getElementById('stats').innerHTML = stats
         .map(function (pair) { return '<div class="stat"><b>' + pair[0] + '</b><span>' + pair[1] + '</span></div>'; })
@@ -533,7 +628,7 @@
         ' · run: ' + (d.runId || '—') + ' · mode: ' + (d.mode || '—') +
         (d.startedAt ? ' · started ' + new Date(d.startedAt).toLocaleString('ru') : '');
 
-      renderLive(d.live, d);
+      renderLive(d.live, d, agent || lastAgentBridge);
 
       const tbody = document.getElementById('rows');
       tbody.innerHTML = (d.videos || []).map(function (v) {
@@ -588,7 +683,13 @@
         if (data.manualQueue && data.manualQueue.videos) {
           renderManualQueue(data.manualQueue.videos);
         }
-        renderYoutube(data.dashboard, 'Railway');
+        if (data.retryQueue && data.retryQueue.videos) {
+          renderRetryQueue(data.retryQueue.videos);
+        }
+        lastAgentBridge = data.agent || null;
+        const dash = data.dashboard;
+        if (data.live) dash.live = data.live;
+        renderYoutube(dash, 'Railway', lastAgentBridge);
         if (data.bulkSeed) renderBulk(data.bulkSeed, 'Railway');
         else await loadBulk('Railway');
       } catch (e) {
@@ -724,12 +825,14 @@
       return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;');
     }
 
-    function setupPoll() {
+    function setupPoll(fast) {
       if (pollTimer) clearInterval(pollTimer);
       if (!document.getElementById('autoRefresh').checked) return;
       const bulkRunning = lastBulk && lastBulk.runStatus === 'running';
-      const ytRunning = lastYoutubeDash && lastYoutubeDash.live && lastYoutubeDash.live.status === 'running';
-      const ms = bulkRunning || ytRunning ? 3000 : 10000;
+      const live = lastYoutubeDash && lastYoutubeDash.live;
+      const ytRunning = live && live.status === 'running';
+      const waiting = (lastAgentBridge && lastAgentBridge.pending > 0) || retryQueueVideos.length > 0;
+      const ms = fast || bulkRunning || ytRunning || waiting ? 3000 : 10000;
       pollTimer = setInterval(load, ms);
     }
 

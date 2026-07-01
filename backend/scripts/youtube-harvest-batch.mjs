@@ -341,6 +341,14 @@ function removeFromRetryQueue(videoId) {
 }
 
 async function runOneVideo(v, ctx) {
+  const workDir = path.join(OUT_DIR, v.id);
+  const factsRawPath = path.join(workDir, 'facts-raw.json');
+  if (v._retryCount || ctx.run.mode === 'retry') {
+    if (fs.existsSync(factsRawPath)) {
+      fs.unlinkSync(factsRawPath);
+      console.log(`[retry] cleared facts-raw.json for ${v.id}`);
+    }
+  }
   const report = await processVideo(v, {
     dryRun: ctx.dryRun,
     maxSeconds: ctx.maxSeconds,
@@ -431,7 +439,7 @@ async function main() {
   const retryOnly = hasFlag('retry-only');
   const fromQueue = hasFlag('from-queue');
   let videos = retryOnly || fromQueue ? [] : collectVideos(cfg, state, mode);
-  const pendingRetry = loadRetryQueue().filter((q) => !(state.processedVideoIds ?? []).includes(q.id));
+  const pendingRetry = loadRetryQueue();
   if (fromQueue) {
     const manual = await pullRemoteManualQueue();
     if (!manual.length) {
@@ -443,6 +451,7 @@ async function main() {
   } else if (retryOnly) {
     if (!pendingRetry.length) {
       console.log('[batch] retry-only: retry queue empty');
+      await syncProgressRemote({ status: 'idle', message: 'Retry-очередь пуста' });
       return;
     }
     videos = pendingRetry.map((q) => ({
@@ -465,20 +474,14 @@ async function main() {
   }
 
   if (!retryOnly && pendingRetry.length) {
-    const byId = new Map(videos.map((v) => [v.id, v]));
-    const retryVideos = pendingRetry
-      .map(
-        (q) =>
-          byId.get(q.id) ?? {
-            id: q.id,
-            title: q.title,
-            url: q.url,
-            channelName: q.channelName,
-            languageCode: q.languageCode ?? 'rus',
-            _retryCount: q.attempts ?? 0,
-          },
-      )
-      .filter((v) => !(state.processedVideoIds ?? []).includes(v.id));
+    const retryVideos = pendingRetry.map((q) => ({
+      id: q.id,
+      title: q.title,
+      url: q.url,
+      channelName: q.channelName,
+      languageCode: q.languageCode ?? 'rus',
+      _retryCount: q.attempts ?? 0,
+    }));
     const retryIds = new Set(retryVideos.map((v) => v.id));
     videos = [...retryVideos, ...videos.filter((v) => !retryIds.has(v.id))];
     console.log(`[batch] priority retry queue (${retryVideos.length}): ${retryVideos.map((v) => v.id).join(', ')}`);
@@ -510,7 +513,7 @@ async function main() {
 
   const run = {
     id: `run-${Date.now()}`,
-    mode: fromQueue ? 'manual-queue' : mode,
+    mode: retryOnly ? 'retry' : fromQueue ? 'manual-queue' : mode,
     startedAt: new Date().toISOString(),
     sttProvider,
     videoIds: videos.map((v) => v.id),
@@ -525,8 +528,8 @@ async function main() {
     current: 0,
     total: videos.length,
     sttProvider,
+    message: retryOnly ? `Retry: ${videos.length} видео` : `Старт: ${videos.length} видео`,
     queue: videos.map((v) => ({ videoId: v.id, title: v.title, channel: v.channelName })),
-    message: `Старт: ${videos.length} видео`,
   });
 
   for (let i = 0; i < videos.length; i += 1) {

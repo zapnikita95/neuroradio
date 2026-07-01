@@ -26,9 +26,11 @@ import {
   loadHarvestChannels,
   loadHarvestLiveProgress,
   loadManualQueue,
+  loadRetryQueue,
   loadCatalogFactsForVideo,
   removeManualQueueItem,
   appendRetryQueue,
+  removeRetryQueueItem,
   saveHarvestLiveProgress,
   type HarvestLiveProgress,
   type HarvestManualQueueVideo,
@@ -160,6 +162,8 @@ router.get('/youtube-harvest/status', (req, res) => {
     dashboard: dash,
     live: dash.live ?? loadHarvestLiveProgress(),
     manualQueue: loadManualQueue(),
+    retryQueue: loadRetryQueue(),
+    agent: getHarvestAgentBridgeStatus(),
     bulkSeed: loadBulkSeedDashboard() ?? buildBulkSeedDashboardFromFiles(),
   });
 });
@@ -294,6 +298,18 @@ router.post('/youtube-harvest/retry', (req, res) => {
   }));
   const videos = appendRetryQueue(items);
   res.json({ ok: true, queued: items.length, total: videos.length, videos });
+});
+
+/** DELETE /v1/admin/youtube-harvest/retry?videoId= — remove one video from retry queue */
+router.delete('/youtube-harvest/retry', (req, res) => {
+  if (!requireHarvestAdmin(req, res)) return;
+  const videoId = String(req.query.videoId ?? '').trim();
+  if (videoId.length < 6) {
+    res.status(400).json({ error: 'videoId query required' });
+    return;
+  }
+  const videos = removeRetryQueueItem(videoId);
+  res.json({ ok: true, removed: videoId, total: videos.length, videos });
 });
 
 /** GET /v1/admin/bulk-seed/status */

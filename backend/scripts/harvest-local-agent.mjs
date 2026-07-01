@@ -170,10 +170,55 @@ async function isYoutubeHarvestRunning() {
   return null;
 }
 
+async function readLocalYtProgress() {
+  const p = join(BACKEND, 'data', 'youtube-harvest-progress.json');
+  if (!existsSync(p)) return null;
+  try {
+    return JSON.parse(readFileSync(p, 'utf8'));
+  } catch {
+    return null;
+  }
+}
+
+async function killYoutubeHarvestProcs(pids) {
+  for (const pid of pids) {
+    try {
+      if (process.platform === 'win32') {
+        await execFileAsync('taskkill', ['/PID', String(pid), '/F'], { timeout: 8000 });
+      } else {
+        process.kill(pid, 'SIGTERM');
+      }
+    } catch {
+      /* ignore */
+    }
+  }
+}
+
 async function startYoutubeHarvestDetached(mode) {
   const running = await isYoutubeHarvestRunning();
-  if (running?.length) return { ok: true, alreadyRunning: true, pids: running, mode };
+  const progress = await readLocalYtProgress();
+  const progressAge = progress?.updatedAt ? Date.now() - new Date(progress.updatedAt).getTime() : Infinity;
+  const activelyRunning = progress?.status === 'running' && progressAge < 120_000;
 
+  if (running?.length && activelyRunning) {
+    return {
+      ok: true,
+      alreadyRunning: true,
+      pids: running,
+      mode,
+      progress: {
+        current: progress.current,
+        total: progress.total,
+        title: progress.title,
+        step: progress.step,
+      },
+    };
+  }
+  if (running?.length) {
+    console.log('[agent] stale youtube-harvest PID(s), restarting:', running.join(', '));
+    await killYoutubeHarvestProcs(running);
+    await new Promise((r) => setTimeout(r, 1500));
+  }
   if (process.platform === 'win32') {
     const ps1 = join(__dir, 'run-youtube-harvest-detached.ps1');
     await execFileAsync(

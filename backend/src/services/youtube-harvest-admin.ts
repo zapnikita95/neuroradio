@@ -179,14 +179,26 @@ export function appendRetryQueue(
   items: Array<Omit<HarvestManualQueueVideo, 'addedAt'>>,
 ): HarvestManualQueueVideo[] {
   const q = loadRetryQueue();
-  const seen = new Set(q.videos.map((v) => v.id));
   for (const item of items) {
-    if (seen.has(item.id)) continue;
-    seen.add(item.id);
-    q.videos.push({ ...item, addedAt: new Date().toISOString(), addedBy: item.addedBy ?? 'dashboard-retry' });
+    const idx = q.videos.findIndex((v) => v.id === item.id);
+    const row = {
+      ...item,
+      addedAt: new Date().toISOString(),
+      addedBy: item.addedBy ?? 'dashboard-retry',
+    };
+    if (idx >= 0) q.videos[idx] = { ...q.videos[idx], ...row };
+    else q.videos.push(row);
   }
   writeJson(RETRY_QUEUE_FILE, { videos: q.videos, updatedAt: new Date().toISOString() });
   return q.videos;
+}
+
+export function removeRetryQueueItem(videoId: string): HarvestManualQueueVideo[] {
+  const id = videoId.trim();
+  const q = loadRetryQueue();
+  const videos = q.videos.filter((v) => v.id !== id);
+  writeJson(RETRY_QUEUE_FILE, { videos, updatedAt: new Date().toISOString() });
+  return videos;
 }
 
 export function loadCatalogFactsForVideo(videoId: string, limit = 80): Array<{
