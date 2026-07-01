@@ -441,7 +441,18 @@ async function main() {
   let videos = retryOnly || fromQueue ? [] : collectVideos(cfg, state, mode);
   const pendingRetry = loadRetryQueue();
   if (fromQueue) {
-    const manual = await pullRemoteManualQueue();
+    let manual = await pullRemoteManualQueue();
+    if (!manual.length) {
+      const localQ = loadJson(path.join(DATA, 'youtube-harvest-manual-queue.json'), { videos: [] });
+      manual = (localQ.videos ?? []).map((v) => ({
+        id: v.id,
+        title: v.title,
+        url: v.url,
+        channelName: v.channelName,
+        languageCode: v.languageCode ?? 'rus',
+      }));
+      if (manual.length) console.log(`[batch] from-queue: ${manual.length} video(s) from local queue file`);
+    }
     if (!manual.length) {
       console.log('[batch] from-queue: remote queue empty');
       return;
