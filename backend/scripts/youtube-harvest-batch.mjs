@@ -633,6 +633,10 @@ async function publishHarvestDashboard() {
     console.warn('[batch] HARVEST_DASHBOARD_TOKEN missing — dashboard not synced to Railway');
     return;
   }
+  const { slimYoutubeHarvestDashboardForSync } = await import(
+    '../dist/services/youtube-harvest-dashboard.js'
+  );
+  const syncBody = slimYoutubeHarvestDashboardForSync(dashboard);
   try {
     const res = await fetch(`${bff.replace(/\/$/, '')}/v1/admin/youtube-harvest/sync`, {
       method: 'POST',
@@ -640,7 +644,7 @@ async function publishHarvestDashboard() {
         'content-type': 'application/json',
         'x-harvest-dashboard-token': token,
       },
-      body: JSON.stringify(dashboard),
+      body: JSON.stringify(syncBody),
       signal: AbortSignal.timeout(60_000),
     });
     const raw = await res.text();

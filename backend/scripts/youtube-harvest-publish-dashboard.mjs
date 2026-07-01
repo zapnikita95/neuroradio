@@ -7,6 +7,7 @@ import { fileURLToPath } from 'node:url';
 import {
   buildYoutubeHarvestDashboardFromFiles,
   saveYoutubeHarvestDashboard,
+  slimYoutubeHarvestDashboardForSync,
 } from '../dist/services/youtube-harvest-dashboard.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -57,10 +58,11 @@ async function main() {
     console.warn('HARVEST_DASHBOARD_TOKEN missing — site snapshot ok, Railway sync skipped');
     return;
   }
+  const syncBody = slimYoutubeHarvestDashboardForSync(dashboard);
   const res = await fetch(`${bff}/v1/admin/youtube-harvest/sync`, {
     method: 'POST',
     headers: { 'content-type': 'application/json', 'x-harvest-dashboard-token': token },
-    body: JSON.stringify(dashboard),
+    body: JSON.stringify(syncBody),
   });
   const body = await res.text();
   console.log('sync', res.status, body.slice(0, 300));

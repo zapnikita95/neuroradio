@@ -150,7 +150,6 @@
     </div>
     </div>
   </div>
-  <script>window.EFIR_API_BASE = 'https://music-story-production.up.railway.app';</script>
   <script>
     const TOKEN_KEY = 'harvest_dashboard_token';
     const tokenEl = document.getElementById('token');
@@ -171,19 +170,26 @@
     }
 
     function apiBase() {
-      return (window.EFIR_API_BASE || window.location.origin || '').replace(/\/$/, '');
+      // efir-ai.ru и BFF — один origin; не ходить на *.railway.app из браузера (CORS).
+      return (window.location.origin || '').replace(/\/$/, '');
     }
     function token() { return tokenEl.value.trim(); }
     function hdr() { return { 'x-harvest-dashboard-token': token() }; }
 
     async function apiGet(path) {
-      const res = await fetch(apiBase() + path + (path.includes('?') ? '&' : '?') + 'token=' + encodeURIComponent(token()));
+      const res = await fetch(apiBase() + path + (path.includes('?') ? '&' : '?') + 'token=' + encodeURIComponent(token()), {
+        headers: hdr(),
+      });
       const data = await res.json();
       if (!res.ok) throw data;
       return data;
     }
     async function apiPost(path, body) {
-      const res = await fetch(apiBase() + path, { method: 'POST', headers: { ...hdr(), 'content-type': 'application/json' }, body: JSON.stringify(body) });
+      const res = await fetch(apiBase() + path + (path.includes('?') ? '' : '?token=' + encodeURIComponent(token())), {
+        method: 'POST',
+        headers: { ...hdr(), 'content-type': 'application/json' },
+        body: JSON.stringify(body),
+      });
       const data = await res.json();
       if (!res.ok) throw data;
       return data;

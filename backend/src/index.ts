@@ -67,7 +67,10 @@ app.set('trust proxy', 1);
 
 app.use(securityHeaders);
 app.use(requestLogger);
-app.use(express.json({ limit: SECURITY.jsonBodyLimit }));
+app.use((req, res, next) => {
+  const limit = req.path.startsWith('/v1/admin') ? '8mb' : SECURITY.jsonBodyLimit;
+  express.json({ limit })(req, res, next);
+});
 
 process.on('unhandledRejection', (reason) => {
   console.error('[process] unhandledRejection:', reason);

@@ -394,6 +394,13 @@ export function loadYoutubeHarvestDashboard(): YoutubeHarvestDashboard | null {
   return null;
 }
 
+export function slimYoutubeHarvestDashboardForSync(payload: YoutubeHarvestDashboard): YoutubeHarvestDashboard {
+  return {
+    ...payload,
+    videos: (payload.videos ?? []).map(({ factsPreview: _fp, ...rest }) => rest),
+  };
+}
+
 export function saveYoutubeHarvestDashboard(payload: YoutubeHarvestDashboard): void {
   fs.mkdirSync(path.dirname(DASHBOARD_FILE), { recursive: true });
   const tmp = `${DASHBOARD_FILE}.${process.pid}.tmp`;

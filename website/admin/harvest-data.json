@@ -1,21 +1,21 @@
 {
-  "updatedAt": "2026-06-30T20:29:19.792Z",
+  "updatedAt": "2026-07-01T13:54:04.076Z",
   "source": "local-batch",
-  "runId": "run-1782753501506",
-  "mode": "initial",
-  "startedAt": "2026-06-29T17:18:21.506Z",
-  "finishedAt": "2026-06-29T17:24:56.162Z",
+  "runId": "run-1782904986505",
+  "mode": "manual-queue",
+  "startedAt": "2026-07-01T11:23:06.505Z",
+  "finishedAt": "2026-07-01T11:25:22.609Z",
   "sttProvider": "railway",
   "queued": 3,
-  "processed": 44,
+  "processed": 46,
   "pending": 0,
   "failed": 0,
-  "ok": 34,
+  "ok": 36,
   "partial": 10,
-  "ingestedRun": 192,
-  "catalogSavedTotal": 904,
-  "catalogFacts": 937,
-  "catalogVideos": 44,
+  "ingestedRun": 218,
+  "catalogSavedTotal": 934,
+  "catalogFacts": 967,
+  "catalogVideos": 46,
   "bankYoutubeFacts": 0,
   "retryQueue": 0,
   "manualQueue": 0,
@@ -1709,7 +1709,6 @@
       "catalogFacts": 42,
       "catalogSaved": 42,
       "factsExtracted": 42,
-      "ingestedLastRun": 19,
       "ingested": 42,
       "error": "Gemini 400: {\n  \"error\": {\n    \"code\": 400,\n    \"message\": \"API key not valid. Please pass a valid API key.\",\n    \"status\": \"INVALID_ARGUMENT\",\n    \"details\": [\n      {\n        \"@type\": \"type.googleapis.com/google.rpc.ErrorInfo\",\n        \"reason\": \"API_KEY_INVALID\",\n        \"domain\": \"googleapis.com\",\n        \"metadata\": {\n          \"service\": \"generativelanguage.googleapis.com\"\n        }\n      },",
       "inRetryQueue": false,
@@ -2080,6 +2079,313 @@
       ]
     },
     {
+      "videoId": "_Rvq1Tpho4o",
+      "title": "Eminem: How a Loser Became the World's Most Powerful Rapper",
+      "channel": "The Fast Flow",
+      "ok": true,
+      "harvestStatus": "ok",
+      "catalogFacts": 32,
+      "catalogSaved": 32,
+      "factsExtracted": 32,
+      "ingested": 32,
+      "error": "Gemini 400: {\n  \"error\": {\n    \"code\": 400,\n    \"message\": \"API key not valid. Please pass a valid API key.\",\n    \"status\": \"INVALID_ARGUMENT\",\n    \"details\": [\n      {\n        \"@type\": \"type.googleapis.com/google.rpc.ErrorInfo\",\n        \"reason\": \"API_KEY_INVALID\",\n        \"domain\": \"googleapis.com\",\n        \"metadata\": {\n          \"service\": \"generativelanguage.googleapis.com\"\n        }\n      },",
+      "retried": true,
+      "inRetryQueue": false,
+      "checkpoint": "done",
+      "checkpointLabel": "готово",
+      "transcriptChars": 8597,
+      "factsPreview": [
+        {
+          "fact": "Альбом Marshall Mathers LP, выпущенный в 2000 году, считается самым успешным и влиятельным альбомом Эминема, который сделал его суперзвездой.",
+          "scope": "album",
+          "artist": "Eminem",
+          "title": "Marshall Mathers LP",
+          "interest": 9,
+          "bankQuality": 9,
+          "saved": true
+        },
+        {
+          "fact": "Мини-альбом Slim Shady LP, выпущенный в 1997 году, стал поворотным моментом в карьере Эминема, представив его альтер-эго Слима Шейди.",
+          "scope": "album",
+          "artist": "Eminem",
+          "title": "Slim Shady LP",
+          "interest": 9,
+          "bankQuality": 9,
+          "saved": true
+        },
+        {
+          "fact": "Демо-кассета Slim Shady LP попала к Доктору Дре через Джимми Айовина, что привело к подписанию контракта с Interscope Records.",
+          "scope": "album",
+          "artist": "Eminem",
+          "title": "Slim Shady LP",
+          "interest": 9,
+          "bankQuality": 9,
+          "saved": true
+        },
+        {
+          "fact": "В треке Bonnie and Clyde 97 Эминем использовал голос своей дочери Хейли без ведома ее матери, что вызвало скандал.",
+          "scope": "track",
+          "artist": "Eminem",
+          "title": "Bonnie and Clyde 97",
+          "interest": 9,
+          "bankQuality": 9,
+          "saved": true
+        },
+        {
+          "fact": "Альбом Marshall Mathers LP, выпущенный в 2000 году, считается самым успешным и влиятельным альбомом Эминема, который сделал его суперзвездой.",
+          "scope": "album",
+          "artist": "Eminem",
+          "title": "Marshall Mathers LP",
+          "interest": 9,
+          "bankQuality": 9,
+          "saved": true
+        },
+        {
+          "fact": "Мини-альбом Slim Shady LP, выпущенный в 1997 году, стал поворотным моментом в карьере Эминема, представив его альтер-эго Слима Шейди.",
+          "scope": "album",
+          "artist": "Eminem",
+          "title": "Slim Shady LP",
+          "interest": 9,
+          "bankQuality": 9,
+          "saved": true
+        },
+        {
+          "fact": "Демо-кассета Slim Shady LP попала к Доктору Дре через Джимми Айовина, что привело к подписанию контракта с Interscope Records.",
+          "scope": "album",
+          "artist": "Eminem",
+          "title": "Slim Shady LP",
+          "interest": 9,
+          "bankQuality": 9,
+          "saved": true
+        },
+        {
+          "fact": "В треке Bonnie and Clyde 97 Эминем использовал голос своей дочери Хейли без ведома ее матери, что вызвало скандал.",
+          "scope": "track",
+          "artist": "Eminem",
+          "title": "Bonnie and Clyde 97",
+          "interest": 9,
+          "bankQuality": 9,
+          "saved": true
+        },
+        {
+          "fact": "Песня The Real Slim Shady была исполнена Эминемом на церемонии награждения MTV в 2000 году, где он критиковал поп-звезд и своих критиков.",
+          "scope": "track",
+          "artist": "Eminem",
+          "title": "The Real Slim Shady",
+          "interest": 8,
+          "bankQuality": 8,
+          "saved": true
+        },
+        {
+          "fact": "В детстве Эминем подвергался издевательствам и однажды был избит настолько сильно, что получил травму мозга и провел несколько дней в больнице.",
+          "scope": "artist",
+          "artist": "Eminem",
+          "title": "",
+          "interest": 8,
+          "bankQuality": 8,
+          "saved": true
+        },
+        {
+          "fact": "Друг Эминема, Дешон Холтон (Пруф), сыграл ключевую роль в его карьере, поддерживая его и веря в его талант.",
+          "scope": "artist",
+          "artist": "Eminem",
+          "title": "",
+          "interest": 8,
+          "bankQuality": 8,
+          "saved": true
+        },
+        {
+          "fact": "Песня My Name Is стала первым большим хитом Эминема, а ее клип, где он выглядел как мультяшный персонаж, усилил его популярность.",
+          "scope": "track",
+          "artist": "Eminem",
+          "title": "My Name Is",
+          "interest": 8,
+          "bankQuality": 8,
+          "saved": true
+        },
+        {
+          "fact": "Обложка альбома Slim Shady LP, изображающая Эминема с дочерью Хейли и телом в багажнике, была вдохновлена песней Bonnie and Clyde 97.",
+          "scope": "album",
+          "artist": "Eminem",
+          "title": "Slim Shady LP",
+          "interest": 8,
+          "bankQuality": 8,
+          "saved": true
+        },
+        {
+          "fact": "Песня The Real Slim Shady была исполнена Эминемом на церемонии награждения MTV в 2000 году, где он критиковал поп-звезд и своих критиков.",
+          "scope": "track",
+          "artist": "Eminem",
+          "title": "The Real Slim Shady",
+          "interest": 8,
+          "bankQuality": 8,
+          "saved": true
+        },
+        {
+          "fact": "В детстве Эминем подвергался издевательствам и однажды был избит настолько сильно, что получил травму мозга и провел несколько дней в больнице.",
+          "scope": "artist",
+          "artist": "Eminem",
+          "title": "",
+          "interest": 8,
+          "bankQuality": 8,
+          "saved": true
+        },
+        {
+          "fact": "Друг Эминема, Дешон Холтон (Пруф), сыграл ключевую роль в его карьере, поддерживая его и веря в его талант.",
+          "scope": "artist",
+          "artist": "Eminem",
+          "title": "",
+          "interest": 8,
+          "bankQuality": 8,
+          "saved": true
+        },
+        {
+          "fact": "Песня My Name Is стала первым большим хитом Эминема, а ее клип, где он выглядел как мультяшный персонаж, усилил его популярность.",
+          "scope": "track",
+          "artist": "Eminem",
+          "title": "My Name Is",
+          "interest": 8,
+          "bankQuality": 8,
+          "saved": true
+        },
+        {
+          "fact": "Обложка альбома Slim Shady LP, изображающая Эминема с дочерью Хейли и телом в багажнике, была вдохновлена песней Bonnie and Clyde 97.",
+          "scope": "album",
+          "artist": "Eminem",
+          "title": "Slim Shady LP",
+          "interest": 8,
+          "bankQuality": 8,
+          "saved": true
+        },
+        {
+          "fact": "Эминем вырос в сложных условиях: без отца, с матерью, страдавшей от зависимости, и частыми переездами.",
+          "scope": "artist",
+          "artist": "Eminem",
+          "title": "",
+          "interest": 7,
+          "bankQuality": 7,
+          "saved": true
+        },
+        {
+          "fact": "Дебютный альбом Infinite, выпущенный в 1995 году, стал коммерческим провалом, что почти заставило Эминема бросить музыку.",
+          "scope": "album",
+          "artist": "Eminem",
+          "title": "Infinite",
+          "interest": 7,
+          "bankQuality": 7,
+          "saved": true
+        },
+        {
+          "fact": "Эминем столкнулся с дискриминацией из-за своего белого цвета кожи в хип-хоп индустрии, но продолжал участвовать в батлах и открытых микрофонах.",
+          "scope": "artist",
+          "artist": "Eminem",
+          "title": "",
+          "interest": 7,
+          "bankQuality": 7,
+          "saved": true
+        },
+        {
+          "fact": "Эминем участвовал в батлах, таких как Scribble Jam и Rap Olympics, где он часто побеждал благодаря своему чувству юмора и импровизации.",
+          "scope": "artist",
+          "artist": "Eminem",
+          "title": "",
+          "interest": 7,
+          "bankQuality": 7,
+          "saved": true
+        },
+        {
+          "fact": "В песне My Name Is Эминем критиковал свою мать, что привело к судебному иску с ее стороны.",
+          "scope": "track",
+          "artist": "Eminem",
+          "title": "My Name Is",
+          "interest": 7,
+          "bankQuality": 7,
+          "saved": true
+        },
+        {
+          "fact": "Эминем вырос в сложных условиях: без отца, с матерью, страдавшей от зависимости, и частыми переездами.",
+          "scope": "artist",
+          "artist": "Eminem",
+          "title": "",
+          "interest": 7,
+          "bankQuality": 7,
+          "saved": true
+        },
+        {
+          "fact": "Дебютный альбом Infinite, выпущенный в 1995 году, стал коммерческим провалом, что почти заставило Эминема бросить музыку.",
+          "scope": "album",
+          "artist": "Eminem",
+          "title": "Infinite",
+          "interest": 7,
+          "bankQuality": 7,
+          "saved": true
+        },
+        {
+          "fact": "Эминем столкнулся с дискриминацией из-за своего белого цвета кожи в хип-хоп индустрии, но продолжал участвовать в батлах и открытых микрофонах.",
+          "scope": "artist",
+          "artist": "Eminem",
+          "title": "",
+          "interest": 7,
+          "bankQuality": 7,
+          "saved": true
+        },
+        {
+          "fact": "Эминем участвовал в батлах, таких как Scribble Jam и Rap Olympics, где он часто побеждал благодаря своему чувству юмора и импровизации.",
+          "scope": "artist",
+          "artist": "Eminem",
+          "title": "",
+          "interest": 7,
+          "bankQuality": 7,
+          "saved": true
+        },
+        {
+          "fact": "В песне My Name Is Эминем критиковал свою мать, что привело к судебному иску с ее стороны.",
+          "scope": "track",
+          "artist": "Eminem",
+          "title": "My Name Is",
+          "interest": 7,
+          "bankQuality": 7,
+          "saved": true
+        },
+        {
+          "fact": "Эминем начал свою музыкальную карьеру в группе Best Man Production, позже переименованной в Soul Intent.",
+          "scope": "artist",
+          "artist": "Eminem",
+          "title": "",
+          "interest": 6,
+          "bankQuality": 6,
+          "saved": true
+        },
+        {
+          "fact": "Эминем познакомился с участниками группы D12, включая Пруфа, в подвале хип-хоп шопа в Детройте.",
+          "scope": "artist",
+          "artist": "Eminem",
+          "title": "",
+          "interest": 6,
+          "bankQuality": 6,
+          "saved": true
+        },
+        {
+          "fact": "Эминем начал свою музыкальную карьеру в группе Best Man Production, позже переименованной в Soul Intent.",
+          "scope": "artist",
+          "artist": "Eminem",
+          "title": "",
+          "interest": 6,
+          "bankQuality": 6,
+          "saved": true
+        },
+        {
+          "fact": "Эминем познакомился с участниками группы D12, включая Пруфа, в подвале хип-хоп шопа в Детройте.",
+          "scope": "artist",
+          "artist": "Eminem",
+          "title": "",
+          "interest": 6,
+          "bankQuality": 6,
+          "saved": true
+        }
+      ]
+    },
+    {
       "videoId": "eZwkQ3Z90Vw",
       "title": "I'm so over brat",
       "channel": "Middle8",
@@ -2088,7 +2394,6 @@
       "catalogFacts": 34,
       "catalogSaved": 32,
       "factsExtracted": 34,
-      "ingestedLastRun": 15,
       "ingested": 32,
       "error": "Gemini 400: {\n  \"error\": {\n    \"code\": 400,\n    \"message\": \"API key not valid. Please pass a valid API key.\",\n    \"status\": \"INVALID_ARGUMENT\",\n    \"details\": [\n      {\n        \"@type\": \"type.googleapis.com/google.rpc.ErrorInfo\",\n        \"reason\": \"API_KEY_INVALID\",\n        \"domain\": \"googleapis.com\",\n        \"metadata\": {\n          \"service\": \"generativelanguage.googleapis.com\"\n        }\n      },",
       "inRetryQueue": false,
@@ -2401,313 +2706,6 @@
           "interest": 4,
           "bankQuality": 4,
           "saved": false
-        }
-      ]
-    },
-    {
-      "videoId": "_Rvq1Tpho4o",
-      "title": "Eminem: How a Loser Became the World's Most Powerful Rapper",
-      "channel": "The Fast Flow",
-      "ok": true,
-      "harvestStatus": "ok",
-      "catalogFacts": 32,
-      "catalogSaved": 32,
-      "factsExtracted": 32,
-      "ingested": 32,
-      "error": "Gemini 400: {\n  \"error\": {\n    \"code\": 400,\n    \"message\": \"API key not valid. Please pass a valid API key.\",\n    \"status\": \"INVALID_ARGUMENT\",\n    \"details\": [\n      {\n        \"@type\": \"type.googleapis.com/google.rpc.ErrorInfo\",\n        \"reason\": \"API_KEY_INVALID\",\n        \"domain\": \"googleapis.com\",\n        \"metadata\": {\n          \"service\": \"generativelanguage.googleapis.com\"\n        }\n      },",
-      "retried": true,
-      "inRetryQueue": false,
-      "checkpoint": "done",
-      "checkpointLabel": "готово",
-      "transcriptChars": 8597,
-      "factsPreview": [
-        {
-          "fact": "Альбом Marshall Mathers LP, выпущенный в 2000 году, считается самым успешным и влиятельным альбомом Эминема, который сделал его суперзвездой.",
-          "scope": "album",
-          "artist": "Eminem",
-          "title": "Marshall Mathers LP",
-          "interest": 9,
-          "bankQuality": 9,
-          "saved": true
-        },
-        {
-          "fact": "Мини-альбом Slim Shady LP, выпущенный в 1997 году, стал поворотным моментом в карьере Эминема, представив его альтер-эго Слима Шейди.",
-          "scope": "album",
-          "artist": "Eminem",
-          "title": "Slim Shady LP",
-          "interest": 9,
-          "bankQuality": 9,
-          "saved": true
-        },
-        {
-          "fact": "Демо-кассета Slim Shady LP попала к Доктору Дре через Джимми Айовина, что привело к подписанию контракта с Interscope Records.",
-          "scope": "album",
-          "artist": "Eminem",
-          "title": "Slim Shady LP",
-          "interest": 9,
-          "bankQuality": 9,
-          "saved": true
-        },
-        {
-          "fact": "В треке Bonnie and Clyde 97 Эминем использовал голос своей дочери Хейли без ведома ее матери, что вызвало скандал.",
-          "scope": "track",
-          "artist": "Eminem",
-          "title": "Bonnie and Clyde 97",
-          "interest": 9,
-          "bankQuality": 9,
-          "saved": true
-        },
-        {
-          "fact": "Альбом Marshall Mathers LP, выпущенный в 2000 году, считается самым успешным и влиятельным альбомом Эминема, который сделал его суперзвездой.",
-          "scope": "album",
-          "artist": "Eminem",
-          "title": "Marshall Mathers LP",
-          "interest": 9,
-          "bankQuality": 9,
-          "saved": true
-        },
-        {
-          "fact": "Мини-альбом Slim Shady LP, выпущенный в 1997 году, стал поворотным моментом в карьере Эминема, представив его альтер-эго Слима Шейди.",
-          "scope": "album",
-          "artist": "Eminem",
-          "title": "Slim Shady LP",
-          "interest": 9,
-          "bankQuality": 9,
-          "saved": true
-        },
-        {
-          "fact": "Демо-кассета Slim Shady LP попала к Доктору Дре через Джимми Айовина, что привело к подписанию контракта с Interscope Records.",
-          "scope": "album",
-          "artist": "Eminem",
-          "title": "Slim Shady LP",
-          "interest": 9,
-          "bankQuality": 9,
-          "saved": true
-        },
-        {
-          "fact": "В треке Bonnie and Clyde 97 Эминем использовал голос своей дочери Хейли без ведома ее матери, что вызвало скандал.",
-          "scope": "track",
-          "artist": "Eminem",
-          "title": "Bonnie and Clyde 97",
-          "interest": 9,
-          "bankQuality": 9,
-          "saved": true
-        },
-        {
-          "fact": "Песня The Real Slim Shady была исполнена Эминемом на церемонии награждения MTV в 2000 году, где он критиковал поп-звезд и своих критиков.",
-          "scope": "track",
-          "artist": "Eminem",
-          "title": "The Real Slim Shady",
-          "interest": 8,
-          "bankQuality": 8,
-          "saved": true
-        },
-        {
-          "fact": "В детстве Эминем подвергался издевательствам и однажды был избит настолько сильно, что получил травму мозга и провел несколько дней в больнице.",
-          "scope": "artist",
-          "artist": "Eminem",
-          "title": "",
-          "interest": 8,
-          "bankQuality": 8,
-          "saved": true
-        },
-        {
-          "fact": "Друг Эминема, Дешон Холтон (Пруф), сыграл ключевую роль в его карьере, поддерживая его и веря в его талант.",
-          "scope": "artist",
-          "artist": "Eminem",
-          "title": "",
-          "interest": 8,
-          "bankQuality": 8,
-          "saved": true
-        },
-        {
-          "fact": "Песня My Name Is стала первым большим хитом Эминема, а ее клип, где он выглядел как мультяшный персонаж, усилил его популярность.",
-          "scope": "track",
-          "artist": "Eminem",
-          "title": "My Name Is",
-          "interest": 8,
-          "bankQuality": 8,
-          "saved": true
-        },
-        {
-          "fact": "Обложка альбома Slim Shady LP, изображающая Эминема с дочерью Хейли и телом в багажнике, была вдохновлена песней Bonnie and Clyde 97.",
-          "scope": "album",
-          "artist": "Eminem",
-          "title": "Slim Shady LP",
-          "interest": 8,
-          "bankQuality": 8,
-          "saved": true
-        },
-        {
-          "fact": "Песня The Real Slim Shady была исполнена Эминемом на церемонии награждения MTV в 2000 году, где он критиковал поп-звезд и своих критиков.",
-          "scope": "track",
-          "artist": "Eminem",
-          "title": "The Real Slim Shady",
-          "interest": 8,
-          "bankQuality": 8,
-          "saved": true
-        },
-        {
-          "fact": "В детстве Эминем подвергался издевательствам и однажды был избит настолько сильно, что получил травму мозга и провел несколько дней в больнице.",
-          "scope": "artist",
-          "artist": "Eminem",
-          "title": "",
-          "interest": 8,
-          "bankQuality": 8,
-          "saved": true
-        },
-        {
-          "fact": "Друг Эминема, Дешон Холтон (Пруф), сыграл ключевую роль в его карьере, поддерживая его и веря в его талант.",
-          "scope": "artist",
-          "artist": "Eminem",
-          "title": "",
-          "interest": 8,
-          "bankQuality": 8,
-          "saved": true
-        },
-        {
-          "fact": "Песня My Name Is стала первым большим хитом Эминема, а ее клип, где он выглядел как мультяшный персонаж, усилил его популярность.",
-          "scope": "track",
-          "artist": "Eminem",
-          "title": "My Name Is",
-          "interest": 8,
-          "bankQuality": 8,
-          "saved": true
-        },
-        {
-          "fact": "Обложка альбома Slim Shady LP, изображающая Эминема с дочерью Хейли и телом в багажнике, была вдохновлена песней Bonnie and Clyde 97.",
-          "scope": "album",
-          "artist": "Eminem",
-          "title": "Slim Shady LP",
-          "interest": 8,
-          "bankQuality": 8,
-          "saved": true
-        },
-        {
-          "fact": "Эминем вырос в сложных условиях: без отца, с матерью, страдавшей от зависимости, и частыми переездами.",
-          "scope": "artist",
-          "artist": "Eminem",
-          "title": "",
-          "interest": 7,
-          "bankQuality": 7,
-          "saved": true
-        },
-        {
-          "fact": "Дебютный альбом Infinite, выпущенный в 1995 году, стал коммерческим провалом, что почти заставило Эминема бросить музыку.",
-          "scope": "album",
-          "artist": "Eminem",
-          "title": "Infinite",
-          "interest": 7,
-          "bankQuality": 7,
-          "saved": true
-        },
-        {
-          "fact": "Эминем столкнулся с дискриминацией из-за своего белого цвета кожи в хип-хоп индустрии, но продолжал участвовать в батлах и открытых микрофонах.",
-          "scope": "artist",
-          "artist": "Eminem",
-          "title": "",
-          "interest": 7,
-          "bankQuality": 7,
-          "saved": true
-        },
-        {
-          "fact": "Эминем участвовал в батлах, таких как Scribble Jam и Rap Olympics, где он часто побеждал благодаря своему чувству юмора и импровизации.",
-          "scope": "artist",
-          "artist": "Eminem",
-          "title": "",
-          "interest": 7,
-          "bankQuality": 7,
-          "saved": true
-        },
-        {
-          "fact": "В песне My Name Is Эминем критиковал свою мать, что привело к судебному иску с ее стороны.",
-          "scope": "track",
-          "artist": "Eminem",
-          "title": "My Name Is",
-          "interest": 7,
-          "bankQuality": 7,
-          "saved": true
-        },
-        {
-          "fact": "Эминем вырос в сложных условиях: без отца, с матерью, страдавшей от зависимости, и частыми переездами.",
-          "scope": "artist",
-          "artist": "Eminem",
-          "title": "",
-          "interest": 7,
-          "bankQuality": 7,
-          "saved": true
-        },
-        {
-          "fact": "Дебютный альбом Infinite, выпущенный в 1995 году, стал коммерческим провалом, что почти заставило Эминема бросить музыку.",
-          "scope": "album",
-          "artist": "Eminem",
-          "title": "Infinite",
-          "interest": 7,
-          "bankQuality": 7,
-          "saved": true
-        },
-        {
-          "fact": "Эминем столкнулся с дискриминацией из-за своего белого цвета кожи в хип-хоп индустрии, но продолжал участвовать в батлах и открытых микрофонах.",
-          "scope": "artist",
-          "artist": "Eminem",
-          "title": "",
-          "interest": 7,
-          "bankQuality": 7,
-          "saved": true
-        },
-        {
-          "fact": "Эминем участвовал в батлах, таких как Scribble Jam и Rap Olympics, где он часто побеждал благодаря своему чувству юмора и импровизации.",
-          "scope": "artist",
-          "artist": "Eminem",
-          "title": "",
-          "interest": 7,
-          "bankQuality": 7,
-          "saved": true
-        },
-        {
-          "fact": "В песне My Name Is Эминем критиковал свою мать, что привело к судебному иску с ее стороны.",
-          "scope": "track",
-          "artist": "Eminem",
-          "title": "My Name Is",
-          "interest": 7,
-          "bankQuality": 7,
-          "saved": true
-        },
-        {
-          "fact": "Эминем начал свою музыкальную карьеру в группе Best Man Production, позже переименованной в Soul Intent.",
-          "scope": "artist",
-          "artist": "Eminem",
-          "title": "",
-          "interest": 6,
-          "bankQuality": 6,
-          "saved": true
-        },
-        {
-          "fact": "Эминем познакомился с участниками группы D12, включая Пруфа, в подвале хип-хоп шопа в Детройте.",
-          "scope": "artist",
-          "artist": "Eminem",
-          "title": "",
-          "interest": 6,
-          "bankQuality": 6,
-          "saved": true
-        },
-        {
-          "fact": "Эминем начал свою музыкальную карьеру в группе Best Man Production, позже переименованной в Soul Intent.",
-          "scope": "artist",
-          "artist": "Eminem",
-          "title": "",
-          "interest": 6,
-          "bankQuality": 6,
-          "saved": true
-        },
-        {
-          "fact": "Эминем познакомился с участниками группы D12, включая Пруфа, в подвале хип-хоп шопа в Детройте.",
-          "scope": "artist",
-          "artist": "Eminem",
-          "title": "",
-          "interest": 6,
-          "bankQuality": 6,
-          "saved": true
         }
       ]
     },
@@ -4436,223 +4434,6 @@
       ]
     },
     {
-      "videoId": "GlUPGI7pElA",
-      "title": "Something weird is happening in hip-hop",
-      "channel": "Middle8",
-      "ok": true,
-      "harvestStatus": "ok",
-      "catalogFacts": 22,
-      "catalogSaved": 22,
-      "factsExtracted": 22,
-      "ingestedLastRun": 9,
-      "ingested": 22,
-      "error": "Gemini 400: {\n  \"error\": {\n    \"code\": 400,\n    \"message\": \"API key not valid. Please pass a valid API key.\",\n    \"status\": \"INVALID_ARGUMENT\",\n    \"details\": [\n      {\n        \"@type\": \"type.googleapis.com/google.rpc.ErrorInfo\",\n        \"reason\": \"API_KEY_INVALID\",\n        \"domain\": \"googleapis.com\",\n        \"metadata\": {\n          \"service\": \"generativelanguage.googleapis.com\"\n        }\n      },",
-      "inRetryQueue": false,
-      "checkpoint": "done",
-      "checkpointLabel": "готово",
-      "transcriptChars": 11016,
-      "factsPreview": [
-        {
-          "fact": "Альбом M.I.A. «Maya» записывался в домашней студии в Лос-Анджелесе, на вершинах майяских пирамид в Мексике и во время отпуска на Гавайях.",
-          "scope": "album",
-          "artist": "M.I.A.",
-          "title": "Maya",
-          "interest": 10,
-          "bankQuality": 9,
-          "saved": true
-        },
-        {
-          "fact": "Альбом M.I.A. «Maya» записывался в домашней студии в Лос-Анджелесе, на вершинах майяских пирамид в Мексике и во время отпуска на Гавайях.",
-          "scope": "album",
-          "artist": "M.I.A.",
-          "title": "Maya",
-          "interest": 10,
-          "bankQuality": 9,
-          "saved": true
-        },
-        {
-          "fact": "Группа Death Grips самостоятельно выпустила альбом «No Love Deep Web» в интернет бесплатно, не получив одобрения своего лейбла.",
-          "scope": "album",
-          "artist": "Death Grips",
-          "title": "No Love Deep Web",
-          "interest": 9,
-          "bankQuality": 9,
-          "saved": true
-        },
-        {
-          "fact": "Группа Death Grips самостоятельно выпустила альбом «No Love Deep Web» в интернет бесплатно, не получив одобрения своего лейбла.",
-          "scope": "album",
-          "artist": "Death Grips",
-          "title": "No Love Deep Web",
-          "interest": 9,
-          "bankQuality": 9,
-          "saved": true
-        },
-        {
-          "fact": "Участники группы Clipping создавали треки, используя в качестве звуковых элементов звук своего будильника.",
-          "scope": "artist",
-          "artist": "Clipping",
-          "title": "",
-          "interest": 9,
-          "bankQuality": 8,
-          "saved": true
-        },
-        {
-          "fact": "Участники группы Clipping создавали треки, используя в качестве звуковых элементов звук своего будильника.",
-          "scope": "artist",
-          "artist": "Clipping",
-          "title": "",
-          "interest": 9,
-          "bankQuality": 8,
-          "saved": true
-        },
-        {
-          "fact": "Название альбома «Maya» было стилизовано под leet-speak (интернет-алфавит), чтобы избежать обнаружения поисковыми системами.",
-          "scope": "album",
-          "artist": "M.I.A.",
-          "title": "Maya",
-          "interest": 8,
-          "bankQuality": 9,
-          "saved": true
-        },
-        {
-          "fact": "Название альбома «Maya» было стилизовано под leet-speak (интернет-алфавит), чтобы избежать обнаружения поисковыми системами.",
-          "scope": "album",
-          "artist": "M.I.A.",
-          "title": "Maya",
-          "interest": 8,
-          "bankQuality": 9,
-          "saved": true
-        },
-        {
-          "fact": "Балтиморский рэпер JPEGMAFIA использует в своем творчестве манипуляции со звуком щелчков ручки.",
-          "scope": "artist",
-          "artist": "JPEGMAFIA",
-          "title": "",
-          "interest": 8,
-          "bankQuality": 8,
-          "saved": true
-        },
-        {
-          "fact": "Коллектив Brockhampton сформировался на базе онлайн-форума, используя интернет и стриминг для привлечения аудитории до дебюта на крупном лейбле.",
-          "scope": "artist",
-          "artist": "Brockhampton",
-          "title": "",
-          "interest": 8,
-          "bankQuality": 8,
-          "saved": true
-        },
-        {
-          "fact": "Балтиморский рэпер JPEGMAFIA использует в своем творчестве манипуляции со звуком щелчков ручки.",
-          "scope": "artist",
-          "artist": "JPEGMAFIA",
-          "title": "",
-          "interest": 8,
-          "bankQuality": 8,
-          "saved": true
-        },
-        {
-          "fact": "Коллектив Brockhampton сформировался на базе онлайн-форума, используя интернет и стриминг для привлечения аудитории до дебюта на крупном лейбле.",
-          "scope": "artist",
-          "artist": "Brockhampton",
-          "title": "",
-          "interest": 8,
-          "bankQuality": 8,
-          "saved": true
-        },
-        {
-          "fact": "В своем четвертом альбоме Run the Jewels сфокусировались на темах полицейского насилия, корпоративных СМИ и американской политики в период зарождения движения BLM.",
-          "scope": "artist",
-          "artist": "Run the Jewels",
-          "title": "",
-          "interest": 7,
-          "bankQuality": 8,
-          "saved": true
-        },
-        {
-          "fact": "В своем четвертом альбоме Run the Jewels сфокусировались на темах полицейского насилия, корпоративных СМИ и американской политики в период зарождения движения BLM.",
-          "scope": "artist",
-          "artist": "Run the Jewels",
-          "title": "",
-          "interest": 7,
-          "bankQuality": 8,
-          "saved": true
-        },
-        {
-          "fact": "Обложка альбома «Maya» представляет собой коллаж из цифровых музыкальных плееров.",
-          "scope": "album",
-          "artist": "M.I.A.",
-          "title": "Maya",
-          "interest": 7,
-          "bankQuality": 7,
-          "saved": true
-        },
-        {
-          "fact": "Обложка альбома «Maya» представляет собой коллаж из цифровых музыкальных плееров.",
-          "scope": "album",
-          "artist": "M.I.A.",
-          "title": "Maya",
-          "interest": 7,
-          "bankQuality": 7,
-          "saved": true
-        },
-        {
-          "fact": "Совместная работа Kid Cudi и Kanye West была посвящена размышлениям о ментальном здоровье и искуплении.",
-          "scope": "artist",
-          "artist": "Kid Cudi & Kanye West",
-          "title": "",
-          "interest": 6,
-          "bankQuality": 6,
-          "saved": true
-        },
-        {
-          "fact": "Совместная работа Kid Cudi и Kanye West была посвящена размышлениям о ментальном здоровье и искуплении.",
-          "scope": "artist",
-          "artist": "Kid Cudi & Kanye West",
-          "title": "",
-          "interest": 6,
-          "bankQuality": 6,
-          "saved": true
-        },
-        {
-          "fact": "В конце 90-х и 2000-х Puff Daddy и Jay-Z стали не только рэперами, но и бизнесменами, монетизировавшими коммерческий хип-хоп.",
-          "scope": "artist",
-          "artist": "Puff Daddy & Jay-Z",
-          "title": "",
-          "interest": 5,
-          "bankQuality": 6,
-          "saved": true
-        },
-        {
-          "fact": "В конце 90-х и 2000-х Puff Daddy и Jay-Z стали не только рэперами, но и бизнесменами, монетизировавшими коммерческий хип-хоп.",
-          "scope": "artist",
-          "artist": "Puff Daddy & Jay-Z",
-          "title": "",
-          "interest": 5,
-          "bankQuality": 6,
-          "saved": true
-        },
-        {
-          "fact": "Kanye West бросил вызов доминирующему в свое время гангстер-рэпу, предложив более интроспективные тексты.",
-          "scope": "artist",
-          "artist": "Kanye West",
-          "title": "",
-          "interest": 5,
-          "bankQuality": 5,
-          "saved": true
-        },
-        {
-          "fact": "Kanye West бросил вызов доминирующему в свое время гангстер-рэпу, предложив более интроспективные тексты.",
-          "scope": "artist",
-          "artist": "Kanye West",
-          "title": "",
-          "interest": 5,
-          "bankQuality": 5,
-          "saved": true
-        }
-      ]
-    },
-    {
       "videoId": "FW9mIhLDo9M",
       "title": "2013: Max Korzh, VERSUS, Pasha Technic, ENJOYKIN, trap, GORSHOK (rip)",
       "channel": "NA",
@@ -4661,6 +4442,7 @@
       "catalogFacts": 22,
       "catalogSaved": 22,
       "factsExtracted": 22,
+      "ingestedLastRun": 11,
       "ingested": 22,
       "inRetryQueue": false,
       "checkpoint": "done",
@@ -5079,6 +4861,222 @@
           "title": "",
           "interest": 7,
           "bankQuality": 7,
+          "saved": true
+        }
+      ]
+    },
+    {
+      "videoId": "GlUPGI7pElA",
+      "title": "Something weird is happening in hip-hop",
+      "channel": "Middle8",
+      "ok": true,
+      "harvestStatus": "ok",
+      "catalogFacts": 22,
+      "catalogSaved": 22,
+      "factsExtracted": 22,
+      "ingested": 22,
+      "error": "Gemini 400: {\n  \"error\": {\n    \"code\": 400,\n    \"message\": \"API key not valid. Please pass a valid API key.\",\n    \"status\": \"INVALID_ARGUMENT\",\n    \"details\": [\n      {\n        \"@type\": \"type.googleapis.com/google.rpc.ErrorInfo\",\n        \"reason\": \"API_KEY_INVALID\",\n        \"domain\": \"googleapis.com\",\n        \"metadata\": {\n          \"service\": \"generativelanguage.googleapis.com\"\n        }\n      },",
+      "inRetryQueue": false,
+      "checkpoint": "done",
+      "checkpointLabel": "готово",
+      "transcriptChars": 11016,
+      "factsPreview": [
+        {
+          "fact": "Альбом M.I.A. «Maya» записывался в домашней студии в Лос-Анджелесе, на вершинах майяских пирамид в Мексике и во время отпуска на Гавайях.",
+          "scope": "album",
+          "artist": "M.I.A.",
+          "title": "Maya",
+          "interest": 10,
+          "bankQuality": 9,
+          "saved": true
+        },
+        {
+          "fact": "Альбом M.I.A. «Maya» записывался в домашней студии в Лос-Анджелесе, на вершинах майяских пирамид в Мексике и во время отпуска на Гавайях.",
+          "scope": "album",
+          "artist": "M.I.A.",
+          "title": "Maya",
+          "interest": 10,
+          "bankQuality": 9,
+          "saved": true
+        },
+        {
+          "fact": "Группа Death Grips самостоятельно выпустила альбом «No Love Deep Web» в интернет бесплатно, не получив одобрения своего лейбла.",
+          "scope": "album",
+          "artist": "Death Grips",
+          "title": "No Love Deep Web",
+          "interest": 9,
+          "bankQuality": 9,
+          "saved": true
+        },
+        {
+          "fact": "Группа Death Grips самостоятельно выпустила альбом «No Love Deep Web» в интернет бесплатно, не получив одобрения своего лейбла.",
+          "scope": "album",
+          "artist": "Death Grips",
+          "title": "No Love Deep Web",
+          "interest": 9,
+          "bankQuality": 9,
+          "saved": true
+        },
+        {
+          "fact": "Участники группы Clipping создавали треки, используя в качестве звуковых элементов звук своего будильника.",
+          "scope": "artist",
+          "artist": "Clipping",
+          "title": "",
+          "interest": 9,
+          "bankQuality": 8,
+          "saved": true
+        },
+        {
+          "fact": "Участники группы Clipping создавали треки, используя в качестве звуковых элементов звук своего будильника.",
+          "scope": "artist",
+          "artist": "Clipping",
+          "title": "",
+          "interest": 9,
+          "bankQuality": 8,
+          "saved": true
+        },
+        {
+          "fact": "Название альбома «Maya» было стилизовано под leet-speak (интернет-алфавит), чтобы избежать обнаружения поисковыми системами.",
+          "scope": "album",
+          "artist": "M.I.A.",
+          "title": "Maya",
+          "interest": 8,
+          "bankQuality": 9,
+          "saved": true
+        },
+        {
+          "fact": "Название альбома «Maya» было стилизовано под leet-speak (интернет-алфавит), чтобы избежать обнаружения поисковыми системами.",
+          "scope": "album",
+          "artist": "M.I.A.",
+          "title": "Maya",
+          "interest": 8,
+          "bankQuality": 9,
+          "saved": true
+        },
+        {
+          "fact": "Балтиморский рэпер JPEGMAFIA использует в своем творчестве манипуляции со звуком щелчков ручки.",
+          "scope": "artist",
+          "artist": "JPEGMAFIA",
+          "title": "",
+          "interest": 8,
+          "bankQuality": 8,
+          "saved": true
+        },
+        {
+          "fact": "Коллектив Brockhampton сформировался на базе онлайн-форума, используя интернет и стриминг для привлечения аудитории до дебюта на крупном лейбле.",
+          "scope": "artist",
+          "artist": "Brockhampton",
+          "title": "",
+          "interest": 8,
+          "bankQuality": 8,
+          "saved": true
+        },
+        {
+          "fact": "Балтиморский рэпер JPEGMAFIA использует в своем творчестве манипуляции со звуком щелчков ручки.",
+          "scope": "artist",
+          "artist": "JPEGMAFIA",
+          "title": "",
+          "interest": 8,
+          "bankQuality": 8,
+          "saved": true
+        },
+        {
+          "fact": "Коллектив Brockhampton сформировался на базе онлайн-форума, используя интернет и стриминг для привлечения аудитории до дебюта на крупном лейбле.",
+          "scope": "artist",
+          "artist": "Brockhampton",
+          "title": "",
+          "interest": 8,
+          "bankQuality": 8,
+          "saved": true
+        },
+        {
+          "fact": "В своем четвертом альбоме Run the Jewels сфокусировались на темах полицейского насилия, корпоративных СМИ и американской политики в период зарождения движения BLM.",
+          "scope": "artist",
+          "artist": "Run the Jewels",
+          "title": "",
+          "interest": 7,
+          "bankQuality": 8,
+          "saved": true
+        },
+        {
+          "fact": "В своем четвертом альбоме Run the Jewels сфокусировались на темах полицейского насилия, корпоративных СМИ и американской политики в период зарождения движения BLM.",
+          "scope": "artist",
+          "artist": "Run the Jewels",
+          "title": "",
+          "interest": 7,
+          "bankQuality": 8,
+          "saved": true
+        },
+        {
+          "fact": "Обложка альбома «Maya» представляет собой коллаж из цифровых музыкальных плееров.",
+          "scope": "album",
+          "artist": "M.I.A.",
+          "title": "Maya",
+          "interest": 7,
+          "bankQuality": 7,
+          "saved": true
+        },
+        {
+          "fact": "Обложка альбома «Maya» представляет собой коллаж из цифровых музыкальных плееров.",
+          "scope": "album",
+          "artist": "M.I.A.",
+          "title": "Maya",
+          "interest": 7,
+          "bankQuality": 7,
+          "saved": true
+        },
+        {
+          "fact": "Совместная работа Kid Cudi и Kanye West была посвящена размышлениям о ментальном здоровье и искуплении.",
+          "scope": "artist",
+          "artist": "Kid Cudi & Kanye West",
+          "title": "",
+          "interest": 6,
+          "bankQuality": 6,
+          "saved": true
+        },
+        {
+          "fact": "Совместная работа Kid Cudi и Kanye West была посвящена размышлениям о ментальном здоровье и искуплении.",
+          "scope": "artist",
+          "artist": "Kid Cudi & Kanye West",
+          "title": "",
+          "interest": 6,
+          "bankQuality": 6,
+          "saved": true
+        },
+        {
+          "fact": "В конце 90-х и 2000-х Puff Daddy и Jay-Z стали не только рэперами, но и бизнесменами, монетизировавшими коммерческий хип-хоп.",
+          "scope": "artist",
+          "artist": "Puff Daddy & Jay-Z",
+          "title": "",
+          "interest": 5,
+          "bankQuality": 6,
+          "saved": true
+        },
+        {
+          "fact": "В конце 90-х и 2000-х Puff Daddy и Jay-Z стали не только рэперами, но и бизнесменами, монетизировавшими коммерческий хип-хоп.",
+          "scope": "artist",
+          "artist": "Puff Daddy & Jay-Z",
+          "title": "",
+          "interest": 5,
+          "bankQuality": 6,
+          "saved": true
+        },
+        {
+          "fact": "Kanye West бросил вызов доминирующему в свое время гангстер-рэпу, предложив более интроспективные тексты.",
+          "scope": "artist",
+          "artist": "Kanye West",
+          "title": "",
+          "interest": 5,
+          "bankQuality": 5,
+          "saved": true
+        },
+        {
+          "fact": "Kanye West бросил вызов доминирующему в свое время гангстер-рэпу, предложив более интроспективные тексты.",
+          "scope": "artist",
+          "artist": "Kanye West",
+          "title": "",
+          "interest": 5,
+          "bankQuality": 5,
           "saved": true
         }
       ]
@@ -6772,6 +6770,168 @@
       ]
     },
     {
+      "videoId": "vu0FjcyNHRk",
+      "title": "Как Майкл Джексон приезжал в Москву #музыка",
+      "channel": "БРОКЕН ДЭНС",
+      "ok": true,
+      "harvestStatus": "ok",
+      "catalogFacts": 16,
+      "catalogSaved": 16,
+      "factsExtracted": 16,
+      "ingestedLastRun": 8,
+      "ingested": 16,
+      "inRetryQueue": false,
+      "checkpoint": "done",
+      "checkpointLabel": "готово",
+      "transcriptChars": 1368,
+      "factsPreview": [
+        {
+          "fact": "Первый концерт Майкла Джексона в Москве состоялся в сентябре 1993 года на стадионе Лужники.",
+          "scope": "track",
+          "artist": "Майкл Джексон",
+          "title": "Первый концерт в Москве",
+          "interest": 8,
+          "bankQuality": 9,
+          "saved": true
+        },
+        {
+          "fact": "Первый концерт Майкла Джексона в Москве состоялся в сентябре 1993 года на стадионе Лужники.",
+          "scope": "track",
+          "artist": "Майкл Джексон",
+          "title": "Первый концерт в Москве",
+          "interest": 8,
+          "bankQuality": 9,
+          "saved": true
+        },
+        {
+          "fact": "Второй концерт Майкла Джексона в Москве состоялся в 1996 году.",
+          "scope": "track",
+          "artist": "Майкл Джексон",
+          "title": "Второй концерт в Москве",
+          "interest": 7,
+          "bankQuality": 8,
+          "saved": true
+        },
+        {
+          "fact": "Песня Stranger in Moscow была написана после первого концерта в Москве.",
+          "scope": "track",
+          "artist": "Майкл Джексон",
+          "title": "Песня Stranger in Moscow",
+          "interest": 7,
+          "bankQuality": 8,
+          "saved": true
+        },
+        {
+          "fact": "Второй концерт Майкла Джексона в Москве состоялся в 1996 году.",
+          "scope": "track",
+          "artist": "Майкл Джексон",
+          "title": "Второй концерт в Москве",
+          "interest": 7,
+          "bankQuality": 8,
+          "saved": true
+        },
+        {
+          "fact": "Песня Stranger in Moscow была написана после первого концерта в Москве.",
+          "scope": "track",
+          "artist": "Майкл Джексон",
+          "title": "Песня Stranger in Moscow",
+          "interest": 7,
+          "bankQuality": 8,
+          "saved": true
+        },
+        {
+          "fact": "У Майкла Джексона была насыщенная культурная программа во время его визита в Москву.",
+          "scope": "track",
+          "artist": "Майкл Джексон",
+          "title": "Культурная программа",
+          "interest": 6,
+          "bankQuality": 7,
+          "saved": true
+        },
+        {
+          "fact": "Майкл Джексон посетил детский дом во время своего визита в Москву.",
+          "scope": "track",
+          "artist": "Майкл Джексон",
+          "title": "Встреча с детьми",
+          "interest": 6,
+          "bankQuality": 7,
+          "saved": true
+        },
+        {
+          "fact": "У Майкла Джексона была насыщенная культурная программа во время его визита в Москву.",
+          "scope": "track",
+          "artist": "Майкл Джексон",
+          "title": "Культурная программа",
+          "interest": 6,
+          "bankQuality": 7,
+          "saved": true
+        },
+        {
+          "fact": "Майкл Джексон посетил детский дом во время своего визита в Москву.",
+          "scope": "track",
+          "artist": "Майкл Джексон",
+          "title": "Встреча с детьми",
+          "interest": 6,
+          "bankQuality": 7,
+          "saved": true
+        },
+        {
+          "fact": "В 2023 году вышел байопик Майкла Джексона под названием \"Майкл\".",
+          "scope": "track",
+          "artist": "Майкл Джексон",
+          "title": "Байопик",
+          "interest": 5,
+          "bankQuality": 6,
+          "saved": true
+        },
+        {
+          "fact": "Главную роль в байопике Майкла Джексона играет его племянник Джафар Джексон.",
+          "scope": "track",
+          "artist": "Майкл Джексон",
+          "title": "Роль в байопике",
+          "interest": 5,
+          "bankQuality": 6,
+          "saved": true
+        },
+        {
+          "fact": "В 2023 году вышел байопик Майкла Джексона под названием \"Майкл\".",
+          "scope": "track",
+          "artist": "Майкл Джексон",
+          "title": "Байопик",
+          "interest": 5,
+          "bankQuality": 6,
+          "saved": true
+        },
+        {
+          "fact": "Главную роль в байопике Майкла Джексона играет его племянник Джафар Джексон.",
+          "scope": "track",
+          "artist": "Майкл Джексон",
+          "title": "Роль в байопике",
+          "interest": 5,
+          "bankQuality": 6,
+          "saved": true
+        },
+        {
+          "fact": "Байопик Майкла Джексона уже обогнал все байопики по сборам, включая \"Богемскую рапсодию\".",
+          "scope": "track",
+          "artist": "Майкл Джексон",
+          "title": "Сборы байопика",
+          "interest": 4,
+          "bankQuality": 5,
+          "saved": true
+        },
+        {
+          "fact": "Байопик Майкла Джексона уже обогнал все байопики по сборам, включая \"Богемскую рапсодию\".",
+          "scope": "track",
+          "artist": "Майкл Джексон",
+          "title": "Сборы байопика",
+          "interest": 4,
+          "bankQuality": 5,
+          "saved": true
+        }
+      ]
+    },
+    {
       "videoId": "ZXLZidIIYEg",
       "title": "Forgotten Treasures of Soviet Post-Punk",
       "channel": "NA",
@@ -7454,6 +7614,150 @@
       ]
     },
     {
+      "videoId": "T02yvupD5AI",
+      "title": "Гениальность команды \"Федор Двинятин\"",
+      "channel": "БРОКЕН ДЭНС",
+      "ok": true,
+      "harvestStatus": "ok",
+      "catalogFacts": 14,
+      "catalogSaved": 14,
+      "factsExtracted": 14,
+      "ingestedLastRun": 7,
+      "ingested": 14,
+      "inRetryQueue": false,
+      "checkpoint": "done",
+      "checkpointLabel": "готово",
+      "transcriptChars": 1929,
+      "factsPreview": [
+        {
+          "fact": "Бит для песни «Бип, бип, бип, твой сигналит джип» Джулии Ковы написал Скотт Сторч, известный по работе над треком Candy Shop.",
+          "scope": "track",
+          "artist": "Джулия Кова (Юлия Ахонькова)",
+          "title": "Бип, бип, бип, твой сигналит джип",
+          "interest": 8,
+          "bankQuality": 8,
+          "saved": true
+        },
+        {
+          "fact": "Бит для песни «Бип, бип, бип, твой сигналит джип» Джулии Ковы написал Скотт Сторч, известный по работе над треком Candy Shop.",
+          "scope": "track",
+          "artist": "Джулия Кова (Юлия Ахонькова)",
+          "title": "Бип, бип, бип, твой сигналит джип",
+          "interest": 8,
+          "bankQuality": 8,
+          "saved": true
+        },
+        {
+          "fact": "Молдавская группа WK, чей фронтмен по имени Шум позже стал первым продюсером группы «Пятница» и основал лейбл «Вдох».",
+          "scope": "artist",
+          "artist": "WK",
+          "title": "",
+          "interest": 7,
+          "bankQuality": 7,
+          "saved": true
+        },
+        {
+          "fact": "Скотт Сторч снялся в клипе Джулии Ковы на песню «Бип, бип, бип, твой сигналит джип».",
+          "scope": "track",
+          "artist": "Джулия Кова (Юлия Ахонькова)",
+          "title": "Бип, бип, бип, твой сигналит джип",
+          "interest": 7,
+          "bankQuality": 7,
+          "saved": true
+        },
+        {
+          "fact": "Молдавская группа WK, чей фронтмен по имени Шум позже стал первым продюсером группы «Пятница» и основал лейбл «Вдох».",
+          "scope": "artist",
+          "artist": "WK",
+          "title": "",
+          "interest": 7,
+          "bankQuality": 7,
+          "saved": true
+        },
+        {
+          "fact": "Скотт Сторч снялся в клипе Джулии Ковы на песню «Бип, бип, бип, твой сигналит джип».",
+          "scope": "track",
+          "artist": "Джулия Кова (Юлия Ахонькова)",
+          "title": "Бип, бип, бип, твой сигналит джип",
+          "interest": 7,
+          "bankQuality": 7,
+          "saved": true
+        },
+        {
+          "fact": "Фронтмен группы WK Шум помог продвинуться Антохе MC, хотя их сотрудничество закончилось судебным разбирательством.",
+          "scope": "artist",
+          "artist": "WK",
+          "title": "",
+          "interest": 6,
+          "bankQuality": 6,
+          "saved": true
+        },
+        {
+          "fact": "Песня «Клубничка» группы «Президент и Амазонка» сопровождается клипом с ранней компьютерной графикой, привлекающим внимание иностранных зрителей.",
+          "scope": "track",
+          "artist": "Президент и Амазонка",
+          "title": "Клубничка",
+          "interest": 6,
+          "bankQuality": 6,
+          "saved": true
+        },
+        {
+          "fact": "Фронтмен группы WK Шум помог продвинуться Антохе MC, хотя их сотрудничество закончилось судебным разбирательством.",
+          "scope": "artist",
+          "artist": "WK",
+          "title": "",
+          "interest": 6,
+          "bankQuality": 6,
+          "saved": true
+        },
+        {
+          "fact": "Песня «Клубничка» группы «Президент и Амазонка» сопровождается клипом с ранней компьютерной графикой, привлекающим внимание иностранных зрителей.",
+          "scope": "track",
+          "artist": "Президент и Амазонка",
+          "title": "Клубничка",
+          "interest": 6,
+          "bankQuality": 6,
+          "saved": true
+        },
+        {
+          "fact": "Группа «Шпильки» известна такими песнями, как «Сам ты Наташа», «Мяу-мяу» и «Чмоки-чмоки», которые вышли на одном альбоме.",
+          "scope": "artist",
+          "artist": "Шпильки",
+          "title": "",
+          "interest": 5,
+          "bankQuality": 5,
+          "saved": true
+        },
+        {
+          "fact": "Группа «Шпильки» известна такими песнями, как «Сам ты Наташа», «Мяу-мяу» и «Чмоки-чмоки», которые вышли на одном альбоме.",
+          "scope": "artist",
+          "artist": "Шпильки",
+          "title": "",
+          "interest": 5,
+          "bankQuality": 5,
+          "saved": true
+        },
+        {
+          "fact": "Песня «Дуня Кулакова» группы «Шпильки» рассказывает о девушке-легенде, которая увела бойфренда.",
+          "scope": "track",
+          "artist": "Шпильки",
+          "title": "Дуня Кулакова",
+          "interest": 4,
+          "bankQuality": 4,
+          "saved": true
+        },
+        {
+          "fact": "Песня «Дуня Кулакова» группы «Шпильки» рассказывает о девушке-легенде, которая увела бойфренда.",
+          "scope": "track",
+          "artist": "Шпильки",
+          "title": "Дуня Кулакова",
+          "interest": 4,
+          "bankQuality": 4,
+          "saved": true
+        }
+      ]
+    },
+    {
       "videoId": "U3VMv4Kd8b8",
       "title": "How Justice turned rock fans into rave kids",
       "channel": "Middle 8",
@@ -8000,8 +8304,8 @@
     },
     {
       "name": "БРОКЕН ДЭНС",
-      "processed": 2,
-      "total": 3
+      "processed": 4,
+      "total": 5
     },
     {
       "name": "Middle8",
@@ -8021,8 +8325,9 @@
   ],
   "live": {
     "status": "finished",
-    "runId": "run-1782753501506",
-    "finishedAt": "2026-06-29T17:24:56.161Z",
-    "updatedAt": "2026-06-29T17:24:56.161Z"
+    "runId": "run-1782904986505",
+    "finishedAt": "2026-07-01T11:25:22.225Z",
+    "mode": "manual-queue",
+    "updatedAt": "2026-07-01T11:25:22.225Z"
   }
 }
