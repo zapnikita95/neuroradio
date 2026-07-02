@@ -86,6 +86,7 @@ data class StoryFeedbackRequest(
     val historyId: String? = null,
     val story_narrator: String? = null,
     val seed_fact: String? = null,
+    val voiced_text: String? = null,
     val genre: String? = null,
     val year: Int? = null,
     val lang: String? = null,

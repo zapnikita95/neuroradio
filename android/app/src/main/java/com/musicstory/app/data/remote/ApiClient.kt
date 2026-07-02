@@ -390,6 +390,7 @@ class ApiClient(
         genre: String? = null,
         year: Int? = null,
         lang: String? = null,
+        voicedText: String? = null,
     ): Boolean {
         if (reasons.isEmpty()) return false
         val body = StoryFeedbackRequest(
@@ -405,6 +406,7 @@ class ApiClient(
             genre = genre,
             year = year,
             lang = lang,
+            voiced_text = voicedText?.takeIf { it.isNotBlank() },
         )
         return try {
             getApi(baseUrl).submitStoryFeedback(body)

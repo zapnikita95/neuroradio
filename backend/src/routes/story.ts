@@ -133,6 +133,8 @@ import {
   recordStoryFeedback,
   type FeedbackVote,
 } from '../services/story-feedback.js';
+import { isTripleLikeReasonSet } from '../services/triple-like-detect.js';
+import { promoteVoicedFactIfQuality } from '../services/voiced-fact-promote.js';
 import { updateHistoryVoteAsync } from '../services/account-store.js';
 import {
   claimStoryGeneration,
@@ -2480,6 +2482,26 @@ router.post('/feedback', (req: Request, res: Response) => {
       ),
     );
   }
+
+  if (vote === 'like' && isTripleLikeReasonSet(uniqueReasons)) {
+    const voicedTextRaw =
+      typeof req.body?.voiced_text === 'string' ? req.body.voiced_text.trim() : '';
+    try {
+      promoteVoicedFactIfQuality({
+        artist,
+        title,
+        voicedText: voicedTextRaw,
+        script,
+        seedFact,
+        storyNarrator: storyNarratorRaw,
+        lang: lang ?? 'ru',
+        source: 'triple_like',
+      });
+    } catch (err) {
+      console.warn('[feedback] triple-like promote failed:', err instanceof Error ? err.message : err);
+    }
+  }
+
   res.json({ ok: true, ids, count: ids.length });
 });
 

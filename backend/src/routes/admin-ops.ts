@@ -401,4 +401,42 @@ router.post('/harvest-agent/ack', (req, res) => {
   res.json({ ok: true, command: cmd });
 });
 
+/** GET /v1/admin/social/queue — social publish queue (admin secret). */
+router.get('/social/queue', (req, res) => {
+  if (!requireAdmin(req, res)) return;
+  const status = typeof req.query.status === 'string' ? req.query.status.trim() : undefined;
+  void import('../services/social-publish-queue.js').then(({ listSocialPublishQueue }) => {
+    const items = listSocialPublishQueue(
+      status as import('../services/social-publish-queue.js').SocialPublishStatus | undefined,
+    );
+    res.json({ ok: true, total: items.length, items });
+  });
+});
+
+/** POST /v1/admin/social/approve — approve candidate for publishing. */
+router.post('/social/approve', (req, res) => {
+  if (!requireAdmin(req, res)) return;
+  const id = typeof req.body?.id === 'string' ? req.body.id.trim() : '';
+  if (!id) {
+    res.status(400).json({ error: 'id required' });
+    return;
+  }
+  void import('../services/social-publish-queue.js').then(({ approveSocialPublishItem }) => {
+    const item = approveSocialPublishItem(id);
+    if (!item) {
+      res.status(404).json({ error: 'not found' });
+      return;
+    }
+    res.json({ ok: true, item });
+  });
+});
+
+/** POST /v1/admin/social/publish-now — run one publish tick immediately. */
+router.post('/social/publish-now', (req, res) => {
+  if (!requireAdmin(req, res)) return;
+  void import('../services/social-publish-tick.js').then(({ runSocialPublishTick }) =>
+    runSocialPublishTick().then((result) => res.json({ ok: true, ...result })),
+  );
+});
+
 export default router;

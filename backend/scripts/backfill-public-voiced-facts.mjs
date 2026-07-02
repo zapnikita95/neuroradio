@@ -1,6 +1,10 @@
 #!/usr/bin/env node
 /**
- * Backfill public-voiced-facts.json from Postgres story_history + style-corpus gold.
+ * Backfill public-voiced-facts.json from:
+ * - Postgres triple-like feedback + story_history (voiced_text preferred)
+ * - style-corpus gold (seed + runtime)
+ *
+ * Only quality-approved content — NOT all completed stories.
  * Usage: node backend/scripts/backfill-public-voiced-facts.mjs
  */
 import fs from 'node:fs';
@@ -14,9 +18,35 @@ const dataDir = process.env.ACCOUNT_DATA_DIR?.trim() || path.join(backendRoot, '
 const storePath = path.join(dataDir, 'public-voiced-facts.json');
 const goldPath = path.join(dataDir, 'style-corpus', 'gold.jsonl');
 const seedGoldPath = path.join(backendRoot, 'src', 'data', 'style-corpus-seed.jsonl');
+const feedbackJsonl = path.join(dataDir, 'story-feedback.jsonl');
+
+const TRIPLE = ['interesting_fact', 'good_speech', 'good_persona'];
 
 function trackKey(artist, title) {
   return `${artist.trim().toLowerCase()}|${title.trim().toLowerCase()}`;
+}
+
+function goldTrackFromEntry(g) {
+  const id = String(g.id ?? '').toLowerCase();
+  const fact = String(g.seedFact ?? '').toLowerCase();
+  if (id.includes('thriller') || fact.includes('thriller')) return ['Michael Jackson', 'Thriller'];
+  if (id.includes('bohemian') || id.includes('queen') || fact.includes('bohemian rhapsody'))
+    return ['Queen', 'Bohemian Rhapsody'];
+  if (id.includes('smells') || id.includes('teen-spirit') || fact.includes('teen spirit'))
+    return ['Nirvana', 'Smells Like Teen Spirit'];
+  if (id.includes('blinding') || fact.includes('blinding lights'))
+    return ['The Weeknd', 'Blinding Lights'];
+  if (id.includes('tsoi') || id.includes('krovi') || fact.includes('gruppa krovi'))
+    return ['Kino', 'Gruppa krovi'];
+  if (id.includes('techno') || id.includes('daft') || fact.includes('daft punk'))
+    return ['Daft Punk', 'Around the World'];
+  if (id.includes('jazz') || id.includes('miles') || fact.includes('kind of blue'))
+    return ['Miles Davis', 'Kind of Blue'];
+  if (g.trackKey?.includes('|')) {
+    const [a, t] = g.trackKey.split('|');
+    return [a, t];
+  }
+  return null;
 }
 
 async function loadGoldLines() {
@@ -31,6 +61,40 @@ async function loadGoldLines() {
   return lines.filter((e) => e.status === 'gold' || e.source === 'seed');
 }
 
+function loadTripleLikeFromJsonl() {
+  if (!fs.existsSync(feedbackJsonl)) return [];
+  const groups = new Map();
+  for (const line of fs.readFileSync(feedbackJsonl, 'utf8').split('\n')) {
+    const t = line.trim();
+    if (!t) continue;
+    let row;
+    try {
+      row = JSON.parse(t);
+    } catch {
+      continue;
+    }
+    if (row.vote !== 'like' || !TRIPLE.includes(row.reason)) continue;
+    const key = `${row.installId}|${row.artist}|${row.title}|${row.script ?? ''}`;
+    if (!groups.has(key)) {
+      groups.set(key, {
+        artist: row.artist,
+        title: row.title,
+        script: row.script,
+        seedFact: row.seedFact,
+        storyNarrator: row.storyNarrator,
+        lang: row.lang,
+        reasons: new Set(),
+        at: row.at ?? Date.now(),
+      });
+    }
+    const g = groups.get(key);
+    g.reasons.add(row.reason);
+    if (row.seedFact && !g.seedFact) g.seedFact = row.seedFact;
+    if (row.storyNarrator && !g.storyNarrator) g.storyNarrator = row.storyNarrator;
+  }
+  return [...groups.values()].filter((g) => TRIPLE.every((r) => g.reasons.has(r)));
+}
+
 async function main() {
   const crypto = await import('node:crypto');
   const facts = [];
@@ -42,9 +106,7 @@ async function main() {
     const narrator = entry.narrator || entry.storyNarrator || 'radio_host';
     const key = crypto
       .createHash('sha256')
-      .update(
-        `${voicedText.toLowerCase()}|${trackKey(entry.artist, entry.title)}|${narrator}`,
-      )
+      .update(`${voicedText.toLowerCase()}|${trackKey(entry.artist, entry.title)}|${narrator}`)
       .digest('hex')
       .slice(0, 24);
     if (seen.has(key)) return;
@@ -54,12 +116,12 @@ async function main() {
       artist: entry.artist,
       title: entry.title,
       voicedText,
-      seedFact: entry.seedFact || entry.seed_fact || undefined,
+      seedFact: entry.seedFact || undefined,
       narrator,
       lang: entry.lang === 'en' ? 'en' : 'ru',
-      source: entry.source || 'history',
+      source: entry.source === 'gold' ? 'gold' : 'history',
       trackKey: trackKey(entry.artist, entry.title),
-      firstVoicedAt: entry.firstVoicedAt || entry.played_at || entry.promotedAt || Date.now(),
+      firstVoicedAt: entry.firstVoicedAt || entry.played_at || entry.at || Date.now(),
       publishedOnSite: false,
     });
   };
@@ -71,48 +133,68 @@ async function main() {
       ssl: dbUrl.includes('railway') ? { rejectUnauthorized: false } : undefined,
     });
     try {
-      const res = await pool.query(`
-        SELECT artist, title, script, voiced_text, seed_fact, story_narrator, played_at
-        FROM story_history
-        WHERE seed_fact IS NOT NULL
-        ORDER BY played_at DESC
-        LIMIT 5000
-      `);
-      for (const row of res.rows) {
+      const tripleRes = await pool.query(`
+        SELECT install_id, artist, title, script
+        FROM story_feedback
+        WHERE vote = 'like' AND reason = ANY($1::text[])
+        GROUP BY install_id, artist, title, script
+        HAVING COUNT(DISTINCT reason) = 3
+      `, [TRIPLE]);
+
+      for (const row of tripleRes.rows) {
+        const hist = await pool.query(
+          `SELECT voiced_text, script, seed_fact, story_narrator, played_at
+           FROM story_history
+           WHERE artist = $1 AND title = $2 AND (script = $3 OR voiced_text = $3)
+           ORDER BY played_at DESC LIMIT 1`,
+          [row.artist, row.title, row.script],
+        );
+        const h = hist.rows[0];
         add({
           artist: row.artist,
           title: row.title,
-          voicedText: row.voiced_text || row.script,
-          seedFact: row.seed_fact,
-          narrator: row.story_narrator || 'radio_host',
+          voicedText: h?.voiced_text || h?.script || row.script,
+          seedFact: h?.seed_fact,
+          narrator: h?.story_narrator || 'radio_host',
           source: 'history',
-          played_at: Number(row.played_at),
+          played_at: h?.played_at ? Number(h.played_at) : Date.now(),
         });
       }
     } finally {
       await pool.end();
     }
+  } else {
+    for (const g of loadTripleLikeFromJsonl()) {
+      add({
+        artist: g.artist,
+        title: g.title,
+        voicedText: g.script,
+        seedFact: g.seedFact,
+        narrator: g.storyNarrator || 'radio_host',
+        lang: g.lang,
+        source: 'history',
+        at: g.at,
+      });
+    }
   }
 
   for (const g of await loadGoldLines()) {
+    const track = goldTrackFromEntry(g);
+    if (!track) continue;
     add({
-      artist: g.trackKey?.split('|')[0] || 'Unknown',
-      title: g.trackKey?.split('|')[1] || 'Track',
+      artist: track[0],
+      title: track[1],
       voicedText: g.script,
       seedFact: g.seedFact,
       narrator: g.narrator,
       lang: g.lang,
       source: 'gold',
-      promotedAt: g.promotedAt,
+      firstVoicedAt: g.promotedAt ?? Date.now(),
     });
   }
 
   fs.mkdirSync(path.dirname(storePath), { recursive: true });
-  fs.writeFileSync(
-    storePath,
-    JSON.stringify({ updatedAt: Date.now(), facts }, null, 2),
-    'utf8',
-  );
+  fs.writeFileSync(storePath, JSON.stringify({ updatedAt: Date.now(), facts }, null, 2), 'utf8');
   console.log(`[backfill-public-facts] wrote ${facts.length} facts → ${storePath}`);
 }
 

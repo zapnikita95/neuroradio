@@ -277,6 +277,8 @@ async function boot(): Promise<void> {
   startSubscriptionRenewalScheduler();
   startWeeklyChartHarvestScheduler();
   startWeeklyDeepEnrichScheduler();
+  const { startSocialPublishScheduler } = await import('./services/social-publish-tick.js');
+  startSocialPublishScheduler();
   await probeElevenLabsAtBoot();
 
   const tgWidget = resolveTelegramWidgetBaseUrl();

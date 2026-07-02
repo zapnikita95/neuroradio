@@ -238,6 +238,7 @@ class StoryRepository(
             historyId = serverId,
             storyNarrator = storyNarrator.id,
             lang = resolveAppLanguage(appLang).toApiCode(),
+            voicedText = entry.displayVoicedText,
         )
         if (!ok) return false
 
@@ -271,6 +272,7 @@ class StoryRepository(
             script = feedback.script,
             storyNarrator = storyNarrator.id,
             lang = resolveAppLanguage(appLang).toApiCode(),
+            voicedText = feedback.voicedText,
         )
         if (ok) {
             storyHistoryDao.findLatestByTrackAndScript(feedback.trackKey, feedback.script)

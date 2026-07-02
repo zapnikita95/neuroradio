@@ -63,10 +63,21 @@ POST /v1/story/full → tts_transcript в ответе
         ↓
 POST /v1/story/complete { voiced_text, script, seed_fact, story_narrator, … }
         ↓
-recordUserStory → story_history.voiced_text + appendPublicVoicedFact
+recordUserStory → story_history.voiced_text (без автопубликации)
+        ↓
+Triple-like feedback (👍 + все 3 причины) → promoteVoicedFactIfQuality
+        ↓
+public-voiced-facts.json (+ social queue при SOCIAL_PUBLISH_ENABLED)
         ↓
 generate-facts-seo-pages.mjs → website/docs/facts/*.html
 ```
+
+**В публичный store попадают только:**
+- triple-like (like + `interesting_fact` + `good_speech` + `good_persona` за одну историю), прошедшие `validateStoryScript`;
+- gold corpus (backfill);
+- ручной approve (admin).
+
+Обычный `/complete` **не** добавляет запись в `public-voiced-facts.json`.
 
 ---
 
@@ -106,7 +117,7 @@ Backfill: [`backend/scripts/backfill-public-voiced-facts.mjs`](../backend/script
 ## Ключевые файлы
 
 - `backend/src/services/public-voiced-facts.ts`
-- `backend/src/services/fact-user-service.ts` — hook после complete
-- `backend/src/routes/story.ts` — поле `voiced_text` в `/complete`
+- `backend/src/services/voiced-fact-promote.ts` — quality gate + triple-like hook
+- `backend/src/routes/story.ts` — `voiced_text` в `/complete` и `/feedback`
 - `backend/src/services/db.ts` — колонка `story_history.voiced_text`
 - `website/docs/facts/index.html`

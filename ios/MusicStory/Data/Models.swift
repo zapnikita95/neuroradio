@@ -315,6 +315,7 @@ struct StoryFeedbackRequest: Encodable, Sendable {
     let historyId: String?
     let story_narrator: String?
     let seed_fact: String?
+    let voiced_text: String?
     let genre: String?
     let year: Int?
     let lang: String?
@@ -329,6 +330,7 @@ struct StoryFeedbackRequest: Encodable, Sendable {
         historyId: String?,
         story_narrator: String? = nil,
         seed_fact: String? = nil,
+        voiced_text: String? = nil,
         genre: String? = nil,
         year: Int? = nil,
         lang: String? = nil
@@ -342,6 +344,7 @@ struct StoryFeedbackRequest: Encodable, Sendable {
         self.historyId = historyId
         self.story_narrator = story_narrator
         self.seed_fact = seed_fact
+        self.voiced_text = voiced_text
         self.genre = genre
         self.year = year
         self.lang = lang

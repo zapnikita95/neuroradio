@@ -231,6 +231,7 @@ final class StoryRepository: ObservableObject {
             script: feedback.script,
             historyId: nil,
             story_narrator: settings.storyNarrator.rawValue,
+            voiced_text: feedback.voicedText,
             lang: langCode
         )
         do {

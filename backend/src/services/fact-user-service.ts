@@ -1,7 +1,6 @@
 import crypto from 'node:crypto';
 import type { StoryNarratorId } from './story-narrator.js';
 import type { StoryLanguageId } from './story-language.js';
-import { appendPublicVoicedFact } from './public-voiced-facts.js';
 import {
   createAccount,
   getAccountListenStat,
@@ -587,24 +586,6 @@ export async function recordUserStory(
     interestRating: input.seed.interestRating,
   });
   clearPendingTrackSeed(installId, input.artist, input.title);
-
-  try {
-    appendPublicVoicedFact({
-      artist: input.artist,
-      title: input.title,
-      voicedText: input.voicedText,
-      seedFact: input.seed.fact,
-      storyNarrator: input.storyNarrator,
-      lang: input.lang ?? 'ru',
-      source: 'history',
-      voicedAt: Date.now(),
-    });
-  } catch (err) {
-    console.warn(
-      '[public-facts] append failed:',
-      err instanceof Error ? err.message : err,
-    );
-  }
 }
 
 /** 0–1: насколько вероятен повтор того же артиста (для prefetch запасных фактов). */
