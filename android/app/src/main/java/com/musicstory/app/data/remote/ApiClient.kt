@@ -4,6 +4,7 @@ import com.musicstory.app.data.local.SettingsDataStore
 import com.musicstory.app.util.StoryLog
 import com.musicstory.app.data.model.StoryRequest
 import com.musicstory.app.data.model.StoryResponse
+import com.musicstory.app.domain.StoryShareText
 import com.musicstory.app.data.model.LlmProbeRequest
 import com.musicstory.app.data.model.LlmProbeResponse
 import com.musicstory.app.data.remote.QuotaResponse
@@ -359,6 +360,7 @@ class ApiClient(
             artist = response.artist,
             title = response.title,
             script = response.script,
+            voicedText = StoryShareText.resolveVoicedText(response),
             seedFact = seedFact,
             seedScope = response.seedScope,
             seedInterestScore = response.seedInterestScore,

@@ -61,12 +61,13 @@ export async function pgInsertStoryHistory(
   const res = await getPool().query(
     `INSERT INTO story_history (
       id, install_id, account_id, track_key, artist, title, script, angle,
-      seed_fact, seed_scope, interest_rating, vote, played_at, story_narrator
-    ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)
+      seed_fact, seed_scope, interest_rating, vote, played_at, story_narrator, voiced_text
+    ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)
     ON CONFLICT (id) DO UPDATE SET
       vote = COALESCE(EXCLUDED.vote, story_history.vote),
       account_id = COALESCE(EXCLUDED.account_id, story_history.account_id),
-      story_narrator = COALESCE(EXCLUDED.story_narrator, story_history.story_narrator)`,
+      story_narrator = COALESCE(EXCLUDED.story_narrator, story_history.story_narrator),
+      voiced_text = COALESCE(EXCLUDED.voiced_text, story_history.voiced_text)`,
     [
       historyId,
       installId.trim().toLowerCase(),
@@ -82,6 +83,7 @@ export async function pgInsertStoryHistory(
       entry.vote ?? null,
       entry.playedAt,
       entry.storyNarrator ?? null,
+      entry.voicedText ?? null,
     ],
   );
   return (res.rowCount ?? 0) > 0;

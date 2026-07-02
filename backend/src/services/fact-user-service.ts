@@ -1,5 +1,7 @@
 import crypto from 'node:crypto';
 import type { StoryNarratorId } from './story-narrator.js';
+import type { StoryLanguageId } from './story-language.js';
+import { appendPublicVoicedFact } from './public-voiced-facts.js';
 import {
   createAccount,
   getAccountListenStat,
@@ -34,7 +36,6 @@ import {
   topicKeySet,
   type FactTopicKey,
 } from './fact-topic.js';
-import type { StoryLanguageId } from './story-language.js';
 import { getAccountUsedSeedsForArtistAsync } from './account-store.js';
 import type { ArtistTier } from './artist-notability.js';
 import { isCatalogMajorArtist } from './artist-notability.js';
@@ -554,8 +555,10 @@ export async function recordUserStory(
     artist: string;
     title: string;
     script: string;
+    voicedText: string;
     seed: SelectedReferenceFact;
     storyNarrator?: StoryNarratorId;
+    lang?: StoryLanguageId;
   },
 ): Promise<void> {
   ensureAccount(installId);
@@ -576,6 +579,7 @@ export async function recordUserStory(
     artist: input.artist,
     title: input.title,
     script: input.script,
+    voicedText: input.voicedText,
     playedAt: Date.now(),
     seedFact: input.seed.fact,
     seedScope: input.seed.scope,
@@ -583,6 +587,24 @@ export async function recordUserStory(
     interestRating: input.seed.interestRating,
   });
   clearPendingTrackSeed(installId, input.artist, input.title);
+
+  try {
+    appendPublicVoicedFact({
+      artist: input.artist,
+      title: input.title,
+      voicedText: input.voicedText,
+      seedFact: input.seed.fact,
+      storyNarrator: input.storyNarrator,
+      lang: input.lang ?? 'ru',
+      source: 'history',
+      voicedAt: Date.now(),
+    });
+  } catch (err) {
+    console.warn(
+      '[public-facts] append failed:',
+      err instanceof Error ? err.message : err,
+    );
+  }
 }
 
 /** 0–1: насколько вероятен повтор того же артиста (для prefetch запасных фактов). */

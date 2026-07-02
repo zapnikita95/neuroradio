@@ -62,6 +62,8 @@ export interface SyncHistoryEntry {
   artist: string;
   title: string;
   script: string;
+  /** Exact text as voiced (TTS transcript). Prefer over script for display/publish. */
+  voicedText?: string;
   angle?: string;
   playedAt: number;
   seedFact?: string;

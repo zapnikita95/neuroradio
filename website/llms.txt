@@ -12,6 +12,7 @@
 - Яндекс Музыка + факты о треках: https://www.efir-ai.ru/docs/yandex-music.html
 - Android APK: https://www.efir-ai.ru/docs/android-app.html
 - Расширение браузера: https://www.efir-ai.ru/docs/extension.html
+- Озвученные факты о музыке (SEO): https://www.efir-ai.ru/docs/facts/index.html
 
 ## Что это такое
 

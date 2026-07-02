@@ -67,7 +67,7 @@ struct HistoryView: View {
                                 .font(.caption2)
                                 .foregroundStyle(AppTheme.liveGreen)
                         }
-                        Text(entry.script)
+                        Text(entry.displayVoicedText)
                             .font(.caption)
                             .foregroundStyle(AppTheme.mutedLavender)
                             .lineLimit(4)
@@ -77,6 +77,16 @@ struct HistoryView: View {
                             }
                             .buttonStyle(.borderedProminent)
                             .tint(AppTheme.goldBright)
+                        }
+                        SecondaryStoryButton(title: copy.shareStory) {
+                            StoryShareHelper.shareStory(
+                                artist: entry.artist,
+                                title: entry.title,
+                                voicedText: entry.displayVoicedText,
+                                narratorId: entry.storyNarrator,
+                                trackKey: entry.trackKey,
+                                playedAt: entry.createdAt.timeIntervalSince1970
+                            )
                         }
                     }
                     .listRowBackground(AppTheme.surfaceGlass)

@@ -301,6 +301,7 @@ final class BackendClient {
         artist: String,
         title: String,
         script: String,
+        voicedText: String,
         seedFact: String,
         seedScope: String?,
         seedInterestScore: Int?,
@@ -311,6 +312,7 @@ final class BackendClient {
             "artist": artist,
             "title": title,
             "script": script,
+            "voiced_text": voicedText,
             "seed_fact": seedFact,
         ]
         if let seedScope, !seedScope.isEmpty { payload["seed_scope"] = seedScope }

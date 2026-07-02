@@ -272,10 +272,10 @@ private fun StoryHistoryItem(
                 Spacer(modifier = Modifier.height(8.dp))
                 Text(
                     text = if (expanded) {
-                        entry.script
+                        entry.displayVoicedText
                     } else {
-                        entry.script.take(PREVIEW_CHARS).let { preview ->
-                            if (entry.script.length > PREVIEW_CHARS) "$preview…" else preview
+                        entry.displayVoicedText.take(PREVIEW_CHARS).let { preview ->
+                            if (entry.displayVoicedText.length > PREVIEW_CHARS) "$preview…" else preview
                         }
                     },
                     style = MaterialTheme.typography.bodyMedium,
@@ -283,7 +283,7 @@ private fun StoryHistoryItem(
                     maxLines = if (expanded) Int.MAX_VALUE else 2,
                     overflow = TextOverflow.Ellipsis,
                 )
-                if (!expanded && entry.script.length > PREVIEW_CHARS) {
+                if (!expanded && entry.displayVoicedText.length > PREVIEW_CHARS) {
                     Text(
                         text = context.getString(R.string.history_tap_to_expand),
                         style = MaterialTheme.typography.labelSmall,
@@ -294,6 +294,7 @@ private fun StoryHistoryItem(
                 if (expanded) {
                     Spacer(modifier = Modifier.height(12.dp))
                     HistoryListenButton(entry = entry, app = app)
+                    HistoryShareButton(entry = entry)
                     HistoryStoryFeedbackBlock(entry = entry, app = app)
                 }
             }
@@ -331,6 +332,26 @@ private fun HistoryListenButton(
         text = context.getString(R.string.history_listen),
         onClick = {
             app.storyOrchestrator.replayHistoryStory(entry)
+        },
+    )
+}
+
+@Composable
+private fun HistoryShareButton(entry: StoryHistoryEntry) {
+    val context = LocalContext.current
+    Spacer(modifier = Modifier.height(8.dp))
+    SecondaryStoryButton(
+        text = context.getString(R.string.action_share_story),
+        onClick = {
+            com.musicstory.app.ui.share.StoryShareHelper.shareStory(
+                context = context,
+                artist = entry.artist,
+                title = entry.title,
+                voicedText = entry.displayVoicedText,
+                narratorId = entry.storyNarrator,
+                trackKey = entry.trackKey,
+                playedAt = entry.playedAt,
+            )
         },
     )
 }

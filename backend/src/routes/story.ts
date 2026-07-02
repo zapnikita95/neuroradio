@@ -2351,13 +2351,23 @@ router.post('/complete', async (req: Request, res: Response) => {
   const artist = typeof req.body?.artist === 'string' ? req.body.artist.trim() : '';
   const title = typeof req.body?.title === 'string' ? req.body.title.trim() : '';
   const script = typeof req.body?.script === 'string' ? req.body.script.trim() : '';
+  const voicedTextRaw =
+    typeof req.body?.voiced_text === 'string' ? req.body.voiced_text.trim() : '';
   const seedFact = typeof req.body?.seed_fact === 'string' ? req.body.seed_fact.trim() : '';
   const seedScopeRaw = typeof req.body?.seed_scope === 'string' ? req.body.seed_scope.trim() : 'track';
   const storyNarratorRaw =
     typeof req.body?.story_narrator === 'string' ? req.body.story_narrator.trim() : 'auto';
+  const langRaw = typeof req.body?.lang === 'string' ? req.body.lang.trim() : 'ru';
 
   if (!artist || !title || !script || !seedFact) {
     res.status(400).json({ error: 'artist, title, script and seed_fact required' });
+    return;
+  }
+
+  const { resolveVoicedTextForStorage } = await import('../services/public-voiced-facts.js');
+  const voicedText = resolveVoicedTextForStorage(voicedTextRaw, script);
+  if (voicedText.length < 20) {
+    res.status(400).json({ error: 'voiced_text or script too short' });
     return;
   }
 
@@ -2376,6 +2386,7 @@ router.post('/complete', async (req: Request, res: Response) => {
       artist,
       title,
       script,
+      voicedText,
       seed: {
         fact: seedFact,
         scope,
@@ -2385,6 +2396,7 @@ router.post('/complete', async (req: Request, res: Response) => {
         interestRating,
       },
       storyNarrator,
+      lang: langRaw === 'en' ? 'en' : 'ru',
     });
     res.json({ ok: true });
   } catch (err) {

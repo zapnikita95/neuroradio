@@ -19,6 +19,9 @@ struct PendingStoryFeedback: Equatable {
     let title: String
     let script: String
     let trackKey: String
+    let voicedText: String
+    let storyNarrator: String?
+    let playedAt: TimeInterval
 }
 
 struct GenerationPreviewState: Equatable {
@@ -397,7 +400,10 @@ final class StoryOrchestrator: ObservableObject {
                                 artist: response.artist,
                                 title: response.title,
                                 script: script,
-                                trackKey: trackKey
+                                trackKey: trackKey,
+                                voicedText: StoryShareText.resolveVoicedText(response),
+                                storyNarrator: self.settings.storyNarrator.rawValue,
+                                playedAt: Date().timeIntervalSince1970
                             )
                         } else {
                             self.uiState.pendingFeedback = nil

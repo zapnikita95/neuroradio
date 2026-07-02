@@ -180,6 +180,21 @@ fun StoryFeedbackSheet(
                 },
             )
         }
+        Spacer(modifier = Modifier.height(8.dp))
+        SecondaryStoryButton(
+            text = context.getString(R.string.action_share_story),
+            onClick = {
+                com.musicstory.app.ui.share.StoryShareHelper.shareStory(
+                    context = context,
+                    artist = feedback.artist,
+                    title = feedback.title,
+                    voicedText = feedback.voicedText,
+                    narratorId = feedback.storyNarrator,
+                    trackKey = feedback.trackKey,
+                    playedAt = feedback.playedAt,
+                )
+            },
+        )
         Spacer(modifier = Modifier.height(6.dp))
         SecondaryStoryButton(text = context.getString(R.string.feedback_skip), onClick = onDismiss)
     }

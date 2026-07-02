@@ -5,10 +5,14 @@ struct StoryFeedbackSheet: View {
     let onDismiss: () -> Void
     var onSubmitted: () -> Void = {}
 
+    @EnvironmentObject private var settings: SettingsStore
+
     @State private var vote: FeedbackVote?
     @State private var selectedReasons = Set<String>()
     @State private var sent = false
     @State private var sending = false
+
+    private var copy: AppL10n { AppStrings.l10n(settings.resolvedLanguage) }
 
     var body: some View {
         VStack(spacing: 14) {
@@ -48,6 +52,17 @@ struct StoryFeedbackSheet: View {
                     ) {
                         Task { await submit(vote: vote) }
                     }
+                }
+
+                SecondaryStoryButton(title: copy.shareStory) {
+                    StoryShareHelper.shareStory(
+                        artist: feedback.artist,
+                        title: feedback.title,
+                        voicedText: feedback.voicedText,
+                        narratorId: feedback.storyNarrator,
+                        trackKey: feedback.trackKey,
+                        playedAt: feedback.playedAt
+                    )
                 }
 
                 SecondaryStoryButton(title: "Пропустить", action: onDismiss)

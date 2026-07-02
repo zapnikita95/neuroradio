@@ -41,6 +41,8 @@ final class StoryHistoryEntry {
     var title: String
     var trackKey: String
     var script: String
+    var voicedText: String?
+    var storyNarrator: String?
     var year: Int?
     var genre: String?
     var demo: Bool
@@ -52,6 +54,8 @@ final class StoryHistoryEntry {
         title: String,
         trackKey: String,
         script: String,
+        voicedText: String? = nil,
+        storyNarrator: String? = nil,
         serverId: String? = nil,
         year: Int? = nil,
         genre: String? = nil,
@@ -65,6 +69,8 @@ final class StoryHistoryEntry {
         self.title = title
         self.trackKey = trackKey
         self.script = script
+        self.voicedText = voicedText
+        self.storyNarrator = storyNarrator
         self.year = year
         self.genre = genre
         self.demo = demo
@@ -151,6 +157,8 @@ final class StoryHistoryStore {
             title: response.title,
             trackKey: track.displayKey,
             script: response.script,
+            voicedText: StoryShareText.resolveVoicedText(response),
+            storyNarrator: SettingsStore.shared.storyNarrator.rawValue,
             serverId: serverId,
             year: response.year,
             genre: response.genre,

@@ -65,6 +65,15 @@
 		B1000053 /* MusicBrainzGenreLookup.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1000053 /* MusicBrainzGenreLookup.swift */; };
 		B1000054 /* DeviceFingerprint.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1000054 /* DeviceFingerprint.swift */; };
 		B1000055 /* MediaJunkFilter.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1000055 /* MediaJunkFilter.swift */; };
+		B1000056 /* StoryShareText.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1000056 /* StoryShareText.swift */; };
+		B1000057 /* StoryShareHelper.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1000057 /* StoryShareHelper.swift */; };
+		B1000058 /* logo_efir_ai.png in Resources */ = {isa = PBXBuildFile; fileRef = F1000058 /* logo_efir_ai.png */; };
+		B1000059 /* persona-radio_host.png in Resources */ = {isa = PBXBuildFile; fileRef = F1000059 /* persona-radio_host.png */; };
+		B100005A /* persona-night_dj.png in Resources */ = {isa = PBXBuildFile; fileRef = F100005A /* persona-night_dj.png */; };
+		B100005B /* persona-expert.png in Resources */ = {isa = PBXBuildFile; fileRef = F100005B /* persona-expert.png */; };
+		B100005C /* persona-contemporary.png in Resources */ = {isa = PBXBuildFile; fileRef = F100005C /* persona-contemporary.png */; };
+		B100005D /* persona-fan.png in Resources */ = {isa = PBXBuildFile; fileRef = F100005D /* persona-fan.png */; };
+		B100005E /* persona-backstage.png in Resources */ = {isa = PBXBuildFile; fileRef = F100005E /* persona-backstage.png */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -154,6 +163,15 @@
 		F1000053 /* MusicBrainzGenreLookup.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MusicBrainzGenreLookup.swift; sourceTree = "<group>"; };
 		F1000054 /* DeviceFingerprint.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeviceFingerprint.swift; sourceTree = "<group>"; };
 		F1000055 /* MediaJunkFilter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MediaJunkFilter.swift; sourceTree = "<group>"; };
+		F1000056 /* StoryShareText.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StoryShareText.swift; sourceTree = "<group>"; };
+		F1000057 /* StoryShareHelper.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StoryShareHelper.swift; sourceTree = "<group>"; };
+		F1000058 /* logo_efir_ai.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = logo_efir_ai.png; sourceTree = "<group>"; };
+		F1000059 /* persona-radio_host.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = "persona-radio_host.png"; sourceTree = "<group>"; };
+		F100005A /* persona-night_dj.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = "persona-night_dj.png"; sourceTree = "<group>"; };
+		F100005B /* persona-expert.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = "persona-expert.png"; sourceTree = "<group>"; };
+		F100005C /* persona-contemporary.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = "persona-contemporary.png"; sourceTree = "<group>"; };
+		F100005D /* persona-fan.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = "persona-fan.png"; sourceTree = "<group>"; };
+		F100005E /* persona-backstage.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = "persona-backstage.png"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -196,6 +214,7 @@
 				G100000A /* Notifications */,
 				G100000C /* Billing */,
 				G100000B /* UI */,
+				G100000D /* Resources */,
 				F1000016 /* Assets.xcassets */,
 				F1000018 /* Info.plist */,
 				F1000040 /* MusicStory.entitlements */,
@@ -291,6 +310,8 @@
 				F1000022 /* FactHintRateLimiter.swift */,
 				F100000E /* StoryPlayer.swift */,
 				F100000F /* StoryOrchestrator.swift */,
+				F1000056 /* StoryShareText.swift */,
+				F1000057 /* StoryShareHelper.swift */,
 				F1000051 /* WelcomeTrialCoordinator.swift */,
 			);
 			path = Domain;
@@ -310,6 +331,20 @@
 				F1000025 /* StoreKitManager.swift */,
 			);
 			path = Billing;
+			sourceTree = "<group>";
+		};
+		G100000D /* Resources */ = {
+			isa = PBXGroup;
+			children = (
+				F1000058 /* logo_efir_ai.png */,
+				F1000059 /* persona-radio_host.png */,
+				F100005A /* persona-night_dj.png */,
+				F100005B /* persona-expert.png */,
+				F100005C /* persona-contemporary.png */,
+				F100005D /* persona-fan.png */,
+				F100005E /* persona-backstage.png */,
+			);
+			path = Resources;
 			sourceTree = "<group>";
 		};
 		G100000B /* UI */ = {
@@ -415,6 +450,13 @@
 			buildActionMask = 2147483647;
 			files = (
 				B1000016 /* Assets.xcassets in Resources */,
+				B1000058 /* logo_efir_ai.png in Resources */,
+				B1000059 /* persona-radio_host.png in Resources */,
+				B100005A /* persona-night_dj.png in Resources */,
+				B100005B /* persona-expert.png in Resources */,
+				B100005C /* persona-contemporary.png in Resources */,
+				B100005D /* persona-fan.png in Resources */,
+				B100005E /* persona-backstage.png in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -467,6 +509,8 @@
 				B1000052 /* RadioModeOnboardingView.swift in Sources */,
 				B1000053 /* MusicBrainzGenreLookup.swift in Sources */,
 				B1000054 /* DeviceFingerprint.swift in Sources */,
+				B1000056 /* StoryShareText.swift in Sources */,
+				B1000057 /* StoryShareHelper.swift in Sources */,
 				B1000022 /* FactHintRateLimiter.swift in Sources */,
 				B1000025 /* StoreKitManager.swift in Sources */,
 				B1000026 /* AccountView.swift in Sources */,

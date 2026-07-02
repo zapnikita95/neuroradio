@@ -134,6 +134,7 @@ final class StoryRepository: ObservableObject {
             artist: response.artist,
             title: response.title,
             script: response.script,
+            voicedText: StoryShareText.resolveVoicedText(response),
             seedFact: seedFact,
             seedScope: response.seedScope,
             seedInterestScore: response.seedInterestScore,

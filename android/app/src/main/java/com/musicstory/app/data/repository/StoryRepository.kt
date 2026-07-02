@@ -33,6 +33,7 @@ import com.musicstory.app.domain.EdgeVoicePreset
 import com.musicstory.app.domain.StoryLength
 import com.musicstory.app.domain.StoryNarrator
 import com.musicstory.app.domain.StoryPersona
+import com.musicstory.app.domain.StoryShareText
 import com.musicstory.app.domain.StoryScriptQuality
 import com.musicstory.app.domain.ServerTtsProvider
 import com.musicstory.app.domain.UserTtsBilling
@@ -1270,6 +1271,7 @@ class StoryRepository(
             artist = track.artist,
             title = track.title,
             script = response.script,
+            voicedText = StoryShareText.resolveVoicedText(response),
             angle = null,
             storyNarrator = storyNarrator.id,
             seedScope = response.seedScope,

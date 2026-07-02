@@ -186,6 +186,7 @@
     <string name="offline_pack_failed_title">Не удалось подготовить офлайн-эфир</string>
     <string name="offline_pack_failed_body">Проверьте интернет и попробуйте снова в настройках.</string>
     <string name="history_listen">Слушать</string>
+    <string name="action_share_story">Поделиться</string>
     <string name="offline_replay_unavailable">Нет сохранённой озвучки для этой истории. Послушайте трек онлайн с расширенным тарифом.</string>
     <string name="settings_narrator_section">Рассказчик (амлуа)</string>
     <string name="settings_voice_section">Озвучка</string>

@@ -16,6 +16,8 @@ data class StoryHistoryEntry(
     val artist: String,
     val title: String,
     val script: String,
+    /** Text exactly as voiced (TTS transcript). */
+    val voicedText: String? = null,
     /** Legacy narrator label/id; prefer [storyNarrator]. */
     val angle: String? = null,
     /** Narrator persona id (`radio_host`, …). */
@@ -25,4 +27,7 @@ data class StoryHistoryEntry(
     val playedAt: Long = System.currentTimeMillis(),
     /** "like" or "dislike" after user feedback. */
     val vote: String? = null,
-)
+) {
+    val displayVoicedText: String
+        get() = voicedText?.takeIf { it.isNotBlank() } ?: script
+}

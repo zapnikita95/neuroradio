@@ -887,6 +887,8 @@ class StoryOrchestrator(
                                             title = response.title,
                                             script = response.script,
                                             trackKey = trackKey,
+                                            voicedText = StoryShareText.resolveVoicedText(response),
+                                            storyNarrator = storyNarrator.id,
                                         )
                                     } else {
                                         null

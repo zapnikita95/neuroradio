@@ -151,6 +151,7 @@ struct AppL10n {
 
     var historyTitle: String { en ? "History" : "История" }
     var listen: String { en ? "Listen" : "Слушать" }
+    var shareStory: String { en ? "Share story" : "Поделиться" }
 
     // MARK: - Account
 

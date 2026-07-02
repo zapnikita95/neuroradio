@@ -27,6 +27,7 @@ import {
 } from '../services/account-store.js';
 import { getChartHarvestStatus } from '../services/weekly-chart-harvest.js';
 import { handleAppStoreServerNotification } from '../services/apple-iap-billing.js';
+import { listPublicVoicedFacts, groupPublicVoicedFactsByNarrator } from '../services/public-voiced-facts.js';
 
 const router = Router();
 
@@ -586,6 +587,31 @@ router.get('/chart-harvest/status', (_req: Request, res: Response) => {
   } catch (err) {
     console.warn('[public/chart-harvest/status]', err instanceof Error ? err.message : err);
     res.status(500).json({ error: 'status_failed' });
+  }
+});
+
+/** Public voiced facts for SEO / landing (read-only, anonymized). */
+router.get('/facts', (req: Request, res: Response) => {
+  try {
+    const narrator = typeof req.query.narrator === 'string' ? req.query.narrator.trim() : undefined;
+    const langRaw = typeof req.query.lang === 'string' ? req.query.lang.trim() : 'ru';
+    const lang = langRaw === 'en' ? 'en' : 'ru';
+    const limitRaw = parseInt(String(req.query.limit ?? '30'), 10);
+    const limit = Number.isFinite(limitRaw) ? Math.min(Math.max(limitRaw, 1), 100) : 30;
+
+    if (req.query.grouped === '1') {
+      res.json({ ok: true, lang, groups: groupPublicVoicedFactsByNarrator(lang) });
+      return;
+    }
+
+    res.json({
+      ok: true,
+      lang,
+      facts: listPublicVoicedFacts({ narrator, lang, limit }),
+    });
+  } catch (err) {
+    console.warn('[public/facts]', err instanceof Error ? err.message : err);
+    res.status(500).json({ error: 'facts_failed' });
   }
 });
 

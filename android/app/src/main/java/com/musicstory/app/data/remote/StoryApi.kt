@@ -73,6 +73,7 @@ data class StoryCompleteRequest(
     @com.google.gson.annotations.SerializedName("seed_interest_score") val seedInterestScore: Int? = null,
     @com.google.gson.annotations.SerializedName("seed_interest_rating") val seedInterestRating: Int? = null,
     @com.google.gson.annotations.SerializedName("story_narrator") val storyNarrator: String? = null,
+    @com.google.gson.annotations.SerializedName("voiced_text") val voicedText: String? = null,
 )
 
 data class StoryFeedbackRequest(
