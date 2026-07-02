@@ -4,7 +4,8 @@ import { appendPublicVoicedFact, resolveVoicedTextForStorage } from './public-vo
 import { enqueueSocialPublishCandidate } from './social-publish-queue.js';
 import { anchorsReferenceFact, validateStoryScript } from './story-quality.js';
 import { DEFAULT_STORY_LENGTH } from './story-length.js';
-import { sendTelegramAdminMessage, isTelegramAdminNotifyConfigured } from './telegram-admin-notify.js';
+import { sendSocialCandidateToAdmin } from './telegram-admin-bot.js';
+import { isTelegramAdminNotifyConfigured } from './telegram-admin-notify.js';
 
 export interface PromoteVoicedFactInput {
   artist: string;
@@ -74,13 +75,7 @@ export function promoteVoicedFactIfQuality(input: PromoteVoicedFactInput): boole
 
   if (queued && isTelegramAdminNotifyConfigured()) {
     const preview = fact.voicedText.slice(0, 320);
-    void sendTelegramAdminMessage(
-      `⭐ Кандидат в автопост (${input.source})\n` +
-        `${fact.artist} — ${fact.title}\n` +
-        `Амплуа: ${fact.narrator}\n\n` +
-        `${preview}${fact.voicedText.length > 320 ? '…' : ''}\n\n` +
-        `Одобрить: POST /v1/admin/social/approve body { "id": "${queued.id}" }`,
-    );
+    void sendSocialCandidateToAdmin(queued, preview);
   }
 
   return true;

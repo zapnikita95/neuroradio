@@ -1,7 +1,7 @@
 # Use when Railway Root Directory = backend (see backend/railway.toml)
 FROM node:20-alpine
 
-RUN apk add --no-cache ffmpeg
+RUN apk add --no-cache ffmpeg ttf-dejavu
 
 WORKDIR /app
 

@@ -59,6 +59,19 @@ router.get('/auth-config', (_req: Request, res: Response) => {
   res.json(getPublicAuthConfig());
 });
 
+/** Telegram bot webhook — inline approve/reject for social autopost (admin chat only). */
+router.post('/telegram/bot-webhook', express.json(), (req: Request, res: Response) => {
+  void import('../services/telegram-admin-bot.js').then(({ handleTelegramBotUpdate, verifyTelegramWebhookSecret }) => {
+    const secret = req.header('X-Telegram-Bot-Api-Secret-Token');
+    if (!verifyTelegramWebhookSecret(secret)) {
+      res.sendStatus(403);
+      return;
+    }
+    void handleTelegramBotUpdate(req.body as Record<string, unknown>);
+    res.sendStatus(200);
+  });
+});
+
 /** HTTPS redirect target for Telegram OIDC → efirai:// deep link (iOS ASWebAuthenticationSession). */
 router.get('/oauth/telegram/callback-bridge', (req: Request, res: Response) => {
   const qs = req.url.includes('?') ? req.url.slice(req.url.indexOf('?') + 1) : '';

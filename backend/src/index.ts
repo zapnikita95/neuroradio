@@ -279,6 +279,14 @@ async function boot(): Promise<void> {
   startWeeklyDeepEnrichScheduler();
   const { startSocialPublishScheduler } = await import('./services/social-publish-tick.js');
   startSocialPublishScheduler();
+  const { ensureTelegramAdminWebhook, listConfiguredSocialDestinations } = await import(
+    './services/telegram-admin-bot.js',
+  );
+  await ensureTelegramAdminWebhook();
+  const socialDests = listConfiguredSocialDestinations().filter((d) => d.configured);
+  if (socialDests.length) {
+    console.log(`[boot] social publish → ${socialDests.map((d) => d.label).join(', ')}`);
+  }
   await probeElevenLabsAtBoot();
 
   const tgWidget = resolveTelegramWidgetBaseUrl();

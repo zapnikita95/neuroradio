@@ -33,3 +33,32 @@ export async function publishToTelegramChannel(text: string): Promise<number | n
     throw new Error(err instanceof Error ? err.message : String(err));
   }
 }
+
+export async function publishVideoToTelegramChannel(
+  videoPath: string,
+  caption: string,
+): Promise<number | null> {
+  const token = BOT_TOKEN();
+  const chatId = CHANNEL_ID();
+  if (!token || !chatId) return null;
+
+  const fs = await import('node:fs/promises');
+  const buf = await fs.readFile(videoPath);
+  const form = new FormData();
+  form.append('chat_id', chatId);
+  form.append('caption', caption.slice(0, 1024));
+  form.append('supports_streaming', 'true');
+  form.append('video', new Blob([buf], { type: 'video/mp4' }), 'efir-story.mp4');
+
+  const res = await fetch(`https://api.telegram.org/bot${token}/sendVideo`, {
+    method: 'POST',
+    body: form,
+    signal: AbortSignal.timeout(120_000),
+  });
+  if (!res.ok) {
+    const body = await res.text();
+    throw new Error(`sendVideo ${res.status}: ${body.slice(0, 200)}`);
+  }
+  const data = (await res.json()) as { result?: { message_id?: number } };
+  return data.result?.message_id ?? null;
+}

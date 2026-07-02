@@ -34,6 +34,10 @@ export interface SocialPublishQueueItem {
   lastError?: string;
   telegramMessageId?: number;
   vkPostId?: number;
+  blueskyUri?: string;
+  mastodonUrl?: string;
+  postizPostIds?: string[];
+  videoPath?: string;
 }
 
 interface SocialPublishQueueFile {
@@ -126,6 +130,16 @@ export function approveSocialPublishItem(id: string): SocialPublishQueueItem | n
   return item;
 }
 
+export function rejectSocialPublishItem(id: string, reason: string): SocialPublishQueueItem | null {
+  const file = loadQueue();
+  const item = file.items.find((i) => i.id === id);
+  if (!item || item.status === 'published') return null;
+  item.status = 'failed';
+  item.lastError = reason.slice(0, 500);
+  saveQueue(file);
+  return item;
+}
+
 export function listSocialPublishQueue(status?: SocialPublishStatus): SocialPublishQueueItem[] {
   const items = loadQueue().items.sort((a, b) => b.createdAt - a.createdAt);
   if (!status) return items;
@@ -148,7 +162,12 @@ export function pickNextApprovedForPublish(): SocialPublishQueueItem | null {
 
 export function markSocialPublished(
   id: string,
-  patch: Partial<Pick<SocialPublishQueueItem, 'telegramMessageId' | 'vkPostId'>>,
+  patch: Partial<
+    Pick<
+      SocialPublishQueueItem,
+      'telegramMessageId' | 'vkPostId' | 'blueskyUri' | 'mastodonUrl' | 'postizPostIds'
+    >
+  >,
 ): void {
   const file = loadQueue();
   const item = file.items.find((i) => i.id === id);
@@ -157,6 +176,9 @@ export function markSocialPublished(
   item.publishedAt = Date.now();
   if (patch.telegramMessageId != null) item.telegramMessageId = patch.telegramMessageId;
   if (patch.vkPostId != null) item.vkPostId = patch.vkPostId;
+  if (patch.blueskyUri != null) item.blueskyUri = patch.blueskyUri;
+  if (patch.mastodonUrl != null) item.mastodonUrl = patch.mastodonUrl;
+  if (patch.postizPostIds != null) item.postizPostIds = patch.postizPostIds;
   saveQueue(file);
 }
 

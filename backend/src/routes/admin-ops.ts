@@ -402,6 +402,14 @@ router.post('/harvest-agent/ack', (req, res) => {
 });
 
 /** GET /v1/admin/social/queue — social publish queue (admin secret). */
+router.get('/social/destinations', (req, res) => {
+  if (!requireAdmin(req, res)) return;
+  void import('../services/telegram-admin-bot.js').then(({ listConfiguredSocialDestinations }) => {
+    res.json({ ok: true, destinations: listConfiguredSocialDestinations() });
+  });
+});
+
+/** GET /v1/admin/social/queue — social publish queue (admin secret). */
 router.get('/social/queue', (req, res) => {
   if (!requireAdmin(req, res)) return;
   const status = typeof req.query.status === 'string' ? req.query.status.trim() : undefined;

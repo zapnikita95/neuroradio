@@ -1,7 +1,7 @@
 # Monorepo root — deploy only backend/ to Railway (Root Directory must be empty)
 FROM node:20-alpine
 
-RUN apk add --no-cache ffmpeg
+RUN apk add --no-cache ffmpeg ttf-dejavu
 
 WORKDIR /app
 

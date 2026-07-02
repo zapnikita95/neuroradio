@@ -83,4 +83,11 @@
     <changefreq>yearly</changefreq>
     <priority>0.3</priority>
   </url>
+  <url><loc>https://www.efir-ai.ru/docs/facts/artists/michael-jackson.html</loc><changefreq>weekly</changefreq><priority>0.6</priority></url>
+  <url><loc>https://www.efir-ai.ru/docs/facts/artists/queen.html</loc><changefreq>weekly</changefreq><priority>0.6</priority></url>
+  <url><loc>https://www.efir-ai.ru/docs/facts/artists/nirvana.html</loc><changefreq>weekly</changefreq><priority>0.6</priority></url>
+  <url><loc>https://www.efir-ai.ru/docs/facts/artists/the-weeknd.html</loc><changefreq>weekly</changefreq><priority>0.6</priority></url>
+  <url><loc>https://www.efir-ai.ru/docs/facts/artists/kino.html</loc><changefreq>weekly</changefreq><priority>0.6</priority></url>
+  <url><loc>https://www.efir-ai.ru/docs/facts/artists/daft-punk.html</loc><changefreq>weekly</changefreq><priority>0.6</priority></url>
+  <url><loc>https://www.efir-ai.ru/docs/facts/artists/miles-davis.html</loc><changefreq>weekly</changefreq><priority>0.6</priority></url>
 </urlset>
